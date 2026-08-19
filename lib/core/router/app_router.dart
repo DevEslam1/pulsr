@@ -12,6 +12,9 @@ import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/player/presentation/now_playing_screen.dart';
 import '../../features/shell/presentation/app_shell.dart';
 
+import '../../features/tag_editor/tag_editor_screen.dart';
+import '../../data/db/app_database.dart';
+
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
 GoRouter createRouter(MediaScannerService scannerService) {
@@ -119,6 +122,16 @@ GoRouter createRouter(MediaScannerService scannerService) {
           },
         ),
       ),
+      GoRoute(
+        path: '/tag-editor',
+        name: 'tag-editor',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final song = state.extra as SongsTableData;
+          return TagEditorScreen(song: song);
+        },
+      ),
     ],
   );
 }
+

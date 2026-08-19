@@ -5,6 +5,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/widgets/cached_artwork.dart';
+import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/utils/formatters.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
@@ -24,11 +25,17 @@ class QueueScreen extends StatelessWidget {
           final currentSong = state.currentSong;
 
           if (queue.isEmpty) {
-            return const Center(
-              child: Text(
-                'Queue is empty',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
+            return EmptyStateWidget(
+              icon: Icons.queue_music_rounded,
+              title: 'Playback Queue is Empty',
+              subtitle: 'Select a song, album, or playlist from your library to start playing music.',
+              primaryActionLabel: 'Explore Library',
+              primaryActionIcon: Icons.library_music_rounded,
+              onPrimaryAction: () {
+                if (Navigator.of(context).canPop()) {
+                  Navigator.of(context).pop();
+                }
+              },
             );
           }
 

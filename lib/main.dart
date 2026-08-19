@@ -1,8 +1,8 @@
 // lib/main.dart
-import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'core/di/injection.dart';
 import 'core/theme/aura_theme.dart';
 import 'core/theme/dynamic_theme_cubit.dart';
 import 'core/router/app_router.dart';
@@ -23,6 +23,8 @@ import 'features/player/cubit/player_cubit.dart';
 import 'features/playlists/cubit/playlist_cubit.dart';
 import 'features/search/cubit/search_cubit.dart';
 import 'features/settings/cubit/settings_cubit.dart';
+import 'features/settings/cubit/settings_state.dart';
+import 'features/widgets/widget_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,154 +39,113 @@ Future<void> main() async {
     ),
   );
 
-  // Initialize Database & Repository
-  final db = AppDatabase();
-  final repository = MusicRepository(db);
+  await configureDependencies();
 
-  // Initialize Audio Handler
-  final audioHandler = await AudioService.init(
-    builder: () => PulsrAudioHandler(repository),
-    config: const AudioServiceConfig(
-      androidNotificationChannelId: 'com.example.pulsr.audio',
-      androidNotificationChannelName: 'Pulsr Audio Playback',
-      androidNotificationOngoing: true,
-      androidNotificationClickStartsActivity: true,
-      androidStopForegroundOnPause: false,
-      androidResumeOnClick: true,
-      androidNotificationIcon: 'mipmap/ic_launcher',
-    ),
-  );
-
-  // Initialize Scanner Service
-  final scannerService = MediaScannerService(repository);
-
-  // Initialize Domain UseCases
-  final getSongsUseCase = GetSongsUseCase(repository);
-  final getAlbumsUseCase = GetAlbumsUseCase(repository);
-  final getArtistsUseCase = GetArtistsUseCase(repository);
-  final getFavoritesUseCase = GetFavoritesUseCase(repository);
-  final toggleFavoriteUseCase = ToggleFavoriteUseCase(repository);
-  final searchMusicUseCase = SearchMusicUseCase(repository);
-  final playlistUseCases = PlaylistUseCases(repository);
-  final folderUseCases = FolderUseCases(repository);
-
-  runApp(
-    PulsrApp(
-      database: db,
-      repository: repository,
-      audioHandler: audioHandler,
-      scannerService: scannerService,
-      getSongsUseCase: getSongsUseCase,
-      getAlbumsUseCase: getAlbumsUseCase,
-      getArtistsUseCase: getArtistsUseCase,
-      getFavoritesUseCase: getFavoritesUseCase,
-      toggleFavoriteUseCase: toggleFavoriteUseCase,
-      searchMusicUseCase: searchMusicUseCase,
-      playlistUseCases: playlistUseCases,
-      folderUseCases: folderUseCases,
-    ),
-  );
+  runApp(const PulsrApp());
 }
 
 class PulsrApp extends StatefulWidget {
-  final AppDatabase database;
-  final MusicRepository repository;
-  final PulsrAudioHandler audioHandler;
-  final MediaScannerService scannerService;
-  final GetSongsUseCase getSongsUseCase;
-  final GetAlbumsUseCase getAlbumsUseCase;
-  final GetArtistsUseCase getArtistsUseCase;
-  final GetFavoritesUseCase getFavoritesUseCase;
-  final ToggleFavoriteUseCase toggleFavoriteUseCase;
-  final SearchMusicUseCase searchMusicUseCase;
-  final PlaylistUseCases playlistUseCases;
-  final FolderUseCases folderUseCases;
-
-  const PulsrApp({
-    super.key,
-    required this.database,
-    required this.repository,
-    required this.audioHandler,
-    required this.scannerService,
-    required this.getSongsUseCase,
-    required this.getAlbumsUseCase,
-    required this.getArtistsUseCase,
-    required this.getFavoritesUseCase,
-    required this.toggleFavoriteUseCase,
-    required this.searchMusicUseCase,
-    required this.playlistUseCases,
-    required this.folderUseCases,
-  });
+  const PulsrApp({super.key});
 
   @override
   State<PulsrApp> createState() => _PulsrAppState();
 }
 
 class _PulsrAppState extends State<PulsrApp> {
-  late final _router = createRouter(widget.scannerService);
+  late final _router = createRouter(getIt<MediaScannerService>());
 
   @override
   Widget build(BuildContext context) {
     return MultiRepositoryProvider(
       providers: [
-        RepositoryProvider<AppDatabase>.value(value: widget.database),
-        RepositoryProvider<MusicRepository>.value(value: widget.repository),
-        RepositoryProvider<PulsrAudioHandler>.value(value: widget.audioHandler),
-        RepositoryProvider<MediaScannerService>.value(value: widget.scannerService),
-        RepositoryProvider<GetSongsUseCase>.value(value: widget.getSongsUseCase),
-        RepositoryProvider<GetAlbumsUseCase>.value(value: widget.getAlbumsUseCase),
-        RepositoryProvider<GetArtistsUseCase>.value(value: widget.getArtistsUseCase),
-        RepositoryProvider<GetFavoritesUseCase>.value(value: widget.getFavoritesUseCase),
-        RepositoryProvider<ToggleFavoriteUseCase>.value(value: widget.toggleFavoriteUseCase),
-        RepositoryProvider<SearchMusicUseCase>.value(value: widget.searchMusicUseCase),
-        RepositoryProvider<PlaylistUseCases>.value(value: widget.playlistUseCases),
-        RepositoryProvider<FolderUseCases>.value(value: widget.folderUseCases),
+        RepositoryProvider<AppDatabase>.value(value: getIt<AppDatabase>()),
+        RepositoryProvider<MusicRepository>.value(value: getIt<MusicRepository>()),
+        RepositoryProvider<PulsrAudioHandler>.value(value: getIt<PulsrAudioHandler>()),
+        RepositoryProvider<MediaScannerService>.value(
+            value: getIt<MediaScannerService>()),
+        RepositoryProvider<GetSongsUseCase>.value(
+            value: getIt<GetSongsUseCase>()),
+        RepositoryProvider<GetAlbumsUseCase>.value(
+            value: getIt<GetAlbumsUseCase>()),
+        RepositoryProvider<GetArtistsUseCase>.value(
+            value: getIt<GetArtistsUseCase>()),
+        RepositoryProvider<GetFavoritesUseCase>.value(
+            value: getIt<GetFavoritesUseCase>()),
+        RepositoryProvider<ToggleFavoriteUseCase>.value(
+            value: getIt<ToggleFavoriteUseCase>()),
+        RepositoryProvider<SearchMusicUseCase>.value(
+            value: getIt<SearchMusicUseCase>()),
+        RepositoryProvider<PlaylistUseCases>.value(
+            value: getIt<PlaylistUseCases>()),
+        RepositoryProvider<FolderUseCases>.value(value: getIt<FolderUseCases>()),
+        RepositoryProvider<WidgetService>.value(value: getIt<WidgetService>()),
       ],
       child: MultiBlocProvider(
         providers: [
           BlocProvider<DynamicThemeCubit>(
-            create: (_) => DynamicThemeCubit(),
+            create: (_) => getIt<DynamicThemeCubit>(),
           ),
           BlocProvider<PlayerCubit>(
-            create: (_) => PlayerCubit(
-              audioHandler: widget.audioHandler,
-              repository: widget.repository,
-              toggleFavoriteUseCase: widget.toggleFavoriteUseCase,
-            ),
+            create: (_) => getIt<PlayerCubit>(),
           ),
           BlocProvider<LibraryCubit>(
-            create: (_) => LibraryCubit(
-              getSongsUseCase: widget.getSongsUseCase,
-              getAlbumsUseCase: widget.getAlbumsUseCase,
-              getArtistsUseCase: widget.getArtistsUseCase,
-              getFavoritesUseCase: widget.getFavoritesUseCase,
-              toggleFavoriteUseCase: widget.toggleFavoriteUseCase,
-              folderUseCases: widget.folderUseCases,
-            ),
+            create: (_) => getIt<LibraryCubit>(),
           ),
           BlocProvider<SearchCubit>(
-            create: (_) => SearchCubit(
-              searchUseCase: widget.searchMusicUseCase,
-            ),
+            create: (_) => getIt<SearchCubit>(),
           ),
           BlocProvider<PlaylistCubit>(
-            create: (_) => PlaylistCubit(
-              playlistUseCases: widget.playlistUseCases,
-            ),
+            create: (_) => getIt<PlaylistCubit>(),
           ),
           BlocProvider<SettingsCubit>(
-            create: (_) => SettingsCubit(
-              scannerService: widget.scannerService,
-            ),
+            create: (_) => getIt<SettingsCubit>(),
           ),
         ],
-        child: MaterialApp.router(
-          title: 'Pulsr Music',
-          debugShowCheckedModeBanner: false,
-          themeMode: ThemeMode.dark,
-          darkTheme: AuraTheme.darkTheme,
-          theme: AuraTheme.darkTheme,
-          routerConfig: _router,
+        child: BlocBuilder<SettingsCubit, SettingsState>(
+          builder: (context, settingsState) {
+            return BlocBuilder<DynamicThemeCubit, DynamicThemeState>(
+              builder: (context, dynamicThemeState) {
+                final isDynamicOn = settingsState.dynamicThemingEnabled;
+                final activeAccent = (isDynamicOn && dynamicThemeState.hasCustomArtworkColor)
+                    ? dynamicThemeState.primaryColor
+                    : settingsState.customAccentColor;
+
+                final lightTheme = AuraTheme.customTheme(
+                  activeAccent,
+                  brightness: Brightness.light,
+                );
+
+                final darkTheme = AuraTheme.customTheme(
+                  activeAccent,
+                  brightness: Brightness.dark,
+                  isAmoled: settingsState.themeMode == AppThemeMode.amoled,
+                );
+
+                final ThemeMode flutterThemeMode;
+                switch (settingsState.themeMode) {
+                  case AppThemeMode.light:
+                    flutterThemeMode = ThemeMode.light;
+                    break;
+                  case AppThemeMode.dark:
+                  case AppThemeMode.amoled:
+                    flutterThemeMode = ThemeMode.dark;
+                    break;
+                  case AppThemeMode.system:
+                    flutterThemeMode = ThemeMode.system;
+                    break;
+                }
+
+                return MaterialApp.router(
+                  title: 'Pulsr Music',
+                  debugShowCheckedModeBanner: false,
+                  themeMode: flutterThemeMode,
+                  theme: lightTheme,
+                  darkTheme: darkTheme,
+                  routerConfig: _router,
+                );
+              },
+            );
+          },
         ),
       ),
     );

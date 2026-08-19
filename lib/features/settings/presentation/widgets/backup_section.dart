@@ -1,0 +1,300 @@
+// lib/features/settings/presentation/widgets/backup_section.dart
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/di/injection.dart';
+import '../../../../domain/usecases/backup_usecases.dart';
+import '../../cubit/settings_cubit.dart';
+
+class BackupSection extends StatefulWidget {
+  const BackupSection({super.key});
+
+  @override
+  State<BackupSection> createState() => _BackupSectionState();
+}
+
+class _BackupSectionState extends State<BackupSection> {
+  bool _isExporting = false;
+  bool _isImporting = false;
+
+  static Widget _buildIconContainer(BuildContext context, IconData icon) {
+    final cardColor = Theme.of(context).cardTheme.color ?? AppColors.card;
+    final outlineColor = Theme.of(context).colorScheme.outline;
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: outlineColor, width: 1),
+      ),
+      child: Icon(icon, color: primaryColor, size: 20),
+    );
+  }
+
+  Future<void> _exportBackup(BuildContext context) async {
+    setState(() => _isExporting = true);
+    try {
+      final exportUseCase = getIt<ExportBackupUseCase>();
+      final jsonContent = await exportUseCase.execute();
+
+      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+      final fileName = 'pulsr_backup_$timestamp.json';
+      final bytes = Uint8List.fromList(utf8.encode(jsonContent));
+
+      final outputFile = await FilePicker.platform.saveFile(
+        dialogTitle: 'Export Backup JSON',
+        fileName: fileName,
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        bytes: bytes,
+      );
+
+      if (outputFile != null && outputFile.isNotEmpty) {
+        final file = File(outputFile);
+        if (!await file.exists() || (await file.length()) == 0) {
+          await file.writeAsString(jsonContent);
+        }
+
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Backup exported successfully to ${file.path.split(Platform.pathSeparator).last}'),
+              backgroundColor: AppColors.primary,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Export failed: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isExporting = false);
+    }
+  }
+
+  Future<void> _importBackup(BuildContext context) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+    );
+
+    if (result == null || result.files.single.path == null) {
+      return;
+    }
+
+    final filePath = result.files.single.path!;
+    final file = File(filePath);
+
+    if (!await file.exists()) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Selected backup file does not exist'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+      return;
+    }
+
+    final jsonContent = await file.readAsString();
+    Map<String, dynamic> data;
+    try {
+      data = jsonDecode(jsonContent) as Map<String, dynamic>;
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invalid JSON backup file format'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+      return;
+    }
+
+    final favsCount = (data['favorites'] as List?)?.length ?? 0;
+    final playlistsCount = (data['playlists'] as List?)?.length ?? 0;
+    final historyCount = (data['playHistory'] as List?)?.length ?? 0;
+    final hasSettings = data['settings'] is Map;
+
+    if (!context.mounted) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: const Row(
+          children: [
+            Icon(Icons.restore_rounded, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text('Confirm Restore'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Are you sure you want to restore backup data from this file?',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            Text('• Favorites: $favsCount items'),
+            Text('• Playlists: $playlistsCount items'),
+            Text('• Play History: $historyCount entries'),
+            Text('• Settings: ${hasSettings ? "Included" : "None"}'),
+            const SizedBox(height: 12),
+            const Text(
+              'Existing library matching tracks will be updated.',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Restore Backup'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isImporting = true);
+    try {
+      final importUseCase = getIt<ImportBackupUseCase>();
+      final importResult = await importUseCase.execute(jsonContent);
+
+      if (context.mounted) {
+        // Reload SettingsCubit so theme and player settings update immediately
+        final settingsCubit = context.read<SettingsCubit>();
+        await settingsCubit.reloadSettings();
+
+        if (!context.mounted) return;
+
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle_rounded, color: AppColors.primary),
+                SizedBox(width: 8),
+                Text('Backup Restored'),
+              ],
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('• Restored Favorites: ${importResult.restoredFavoritesCount}'),
+                Text('• Restored Playlists: ${importResult.restoredPlaylistsCount}'),
+                Text('• Restored History Entries: ${importResult.restoredHistoryCount}'),
+                Text('• Restored Settings: ${importResult.restoredSettingsCount} keys'),
+                if (importResult.restoredExcludedFoldersCount > 0)
+                  Text('• Restored Excluded Folders: ${importResult.restoredExcludedFoldersCount}'),
+                if (importResult.unmatchedPaths.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    '⚠️ ${importResult.unmatchedPaths.length} song paths could not be matched in your current library.',
+                    style: const TextStyle(color: Colors.amber, fontSize: 12),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Done'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Import failed: ${e.toString()}'),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isImporting = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? AppColors.textSecondary;
+
+    return Column(
+      children: [
+        ListTile(
+          leading: _buildIconContainer(context, Icons.upload_file_rounded),
+          title: const Text(
+            'Export Backup',
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          ),
+          subtitle: Text(
+            'Save favorites, playlists, history & settings to JSON',
+            style: TextStyle(color: textSecondary, fontSize: 12),
+          ),
+          trailing: _isExporting
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(Icons.chevron_right_rounded, color: textSecondary),
+          onTap: _isExporting ? null : () => _exportBackup(context),
+        ),
+        ListTile(
+          leading: _buildIconContainer(context, Icons.download_for_offline_rounded),
+          title: const Text(
+            'Import Backup',
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          ),
+          subtitle: Text(
+            'Restore favorites, playlists, history & settings from JSON file',
+            style: TextStyle(color: textSecondary, fontSize: 12),
+          ),
+          trailing: _isImporting
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Icon(Icons.chevron_right_rounded, color: textSecondary),
+          onTap: _isImporting ? null : () => _importBackup(context),
+        ),
+      ],
+    );
+  }
+}

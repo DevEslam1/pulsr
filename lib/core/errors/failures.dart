@@ -1,4 +1,7 @@
 // lib/core/errors/failures.dart
+import 'package:fpdart/fpdart.dart';
+
+typedef Result<T> = Either<AppFailure, T>;
 
 abstract class AppFailure {
   final String message;
@@ -29,3 +32,16 @@ class StorageFailure extends AppFailure {
 class LyricsFailure extends AppFailure {
   const LyricsFailure(super.message, [super.error]);
 }
+
+class TagEditFailure extends AppFailure {
+  const TagEditFailure(super.message, [super.error]);
+}
+
+class PlaylistImportFailure extends AppFailure {
+  const PlaylistImportFailure(super.message, [super.error]);
+}
+
+class BackupFailure extends AppFailure {
+  const BackupFailure(super.message, [super.error]);
+}
+

@@ -85,6 +85,29 @@ subprojects {
     }
 }
 
+subprojects {
+    val configureCompileOptions = {
+        val android = extensions.findByName("android")
+        if (android != null) {
+            try {
+                val compileOptions = android.javaClass.getMethod("getCompileOptions").invoke(android)
+                val setSource = compileOptions.javaClass.getMethod("setSourceCompatibility", JavaVersion::class.java)
+                val setTarget = compileOptions.javaClass.getMethod("setTargetCompatibility", JavaVersion::class.java)
+                setSource.invoke(compileOptions, JavaVersion.VERSION_17)
+                setTarget.invoke(compileOptions, JavaVersion.VERSION_17)
+            } catch (_: Throwable) {}
+        }
+    }
+
+    if (state.executed) {
+        configureCompileOptions()
+    } else {
+        afterEvaluate {
+            configureCompileOptions()
+        }
+    }
+}
+
 gradle.projectsEvaluated {
     subprojects {
         val android = extensions.findByName("android")

@@ -6,55 +6,101 @@ import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
 
 class AuraTheme {
-  static ThemeData get darkTheme {
-    final baseTextTheme = GoogleFonts.manropeTextTheme(ThemeData.dark().textTheme);
+  static ThemeData get darkTheme => customTheme(AppColors.primary, brightness: Brightness.dark);
+
+  static ThemeData get lightTheme => customTheme(AppColors.lightPrimary, brightness: Brightness.light);
+
+  static ThemeData get amoledTheme => customTheme(AppColors.primary, brightness: Brightness.dark, isAmoled: true);
+
+  static ThemeData customTheme(
+    Color accent, {
+    Brightness brightness = Brightness.dark,
+    bool isAmoled = false,
+  }) {
+    final isDark = brightness == Brightness.dark;
+
+    final Color scaffoldBg;
+    final Color surfaceColor;
+    final Color cardColor;
+    final Color textPrimary;
+    final Color textSecondary;
+    final Color outlineColor;
+
+    if (!isDark) {
+      scaffoldBg = AppColors.lightBackground;
+      surfaceColor = AppColors.lightSurface;
+      cardColor = AppColors.lightCard;
+      textPrimary = AppColors.lightTextPrimary;
+      textSecondary = AppColors.lightTextSecondary;
+      outlineColor = AppColors.lightOutline;
+    } else if (isAmoled) {
+      scaffoldBg = AppColors.amoledBackground;
+      surfaceColor = AppColors.amoledSurface;
+      cardColor = AppColors.amoledCard;
+      textPrimary = AppColors.amoledTextPrimary;
+      textSecondary = AppColors.amoledTextSecondary;
+      outlineColor = AppColors.amoledOutline;
+    } else {
+      scaffoldBg = AppColors.background;
+      surfaceColor = AppColors.surface;
+      cardColor = AppColors.card;
+      textPrimary = AppColors.textPrimary;
+      textSecondary = AppColors.textSecondary;
+      outlineColor = AppColors.outline;
+    }
+
+    final onAccent = accent.computeLuminance() > 0.5 ? Colors.black : Colors.white;
+
+    final baseTextTheme = isDark
+        ? GoogleFonts.manropeTextTheme(ThemeData.dark().textTheme)
+        : GoogleFonts.manropeTextTheme(ThemeData.light().textTheme);
 
     final customTextTheme = baseTextTheme.copyWith(
       displayLarge: baseTextTheme.displayLarge?.copyWith(
-        color: AppColors.textPrimary,
+        color: textPrimary,
         fontWeight: FontWeight.w800,
         letterSpacing: -1.0,
       ),
       displayMedium: baseTextTheme.displayMedium?.copyWith(
-        color: AppColors.textPrimary,
+        color: textPrimary,
         fontWeight: FontWeight.w700,
         letterSpacing: -0.5,
       ),
       headlineMedium: baseTextTheme.headlineMedium?.copyWith(
-        color: AppColors.textPrimary,
+        color: textPrimary,
         fontWeight: FontWeight.w700,
       ),
       headlineSmall: baseTextTheme.headlineSmall?.copyWith(
-        color: AppColors.textPrimary,
+        color: textPrimary,
         fontWeight: FontWeight.w600,
       ),
       titleLarge: baseTextTheme.titleLarge?.copyWith(
-        color: AppColors.textPrimary,
+        color: textPrimary,
         fontWeight: FontWeight.w600,
         letterSpacing: -0.2,
       ),
       titleMedium: baseTextTheme.titleMedium?.copyWith(
-        color: AppColors.textPrimary,
+        color: textPrimary,
         fontWeight: FontWeight.w600,
       ),
       titleSmall: baseTextTheme.titleSmall?.copyWith(
-        color: AppColors.textSecondary,
+        color: textSecondary,
         fontWeight: FontWeight.w500,
       ),
       bodyLarge: baseTextTheme.bodyLarge?.copyWith(
-        color: AppColors.textPrimary,
+        color: textPrimary,
         fontSize: 16,
       ),
       bodyMedium: baseTextTheme.bodyMedium?.copyWith(
-        color: AppColors.textSecondary,
+        color: textSecondary,
         fontSize: 14,
       ),
       bodySmall: baseTextTheme.bodySmall?.copyWith(
-        color: AppColors.textSecondary.withValues(alpha: 0.8),
+        color: textSecondary.withValues(alpha: 0.8),
         fontSize: 12,
       ),
       labelLarge: baseTextTheme.labelLarge?.copyWith(
-        color: AppColors.onPrimary,
+        color: onAccent,
         fontWeight: FontWeight.w700,
         fontSize: 14,
       ),
@@ -62,57 +108,60 @@ class AuraTheme {
 
     return ThemeData(
       useMaterial3: true,
-      brightness: Brightness.dark,
-      scaffoldBackgroundColor: AppColors.background,
-      colorScheme: const ColorScheme.dark(
-        primary: AppColors.primary,
-        onPrimary: AppColors.onPrimary,
-        primaryContainer: AppColors.ctaLavender,
-        onPrimaryContainer: AppColors.onPrimary,
-        surface: AppColors.surface,
-        onSurface: AppColors.textPrimary,
-        outline: AppColors.outline,
+      brightness: brightness,
+      scaffoldBackgroundColor: scaffoldBg,
+      colorScheme: ColorScheme(
+        brightness: brightness,
+        primary: accent,
+        onPrimary: onAccent,
+        primaryContainer: accent.withValues(alpha: isDark ? 0.25 : 0.15),
+        onPrimaryContainer: isDark ? accent : textPrimary,
+        secondary: accent,
+        onSecondary: onAccent,
+        surface: surfaceColor,
+        onSurface: textPrimary,
+        outline: outlineColor,
         error: AppColors.error,
         onError: Colors.white,
       ),
       textTheme: customTextTheme,
       cardTheme: CardThemeData(
-        color: AppColors.card,
+        color: cardColor,
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: AppRadii.cardRadius,
-          side: const BorderSide(color: AppColors.outline, width: 1),
+          side: BorderSide(color: outlineColor, width: 1),
         ),
         margin: EdgeInsets.zero,
       ),
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
         systemOverlayStyle: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
-          statusBarIconBrightness: Brightness.light,
-          statusBarBrightness: Brightness.dark,
+          statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+          statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
         ),
         titleTextStyle: TextStyle(
-          color: AppColors.textPrimary,
+          color: textPrimary,
           fontSize: 20,
           fontWeight: FontWeight.w700,
         ),
-        iconTheme: IconThemeData(color: AppColors.textPrimary),
+        iconTheme: IconThemeData(color: textPrimary),
       ),
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: AppColors.surface,
-        selectedItemColor: AppColors.primary,
-        unselectedItemColor: AppColors.textSecondary,
+      bottomNavigationBarTheme: BottomNavigationBarThemeData(
+        backgroundColor: surfaceColor,
+        selectedItemColor: accent,
+        unselectedItemColor: textSecondary,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.ctaLavender,
-          foregroundColor: AppColors.onPrimary,
+          backgroundColor: accent,
+          foregroundColor: onAccent,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: const RoundedRectangleBorder(
@@ -125,51 +174,51 @@ class AuraTheme {
         ),
       ),
       chipTheme: ChipThemeData(
-        backgroundColor: AppColors.card,
-        disabledColor: AppColors.card.withValues(alpha: 0.5),
-        selectedColor: AppColors.primary,
-        secondarySelectedColor: AppColors.primary,
+        backgroundColor: cardColor,
+        disabledColor: cardColor.withValues(alpha: 0.5),
+        selectedColor: accent,
+        secondarySelectedColor: accent,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        shape: const RoundedRectangleBorder(
+        shape: RoundedRectangleBorder(
           borderRadius: AppRadii.chipRadius,
-          side: BorderSide(color: AppColors.outline, width: 1),
+          side: BorderSide(color: outlineColor, width: 1),
         ),
-        labelStyle: const TextStyle(
-          color: AppColors.textPrimary,
+        labelStyle: TextStyle(
+          color: textPrimary,
           fontSize: 13,
           fontWeight: FontWeight.w500,
         ),
-        secondaryLabelStyle: const TextStyle(
-          color: AppColors.onPrimary,
+        secondaryLabelStyle: TextStyle(
+          color: onAccent,
           fontSize: 13,
           fontWeight: FontWeight.w600,
         ),
       ),
-      bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: AppColors.surface,
-        modalBackgroundColor: AppColors.surface,
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: surfaceColor,
+        modalBackgroundColor: surfaceColor,
         elevation: 16,
-        shape: RoundedRectangleBorder(
+        shape: const RoundedRectangleBorder(
           borderRadius: AppRadii.bottomSheetRadius,
         ),
         clipBehavior: Clip.antiAliasWithSaveLayer,
       ),
       sliderTheme: SliderThemeData(
-        activeTrackColor: AppColors.primary,
-        inactiveTrackColor: AppColors.outline,
-        thumbColor: AppColors.primary,
-        overlayColor: AppColors.accentGlow,
+        activeTrackColor: accent,
+        inactiveTrackColor: outlineColor,
+        thumbColor: accent,
+        overlayColor: accent.withValues(alpha: 0.2),
         trackHeight: 4.0,
         thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6.0),
         overlayShape: const RoundSliderOverlayShape(overlayRadius: 14.0),
       ),
-      dividerTheme: const DividerThemeData(
-        color: AppColors.outline,
+      dividerTheme: DividerThemeData(
+        color: outlineColor,
         thickness: 1,
         space: 1,
       ),
-      iconTheme: const IconThemeData(
-        color: AppColors.textPrimary,
+      iconTheme: IconThemeData(
+        color: textPrimary,
         size: 24,
       ),
     );

@@ -13,6 +13,8 @@ import '../../../data/scanner/media_scanner_service.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
 
+import '../../../core/errors/failures.dart';
+
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -121,10 +123,10 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(height: 16),
 
           // Recently Played Section
-          StreamBuilder<List<SongsTableData>>(
+          StreamBuilder<Result<List<SongsTableData>>>(
             stream: repository.watchRecentlyPlayed(),
             builder: (context, snapshot) {
-              final recentSongs = snapshot.data ?? [];
+              final recentSongs = snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
               if (recentSongs.isEmpty) return const SizedBox.shrink();
 
               return Column(
@@ -184,10 +186,10 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(height: 16),
 
           // Recently Added Section / Actionable Empty State
-          StreamBuilder<List<SongsTableData>>(
+          StreamBuilder<Result<List<SongsTableData>>>(
             stream: repository.watchRecentlyAdded(),
             builder: (context, snapshot) {
-              final songs = snapshot.data ?? [];
+              final songs = snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
               if (songs.isEmpty) {
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 24),

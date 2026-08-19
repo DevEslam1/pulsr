@@ -6,6 +6,7 @@ import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/widgets/empty_state_widget.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
 import '../cubit/search_cubit.dart';
@@ -120,23 +121,23 @@ class _SearchScreenState extends State<SearchScreen> {
                 child: state.isLoading
                     ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
                     : state.results.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.search_off_rounded,
-                                  size: 56,
-                                  color: AppColors.textSecondary.withValues(alpha: 0.5),
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  state.query.isEmpty ? 'Type to search your library' : 'No results found for "${state.query}"',
-                                  style: const TextStyle(color: AppColors.textSecondary),
-                                ),
-                              ],
-                            ),
-                          )
+                        ? state.query.isEmpty
+                            ? const EmptyStateWidget(
+                                icon: Icons.search_rounded,
+                                title: 'Search Your Music',
+                                subtitle: 'Find songs, artists, or albums in your local library.',
+                              )
+                            : EmptyStateWidget(
+                                icon: Icons.search_off_rounded,
+                                title: 'No Results Found',
+                                subtitle: 'No matches found for "${state.query}". Try a different search term.',
+                                primaryActionLabel: 'Clear Search',
+                                primaryActionIcon: Icons.backspace_rounded,
+                                onPrimaryAction: () {
+                                  _searchController.clear();
+                                  cubit.clearQuery();
+                                },
+                              )
                         : ListView.builder(
                             padding: const EdgeInsets.only(bottom: 120, top: 4),
                             itemCount: state.results.length,

@@ -43,3 +43,8 @@ kotlin {
 flutter {
     source = "../.."
 }
+
+dependencies {
+    implementation("net.jthink:jaudiotagger:3.0.1")
+}
+

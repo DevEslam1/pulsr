@@ -2,6 +2,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:injectable/injectable.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:palette_generator/palette_generator.dart';
 import '../constants/app_colors.dart';
@@ -12,6 +13,7 @@ class DynamicThemeState {
   final Color backgroundColor;
   final Color surfaceColor;
   final bool isDark;
+  final bool hasCustomArtworkColor;
 
   const DynamicThemeState({
     this.primaryColor = AppColors.primary,
@@ -19,6 +21,7 @@ class DynamicThemeState {
     this.backgroundColor = AppColors.background,
     this.surfaceColor = AppColors.surface,
     this.isDark = true,
+    this.hasCustomArtworkColor = false,
   });
 
   DynamicThemeState copyWith({
@@ -27,6 +30,7 @@ class DynamicThemeState {
     Color? backgroundColor,
     Color? surfaceColor,
     bool? isDark,
+    bool? hasCustomArtworkColor,
   }) {
     return DynamicThemeState(
       primaryColor: primaryColor ?? this.primaryColor,
@@ -34,10 +38,12 @@ class DynamicThemeState {
       backgroundColor: backgroundColor ?? this.backgroundColor,
       surfaceColor: surfaceColor ?? this.surfaceColor,
       isDark: isDark ?? this.isDark,
+      hasCustomArtworkColor: hasCustomArtworkColor ?? this.hasCustomArtworkColor,
     );
   }
 }
 
+@singleton
 class DynamicThemeCubit extends Cubit<DynamicThemeState> {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   final Map<int, DynamicThemeState> _cachedPalettes = {};
@@ -80,6 +86,7 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
           secondaryColor: palette.mutedColor?.color ?? AppColors.secondary,
           backgroundColor: bg,
           surfaceColor: Color.alphaBlend(primary.withValues(alpha: 0.08), AppColors.surface),
+          hasCustomArtworkColor: true,
         );
 
         _cachedPalettes[songId] = newState;

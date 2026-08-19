@@ -1,19 +1,25 @@
 // lib/features/library/cubit/library_cubit.dart
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:injectable/injectable.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../../domain/usecases/get_albums_usecase.dart';
 import '../../../domain/usecases/get_artists_usecase.dart';
+import '../../../domain/usecases/get_genres_usecase.dart';
+import '../../../domain/usecases/get_years_usecase.dart';
 import '../../../domain/usecases/get_favorites_usecase.dart';
 import '../../../domain/usecases/toggle_favorite_usecase.dart';
 import '../../../domain/usecases/folder_usecases.dart';
 import 'library_state.dart';
 
+@injectable
 class LibraryCubit extends Cubit<LibraryState> {
   final GetSongsUseCase _getSongsUseCase;
   final GetAlbumsUseCase _getAlbumsUseCase;
   final GetArtistsUseCase _getArtistsUseCase;
+  final GetGenresUseCase _getGenresUseCase;
+  final GetYearsUseCase _getYearsUseCase;
   final GetFavoritesUseCase _getFavoritesUseCase;
   final ToggleFavoriteUseCase _toggleFavoriteUseCase;
   final FolderUseCases _folderUseCases;
@@ -21,18 +27,24 @@ class LibraryCubit extends Cubit<LibraryState> {
   StreamSubscription? _songsSub;
   StreamSubscription? _albumsSub;
   StreamSubscription? _artistsSub;
+  StreamSubscription? _genresSub;
+  StreamSubscription? _yearsSub;
   StreamSubscription? _favoritesSub;
 
   LibraryCubit({
     required GetSongsUseCase getSongsUseCase,
     required GetAlbumsUseCase getAlbumsUseCase,
     required GetArtistsUseCase getArtistsUseCase,
+    required GetGenresUseCase getGenresUseCase,
+    required GetYearsUseCase getYearsUseCase,
     required GetFavoritesUseCase getFavoritesUseCase,
     required ToggleFavoriteUseCase toggleFavoriteUseCase,
     required FolderUseCases folderUseCases,
   })  : _getSongsUseCase = getSongsUseCase,
         _getAlbumsUseCase = getAlbumsUseCase,
         _getArtistsUseCase = getArtistsUseCase,
+        _getGenresUseCase = getGenresUseCase,
+        _getYearsUseCase = getYearsUseCase,
         _getFavoritesUseCase = getFavoritesUseCase,
         _toggleFavoriteUseCase = toggleFavoriteUseCase,
         _folderUseCases = folderUseCases,
@@ -44,45 +56,88 @@ class LibraryCubit extends Cubit<LibraryState> {
     _subscribeSongs();
     _subscribeAlbums();
     _subscribeArtists();
+    _subscribeGenres();
+    _subscribeYears();
     _subscribeFavorites();
     loadFolders();
   }
 
+  void clearError() {
+    emit(state.copyWith(errorMessage: null));
+  }
+
   void _subscribeSongs() {
     _songsSub?.cancel();
-    _songsSub = _getSongsUseCase.watchSongs(
+    _songsSub = _getSongsUseCase
+        .watchSongs(
       sortBy: state.sortBy,
       ascending: state.ascending,
-    ).listen((songs) {
-      emit(state.copyWith(songs: songs));
+    )
+        .listen((result) {
+      result.fold(
+        (failure) => emit(state.copyWith(errorMessage: failure.message)),
+        (songs) => emit(state.copyWith(songs: songs, errorMessage: null)),
+      );
     });
   }
 
   void _subscribeAlbums() {
     _albumsSub?.cancel();
-    _albumsSub = _getAlbumsUseCase.watchAlbums().listen((albums) {
-      emit(state.copyWith(albums: albums));
+    _albumsSub = _getAlbumsUseCase.watchAlbums().listen((result) {
+      result.fold(
+        (failure) => emit(state.copyWith(errorMessage: failure.message)),
+        (albums) => emit(state.copyWith(albums: albums, errorMessage: null)),
+      );
     });
   }
 
   void _subscribeArtists() {
     _artistsSub?.cancel();
-    _artistsSub = _getArtistsUseCase.watchArtists().listen((artists) {
-      emit(state.copyWith(artists: artists));
+    _artistsSub = _getArtistsUseCase.watchArtists().listen((result) {
+      result.fold(
+        (failure) => emit(state.copyWith(errorMessage: failure.message)),
+        (artists) => emit(state.copyWith(artists: artists, errorMessage: null)),
+      );
+    });
+  }
+
+  void _subscribeGenres() {
+    _genresSub?.cancel();
+    _genresSub = _getGenresUseCase.watchGenres().listen((result) {
+      result.fold(
+        (failure) => emit(state.copyWith(errorMessage: failure.message)),
+        (genres) => emit(state.copyWith(genres: genres, errorMessage: null)),
+      );
+    });
+  }
+
+  void _subscribeYears() {
+    _yearsSub?.cancel();
+    _yearsSub = _getYearsUseCase.watchYears().listen((result) {
+      result.fold(
+        (failure) => emit(state.copyWith(errorMessage: failure.message)),
+        (years) => emit(state.copyWith(years: years, errorMessage: null)),
+      );
     });
   }
 
   void _subscribeFavorites() {
     _favoritesSub?.cancel();
-    _favoritesSub = _getFavoritesUseCase.watchFavorites().listen((favs) {
-      emit(state.copyWith(favorites: favs));
+    _favoritesSub = _getFavoritesUseCase.watchFavorites().listen((result) {
+      result.fold(
+        (failure) => emit(state.copyWith(errorMessage: failure.message)),
+        (favs) => emit(state.copyWith(favorites: favs, errorMessage: null)),
+      );
     });
   }
 
   Future<void> loadFolders() async {
-    final folders = await _folderUseCases.getFolderHierarchy();
+    final result = await _folderUseCases.getFolderHierarchy();
     if (isClosed) return;
-    emit(state.copyWith(folders: folders));
+    result.fold(
+      (failure) => emit(state.copyWith(errorMessage: failure.message)),
+      (folders) => emit(state.copyWith(folders: folders, errorMessage: null)),
+    );
   }
 
   void updateSort(String sortBy, bool ascending) {
@@ -97,13 +152,22 @@ class LibraryCubit extends Cubit<LibraryState> {
   }
 
   Future<void> toggleFavorite(int songId) async {
-    await _toggleFavoriteUseCase(songId);
+    final result = await _toggleFavoriteUseCase(songId);
+    result.fold(
+      (failure) => emit(state.copyWith(errorMessage: failure.message)),
+      (_) => null,
+    );
   }
 
   Future<void> toggleFolderExclusion(String folderPath) async {
-    await _folderUseCases.toggleExcludeFolder(folderPath);
-    await loadFolders();
-    _subscribeSongs();
+    final result = await _folderUseCases.toggleExcludeFolder(folderPath);
+    result.fold(
+      (failure) => emit(state.copyWith(errorMessage: failure.message)),
+      (_) async {
+        await loadFolders();
+        _subscribeSongs();
+      },
+    );
   }
 
   // Multi-select actions
@@ -138,6 +202,8 @@ class LibraryCubit extends Cubit<LibraryState> {
     _songsSub?.cancel();
     _albumsSub?.cancel();
     _artistsSub?.cancel();
+    _genresSub?.cancel();
+    _yearsSub?.cancel();
     _favoritesSub?.cancel();
     return super.close();
   }

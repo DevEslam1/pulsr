@@ -6,6 +6,8 @@ import 'package:pulsr/domain/usecases/folder_usecases.dart';
 import 'package:pulsr/domain/usecases/get_albums_usecase.dart';
 import 'package:pulsr/domain/usecases/get_artists_usecase.dart';
 import 'package:pulsr/domain/usecases/get_favorites_usecase.dart';
+import 'package:pulsr/domain/usecases/get_genres_usecase.dart';
+import 'package:pulsr/domain/usecases/get_years_usecase.dart';
 import 'package:pulsr/domain/usecases/get_songs_usecase.dart';
 import 'package:pulsr/domain/usecases/toggle_favorite_usecase.dart';
 import 'package:pulsr/features/library/cubit/library_cubit.dart';
@@ -14,6 +16,8 @@ import 'package:pulsr/features/library/cubit/library_state.dart';
 class MockGetSongsUseCase extends Mock implements GetSongsUseCase {}
 class MockGetAlbumsUseCase extends Mock implements GetAlbumsUseCase {}
 class MockGetArtistsUseCase extends Mock implements GetArtistsUseCase {}
+class MockGetGenresUseCase extends Mock implements GetGenresUseCase {}
+class MockGetYearsUseCase extends Mock implements GetYearsUseCase {}
 class MockGetFavoritesUseCase extends Mock implements GetFavoritesUseCase {}
 class MockToggleFavoriteUseCase extends Mock implements ToggleFavoriteUseCase {}
 class MockFolderUseCases extends Mock implements FolderUseCases {}
@@ -22,6 +26,8 @@ void main() {
   late MockGetSongsUseCase mockGetSongs;
   late MockGetAlbumsUseCase mockGetAlbums;
   late MockGetArtistsUseCase mockGetArtists;
+  late MockGetGenresUseCase mockGetGenres;
+  late MockGetYearsUseCase mockGetYears;
   late MockGetFavoritesUseCase mockGetFavorites;
   late MockToggleFavoriteUseCase mockToggleFavorite;
   late MockFolderUseCases mockFolderUseCases;
@@ -30,16 +36,20 @@ void main() {
     mockGetSongs = MockGetSongsUseCase();
     mockGetAlbums = MockGetAlbumsUseCase();
     mockGetArtists = MockGetArtistsUseCase();
+    mockGetGenres = MockGetGenresUseCase();
+    mockGetYears = MockGetYearsUseCase();
     mockGetFavorites = MockGetFavoritesUseCase();
     mockToggleFavorite = MockToggleFavoriteUseCase();
     mockFolderUseCases = MockFolderUseCases();
 
     when(() => mockGetSongs.watchSongs(sortBy: any(named: 'sortBy'), ascending: any(named: 'ascending')))
-        .thenAnswer((_) => Stream.value([]));
-    when(() => mockGetAlbums.watchAlbums()).thenAnswer((_) => Stream.value([]));
-    when(() => mockGetArtists.watchArtists()).thenAnswer((_) => Stream.value([]));
-    when(() => mockGetFavorites.watchFavorites()).thenAnswer((_) => Stream.value([]));
-    when(() => mockFolderUseCases.getFolderHierarchy()).thenAnswer((_) async => []);
+        .thenAnswer((_) => Stream.value(const Right([])));
+    when(() => mockGetAlbums.watchAlbums()).thenAnswer((_) => Stream.value(const Right([])));
+    when(() => mockGetArtists.watchArtists()).thenAnswer((_) => Stream.value(const Right([])));
+    when(() => mockGetGenres.watchGenres()).thenAnswer((_) => Stream.value(const Right([])));
+    when(() => mockGetYears.watchYears()).thenAnswer((_) => Stream.value(const Right([])));
+    when(() => mockGetFavorites.watchFavorites()).thenAnswer((_) => Stream.value(const Right([])));
+    when(() => mockFolderUseCases.getFolderHierarchy()).thenAnswer((_) async => const Right([]));
   });
 
   group('LibraryCubit', () {
@@ -48,6 +58,8 @@ void main() {
         getSongsUseCase: mockGetSongs,
         getAlbumsUseCase: mockGetAlbums,
         getArtistsUseCase: mockGetArtists,
+        getGenresUseCase: mockGetGenres,
+        getYearsUseCase: mockGetYears,
         getFavoritesUseCase: mockGetFavorites,
         toggleFavoriteUseCase: mockToggleFavorite,
         folderUseCases: mockFolderUseCases,
@@ -65,6 +77,8 @@ void main() {
         getSongsUseCase: mockGetSongs,
         getAlbumsUseCase: mockGetAlbums,
         getArtistsUseCase: mockGetArtists,
+        getGenresUseCase: mockGetGenres,
+        getYearsUseCase: mockGetYears,
         getFavoritesUseCase: mockGetFavorites,
         toggleFavoriteUseCase: mockToggleFavorite,
         folderUseCases: mockFolderUseCases,
@@ -84,6 +98,8 @@ void main() {
         getSongsUseCase: mockGetSongs,
         getAlbumsUseCase: mockGetAlbums,
         getArtistsUseCase: mockGetArtists,
+        getGenresUseCase: mockGetGenres,
+        getYearsUseCase: mockGetYears,
         getFavoritesUseCase: mockGetFavorites,
         toggleFavoriteUseCase: mockToggleFavorite,
         folderUseCases: mockFolderUseCases,
@@ -107,6 +123,8 @@ void main() {
         getSongsUseCase: mockGetSongs,
         getAlbumsUseCase: mockGetAlbums,
         getArtistsUseCase: mockGetArtists,
+        getGenresUseCase: mockGetGenres,
+        getYearsUseCase: mockGetYears,
         getFavoritesUseCase: mockGetFavorites,
         toggleFavoriteUseCase: mockToggleFavorite,
         folderUseCases: mockFolderUseCases,

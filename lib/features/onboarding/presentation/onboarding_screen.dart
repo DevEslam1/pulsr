@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_radii.dart';
-import '../../../core/constants/app_strings.dart';
 import '../../../core/widgets/waveform_logo.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 
@@ -19,7 +18,15 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
+  final PageController _pageController = PageController();
+  int _currentPage = 0;
   bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   Future<void> _handleGrantAccess() async {
     setState(() {
@@ -47,98 +54,480 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     }
   }
 
+  void _nextPage() {
+    if (_currentPage < 2) {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void _skipToFinal() {
+    _pageController.animateToPage(
+      2,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28.0, vertical: 24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              const Spacer(),
-              Container(
-                width: 96,
-                height: 96,
-                decoration: BoxDecoration(
-                  color: AppColors.card,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: AppColors.outline, width: 1.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.2),
-                      blurRadius: 32,
-                      spreadRadius: 4,
+        child: Column(
+          children: [
+            // Top Bar with Skip Button
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'PULSR',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2,
+                      color: AppColors.primary,
                     ),
-                  ],
-                ),
-                child: const Center(child: WaveformLogo(size: 48)),
-              ).animate().scale(duration: 600.ms, curve: Curves.easeOutBack),
-              const SizedBox(height: 36),
-              Text(
-                AppStrings.onboardingTitle,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.5,
-                    ),
-              ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1, end: 0),
-              const SizedBox(height: 16),
-              Text(
-                AppStrings.onboardingSubtitle,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: AppColors.textSecondary,
-                      height: 1.5,
-                    ),
-              ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1, end: 0),
-              const SizedBox(height: 32),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.card,
-                  borderRadius: AppRadii.cardRadius,
-                  border: Border.all(color: AppColors.outline),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.lock_outline_rounded, color: AppColors.primary, size: 20),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        '100% offline. Zero telemetry, zero cloud tracking.',
+                  ),
+                  if (_currentPage < 2)
+                    TextButton(
+                      onPressed: _skipToFinal,
+                      child: const Text(
+                        'Skip',
                         style: TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.w600,
                         ),
+                      ),
+                    )
+                  else
+                    const SizedBox(height: 36),
+                ],
+              ),
+            ),
+
+            // PageView Walkthrough
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: (index) {
+                  setState(() {
+                    _currentPage = index;
+                  });
+                },
+                children: [
+                  _buildPage1(context),
+                  _buildPage2(context),
+                  _buildPage3(context),
+                ],
+              ),
+            ),
+
+            // Bottom Navigation & Page Indicators
+            Padding(
+              padding: const EdgeInsets.fromLTRB(28, 0, 28, 24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Page Indicators (Dots)
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: List.generate(3, (index) {
+                      final isActive = index == _currentPage;
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        height: 8,
+                        width: isActive ? 24 : 8,
+                        decoration: BoxDecoration(
+                          color: isActive ? AppColors.primary : AppColors.outline,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Navigation Button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: _currentPage == 2
+                        ? ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: AppColors.onPrimary,
+                              shape: RoundedRectangleBorder(borderRadius: AppRadii.cardRadius),
+                              elevation: 4,
+                            ),
+                            onPressed: _isLoading ? null : _handleGrantAccess,
+                            child: _isLoading
+                                ? const SizedBox(
+                                    height: 22,
+                                    width: 22,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2.5,
+                                      color: AppColors.onPrimary,
+                                    ),
+                                  )
+                                : const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.shield_rounded, size: 20),
+                                      SizedBox(width: 8),
+                                      Text(
+                                        'Grant Access & Start Listening',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          )
+                        : ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.card,
+                              foregroundColor: AppColors.textPrimary,
+                              side: const BorderSide(color: AppColors.outline, width: 1.5),
+                              shape: RoundedRectangleBorder(borderRadius: AppRadii.cardRadius),
+                            ),
+                            onPressed: _nextPage,
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'Next',
+                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                                ),
+                                SizedBox(width: 8),
+                                Icon(Icons.arrow_forward_rounded, size: 20, color: AppColors.primary),
+                              ],
+                            ),
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Page 1: "Your Music, Your Privacy"
+  Widget _buildPage1(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Spacer(),
+          Container(
+            width: 104,
+            height: 104,
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(color: AppColors.outline, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.25),
+                  blurRadius: 36,
+                  spreadRadius: 6,
+                ),
+              ],
+            ),
+            child: const Center(child: WaveformLogo(size: 52)),
+          ).animate().scale(duration: 600.ms, curve: Curves.easeOutBack),
+          const SizedBox(height: 36),
+          Text(
+            'Your Music, Your Privacy',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                ),
+          ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1, end: 0),
+          const SizedBox(height: 16),
+          Text(
+            '100% offline local playback. No accounts, no cloud dependencies, zero tracking, and absolute privacy for your music collection.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: AppColors.textSecondary,
+                  height: 1.5,
+                ),
+          ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1, end: 0),
+          const SizedBox(height: 32),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: AppRadii.cardRadius,
+              border: Border.all(color: AppColors.outline),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.lock_rounded, color: AppColors.primary, size: 22),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '100% Offline • Zero Telemetry • Local Storage',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ).animate().fadeIn(delay: 500.ms),
+          const Spacer(),
+        ],
+      ),
+    );
+  }
+
+  // Page 2: "Powerful Playback"
+  Widget _buildPage2(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Spacer(),
+          // Graphic container representing EQ & Audio Controls
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.15),
+                  blurRadius: 32,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildPlaybackFeatureIcon(Icons.equalizer_rounded, '5-Band EQ', AppColors.primary),
+                _buildPlaybackFeatureIcon(Icons.tune_rounded, 'Crossfade', AppColors.accent),
+                _buildPlaybackFeatureIcon(Icons.timer_rounded, 'Sleep Timer', AppColors.ctaLavender),
+              ],
+            ),
+          ).animate().fadeIn(duration: 500.ms).scale(begin: const Offset(0.9, 0.9)),
+          const SizedBox(height: 36),
+          Text(
+            'Powerful Playback',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                ),
+          ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1, end: 0),
+          const SizedBox(height: 16),
+          Text(
+            'Tailor your sound with a 5-band parametric equalizer, smooth crossfade transitions, gapless playback, and smart sleep timers.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: AppColors.textSecondary,
+                  height: 1.5,
+                ),
+          ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1, end: 0),
+          const SizedBox(height: 24),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: const [
+              _FeatureBadge(label: '5-Band Equalizer'),
+              _FeatureBadge(label: 'Smooth Crossfade'),
+              _FeatureBadge(label: 'Sleep Timer'),
+              _FeatureBadge(label: 'Gapless Playback'),
+            ],
+          ).animate().fadeIn(delay: 500.ms),
+          const Spacer(),
+        ],
+      ),
+    );
+  }
+
+  // Page 3: "Beautiful & Personal"
+  Widget _buildPage3(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 28.0),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Spacer(),
+          // Theme swatches visual container
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.card,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppColors.outline, width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.primary.withValues(alpha: 0.2),
+                  blurRadius: 36,
+                  spreadRadius: 4,
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.palette_rounded, color: AppColors.primary, size: 24),
+                    SizedBox(width: 8),
+                    Text(
+                      '4 DISTINCT PLAYER THEMES',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                        color: AppColors.textPrimary,
                       ),
                     ),
                   ],
                 ),
-              ).animate().fadeIn(delay: 500.ms),
-              const Spacer(),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _handleGrantAccess,
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.onPrimary),
-                        )
-                      : const Text(
-                          AppStrings.grantAccess,
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                        ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildThemeSwatch('Pulsr Modern', const [Color(0xFF9B9EF5), Color(0xFF6C70DC)]),
+                    _buildThemeSwatch('Glassmorphism', const [Color(0xFF00E676), Color(0xFF1DE9B6)]),
+                    _buildThemeSwatch('Dynamic Palette', const [Color(0xFFFF9100), Color(0xFFFF4081)]),
+                    _buildThemeSwatch('Cyberpunk Aura', const [Color(0xFFD500F9), Color(0xFF40C4FF)]),
+                  ],
                 ),
-              ).animate().fadeIn(delay: 600.ms).slideY(begin: 0.2, end: 0),
-              const SizedBox(height: 12),
+              ],
+            ),
+          ).animate().fadeIn(duration: 500.ms).scale(begin: const Offset(0.9, 0.9)),
+          const SizedBox(height: 36),
+          Text(
+            'Beautiful & Personal',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5,
+                ),
+          ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1, end: 0),
+          const SizedBox(height: 16),
+          Text(
+            'Express your style with real-time dynamic color extraction from album art and switch between 4 unique player themes.',
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: AppColors.textSecondary,
+                  height: 1.5,
+                ),
+          ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1, end: 0),
+          const Spacer(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPlaybackFeatureIcon(IconData icon, String label, Color color) {
+    return Column(
+      children: [
+        Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.15),
+            shape: BoxShape.circle,
+            border: Border.all(color: color.withValues(alpha: 0.4), width: 1.5),
+          ),
+          child: Icon(icon, color: color, size: 28),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildThemeSwatch(String name, List<Color> colors) {
+    return Column(
+      children: [
+        Container(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              colors: colors,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: colors.first.withValues(alpha: 0.4),
+                blurRadius: 10,
+                spreadRadius: 1,
+              ),
             ],
           ),
+        ),
+        const SizedBox(height: 6),
+        SizedBox(
+          width: 64,
+          child: Text(
+            name,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _FeatureBadge extends StatelessWidget {
+  final String label;
+
+  const _FeatureBadge({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.outline),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: AppColors.textPrimary,
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
         ),
       ),
     );

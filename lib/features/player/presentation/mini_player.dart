@@ -7,6 +7,8 @@ import '../../../core/constants/app_radii.dart';
 import '../../../core/theme/dynamic_theme_cubit.dart';
 import '../../../core/widgets/glass_container.dart';
 import '../../../core/widgets/cached_artwork.dart';
+import '../../settings/cubit/settings_cubit.dart';
+import '../../settings/cubit/settings_state.dart';
 import '../cubit/player_cubit.dart';
 import '../cubit/player_state.dart';
 
@@ -18,8 +20,26 @@ class MiniPlayer extends StatelessWidget {
     required this.onTap,
   });
 
+  void _handleSwipeAction(PlayerCubit cubit, MiniPlayerSwipeAction action, {required bool isLeft}) {
+    switch (action) {
+      case MiniPlayerSwipeAction.next:
+        cubit.next();
+        break;
+      case MiniPlayerSwipeAction.prev:
+        cubit.previous();
+        break;
+      case MiniPlayerSwipeAction.volume:
+        cubit.adjustVolume(isLeft ? -0.15 : 0.15);
+        break;
+      case MiniPlayerSwipeAction.none:
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final settingsState = context.watch<SettingsCubit>().state;
+
     return BlocBuilder<PlayerCubit, PlayerState>(
       builder: (context, state) {
         final song = state.currentSong;
@@ -44,11 +64,9 @@ class MiniPlayer extends StatelessWidget {
           onHorizontalDragEnd: (details) {
             if (details.primaryVelocity != null) {
               if (details.primaryVelocity! < -200) {
-                // Swiped Left -> Next Track
-                cubit.next();
+                _handleSwipeAction(cubit, settingsState.miniPlayerSwipeLeft, isLeft: true);
               } else if (details.primaryVelocity! > 200) {
-                // Swiped Right -> Previous Track
-                cubit.previous();
+                _handleSwipeAction(cubit, settingsState.miniPlayerSwipeRight, isLeft: false);
               }
             }
           },

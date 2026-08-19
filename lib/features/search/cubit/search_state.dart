@@ -1,30 +1,18 @@
 // lib/features/search/cubit/search_state.dart
+import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../../data/db/app_database.dart';
 
-class SearchState {
-  final String query;
-  final String selectedFilter; // 'All', 'Songs', 'Artists', 'Albums'
-  final List<SongsTableData> results;
-  final bool isLoading;
+part 'search_state.freezed.dart';
 
-  const SearchState({
-    this.query = '',
-    this.selectedFilter = 'All',
-    this.results = const [],
-    this.isLoading = false,
-  });
+@freezed
+abstract class SearchState with _$SearchState {
+  const SearchState._();
 
-  SearchState copyWith({
-    String? query,
-    String? selectedFilter,
-    List<SongsTableData>? results,
-    bool? isLoading,
-  }) {
-    return SearchState(
-      query: query ?? this.query,
-      selectedFilter: selectedFilter ?? this.selectedFilter,
-      results: results ?? this.results,
-      isLoading: isLoading ?? this.isLoading,
-    );
-  }
+  const factory SearchState({
+    @Default('') String query,
+    @Default('All') String selectedFilter,
+    @Default([]) List<SongsTableData> results,
+    @Default(false) bool isLoading,
+    String? errorMessage,
+  }) = _SearchState;
 }

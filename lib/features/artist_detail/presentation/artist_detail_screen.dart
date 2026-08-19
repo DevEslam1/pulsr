@@ -9,6 +9,8 @@ import '../../../data/db/app_database.dart';
 import '../../../data/repositories/music_repository.dart';
 import '../../player/cubit/player_cubit.dart';
 
+import '../../../core/errors/failures.dart';
+
 class ArtistDetailScreen extends StatelessWidget {
   final ArtistsTableData artist;
 
@@ -48,10 +50,10 @@ class ArtistDetailScreen extends StatelessWidget {
           const SizedBox(height: 24),
 
           // Discography (Albums)
-          StreamBuilder<List<AlbumsTableData>>(
+          StreamBuilder<Result<List<AlbumsTableData>>>(
             stream: repository.watchArtistAlbums(artist.id),
             builder: (context, snapshot) {
-              final albums = snapshot.data ?? [];
+              final albums = snapshot.data?.fold((l) => <AlbumsTableData>[], (r) => r) ?? [];
               if (albums.isEmpty) return const SizedBox.shrink();
 
               return Column(
@@ -97,10 +99,10 @@ class ArtistDetailScreen extends StatelessWidget {
             child: Text('TOP TRACKS', style: TextStyle(letterSpacing: 1.2, fontWeight: FontWeight.w700, fontSize: 12)),
           ),
 
-          StreamBuilder<List<SongsTableData>>(
+          StreamBuilder<Result<List<SongsTableData>>>(
             stream: repository.watchArtistSongs(artist.id),
             builder: (context, snapshot) {
-              final songs = snapshot.data ?? [];
+              final songs = snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
 
               return ListView.builder(
                 shrinkWrap: true,

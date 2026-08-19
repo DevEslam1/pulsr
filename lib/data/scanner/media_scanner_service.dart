@@ -1,11 +1,15 @@
 // lib/data/scanner/media_scanner_service.dart
 import 'dart:io';
 import 'package:drift/drift.dart';
+import 'package:flutter/services.dart';
+import 'package:injectable/injectable.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../db/app_database.dart';
 import '../repositories/music_repository.dart';
 
+
+@singleton
 class MediaScannerService {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   final MusicRepository _repository;
@@ -44,7 +48,8 @@ class MediaScannerService {
       if (!granted) return 0;
     }
 
-    final excludedFolders = await _repository.getExcludedFolderPaths();
+    final excludedRes = await _repository.getExcludedFolderPaths();
+    final excludedFolders = excludedRes.fold((l) => <String>[], (r) => r);
 
     // Query songs using on_audio_query
     final List<SongModel> songs = await _audioQuery.querySongs(
@@ -79,6 +84,13 @@ class MediaScannerService {
           ? song.album!.trim()
           : 'Unknown Album';
 
+      final genreRaw = song.genre ?? song.getMap['genre']?.toString();
+      final genre = (genreRaw != null && genreRaw.trim().isNotEmpty && genreRaw != '<unknown>')
+          ? genreRaw.trim()
+          : null;
+      final yearRaw = song.getMap['year'];
+      final int? year = yearRaw is int ? yearRaw : int.tryParse(yearRaw?.toString() ?? '');
+
       validSongIds.add(song.id);
 
       songCompanions.add(
@@ -96,6 +108,8 @@ class MediaScannerService {
           dateAdded: Value(song.dateAdded),
           fileSize: Value(song.size),
           artworkUri: Value(song.id.toString()),
+          genre: Value(genre),
+          year: Value(year),
         ),
       );
 
@@ -133,4 +147,35 @@ class MediaScannerService {
 
     return songCompanions.length;
   }
+
+  Future<void> rescanSingleFile(String path) async {
+    const channel = MethodChannel('com.example.pulsr/tag_editor');
+    try {
+      final Map<dynamic, dynamic>? tags = await channel.invokeMapMethod<dynamic, dynamic>('readTags', {'path': path});
+      if (tags != null) {
+        final title = (tags['title'] as String?)?.trim();
+        final artist = (tags['artist'] as String?)?.trim();
+        final album = (tags['album'] as String?)?.trim();
+        final genre = (tags['genre'] as String?)?.trim();
+        final yearStr = (tags['year'] as String?)?.trim();
+        final trackStr = (tags['trackNumber'] as String?)?.trim();
+
+        final year = yearStr != null ? int.tryParse(yearStr) : null;
+        final trackNumber = trackStr != null ? int.tryParse(trackStr) : null;
+
+        await _repository.updateSongTags(
+          path: path,
+          title: (title != null && title.isNotEmpty) ? title : 'Unknown Song',
+          artist: (artist != null && artist.isNotEmpty) ? artist : 'Unknown Artist',
+          album: (album != null && album.isNotEmpty) ? album : 'Unknown Album',
+          genre: genre,
+          year: year,
+          trackNumber: trackNumber,
+        );
+      }
+    } catch (_) {
+      // Fallback or ignore error if method channel is unsupported
+    }
+  }
 }
+

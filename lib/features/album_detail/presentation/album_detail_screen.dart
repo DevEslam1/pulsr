@@ -9,6 +9,8 @@ import '../../../data/db/app_database.dart';
 import '../../../data/repositories/music_repository.dart';
 import '../../player/cubit/player_cubit.dart';
 
+import '../../../core/errors/failures.dart';
+
 class AlbumDetailScreen extends StatelessWidget {
   final AlbumsTableData album;
 
@@ -22,10 +24,10 @@ class AlbumDetailScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(album.title),
       ),
-      body: StreamBuilder<List<SongsTableData>>(
+      body: StreamBuilder<Result<List<SongsTableData>>>(
         stream: repository.watchAlbumSongs(album.id),
         builder: (context, snapshot) {
-          final songs = snapshot.data ?? [];
+          final songs = snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
 
           return ListView(
             padding: const EdgeInsets.only(bottom: 120),

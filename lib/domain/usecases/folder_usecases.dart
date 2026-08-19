@@ -1,6 +1,7 @@
 // lib/domain/usecases/folder_usecases.dart
 import 'dart:io';
 import 'package:fpdart/fpdart.dart';
+import 'package:injectable/injectable.dart';
 import '../../core/errors/failures.dart';
 import '../../data/db/app_database.dart';
 import '../../data/repositories/music_repository.dart';
@@ -19,24 +20,33 @@ class FolderItem {
   });
 }
 
+@singleton
 class FolderUseCases {
   final MusicRepository _repository;
 
   FolderUseCases(this._repository);
 
-  Stream<List<ExcludedFoldersTableData>> watchExcludedFolders() {
+  Stream<Result<List<ExcludedFoldersTableData>>> watchExcludedFolders() {
     return _repository.watchExcludedFolders();
   }
 
-  Future<Either<AppFailure, void>> toggleExcludeFolder(String path) {
+  Future<Result<void>> toggleExcludeFolder(String path) {
     return _repository.toggleFolderExclusion(path);
   }
 
-  Future<List<FolderItem>> getFolderHierarchy() async {
+  Future<Result<List<FolderItem>>> getFolderHierarchy() async {
     final songsResult = await _repository.getAllSongs();
-    final excludedPaths = await _repository.getExcludedFolderPaths();
+    final excludedResult = await _repository.getExcludedFolderPaths();
+
+    if (songsResult.isLeft()) {
+      return Left(songsResult.fold((l) => l, (r) => const DatabaseFailure('Error')));
+    }
+    if (excludedResult.isLeft()) {
+      return Left(excludedResult.fold((l) => l, (r) => const DatabaseFailure('Error')));
+    }
 
     final List<SongsTableData> songs = songsResult.fold((l) => [], (r) => r);
+    final List<String> excludedPaths = excludedResult.fold((l) => [], (r) => r);
     final Map<String, int> folderSongCounts = {};
 
     for (final song in songs) {
@@ -61,6 +71,6 @@ class FolderUseCases {
     }
 
     items.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-    return items;
+    return Right(items);
   }
 }

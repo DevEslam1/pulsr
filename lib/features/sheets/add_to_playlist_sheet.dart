@@ -5,6 +5,8 @@ import '../../core/constants/app_radii.dart';
 import '../../data/db/app_database.dart';
 import '../../data/repositories/music_repository.dart';
 
+import '../../core/errors/failures.dart';
+
 class AddToPlaylistSheet extends StatelessWidget {
   final SongsTableData song;
   final MusicRepository repository;
@@ -108,10 +110,10 @@ class AddToPlaylistSheet extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          StreamBuilder<List<PlaylistsTableData>>(
+          StreamBuilder<Result<List<PlaylistsTableData>>>(
             stream: repository.watchPlaylists(),
             builder: (context, snapshot) {
-              final playlists = snapshot.data ?? [];
+              final playlists = snapshot.data?.fold((l) => <PlaylistsTableData>[], (r) => r) ?? [];
               if (playlists.isEmpty) {
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 24.0),

@@ -1,6 +1,7 @@
 // test/lrc_parser_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/utils/lrc_parser.dart';
+import 'package:pulsr/domain/models/lyrics_line.dart';
 
 void main() {
   group('LrcParser', () {
@@ -45,6 +46,29 @@ void main() {
       expect(lines.length, 1);
       expect(lines[0].text, 'First real lyric');
       expect(lines[0].timestamp, const Duration(seconds: 5));
+    });
+
+    test('parsePlainText parses non-synced lyrics with Duration.zero timestamp', () {
+      const plainText = '''
+First line of plain lyric
+Second line of plain lyric
+Third line of plain lyric
+''';
+      final lines = LrcParser.parsePlainText(plainText, source: LyricsSource.embedded);
+
+      expect(lines.length, 3);
+      expect(lines[0].text, 'First line of plain lyric');
+      expect(lines[0].timestamp, Duration.zero);
+      expect(lines[0].source, LyricsSource.embedded);
+
+      expect(lines[1].text, 'Second line of plain lyric');
+      expect(lines[1].timestamp, Duration.zero);
+      expect(lines[1].source, LyricsSource.embedded);
+    });
+
+    test('resolveLyrics returns null for non-existent audio path when no embedded or external lrc', () async {
+      final result = await LrcParser.resolveLyrics('/invalid/path/non_existent.mp3');
+      expect(result, isNull);
     });
   });
 }

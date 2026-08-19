@@ -9,6 +9,7 @@ class LyricsView extends StatefulWidget {
   final Duration currentPosition;
   final bool isLoading;
   final Color activeColor;
+  final LyricsSource source;
 
   const LyricsView({
     super.key,
@@ -16,6 +17,7 @@ class LyricsView extends StatefulWidget {
     required this.currentPosition,
     this.isLoading = false,
     this.activeColor = AppColors.primary,
+    this.source = LyricsSource.none,
   });
 
   @override
@@ -26,10 +28,18 @@ class _LyricsViewState extends State<LyricsView> {
   final ScrollController _scrollController = ScrollController();
   int _lastActiveIndex = -1;
 
+  bool get _isSynced => widget.lyrics.any((line) => line.timestamp > Duration.zero);
+
+  LyricsSource get _effectiveSource {
+    if (widget.source != LyricsSource.none) return widget.source;
+    if (widget.lyrics.isNotEmpty) return widget.lyrics.first.source;
+    return LyricsSource.none;
+  }
+
   @override
   void didUpdateWidget(covariant LyricsView oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.lyrics.isEmpty) return;
+    if (widget.lyrics.isEmpty || !_isSynced) return;
 
     final currentMs = widget.currentPosition.inMilliseconds;
     int activeIndex = -1;
@@ -65,6 +75,41 @@ class _LyricsViewState extends State<LyricsView> {
     super.dispose();
   }
 
+  Widget _buildSourceBadge(LyricsSource source) {
+    if (source == LyricsSource.none) return const SizedBox.shrink();
+
+    final String label = source == LyricsSource.embedded ? 'Embedded' : 'LRC File';
+    final IconData icon = source == LyricsSource.embedded ? Icons.music_note : Icons.subtitles_outlined;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: widget.activeColor.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: widget.activeColor.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: widget.activeColor),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: widget.activeColor,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (widget.isLoading) {
@@ -88,7 +133,7 @@ class _LyricsViewState extends State<LyricsView> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Place a .lrc file in the same folder as your audio track for offline synced lyrics.',
+                'Place a .lrc file in the same folder as your audio track or embed lyrics into file tags.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
               ),
@@ -99,38 +144,69 @@ class _LyricsViewState extends State<LyricsView> {
     }
 
     final currentMs = widget.currentPosition.inMilliseconds;
+    final source = _effectiveSource;
+    final isSynced = _isSynced;
 
     return Container(
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.4),
         borderRadius: AppRadii.cardRadius,
       ),
-      child: ListView.builder(
-        controller: _scrollController,
-        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
-        itemCount: widget.lyrics.length,
-        itemBuilder: (context, index) {
-          final line = widget.lyrics[index];
-          final nextLineMs = index + 1 < widget.lyrics.length
-              ? widget.lyrics[index + 1].timestamp.inMilliseconds
-              : double.infinity;
-          final isCurrent = currentMs >= line.timestamp.inMilliseconds && currentMs < nextLineMs;
+      child: Stack(
+        children: [
+          Padding(
+            padding: const EdgeInsets.only(top: 24),
+            child: ListView.builder(
+              controller: _scrollController,
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+              itemCount: widget.lyrics.length,
+              itemBuilder: (context, index) {
+                final line = widget.lyrics[index];
+                if (isSynced) {
+                  final nextLineMs = index + 1 < widget.lyrics.length
+                      ? widget.lyrics[index + 1].timestamp.inMilliseconds
+                      : double.infinity;
+                  final isCurrent = currentMs >= line.timestamp.inMilliseconds && currentMs < nextLineMs;
 
-          return Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 200),
-              style: TextStyle(
-                fontSize: isCurrent ? 20 : 15,
-                fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w500,
-                color: isCurrent ? widget.activeColor : Colors.white.withValues(alpha: 0.45),
-                height: 1.3,
-              ),
-              textAlign: TextAlign.center,
-              child: Text(line.text.isNotEmpty ? line.text : '•••'),
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: AnimatedDefaultTextStyle(
+                      duration: const Duration(milliseconds: 200),
+                      style: TextStyle(
+                        fontSize: isCurrent ? 20 : 15,
+                        fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w500,
+                        color: isCurrent ? widget.activeColor : Colors.white.withValues(alpha: 0.45),
+                        height: 1.3,
+                      ),
+                      textAlign: TextAlign.center,
+                      child: Text(line.text.isNotEmpty ? line.text : '•••'),
+                    ),
+                  );
+                } else {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Text(
+                      line.text,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withValues(alpha: 0.85),
+                        height: 1.4,
+                      ),
+                    ),
+                  );
+                }
+              },
             ),
-          );
-        },
+          ),
+          if (source != LyricsSource.none)
+            Positioned(
+              top: 12,
+              right: 12,
+              child: _buildSourceBadge(source),
+            ),
+        ],
       ),
     );
   }

@@ -4,24 +4,44 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
 import 'package:pulsr/data/repositories/music_repository.dart';
+import 'package:pulsr/data/scanner/media_scanner_service.dart';
 import 'package:pulsr/domain/models/eq_preset.dart';
 import 'package:pulsr/domain/usecases/toggle_favorite_usecase.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
+import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MockMusicRepository extends Mock implements MusicRepository {}
 class MockToggleFavoriteUseCase extends Mock implements ToggleFavoriteUseCase {}
+class MockMediaScannerService extends Mock implements MediaScannerService {}
 
 class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler implements PulsrAudioHandler {
+  double _vol = 1.0;
+  @override
+  double get volume => _vol;
+  @override
+  Future<void> setVolume(double volume) async {
+    _vol = volume;
+  }
   bool eqEnabled = false;
   EqPreset currentEqPreset = EqPreset.defaultPresets.first;
   Duration? sleepTimerDuration;
+  Duration currentCrossfadeDuration = Duration.zero;
 
   @override
   bool get isEqualizerEnabled => eqEnabled;
 
   @override
   EqPreset get currentPreset => currentEqPreset;
+
+  @override
+  Duration get crossfadeDuration => currentCrossfadeDuration;
+
+  @override
+  void setCrossfadeDuration(Duration d) {
+    currentCrossfadeDuration = d;
+  }
 
   @override
   Future<void> setEqualizerEnabled(bool enabled) async {
@@ -154,6 +174,25 @@ void main() {
       expect(cubit.state.isLyricsVisible, false);
 
       cubit.close();
+    });
+
+    test('crossfade duration updates when settings cubit changes', () async {
+      final mockScannerService = MockMediaScannerService();
+      SharedPreferences.setMockInitialValues({'setting_crossfade': 4.0});
+      final settingsCubit = SettingsCubit(scannerService: mockScannerService);
+
+      final cubit = PlayerCubit(
+        audioHandler: testAudioHandler,
+        repository: mockRepository,
+        toggleFavoriteUseCase: mockToggleFavorite,
+        settingsCubit: settingsCubit,
+      );
+
+      await settingsCubit.setCrossfade(6.0);
+      expect(testAudioHandler.currentCrossfadeDuration, const Duration(seconds: 6));
+
+      cubit.close();
+      await settingsCubit.close();
     });
   });
 }

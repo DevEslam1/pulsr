@@ -1,30 +1,18 @@
 // lib/features/playlists/cubit/playlist_state.dart
+import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../../data/db/app_database.dart';
 
-class PlaylistState {
-  final List<PlaylistsTableData> playlists;
-  final List<SongsTableData> currentPlaylistSongs;
-  final bool isLoading;
-  final String? errorMessage;
+part 'playlist_state.freezed.dart';
 
-  const PlaylistState({
-    this.playlists = const [],
-    this.currentPlaylistSongs = const [],
-    this.isLoading = false,
-    this.errorMessage,
-  });
+@freezed
+abstract class PlaylistState with _$PlaylistState {
+  const PlaylistState._();
 
-  PlaylistState copyWith({
-    List<PlaylistsTableData>? playlists,
-    List<SongsTableData>? currentPlaylistSongs,
-    bool? isLoading,
+  const factory PlaylistState({
+    @Default([]) List<PlaylistsTableData> playlists,
+    @Default([]) List<SongsTableData> currentPlaylistSongs,
+    @Default({}) Map<int, int> smartPlaylistCounts,
+    @Default(false) bool isLoading,
     String? errorMessage,
-  }) {
-    return PlaylistState(
-      playlists: playlists ?? this.playlists,
-      currentPlaylistSongs: currentPlaylistSongs ?? this.currentPlaylistSongs,
-      isLoading: isLoading ?? this.isLoading,
-      errorMessage: errorMessage,
-    );
-  }
+  }) = _PlaylistState;
 }

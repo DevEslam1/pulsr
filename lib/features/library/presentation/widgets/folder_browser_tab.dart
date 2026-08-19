@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_radii.dart';
+import '../../../../core/widgets/empty_state_widget.dart';
+import '../../../../data/scanner/media_scanner_service.dart';
 import '../../cubit/library_cubit.dart';
 import '../../cubit/library_state.dart';
 
@@ -17,23 +19,21 @@ class FolderBrowserTab extends StatelessWidget {
         final cubit = context.read<LibraryCubit>();
 
         if (folders.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.folder_off_outlined, size: 56, color: Colors.white.withValues(alpha: 0.3)),
-                const SizedBox(height: 12),
-                const Text(
-                  'No Folders Found',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Scan storage to discover music directories.',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                ),
-              ],
-            ),
+          return EmptyStateWidget(
+            icon: Icons.folder_off_rounded,
+            title: 'No Folders Found',
+            subtitle: 'Scan device storage to discover music directories and organize by path.',
+            primaryActionLabel: 'Scan Storage',
+            primaryActionIcon: Icons.center_focus_strong_rounded,
+            onPrimaryAction: () async {
+              final scanner = context.read<MediaScannerService>();
+              final count = await scanner.scanDeviceLibrary();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Scan complete! $count tracks loaded.')),
+                );
+              }
+            },
           );
         }
 
