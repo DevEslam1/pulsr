@@ -1,0 +1,115 @@
+// lib/data/db/tables.dart
+import 'package:drift/drift.dart';
+
+class SongsTable extends Table {
+  @override
+  String get tableName => 'songs';
+
+  IntColumn get id => integer()();
+  TextColumn get title => text()();
+  TextColumn get artist => text().withDefault(const Constant('Unknown Artist'))();
+  IntColumn get artistId => integer().nullable()();
+  TextColumn get album => text().withDefault(const Constant('Unknown Album'))();
+  IntColumn get albumId => integer().nullable()();
+  IntColumn get durationMs => integer().withDefault(const Constant(0))();
+  TextColumn get path => text()();
+  TextColumn get uri => text().nullable()();
+  IntColumn get trackNumber => integer().nullable()();
+  IntColumn get discNumber => integer().nullable()();
+  IntColumn get year => integer().nullable()();
+  IntColumn get dateAdded => integer().nullable()();
+  TextColumn get genre => text().nullable()();
+  BoolColumn get isFavorite => boolean().withDefault(const Constant(false))();
+  IntColumn get playCount => integer().withDefault(const Constant(0))();
+  IntColumn get lastPlayed => integer().nullable()();
+  IntColumn get lastPositionMs => integer().withDefault(const Constant(0))();
+  TextColumn get artworkUri => text().nullable()();
+  IntColumn get fileSize => integer().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+class AlbumsTable extends Table {
+  @override
+  String get tableName => 'albums';
+
+  IntColumn get id => integer()();
+  TextColumn get title => text()();
+  TextColumn get artist => text().withDefault(const Constant('Unknown Artist'))();
+  IntColumn get artistId => integer().nullable()();
+  IntColumn get songCount => integer().withDefault(const Constant(0))();
+  TextColumn get artworkUri => text().nullable()();
+  IntColumn get year => integer().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+class ArtistsTable extends Table {
+  @override
+  String get tableName => 'artists';
+
+  IntColumn get id => integer()();
+  TextColumn get name => text()();
+  IntColumn get songCount => integer().withDefault(const Constant(0))();
+  IntColumn get albumCount => integer().withDefault(const Constant(0))();
+  TextColumn get artworkUri => text().nullable()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+class PlaylistsTable extends Table {
+  @override
+  String get tableName => 'playlists';
+
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get name => text()();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get updatedAt => dateTime().withDefault(currentDateAndTime)();
+  BoolColumn get isSmart => boolean().withDefault(const Constant(false))();
+  TextColumn get smartCriteria => text().nullable()();
+}
+
+class PlaylistEntriesTable extends Table {
+  @override
+  String get tableName => 'playlist_entries';
+
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get playlistId => integer().references(PlaylistsTable, #id, onDelete: KeyAction.cascade)();
+  IntColumn get songId => integer().references(SongsTable, #id, onDelete: KeyAction.cascade)();
+  IntColumn get orderIndex => integer()();
+  DateTimeColumn get addedAt => dateTime().withDefault(currentDateAndTime)();
+}
+
+class PlayHistoryTable extends Table {
+  @override
+  String get tableName => 'play_history';
+
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get songId => integer().references(SongsTable, #id, onDelete: KeyAction.cascade)();
+  DateTimeColumn get playedAt => dateTime().withDefault(currentDateAndTime)();
+  BoolColumn get completed => boolean().withDefault(const Constant(false))();
+}
+
+class QueueItemsTable extends Table {
+  @override
+  String get tableName => 'queue_items';
+
+  IntColumn get id => integer().autoIncrement()();
+  IntColumn get songId => integer().references(SongsTable, #id, onDelete: KeyAction.cascade)();
+  IntColumn get orderIndex => integer()();
+  BoolColumn get isCurrent => boolean().withDefault(const Constant(false))();
+  IntColumn get positionMs => integer().withDefault(const Constant(0))();
+}
+
+class ExcludedFoldersTable extends Table {
+  @override
+  String get tableName => 'excluded_folders';
+
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get folderPath => text().unique()();
+  DateTimeColumn get addedAt => dateTime().withDefault(currentDateAndTime)();
+}
+
