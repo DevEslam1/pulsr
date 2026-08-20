@@ -1,6 +1,7 @@
 // lib/features/library/presentation/widgets/folder_browser_tab.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/widgets/empty_state_widget.dart';
@@ -64,7 +65,11 @@ class FolderBrowserTab extends StatelessWidget {
                       ),
                     ),
                     child: ListTile(
-                    leading: Container(
+                      onTap: () => context.push('/folder', extra: folder),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      leading: Container(
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(

@@ -1,6 +1,7 @@
 // lib/features/player/presentation/themes/classic_player_theme.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/cached_artwork.dart';
@@ -61,7 +62,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                 children: [
                   IconButton(
                     icon: Icon(Icons.keyboard_arrow_down_rounded, size: 32, color: p.textPrimary),
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () => context.canPop() ? context.pop() : context.go('/'),
                   ),
                   Column(
                     children: [

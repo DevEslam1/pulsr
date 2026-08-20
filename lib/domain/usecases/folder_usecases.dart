@@ -77,4 +77,17 @@ class FolderUseCases {
     items.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return Right(items);
   }
+
+  Stream<Result<List<SongsTableData>>> watchFolderSongs(String folderPath) {
+    return _repository.watchAllSongs().map((result) {
+      return result.map((songs) {
+        final normalizedTarget = folderPath.replaceAll('\\', '/').toLowerCase().trim();
+        return songs.where((s) {
+          final parentDir = File(s.path).parent.path.replaceAll('\\', '/').toLowerCase().trim();
+          return parentDir == normalizedTarget;
+        }).toList();
+      });
+    });
+  }
 }
+

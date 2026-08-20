@@ -139,7 +139,6 @@ class WidgetService {
   }
 
   StreamSubscription<Uri?> listenToWidgetClicks(void Function(Uri? uri) onUriReceived) {
-    HomeWidget.initiallyLaunchedFromHomeWidget().then(onUriReceived);
     return HomeWidget.widgetClicked.listen(onUriReceived);
   }
 }

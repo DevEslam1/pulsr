@@ -75,11 +75,54 @@ class SettingsScreen extends StatelessWidget {
                       child: SizedBox(
                         width: double.infinity,
                         child: SegmentedButton<AppThemeMode>(
-                          segments: const [
-                            ButtonSegment(value: AppThemeMode.system, label: Text('Auto'), icon: Icon(Icons.brightness_auto_rounded, size: 15)),
-                            ButtonSegment(value: AppThemeMode.light, label: Text('Light'), icon: Icon(Icons.light_mode_rounded, size: 15)),
-                            ButtonSegment(value: AppThemeMode.dark, label: Text('Dark'), icon: Icon(Icons.dark_mode_rounded, size: 15)),
-                            ButtonSegment(value: AppThemeMode.amoled, label: Text('AMOLED'), icon: Icon(Icons.contrast_rounded, size: 15)),
+                          showSelectedIcon: false,
+                          style: const ButtonStyle(
+                            visualDensity: VisualDensity.compact,
+                            padding: WidgetStatePropertyAll(
+                              EdgeInsets.symmetric(horizontal: 2),
+                            ),
+                          ),
+                          segments: [
+                            ButtonSegment(
+                              value: AppThemeMode.system,
+                              label: Text(
+                                'Auto',
+                                maxLines: 1,
+                                softWrap: false,
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                              icon: const Icon(Icons.brightness_auto_rounded, size: 15),
+                            ),
+                            ButtonSegment(
+                              value: AppThemeMode.light,
+                              label: Text(
+                                'Light',
+                                maxLines: 1,
+                                softWrap: false,
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                              icon: const Icon(Icons.light_mode_rounded, size: 15),
+                            ),
+                            ButtonSegment(
+                              value: AppThemeMode.dark,
+                              label: Text(
+                                'Dark',
+                                maxLines: 1,
+                                softWrap: false,
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                              icon: const Icon(Icons.dark_mode_rounded, size: 15),
+                            ),
+                            ButtonSegment(
+                              value: AppThemeMode.amoled,
+                              label: Text(
+                                'AMOLED',
+                                maxLines: 1,
+                                softWrap: false,
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+                              ),
+                              icon: const Icon(Icons.contrast_rounded, size: 15),
+                            ),
                           ],
                           selected: {state.themeMode},
                           onSelectionChanged: (sel) => cubit.setThemeMode(sel.first),
@@ -93,28 +136,43 @@ class SettingsScreen extends StatelessWidget {
                         children: [
                           Text('Accent Color', style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14)),
                           const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 12, runSpacing: 12,
-                            children: AppColors.customAccents.map((color) {
-                              final isSelected = state.customAccentColorValue == color.toARGB32();
-                              return GestureDetector(
-                                onTap: () => cubit.setCustomAccentColor(color),
-                                child: AnimatedContainer(
-                                  duration: const Duration(milliseconds: 200),
-                                  width: 42, height: 42,
-                                  decoration: BoxDecoration(
-                                    color: color,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: isSelected ? p.textPrimary : Colors.transparent, width: 2.5),
-                                    boxShadow: isSelected ? [BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 12, spreadRadius: 1)] : null,
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            child: Row(
+                              children: AppColors.customAccents.map((color) {
+                                final isSelected = state.customAccentColorValue == color.toARGB32();
+                                return Padding(
+                                  padding: const EdgeInsets.only(right: 12),
+                                  child: GestureDetector(
+                                    onTap: () => cubit.setCustomAccentColor(color),
+                                    child: AnimatedContainer(
+                                      duration: const Duration(milliseconds: 200),
+                                      width: 42,
+                                      height: 42,
+                                      decoration: BoxDecoration(
+                                        color: color,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: isSelected ? p.textPrimary : Colors.transparent,
+                                          width: 2.5,
+                                        ),
+                                        boxShadow: isSelected
+                                            ? [BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 12, spreadRadius: 1)]
+                                            : null,
+                                      ),
+                                      child: isSelected
+                                          ? Icon(
+                                              Icons.check_rounded,
+                                              size: 20,
+                                              color: color.computeLuminance() > 0.5 ? Colors.black : Colors.white,
+                                            )
+                                          : null,
+                                    ),
                                   ),
-                                  child: isSelected
-                                      ? Icon(Icons.check_rounded, size: 20,
-                                          color: color.computeLuminance() > 0.5 ? Colors.black : Colors.white)
-                                      : null,
-                                ),
-                              );
-                            }).toList(),
+                                );
+                              }).toList(),
+                            ),
                           ),
                         ],
                       ),

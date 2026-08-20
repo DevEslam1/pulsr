@@ -25,7 +25,8 @@ class LibraryScreen extends StatefulWidget {
   State<LibraryScreen> createState() => _LibraryScreenState();
 }
 
-class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProviderStateMixin {
+class _LibraryScreenState extends State<LibraryScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   final ScrollController _songsScrollController = ScrollController();
 
@@ -43,10 +44,12 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
   }
 
   void _scrollToLetter(String letter, List<SongsTableData> songs) {
-    final index = songs.indexWhere((s) => s.title.toUpperCase().startsWith(letter));
+    final index =
+        songs.indexWhere((s) => s.title.toUpperCase().startsWith(letter));
     if (index != -1 && _songsScrollController.hasClients) {
       final maxScroll = _songsScrollController.position.maxScrollExtent;
-      final target = songs.length > 1 ? (index / (songs.length - 1)) * maxScroll : 0.0;
+      final target =
+          songs.length > 1 ? (index / (songs.length - 1)) * maxScroll : 0.0;
       _songsScrollController.animateTo(
         target.clamp(0.0, maxScroll),
         duration: const Duration(milliseconds: 250),
@@ -66,10 +69,15 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
         return Scaffold(
           appBar: isMultiSelect
               ? AppBar(
-                  leading: IconButton(icon: const Icon(Icons.close_rounded), onPressed: cubit.clearSelection),
+                  leading: IconButton(
+                      icon: const Icon(Icons.close_rounded),
+                      onPressed: cubit.clearSelection),
                   title: Text('${state.selectedSongIds.length} Selected'),
                   actions: [
-                    IconButton(icon: const Icon(Icons.select_all_rounded), tooltip: 'Select All', onPressed: cubit.selectAllSongs),
+                    IconButton(
+                        icon: const Icon(Icons.select_all_rounded),
+                        tooltip: 'Select All',
+                        onPressed: cubit.selectAllSongs),
                     IconButton(
                       icon: const Icon(Icons.playlist_add_rounded),
                       tooltip: 'Add to Playlist',
@@ -81,7 +89,8 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
                             useRootNavigator: true,
                             isScrollControlled: true,
                             backgroundColor: Colors.transparent,
-                            builder: (_) => AddToPlaylistSheet(song: selected.first),
+                            builder: (_) =>
+                                AddToPlaylistSheet(song: selected.first),
                           );
                         }
                       },
@@ -95,8 +104,9 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
                           playerCubit.addToQueue(s);
                         }
                         cubit.clearSelection();
-                        ScaffoldMessenger.of(context)
-                            .showSnackBar(SnackBar(content: Text('Added ${selected.length} tracks to queue')));
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                            content: Text(
+                                'Added ${selected.length} tracks to queue')));
                       },
                     ),
                   ],
@@ -105,7 +115,9 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
                   title: const Text('Library'),
                   actions: [
                     IconButton(
-                      icon: Icon(state.viewMode == LibraryViewMode.list ? Icons.grid_view_rounded : Icons.view_list_rounded),
+                      icon: Icon(state.viewMode == LibraryViewMode.list
+                          ? Icons.grid_view_rounded
+                          : Icons.view_list_rounded),
                       onPressed: cubit.toggleViewMode,
                     ),
                     IconButton(
@@ -132,10 +144,10 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
                       Tab(text: 'Songs'),
                       Tab(text: 'Albums'),
                       Tab(text: 'Artists'),
-                      Tab(text: 'Genres'),
-                      Tab(text: 'Years'),
                       Tab(text: 'Favorites'),
                       Tab(text: 'Folders'),
+                      Tab(text: 'Genres'),
+                      Tab(text: 'Years'),
                     ],
                   ),
                 ),
@@ -148,10 +160,10 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
                   _buildSongsTab(context, state, cubit, playerCubit),
                   _buildAlbumsTab(context, state),
                   _buildArtistsTab(context, state),
-                  _buildGenresTab(context, state),
-                  _buildYearsTab(context, state),
                   _buildFavoritesTab(context, state, playerCubit),
                   const FolderBrowserTab(),
+                  _buildGenresTab(context, state),
+                  _buildYearsTab(context, state),
                 ],
               ),
             ),
@@ -161,7 +173,10 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
     );
   }
 
-  Widget _buildEmpty(BuildContext context, {required String title, required String subtitle, required IconData icon}) {
+  Widget _buildEmpty(BuildContext context,
+      {required String title,
+      required String subtitle,
+      required IconData icon}) {
     return EmptyStateWidget(
       icon: icon,
       title: title,
@@ -172,25 +187,31 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
         final scanner = context.read<MediaScannerService>();
         final count = await scanner.scanDeviceLibrary();
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Scan complete! $count tracks loaded.')));
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Scan complete! $count tracks loaded.')));
         }
       },
     );
   }
 
   // ================= SONGS =================
-  Widget _buildSongsTab(BuildContext context, LibraryState state, LibraryCubit cubit, PlayerCubit playerCubit) {
+  Widget _buildSongsTab(BuildContext context, LibraryState state,
+      LibraryCubit cubit, PlayerCubit playerCubit) {
     final p = context.palette;
     final songs = state.songs;
     if (songs.isEmpty) {
-      return _buildEmpty(context, title: 'No Songs Found', subtitle: 'Scan your local storage to find all offline music files.', icon: Icons.music_note_rounded);
+      return _buildEmpty(context,
+          title: 'No Songs Found',
+          subtitle: 'Scan your local storage to find all offline music files.',
+          icon: Icons.music_note_rounded);
     }
 
     final isGrid = state.viewMode == LibraryViewMode.grid;
 
     if (isGrid) {
       return GridView.builder(
-        padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 160),
+        padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16,
+            Adaptive.pagePadding(context), 160),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: Adaptive.gridColumns(context, minItemWidth: 155),
           crossAxisSpacing: 14,
@@ -233,7 +254,8 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
                               borderRadius: BorderRadius.circular(18),
                             ),
                             child: const Center(
-                              child: Icon(Icons.check_circle_rounded, color: Colors.white, size: 36),
+                              child: Icon(Icons.check_circle_rounded,
+                                  color: Colors.white, size: 36),
                             ),
                           ),
                         ),
@@ -254,7 +276,8 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
                             ),
                             child: const Padding(
                               padding: EdgeInsets.all(6.0),
-                              child: Icon(Icons.more_vert_rounded, color: Colors.white, size: 18),
+                              child: Icon(Icons.more_vert_rounded,
+                                  color: Colors.white, size: 18),
                             ),
                           ),
                         ),
@@ -267,7 +290,10 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
                   song.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 13.5),
+                  style: TextStyle(
+                      color: p.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13.5),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -295,74 +321,95 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
           },
           child: ListView.builder(
             controller: _songsScrollController,
-            padding: const EdgeInsets.only(bottom: 160, top: 8, left: 4, right: 4),
+            padding:
+                const EdgeInsets.only(bottom: 160, top: 8, left: 4, right: 4),
             itemCount: songs.length,
             itemBuilder: (context, index) {
-            final song = songs[index];
-            return Dismissible(
-              key: ValueKey('song_${song.id}'),
-              background: Container(
-                color: p.accentContainer,
-                alignment: Alignment.centerLeft,
-                padding: const EdgeInsets.only(left: 24),
-                child: Row(children: [Icon(Icons.playlist_play_rounded, color: p.accent), const SizedBox(width: 8),
-                  Text('Play Next', style: TextStyle(color: p.accent, fontWeight: FontWeight.w700))]),
-              ),
-              secondaryBackground: Container(
-                color: p.favorite.withValues(alpha: 0.2),
-                alignment: Alignment.centerRight,
-                padding: const EdgeInsets.only(right: 24),
-                child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-                  Text('Favorite', style: TextStyle(color: p.favorite, fontWeight: FontWeight.w700)),
-                  const SizedBox(width: 8), Icon(Icons.favorite_rounded, color: p.favorite)]),
-              ),
-              confirmDismiss: (direction) async {
-                if (direction == DismissDirection.startToEnd) {
-                  playerCubit.playNext(song);
-                } else {
-                  cubit.toggleFavorite(song.id);
-                }
-                return false;
-              },
-              child: SongTile(
-                song: song,
-                selected: state.selectedSongIds.contains(song.id),
-                onTap: () {
-                  if (state.isMultiSelectMode) {
-                    cubit.toggleSongSelection(song.id);
-                  } else {
-                    playerCubit.playSong(song, queue: songs);
-                  }
-                },
-                onLongPress: () => cubit.toggleSongSelection(song.id),
-                onMorePressed: () => showModalBottomSheet(
-                  context: context,
-                  useRootNavigator: true,
-                  isScrollControlled: true,
-                  backgroundColor: Colors.transparent,
-                  builder: (_) => SongInfoSheet(song: song),
+              final song = songs[index];
+              return Dismissible(
+                key: ValueKey('song_${song.id}'),
+                background: Container(
+                  color: p.accentContainer,
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.only(left: 24),
+                  child: Row(children: [
+                    Icon(Icons.playlist_play_rounded, color: p.accent),
+                    const SizedBox(width: 8),
+                    Text('Play Next',
+                        style: TextStyle(
+                            color: p.accent, fontWeight: FontWeight.w700))
+                  ]),
                 ),
-              ),
-            );
+                secondaryBackground: Container(
+                  color: p.favorite.withValues(alpha: 0.2),
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 24),
+                  child:
+                      Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                    Text('Favorite',
+                        style: TextStyle(
+                            color: p.favorite, fontWeight: FontWeight.w700)),
+                    const SizedBox(width: 8),
+                    Icon(Icons.favorite_rounded, color: p.favorite)
+                  ]),
+                ),
+                confirmDismiss: (direction) async {
+                  if (direction == DismissDirection.startToEnd) {
+                    playerCubit.playNext(song);
+                  } else {
+                    cubit.toggleFavorite(song.id);
+                  }
+                  return false;
+                },
+                child: SongTile(
+                  song: song,
+                  selected: state.selectedSongIds.contains(song.id),
+                  onTap: () {
+                    if (state.isMultiSelectMode) {
+                      cubit.toggleSongSelection(song.id);
+                    } else {
+                      playerCubit.playSong(song, queue: songs);
+                    }
+                  },
+                  onLongPress: () => cubit.toggleSongSelection(song.id),
+                  onMorePressed: () => showModalBottomSheet(
+                    context: context,
+                    useRootNavigator: true,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (_) => SongInfoSheet(song: song),
+                  ),
+                ),
+              );
             },
           ),
         ),
         if (showAlphabet)
           Positioned(
-            right: 4, top: 8, bottom: 150,
+            right: 4,
+            top: 8,
+            bottom: 150,
             child: Container(
               width: 22,
-              decoration: BoxDecoration(color: p.surfaceContainer.withValues(alpha: 0.7), borderRadius: BorderRadius.circular(11)),
+              decoration: BoxDecoration(
+                  color: p.surfaceContainer.withValues(alpha: 0.7),
+                  borderRadius: BorderRadius.circular(11)),
               child: SingleChildScrollView(
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Column(
-                  children: alphabet.map((l) => InkWell(
-                    onTap: () => _scrollToLetter(l, songs),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 1),
-                      child: Text(l, style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: p.textTertiary)),
-                    ),
-                  )).toList(),
+                  children: alphabet
+                      .map((l) => InkWell(
+                            onTap: () => _scrollToLetter(l, songs),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 1),
+                              child: Text(l,
+                                  style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.w800,
+                                      color: p.textTertiary)),
+                            ),
+                          ))
+                      .toList(),
                 ),
               ),
             ),
@@ -376,7 +423,10 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
     final p = context.palette;
     final albums = state.albums;
     if (albums.isEmpty) {
-      return _buildEmpty(context, title: 'No Albums Found', subtitle: 'Scan your media library to view your albums.', icon: Icons.album_rounded);
+      return _buildEmpty(context,
+          title: 'No Albums Found',
+          subtitle: 'Scan your media library to view your albums.',
+          icon: Icons.album_rounded);
     }
 
     final isGrid = state.viewMode == LibraryViewMode.grid;
@@ -396,12 +446,22 @@ class _LibraryScreenState extends State<LibraryScreen> with SingleTickerProvider
                 side: BorderSide(color: p.hairline),
               ),
               child: ListTile(
-                leading: CachedArtwork(id: album.id, type: ArtworkType.ALBUM, size: 48, borderRadius: 12),
-                title: Text(album.title, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: p.textPrimary)),
-                subtitle: Text('${album.artist} • ${Formatters.formatTrackCount(album.songCount)}',
+                leading: CachedArtwork(
+                    id: album.id,
+                    type: ArtworkType.ALBUM,
+                    size: 48,
+                    borderRadius: 12),
+                title: Text(album.title,
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: p.textPrimary)),
+                subtitle: Text(
+                    '${album.artist} • ${Formatters.formatTrackCount(album.songCount)}',
                     style: TextStyle(color: p.textSecondary, fontSize: 12)),
-                trailing: Icon(Icons.chevron_right_rounded, color: p.textTertiary),
-onTap: () => context.push('/album', extra: album),
+                trailing:
+                    Icon(Icons.chevron_right_rounded, color: p.textTertiary),
+                onTap: () => context.push('/album', extra: album),
               ),
             ),
           );
@@ -410,7 +470,8 @@ onTap: () => context.push('/album', extra: album),
     }
 
     return GridView.builder(
-      padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 160),
+      padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16,
+          Adaptive.pagePadding(context), 160),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: Adaptive.gridColumns(context, minItemWidth: 168),
         crossAxisSpacing: 14,
@@ -429,15 +490,26 @@ onTap: () => context.push('/album', extra: album),
               Expanded(
                 child: Hero(
                   tag: 'album_${album.id}',
-                  child: CachedArtwork(id: album.id, type: ArtworkType.ALBUM, size: double.infinity, borderRadius: 18),
+                  child: CachedArtwork(
+                      id: album.id,
+                      type: ArtworkType.ALBUM,
+                      size: double.infinity,
+                      borderRadius: 18),
                 ),
               ),
               const SizedBox(height: 9),
-              Text(album.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 13.5)),
+              Text(album.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                      color: p.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13.5)),
               const SizedBox(height: 2),
-              Text('${album.artist} • ${Formatters.formatTrackCount(album.songCount)}',
-                  maxLines: 1, overflow: TextOverflow.ellipsis,
+              Text(
+                  '${album.artist} • ${Formatters.formatTrackCount(album.songCount)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: p.textSecondary, fontSize: 11.5)),
             ],
           ),
@@ -451,7 +523,10 @@ onTap: () => context.push('/album', extra: album),
     final p = context.palette;
     final artists = state.artists;
     if (artists.isEmpty) {
-      return _buildEmpty(context, title: 'No Artists Found', subtitle: 'Scan your media library to view all artists.', icon: Icons.person_rounded);
+      return _buildEmpty(context,
+          title: 'No Artists Found',
+          subtitle: 'Scan your media library to view all artists.',
+          icon: Icons.person_rounded);
     }
 
     final isGrid = state.viewMode == LibraryViewMode.grid;
@@ -471,12 +546,22 @@ onTap: () => context.push('/album', extra: album),
                 side: BorderSide(color: p.hairline),
               ),
               child: ListTile(
-                leading: CachedArtwork(id: artist.id, type: ArtworkType.ARTIST, size: 48, borderRadius: 999, fallbackIcon: Icons.person_rounded),
-                title: Text(artist.name, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: p.textPrimary)),
+                leading: CachedArtwork(
+                    id: artist.id,
+                    type: ArtworkType.ARTIST,
+                    size: 48,
+                    borderRadius: 999,
+                    fallbackIcon: Icons.person_rounded),
+                title: Text(artist.name,
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: p.textPrimary)),
                 subtitle: Text(Formatters.formatTrackCount(artist.songCount),
                     style: TextStyle(color: p.textSecondary, fontSize: 12)),
-                trailing: Icon(Icons.chevron_right_rounded, color: p.textTertiary),
-onTap: () => context.push('/artist', extra: artist),
+                trailing:
+                    Icon(Icons.chevron_right_rounded, color: p.textTertiary),
+                onTap: () => context.push('/artist', extra: artist),
               ),
             ),
           );
@@ -485,9 +570,11 @@ onTap: () => context.push('/artist', extra: artist),
     }
 
     return GridView.builder(
-      padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 160),
+      padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16,
+          Adaptive.pagePadding(context), 160),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: Adaptive.gridColumns(context, minItemWidth: 150, phoneColumns: 3, maxColumns: 8),
+        crossAxisCount: Adaptive.gridColumns(context,
+            minItemWidth: 150, phoneColumns: 3, maxColumns: 8),
         crossAxisSpacing: 14,
         mainAxisSpacing: 18,
         childAspectRatio: 0.82,
@@ -501,12 +588,22 @@ onTap: () => context.push('/artist', extra: artist),
           child: Column(
             children: [
               Expanded(
-                child: CachedArtwork(id: artist.id, type: ArtworkType.ARTIST, size: double.infinity,
-                    borderRadius: 999, fallbackIcon: Icons.person_rounded),
+                child: CachedArtwork(
+                    id: artist.id,
+                    type: ArtworkType.ARTIST,
+                    size: double.infinity,
+                    borderRadius: 999,
+                    fallbackIcon: Icons.person_rounded),
               ),
               const SizedBox(height: 9),
-              Text(artist.name, maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
-                  style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 13)),
+              Text(artist.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      color: p.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13)),
               Text(Formatters.formatTrackCount(artist.songCount),
                   style: TextStyle(color: p.textSecondary, fontSize: 11)),
             ],
@@ -521,7 +618,10 @@ onTap: () => context.push('/artist', extra: artist),
     final p = context.palette;
     final genres = state.genres;
     if (genres.isEmpty) {
-      return _buildEmpty(context, title: 'No Genres Found', subtitle: 'Scan your media library to view all song genres.', icon: Icons.style_rounded);
+      return _buildEmpty(context,
+          title: 'No Genres Found',
+          subtitle: 'Scan your media library to view all song genres.',
+          icon: Icons.style_rounded);
     }
     return _chipCategoryGrid(
       context,
@@ -542,7 +642,10 @@ onTap: () => context.push('/artist', extra: artist),
   Widget _buildYearsTab(BuildContext context, LibraryState state) {
     final years = state.years;
     if (years.isEmpty) {
-      return _buildEmpty(context, title: 'No Years Found', subtitle: 'Scan your media library to view release years.', icon: Icons.calendar_today_rounded);
+      return _buildEmpty(context,
+          title: 'No Years Found',
+          subtitle: 'Scan your media library to view release years.',
+          icon: Icons.calendar_today_rounded);
     }
     return _chipCategoryGrid(
       context,
@@ -560,11 +663,15 @@ onTap: () => context.push('/artist', extra: artist),
     );
   }
 
-  Widget _chipCategoryGrid(BuildContext context, {required int count, required Widget Function(BuildContext, int) builder}) {
+  Widget _chipCategoryGrid(BuildContext context,
+      {required int count,
+      required Widget Function(BuildContext, int) builder}) {
     return GridView.builder(
-      padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 160),
+      padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16,
+          Adaptive.pagePadding(context), 160),
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: Adaptive.gridColumns(context, minItemWidth: 160, phoneColumns: 2),
+        crossAxisCount:
+            Adaptive.gridColumns(context, minItemWidth: 160, phoneColumns: 2),
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
         childAspectRatio: 3.4,
@@ -575,7 +682,8 @@ onTap: () => context.push('/artist', extra: artist),
   }
 
   // ================= FAVORITES =================
-  Widget _buildFavoritesTab(BuildContext context, LibraryState state, PlayerCubit playerCubit) {
+  Widget _buildFavoritesTab(
+      BuildContext context, LibraryState state, PlayerCubit playerCubit) {
     final p = context.palette;
     final favorites = state.favorites;
     if (favorites.isEmpty) {
@@ -594,7 +702,8 @@ onTap: () => context.push('/artist', extra: artist),
 
     if (isGrid) {
       return GridView.builder(
-        padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 160),
+        padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16,
+            Adaptive.pagePadding(context), 160),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: Adaptive.gridColumns(context, minItemWidth: 155),
           crossAxisSpacing: 14,
@@ -629,10 +738,13 @@ onTap: () => context.push('/artist', extra: artist),
                           shape: const CircleBorder(),
                           child: InkWell(
                             customBorder: const CircleBorder(),
-                            onTap: () => context.read<LibraryCubit>().toggleFavorite(song.id),
+                            onTap: () => context
+                                .read<LibraryCubit>()
+                                .toggleFavorite(song.id),
                             child: Padding(
                               padding: const EdgeInsets.all(6.0),
-                              child: Icon(Icons.favorite_rounded, color: p.favorite, size: 18),
+                              child: Icon(Icons.favorite_rounded,
+                                  color: p.favorite, size: 18),
                             ),
                           ),
                         ),
@@ -645,7 +757,10 @@ onTap: () => context.push('/artist', extra: artist),
                   song.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 13.5),
+                  style: TextStyle(
+                      color: p.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13.5),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -671,7 +786,8 @@ onTap: () => context.push('/artist', extra: artist),
             onTap: () => playerCubit.playSong(song, queue: favorites),
             trailing: IconButton(
               icon: Icon(Icons.favorite_rounded, color: p.favorite, size: 21),
-              onPressed: () => context.read<LibraryCubit>().toggleFavorite(song.id),
+              onPressed: () =>
+                  context.read<LibraryCubit>().toggleFavorite(song.id),
             ),
           ),
       ],
@@ -686,7 +802,12 @@ class _CategoryCard extends StatelessWidget {
   final Color color;
   final VoidCallback onTap;
 
-  const _CategoryCard({required this.icon, required this.title, required this.subtitle, required this.color, required this.onTap});
+  const _CategoryCard(
+      {required this.icon,
+      required this.title,
+      required this.subtitle,
+      required this.color,
+      required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -705,7 +826,9 @@ class _CategoryCard extends StatelessWidget {
           children: [
             Container(
               padding: const EdgeInsets.all(9),
-              decoration: BoxDecoration(color: color.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(12)),
+              decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(12)),
               child: Icon(icon, color: color, size: 20),
             ),
             const SizedBox(width: 12),
@@ -714,10 +837,16 @@ class _CategoryCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w800, fontSize: 14)),
+                  Text(title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: p.textPrimary,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14)),
                   const SizedBox(height: 1),
-                  Text(subtitle, style: TextStyle(color: p.textSecondary, fontSize: 11.5)),
+                  Text(subtitle,
+                      style: TextStyle(color: p.textSecondary, fontSize: 11.5)),
                 ],
               ),
             ),

@@ -5,8 +5,10 @@ import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
 import '../../domain/models/genre_item.dart';
 import '../../domain/models/year_item.dart';
+import '../../domain/usecases/folder_usecases.dart';
 import '../../features/album_detail/presentation/album_detail_screen.dart';
 import '../../features/artist_detail/presentation/artist_detail_screen.dart';
+import '../../features/folder_detail/presentation/folder_detail_screen.dart';
 import '../../features/genre_detail/presentation/genre_detail_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/library/presentation/library_screen.dart';
@@ -191,6 +193,15 @@ GoRouter createRouter(MediaScannerService scannerService) {
         name: 'queue',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const QueueScreen(),
+      ),
+      GoRoute(
+        path: '/folder',
+        name: 'folder',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final folder = state.extra as FolderItem;
+          return FolderDetailScreen(folder: folder);
+        },
       ),
       GoRoute(
         path: '/tag-editor',

@@ -1,6 +1,7 @@
 // lib/features/player/presentation/now_playing_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/theme/dynamic_theme_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../settings/cubit/settings_state.dart';
@@ -64,7 +65,7 @@ class NowPlayingScreen extends StatelessWidget {
         return Scaffold(
           backgroundColor: bgColor,
           body: _SwipeDownToDismiss(
-            onDismiss: () => Navigator.of(context).maybePop(),
+            onDismiss: () => context.canPop() ? context.pop() : context.go('/'),
             child: Center(
               child: ConstrainedBox(
                 constraints: BoxConstraints(
