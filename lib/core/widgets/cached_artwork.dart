@@ -24,17 +24,27 @@ class ArtworkLruCache {
   Uint8List? get(String key) {
     if (!_cache.containsKey(key)) return null;
     final value = _cache.remove(key);
-    _cache[key] = value;
+    if (value != null) {
+      _cache[key] = value;
+    }
     return value;
   }
 
   void put(String key, Uint8List? bytes) {
+    if (bytes == null || bytes.isEmpty) {
+      _cache.remove(key);
+      return;
+    }
     if (_cache.containsKey(key)) {
       _cache.remove(key);
     } else if (_cache.length >= maxCapacity) {
       _cache.remove(_cache.keys.first);
     }
     _cache[key] = bytes;
+  }
+
+  void remove(String key) {
+    _cache.remove(key);
   }
 
   void clear() {
@@ -105,14 +115,16 @@ class _CachedArtworkState extends State<CachedArtwork> {
           )
           .then((bytes) {
         if (mounted && token == _loadToken) {
-          _cache.put(key, bytes);
+          if (bytes != null && bytes.isNotEmpty) {
+            _cache.put(key, bytes);
+          }
           setState(() {
             _cachedBytes = bytes;
           });
         }
       }).catchError((_) {
         if (mounted && token == _loadToken) {
-          _cache.put(key, null);
+          // Do not cache null on failure so future queries can retry
           setState(() {
             _cachedBytes = null;
           });

@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../../domain/models/lyrics_line.dart';
 
 class LrcParser {
-  static const MethodChannel _lyricsChannel = MethodChannel('com.example.pulsr/lyrics');
+  static const MethodChannel _lyricsChannel = MethodChannel('com.pulsr.music/lyrics');
 
   /// Parses raw LRC string content into a sorted list of `LyricsLine`.
   static List<LyricsLine> parse(String lrcContent, {LyricsSource source = LyricsSource.none}) {

@@ -79,7 +79,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           BoxShadow(color: p.glow, blurRadius: 24, spreadRadius: -4, offset: const Offset(0, 8)),
                         ],
                       ),
-                      child: PulsrLogo(size: 26, color: p.accent, glowColor: p.glow, animate: true),
+                      child: PulsrLogo(size: 26, color: p.accent, glowColor: p.glow, animate: false),
                     ),
                   ],
                 ),

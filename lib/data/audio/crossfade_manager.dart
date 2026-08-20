@@ -23,28 +23,35 @@ class CrossfadeManager {
       await player.setVolume(to);
       return;
     }
-    const steps = 20;
-    final stepDuration = Duration(milliseconds: (fadeDuration.inMilliseconds / steps).round());
-    final volumeDelta = (to - from) / steps;
+    final startTime = DateTime.now();
+    final totalMs = fadeDuration.inMilliseconds.toDouble();
+    if (totalMs <= 0) {
+      await player.setVolume(to);
+      return;
+    }
 
     await player.setVolume(from);
-    for (int i = 1; i <= steps; i++) {
+    while (_fadeId == fadeId) {
+      await Future.delayed(const Duration(milliseconds: 20));
       if (_fadeId != fadeId) break;
-      await Future.delayed(stepDuration);
-      if (_fadeId != fadeId) break;
-      final nextVolume = (from + volumeDelta * i).clamp(0.0, 1.0);
-      await player.setVolume(nextVolume);
+      final elapsed = DateTime.now().difference(startTime).inMilliseconds.toDouble();
+      final fraction = (elapsed / totalMs).clamp(0.0, 1.0);
+      final currentVol = from + (to - from) * fraction;
+      await player.setVolume(currentVol.clamp(0.0, 1.0));
+      if (fraction >= 1.0) break;
     }
   }
 
-  void cancel(AudioPlayer inactivePlayer, AudioPlayer activePlayer) {
+  Future<void> cancel(AudioPlayer inactivePlayer, AudioPlayer activePlayer) async {
     if (isCrossfading) {
       _fadeId++;
       isCrossfading = false;
       pendingIndex = null;
-      inactivePlayer.stop();
-      inactivePlayer.setVolume(1.0);
-      activePlayer.setVolume(1.0);
+      try {
+        await inactivePlayer.stop();
+        await inactivePlayer.setVolume(1.0);
+        await activePlayer.setVolume(1.0);
+      } catch (_) {}
       if (_crossfadeCompleter != null && !_crossfadeCompleter!.isCompleted) {
         _crossfadeCompleter!.complete();
       }

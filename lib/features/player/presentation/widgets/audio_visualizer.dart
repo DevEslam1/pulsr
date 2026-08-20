@@ -34,8 +34,8 @@ class AudioVisualizer extends StatefulWidget {
 }
 
 class _AudioVisualizerState extends State<AudioVisualizer> with SingleTickerProviderStateMixin {
-  static const MethodChannel _methodChannel = MethodChannel('com.example.pulsr/visualizer');
-  static const EventChannel _eventChannel = EventChannel('com.example.pulsr/visualizer_stream');
+  static const MethodChannel _methodChannel = MethodChannel('com.pulsr.music/visualizer');
+  static const EventChannel _eventChannel = EventChannel('com.pulsr.music/visualizer_stream');
 
   StreamSubscription? _subscription;
   late AnimationController _animController;

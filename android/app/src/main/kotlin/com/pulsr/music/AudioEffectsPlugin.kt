@@ -1,7 +1,8 @@
-package com.example.pulsr
+package com.pulsr.music
 
 import android.content.Context
 import android.media.AudioManager
+import android.media.audiofx.AudioEffect
 import android.media.audiofx.BassBoost
 import android.media.audiofx.DynamicsProcessing
 import android.media.audiofx.LoudnessEnhancer
@@ -13,6 +14,7 @@ import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
+import java.util.UUID
 
 class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var methodChannel: MethodChannel
@@ -34,7 +36,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var currentAudioSessionId = 0
 
     companion object {
-        const val CHANNEL_NAME = "com.example.pulsr/audio_effects"
+        const val CHANNEL_NAME = "com.pulsr.music/audio_effects"
 
         fun registerWith(flutterEngine: FlutterEngine, context: Context) {
             val plugin = AudioEffectsPlugin()
@@ -85,13 +87,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 "isVolumeBoostSupported" -> {
-                    val supported = try {
-                        val testLe = LoudnessEnhancer(0)
-                        testLe.release()
-                        true
-                    } catch (e: Exception) {
-                        false
-                    }
+                    val supported = isEffectTypeSupported(AudioEffect.EFFECT_TYPE_LOUDNESS_ENHANCER)
                     result.success(supported)
                 }
 
@@ -102,14 +98,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 "isBassBoostSupported" -> {
-                    val supported = try {
-                        val testBb = BassBoost(0, 0)
-                        val sup = testBb.strengthSupported
-                        testBb.release()
-                        sup
-                    } catch (e: Exception) {
-                        false
-                    }
+                    val supported = isEffectTypeSupported(AudioEffect.EFFECT_TYPE_BASS_BOOST)
                     result.success(supported)
                 }
 
@@ -121,19 +110,16 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 "isDynamicsSupported" -> {
-                    val supported = Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
+                    val supported = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                        isEffectTypeSupported(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING)
+                    } else {
+                        false
+                    }
                     result.success(supported)
                 }
 
                 "isVirtualizerSupported" -> {
-                    val supported = try {
-                        val testVirt = Virtualizer(0, 0)
-                        val sup = testVirt.strengthSupported
-                        testVirt.release()
-                        sup
-                    } catch (e: Exception) {
-                        false
-                    }
+                    val supported = isEffectTypeSupported(AudioEffect.EFFECT_TYPE_VIRTUALIZER)
                     result.success(supported)
                 }
 
@@ -602,5 +588,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             dynamicsProcessing?.release()
         } catch (_: Exception) {}
         dynamicsProcessing = null
+    }
+
+    private fun isEffectTypeSupported(effectType: UUID): Boolean {
+        return try {
+            val effects = AudioEffect.queryEffects() ?: return false
+            effects.any { it.type == effectType }
+        } catch (_: Exception) {
+            false
+        }
     }
 }

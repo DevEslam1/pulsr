@@ -3,6 +3,8 @@ import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 
 class ErrorLogger {
+  static void Function(dynamic error, StackTrace? stackTrace, String category)? onCrashReported;
+
   static void log(
     String message, {
     dynamic error,
@@ -16,6 +18,11 @@ class ErrorLogger {
         error: error,
         stackTrace: stackTrace,
       );
+    } else {
+      // In release mode, route to crash reporting hook if configured
+      if (error != null) {
+        onCrashReported?.call(error, stackTrace, category);
+      }
     }
   }
 

@@ -1,4 +1,4 @@
-package com.example.pulsr
+package com.pulsr.music
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
@@ -32,7 +32,7 @@ class NowPlayingWidget : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
-        if (action != null && action.startsWith("com.example.pulsr.widget.")) {
+        if (action != null && action.startsWith("com.pulsr.music.widget.")) {
             handleWidgetAction(context, intent)
             return
         }
@@ -141,14 +141,17 @@ class NowPlayingWidget : AppWidgetProvider() {
     }
 
     companion object {
-        const val ACTION_PLAY_PAUSE = "com.example.pulsr.widget.PLAY_PAUSE"
-        const val ACTION_NEXT = "com.example.pulsr.widget.NEXT"
-        const val ACTION_PREV = "com.example.pulsr.widget.PREV"
-        const val ACTION_REWIND = "com.example.pulsr.widget.REWIND"
-        const val ACTION_FORWARD = "com.example.pulsr.widget.FORWARD"
-        const val ACTION_SEEK_RATIO = "com.example.pulsr.widget.SEEK_RATIO"
-        const val ACTION_FAVORITE = "com.example.pulsr.widget.FAVORITE"
+        const val ACTION_PLAY_PAUSE = "com.pulsr.music.widget.PLAY_PAUSE"
+        const val ACTION_NEXT = "com.pulsr.music.widget.NEXT"
+        const val ACTION_PREV = "com.pulsr.music.widget.PREV"
+        const val ACTION_REWIND = "com.pulsr.music.widget.REWIND"
+        const val ACTION_FORWARD = "com.pulsr.music.widget.FORWARD"
+        const val ACTION_SEEK_RATIO = "com.pulsr.music.widget.SEEK_RATIO"
+        const val ACTION_FAVORITE = "com.pulsr.music.widget.FAVORITE"
         const val EXTRA_RATIO = "extra_ratio"
+
+        private var cachedMediaBrowser: MediaBrowserCompat? = null
+        private var cachedMediaController: MediaControllerCompat? = null
 
         private fun sendExplicitMediaButton(context: Context, keyCode: Int) {
             try {
@@ -179,33 +182,37 @@ class NowPlayingWidget : AppWidgetProvider() {
                 val position = getSafeLong(data, "positionMs", 0L)
                 val isPlaying = getSafeBoolean(data, "isPlaying", false)
 
+                val controller = cachedMediaController
+                if (controller != null && cachedMediaBrowser?.isConnected == true) {
+                    action(controller.transportControls, isPlaying, position, duration)
+                    return
+                }
+
                 val component = ComponentName(context, "com.ryanheise.audioservice.AudioService")
                 val appContext = context.applicationContext ?: context
                 val handler = Handler(Looper.getMainLooper())
 
-                var browser: MediaBrowserCompat? = null
                 val connectionCallback = object : MediaBrowserCompat.ConnectionCallback() {
                     override fun onConnected() {
                         try {
-                            val token = browser?.sessionToken
+                            val token = cachedMediaBrowser?.sessionToken
                             if (token != null) {
-                                val controller = MediaControllerCompat(appContext, token)
-                                action(controller.transportControls, isPlaying, position, duration)
+                                val newController = MediaControllerCompat(appContext, token)
+                                cachedMediaController = newController
+                                action(newController.transportControls, isPlaying, position, duration)
                             }
                         } catch (_: Throwable) {
-                        } finally {
-                            handler.postDelayed({
-                                try { browser?.disconnect() } catch (_: Throwable) {}
-                            }, 500)
                         }
                     }
 
                     override fun onConnectionFailed() {
-                        try { browser?.disconnect() } catch (_: Throwable) {}
+                        cachedMediaBrowser = null
+                        cachedMediaController = null
                     }
                 }
-                browser = MediaBrowserCompat(appContext, component, connectionCallback, null)
-                browser.connect()
+
+                cachedMediaBrowser = MediaBrowserCompat(appContext, component, connectionCallback, null)
+                cachedMediaBrowser?.connect()
             } catch (_: Throwable) {}
         }
 
@@ -298,17 +305,43 @@ class NowPlayingWidget : AppWidgetProvider() {
                     if (isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play
                 )
 
-                // ---- Artwork ----
+                // ---- Artwork (with Downsampling & RGB_565 to prevent OOM) ----
                 val artworkPath = getSafeString(data, "artwork")
                 var bitmapSet = false
                 if (!artworkPath.isNullOrEmpty()) {
                     try {
                         val file = File(artworkPath)
                         if (file.exists() && file.length() > 0) {
-                            val bitmap = BitmapFactory.decodeFile(artworkPath)
-                            if (bitmap != null) {
-                                val density = context.resources.displayMetrics.density
-                                val roundedBitmap = getRoundedCornerBitmap(bitmap, 14f * density)
+                            val density = context.resources.displayMetrics.density
+                            val targetPx = (112 * density).toInt().coerceAtLeast(112)
+
+                            val boundsOptions = BitmapFactory.Options().apply {
+                                inJustDecodeBounds = true
+                            }
+                            BitmapFactory.decodeFile(artworkPath, boundsOptions)
+
+                            var sampleSize = 1
+                            while ((boundsOptions.outWidth / sampleSize) > targetPx * 2 ||
+                                   (boundsOptions.outHeight / sampleSize) > targetPx * 2) {
+                                sampleSize *= 2
+                            }
+
+                            val decodeOptions = BitmapFactory.Options().apply {
+                                inSampleSize = sampleSize
+                                inPreferredConfig = Bitmap.Config.RGB_565
+                            }
+
+                            val rawBitmap = BitmapFactory.decodeFile(artworkPath, decodeOptions)
+                            if (rawBitmap != null) {
+                                val scaledBitmap = if (rawBitmap.width > targetPx || rawBitmap.height > targetPx) {
+                                    val s = Bitmap.createScaledBitmap(rawBitmap, targetPx, targetPx, true)
+                                    if (s != rawBitmap) rawBitmap.recycle()
+                                    s
+                                } else {
+                                    rawBitmap
+                                }
+                                val roundedBitmap = getRoundedCornerBitmap(scaledBitmap, 14f * density)
+                                if (roundedBitmap != scaledBitmap) scaledBitmap.recycle()
                                 views.setImageViewBitmap(R.id.widget_artwork, roundedBitmap)
                                 bitmapSet = true
                             }

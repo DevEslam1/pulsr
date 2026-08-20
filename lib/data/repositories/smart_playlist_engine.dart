@@ -114,8 +114,8 @@ class SmartPlaylistEngine {
       case SmartRuleField.dateAdded:
         if (rule.operator == SmartOperator.withinDays) {
           final days = valInt ?? 30;
-          final cutoffSec = (DateTime.now().millisecondsSinceEpoch ~/ 1000) - (days * 86400);
-          return t.dateAdded.isBiggerOrEqualValue(cutoffSec);
+          final cutoffMs = DateTime.now().millisecondsSinceEpoch - (days * 86400 * 1000);
+          return t.dateAdded.isBiggerOrEqualValue(cutoffMs);
         }
         if (valInt == null) return null;
         switch (rule.operator) {

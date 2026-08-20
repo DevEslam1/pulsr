@@ -13,7 +13,7 @@ import '../../data/db/app_database.dart';
 @lazySingleton
 class WidgetService {
   static const String androidWidgetName = 'NowPlayingWidget';
-  static const String qualifiedAndroidName = 'com.example.pulsr.NowPlayingWidget';
+  static const String qualifiedAndroidName = 'com.pulsr.music.NowPlayingWidget';
 
   final OnAudioQuery _audioQuery = OnAudioQuery();
 

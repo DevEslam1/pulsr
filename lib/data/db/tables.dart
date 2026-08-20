@@ -17,6 +17,7 @@ class SongsTable extends Table {
   IntColumn get trackNumber => integer().nullable()();
   IntColumn get discNumber => integer().nullable()();
   IntColumn get year => integer().nullable()();
+  /// Stored as timestamp (seconds or milliseconds since Unix epoch, consistent with MediaStore/on_audio_query).
   IntColumn get dateAdded => integer().nullable()();
   TextColumn get genre => text().nullable()();
   BoolColumn get isFavorite => boolean().withDefault(const Constant(false))();

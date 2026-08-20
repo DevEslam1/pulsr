@@ -103,12 +103,13 @@ extension GetItInjectableX on _i174.GetIt {
     await gh.singletonAsync<_i366.PulsrAudioHandler>(
       () => _i366.PulsrAudioHandler.create(gh<_i320.IMusicRepository>()),
       preResolve: true,
+      dispose: (i) => i.dispose(),
     );
     gh.factory<_i984.SearchCubit>(() => _i984.SearchCubit(
           searchUseCase: gh<_i644.SearchMusicUseCase>(),
           folderUseCases: gh<_i1017.FolderUseCases>(),
         ));
-    gh.factory<_i147.PlayerCubit>(() => _i147.PlayerCubit(
+    gh.lazySingleton<_i147.PlayerCubit>(() => _i147.PlayerCubit(
           audioHandler: gh<_i366.PulsrAudioHandler>(),
           repository: gh<_i320.IMusicRepository>(),
           toggleFavoriteUseCase: gh<_i800.ToggleFavoriteUseCase>(),

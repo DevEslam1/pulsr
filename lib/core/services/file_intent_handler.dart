@@ -11,7 +11,7 @@ import '../../features/player/cubit/player_cubit.dart';
 
 @singleton
 class FileIntentHandler {
-  static const MethodChannel _channel = MethodChannel('com.example.pulsr/file_opener');
+  static const MethodChannel _channel = MethodChannel('com.pulsr.music/file_opener');
   final IMusicRepository _repository;
   final PlayerCubit _playerCubit;
 
@@ -65,12 +65,13 @@ class FileIntentHandler {
       }
 
       // 2. If not yet indexed in database, build standalone playable SongsTableData
+      // Use negative ID to guarantee zero collision with positive MediaStore database IDs
       final file = File(cleanPath);
       final filename = file.uri.pathSegments.isNotEmpty ? file.uri.pathSegments.last : 'Audio File';
       final title = filename.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '');
 
       final tempSong = SongsTableData(
-        id: math.Random().nextInt(999999) + 1000000,
+        id: -1 * (math.Random().nextInt(900000) + 100000),
         title: title,
         artist: 'External Audio',
         album: 'Files',

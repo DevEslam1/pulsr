@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -5,7 +8,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.pulsr"
+    namespace = "com.pulsr.music"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -24,12 +27,41 @@ android {
         versionName = flutter.versionName
     }
 
+    val keystoreProperties = Properties().apply {
+        val f = rootProject.file("key.properties")
+        if (f.exists()) {
+            load(FileInputStream(f))
+        }
+    }
+
+    signingConfigs {
+        create("release") {
+            if (keystoreProperties.containsKey("keyAlias")) {
+                keyAlias = keystoreProperties["keyAlias"] as String
+                keyPassword = keystoreProperties["keyPassword"] as String
+                storeFile = file(keystoreProperties["storeFile"] as String)
+                storePassword = keystoreProperties["storePassword"] as String
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // Safe release signing with debug fallback if key.properties not configured
-            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
-            isMinifyEnabled = false
-            isShrinkResources = false
+            val releaseConfig = signingConfigs.getByName("release")
+            val isReleaseTask = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) || it.contains("bundle", ignoreCase = true) }
+            val hasKeystore = releaseConfig.storeFile != null && releaseConfig.storeFile!!.exists()
+            if (isReleaseTask && !hasKeystore) {
+                throw GradleException(
+                    "Release keystore not configured. Create android/key.properties with storeFile/keyAlias/keyPassword/storePassword."
+                )
+            }
+            signingConfig = if (hasKeystore) releaseConfig else signingConfigs.getByName("debug")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 }

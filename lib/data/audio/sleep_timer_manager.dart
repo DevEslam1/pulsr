@@ -11,6 +11,9 @@ class SleepTimerManager {
   final StreamController<Duration?> _sleepTimerRemainingSubject = StreamController<Duration?>.broadcast();
   Stream<Duration?> get sleepTimerRemainingStream => _sleepTimerRemainingSubject.stream;
 
+  double? _preFadeVolume;
+  AudioPlayer Function()? _lastPlayerGetter;
+
   void startSleepTimer(
     Duration duration, {
     bool fadeOut = true,
@@ -19,6 +22,7 @@ class SleepTimerManager {
   }) {
     cancelSleepTimer();
     final currentToken = ++_sleepFadeToken;
+    _lastPlayerGetter = getActivePlayer;
     _sleepTargetTime = DateTime.now().add(duration);
     _sleepTimerRemainingSubject.add(duration);
 
@@ -43,17 +47,20 @@ class SleepTimerManager {
       _sleepTimerRemainingSubject.add(null);
 
       final player = getActivePlayer();
+      _preFadeVolume = player.volume;
       if (fadeOut) {
         // Integer steps to eliminate floating point imprecision
+        final baseVol = _preFadeVolume ?? 1.0;
         for (int i = 10; i >= 0; i--) {
           if (_sleepFadeToken != currentToken) return;
-          await player.setVolume((i / 10.0).clamp(0.0, 1.0));
+          await player.setVolume(((i / 10.0) * baseVol).clamp(0.0, 1.0));
           await Future.delayed(const Duration(milliseconds: 300));
         }
       }
       if (_sleepFadeToken != currentToken) return;
       await onTimerExpired();
-      await player.setVolume(1.0);
+      await player.setVolume(_preFadeVolume ?? 1.0);
+      _preFadeVolume = null;
     });
   }
 
@@ -83,6 +90,12 @@ class SleepTimerManager {
     _sleepCountdownTimer = null;
     _sleepTargetTime = null;
     _sleepTimerRemainingSubject.add(null);
+    if (_preFadeVolume != null && _lastPlayerGetter != null) {
+      try {
+        _lastPlayerGetter!().setVolume(_preFadeVolume!);
+      } catch (_) {}
+      _preFadeVolume = null;
+    }
   }
 
   void dispose() {

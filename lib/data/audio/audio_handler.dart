@@ -7,6 +7,7 @@ import 'package:audio_session/audio_session.dart';
 import 'package:injectable/injectable.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/constants/prefs_keys.dart';
 import '../../domain/models/audio_effects_config.dart';
 import '../../domain/models/eq_preset.dart';
 import '../../domain/models/headphone_profile.dart';
@@ -26,7 +27,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     return await AudioService.init(
       builder: () => PulsrAudioHandler(repository),
       config: const AudioServiceConfig(
-        androidNotificationChannelId: 'com.example.pulsr.audio',
+        androidNotificationChannelId: 'com.pulsr.music.audio',
         androidNotificationChannelName: 'Pulsr Audio Playback',
         androidNotificationOngoing: false,
         androidNotificationClickStartsActivity: true,
@@ -51,8 +52,10 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
   List<SongsTableData> _songs = [];
   int _currentIndex = 0;
+  bool _queueDirty = false;
+  double? _preDuckVolume;
+  final List<int> _shuffleHistory = [];
 
-  Timer? _positionPeriodicTimer;
   Timer? _savePositionDebounce;
   final StreamController<Duration> _positionSubject = StreamController<Duration>.broadcast();
   Stream<Duration> get positionStream => _positionSubject.stream;
@@ -175,7 +178,10 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
         final currentSong = _songs[_currentIndex];
         final posMs = _activePlayer.position.inMilliseconds;
         _repository.updateLastPosition(currentSong.id, posMs);
-        _repository.saveQueue(_songs.map((s) => s.id).toList(), _currentIndex, posMs);
+        if (_queueDirty) {
+          _repository.saveQueue(_songs.map((s) => s.id).toList(), _currentIndex, posMs);
+          _queueDirty = false;
+        }
       }
     });
   }
@@ -238,38 +244,49 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
       final session = await AudioSession.instance;
       await session.configure(const AudioSessionConfiguration.music());
 
-      session.interruptionEventStream.listen((event) async {
-        if (event.begin) {
-          switch (event.type) {
-            case AudioInterruptionType.duck:
-              await _activePlayer.setVolume(0.3);
-              break;
-            case AudioInterruptionType.pause:
-            case AudioInterruptionType.unknown:
-              await pause();
-              break;
+      _subscriptions.add(
+        session.interruptionEventStream.listen((event) async {
+          if (event.begin) {
+            switch (event.type) {
+              case AudioInterruptionType.duck:
+                _preDuckVolume = _activePlayer.volume;
+                await _activePlayer.setVolume(0.3 * (_preDuckVolume ?? 1.0));
+                break;
+              case AudioInterruptionType.pause:
+              case AudioInterruptionType.unknown:
+                await pause();
+                break;
+            }
+          } else {
+            switch (event.type) {
+              case AudioInterruptionType.duck:
+                if (_preDuckVolume != null) {
+                  final expectedDucked = 0.3 * (_preDuckVolume ?? 1.0);
+                  if ((_activePlayer.volume - expectedDucked).abs() < 0.05) {
+                    await _activePlayer.setVolume(_preDuckVolume ?? 1.0);
+                  }
+                  _preDuckVolume = null;
+                }
+                break;
+              case AudioInterruptionType.pause:
+                final prefs = await SharedPreferences.getInstance();
+                final resume = prefs.getBool(PrefsKeys.resumeAfterInterruption) ?? true;
+                if (resume) {
+                  await play();
+                }
+                break;
+              case AudioInterruptionType.unknown:
+                break;
+            }
           }
-        } else {
-          switch (event.type) {
-            case AudioInterruptionType.duck:
-              await _activePlayer.setVolume(1.0);
-              break;
-            case AudioInterruptionType.pause:
-              final prefs = await SharedPreferences.getInstance();
-              final resume = prefs.getBool('setting_resume_after_interruption') ?? true;
-              if (resume) {
-                await play();
-              }
-              break;
-            case AudioInterruptionType.unknown:
-              break;
-          }
-        }
-      });
+        }),
+      );
 
-      session.becomingNoisyEventStream.listen((_) {
-        pause();
-      });
+      _subscriptions.add(
+        session.becomingNoisyEventStream.listen((_) {
+          pause();
+        }),
+      );
     } catch (_) {}
 
     // Initialize audio effects & equalizer preferences
@@ -381,9 +398,20 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     }
     if (_activePlayer.shuffleModeEnabled && _songs.length > 1) {
       final random = math.Random();
+      final recentWindow = math.min(_songs.length - 1, 10);
+      final recent = _shuffleHistory.length >= recentWindow
+          ? _shuffleHistory.sublist(_shuffleHistory.length - recentWindow)
+          : _shuffleHistory;
+
       int next = random.nextInt(_songs.length);
-      while (next == _currentIndex && _songs.length > 1) {
+      int attempts = 0;
+      while ((next == _currentIndex || recent.contains(next)) && attempts < 20 && _songs.length > 2) {
         next = random.nextInt(_songs.length);
+        attempts++;
+      }
+      _shuffleHistory.add(next);
+      if (_shuffleHistory.length > 50) {
+        _shuffleHistory.removeAt(0);
       }
       return next;
     }
@@ -446,9 +474,10 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
   // --- QUEUE & PLAYBACK COMMANDS ---
   Future<void> loadQueue(List<SongsTableData> songs, {int initialIndex = 0, Duration? initialPosition}) async {
-    _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
+    await _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
     _songs = List.from(songs);
     _currentIndex = initialIndex.clamp(0, _songs.isEmpty ? 0 : _songs.length - 1);
+    _queueDirty = true;
 
     final mediaItems = _songs.map(_songToMediaItem).toList();
     queue.add(mediaItems);
@@ -460,7 +489,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {
     if (index < 0 || index >= _songs.length) return;
-    _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
+    await _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
     _currentIndex = index;
 
     final song = _songs[index];
@@ -503,14 +532,14 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
   @override
   Future<void> pause() async {
-    _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
+    await _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
     _saveCurrentPosition();
     await _activePlayer.pause();
   }
 
   @override
   Future<void> seek(Duration position) async {
-    _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
+    await _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
     await _activePlayer.seek(position);
     _saveCurrentPosition();
   }
@@ -518,10 +547,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   @override
   Future<void> skipToNext() async {
     if (_crossfadeManager.isCrossfading) {
-      _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
-      await _inactivePlayer.stop();
-      await _inactivePlayer.setVolume(1.0);
-      await _activePlayer.setVolume(1.0);
+      await _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
     }
 
     final nextIdx = _getNextIndex();
@@ -537,10 +563,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   @override
   Future<void> skipToPrevious() async {
     if (_crossfadeManager.isCrossfading) {
-      _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
-      await _inactivePlayer.stop();
-      await _inactivePlayer.setVolume(1.0);
-      await _activePlayer.setVolume(1.0);
+      await _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
     }
     if (_activePlayer.position.inSeconds > 3) {
       await _activePlayer.seek(Duration.zero);
@@ -566,7 +589,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
   @override
   Future<void> setRepeatMode(AudioServiceRepeatMode repeatMode) async {
-    LoopMode loopMode;
+    LoopMode loopMode = LoopMode.off;
     switch (repeatMode) {
       case AudioServiceRepeatMode.none:
         loopMode = LoopMode.off;
@@ -596,7 +619,11 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     if (name == 'toggleFavorite') {
       if (_songs.isNotEmpty && _currentIndex < _songs.length) {
         final currentSong = _songs[_currentIndex];
-        await _repository.toggleFavorite(currentSong.id);
+        final result = await _repository.toggleFavorite(currentSong.id);
+        final newFav = result.fold((l) => currentSong.isFavorite, (r) => r);
+        _songs[_currentIndex] = currentSong.copyWith(isFavorite: newFav);
+        final artUri = await ArtworkUriResolver.resolveArtworkUri(_songs[_currentIndex]);
+        mediaItem.add(_songToMediaItem(_songs[_currentIndex], artUri));
       }
       return true;
     }
@@ -611,6 +638,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
       final song = songRes.fold((l) => null, (r) => r);
       if (song != null) {
         _songs.add(song);
+        _queueDirty = true;
         queue.add(_songs.map(_songToMediaItem).toList());
         _saveCurrentPosition();
       }
@@ -620,12 +648,14 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   Future<void> insertNextInQueue(SongsTableData song) async {
     final insertIdx = _songs.isEmpty ? 0 : (_currentIndex + 1).clamp(0, _songs.length);
     _songs.insert(insertIdx, song);
+    _queueDirty = true;
     queue.add(_songs.map(_songToMediaItem).toList());
     _saveCurrentPosition();
   }
 
   Future<void> addToQueueEnd(SongsTableData song) async {
     _songs.add(song);
+    _queueDirty = true;
     queue.add(_songs.map(_songToMediaItem).toList());
     _saveCurrentPosition();
   }
@@ -636,6 +666,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
     final wasPlayingCurrent = index == _currentIndex;
     _songs.removeAt(index);
+    _queueDirty = true;
 
     if (_songs.isEmpty) {
       _currentIndex = 0;
@@ -670,6 +701,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
     final song = _songs.removeAt(oldIndex);
     _songs.insert(newIndex, song);
+    _queueDirty = true;
 
     if (_currentIndex == oldIndex) {
       _currentIndex = newIndex;
@@ -958,15 +990,15 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
   @override
   Future<void> stop() async {
-    _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
+    await _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
     _saveCurrentPosition();
     await _playerA.stop();
     await _playerB.stop();
     await super.stop();
   }
 
+  @disposeMethod
   void dispose() {
-    _positionPeriodicTimer?.cancel();
     _savePositionDebounce?.cancel();
     for (final sub in _subscriptions) {
       sub.cancel();
@@ -974,5 +1006,8 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     _subscriptions.clear();
     _positionSubject.close();
     _sleepTimerManager.dispose();
+    _equalizerManager.dispose();
+    _playerA.dispose();
+    _playerB.dispose();
   }
 }

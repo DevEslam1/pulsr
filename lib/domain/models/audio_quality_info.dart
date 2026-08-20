@@ -39,7 +39,13 @@ class AudioQualityInfo {
     required this.icon,
   });
 
-  factory AudioQualityInfo.fromSong(SongsTableData? song) {
+  factory AudioQualityInfo.fromSong(
+    SongsTableData? song, {
+    int? explicitSampleRate,
+    int? explicitBitDepth,
+    int? explicitBitrateKbps,
+    String? explicitFormat,
+  }) {
     if (song == null) {
       return const AudioQualityInfo(
         format: 'AUDIO',
@@ -65,8 +71,8 @@ class AudioQualityInfo {
     }
 
     // Calculate bitrate if fileSize and durationMs are available
-    int? calculatedBitrate;
-    if (song.fileSize != null && song.fileSize! > 0 && song.durationMs > 0) {
+    int? calculatedBitrate = explicitBitrateKbps;
+    if (calculatedBitrate == null && song.fileSize != null && song.fileSize! > 0 && song.durationMs > 0) {
       final seconds = song.durationMs / 1000.0;
       final bits = song.fileSize! * 8.0;
       calculatedBitrate = (bits / seconds / 1000.0).round();
@@ -79,8 +85,12 @@ class AudioQualityInfo {
     final bool isDsd = ext == 'dsf' || ext == 'dff';
     final bool isLosslessFormat = isFlac || isWav || isAlac || isAiff || isDsd;
 
+    final bool hasExplicitHiRes = (explicitBitDepth != null && explicitBitDepth >= 24) ||
+        (explicitSampleRate != null && explicitSampleRate > 48000);
+
     final bool isHiRes = isLosslessFormat &&
-        ((calculatedBitrate != null && calculatedBitrate >= 1411) ||
+        (hasExplicitHiRes ||
+            (calculatedBitrate != null && calculatedBitrate >= 1411) ||
             path.contains('24bit') ||
             path.contains('96k') ||
             path.contains('192k') ||
@@ -99,6 +109,14 @@ class AudioQualityInfo {
     final String sampleRate;
     final String bitDepth;
 
+    final String resolvedSampleRate = explicitSampleRate != null
+        ? '${(explicitSampleRate / 1000).toStringAsFixed(1)} kHz'
+        : (isHiRes ? '96.0 kHz / 192.0 kHz' : '44.1 kHz');
+
+    final String resolvedBitDepth = explicitBitDepth != null
+        ? '$explicitBitDepth-bit'
+        : (isHiRes ? '24-bit' : '16-bit');
+
     if (isDsd) {
       formatLabel = 'DSD';
       codecName = 'Direct Stream Digital';
@@ -108,10 +126,10 @@ class AudioQualityInfo {
       description = '1-bit High Density Studio Master audio stream';
       badgeColor = const Color(0xFFFFB800);
       icon = Icons.stars_rounded;
-      sampleRate = '2.8 MHz / 5.6 MHz';
+      sampleRate = explicitSampleRate != null ? resolvedSampleRate : '2.8 MHz / 5.6 MHz';
       bitDepth = '1-bit DSD';
     } else if (isHiRes) {
-      formatLabel = isFlac ? 'FLAC' : (isWav ? 'WAV' : 'HI-RES');
+      formatLabel = isFlac ? 'FLAC' : (isWav ? 'WAV' : (explicitFormat ?? 'HI-RES'));
       codecName = isFlac
           ? 'Free Lossless Audio Codec (Hi-Res)'
           : (isWav ? 'Waveform Audio File (Hi-Res PCM)' : 'Lossless Audio');
@@ -123,8 +141,8 @@ class AudioQualityInfo {
       description = 'Studio Master 24-bit • Up to 192 kHz lossless bit-perfect stream';
       badgeColor = const Color(0xFFFFB800); // Gold Shimmer
       icon = Icons.workspace_premium_rounded;
-      sampleRate = '96.0 kHz / 192.0 kHz';
-      bitDepth = '24-bit';
+      sampleRate = resolvedSampleRate;
+      bitDepth = resolvedBitDepth;
     } else if (isLosslessFormat) {
       formatLabel = isFlac ? 'FLAC' : (isWav ? 'WAV' : (isAlac ? 'ALAC' : 'AIFF'));
       codecName = isFlac
@@ -138,8 +156,8 @@ class AudioQualityInfo {
       description = 'CD Quality 16-bit / 44.1 kHz • Exact bit-perfect reproduction';
       badgeColor = const Color(0xFF00F2FF); // Electric Cyan
       icon = Icons.diamond_rounded;
-      sampleRate = '44.1 kHz';
-      bitDepth = '16-bit';
+      sampleRate = resolvedSampleRate;
+      bitDepth = resolvedBitDepth;
     } else if (ext == 'aac' || ext == 'm4a') {
       formatLabel = 'AAC';
       codecName = 'Advanced Audio Coding (AAC-LC)';

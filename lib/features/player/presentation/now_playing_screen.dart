@@ -62,16 +62,27 @@ class NowPlayingScreen extends StatelessWidget {
             break;
         }
 
-        return Scaffold(
-          backgroundColor: bgColor,
-          body: _SwipeDownToDismiss(
-            onDismiss: () => context.canPop() ? context.pop() : context.go('/'),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  maxWidth: MediaQuery.orientationOf(context) == Orientation.landscape ? 960 : 560,
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) {
+            if (didPop) return;
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
+          child: Scaffold(
+            backgroundColor: bgColor,
+            body: _SwipeDownToDismiss(
+              onDismiss: () => context.canPop() ? context.pop() : context.go('/'),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.orientationOf(context) == Orientation.landscape ? 960 : 560,
+                  ),
+                  child: themeWidget,
                 ),
-                child: themeWidget,
               ),
             ),
           ),

@@ -16,13 +16,15 @@ void main() {
       expect(cache.length, equals(1));
     });
 
-    test('Stores null values for missing artwork', () {
+    test('Ignores null or empty values so missing artwork can retry', () {
       final cache = ArtworkLruCache.withCapacity(5);
 
       cache.put('key_null', null);
-
-      expect(cache.containsKey('key_null'), isTrue);
+      expect(cache.containsKey('key_null'), isFalse);
       expect(cache.get('key_null'), isNull);
+
+      cache.put('key_empty', Uint8List(0));
+      expect(cache.containsKey('key_empty'), isFalse);
     });
 
     test('Evicts least recently used item when capacity exceeded (max 200 items logic)', () {

@@ -14,7 +14,10 @@
     <application
         android:label="Pulsr Music"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -95,13 +98,13 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.example.pulsr.widget.PLAY_PAUSE" />
-                <action android:name="com.example.pulsr.widget.NEXT" />
-                <action android:name="com.example.pulsr.widget.PREV" />
-                <action android:name="com.example.pulsr.widget.REWIND" />
-                <action android:name="com.example.pulsr.widget.FORWARD" />
-                <action android:name="com.example.pulsr.widget.SEEK_RATIO" />
-                <action android:name="com.example.pulsr.widget.FAVORITE" />
+                <action android:name="com.pulsr.music.widget.PLAY_PAUSE" />
+                <action android:name="com.pulsr.music.widget.NEXT" />
+                <action android:name="com.pulsr.music.widget.PREV" />
+                <action android:name="com.pulsr.music.widget.REWIND" />
+                <action android:name="com.pulsr.music.widget.FORWARD" />
+                <action android:name="com.pulsr.music.widget.SEEK_RATIO" />
+                <action android:name="com.pulsr.music.widget.FAVORITE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"

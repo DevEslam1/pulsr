@@ -74,7 +74,7 @@ class AppShell extends StatelessWidget {
                     child: extendedRail
                         ? Row(
                             children: [
-                              PulsrLogo(size: 32, color: p.accent, glowColor: p.glow, animate: true),
+                              PulsrLogo(size: 32, color: p.accent, glowColor: p.glow, animate: false),
                               const SizedBox(width: 12),
                               Text(
                                 'PULSR',
@@ -87,7 +87,7 @@ class AppShell extends StatelessWidget {
                               ),
                             ],
                           )
-                        : PulsrLogo(size: 32, color: p.accent, glowColor: p.glow, animate: true),
+                        : PulsrLogo(size: 32, color: p.accent, glowColor: p.glow, animate: false),
                   ),
                   Expanded(
                     child: NavigationRail(

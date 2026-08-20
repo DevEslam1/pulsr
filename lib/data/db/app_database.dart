@@ -31,9 +31,15 @@ class AppDatabase extends _$AppDatabase {
     await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_artist ON songs (artist);');
     await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_album_id ON songs (album_id);');
     await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_is_favorite ON songs (is_favorite);');
+    await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_last_played ON songs (last_played);');
+    await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_date_added ON songs (date_added);');
+    await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_play_count ON songs (play_count);');
     await executeSql('CREATE INDEX IF NOT EXISTS idx_playlist_entries_song_id ON playlist_entries (song_id);');
+    await executeSql('CREATE INDEX IF NOT EXISTS idx_playlist_entries_playlist_id ON playlist_entries (playlist_id);');
     await executeSql('CREATE INDEX IF NOT EXISTS idx_play_history_song_id ON play_history (song_id);');
+    await executeSql('CREATE INDEX IF NOT EXISTS idx_play_history_played_at ON play_history (played_at);');
     await executeSql('CREATE INDEX IF NOT EXISTS idx_queue_items_song_id ON queue_items (song_id);');
+    await executeSql('CREATE INDEX IF NOT EXISTS idx_queue_items_order_index ON queue_items (order_index);');
   }
 
   @override

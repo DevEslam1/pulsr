@@ -33,6 +33,11 @@ import 'features/widgets/widget_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   ErrorLogger.initialize();
+  ErrorLogger.onCrashReported = (error, stackTrace, category) {
+    // Production crash reporting hook (FirebaseCrashlytics / Sentry / Bugsnag)
+    // FirebaseCrashlytics.instance.recordError(error, stackTrace, reason: category);
+    debugPrint('[Pulsr.CrashReport][$category] $error\n$stackTrace');
+  };
 
   // System Chrome configuration
   SystemChrome.setSystemUIOverlayStyle(

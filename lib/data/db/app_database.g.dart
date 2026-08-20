@@ -336,6 +336,8 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
   final int? trackNumber;
   final int? discNumber;
   final int? year;
+
+  /// Stored as timestamp (seconds or milliseconds since Unix epoch, consistent with MediaStore/on_audio_query).
   final int? dateAdded;
   final String? genre;
   final bool isFavorite;

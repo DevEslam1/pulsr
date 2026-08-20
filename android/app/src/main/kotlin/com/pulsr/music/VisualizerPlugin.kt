@@ -1,4 +1,4 @@
-package com.example.pulsr
+package com.pulsr.music
 
 import android.media.audiofx.Visualizer
 import io.flutter.embedding.engine.FlutterEngine
@@ -17,8 +17,8 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
     private var eventSink: EventChannel.EventSink? = null
 
     companion object {
-        const val METHOD_CHANNEL = "com.example.pulsr/visualizer"
-        const val EVENT_CHANNEL = "com.example.pulsr/visualizer_stream"
+        const val METHOD_CHANNEL = "com.pulsr.music/visualizer"
+        const val EVENT_CHANNEL = "com.pulsr.music/visualizer_stream"
 
         fun registerWith(flutterEngine: FlutterEngine) {
             val plugin = VisualizerPlugin()

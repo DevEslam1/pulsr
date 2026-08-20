@@ -31,6 +31,24 @@ GoRouter createRouter(MediaScannerService scannerService) {
   return GoRouter(
     navigatorKey: rootNavigatorKey,
     initialLocation: '/splash',
+    errorBuilder: (context, state) => Scaffold(
+      appBar: AppBar(title: const Text('Page Not Found')),
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.music_off_outlined, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
+            Text('No page found at ${state.uri}', style: const TextStyle(fontSize: 16)),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => context.go('/'),
+              child: const Text('Go Home'),
+            ),
+          ],
+        ),
+      ),
+    ),
     routes: [
       GoRoute(
         path: '/splash',
@@ -137,7 +155,10 @@ GoRouter createRouter(MediaScannerService scannerService) {
         name: 'album',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) {
-          final album = state.extra as AlbumsTableData;
+          final album = state.extra as AlbumsTableData?;
+          if (album == null) {
+            return const Scaffold(body: Center(child: Text('Album not found')));
+          }
           return AlbumDetailScreen(album: album);
         },
       ),
@@ -146,7 +167,10 @@ GoRouter createRouter(MediaScannerService scannerService) {
         name: 'artist',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) {
-          final artist = state.extra as ArtistsTableData;
+          final artist = state.extra as ArtistsTableData?;
+          if (artist == null) {
+            return const Scaffold(body: Center(child: Text('Artist not found')));
+          }
           return ArtistDetailScreen(artist: artist);
         },
       ),
@@ -155,7 +179,10 @@ GoRouter createRouter(MediaScannerService scannerService) {
         name: 'genre',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) {
-          final genre = state.extra as GenreItem;
+          final genre = state.extra as GenreItem?;
+          if (genre == null) {
+            return const Scaffold(body: Center(child: Text('Genre not found')));
+          }
           return GenreDetailScreen(genreItem: genre);
         },
       ),
@@ -164,7 +191,10 @@ GoRouter createRouter(MediaScannerService scannerService) {
         name: 'year',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) {
-          final year = state.extra as YearItem;
+          final year = state.extra as YearItem?;
+          if (year == null) {
+            return const Scaffold(body: Center(child: Text('Year not found')));
+          }
           return YearDetailScreen(yearItem: year);
         },
       ),
@@ -173,7 +203,10 @@ GoRouter createRouter(MediaScannerService scannerService) {
         name: 'playlist',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) {
-          final playlist = state.extra as PlaylistsTableData;
+          final playlist = state.extra as PlaylistsTableData?;
+          if (playlist == null) {
+            return const Scaffold(body: Center(child: Text('Playlist not found')));
+          }
           return PlaylistDetailScreen(playlist: playlist);
         },
       ),
@@ -199,7 +232,10 @@ GoRouter createRouter(MediaScannerService scannerService) {
         name: 'folder',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) {
-          final folder = state.extra as FolderItem;
+          final folder = state.extra as FolderItem?;
+          if (folder == null) {
+            return const Scaffold(body: Center(child: Text('Folder not found')));
+          }
           return FolderDetailScreen(folder: folder);
         },
       ),
@@ -208,7 +244,10 @@ GoRouter createRouter(MediaScannerService scannerService) {
         name: 'tag-editor',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) {
-          final song = state.extra as SongsTableData;
+          final song = state.extra as SongsTableData?;
+          if (song == null) {
+            return const Scaffold(body: Center(child: Text('Song not found')));
+          }
           return TagEditorScreen(song: song);
         },
       ),

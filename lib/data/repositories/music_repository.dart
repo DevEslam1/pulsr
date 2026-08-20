@@ -181,15 +181,22 @@ class MusicRepository implements IMusicRepository {
     }
   }
 
+  int? _lastRecordedSongId;
+  DateTime? _lastRecordedTime;
+
   @override
   Future<Result<bool>> toggleFavorite(int songId) async {
     try {
-      final song = await (_db.select(_db.songsTable)..where((t) => t.id.equals(songId))).getSingleOrNull();
-      if (song != null) {
+      final updatedVal = await _db.transaction(() async {
+        final song = await (_db.select(_db.songsTable)..where((t) => t.id.equals(songId))).getSingleOrNull();
+        if (song == null) return null;
         final nextVal = !song.isFavorite;
         await (_db.update(_db.songsTable)..where((t) => t.id.equals(songId)))
             .write(SongsTableCompanion(isFavorite: Value(nextVal)));
-        return Right(nextVal);
+        return nextVal;
+      });
+      if (updatedVal != null) {
+        return Right(updatedVal);
       }
       return const Left(DatabaseFailure('Song not found'));
     } catch (e) {
@@ -200,22 +207,30 @@ class MusicRepository implements IMusicRepository {
   @override
   Future<Result<void>> recordPlayHistory(int songId, {bool completed = false}) async {
     try {
-      final now = DateTime.now().millisecondsSinceEpoch;
-      final song = await (_db.select(_db.songsTable)..where((t) => t.id.equals(songId))).getSingleOrNull();
-      if (song != null) {
-        await (_db.update(_db.songsTable)..where((t) => t.id.equals(songId))).write(
-          SongsTableCompanion(
-            playCount: Value(song.playCount + 1),
-            lastPlayed: Value(now),
-          ),
-        );
-        await _db.into(_db.playHistoryTable).insert(
-          PlayHistoryTableCompanion.insert(
-            songId: songId,
-            completed: Value(completed),
-          ),
-        );
+      final now = DateTime.now();
+      if (_lastRecordedSongId == songId && _lastRecordedTime != null && now.difference(_lastRecordedTime!).inMilliseconds < 1500) {
+        return const Right(null);
       }
+      _lastRecordedSongId = songId;
+      _lastRecordedTime = now;
+      final nowMs = now.millisecondsSinceEpoch;
+      await _db.transaction(() async {
+        final song = await (_db.select(_db.songsTable)..where((t) => t.id.equals(songId))).getSingleOrNull();
+        if (song != null) {
+          await (_db.update(_db.songsTable)..where((t) => t.id.equals(songId))).write(
+            SongsTableCompanion(
+              playCount: Value(song.playCount + 1),
+              lastPlayed: Value(nowMs),
+            ),
+          );
+          await _db.into(_db.playHistoryTable).insert(
+            PlayHistoryTableCompanion.insert(
+              songId: songId,
+              completed: Value(completed),
+            ),
+          );
+        }
+      });
       return const Right(null);
     } catch (e) {
       return Left(DatabaseFailure('Failed to record play history', e));
@@ -580,16 +595,19 @@ class MusicRepository implements IMusicRepository {
     try {
       await _db.transaction(() async {
         await _db.delete(_db.queueItemsTable).go();
-        for (int i = 0; i < songIds.length; i++) {
-          await _db.into(_db.queueItemsTable).insert(
-            QueueItemsTableCompanion.insert(
-              songId: songIds[i],
-              orderIndex: i,
-              isCurrent: Value(i == currentIndex),
-              positionMs: Value(i == currentIndex ? positionMs : 0),
-            ),
-          );
-        }
+        await _db.batch((batch) {
+          for (int i = 0; i < songIds.length; i++) {
+            batch.insert(
+              _db.queueItemsTable,
+              QueueItemsTableCompanion.insert(
+                songId: songIds[i],
+                orderIndex: i,
+                isCurrent: Value(i == currentIndex),
+                positionMs: Value(i == currentIndex ? positionMs : 0),
+              ),
+            );
+          }
+        });
       });
       return const Right(null);
     } catch (e) {

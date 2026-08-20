@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/constants/prefs_keys.dart';
 import '../../domain/models/audio_effects_config.dart';
 import '../../domain/models/eq_preset.dart';
 import '../../domain/models/headphone_profile.dart';
@@ -55,11 +56,11 @@ class EqualizerManager {
   Future<void> _restorePreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      isEnabled = prefs.getBool('eq_enabled') ?? false;
-      final presetName = prefs.getString('eq_preset_name') ?? 'Flat';
-      final gainsJson = prefs.getString('eq_gains');
-      final bass = prefs.getDouble('eq_bass_boost') ?? 0.0;
-      volumeBoost = prefs.getDouble('eq_volume_boost') ?? 0.0;
+      isEnabled = prefs.getBool(PrefsKeys.eqEnabled) ?? false;
+      final presetName = prefs.getString(PrefsKeys.eqPresetName) ?? 'Flat';
+      final gainsJson = prefs.getString(PrefsKeys.eqGains);
+      final bass = prefs.getDouble(PrefsKeys.eqBassBoost) ?? 0.0;
+      volumeBoost = prefs.getDouble(PrefsKeys.eqVolumeBoost) ?? 0.0;
 
       List<double> gains = [0.0, 0.0, 0.0, 0.0, 0.0];
       if (gainsJson != null) {
@@ -76,19 +77,19 @@ class EqualizerManager {
 
       currentPreset = EqPreset(name: presetName, gains: gains, bassBoost: bass);
 
-      isVirtualizerEnabled = prefs.getBool('eq_virtualizer_enabled') ?? false;
-      virtualizerStrength = prefs.getDouble('eq_virtualizer_strength') ?? 0.0;
+      isVirtualizerEnabled = prefs.getBool(PrefsKeys.eqVirtualizerEnabled) ?? false;
+      virtualizerStrength = prefs.getDouble(PrefsKeys.eqVirtualizerStrength) ?? 0.0;
 
-      final dynPresetStr = prefs.getString('eq_dynamics_preset') ?? DynamicsPreset.off.name;
+      final dynPresetStr = prefs.getString(PrefsKeys.eqDynamicsPreset) ?? DynamicsPreset.off.name;
       dynamicsPreset = DynamicsPreset.values.firstWhere(
         (d) => d.name == dynPresetStr,
         orElse: () => DynamicsPreset.off,
       );
-      isDynamicsEnabled = prefs.getBool('eq_dynamics_enabled') ?? false;
+      isDynamicsEnabled = prefs.getBool(PrefsKeys.eqDynamicsEnabled) ?? false;
 
-      isSpatializerEnabled = prefs.getBool('eq_spatializer_enabled') ?? false;
+      isSpatializerEnabled = prefs.getBool(PrefsKeys.eqSpatializerEnabled) ?? false;
 
-      final profileId = prefs.getString('eq_headphone_profile_id');
+      final profileId = prefs.getString(PrefsKeys.eqHeadphoneProfileId);
       if (profileId != null) {
         await HeadphoneProfilesRepository().loadProfiles();
         selectedHeadphoneProfile = HeadphoneProfilesRepository().getProfileById(profileId);
@@ -117,20 +118,20 @@ class EqualizerManager {
   Future<void> _savePreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('eq_enabled', isEnabled);
-      await prefs.setString('eq_preset_name', currentPreset.name);
-      await prefs.setString('eq_gains', json.encode(currentPreset.gains));
-      await prefs.setDouble('eq_bass_boost', currentPreset.bassBoost);
-      await prefs.setDouble('eq_volume_boost', volumeBoost);
-      await prefs.setBool('eq_virtualizer_enabled', isVirtualizerEnabled);
-      await prefs.setDouble('eq_virtualizer_strength', virtualizerStrength);
-      await prefs.setString('eq_dynamics_preset', dynamicsPreset.name);
-      await prefs.setBool('eq_dynamics_enabled', isDynamicsEnabled);
-      await prefs.setBool('eq_spatializer_enabled', isSpatializerEnabled);
+      await prefs.setBool(PrefsKeys.eqEnabled, isEnabled);
+      await prefs.setString(PrefsKeys.eqPresetName, currentPreset.name);
+      await prefs.setString(PrefsKeys.eqGains, json.encode(currentPreset.gains));
+      await prefs.setDouble(PrefsKeys.eqBassBoost, currentPreset.bassBoost);
+      await prefs.setDouble(PrefsKeys.eqVolumeBoost, volumeBoost);
+      await prefs.setBool(PrefsKeys.eqVirtualizerEnabled, isVirtualizerEnabled);
+      await prefs.setDouble(PrefsKeys.eqVirtualizerStrength, virtualizerStrength);
+      await prefs.setString(PrefsKeys.eqDynamicsPreset, dynamicsPreset.name);
+      await prefs.setBool(PrefsKeys.eqDynamicsEnabled, isDynamicsEnabled);
+      await prefs.setBool(PrefsKeys.eqSpatializerEnabled, isSpatializerEnabled);
       if (selectedHeadphoneProfile != null) {
-        await prefs.setString('eq_headphone_profile_id', selectedHeadphoneProfile!.id);
+        await prefs.setString(PrefsKeys.eqHeadphoneProfileId, selectedHeadphoneProfile!.id);
       } else {
-        await prefs.remove('eq_headphone_profile_id');
+        await prefs.remove(PrefsKeys.eqHeadphoneProfileId);
       }
     } catch (_) {}
   }
@@ -187,13 +188,6 @@ class EqualizerManager {
     currentPreset = currentPreset.copyWith(bassBoost: value);
     final strength = (value.clamp(0.0, 1.0) * 1000).round();
     await _effectsChannel.setBassBoost(strength);
-    for (final le in [loudnessEnhancerA, loudnessEnhancerB]) {
-      if (le != null) {
-        try {
-          await le.setTargetGain(value * 0.5);
-        } catch (_) {}
-      }
-    }
     _debouncedSavePreferences();
   }
 
@@ -232,9 +226,18 @@ class EqualizerManager {
           } catch (_) {}
         }
       }
+      if (profile.preampGain != 0.0) {
+        final normalizedPreamp = ((profile.preampGain.abs()) / 12.0).clamp(0.0, 1.0);
+        await setVolumeBoost(normalizedPreamp);
+      }
       await setBassBoost(profile.bassBoost);
     }
     await _savePreferences();
+  }
+
+  void dispose() {
+    _saveDebounce?.cancel();
+    _saveDebounce = null;
   }
 
   Future<void> setVirtualizerEnabled(bool enabled) async {

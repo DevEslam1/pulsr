@@ -1,16 +1,18 @@
-package com.example.pulsr
+package com.pulsr.music
 
 import android.content.Intent
 import android.media.MediaMetadataRetriever
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : AudioServiceActivity() {
-    private val LYRICS_CHANNEL = "com.example.pulsr/lyrics"
-    private val FILE_OPENER_CHANNEL = "com.example.pulsr/file_opener"
+    private val LYRICS_CHANNEL = "com.pulsr.music/lyrics"
+    private val FILE_OPENER_CHANNEL = "com.pulsr.music/file_opener"
     private var pendingAudioUri: String? = null
     private var fileOpenerChannel: MethodChannel? = null
 
@@ -27,12 +29,22 @@ class MainActivity : AudioServiceActivity() {
 
     private fun handleAudioIntent(intent: Intent?) {
         if (intent?.action == Intent.ACTION_VIEW || intent?.action == Intent.ACTION_SEND) {
-            val uri = intent.data?.toString() ?: intent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM)?.toString()
+            val streamUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+            }
+            val uri = intent.data?.toString() ?: streamUri?.toString()
             if (uri != null) {
                 pendingAudioUri = uri
                 fileOpenerChannel?.invokeMethod("onAudioFileOpened", uri)
             }
         }
+    }
+
+    companion object {
+        private const val METADATA_KEY_LYRICS = 1000
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -65,13 +77,14 @@ class MainActivity : AudioServiceActivity() {
                     val retriever = MediaMetadataRetriever()
                     retriever.setDataSource(filePath)
                     val lyrics = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                        retriever.extractMetadata(1000)
+                        retriever.extractMetadata(METADATA_KEY_LYRICS)
                     } else {
                         null
                     }
                     retriever.release()
                     result.success(lyrics)
                 } catch (e: Exception) {
+                    Log.w("MainActivity", "Embedded lyrics extraction failed for $filePath: ${e.message}")
                     result.success(null)
                 }
             } else {

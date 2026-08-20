@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../../domain/models/audio_effects_config.dart';
 
 class AudioEffectsChannel {
-  static const MethodChannel _channel = MethodChannel('com.example.pulsr/audio_effects');
+  static const MethodChannel _channel = MethodChannel('com.pulsr.music/audio_effects');
 
   static final AudioEffectsChannel _instance = AudioEffectsChannel._internal();
   factory AudioEffectsChannel() => _instance;

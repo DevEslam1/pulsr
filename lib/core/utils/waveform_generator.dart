@@ -27,7 +27,7 @@ class WaveformGenerator {
     }
 
     // 2. Generate deterministic harmonic waveform
-    final samples = _generateDeterministicWaveform(songId, count);
+    final samples = _generateDeterministicWaveform(songId, count, filePath);
 
     // 3. Cache result with LRU eviction
     if (_cache.length >= _maxCacheSize) {
@@ -38,9 +38,10 @@ class WaveformGenerator {
     return samples;
   }
 
-  List<double> _generateDeterministicWaveform(int songId, int count) {
+  List<double> _generateDeterministicWaveform(int songId, int count, [String? filePath]) {
     final List<double> raw = [];
-    final Random random = Random(songId);
+    final int seed = filePath != null && filePath.isNotEmpty ? (songId ^ filePath.hashCode) : songId;
+    final Random random = Random(seed);
 
     final double seed1 = random.nextDouble() * 10.0;
     final double seed2 = random.nextDouble() * 10.0;

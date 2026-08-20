@@ -76,5 +76,55 @@ void main() {
       expect(info.tier, AudioQualityTier.standardQuality);
       expect(info.shortBadgeLabel, 'STANDARD');
     });
+
+    test('Calculates Hi-Res with explicit sampleRate and bitDepth metadata', () {
+      const song = SongsTableData(
+        id: 4,
+        title: 'Explicit HiRes',
+        artist: 'Artist',
+        album: 'Album',
+        durationMs: 180000,
+        path: '/storage/emulated/0/Music/track.flac',
+        fileSize: 35000000,
+        isFavorite: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+
+      final info = AudioQualityInfo.fromSong(
+        song,
+        explicitSampleRate: 96000,
+        explicitBitDepth: 24,
+        explicitBitrateKbps: 2304,
+      );
+
+      expect(info.format, 'FLAC');
+      expect(info.tier, AudioQualityTier.hiResLossless);
+      expect(info.bitDepth, '24-bit');
+      expect(info.sampleRate, '96.0 kHz');
+      expect(info.bitrateKbps, 2304);
+      expect(info.shortBadgeLabel, 'FLAC • 2304k');
+    });
+
+    test('Calculates DSD Ultra Hi-Res quality correctly', () {
+      const song = SongsTableData(
+        id: 5,
+        title: 'DSD Track',
+        artist: 'Artist',
+        album: 'Album',
+        durationMs: 200000,
+        path: '/storage/emulated/0/Music/track.dsf',
+        fileSize: 100000000,
+        isFavorite: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+
+      final info = AudioQualityInfo.fromSong(song);
+      expect(info.format, 'DSD');
+      expect(info.tier, AudioQualityTier.hiResLossless);
+      expect(info.bitDepth, '1-bit DSD');
+      expect(info.shortBadgeLabel, 'DSD • HI-RES');
+    });
   });
 }

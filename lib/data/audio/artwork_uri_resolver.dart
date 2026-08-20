@@ -17,7 +17,14 @@ class ArtworkUriResolver {
     if (map.containsKey(key)) {
       map.remove(key);
     } else if (map.length >= _maxCacheSize) {
-      map.remove(map.keys.first);
+      final oldestKey = map.keys.first;
+      final oldestUri = map.remove(oldestKey);
+      if (oldestUri != null && oldestUri.scheme == 'file') {
+        try {
+          final f = File(oldestUri.toFilePath());
+          if (f.existsSync()) f.deleteSync();
+        } catch (_) {}
+      }
     }
     map[key] = value;
   }

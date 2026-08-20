@@ -96,11 +96,12 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
 }
 
 extension PulsrThemeX on BuildContext {
-  PulsrPalette get palette => Theme.of(this).extension<PulsrPalette>()!;
+  PulsrPalette get palette => Theme.of(this).extension<PulsrPalette>() ?? AuraTheme.defaultDark;
   bool get isDarkUi => palette.isDark;
 }
 
 class AuraTheme {
+  static PulsrPalette get defaultDark => _palette(AppColors.primary, Brightness.dark, false);
   static ThemeData get darkTheme => customTheme(AppColors.primary, brightness: Brightness.dark);
   static ThemeData get lightTheme => customTheme(AppColors.lightPrimary, brightness: Brightness.light);
   static ThemeData get amoledTheme => customTheme(AppColors.primary, brightness: Brightness.dark, isAmoled: true);

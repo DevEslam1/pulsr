@@ -82,6 +82,7 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
       if (rawArt != null && rawArt.isNotEmpty) {
         final palette = await PaletteGenerator.fromImageProvider(
           MemoryImage(rawArt),
+          size: const Size(48, 48),
           maximumColorCount: 12,
         );
 

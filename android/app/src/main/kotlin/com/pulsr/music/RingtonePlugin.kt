@@ -1,4 +1,4 @@
-package com.example.pulsr
+package com.pulsr.music
 
 import android.content.ContentUris
 import android.content.ContentValues
@@ -7,6 +7,7 @@ import android.content.Intent
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.provider.MediaStore
 import android.provider.Settings
 import io.flutter.embedding.engine.FlutterEngine
@@ -16,13 +17,14 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import java.io.File
+import java.io.FileInputStream
 
 class RingtonePlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
     private var context: Context? = null
 
     companion object {
-        const val CHANNEL_NAME = "com.example.pulsr/ringtone"
+        const val CHANNEL_NAME = "com.pulsr.music/ringtone"
 
         fun registerWith(flutterEngine: FlutterEngine) {
             val plugin = RingtonePlugin()
@@ -116,10 +118,13 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
     }
 
     private fun getAudioContentUri(context: Context, file: File, ringtoneType: Int): Uri? {
-        val filePath = file.absolutePath
+        val fileName = file.name
+        val mimeType = getMimeType(file.absolutePath)
+
+        // 1. Try querying MediaStore by DISPLAY_NAME
         val projection = arrayOf(MediaStore.Audio.Media._ID)
-        val selection = "${MediaStore.Audio.Media.DATA}=?"
-        val selectionArgs = arrayOf(filePath)
+        val selection = "${MediaStore.Audio.Media.DISPLAY_NAME}=?"
+        val selectionArgs = arrayOf(fileName)
 
         val cursor = context.contentResolver.query(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
@@ -138,20 +143,53 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
             }
         }
 
-        if (uri == null) {
-            val values = ContentValues().apply {
-                put(MediaStore.Audio.Media.DATA, filePath)
-                put(MediaStore.Audio.Media.TITLE, file.nameWithoutExtension)
-                put(MediaStore.Audio.Media.MIME_TYPE, getMimeType(filePath))
-                put(MediaStore.Audio.Media.IS_RINGTONE, ringtoneType == RingtoneManager.TYPE_RINGTONE)
-                put(MediaStore.Audio.Media.IS_NOTIFICATION, ringtoneType == RingtoneManager.TYPE_NOTIFICATION)
-                put(MediaStore.Audio.Media.IS_ALARM, ringtoneType == RingtoneManager.TYPE_ALARM)
-                put(MediaStore.Audio.Media.IS_MUSIC, false)
-            }
-            uri = context.contentResolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values)
+        if (uri != null) {
+            return uri
         }
 
-        return uri
+        // 2. Insert into MediaStore safely supporting Android 10+ Scoped Storage
+        val relativeFolder = when (ringtoneType) {
+            RingtoneManager.TYPE_NOTIFICATION -> "${Environment.DIRECTORY_NOTIFICATIONS}/"
+            RingtoneManager.TYPE_ALARM -> "${Environment.DIRECTORY_ALARMS}/"
+            else -> "${Environment.DIRECTORY_RINGTONES}/"
+        }
+
+        val values = ContentValues().apply {
+            put(MediaStore.Audio.Media.DISPLAY_NAME, fileName)
+            put(MediaStore.Audio.Media.TITLE, file.nameWithoutExtension)
+            put(MediaStore.Audio.Media.MIME_TYPE, mimeType)
+            put(MediaStore.Audio.Media.IS_RINGTONE, ringtoneType == RingtoneManager.TYPE_RINGTONE)
+            put(MediaStore.Audio.Media.IS_NOTIFICATION, ringtoneType == RingtoneManager.TYPE_NOTIFICATION)
+            put(MediaStore.Audio.Media.IS_ALARM, ringtoneType == RingtoneManager.TYPE_ALARM)
+            put(MediaStore.Audio.Media.IS_MUSIC, false)
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Audio.Media.RELATIVE_PATH, relativeFolder)
+                put(MediaStore.Audio.Media.IS_PENDING, 1)
+            } else {
+                @Suppress("DEPRECATION")
+                put(MediaStore.Audio.Media.DATA, file.absolutePath)
+            }
+        }
+
+        val insertedUri = context.contentResolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values)
+        if (insertedUri != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                context.contentResolver.openOutputStream(insertedUri)?.use { out ->
+                    FileInputStream(file).use { input ->
+                        input.copyTo(out)
+                    }
+                }
+                val updateValues = ContentValues().apply {
+                    put(MediaStore.Audio.Media.IS_PENDING, 0)
+                }
+                context.contentResolver.update(insertedUri, updateValues, null, null)
+            } catch (_: Exception) {
+                // Ignore copy errors, uri might still be usable
+            }
+        }
+
+        return insertedUri
     }
 
     private fun getMimeType(path: String): String {

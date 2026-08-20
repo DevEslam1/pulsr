@@ -7,7 +7,7 @@ import '../../data/scanner/media_scanner_service.dart';
 import 'tag_editor_state.dart';
 
 class TagEditorCubit extends Cubit<TagEditorState> {
-  static const MethodChannel _channel = MethodChannel('com.example.pulsr/tag_editor');
+  static const MethodChannel _channel = MethodChannel('com.pulsr.music/tag_editor');
   final MediaScannerService _scannerService;
   final ImagePicker _imagePicker = ImagePicker();
 

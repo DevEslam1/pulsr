@@ -30,7 +30,7 @@ class _QueueSlotData {
   });
 }
 
-@injectable
+@lazySingleton
 class PlayerCubit extends Cubit<PlayerState> {
   final PulsrAudioHandler _audioHandler;
   final IMusicRepository _repository;

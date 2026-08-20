@@ -1,0 +1,170 @@
+package com.pulsr.music
+
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.plugin.common.MethodCall
+import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.MethodChannel.MethodCallHandler
+import io.flutter.plugin.common.MethodChannel.Result
+import org.jaudiotagger.audio.AudioFileIO
+import org.jaudiotagger.tag.FieldKey
+import org.jaudiotagger.tag.images.ArtworkFactory
+import java.io.File
+import java.util.logging.Level
+import java.util.logging.Logger
+
+class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
+    private lateinit var channel: MethodChannel
+
+    companion object {
+        const val CHANNEL_NAME = "com.pulsr.music/tag_editor"
+
+        fun registerWith(flutterEngine: FlutterEngine) {
+            val plugin = TagEditorPlugin()
+            plugin.channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
+            plugin.channel.setMethodCallHandler(plugin)
+            disableLogger()
+        }
+
+        private fun disableLogger() {
+            try {
+                Logger.getLogger("org.jaudiotagger").level = Level.OFF
+            } catch (_: Exception) {}
+        }
+    }
+
+    override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        channel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME)
+        channel.setMethodCallHandler(this)
+        disableLogger()
+    }
+
+    override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        channel.setMethodCallHandler(null)
+    }
+
+    override fun onMethodCall(call: MethodCall, result: Result) {
+        when (call.method) {
+            "readTags" -> {
+                val path = call.argument<String>("path")
+                if (path.isNullOrEmpty()) {
+                    result.error("INVALID_ARGUMENT", "File path is required", null)
+                    return
+                }
+                try {
+                    val file = File(path)
+                    if (!file.exists()) {
+                        result.error("FILE_NOT_FOUND", "File does not exist at $path", null)
+                        return
+                    }
+                    val audioFile = AudioFileIO.read(file)
+                    val tag = audioFile.tag
+                    val header = audioFile.audioHeader
+
+                    val tagMap = mutableMapOf<String, Any?>()
+                    if (tag != null) {
+                        tagMap["title"] = tag.getFirst(FieldKey.TITLE)
+                        tagMap["artist"] = tag.getFirst(FieldKey.ARTIST)
+                        tagMap["album"] = tag.getFirst(FieldKey.ALBUM)
+                        tagMap["albumArtist"] = tag.getFirst(FieldKey.ALBUM_ARTIST)
+                        tagMap["genre"] = tag.getFirst(FieldKey.GENRE)
+                        tagMap["year"] = tag.getFirst(FieldKey.YEAR)
+                        tagMap["trackNumber"] = tag.getFirst(FieldKey.TRACK)
+                        tagMap["discNumber"] = tag.getFirst(FieldKey.DISC_NO)
+                        tagMap["composer"] = tag.getFirst(FieldKey.COMPOSER)
+                        tagMap["lyrics"] = tag.getFirst(FieldKey.LYRICS)
+                        tagMap["comment"] = tag.getFirst(FieldKey.COMMENT)
+
+                        val artwork = tag.firstArtwork
+                        if (artwork != null && artwork.binaryData != null) {
+                            tagMap["hasArtwork"] = true
+                            tagMap["artworkBytes"] = artwork.binaryData
+                            tagMap["artworkMimeType"] = artwork.mimeType
+                        } else {
+                            tagMap["hasArtwork"] = false
+                        }
+                    }
+
+                    if (header != null) {
+                        tagMap["bitRate"] = header.bitRate
+                        tagMap["sampleRate"] = header.sampleRate
+                        tagMap["format"] = header.format
+                        tagMap["channels"] = header.channels
+                        tagMap["trackLength"] = header.trackLength
+                        tagMap["isLossless"] = header.isLossless
+                    }
+
+                    result.success(tagMap)
+                } catch (e: Exception) {
+                    result.error("READ_TAGS_ERROR", e.message, e.stackTraceToString())
+                }
+            }
+
+            "writeTags" -> {
+                val path = call.argument<String>("path")
+                val tags: Map<String, Any?>? = call.argument<Map<String, Any?>>("tags") ?: (call.arguments as? Map<String, Any?>)
+
+                if (path.isNullOrEmpty() || tags == null) {
+                    result.error("INVALID_ARGUMENT", "File path and tags are required", null)
+                    return
+                }
+
+                try {
+                    val file = File(path)
+                    if (!file.exists()) {
+                        result.error("FILE_NOT_FOUND", "File does not exist at $path", null)
+                        return
+                    }
+
+                    val audioFile = AudioFileIO.read(file)
+                    var tag = audioFile.tag
+                    if (tag == null) {
+                        tag = audioFile.createDefaultTag()
+                        audioFile.tag = tag
+                    }
+
+                    tags["title"]?.let { tag.setField(FieldKey.TITLE, it.toString()) }
+                    tags["artist"]?.let { tag.setField(FieldKey.ARTIST, it.toString()) }
+                    tags["album"]?.let { tag.setField(FieldKey.ALBUM, it.toString()) }
+                    tags["albumArtist"]?.let { tag.setField(FieldKey.ALBUM_ARTIST, it.toString()) }
+                    tags["genre"]?.let { tag.setField(FieldKey.GENRE, it.toString()) }
+                    tags["year"]?.let { tag.setField(FieldKey.YEAR, it.toString()) }
+                    tags["trackNumber"]?.let { tag.setField(FieldKey.TRACK, it.toString()) }
+                    tags["discNumber"]?.let { tag.setField(FieldKey.DISC_NO, it.toString()) }
+                    tags["composer"]?.let { tag.setField(FieldKey.COMPOSER, it.toString()) }
+                    tags["lyrics"]?.let { tag.setField(FieldKey.LYRICS, it.toString()) }
+                    tags["comment"]?.let { tag.setField(FieldKey.COMMENT, it.toString()) }
+
+                    // Handle artwork update if provided via bytes or file path
+                    val artworkBytes = (tags["artworkBytes"] as? ByteArray)
+                        ?: (tags["artworkPath"] as? String)?.let { artPath ->
+                            val artFile = File(artPath)
+                            if (artFile.exists()) artFile.readBytes() else null
+                        }
+
+                    if (artworkBytes != null && artworkBytes.isNotEmpty()) {
+                        try {
+                            val artwork = ArtworkFactory.getNew()
+                            artwork.binaryData = artworkBytes
+                            val mime = tags["artworkMimeType"] as? String ?: "image/jpeg"
+                            artwork.mimeType = mime
+                            tag.deleteArtworkField()
+                            tag.setField(artwork)
+                        } catch (artEx: Exception) {
+                            // Non-fatal, continue writing tags
+                        }
+                    } else if (tags["removeArtwork"] == true) {
+                        tag.deleteArtworkField()
+                    }
+
+                    AudioFileIO.write(audioFile)
+                    result.success(true)
+                } catch (e: Exception) {
+                    result.error("WRITE_TAGS_ERROR", e.message, e.stackTraceToString())
+                }
+            }
+
+            else -> result.notImplemented()
+        }
+    }
+}

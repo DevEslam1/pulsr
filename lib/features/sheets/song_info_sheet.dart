@@ -32,7 +32,7 @@ class SongInfoSheet extends StatelessWidget {
   }
 
   Future<void> _setRingtone(BuildContext context, String type) async {
-    const channel = MethodChannel('com.example.pulsr/ringtone');
+    const channel = MethodChannel('com.pulsr.music/ringtone');
     try {
       final success = await channel.invokeMethod<bool>('setRingtone', {
         'filePath': song.path,

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <exclude domain="database" path="pulsr_music_db.sqlite" />
+    <exclude domain="database" path="pulsr_music_db.sqlite-wal" />
+    <exclude domain="database" path="pulsr_music_db.sqlite-shm" />
+    <exclude domain="file" path="temp_art" />
+</full-backup-content>
