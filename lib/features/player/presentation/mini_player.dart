@@ -162,28 +162,32 @@ class MiniPlayer extends StatelessWidget {
                               height: 6.0,
                               width: double.infinity,
                               child: Stack(
-                                alignment: Alignment.bottomCenter,
+                                alignment: Alignment.centerLeft,
                                 children: [
                                   Positioned.fill(
                                     child: ColoredBox(color: p.hairline.withValues(alpha: 0.35)),
                                   ),
-                                  FractionallySizedBox(
-                                    widthFactor: progress,
+                                  Align(
                                     alignment: Alignment.centerLeft,
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            activeAccent.withValues(alpha: 0.7),
-                                            activeAccent,
+                                    child: FractionallySizedBox(
+                                      widthFactor: progress,
+                                      alignment: Alignment.centerLeft,
+                                      child: Container(
+                                        height: 6.0,
+                                        decoration: BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [
+                                              activeAccent.withValues(alpha: 0.7),
+                                              activeAccent,
+                                            ],
+                                          ),
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color: activeAccent.withValues(alpha: 0.45),
+                                              blurRadius: 4,
+                                            ),
                                           ],
                                         ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: activeAccent.withValues(alpha: 0.45),
-                                            blurRadius: 4,
-                                          ),
-                                        ],
                                       ),
                                     ),
                                   ),

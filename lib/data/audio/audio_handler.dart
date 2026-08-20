@@ -246,6 +246,52 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
         pause();
       });
     } catch (_) {}
+
+    // Restore last played song & queue session from database
+    await restoreLastPlaybackSession();
+  }
+
+  Future<void> restoreLastPlaybackSession() async {
+    try {
+      final queueRes = await _repository.getSavedQueue();
+      final queueItems = queueRes.fold((l) => <QueueItemsTableData>[], (r) => r);
+      if (queueItems.isEmpty) return;
+
+      final List<SongsTableData> songs = [];
+      int targetIndex = 0;
+      int savedPositionMs = 0;
+
+      for (int i = 0; i < queueItems.length; i++) {
+        final item = queueItems[i];
+        final songRes = await _repository.getSongById(item.songId);
+        final song = songRes.fold((l) => null, (r) => r);
+        if (song != null) {
+          songs.add(song);
+          if (item.isCurrent) {
+            targetIndex = songs.length - 1;
+            savedPositionMs = item.positionMs;
+          }
+        }
+      }
+
+      if (songs.isNotEmpty) {
+        _songs = songs;
+        _currentIndex = targetIndex.clamp(0, songs.length - 1);
+        final currentSong = _songs[_currentIndex];
+        final artUri = await ArtworkUriResolver.resolveArtworkUri(currentSong);
+        final item = _songToMediaItem(currentSong, artUri);
+        mediaItem.add(item);
+        queue.add(_songs.map(_songToMediaItem).toList());
+
+        final pos = Duration(milliseconds: savedPositionMs);
+        await _activePlayer.setAudioSource(
+          AudioSource.file(currentSong.path, tag: item),
+          initialPosition: pos,
+        );
+        _broadcastState(_activePlayer.playbackEvent);
+        _positionSubject.add(pos);
+      }
+    } catch (_) {}
   }
 
   Future<void> _startCrossfade(int nextIndex) async {

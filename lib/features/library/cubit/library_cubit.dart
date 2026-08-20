@@ -2,6 +2,7 @@
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../../domain/usecases/get_albums_usecase.dart';
@@ -53,6 +54,23 @@ class LibraryCubit extends Cubit<LibraryState> {
   }
 
   Future<void> init() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedSortBy = prefs.getString('library_sort_by') ?? 'title';
+      final savedAscending = prefs.getBool('library_sort_ascending') ?? true;
+      final savedViewMode = prefs.getString('library_view_mode') == 'grid'
+          ? LibraryViewMode.grid
+          : LibraryViewMode.list;
+
+      if (!isClosed) {
+        emit(state.copyWith(
+          sortBy: savedSortBy,
+          ascending: savedAscending,
+          viewMode: savedViewMode,
+        ));
+      }
+    } catch (_) {}
+
     await _subscribeSongs();
     if (isClosed) return;
     _subscribeAlbums();
@@ -154,12 +172,18 @@ class LibraryCubit extends Cubit<LibraryState> {
   void updateSort(String sortBy, bool ascending) {
     emit(state.copyWith(sortBy: sortBy, ascending: ascending));
     _subscribeSongs();
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('library_sort_by', sortBy);
+      prefs.setBool('library_sort_ascending', ascending);
+    }).catchError((_) {});
   }
 
   void toggleViewMode() {
-    emit(state.copyWith(
-      viewMode: state.viewMode == LibraryViewMode.list ? LibraryViewMode.grid : LibraryViewMode.list,
-    ));
+    final nextMode = state.viewMode == LibraryViewMode.list ? LibraryViewMode.grid : LibraryViewMode.list;
+    emit(state.copyWith(viewMode: nextMode));
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString('library_view_mode', nextMode.name);
+    }).catchError((_) {});
   }
 
   Future<void> toggleFavorite(int songId) async {
