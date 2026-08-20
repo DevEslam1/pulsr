@@ -2,7 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../../data/db/app_database.dart';
+import '../../../domain/models/audio_effects_config.dart';
 import '../../../domain/models/eq_preset.dart';
+import '../../../domain/models/headphone_profile.dart';
 import '../../../domain/models/lyrics_line.dart';
 
 part 'player_state.freezed.dart';
@@ -32,6 +34,14 @@ abstract class PlayerState with _$PlayerState {
     @Default(false) bool isQueueVisible,
     @Default(EqPreset(name: 'Flat', gains: [0, 0, 0, 0, 0])) EqPreset eqPreset,
     @Default(false) bool isEqEnabled,
+    @Default(false) bool isVirtualizerEnabled,
+    @Default(0.0) double virtualizerStrength,
+    @Default(false) bool isDynamicsEnabled,
+    @Default(DynamicsPreset.off) DynamicsPreset dynamicsPreset,
+    HeadphoneProfile? selectedHeadphoneProfile,
+    @Default(false) bool isSpatializerSupported,
+    @Default(false) bool isSpatializerEnabled,
+    @Default(0.0) double volumeBoost,
     @Default(0) int activeQueueSlot,
     @Default(1.0) double playbackSpeed,
     String? errorMessage,

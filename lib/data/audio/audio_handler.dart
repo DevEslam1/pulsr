@@ -7,10 +7,13 @@ import 'package:audio_session/audio_session.dart';
 import 'package:injectable/injectable.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../domain/models/audio_effects_config.dart';
 import '../../domain/models/eq_preset.dart';
+import '../../domain/models/headphone_profile.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../db/app_database.dart';
 import 'artwork_uri_resolver.dart';
+import 'audio_effects_channel.dart';
 import 'crossfade_manager.dart';
 import 'equalizer_manager.dart';
 import 'sleep_timer_manager.dart';
@@ -140,6 +143,11 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
   bool get isEqualizerEnabled => _equalizerManager.isEnabled;
   EqPreset get currentPreset => _equalizerManager.currentPreset;
+  bool get isVirtualizerEnabled => _equalizerManager.isVirtualizerEnabled;
+  double get virtualizerStrength => _equalizerManager.virtualizerStrength;
+  bool get isDynamicsEnabled => _equalizerManager.isDynamicsEnabled;
+  DynamicsPreset get dynamicsPreset => _equalizerManager.dynamicsPreset;
+  HeadphoneProfile? get selectedHeadphoneProfile => _equalizerManager.selectedHeadphoneProfile;
   Duration get crossfadeDuration => _crossfadeManager.duration;
 
   void setCrossfadeDuration(Duration duration) {
@@ -150,6 +158,15 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   Future<void> setBandGain(int bandIndex, double gain) => _equalizerManager.setBandGain(bandIndex, gain);
   Future<void> setBassBoost(double value) => _equalizerManager.setBassBoost(value);
   Future<void> applyPreset(EqPreset preset) => _equalizerManager.applyPreset(preset);
+  Future<void> applyHeadphoneProfile(HeadphoneProfile? profile) => _equalizerManager.applyHeadphoneProfile(profile);
+  Future<void> setVirtualizerEnabled(bool enabled) => _equalizerManager.setVirtualizerEnabled(enabled);
+  Future<void> setVirtualizerStrength(double strength) => _equalizerManager.setVirtualizerStrength(strength);
+  Future<void> setDynamicsPreset(DynamicsPreset preset, {bool? enabled}) => _equalizerManager.setDynamicsPreset(preset, enabled: enabled);
+  bool get isSpatializerEnabled => _equalizerManager.isSpatializerEnabled;
+  bool get isSpatializerSupported => _equalizerManager.isSpatializerSupported;
+  Future<void> setSpatializerEnabled(bool enabled) => _equalizerManager.setSpatializerEnabled(enabled);
+  double get volumeBoost => _equalizerManager.volumeBoost;
+  Future<void> setVolumeBoost(double value) => _equalizerManager.setVolumeBoost(value);
 
   void _saveCurrentPosition() {
     _savePositionDebounce?.cancel();
@@ -203,6 +220,14 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
           }
         }),
       );
+
+      _subscriptions.add(
+        player.androidAudioSessionIdStream.listen((sessionId) {
+          if (sessionId != null && isPlayerA == _isPlayerAActive) {
+            AudioEffectsChannel().setAudioSessionId(sessionId);
+          }
+        }),
+      );
     }
 
     setupPlayerListeners(_playerA, true);
@@ -246,6 +271,9 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
         pause();
       });
     } catch (_) {}
+
+    // Initialize audio effects & equalizer preferences
+    await _equalizerManager.init();
 
     // Restore last played song & queue session from database
     await restoreLastPlaybackSession();
@@ -326,6 +354,11 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
       _isPlayerAActive = !_isPlayerAActive;
       _currentIndex = nextIndex;
+
+      final currentSessionId = _activePlayer.androidAudioSessionId;
+      if (currentSessionId != null) {
+        AudioEffectsChannel().setAudioSessionId(currentSessionId);
+      }
 
       mediaItem.add(_songToMediaItem(nextSong, artUri));
       _repository.recordPlayHistory(nextSong.id);

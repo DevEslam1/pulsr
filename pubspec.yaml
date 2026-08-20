@@ -50,6 +50,7 @@ flutter:
 
   assets:
     - assets/app_icon/
+    - assets/eq_profiles/
 
   fonts:
     - family: Manrope

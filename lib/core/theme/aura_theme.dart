@@ -268,7 +268,6 @@ class AuraTheme {
         indicatorSize: TabBarIndicatorSize.label,
         dividerColor: p.hairline,
         labelPadding: const EdgeInsets.symmetric(horizontal: 16),
-        tabAlignment: TabAlignment.start,
         labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
         unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
       ),

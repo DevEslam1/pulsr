@@ -8,7 +8,9 @@ import '../../../core/router/app_router.dart';
 import '../../../core/utils/lrc_parser.dart';
 import '../../../data/audio/audio_handler.dart';
 import '../../../data/db/app_database.dart';
+import '../../../domain/models/audio_effects_config.dart';
 import '../../../domain/models/eq_preset.dart';
+import '../../../domain/models/headphone_profile.dart';
 import '../../../domain/models/lyrics_line.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../domain/usecases/toggle_favorite_usecase.dart';
@@ -66,7 +68,23 @@ class PlayerCubit extends Cubit<PlayerState> {
     _loadPlaybackSpeed();
     _listenToSettings();
     _listenToWidgetClicks();
+    _syncAudioEffects();
     _updateWidgetThrottled(force: true);
+  }
+
+  void _syncAudioEffects() {
+    emit(state.copyWith(
+      isEqEnabled: _audioHandler.isEqualizerEnabled,
+      eqPreset: _audioHandler.currentPreset,
+      isVirtualizerEnabled: _audioHandler.isVirtualizerEnabled,
+      virtualizerStrength: _audioHandler.virtualizerStrength,
+      isDynamicsEnabled: _audioHandler.isDynamicsEnabled,
+      dynamicsPreset: _audioHandler.dynamicsPreset,
+      selectedHeadphoneProfile: _audioHandler.selectedHeadphoneProfile,
+      isSpatializerEnabled: _audioHandler.isSpatializerEnabled,
+      isSpatializerSupported: _audioHandler.isSpatializerSupported,
+      volumeBoost: _audioHandler.volumeBoost,
+    ));
   }
 
   void clearError() {
@@ -362,7 +380,26 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   Future<void> applyPreset(EqPreset preset) async {
     await _audioHandler.applyPreset(preset);
-    emit(state.copyWith(eqPreset: preset));
+    emit(state.copyWith(
+      eqPreset: preset,
+      selectedHeadphoneProfile: null,
+    ));
+  }
+
+  Future<void> applyHeadphoneProfile(HeadphoneProfile? profile) async {
+    await _audioHandler.applyHeadphoneProfile(profile);
+    if (profile != null) {
+      emit(state.copyWith(
+        eqPreset: EqPreset(
+          name: profile.name,
+          gains: profile.gains,
+          bassBoost: profile.bassBoost,
+        ),
+        selectedHeadphoneProfile: profile,
+      ));
+    } else {
+      emit(state.copyWith(selectedHeadphoneProfile: null));
+    }
   }
 
   Future<void> setBandGain(int bandIndex, double gain) async {
@@ -370,7 +407,10 @@ class PlayerCubit extends Cubit<PlayerState> {
     final gains = List<double>.from(state.eqPreset.gains);
     if (bandIndex >= 0 && bandIndex < gains.length) {
       gains[bandIndex] = gain;
-      emit(state.copyWith(eqPreset: EqPreset(name: 'Custom', gains: gains, bassBoost: state.eqPreset.bassBoost)));
+      emit(state.copyWith(
+        eqPreset: EqPreset(name: 'Custom', gains: gains, bassBoost: state.eqPreset.bassBoost),
+        selectedHeadphoneProfile: null,
+      ));
     }
   }
 
@@ -379,6 +419,35 @@ class PlayerCubit extends Cubit<PlayerState> {
     emit(state.copyWith(
       eqPreset: EqPreset(name: state.eqPreset.name, gains: state.eqPreset.gains, bassBoost: amount),
     ));
+  }
+
+  Future<void> setVirtualizerEnabled(bool enabled) async {
+    await _audioHandler.setVirtualizerEnabled(enabled);
+    emit(state.copyWith(isVirtualizerEnabled: enabled));
+  }
+
+  Future<void> setVirtualizerStrength(double strength) async {
+    await _audioHandler.setVirtualizerStrength(strength);
+    emit(state.copyWith(virtualizerStrength: strength));
+  }
+
+  Future<void> setDynamicsPreset(DynamicsPreset preset, {bool? enabled}) async {
+    await _audioHandler.setDynamicsPreset(preset, enabled: enabled);
+    final isEnabled = enabled ?? (preset != DynamicsPreset.off);
+    emit(state.copyWith(
+      dynamicsPreset: preset,
+      isDynamicsEnabled: isEnabled,
+    ));
+  }
+
+  Future<void> setVolumeBoost(double value) async {
+    await _audioHandler.setVolumeBoost(value);
+    emit(state.copyWith(volumeBoost: value));
+  }
+
+  Future<void> setSpatializerEnabled(bool enabled) async {
+    await _audioHandler.setSpatializerEnabled(enabled);
+    emit(state.copyWith(isSpatializerEnabled: enabled));
   }
 
   // Sleep Timer

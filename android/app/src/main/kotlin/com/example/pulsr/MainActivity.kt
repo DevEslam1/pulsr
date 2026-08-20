@@ -40,6 +40,7 @@ class MainActivity : AudioServiceActivity() {
         TagEditorPlugin.registerWith(flutterEngine)
         VisualizerPlugin.registerWith(flutterEngine)
         RingtonePlugin.registerWith(flutterEngine)
+        AudioEffectsPlugin.registerWith(flutterEngine, applicationContext)
 
         val fileChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FILE_OPENER_CHANNEL)
         fileOpenerChannel = fileChannel

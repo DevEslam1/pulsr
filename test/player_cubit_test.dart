@@ -4,7 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
 import 'package:pulsr/data/scanner/media_scanner_service.dart';
+import 'package:pulsr/domain/models/audio_effects_config.dart';
 import 'package:pulsr/domain/models/eq_preset.dart';
+import 'package:pulsr/domain/models/headphone_profile.dart';
 import 'package:pulsr/domain/usecases/toggle_favorite_usecase.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
@@ -70,6 +72,48 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
 
   @override
   Future<void> setBassBoost(double amount) async {}
+
+  @override
+  bool get isVirtualizerEnabled => false;
+
+  @override
+  double get virtualizerStrength => 0.0;
+
+  @override
+  bool get isDynamicsEnabled => false;
+
+  @override
+  DynamicsPreset get dynamicsPreset => DynamicsPreset.off;
+
+  @override
+  HeadphoneProfile? get selectedHeadphoneProfile => null;
+
+  @override
+  Future<void> setVirtualizerEnabled(bool enabled) async {}
+
+  @override
+  Future<void> setVirtualizerStrength(double strength) async {}
+
+  @override
+  Future<void> setDynamicsPreset(DynamicsPreset preset, {bool? enabled}) async {}
+
+  @override
+  Future<void> applyHeadphoneProfile(HeadphoneProfile? profile) async {}
+
+  @override
+  bool get isSpatializerEnabled => false;
+
+  @override
+  bool get isSpatializerSupported => false;
+
+  @override
+  Future<void> setSpatializerEnabled(bool enabled) async {}
+
+  @override
+  double get volumeBoost => 0.0;
+
+  @override
+  Future<void> setVolumeBoost(double value) async {}
 
   @override
   void startSleepTimer(Duration duration, {bool fadeOut = true}) {

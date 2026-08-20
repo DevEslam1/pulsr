@@ -10,12 +10,14 @@ import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/data/repositories/music_repository.dart';
 import 'package:pulsr/data/repositories/smart_playlist_engine.dart';
 import 'package:pulsr/data/scanner/media_scanner_service.dart';
-import 'package:pulsr/domain/models/eq_preset.dart';
 import 'package:pulsr/domain/repositories/music_repository_interface.dart';
 import 'package:pulsr/domain/usecases/folder_usecases.dart';
 import 'package:pulsr/domain/usecases/get_albums_usecase.dart';
 import 'package:pulsr/domain/usecases/get_artists_usecase.dart';
 import 'package:pulsr/domain/usecases/get_genres_usecase.dart';
+import 'package:pulsr/domain/models/audio_effects_config.dart';
+import 'package:pulsr/domain/models/eq_preset.dart';
+import 'package:pulsr/domain/models/headphone_profile.dart';
 import 'package:pulsr/domain/usecases/get_years_usecase.dart';
 import 'package:pulsr/domain/usecases/get_favorites_usecase.dart';
 import 'package:pulsr/domain/usecases/get_songs_usecase.dart';
@@ -67,6 +69,34 @@ class MockPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   Future<void> setBandGain(int bandIndex, double gainDb) async {}
   @override
   Future<void> setBassBoost(double amount) async {}
+  @override
+  bool get isVirtualizerEnabled => false;
+  @override
+  double get virtualizerStrength => 0.0;
+  @override
+  bool get isDynamicsEnabled => false;
+  @override
+  DynamicsPreset get dynamicsPreset => DynamicsPreset.off;
+  @override
+  HeadphoneProfile? get selectedHeadphoneProfile => null;
+  @override
+  Future<void> setVirtualizerEnabled(bool enabled) async {}
+  @override
+  Future<void> setVirtualizerStrength(double strength) async {}
+  @override
+  Future<void> setDynamicsPreset(DynamicsPreset preset, {bool? enabled}) async {}
+  @override
+  Future<void> applyHeadphoneProfile(HeadphoneProfile? profile) async {}
+  @override
+  bool get isSpatializerEnabled => false;
+  @override
+  bool get isSpatializerSupported => false;
+  @override
+  Future<void> setSpatializerEnabled(bool enabled) async {}
+  @override
+  double get volumeBoost => 0.0;
+  @override
+  Future<void> setVolumeBoost(double value) async {}
   @override
   void startSleepTimer(Duration duration, {bool fadeOut = true}) {}
   @override

@@ -32,6 +32,14 @@ mixin _$PlayerState {
   bool get isQueueVisible;
   EqPreset get eqPreset;
   bool get isEqEnabled;
+  bool get isVirtualizerEnabled;
+  double get virtualizerStrength;
+  bool get isDynamicsEnabled;
+  DynamicsPreset get dynamicsPreset;
+  HeadphoneProfile? get selectedHeadphoneProfile;
+  bool get isSpatializerSupported;
+  bool get isSpatializerEnabled;
+  double get volumeBoost;
   int get activeQueueSlot;
   double get playbackSpeed;
   String? get errorMessage;
@@ -82,6 +90,23 @@ mixin _$PlayerState {
                 other.eqPreset == eqPreset) &&
             (identical(other.isEqEnabled, isEqEnabled) ||
                 other.isEqEnabled == isEqEnabled) &&
+            (identical(other.isVirtualizerEnabled, isVirtualizerEnabled) ||
+                other.isVirtualizerEnabled == isVirtualizerEnabled) &&
+            (identical(other.virtualizerStrength, virtualizerStrength) ||
+                other.virtualizerStrength == virtualizerStrength) &&
+            (identical(other.isDynamicsEnabled, isDynamicsEnabled) ||
+                other.isDynamicsEnabled == isDynamicsEnabled) &&
+            (identical(other.dynamicsPreset, dynamicsPreset) ||
+                other.dynamicsPreset == dynamicsPreset) &&
+            (identical(
+                    other.selectedHeadphoneProfile, selectedHeadphoneProfile) ||
+                other.selectedHeadphoneProfile == selectedHeadphoneProfile) &&
+            (identical(other.isSpatializerSupported, isSpatializerSupported) ||
+                other.isSpatializerSupported == isSpatializerSupported) &&
+            (identical(other.isSpatializerEnabled, isSpatializerEnabled) ||
+                other.isSpatializerEnabled == isSpatializerEnabled) &&
+            (identical(other.volumeBoost, volumeBoost) ||
+                other.volumeBoost == volumeBoost) &&
             (identical(other.activeQueueSlot, activeQueueSlot) ||
                 other.activeQueueSlot == activeQueueSlot) &&
             (identical(other.playbackSpeed, playbackSpeed) ||
@@ -111,6 +136,14 @@ mixin _$PlayerState {
         isQueueVisible,
         eqPreset,
         isEqEnabled,
+        isVirtualizerEnabled,
+        virtualizerStrength,
+        isDynamicsEnabled,
+        dynamicsPreset,
+        selectedHeadphoneProfile,
+        isSpatializerSupported,
+        isSpatializerEnabled,
+        volumeBoost,
         activeQueueSlot,
         playbackSpeed,
         errorMessage
@@ -118,7 +151,7 @@ mixin _$PlayerState {
 
   @override
   String toString() {
-    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, errorMessage: $errorMessage)';
+    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isDynamicsEnabled: $isDynamicsEnabled, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, errorMessage: $errorMessage)';
   }
 }
 
@@ -147,6 +180,14 @@ abstract mixin class $PlayerStateCopyWith<$Res> {
       bool isQueueVisible,
       EqPreset eqPreset,
       bool isEqEnabled,
+      bool isVirtualizerEnabled,
+      double virtualizerStrength,
+      bool isDynamicsEnabled,
+      DynamicsPreset dynamicsPreset,
+      HeadphoneProfile? selectedHeadphoneProfile,
+      bool isSpatializerSupported,
+      bool isSpatializerEnabled,
+      double volumeBoost,
       int activeQueueSlot,
       double playbackSpeed,
       String? errorMessage});
@@ -182,6 +223,14 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
     Object? isQueueVisible = null,
     Object? eqPreset = null,
     Object? isEqEnabled = null,
+    Object? isVirtualizerEnabled = null,
+    Object? virtualizerStrength = null,
+    Object? isDynamicsEnabled = null,
+    Object? dynamicsPreset = null,
+    Object? selectedHeadphoneProfile = freezed,
+    Object? isSpatializerSupported = null,
+    Object? isSpatializerEnabled = null,
+    Object? volumeBoost = null,
     Object? activeQueueSlot = null,
     Object? playbackSpeed = null,
     Object? errorMessage = freezed,
@@ -259,6 +308,38 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
           ? _self.isEqEnabled
           : isEqEnabled // ignore: cast_nullable_to_non_nullable
               as bool,
+      isVirtualizerEnabled: null == isVirtualizerEnabled
+          ? _self.isVirtualizerEnabled
+          : isVirtualizerEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      virtualizerStrength: null == virtualizerStrength
+          ? _self.virtualizerStrength
+          : virtualizerStrength // ignore: cast_nullable_to_non_nullable
+              as double,
+      isDynamicsEnabled: null == isDynamicsEnabled
+          ? _self.isDynamicsEnabled
+          : isDynamicsEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      dynamicsPreset: null == dynamicsPreset
+          ? _self.dynamicsPreset
+          : dynamicsPreset // ignore: cast_nullable_to_non_nullable
+              as DynamicsPreset,
+      selectedHeadphoneProfile: freezed == selectedHeadphoneProfile
+          ? _self.selectedHeadphoneProfile
+          : selectedHeadphoneProfile // ignore: cast_nullable_to_non_nullable
+              as HeadphoneProfile?,
+      isSpatializerSupported: null == isSpatializerSupported
+          ? _self.isSpatializerSupported
+          : isSpatializerSupported // ignore: cast_nullable_to_non_nullable
+              as bool,
+      isSpatializerEnabled: null == isSpatializerEnabled
+          ? _self.isSpatializerEnabled
+          : isSpatializerEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      volumeBoost: null == volumeBoost
+          ? _self.volumeBoost
+          : volumeBoost // ignore: cast_nullable_to_non_nullable
+              as double,
       activeQueueSlot: null == activeQueueSlot
           ? _self.activeQueueSlot
           : activeQueueSlot // ignore: cast_nullable_to_non_nullable
@@ -387,6 +468,14 @@ extension PlayerStatePatterns on PlayerState {
             bool isQueueVisible,
             EqPreset eqPreset,
             bool isEqEnabled,
+            bool isVirtualizerEnabled,
+            double virtualizerStrength,
+            bool isDynamicsEnabled,
+            DynamicsPreset dynamicsPreset,
+            HeadphoneProfile? selectedHeadphoneProfile,
+            bool isSpatializerSupported,
+            bool isSpatializerEnabled,
+            double volumeBoost,
             int activeQueueSlot,
             double playbackSpeed,
             String? errorMessage)?
@@ -415,6 +504,14 @@ extension PlayerStatePatterns on PlayerState {
             _that.isQueueVisible,
             _that.eqPreset,
             _that.isEqEnabled,
+            _that.isVirtualizerEnabled,
+            _that.virtualizerStrength,
+            _that.isDynamicsEnabled,
+            _that.dynamicsPreset,
+            _that.selectedHeadphoneProfile,
+            _that.isSpatializerSupported,
+            _that.isSpatializerEnabled,
+            _that.volumeBoost,
             _that.activeQueueSlot,
             _that.playbackSpeed,
             _that.errorMessage);
@@ -457,6 +554,14 @@ extension PlayerStatePatterns on PlayerState {
             bool isQueueVisible,
             EqPreset eqPreset,
             bool isEqEnabled,
+            bool isVirtualizerEnabled,
+            double virtualizerStrength,
+            bool isDynamicsEnabled,
+            DynamicsPreset dynamicsPreset,
+            HeadphoneProfile? selectedHeadphoneProfile,
+            bool isSpatializerSupported,
+            bool isSpatializerEnabled,
+            double volumeBoost,
             int activeQueueSlot,
             double playbackSpeed,
             String? errorMessage)
@@ -484,6 +589,14 @@ extension PlayerStatePatterns on PlayerState {
             _that.isQueueVisible,
             _that.eqPreset,
             _that.isEqEnabled,
+            _that.isVirtualizerEnabled,
+            _that.virtualizerStrength,
+            _that.isDynamicsEnabled,
+            _that.dynamicsPreset,
+            _that.selectedHeadphoneProfile,
+            _that.isSpatializerSupported,
+            _that.isSpatializerEnabled,
+            _that.volumeBoost,
             _that.activeQueueSlot,
             _that.playbackSpeed,
             _that.errorMessage);
@@ -525,6 +638,14 @@ extension PlayerStatePatterns on PlayerState {
             bool isQueueVisible,
             EqPreset eqPreset,
             bool isEqEnabled,
+            bool isVirtualizerEnabled,
+            double virtualizerStrength,
+            bool isDynamicsEnabled,
+            DynamicsPreset dynamicsPreset,
+            HeadphoneProfile? selectedHeadphoneProfile,
+            bool isSpatializerSupported,
+            bool isSpatializerEnabled,
+            double volumeBoost,
             int activeQueueSlot,
             double playbackSpeed,
             String? errorMessage)?
@@ -552,6 +673,14 @@ extension PlayerStatePatterns on PlayerState {
             _that.isQueueVisible,
             _that.eqPreset,
             _that.isEqEnabled,
+            _that.isVirtualizerEnabled,
+            _that.virtualizerStrength,
+            _that.isDynamicsEnabled,
+            _that.dynamicsPreset,
+            _that.selectedHeadphoneProfile,
+            _that.isSpatializerSupported,
+            _that.isSpatializerEnabled,
+            _that.volumeBoost,
             _that.activeQueueSlot,
             _that.playbackSpeed,
             _that.errorMessage);
@@ -583,6 +712,14 @@ class _PlayerState extends PlayerState {
       this.isQueueVisible = false,
       this.eqPreset = const EqPreset(name: 'Flat', gains: [0, 0, 0, 0, 0]),
       this.isEqEnabled = false,
+      this.isVirtualizerEnabled = false,
+      this.virtualizerStrength = 0.0,
+      this.isDynamicsEnabled = false,
+      this.dynamicsPreset = DynamicsPreset.off,
+      this.selectedHeadphoneProfile,
+      this.isSpatializerSupported = false,
+      this.isSpatializerEnabled = false,
+      this.volumeBoost = 0.0,
       this.activeQueueSlot = 0,
       this.playbackSpeed = 1.0,
       this.errorMessage})
@@ -655,6 +792,29 @@ class _PlayerState extends PlayerState {
   final bool isEqEnabled;
   @override
   @JsonKey()
+  final bool isVirtualizerEnabled;
+  @override
+  @JsonKey()
+  final double virtualizerStrength;
+  @override
+  @JsonKey()
+  final bool isDynamicsEnabled;
+  @override
+  @JsonKey()
+  final DynamicsPreset dynamicsPreset;
+  @override
+  final HeadphoneProfile? selectedHeadphoneProfile;
+  @override
+  @JsonKey()
+  final bool isSpatializerSupported;
+  @override
+  @JsonKey()
+  final bool isSpatializerEnabled;
+  @override
+  @JsonKey()
+  final double volumeBoost;
+  @override
+  @JsonKey()
   final int activeQueueSlot;
   @override
   @JsonKey()
@@ -709,6 +869,23 @@ class _PlayerState extends PlayerState {
                 other.eqPreset == eqPreset) &&
             (identical(other.isEqEnabled, isEqEnabled) ||
                 other.isEqEnabled == isEqEnabled) &&
+            (identical(other.isVirtualizerEnabled, isVirtualizerEnabled) ||
+                other.isVirtualizerEnabled == isVirtualizerEnabled) &&
+            (identical(other.virtualizerStrength, virtualizerStrength) ||
+                other.virtualizerStrength == virtualizerStrength) &&
+            (identical(other.isDynamicsEnabled, isDynamicsEnabled) ||
+                other.isDynamicsEnabled == isDynamicsEnabled) &&
+            (identical(other.dynamicsPreset, dynamicsPreset) ||
+                other.dynamicsPreset == dynamicsPreset) &&
+            (identical(
+                    other.selectedHeadphoneProfile, selectedHeadphoneProfile) ||
+                other.selectedHeadphoneProfile == selectedHeadphoneProfile) &&
+            (identical(other.isSpatializerSupported, isSpatializerSupported) ||
+                other.isSpatializerSupported == isSpatializerSupported) &&
+            (identical(other.isSpatializerEnabled, isSpatializerEnabled) ||
+                other.isSpatializerEnabled == isSpatializerEnabled) &&
+            (identical(other.volumeBoost, volumeBoost) ||
+                other.volumeBoost == volumeBoost) &&
             (identical(other.activeQueueSlot, activeQueueSlot) ||
                 other.activeQueueSlot == activeQueueSlot) &&
             (identical(other.playbackSpeed, playbackSpeed) ||
@@ -738,6 +915,14 @@ class _PlayerState extends PlayerState {
         isQueueVisible,
         eqPreset,
         isEqEnabled,
+        isVirtualizerEnabled,
+        virtualizerStrength,
+        isDynamicsEnabled,
+        dynamicsPreset,
+        selectedHeadphoneProfile,
+        isSpatializerSupported,
+        isSpatializerEnabled,
+        volumeBoost,
         activeQueueSlot,
         playbackSpeed,
         errorMessage
@@ -745,7 +930,7 @@ class _PlayerState extends PlayerState {
 
   @override
   String toString() {
-    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, errorMessage: $errorMessage)';
+    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isDynamicsEnabled: $isDynamicsEnabled, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, errorMessage: $errorMessage)';
   }
 }
 
@@ -776,6 +961,14 @@ abstract mixin class _$PlayerStateCopyWith<$Res>
       bool isQueueVisible,
       EqPreset eqPreset,
       bool isEqEnabled,
+      bool isVirtualizerEnabled,
+      double virtualizerStrength,
+      bool isDynamicsEnabled,
+      DynamicsPreset dynamicsPreset,
+      HeadphoneProfile? selectedHeadphoneProfile,
+      bool isSpatializerSupported,
+      bool isSpatializerEnabled,
+      double volumeBoost,
       int activeQueueSlot,
       double playbackSpeed,
       String? errorMessage});
@@ -811,6 +1004,14 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
     Object? isQueueVisible = null,
     Object? eqPreset = null,
     Object? isEqEnabled = null,
+    Object? isVirtualizerEnabled = null,
+    Object? virtualizerStrength = null,
+    Object? isDynamicsEnabled = null,
+    Object? dynamicsPreset = null,
+    Object? selectedHeadphoneProfile = freezed,
+    Object? isSpatializerSupported = null,
+    Object? isSpatializerEnabled = null,
+    Object? volumeBoost = null,
     Object? activeQueueSlot = null,
     Object? playbackSpeed = null,
     Object? errorMessage = freezed,
@@ -888,6 +1089,38 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
           ? _self.isEqEnabled
           : isEqEnabled // ignore: cast_nullable_to_non_nullable
               as bool,
+      isVirtualizerEnabled: null == isVirtualizerEnabled
+          ? _self.isVirtualizerEnabled
+          : isVirtualizerEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      virtualizerStrength: null == virtualizerStrength
+          ? _self.virtualizerStrength
+          : virtualizerStrength // ignore: cast_nullable_to_non_nullable
+              as double,
+      isDynamicsEnabled: null == isDynamicsEnabled
+          ? _self.isDynamicsEnabled
+          : isDynamicsEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      dynamicsPreset: null == dynamicsPreset
+          ? _self.dynamicsPreset
+          : dynamicsPreset // ignore: cast_nullable_to_non_nullable
+              as DynamicsPreset,
+      selectedHeadphoneProfile: freezed == selectedHeadphoneProfile
+          ? _self.selectedHeadphoneProfile
+          : selectedHeadphoneProfile // ignore: cast_nullable_to_non_nullable
+              as HeadphoneProfile?,
+      isSpatializerSupported: null == isSpatializerSupported
+          ? _self.isSpatializerSupported
+          : isSpatializerSupported // ignore: cast_nullable_to_non_nullable
+              as bool,
+      isSpatializerEnabled: null == isSpatializerEnabled
+          ? _self.isSpatializerEnabled
+          : isSpatializerEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      volumeBoost: null == volumeBoost
+          ? _self.volumeBoost
+          : volumeBoost // ignore: cast_nullable_to_non_nullable
+              as double,
       activeQueueSlot: null == activeQueueSlot
           ? _self.activeQueueSlot
           : activeQueueSlot // ignore: cast_nullable_to_non_nullable
