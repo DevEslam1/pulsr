@@ -48,7 +48,7 @@ class MinimalPlayerTheme extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 30, color: Colors.white),
+                    icon: Icon(Icons.keyboard_arrow_down_rounded, size: 30, color: p.textPrimary),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   Text(
@@ -57,11 +57,11 @@ class MinimalPlayerTheme extends StatelessWidget {
                           fontSize: 11,
                           letterSpacing: 2.0,
                           fontWeight: FontWeight.w800,
-                          color: Colors.white70,
+                          color: p.textSecondary,
                         ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.more_horiz_rounded, color: Colors.white),
+                    icon: Icon(Icons.more_horiz_rounded, color: p.textPrimary),
                     onPressed: () {
                       if (song != null) {
                         showModalBottomSheet(

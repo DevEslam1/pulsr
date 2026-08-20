@@ -17,6 +17,7 @@ mixin _$SettingsState {
   bool get gaplessPlayback;
   double get crossfadeSeconds;
   int get minDurationSec;
+  bool get autoHideSystemMedia;
   bool get dynamicThemingEnabled;
   bool get resumeAfterInterruption;
   bool get waveformSeekBarEnabled;
@@ -51,6 +52,8 @@ mixin _$SettingsState {
                 other.crossfadeSeconds == crossfadeSeconds) &&
             (identical(other.minDurationSec, minDurationSec) ||
                 other.minDurationSec == minDurationSec) &&
+            (identical(other.autoHideSystemMedia, autoHideSystemMedia) ||
+                other.autoHideSystemMedia == autoHideSystemMedia) &&
             (identical(other.dynamicThemingEnabled, dynamicThemingEnabled) ||
                 other.dynamicThemingEnabled == dynamicThemingEnabled) &&
             (identical(
@@ -88,6 +91,7 @@ mixin _$SettingsState {
       gaplessPlayback,
       crossfadeSeconds,
       minDurationSec,
+      autoHideSystemMedia,
       dynamicThemingEnabled,
       resumeAfterInterruption,
       waveformSeekBarEnabled,
@@ -105,7 +109,7 @@ mixin _$SettingsState {
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, dynamicThemingEnabled: $dynamicThemingEnabled, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, isScanning: $isScanning, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, dynamicThemingEnabled: $dynamicThemingEnabled, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, isScanning: $isScanning, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
   }
 }
 
@@ -119,6 +123,7 @@ abstract mixin class $SettingsStateCopyWith<$Res> {
       {bool gaplessPlayback,
       double crossfadeSeconds,
       int minDurationSec,
+      bool autoHideSystemMedia,
       bool dynamicThemingEnabled,
       bool resumeAfterInterruption,
       bool waveformSeekBarEnabled,
@@ -151,6 +156,7 @@ class _$SettingsStateCopyWithImpl<$Res>
     Object? gaplessPlayback = null,
     Object? crossfadeSeconds = null,
     Object? minDurationSec = null,
+    Object? autoHideSystemMedia = null,
     Object? dynamicThemingEnabled = null,
     Object? resumeAfterInterruption = null,
     Object? waveformSeekBarEnabled = null,
@@ -179,6 +185,10 @@ class _$SettingsStateCopyWithImpl<$Res>
           ? _self.minDurationSec
           : minDurationSec // ignore: cast_nullable_to_non_nullable
               as int,
+      autoHideSystemMedia: null == autoHideSystemMedia
+          ? _self.autoHideSystemMedia
+          : autoHideSystemMedia // ignore: cast_nullable_to_non_nullable
+              as bool,
       dynamicThemingEnabled: null == dynamicThemingEnabled
           ? _self.dynamicThemingEnabled
           : dynamicThemingEnabled // ignore: cast_nullable_to_non_nullable
@@ -336,6 +346,7 @@ extension SettingsStatePatterns on SettingsState {
             bool gaplessPlayback,
             double crossfadeSeconds,
             int minDurationSec,
+            bool autoHideSystemMedia,
             bool dynamicThemingEnabled,
             bool resumeAfterInterruption,
             bool waveformSeekBarEnabled,
@@ -360,6 +371,7 @@ extension SettingsStatePatterns on SettingsState {
             _that.gaplessPlayback,
             _that.crossfadeSeconds,
             _that.minDurationSec,
+            _that.autoHideSystemMedia,
             _that.dynamicThemingEnabled,
             _that.resumeAfterInterruption,
             _that.waveformSeekBarEnabled,
@@ -398,6 +410,7 @@ extension SettingsStatePatterns on SettingsState {
             bool gaplessPlayback,
             double crossfadeSeconds,
             int minDurationSec,
+            bool autoHideSystemMedia,
             bool dynamicThemingEnabled,
             bool resumeAfterInterruption,
             bool waveformSeekBarEnabled,
@@ -421,6 +434,7 @@ extension SettingsStatePatterns on SettingsState {
             _that.gaplessPlayback,
             _that.crossfadeSeconds,
             _that.minDurationSec,
+            _that.autoHideSystemMedia,
             _that.dynamicThemingEnabled,
             _that.resumeAfterInterruption,
             _that.waveformSeekBarEnabled,
@@ -458,6 +472,7 @@ extension SettingsStatePatterns on SettingsState {
             bool gaplessPlayback,
             double crossfadeSeconds,
             int minDurationSec,
+            bool autoHideSystemMedia,
             bool dynamicThemingEnabled,
             bool resumeAfterInterruption,
             bool waveformSeekBarEnabled,
@@ -481,6 +496,7 @@ extension SettingsStatePatterns on SettingsState {
             _that.gaplessPlayback,
             _that.crossfadeSeconds,
             _that.minDurationSec,
+            _that.autoHideSystemMedia,
             _that.dynamicThemingEnabled,
             _that.resumeAfterInterruption,
             _that.waveformSeekBarEnabled,
@@ -508,6 +524,7 @@ class _SettingsState extends SettingsState {
       {this.gaplessPlayback = true,
       this.crossfadeSeconds = 0.0,
       this.minDurationSec = 30,
+      this.autoHideSystemMedia = true,
       this.dynamicThemingEnabled = true,
       this.resumeAfterInterruption = true,
       this.waveformSeekBarEnabled = true,
@@ -533,6 +550,9 @@ class _SettingsState extends SettingsState {
   @override
   @JsonKey()
   final int minDurationSec;
+  @override
+  @JsonKey()
+  final bool autoHideSystemMedia;
   @override
   @JsonKey()
   final bool dynamicThemingEnabled;
@@ -593,6 +613,8 @@ class _SettingsState extends SettingsState {
                 other.crossfadeSeconds == crossfadeSeconds) &&
             (identical(other.minDurationSec, minDurationSec) ||
                 other.minDurationSec == minDurationSec) &&
+            (identical(other.autoHideSystemMedia, autoHideSystemMedia) ||
+                other.autoHideSystemMedia == autoHideSystemMedia) &&
             (identical(other.dynamicThemingEnabled, dynamicThemingEnabled) ||
                 other.dynamicThemingEnabled == dynamicThemingEnabled) &&
             (identical(
@@ -630,6 +652,7 @@ class _SettingsState extends SettingsState {
       gaplessPlayback,
       crossfadeSeconds,
       minDurationSec,
+      autoHideSystemMedia,
       dynamicThemingEnabled,
       resumeAfterInterruption,
       waveformSeekBarEnabled,
@@ -647,7 +670,7 @@ class _SettingsState extends SettingsState {
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, dynamicThemingEnabled: $dynamicThemingEnabled, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, isScanning: $isScanning, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, dynamicThemingEnabled: $dynamicThemingEnabled, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, isScanning: $isScanning, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
   }
 }
 
@@ -663,6 +686,7 @@ abstract mixin class _$SettingsStateCopyWith<$Res>
       {bool gaplessPlayback,
       double crossfadeSeconds,
       int minDurationSec,
+      bool autoHideSystemMedia,
       bool dynamicThemingEnabled,
       bool resumeAfterInterruption,
       bool waveformSeekBarEnabled,
@@ -695,6 +719,7 @@ class __$SettingsStateCopyWithImpl<$Res>
     Object? gaplessPlayback = null,
     Object? crossfadeSeconds = null,
     Object? minDurationSec = null,
+    Object? autoHideSystemMedia = null,
     Object? dynamicThemingEnabled = null,
     Object? resumeAfterInterruption = null,
     Object? waveformSeekBarEnabled = null,
@@ -723,6 +748,10 @@ class __$SettingsStateCopyWithImpl<$Res>
           ? _self.minDurationSec
           : minDurationSec // ignore: cast_nullable_to_non_nullable
               as int,
+      autoHideSystemMedia: null == autoHideSystemMedia
+          ? _self.autoHideSystemMedia
+          : autoHideSystemMedia // ignore: cast_nullable_to_non_nullable
+              as bool,
       dynamicThemingEnabled: null == dynamicThemingEnabled
           ? _self.dynamicThemingEnabled
           : dynamicThemingEnabled // ignore: cast_nullable_to_non_nullable

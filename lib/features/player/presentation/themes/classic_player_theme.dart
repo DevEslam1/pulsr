@@ -60,7 +60,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 32, color: Colors.white),
+                    icon: Icon(Icons.keyboard_arrow_down_rounded, size: 32, color: p.textPrimary),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   Column(
@@ -70,7 +70,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                         children: [
                           WaveformLogo(
                             size: 16,
-                            color: state.isPlaying ? activeColor : Colors.white70,
+                            color: state.isPlaying ? activeColor : p.textSecondary,
                             animate: state.isPlaying,
                           ),
                           const SizedBox(width: 6),
@@ -80,7 +80,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                                   fontSize: 10,
                                   letterSpacing: 1.2,
                                   fontWeight: FontWeight.w800,
-                                  color: Colors.white70,
+                                  color: p.textSecondary,
                                 ),
                           ),
                         ],
@@ -90,13 +90,13 @@ class ClassicPlayerTheme extends StatelessWidget {
                         song?.album ?? 'Library',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
                               fontWeight: FontWeight.w800,
-                              color: Colors.white,
+                              color: p.textPrimary,
                             ),
                       ),
                     ],
                   ),
                   IconButton(
-                    icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
+                    icon: Icon(Icons.more_vert_rounded, color: p.textPrimary),
                     onPressed: () {
                       if (song != null) {
                         showModalBottomSheet(

@@ -41,7 +41,60 @@ class MediaScannerService {
     return true;
   }
 
-  Future<int> scanDeviceLibrary({bool ignoreShortFiles = true, int minDurationSec = 30}) async {
+  static const List<String> systemIgnoredPathPatterns = [
+    // WhatsApp
+    '/whatsapp/media/whatsapp voice notes',
+    '/whatsapp/media/whatsapp audio',
+    '/android/media/com.whatsapp',
+    '/com.whatsapp.w4b',
+    // Telegram
+    '/telegram/telegram audio',
+    '/telegram/telegram voice',
+    '/android/media/org.telegram.messenger',
+    '/android/media/org.telegram.plus',
+    // Call & Voice recordings
+    '/recordings',
+    '/callrecordings',
+    '/call_recordings',
+    '/voicerecorder',
+    '/voice_recorder',
+    '/soundrecorder',
+    '/sound_recorder',
+    '/audiorecorder',
+    '/audio_recorder',
+    '/miui/sound_recorder',
+    '/samsung/voicerecorder',
+    // System tones & cache
+    '/ringtones',
+    '/notifications',
+    '/alarms',
+    '/.thumbnails',
+    '/.trash',
+    '/.cache',
+  ];
+
+  static bool isSystemIgnoredPath(String filePath) {
+    final lower = filePath.toLowerCase().replaceAll('\\', '/');
+    for (final pattern in systemIgnoredPathPatterns) {
+      if (lower.contains(pattern)) return true;
+    }
+    final fileName = lower.split('/').lastOrNull ?? '';
+    if (fileName.startsWith('ptt-') || (fileName.startsWith('aud-') && fileName.length > 20)) {
+      if (lower.contains('whatsapp') || lower.contains('opus')) return true;
+    }
+    // Ignore hidden dot folders (.thumbnails, .private, etc.)
+    final parts = lower.split('/');
+    if (parts.any((p) => p.startsWith('.') && p != '.' && p != '..')) {
+      return true;
+    }
+    return false;
+  }
+
+  Future<int> scanDeviceLibrary({
+    bool ignoreShortFiles = true,
+    int minDurationSec = 30,
+    bool autoHideSystemMedia = true,
+  }) async {
     final hasPermission = await checkPermission();
     if (!hasPermission) {
       final granted = await requestPermission();
@@ -71,7 +124,13 @@ class MediaScannerService {
       if (duration < minDurationMs) continue;
 
       final path = song.data;
-      // Skip if within an excluded folder
+
+      // Auto-hide system media / messenger voice notes
+      if (autoHideSystemMedia && isSystemIgnoredPath(path)) {
+        continue;
+      }
+
+      // Skip if within a user-excluded folder
       if (excludedFolders.any((folder) {
         final prefix = folder.endsWith(Platform.pathSeparator) ? folder : '$folder${Platform.pathSeparator}';
         return path.startsWith(prefix) || path == folder;

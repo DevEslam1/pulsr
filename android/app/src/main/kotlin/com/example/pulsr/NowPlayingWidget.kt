@@ -7,7 +7,14 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.Rect
+import android.graphics.RectF
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -300,7 +307,9 @@ class NowPlayingWidget : AppWidgetProvider() {
                         if (file.exists() && file.length() > 0) {
                             val bitmap = BitmapFactory.decodeFile(artworkPath)
                             if (bitmap != null) {
-                                views.setImageViewBitmap(R.id.widget_artwork, bitmap)
+                                val density = context.resources.displayMetrics.density
+                                val roundedBitmap = getRoundedCornerBitmap(bitmap, 14f * density)
+                                views.setImageViewBitmap(R.id.widget_artwork, roundedBitmap)
                                 bitmapSet = true
                             }
                         }
@@ -391,6 +400,22 @@ class NowPlayingWidget : AppWidgetProvider() {
                 PendingIntent.FLAG_UPDATE_CURRENT
             }
             return PendingIntent.getBroadcast(context, requestCode, intent, flags)
+        }
+
+        private fun getRoundedCornerBitmap(bitmap: Bitmap, cornerRadiusPx: Float): Bitmap {
+            return try {
+                val output = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(output)
+                val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+                val rect = Rect(0, 0, bitmap.width, bitmap.height)
+                val rectF = RectF(rect)
+                canvas.drawRoundRect(rectF, cornerRadiusPx, cornerRadiusPx, paint)
+                paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+                canvas.drawBitmap(bitmap, rect, rect, paint)
+                output
+            } catch (_: Throwable) {
+                bitmap
+            }
         }
     }
 }

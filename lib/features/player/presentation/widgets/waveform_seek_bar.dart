@@ -37,7 +37,10 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
     final double currentPos = widget.position.inMilliseconds.toDouble();
     final double effectiveValue = (_dragValue ?? currentPos).clamp(0.0, maxDuration > 0 ? maxDuration : 1.0);
     final double progressPercent = maxDuration > 0 ? (effectiveValue / maxDuration).clamp(0.0, 1.0) : 0.0;
-    final Color inactiveColor = widget.inactiveColor ?? Colors.white.withValues(alpha: 0.25);
+    final p = context.palette;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color inactiveColor = widget.inactiveColor ??
+        (isDark ? Colors.white.withValues(alpha: 0.22) : p.hairline.withValues(alpha: 0.8));
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),

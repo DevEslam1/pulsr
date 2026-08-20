@@ -23,6 +23,7 @@ abstract class SettingsState with _$SettingsState {
     @Default(true) bool gaplessPlayback,
     @Default(0.0) double crossfadeSeconds,
     @Default(30) int minDurationSec,
+    @Default(true) bool autoHideSystemMedia,
     @Default(true) bool dynamicThemingEnabled,
     @Default(true) bool resumeAfterInterruption,
     @Default(true) bool waveformSeekBarEnabled,

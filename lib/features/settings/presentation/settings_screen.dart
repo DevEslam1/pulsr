@@ -9,6 +9,7 @@ import '../../player/presentation/widgets/equalizer_sheet.dart';
 import '../../sheets/sleep_timer_sheet.dart';
 import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
+import 'hidden_folders_screen.dart';
 import 'widgets/backup_section.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -142,6 +143,10 @@ class SettingsScreen extends StatelessWidget {
                         onTap: () => _showNowPlayingArtworkSwipePickerSheet(context, cubit, state.nowPlayingArtworkSwipe)),
                   ]),
                   _section(context, 'Library & Scanning', [
+                    _navTile(context, Icons.folder_off_rounded, 'Hidden & Excluded Folders',
+                        state.autoHideSystemMedia ? 'Auto-filtering voice memos • Custom paths' : 'Manage excluded directories',
+                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HiddenFoldersScreen()))),
+                    _divider(p),
                     _navTile(context, Icons.refresh_rounded,
                         state.isScanning ? 'Scanning storage…' : 'Rescan Media Library',
                         state.scanResultCount != null ? 'Last scan: ${state.scanResultCount} tracks' : 'Scan device storage for audio',

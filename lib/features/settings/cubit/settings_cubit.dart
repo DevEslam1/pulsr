@@ -13,6 +13,7 @@ class SettingsCubit extends Cubit<SettingsState> {
   static const String _keyGapless = 'setting_gapless';
   static const String _keyCrossfade = 'setting_crossfade';
   static const String _keyMinDuration = 'setting_min_duration';
+  static const String _keyAutoHideSystemMedia = 'setting_auto_hide_system_media';
   static const String _keyDynamicTheme = 'setting_dynamic_theme';
   static const String _keyResumeAfterInterruption = 'setting_resume_after_interruption';
   static const String _keyWaveformSeekBar = 'setting_waveform_seek_bar';
@@ -89,6 +90,7 @@ class SettingsCubit extends Cubit<SettingsState> {
         gaplessPlayback: prefs.getBool(_keyGapless) ?? true,
         crossfadeSeconds: prefs.getDouble(_keyCrossfade) ?? 0.0,
         minDurationSec: prefs.getInt(_keyMinDuration) ?? 30,
+        autoHideSystemMedia: prefs.getBool(_keyAutoHideSystemMedia) ?? true,
         dynamicThemingEnabled: prefs.getBool(_keyDynamicTheme) ?? true,
         resumeAfterInterruption: prefs.getBool(_keyResumeAfterInterruption) ?? true,
         waveformSeekBarEnabled: prefs.getBool(_keyWaveformSeekBar) ?? true,
@@ -120,6 +122,12 @@ class SettingsCubit extends Cubit<SettingsState> {
     emit(state.copyWith(minDurationSec: seconds));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_keyMinDuration, seconds);
+  }
+
+  Future<void> setAutoHideSystemMedia(bool value) async {
+    emit(state.copyWith(autoHideSystemMedia: value));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyAutoHideSystemMedia, value);
   }
 
   Future<void> setDynamicTheming(bool value) async {
@@ -195,6 +203,7 @@ class SettingsCubit extends Cubit<SettingsState> {
       final count = await _scannerService.scanDeviceLibrary(
         ignoreShortFiles: state.minDurationSec > 0,
         minDurationSec: state.minDurationSec,
+        autoHideSystemMedia: state.autoHideSystemMedia,
       );
       emit(state.copyWith(isScanning: false, scanResultCount: count));
       return count;

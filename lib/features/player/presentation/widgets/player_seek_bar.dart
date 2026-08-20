@@ -131,7 +131,9 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                       Container(
                         height: 5,
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.15),
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.white.withValues(alpha: 0.18)
+                              : context.palette.hairline.withValues(alpha: 0.9),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),

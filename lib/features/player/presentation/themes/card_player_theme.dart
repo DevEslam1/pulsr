@@ -34,6 +34,17 @@ class CardPlayerTheme extends StatelessWidget {
     final song = state.currentSong;
     final settingsState = context.watch<SettingsCubit>().state;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBgColor = isDark
+        ? const Color(0xFF141828).withValues(alpha: 0.78)
+        : Colors.white.withValues(alpha: 0.92);
+    final cardBorderColor = isDark
+        ? Colors.white.withValues(alpha: 0.15)
+        : p.hairline;
+    final textTitleColor = isDark ? Colors.white : p.textPrimary;
+    final textSubtitleColor = isDark ? Colors.white70 : p.textSecondary;
+    final iconActionColor = isDark ? Colors.white70 : p.textSecondary;
+
     return Stack(
       children: [
         // 1. Full-bleed Artwork Background
@@ -47,16 +58,22 @@ class CardPlayerTheme extends StatelessWidget {
               : Container(color: p.bg),
         ),
 
-        // 2. Dark Gradient & Blur Overlay
+        // 2. Adaptive Gradient & Blur Overlay
         Positioned.fill(
           child: Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [
-                  Colors.black.withValues(alpha: 0.4),
-                  Colors.black.withValues(alpha: 0.75),
-                  Colors.black.withValues(alpha: 0.95),
-                ],
+                colors: isDark
+                    ? [
+                        Colors.black.withValues(alpha: 0.4),
+                        Colors.black.withValues(alpha: 0.75),
+                        Colors.black.withValues(alpha: 0.95),
+                      ]
+                    : [
+                        Colors.white.withValues(alpha: 0.3),
+                        Colors.white.withValues(alpha: 0.65),
+                        Colors.white.withValues(alpha: 0.92),
+                      ],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
@@ -75,7 +92,7 @@ class CardPlayerTheme extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 32, color: Colors.white),
+                      icon: Icon(Icons.keyboard_arrow_down_rounded, size: 32, color: textTitleColor),
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                     Column(
@@ -85,7 +102,7 @@ class CardPlayerTheme extends StatelessWidget {
                           children: [
                             WaveformLogo(
                               size: 16,
-                              color: state.isPlaying ? activeColor : Colors.white70,
+                              color: state.isPlaying ? activeColor : textSubtitleColor,
                               animate: state.isPlaying,
                             ),
                             const SizedBox(width: 6),
@@ -95,7 +112,7 @@ class CardPlayerTheme extends StatelessWidget {
                                     fontSize: 10,
                                     letterSpacing: 1.2,
                                     fontWeight: FontWeight.w800,
-                                    color: Colors.white70,
+                                    color: textSubtitleColor,
                                   ),
                             ),
                           ],
@@ -105,13 +122,13 @@ class CardPlayerTheme extends StatelessWidget {
                           song?.album ?? 'Library',
                           style: Theme.of(context).textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.w800,
-                                color: Colors.white,
+                                color: textTitleColor,
                               ),
                         ),
                       ],
                     ),
                     IconButton(
-                      icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
+                      icon: Icon(Icons.more_vert_rounded, color: textTitleColor),
                       onPressed: () {
                         if (song != null) {
                           showModalBottomSheet(
@@ -179,7 +196,7 @@ class CardPlayerTheme extends StatelessWidget {
                                             borderRadius: BorderRadius.circular(28),
                                             boxShadow: [
                                               BoxShadow(
-                                                color: Colors.black.withValues(alpha: 0.6),
+                                                color: Colors.black.withValues(alpha: isDark ? 0.6 : 0.2),
                                                 blurRadius: 30,
                                                 spreadRadius: 4,
                                                 offset: const Offset(0, 12),
@@ -204,10 +221,10 @@ class CardPlayerTheme extends StatelessWidget {
                                                     color: p.surfaceContainer,
                                                     borderRadius: BorderRadius.circular(28),
                                                   ),
-                                                  child: const Icon(
+                                                  child: Icon(
                                                     Icons.music_note_rounded,
                                                     size: 96,
-                                                    color: Colors.white24,
+                                                    color: textSubtitleColor.withValues(alpha: 0.4),
                                                   ),
                                                 ),
                                         ),
@@ -225,10 +242,10 @@ class CardPlayerTheme extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: GlassContainer(
                   borderRadius: BorderRadius.circular(28),
-                  blur: 20,
-                  color: Colors.white.withValues(alpha: 0.08),
+                  blur: 24,
+                  color: cardBgColor,
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.15),
+                    color: cardBorderColor,
                     width: 1,
                   ),
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
@@ -248,7 +265,7 @@ class CardPlayerTheme extends StatelessWidget {
                                   overflow: TextOverflow.ellipsis,
                                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                         fontWeight: FontWeight.w900,
-                                        color: Colors.white,
+                                        color: textTitleColor,
                                       ),
                                 ),
                                 const SizedBox(height: 2),
@@ -257,7 +274,7 @@ class CardPlayerTheme extends StatelessWidget {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                        color: Colors.white70,
+                                        color: textSubtitleColor,
                                         fontWeight: FontWeight.w600,
                                       ),
                                 ),
@@ -275,7 +292,7 @@ class CardPlayerTheme extends StatelessWidget {
                                   : Icons.favorite_border_rounded,
                               color: song?.isFavorite == true
                                   ? p.favorite
-                                  : Colors.white70,
+                                  : textSubtitleColor,
                               size: 28,
                             ),
                             onPressed: () {
@@ -323,7 +340,7 @@ class CardPlayerTheme extends StatelessWidget {
                           IconButton(
                             icon: Icon(
                               Icons.equalizer_rounded,
-                              color: state.isEqEnabled ? activeColor : Colors.white70,
+                              color: state.isEqEnabled ? activeColor : iconActionColor,
                             ),
                             onPressed: () {
                               showModalBottomSheet(
@@ -336,7 +353,7 @@ class CardPlayerTheme extends StatelessWidget {
                             tooltip: 'Equalizer',
                           ),
                           IconButton(
-                            icon: const Icon(Icons.speed_rounded, color: Colors.white70),
+                            icon: Icon(Icons.speed_rounded, color: iconActionColor),
                             onPressed: () {
                               showModalBottomSheet(
                                 context: context,
@@ -348,7 +365,7 @@ class CardPlayerTheme extends StatelessWidget {
                           IconButton(
                             icon: Icon(
                               Icons.lyrics_rounded,
-                              color: state.isLyricsVisible ? activeColor : Colors.white70,
+                              color: state.isLyricsVisible ? activeColor : iconActionColor,
                             ),
                             onPressed: () => cubit.toggleLyricsVisibility(),
                             tooltip: 'Lyrics',
@@ -356,7 +373,7 @@ class CardPlayerTheme extends StatelessWidget {
                           IconButton(
                             icon: Icon(
                               Icons.timer_outlined,
-                              color: state.sleepTimerRemaining != null ? activeColor : Colors.white70,
+                              color: state.sleepTimerRemaining != null ? activeColor : iconActionColor,
                             ),
                             onPressed: () {
                               showModalBottomSheet(
@@ -370,7 +387,7 @@ class CardPlayerTheme extends StatelessWidget {
                             tooltip: 'Sleep Timer',
                           ),
                           IconButton(
-                            icon: const Icon(Icons.playlist_add_rounded, color: Colors.white70),
+                            icon: Icon(Icons.playlist_add_rounded, color: iconActionColor),
                             onPressed: () {
                               if (song != null) {
                                 showModalBottomSheet(
@@ -387,7 +404,7 @@ class CardPlayerTheme extends StatelessWidget {
                           IconButton(
                             icon: Icon(
                               Icons.queue_music_rounded,
-                              color: state.isQueueVisible ? activeColor : Colors.white70,
+                              color: state.isQueueVisible ? activeColor : iconActionColor,
                             ),
                             onPressed: () => cubit.toggleQueueVisibility(),
                             tooltip: 'Queue',
