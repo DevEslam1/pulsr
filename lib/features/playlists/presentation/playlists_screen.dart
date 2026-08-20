@@ -1,17 +1,14 @@
-// lib/features/playlists/presentation/playlists_screen.dart
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_radii.dart';
+import 'package:go_router/go_router.dart';
 import '../../../core/di/injection.dart';
-import '../../../core/widgets/artwork_placeholder.dart';
+import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/adaptive.dart';
 import '../../../core/widgets/empty_state_widget.dart';
-import '../../../data/repositories/music_repository.dart';
+import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../../domain/usecases/playlist_io_usecases.dart';
 import '../../player/cubit/player_cubit.dart';
-import '../../playlist_detail/presentation/playlist_detail_screen.dart';
-import '../../smart_playlist_builder/smart_playlist_builder_screen.dart';
 import '../cubit/playlist_cubit.dart';
 import '../cubit/playlist_state.dart';
 
@@ -23,22 +20,10 @@ class PlaylistsScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        title: const Text('Create Playlist'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Playlist name',
-            filled: true,
-            fillColor: AppColors.card,
-          ),
-        ),
+        title: const Text('Create Playlist', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: TextField(controller: controller, autofocus: true, decoration: const InputDecoration(hintText: 'Playlist name')),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
-          ),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () async {
               final name = controller.text.trim();
@@ -55,316 +40,298 @@ class PlaylistsScreen extends StatelessWidget {
   }
 
   Future<void> _importPlaylist(BuildContext context) async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: ['m3u', 'm3u8'],
-    );
-
-    if (result == null || result.files.single.path == null) {
-      return;
-    }
+    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['m3u', 'm3u8']);
+    if (result == null || result.files.single.path == null) return;
 
     final filePath = result.files.single.path!;
-    final fileName = result.files.single.name;
-    final playlistName = fileName.replaceAll(RegExp(r'\.m3u8?$', caseSensitive: false), '');
-
+    final playlistName = result.files.single.name.replaceAll(RegExp(r'\.m3u8?$', caseSensitive: false), '');
     final importUseCase = getIt<PlaylistImportUseCase>();
 
-    try {
-      final importResult = await importUseCase.importPlaylistFromFile(
-        filePath: filePath,
-        playlistName: playlistName,
-      );
+    final res = await importUseCase.importPlaylistFromFile(filePath: filePath, playlistName: playlistName);
+    if (!context.mounted) return;
 
-      if (context.mounted) {
+    res.fold(
+      (failure) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Failed to import playlist: ${failure.message}')));
+      },
+      (importResult) {
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
-            backgroundColor: AppColors.surface,
-            title: const Row(
-              children: [
-                Icon(Icons.check_circle_rounded, color: AppColors.primary),
-                SizedBox(width: 8),
-                Text('Playlist Imported'),
-              ],
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Playlist: "${importResult.playlistName}"',
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 12),
-                Text('• ${importResult.matchedTrackCount} of ${importResult.totalExtractedPaths} tracks added to playlist.'),
-                if (importResult.unmatchedPaths.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    '• ${importResult.unmatchedPaths.length} tracks could not be matched with local library songs.',
-                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                  ),
-                ],
-              ],
-            ),
-            actions: [
-              ElevatedButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: const Text('OK'),
-              ),
-            ],
+            title: const Text('Playlist Imported', style: TextStyle(fontWeight: FontWeight.w800)),
+            content: Text('${importResult.matchedTrackCount} of ${importResult.totalExtractedPaths} tracks matched.'),
+            actions: [ElevatedButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
           ),
         );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to import playlist: $e')),
-        );
-      }
-    }
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
+
     return BlocBuilder<PlaylistCubit, PlaylistState>(
       builder: (context, state) {
         final cubit = context.read<PlaylistCubit>();
-        final repository = context.read<MusicRepository>();
+        final getSongsUseCase = getIt<GetSongsUseCase>();
         final playerCubit = context.read<PlayerCubit>();
-
-        final smartPlaylists = state.playlists.where((p) => p.isSmart).toList();
-        final userPlaylists = state.playlists.where((p) => !p.isSmart).toList();
+        final smartPlaylists = state.playlists.where((x) => x.isSmart).toList();
+        final userPlaylists = state.playlists.where((x) => !x.isSmart).toList();
+        final columns = Adaptive.gridColumns(context, minItemWidth: 170);
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text(
-              'Playlists',
-              style: TextStyle(fontWeight: FontWeight.w900),
-            ),
+            title: const Text('Playlists'),
             actions: [
-              IconButton(
-                icon: const Icon(Icons.file_upload_rounded),
-                tooltip: 'Import Playlist',
-                onPressed: () => _importPlaylist(context),
-              ),
-              IconButton(
-                icon: const Icon(Icons.add_rounded),
-                tooltip: 'Create Playlist',
-                onPressed: () => _showCreateDialog(context, cubit),
-              ),
+              IconButton(icon: const Icon(Icons.file_upload_rounded), tooltip: 'Import M3U', onPressed: () => _importPlaylist(context)),
+              IconButton(icon: const Icon(Icons.add_rounded), tooltip: 'Create Playlist', onPressed: () => _showCreateDialog(context, cubit)),
             ],
           ),
-          body: ListView(
-            padding: const EdgeInsets.only(bottom: 120, top: 8),
-            children: [
-              // Create Buttons Card Row
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Row(
-                  children: [
-                    Expanded(
+          body: Center(
+            child: ConstrainedBox(
+              constraints: Adaptive.contentConstraints(context),
+              child: ListView(
+                padding: const EdgeInsets.only(bottom: 160),
+                children: [
+                  // Liked songs hero card
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 12, Adaptive.pagePadding(context), 4),
+                    child: _PlaylistHeroCard(
+                      title: 'Liked Songs',
+                      subtitle: 'Auto-populated from favorites',
+                      icon: Icons.favorite_rounded,
+                      colors: [p.favorite, const Color(0xFFB0316B)],
+                      onTap: () async {
+                        final songs = await getSongsUseCase.getAllSongs();
+                        songs.fold((l) => null, (list) {
+                          final favs = list.where((s) => s.isFavorite).toList();
+                          if (favs.isNotEmpty) playerCubit.playSong(favs.first, queue: favs);
+                        });
+                      },
+                    ),
+                  ),
+
+                  Padding(
+                    padding: EdgeInsets.only(left: Adaptive.pagePadding(context), top: 20, bottom: 10),
+                    child: Text('SMART PLAYLISTS', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: p.textTertiary)),
+                  ),
+                  if (smartPlaylists.isEmpty)
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
                       child: InkWell(
-                        onTap: () => _showCreateDialog(context, cubit),
-                        borderRadius: AppRadii.cardRadius,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                          decoration: BoxDecoration(
-                            color: AppColors.card,
-                            borderRadius: AppRadii.cardRadius,
-                            border: Border.all(color: AppColors.outline),
-                          ),
-                          child: const Column(
-                            mainAxisSize: MainAxisSize.min,
+                        onTap: () => context.push('/smart-playlist-builder'),
+                        borderRadius: BorderRadius.circular(18),
+                        child: DashedBorderCard(
+                          color: p.accent,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.add_rounded, color: AppColors.primary, size: 22),
-                              SizedBox(height: 4),
-                              Text(
-                                'New Playlist',
-                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                              Icon(Icons.auto_awesome_rounded, color: p.accent, size: 20),
+                              const SizedBox(width: 10),
+                              Text('Create Smart Playlist', style: TextStyle(color: p.accent, fontWeight: FontWeight.w800, fontSize: 14)),
                             ],
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: InkWell(
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const SmartPlaylistBuilderScreen(),
-                            ),
+                    )
+                  else
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+                      child: GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: columns, crossAxisSpacing: 14, mainAxisSpacing: 14, childAspectRatio: 1.0,
+                        ),
+                        itemCount: smartPlaylists.length,
+                        itemBuilder: (context, index) {
+                          final pl = smartPlaylists[index];
+                          final count = state.smartPlaylistCounts[pl.id] ?? 0;
+                          return _PlaylistCard(
+                            name: pl.name,
+                            subtitle: '$count tracks • Smart',
+                            icon: Icons.auto_awesome_rounded,
+                            gradient: [p.accent.withValues(alpha: 0.65), p.accent.withValues(alpha: 0.25)],
+                            onTap: () => context.push('/playlist', extra: pl),
                           );
                         },
-                        borderRadius: AppRadii.cardRadius,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                          decoration: BoxDecoration(
-                            color: AppColors.card,
-                            borderRadius: AppRadii.cardRadius,
-                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
-                          ),
-                          child: const Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 22),
-                              SizedBox(height: 4),
-                              Text(
-                                'Smart Playlist',
-                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11, color: AppColors.primary),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => _importPlaylist(context),
-                        borderRadius: AppRadii.cardRadius,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                          decoration: BoxDecoration(
-                            color: AppColors.card,
-                            borderRadius: AppRadii.cardRadius,
-                            border: Border.all(color: AppColors.outline),
-                          ),
-                          child: const Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.file_upload_rounded, color: AppColors.primary, size: 22),
-                              SizedBox(height: 4),
-                              Text(
-                                'Import M3U',
-                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 11),
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
 
-              // Smart Playlists Section
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: Text(
-                  'SMART PLAYLISTS',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        letterSpacing: 1.2,
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-              ),
-
-              ListTile(
-                leading: Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: AppColors.favorite.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 26, Adaptive.pagePadding(context), 10),
+                    child: Text('YOUR PLAYLISTS', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: p.textTertiary)),
                   ),
-                  child: const Icon(Icons.favorite_rounded, color: AppColors.favorite, size: 24),
-                ),
-                title: const Text('Liked Songs', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                subtitle: const Text('Auto-populated from favorites', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
-                onTap: () async {
-                  final songs = await repository.getAllSongs();
-                  songs.fold((l) => null, (list) {
-                    final favs = list.where((s) => s.isFavorite).toList();
-                    if (favs.isNotEmpty) {
-                      playerCubit.playSong(favs.first, queue: favs);
-                    }
-                  });
-                },
-              ),
-
-              if (smartPlaylists.isNotEmpty)
-                ...smartPlaylists.map((playlist) {
-                  final count = state.smartPlaylistCounts[playlist.id] ?? 0;
-                  return ListTile(
-                    leading: Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 24),
-                    ),
-                    title: Text(playlist.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-                    subtitle: Text('$count tracks • Smart Rule Set', style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                    trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => PlaylistDetailScreen(playlist: playlist),
+                  if (userPlaylists.isEmpty)
+                    EmptyStateWidget(
+                      icon: Icons.playlist_add_rounded,
+                      title: 'No Custom Playlists',
+                      subtitle: 'Create a custom playlist or import an M3U file to organize your tracks.',
+                      primaryActionLabel: 'Create Playlist',
+                      primaryActionIcon: Icons.add_rounded,
+                      onPrimaryAction: () => _showCreateDialog(context, cubit),
+                      secondaryActionLabel: 'Import M3U',
+                      secondaryActionIcon: Icons.file_upload_rounded,
+                      onSecondaryAction: () => _importPlaylist(context),
+                    )
+                  else
+                    Padding(
+                      padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+                      child: GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: columns, crossAxisSpacing: 14, mainAxisSpacing: 14, childAspectRatio: 1.0,
                         ),
-                      );
-                    },
-                  );
-                }),
-
-              const SizedBox(height: 16),
-
-              // User Playlists
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: Text(
-                  'YOUR PLAYLISTS',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        letterSpacing: 1.2,
-                        fontWeight: FontWeight.w700,
+                        itemCount: userPlaylists.length,
+                        itemBuilder: (context, index) {
+                          final pl = userPlaylists[index];
+                          return _PlaylistCard(
+                            name: pl.name,
+                            subtitle: 'Offline playlist',
+                            icon: Icons.queue_music_rounded,
+                            gradient: [p.surfaceContainerHigh, p.surfaceContainer],
+                            muted: true,
+                            onTap: () => context.push('/playlist', extra: pl),
+                          );
+                        },
                       ),
-                ),
-              ),
-
-              if (userPlaylists.isEmpty)
-                EmptyStateWidget(
-                  icon: Icons.playlist_add_rounded,
-                  title: 'No Custom Playlists',
-                  subtitle: 'Create a custom playlist or import an M3U file to organize your tracks.',
-                  primaryActionLabel: 'Create Playlist',
-                  primaryActionIcon: Icons.add_rounded,
-                  onPrimaryAction: () => _showCreateDialog(context, cubit),
-                  secondaryActionLabel: 'Import M3U',
-                  secondaryActionIcon: Icons.file_upload_rounded,
-                  onSecondaryAction: () => _importPlaylist(context),
-                )
-              else
-                ...userPlaylists.map((playlist) {
-                  return ListTile(
-                    leading: const ArtworkPlaceholder(
-                      size: 48,
-                      borderRadius: 12,
-                      icon: Icons.queue_music_rounded,
                     ),
-                    title: Text(playlist.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                    subtitle: const Text('Offline playlist', style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-                    trailing: const Icon(Icons.chevron_right_rounded, color: AppColors.textSecondary),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => PlaylistDetailScreen(playlist: playlist),
-                        ),
-                      );
-                    },
-                  );
-                }),
-            ],
+                ],
+              ),
+            ),
           ),
         );
       },
+    );
+  }
+}
+
+class _PlaylistHeroCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final List<Color> colors;
+  final VoidCallback onTap;
+
+  const _PlaylistHeroCard({required this.title, required this.subtitle, required this.icon, required this.colors, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: colors, begin: Alignment.topLeft, end: Alignment.bottomRight),
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(color: colors.first.withValues(alpha: 0.35), blurRadius: 28, spreadRadius: -6, offset: const Offset(0, 12)),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.2), shape: BoxShape.circle),
+              child: Icon(icon, color: Colors.white, size: 26),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 18, letterSpacing: -0.3)),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 12.5)),
+                ],
+              ),
+            ),
+            Container(
+              width: 40, height: 40,
+              decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+              child: Icon(Icons.play_arrow_rounded, color: colors.first, size: 26),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PlaylistCard extends StatelessWidget {
+  final String name;
+  final String subtitle;
+  final IconData icon;
+  final List<Color> gradient;
+  final bool muted;
+  final VoidCallback onTap;
+
+  const _PlaylistCard({required this.name, required this.subtitle, required this.icon, required this.gradient, required this.onTap, this.muted = false});
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        decoration: BoxDecoration(
+          color: p.surfaceContainer,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: p.hairline),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: gradient, begin: Alignment.topLeft, end: Alignment.bottomRight),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(19)),
+                ),
+                child: Center(
+                  child: Icon(icon, color: muted ? p.textSecondary : Colors.white, size: 40),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(name, maxLines: 1, overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w800, fontSize: 14)),
+                  const SizedBox(height: 2),
+                  Text(subtitle, style: TextStyle(color: p.textSecondary, fontSize: 11.5)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class DashedBorderCard extends StatelessWidget {
+  final Widget child;
+  final Color color;
+  const DashedBorderCard({super.key, required this.child, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 64,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: color.withValues(alpha: 0.5), width: 1.4),
+        color: color.withValues(alpha: 0.05),
+      ),
+      child: child,
     );
   }
 }

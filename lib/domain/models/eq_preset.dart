@@ -31,6 +31,18 @@ class EqPreset {
     this.bassBoost = 0.0,
   });
 
+  EqPreset copyWith({
+    String? name,
+    List<double>? gains,
+    double? bassBoost,
+  }) {
+    return EqPreset(
+      name: name ?? this.name,
+      gains: gains ?? this.gains,
+      bassBoost: bassBoost ?? this.bassBoost,
+    );
+  }
+
   static const List<EqPreset> defaultPresets = [
     EqPreset(name: 'Flat', gains: [0, 0, 0, 0, 0], bassBoost: 0.0),
     EqPreset(name: 'Bass Boost', gains: [6, 4, 1, 0, 0], bassBoost: 0.5),

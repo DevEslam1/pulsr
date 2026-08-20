@@ -1,6 +1,6 @@
 // lib/core/widgets/artwork_placeholder.dart
 import 'package:flutter/material.dart';
-import '../constants/app_colors.dart';
+import '../theme/aura_theme.dart';
 import 'waveform_logo.dart';
 
 class ArtworkPlaceholder extends StatelessWidget {
@@ -17,6 +17,7 @@ class ArtworkPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return LayoutBuilder(
       builder: (context, constraints) {
         final isBounded = size.isFinite && size > 0;
@@ -33,16 +34,16 @@ class ArtworkPlaceholder extends StatelessWidget {
           height: isBounded ? effectiveSize : null,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(effectiveBorderRadius),
-            gradient: const LinearGradient(
+            gradient: LinearGradient(
               colors: [
-                AppColors.card,
-                AppColors.surfaceLight,
+                p.surfaceContainer,
+                p.surfaceContainerHigh,
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             border: Border.all(
-              color: AppColors.outline.withValues(alpha: 0.8),
+              color: p.hairline.withValues(alpha: 0.8),
               width: 1,
             ),
           ),
@@ -50,12 +51,12 @@ class ArtworkPlaceholder extends StatelessWidget {
             child: icon != null
                 ? Icon(
                     icon,
-                    color: AppColors.primary.withValues(alpha: 0.8),
+                    color: p.accent.withValues(alpha: 0.8),
                     size: effectiveSize * 0.45,
                   )
                 : WaveformLogo(
                     size: effectiveSize * 0.45,
-                    color: AppColors.primary.withValues(alpha: 0.8),
+                    color: p.accent.withValues(alpha: 0.8),
                   ),
           ),
         );

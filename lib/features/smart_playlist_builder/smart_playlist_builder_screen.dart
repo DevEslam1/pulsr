@@ -2,8 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
-import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_radii.dart';
+import '../../../core/theme/aura_theme.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/widgets/cached_artwork.dart';
@@ -60,13 +60,14 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return BlocConsumer<SmartPlaylistBuilderCubit, SmartPlaylistBuilderState>(
       listener: (context, state) {
         if (state.errorMessage != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(state.errorMessage!),
-              backgroundColor: AppColors.error,
+              backgroundColor: p.error,
             ),
           );
         }
@@ -78,7 +79,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
           appBar: AppBar(
             title: Row(
               children: [
-                const Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 22),
+                Icon(Icons.auto_awesome_rounded, color: p.accent, size: 22),
                 const SizedBox(width: 8),
                 Text(
                   state.isEditing ? 'Edit Smart Playlist' : 'Smart Playlist Builder',
@@ -97,43 +98,46 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                         }
                       },
                 icon: state.isSubmitting
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: p.accent),
                       )
-                    : const Icon(Icons.check_rounded, color: AppColors.primary),
+                    : Icon(Icons.check_rounded, color: p.accent),
                 label: Text(
                   state.isEditing ? 'Update' : 'Save',
-                  style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: p.accent, fontWeight: FontWeight.bold),
                 ),
               ),
             ],
           ),
-          body: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          body: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             children: [
               // Playlist Name Card
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.card,
+                  color: p.surfaceContainer,
                   borderRadius: AppRadii.cardRadius,
-                  border: Border.all(color: AppColors.outline),
+                  border: Border.all(color: p.hairline),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('PLAYLIST NAME', style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+                    Text('PLAYLIST NAME', style: TextStyle(color: p.textSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
                     const SizedBox(height: 8),
                     TextField(
                       controller: _nameController,
                       onChanged: cubit.updateName,
-                      decoration: const InputDecoration(
+                      decoration: InputDecoration(
                         hintText: 'e.g. 80s Rock Hits, Heavy Rotation...',
                         filled: true,
-                        fillColor: AppColors.surface,
-                        border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12)), borderSide: BorderSide.none),
+                        fillColor: p.surfaceContainerHigh,
+                        border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12)), borderSide: BorderSide.none),
                       ),
                     ),
                   ],
@@ -146,14 +150,14 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.card,
+                  color: p.surfaceContainer,
                   borderRadius: AppRadii.cardRadius,
-                  border: Border.all(color: AppColors.outline),
+                  border: Border.all(color: p.hairline),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('MATCH LOGIC', style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+                    Text('MATCH LOGIC', style: TextStyle(color: p.textSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
                     const SizedBox(height: 8),
                     Row(
                       children: [
@@ -161,9 +165,9 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                           child: ChoiceChip(
                             label: const Center(child: Text('Match ALL Rules (AND)')),
                             selected: state.criteria.matchAll,
-                            selectedColor: AppColors.primary.withValues(alpha: 0.25),
+                            selectedColor: p.accent.withValues(alpha: 0.25),
                             labelStyle: TextStyle(
-                              color: state.criteria.matchAll ? AppColors.primary : AppColors.textSecondary,
+                              color: state.criteria.matchAll ? p.accent : p.textSecondary,
                               fontWeight: FontWeight.bold,
                             ),
                             onSelected: (_) => cubit.toggleMatchAll(true),
@@ -174,9 +178,9 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                           child: ChoiceChip(
                             label: const Center(child: Text('Match ANY Rule (OR)')),
                             selected: !state.criteria.matchAll,
-                            selectedColor: AppColors.primary.withValues(alpha: 0.25),
+                            selectedColor: p.accent.withValues(alpha: 0.25),
                             labelStyle: TextStyle(
-                              color: !state.criteria.matchAll ? AppColors.primary : AppColors.textSecondary,
+                              color: !state.criteria.matchAll ? p.accent : p.textSecondary,
                               fontWeight: FontWeight.bold,
                             ),
                             onSelected: (_) => cubit.toggleMatchAll(false),
@@ -194,7 +198,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('RULES', style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+                  Text('RULES', style: TextStyle(color: p.textSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
                   TextButton.icon(
                     onPressed: () {
                       cubit.addRule(const SmartRule(
@@ -225,14 +229,14 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: AppColors.card,
+                  color: p.surfaceContainer,
                   borderRadius: AppRadii.cardRadius,
-                  border: Border.all(color: AppColors.outline),
+                  border: Border.all(color: p.hairline),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('SORTING & LIMIT', style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+                    Text('SORTING & LIMIT', style: TextStyle(color: p.textSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -240,13 +244,13 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Sort Field', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                              Text('Sort Field', style: TextStyle(fontSize: 12, color: p.textSecondary)),
                               const SizedBox(height: 4),
                               DropdownButtonFormField<String>(
                                 initialValue: state.criteria.sortBy ?? 'title',
-                                decoration: const InputDecoration(
+                                decoration: InputDecoration(
                                   filled: true,
-                                  fillColor: AppColors.surface,
+                                  fillColor: p.surface,
                                   contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                   border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10)), borderSide: BorderSide.none),
                                 ),
@@ -268,7 +272,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('Track Limit', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                              Text('Track Limit', style: TextStyle(fontSize: 12, color: p.textSecondary)),
                               const SizedBox(height: 4),
                               TextField(
                                 controller: _limitController,
@@ -277,10 +281,10 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                                   final num = int.tryParse(val.trim());
                                   cubit.setLimit(num);
                                 },
-                                decoration: const InputDecoration(
+                                decoration: InputDecoration(
                                   hintText: 'Unlimited',
                                   filled: true,
-                                  fillColor: AppColors.surface,
+                                  fillColor: p.surface,
                                   contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                   border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10)), borderSide: BorderSide.none),
                                 ),
@@ -300,16 +304,16 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('MATCHING TRACKS PREVIEW', style: TextStyle(color: AppColors.textSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
+                  Text('MATCHING TRACKS PREVIEW', style: TextStyle(color: p.textSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.15),
+                      color: p.accent.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '${state.previewSongs.length} tracks',
-                      style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 12),
+                      style: TextStyle(color: p.accent, fontWeight: FontWeight.bold, fontSize: 12),
                     ),
                   ),
                 ],
@@ -320,52 +324,56 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                 Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: AppColors.card.withValues(alpha: 0.5),
+                    color: p.surfaceContainer.withValues(alpha: 0.5),
                     borderRadius: AppRadii.cardRadius,
-                    border: Border.all(color: AppColors.outline.withValues(alpha: 0.5)),
+                    border: Border.all(color: p.hairline.withValues(alpha: 0.5)),
                   ),
-                  child: const Center(
+                  child: Center(
                     child: Text(
                       'No tracks match the selected rules.',
-                      style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                      style: TextStyle(color: p.textSecondary, fontSize: 13),
                     ),
                   ),
                 )
               else
-                Container(
-                  constraints: const BoxConstraints(maxHeight: 260),
-                  decoration: BoxDecoration(
-                    color: AppColors.card,
+                Material(
+                  color: p.surfaceContainer,
+                  shape: RoundedRectangleBorder(
                     borderRadius: AppRadii.cardRadius,
-                    border: Border.all(color: AppColors.outline),
+                    side: BorderSide(color: p.hairline),
                   ),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: state.previewSongs.length,
-                    separatorBuilder: (_, __) => const Divider(height: 1, color: AppColors.outline),
-                    itemBuilder: (context, index) {
-                      final song = state.previewSongs[index];
-                      return ListTile(
-                        dense: true,
-                        leading: CachedArtwork(id: song.id, type: ArtworkType.AUDIO, size: 36, borderRadius: 8),
-                        title: Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                        subtitle: Text(
-                          '${song.artist} • ${Formatters.formatDuration(Duration(milliseconds: song.durationMs))}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
-                        ),
-                      );
-                    },
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 260),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: state.previewSongs.length,
+                      separatorBuilder: (_, __) => Divider(height: 1, color: p.hairline),
+                      itemBuilder: (context, index) {
+                        final song = state.previewSongs[index];
+                        return ListTile(
+                          dense: true,
+                          leading: CachedArtwork(id: song.id, type: ArtworkType.AUDIO, size: 36, borderRadius: 8),
+                          title: Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: p.textPrimary)),
+                          subtitle: Text(
+                            '${song.artist} • ${Formatters.formatDuration(Duration(milliseconds: song.durationMs))}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(color: p.textSecondary, fontSize: 11),
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ),
 
               const SizedBox(height: 40),
             ],
           ),
-        );
-      },
+        ),
+      ),
     );
+  },
+);
   }
 }
 
@@ -409,13 +417,15 @@ class _RuleCardState extends State<_RuleCard> {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: p.surfaceContainer,
         borderRadius: AppRadii.cardRadius,
-        border: Border.all(color: AppColors.outline),
+        border: Border.all(color: p.hairline),
       ),
       child: Column(
         children: [
@@ -426,11 +436,11 @@ class _RuleCardState extends State<_RuleCard> {
                 flex: 3,
                 child: DropdownButtonFormField<SmartRuleField>(
                   initialValue: widget.rule.field,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     filled: true,
-                    fillColor: AppColors.surface,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8)), borderSide: BorderSide.none),
+                    fillColor: p.surfaceContainerHigh,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8)), borderSide: BorderSide.none),
                   ),
                   items: SmartRuleField.values.map((f) {
                     return DropdownMenuItem(
@@ -452,11 +462,11 @@ class _RuleCardState extends State<_RuleCard> {
                 flex: 3,
                 child: DropdownButtonFormField<SmartOperator>(
                   initialValue: widget.rule.operator,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     filled: true,
-                    fillColor: AppColors.surface,
-                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8)), borderSide: BorderSide.none),
+                    fillColor: p.surfaceContainerHigh,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8)), borderSide: BorderSide.none),
                   ),
                   items: SmartOperator.values.map((o) {
                     return DropdownMenuItem(
@@ -473,7 +483,7 @@ class _RuleCardState extends State<_RuleCard> {
               ),
 
               IconButton(
-                icon: const Icon(Icons.close_rounded, size: 20, color: AppColors.error),
+                icon: Icon(Icons.close_rounded, size: 20, color: p.error),
                 onPressed: widget.onDelete,
               ),
             ],
@@ -484,11 +494,11 @@ class _RuleCardState extends State<_RuleCard> {
           if (widget.rule.field == SmartRuleField.isFavorite)
             DropdownButtonFormField<String>(
               initialValue: widget.rule.value.toLowerCase() == 'true' || widget.rule.value == '1' ? 'true' : 'false',
-              decoration: const InputDecoration(
+              decoration: InputDecoration(
                 filled: true,
-                fillColor: AppColors.surface,
-                contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8)), borderSide: BorderSide.none),
+                fillColor: p.surfaceContainerHigh,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8)), borderSide: BorderSide.none),
               ),
               items: const [
                 DropdownMenuItem(value: 'true', child: Text('Yes (True)')),
@@ -515,7 +525,7 @@ class _RuleCardState extends State<_RuleCard> {
               decoration: InputDecoration(
                 hintText: _getHintForField(widget.rule.field, widget.rule.operator),
                 filled: true,
-                fillColor: AppColors.surface,
+                fillColor: p.surfaceContainerHigh,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8)), borderSide: BorderSide.none),
               ),

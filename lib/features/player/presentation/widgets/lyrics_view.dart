@@ -1,7 +1,7 @@
 // lib/features/player/presentation/widgets/lyrics_view.dart
 import 'package:flutter/material.dart';
-import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_radii.dart';
+import '../../../../core/theme/aura_theme.dart';
 import '../../../../domain/models/lyrics_line.dart';
 
 class LyricsView extends StatefulWidget {
@@ -16,7 +16,7 @@ class LyricsView extends StatefulWidget {
     required this.lyrics,
     required this.currentPosition,
     this.isLoading = false,
-    this.activeColor = AppColors.primary,
+    this.activeColor = Colors.white,
     this.source = LyricsSource.none,
   });
 
@@ -60,10 +60,10 @@ class _LyricsViewState extends State<LyricsView> {
 
   void _scrollToActive(int index) {
     if (!_scrollController.hasClients) return;
-    const itemHeight = 44.0;
-    final targetOffset = (index * itemHeight) - 100;
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final estimatedOffset = (index / widget.lyrics.length) * maxScroll - 100;
     _scrollController.animateTo(
-      targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
+      estimatedOffset.clamp(0.0, maxScroll),
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
     );
@@ -112,9 +112,11 @@ class _LyricsViewState extends State<LyricsView> {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
+
     if (widget.isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
+      return Center(
+        child: CircularProgressIndicator(color: widget.activeColor),
       );
     }
 
@@ -125,17 +127,21 @@ class _LyricsViewState extends State<LyricsView> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.lyrics_outlined, size: 48, color: Colors.white.withValues(alpha: 0.3)),
+              Icon(Icons.lyrics_outlined, size: 48, color: p.textTertiary),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 'No Lyrics Found',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+                style: TextStyle(
+                  color: p.textPrimary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(
                 'Place a .lrc file in the same folder as your audio track or embed lyrics into file tags.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 12),
+                style: TextStyle(color: p.textSecondary, fontSize: 13, height: 1.4),
               ),
             ],
           ),

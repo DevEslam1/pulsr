@@ -1,7 +1,7 @@
 // lib/features/sheets/sort_filter_sheet.dart
 import 'package:flutter/material.dart';
-import '../../core/constants/app_colors.dart';
-import '../../core/constants/app_radii.dart';
+import '../../core/theme/aura_theme.dart';
+import '../../core/utils/adaptive.dart';
 
 class SortFilterSheet extends StatelessWidget {
   final String currentSort;
@@ -17,6 +17,8 @@ class SortFilterSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
+    final screenHeight = MediaQuery.sizeOf(context).height;
     final sortOptions = [
       {'key': 'title', 'label': 'Title'},
       {'key': 'artist', 'label': 'Artist'},
@@ -24,61 +26,82 @@ class SortFilterSheet extends StatelessWidget {
       {'key': 'duration', 'label': 'Duration'},
     ];
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: AppRadii.bottomSheetRadius,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.outline,
-                borderRadius: BorderRadius.circular(2),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => Navigator.of(context).maybePop(),
+      child: Align(
+        alignment: Alignment.bottomCenter,
+        child: GestureDetector(
+          onTap: () {},
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: Adaptive.maxSheetWidth,
+              maxHeight: screenHeight * 0.75,
+            ),
+            child: Material(
+              color: p.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              clipBehavior: Clip.antiAlias,
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: p.hairline,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Sort & Filter',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: p.textPrimary,
+                            ),
+                      ),
+                      const SizedBox(height: 16),
+                      ...sortOptions.map((option) {
+                        final isSelected = currentSort == option['key'];
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: Text(
+                            option['label']!,
+                            style: TextStyle(
+                              color: isSelected ? p.accent : p.textPrimary,
+                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                              fontSize: 14.5,
+                            ),
+                          ),
+                          trailing: isSelected
+                              ? Icon(
+                                  ascending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                                  color: p.accent,
+                                  size: 20,
+                                )
+                              : null,
+                          onTap: () {
+                            final newAsc = isSelected ? !ascending : true;
+                            onApply(option['key']!, newAsc);
+                            Navigator.pop(context);
+                          },
+                        );
+                      }),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
-          const SizedBox(height: 20),
-          Text(
-            'Sort & Filter',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 16),
-          ...sortOptions.map((option) {
-            final isSelected = currentSort == option['key'];
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(
-                option['label']!,
-                style: TextStyle(
-                  color: isSelected ? AppColors.primary : AppColors.textPrimary,
-                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  fontSize: 14,
-                ),
-              ),
-              trailing: isSelected
-                  ? Icon(
-                      ascending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
-                      color: AppColors.primary,
-                      size: 20,
-                    )
-                  : null,
-              onTap: () {
-                final newAsc = isSelected ? !ascending : true;
-                onApply(option['key']!, newAsc);
-                Navigator.pop(context);
-              },
-            );
-          }),
-        ],
+        ),
       ),
     );
   }

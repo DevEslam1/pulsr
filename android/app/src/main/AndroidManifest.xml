@@ -32,6 +32,47 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="pulsrWidget" />
+            </intent-filter>
+            <!-- Intent filter to open audio files from File Explorers & Downloads -->
+            <intent-filter android:label="Pulsr Music">
+                <action android:name="android.intent.action.VIEW" />
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:mimeType="audio/*" />
+                <data android:mimeType="application/ogg" />
+                <data android:mimeType="application/x-ogg" />
+                <data android:mimeType="application/flac" />
+                <data android:mimeType="application/x-flac" />
+                <data android:mimeType="application/x-matroska" />
+            </intent-filter>
+            <intent-filter android:label="Pulsr Music">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="file" />
+                <data android:scheme="content" />
+                <data android:host="*" />
+                <data android:pathPattern=".*\\.mp3" />
+                <data android:pathPattern=".*\\.flac" />
+                <data android:pathPattern=".*\\.wav" />
+                <data android:pathPattern=".*\\.aac" />
+                <data android:pathPattern=".*\\.m4a" />
+                <data android:pathPattern=".*\\.ogg" />
+                <data android:pathPattern=".*\\.opus" />
+                <data android:pathPattern=".*\\.wma" />
+                <data android:pathPattern=".*\\.alac" />
+                <data android:pathPattern=".*\\.aiff" />
+                <data android:pathPattern=".*\\.dsf" />
+                <data android:pathPattern=".*\\.dff" />
+            </intent-filter>
         </activity>
         
         <service android:name="com.ryanheise.audioservice.AudioService"
@@ -54,6 +95,13 @@
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+                <action android:name="com.example.pulsr.widget.PLAY_PAUSE" />
+                <action android:name="com.example.pulsr.widget.NEXT" />
+                <action android:name="com.example.pulsr.widget.PREV" />
+                <action android:name="com.example.pulsr.widget.REWIND" />
+                <action android:name="com.example.pulsr.widget.FORWARD" />
+                <action android:name="com.example.pulsr.widget.SEEK_RATIO" />
+                <action android:name="com.example.pulsr.widget.FAVORITE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"

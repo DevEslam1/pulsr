@@ -5,14 +5,14 @@ import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../../domain/repositories/music_repository_interface.dart';
 import '../db/app_database.dart';
-import '../repositories/music_repository.dart';
 
 
 @singleton
 class MediaScannerService {
   final OnAudioQuery _audioQuery = OnAudioQuery();
-  final MusicRepository _repository;
+  final IMusicRepository _repository;
 
   MediaScannerService(this._repository);
 
@@ -72,7 +72,10 @@ class MediaScannerService {
 
       final path = song.data;
       // Skip if within an excluded folder
-      if (excludedFolders.any((folder) => path.startsWith(folder))) {
+      if (excludedFolders.any((folder) {
+        final prefix = folder.endsWith(Platform.pathSeparator) ? folder : '$folder${Platform.pathSeparator}';
+        return path.startsWith(prefix) || path == folder;
+      })) {
         continue;
       }
 

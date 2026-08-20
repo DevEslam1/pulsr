@@ -3,8 +3,16 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/core/widgets/artwork_placeholder.dart';
 import 'package:pulsr/core/widgets/cached_artwork.dart';
+
+Widget _wrap(Widget child) {
+  return MaterialApp(
+    theme: AuraTheme.customTheme(const Color(0xFF9B9EF5), brightness: Brightness.dark),
+    home: Scaffold(body: child),
+  );
+}
 
 void main() {
   group('CachedArtwork Widget Tests', () {
@@ -13,13 +21,11 @@ void main() {
       customCache.put('AUDIO_1', null); // Cached as missing
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: CachedArtwork(
-              id: 1,
-              type: ArtworkType.AUDIO,
-              customCache: customCache,
-            ),
+        _wrap(
+          CachedArtwork(
+            id: 1,
+            type: ArtworkType.AUDIO,
+            customCache: customCache,
           ),
         ),
       );
@@ -43,14 +49,12 @@ void main() {
       customCache.put('AUDIO_100', samplePng);
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: CachedArtwork(
-              id: 100,
-              type: ArtworkType.AUDIO,
-              size: 64.0,
-              customCache: customCache,
-            ),
+        _wrap(
+          CachedArtwork(
+            id: 100,
+            type: ArtworkType.AUDIO,
+            size: 64.0,
+            customCache: customCache,
           ),
         ),
       );

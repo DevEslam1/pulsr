@@ -52,20 +52,27 @@ class PlaylistCubit extends Cubit<PlaylistState> {
   }
 
   void _updateSmartCounts(List playlists) {
-    for (final sub in _smartSubscriptions.values) {
-      sub.cancel();
-    }
-    _smartSubscriptions.clear();
-
+    final currentSmartIds = <int>{};
     for (final playlist in playlists) {
       if (playlist.isSmart && playlist.smartCriteria != null) {
-        final criteria = SmartCriteria.fromJsonString(playlist.smartCriteria!);
-        _smartSubscriptions[playlist.id] = _playlistUseCases.watchSmartPlaylistSongs(criteria).listen((songs) {
-          final updatedCounts = Map<int, int>.from(state.smartPlaylistCounts);
-          updatedCounts[playlist.id] = songs.length;
-          emit(state.copyWith(smartPlaylistCounts: updatedCounts));
-        });
+        currentSmartIds.add(playlist.id);
+        if (!_smartSubscriptions.containsKey(playlist.id)) {
+          final criteria = SmartCriteria.fromJsonString(playlist.smartCriteria!);
+          _smartSubscriptions[playlist.id] =
+              _playlistUseCases.watchSmartPlaylistSongs(criteria).listen((songs) {
+            if (isClosed) return;
+            final updatedCounts = Map<int, int>.from(state.smartPlaylistCounts);
+            updatedCounts[playlist.id] = songs.length;
+            emit(state.copyWith(smartPlaylistCounts: updatedCounts));
+          });
+        }
       }
+    }
+    // Remove subscriptions for deleted smart playlists
+    final staleIds = _smartSubscriptions.keys.where((id) => !currentSmartIds.contains(id)).toList();
+    for (final id in staleIds) {
+      _smartSubscriptions[id]?.cancel();
+      _smartSubscriptions.remove(id);
     }
   }
 

@@ -67,6 +67,7 @@ class CachedArtwork extends StatefulWidget {
 class _CachedArtworkState extends State<CachedArtwork> {
   static final OnAudioQuery _audioQuery = OnAudioQuery();
   Uint8List? _cachedBytes;
+  int _loadToken = 0;
 
   ArtworkLruCache get _cache => widget.customCache ?? ArtworkLruCache();
 
@@ -88,6 +89,7 @@ class _CachedArtworkState extends State<CachedArtwork> {
 
   void _loadArtwork() {
     final key = _cacheKey;
+    final token = ++_loadToken;
     if (_cache.containsKey(key)) {
       setState(() {
         _cachedBytes = _cache.get(key);
@@ -98,18 +100,18 @@ class _CachedArtworkState extends State<CachedArtwork> {
             widget.id,
             widget.type,
             format: ArtworkFormat.JPEG,
-            size: 200,
+            size: widget.size > 200 ? 300 : 150,
             quality: 80,
           )
           .then((bytes) {
-        if (mounted) {
+        if (mounted && token == _loadToken) {
           _cache.put(key, bytes);
           setState(() {
             _cachedBytes = bytes;
           });
         }
       }).catchError((_) {
-        if (mounted) {
+        if (mounted && token == _loadToken) {
           _cache.put(key, null);
           setState(() {
             _cachedBytes = null;
@@ -138,13 +140,17 @@ class _CachedArtworkState extends State<CachedArtwork> {
           icon: widget.fallbackIcon,
         );
 
+        final decodeDim = (effectiveSize * 2).clamp(64, 600).round();
+
         final content = _cachedBytes != null
             ? Image.memory(
                 _cachedBytes!,
                 width: isBounded ? effectiveSize : null,
                 height: isBounded ? effectiveSize : null,
+                cacheWidth: decodeDim,
+                cacheHeight: decodeDim,
                 fit: BoxFit.cover,
-                filterQuality: FilterQuality.medium,
+                filterQuality: FilterQuality.low,
                 errorBuilder: (context, error, stackTrace) => placeholder,
               )
             : placeholder;
@@ -154,7 +160,11 @@ class _CachedArtworkState extends State<CachedArtwork> {
           child: SizedBox(
             width: isBounded ? effectiveSize : null,
             height: isBounded ? effectiveSize : null,
-            child: content,
+            child: Semantics(
+              label: 'Album artwork',
+              image: true,
+              child: content,
+            ),
           ),
         );
       },

@@ -1,8 +1,8 @@
 // lib/core/widgets/glass_container.dart
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
+import '../theme/aura_theme.dart';
 
 class GlassContainer extends StatelessWidget {
   final Widget child;
@@ -26,8 +26,9 @@ class GlassContainer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final effectiveRadius = borderRadius ?? AppRadii.cardRadius;
-    final baseColor = color ?? AppColors.surface;
+    final baseColor = color ?? p.surface;
 
     return ClipRRect(
       borderRadius: effectiveRadius,
@@ -39,7 +40,7 @@ class GlassContainer extends StatelessWidget {
             color: baseColor.withValues(alpha: opacity),
             borderRadius: effectiveRadius,
             border: border ?? Border.all(
-              color: AppColors.outline.withValues(alpha: 0.5),
+              color: p.hairline.withValues(alpha: 0.5),
               width: 1.0,
             ),
           ),

@@ -1,18 +1,22 @@
-// lib/features/search/cubit/search_cubit.dart
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
+import '../../../domain/usecases/folder_usecases.dart';
 import '../../../domain/usecases/search_music_usecase.dart';
 import 'search_state.dart';
 
 @injectable
 class SearchCubit extends Cubit<SearchState> {
   final SearchMusicUseCase _searchUseCase;
+  final FolderUseCases _folderUseCases;
   StreamSubscription? _searchSub;
   Timer? _debounceTimer;
 
-  SearchCubit({required SearchMusicUseCase searchUseCase})
-      : _searchUseCase = searchUseCase,
+  SearchCubit({
+    required SearchMusicUseCase searchUseCase,
+    required FolderUseCases folderUseCases,
+  })  : _searchUseCase = searchUseCase,
+        _folderUseCases = folderUseCases,
         super(const SearchState());
 
   void clearError() {
@@ -21,7 +25,7 @@ class SearchCubit extends Cubit<SearchState> {
 
   void setFilter(String filter) {
     emit(state.copyWith(selectedFilter: filter));
-    _executeSearch(state.query);
+    _executeSearch(state.query, filterOverride: filter);
   }
 
   void onQueryChanged(String query) {
@@ -32,7 +36,7 @@ class SearchCubit extends Cubit<SearchState> {
     });
   }
 
-  void _executeSearch(String query) {
+  Future<void> _executeSearch(String query, {String? filterOverride}) async {
     _searchSub?.cancel();
     if (query.trim().isEmpty) {
       emit(state.copyWith(results: [], isLoading: false, errorMessage: null));
@@ -40,15 +44,19 @@ class SearchCubit extends Cubit<SearchState> {
     }
 
     emit(state.copyWith(isLoading: true));
-    _searchSub = _searchUseCase.searchSongs(query).listen((result) {
+    final excludedRes = await _folderUseCases.getExcludedFolders();
+    final excluded = excludedRes.fold((l) => <String>[], (r) => r);
+
+    _searchSub = _searchUseCase.searchSongs(query, excludedFolders: excluded).listen((result) {
       result.fold(
         (failure) => emit(state.copyWith(isLoading: false, errorMessage: failure.message)),
         (allResults) {
           final q = query.toLowerCase();
+          final filter = filterOverride ?? state.selectedFilter;
           final filtered = allResults.where((song) {
-            if (state.selectedFilter == 'Songs') return song.title.toLowerCase().contains(q);
-            if (state.selectedFilter == 'Artists') return song.artist.toLowerCase().contains(q);
-            if (state.selectedFilter == 'Albums') return song.album.toLowerCase().contains(q);
+            if (filter == 'Songs') return song.title.toLowerCase().contains(q);
+            if (filter == 'Artists') return song.artist.toLowerCase().contains(q);
+            if (filter == 'Albums') return song.album.toLowerCase().contains(q);
             return song.title.toLowerCase().contains(q) ||
                 song.artist.toLowerCase().contains(q) ||
                 song.album.toLowerCase().contains(q);

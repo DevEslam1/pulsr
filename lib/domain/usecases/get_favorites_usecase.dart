@@ -2,11 +2,11 @@
 import 'package:injectable/injectable.dart';
 import '../../core/errors/failures.dart';
 import '../../data/db/app_database.dart';
-import '../../data/repositories/music_repository.dart';
+import '../repositories/music_repository_interface.dart';
 
 @singleton
 class GetFavoritesUseCase {
-  final MusicRepository _repository;
+  final IMusicRepository _repository;
 
   GetFavoritesUseCase(this._repository);
 

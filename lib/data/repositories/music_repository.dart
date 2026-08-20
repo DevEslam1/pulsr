@@ -1,19 +1,22 @@
 // lib/data/repositories/music_repository.dart
+import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 import '../../core/errors/failures.dart';
 import '../../domain/models/genre_item.dart';
 import '../../domain/models/year_item.dart';
+import '../../domain/repositories/music_repository_interface.dart';
 import '../db/app_database.dart';
 
-@singleton
-class MusicRepository {
+@Singleton(as: IMusicRepository)
+class MusicRepository implements IMusicRepository {
   final AppDatabase _db;
 
   MusicRepository(this._db);
 
   // --- SONGS ---
+  @override
   Stream<Result<List<SongsTableData>>> watchAllSongs({
     String sortBy = 'title',
     bool ascending = true,
@@ -32,7 +35,8 @@ class MusicRepository {
 
       if (excludedFolders.isNotEmpty) {
         for (final folder in excludedFolders) {
-          query.where((t) => t.path.like('$folder%').not());
+          final prefix = folder.endsWith(Platform.pathSeparator) ? folder : '$folder${Platform.pathSeparator}';
+          query.where((t) => t.path.like('$prefix%').not());
         }
       }
 
@@ -58,6 +62,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<List<SongsTableData>>> getAllSongs({
     String sortBy = 'title',
     bool ascending = true,
@@ -81,6 +86,17 @@ class MusicRepository {
     }
   }
 
+  @override
+  Future<Result<SongsTableData?>> getSongById(int id) async {
+    try {
+      final song = await (_db.select(_db.songsTable)..where((t) => t.id.equals(id))).getSingleOrNull();
+      return Right(song);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to fetch song by id', e));
+    }
+  }
+
+  @override
   Stream<Result<List<SongsTableData>>> watchFavorites() {
     try {
       return (_db.select(_db.songsTable)
@@ -94,6 +110,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<List<SongsTableData>>> getFavorites() async {
     try {
       final songs = await (_db.select(_db.songsTable)
@@ -106,6 +123,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Stream<Result<List<SongsTableData>>> watchRecentlyPlayed({int limit = 20}) {
     try {
       return (_db.select(_db.songsTable)
@@ -120,6 +138,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<List<SongsTableData>>> getRecentlyPlayed({int limit = 20}) async {
     try {
       final songs = await (_db.select(_db.songsTable)
@@ -133,6 +152,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Stream<Result<List<SongsTableData>>> watchRecentlyAdded({int limit = 20}) {
     try {
       return (_db.select(_db.songsTable)
@@ -146,6 +166,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Stream<Result<List<SongsTableData>>> watchTopPlayed({int limit = 30}) {
     try {
       return (_db.select(_db.songsTable)
@@ -160,6 +181,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<bool>> toggleFavorite(int songId) async {
     try {
       final song = await (_db.select(_db.songsTable)..where((t) => t.id.equals(songId))).getSingleOrNull();
@@ -175,6 +197,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<void>> recordPlayHistory(int songId, {bool completed = false}) async {
     try {
       final now = DateTime.now().millisecondsSinceEpoch;
@@ -199,6 +222,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<void>> updateLastPosition(int songId, int positionMs) async {
     try {
       await (_db.update(_db.songsTable)..where((t) => t.id.equals(songId))).write(
@@ -211,6 +235,7 @@ class MusicRepository {
   }
 
   // --- ALBUMS ---
+  @override
   Stream<Result<List<AlbumsTableData>>> watchAlbums() {
     try {
       return (_db.select(_db.albumsTable)..orderBy([(t) => OrderingTerm(expression: t.title)]))
@@ -222,6 +247,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Stream<Result<List<SongsTableData>>> watchAlbumSongs(int albumId) {
     try {
       return (_db.select(_db.songsTable)
@@ -235,6 +261,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<List<AlbumsTableData>>> getAlbums() async {
     try {
       final albums = await (_db.select(_db.albumsTable)
@@ -246,6 +273,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<List<SongsTableData>>> getAlbumSongs(int albumId) async {
     try {
       final songs = await (_db.select(_db.songsTable)
@@ -259,6 +287,7 @@ class MusicRepository {
   }
 
   // --- ARTISTS ---
+  @override
   Stream<Result<List<ArtistsTableData>>> watchArtists() {
     try {
       return (_db.select(_db.artistsTable)..orderBy([(t) => OrderingTerm(expression: t.name)]))
@@ -270,6 +299,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Stream<Result<List<SongsTableData>>> watchArtistSongs(int artistId) {
     try {
       return (_db.select(_db.songsTable)..where((t) => t.artistId.equals(artistId)))
@@ -281,6 +311,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<List<ArtistsTableData>>> getArtists() async {
     try {
       final artists = await (_db.select(_db.artistsTable)..orderBy([(t) => OrderingTerm(expression: t.name)]))
@@ -291,6 +322,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<List<SongsTableData>>> getArtistSongs(int artistId) async {
     try {
       final songs = await (_db.select(_db.songsTable)..where((t) => t.artistId.equals(artistId)))
@@ -301,6 +333,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Stream<Result<List<AlbumsTableData>>> watchArtistAlbums(int artistId) {
     try {
       return (_db.select(_db.albumsTable)..where((t) => t.artistId.equals(artistId)))
@@ -313,6 +346,7 @@ class MusicRepository {
   }
 
   // --- PLAYLISTS ---
+  @override
   Stream<Result<List<PlaylistsTableData>>> watchPlaylists() {
     try {
       return (_db.select(_db.playlistsTable)..orderBy([(t) => OrderingTerm(expression: t.name)]))
@@ -324,6 +358,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<int>> createPlaylist(String name, {bool isSmart = false, String? smartCriteria}) async {
     try {
       final id = await _db.into(_db.playlistsTable).insert(
@@ -339,6 +374,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<void>> renamePlaylist(int playlistId, String newName) async {
     try {
       await (_db.update(_db.playlistsTable)..where((t) => t.id.equals(playlistId))).write(
@@ -353,6 +389,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<void>> updateSmartPlaylist(int playlistId, String name, String smartCriteria) async {
     try {
       await (_db.update(_db.playlistsTable)..where((t) => t.id.equals(playlistId))).write(
@@ -368,6 +405,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<void>> deletePlaylist(int playlistId) async {
     try {
       await (_db.delete(_db.playlistsTable)..where((t) => t.id.equals(playlistId))).go();
@@ -377,6 +415,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<List<PlaylistsTableData>>> getPlaylists() async {
     try {
       final playlists = await (_db.select(_db.playlistsTable)..orderBy([(t) => OrderingTerm(expression: t.name)]))
@@ -387,6 +426,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Stream<Result<List<SongsTableData>>> watchPlaylistSongs(int playlistId) {
     try {
       final query = _db.select(_db.playlistEntriesTable).join([
@@ -404,6 +444,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<List<SongsTableData>>> getPlaylistSongs(int playlistId) async {
     try {
       final query = _db.select(_db.playlistEntriesTable).join([
@@ -420,8 +461,16 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<void>> addSongToPlaylist(int playlistId, int songId) async {
     try {
+      final existing = await (_db.select(_db.playlistEntriesTable)
+            ..where((t) => t.playlistId.equals(playlistId) & t.songId.equals(songId)))
+          .getSingleOrNull();
+      if (existing != null) {
+        return const Right(null); // Already present, avoid duplication
+      }
+
       final countExp = _db.playlistEntriesTable.id.count();
       final query = _db.selectOnly(_db.playlistEntriesTable)
         ..where(_db.playlistEntriesTable.playlistId.equals(playlistId))
@@ -441,23 +490,27 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<void>> addSongsToPlaylist(int playlistId, List<int> songIds) async {
     try {
-      final countExp = _db.playlistEntriesTable.id.count();
-      final query = _db.selectOnly(_db.playlistEntriesTable)
-        ..where(_db.playlistEntriesTable.playlistId.equals(playlistId))
-        ..addColumns([countExp]);
-      int count = await query.map((row) => row.read(countExp)).getSingle() ?? 0;
+      final existingRows = await (_db.select(_db.playlistEntriesTable)
+            ..where((t) => t.playlistId.equals(playlistId)))
+          .get();
+      final existingSongIds = existingRows.map((r) => r.songId).toSet();
+      int count = existingRows.length;
 
       await _db.transaction(() async {
         for (final songId in songIds) {
-          await _db.into(_db.playlistEntriesTable).insert(
-            PlaylistEntriesTableCompanion.insert(
-              playlistId: playlistId,
-              songId: songId,
-              orderIndex: count++,
-            ),
-          );
+          if (!existingSongIds.contains(songId)) {
+            existingSongIds.add(songId);
+            await _db.into(_db.playlistEntriesTable).insert(
+              PlaylistEntriesTableCompanion.insert(
+                playlistId: playlistId,
+                songId: songId,
+                orderIndex: count++,
+              ),
+            );
+          }
         }
       });
       return const Right(null);
@@ -466,6 +519,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<void>> removeSongFromPlaylist(int playlistId, int songId) async {
     try {
       await (_db.delete(_db.playlistEntriesTable)
@@ -478,6 +532,7 @@ class MusicRepository {
   }
 
   // --- EXCLUDED FOLDERS ---
+  @override
   Stream<Result<List<ExcludedFoldersTableData>>> watchExcludedFolders() {
     try {
       return _db
@@ -490,6 +545,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<List<String>>> getExcludedFolderPaths() async {
     try {
       final rows = await _db.select(_db.excludedFoldersTable).get();
@@ -499,6 +555,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<void>> toggleFolderExclusion(String folderPath) async {
     try {
       final existing = await (_db.select(_db.excludedFoldersTable)
@@ -518,6 +575,7 @@ class MusicRepository {
   }
 
   // --- QUEUE PERSISTENCE ---
+  @override
   Future<Result<void>> saveQueue(List<int> songIds, int currentIndex, int positionMs) async {
     try {
       await _db.transaction(() async {
@@ -539,6 +597,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<List<QueueItemsTableData>>> getSavedQueue() async {
     try {
       final items = await (_db.select(_db.queueItemsTable)..orderBy([(t) => OrderingTerm(expression: t.orderIndex)])).get();
@@ -549,6 +608,7 @@ class MusicRepository {
   }
 
   // --- BATCH INSERT / SYNC FROM SCANNER & ORPHAN CLEANUP ---
+  @override
   Future<Result<void>> syncScannedMusic({
     required List<SongsTableCompanion> songs,
     required List<AlbumsTableCompanion> albums,
@@ -568,19 +628,69 @@ class MusicRepository {
     }
   }
 
+  @override
   Future<Result<int>> cleanupOrphanedSongs(Set<int> scannedSongIds) async {
     try {
-      final allSongs = await _db.select(_db.songsTable).get();
-      final orphanedIds = allSongs.where((s) => !scannedSongIds.contains(s.id)).map((s) => s.id).toList();
-      if (orphanedIds.isNotEmpty) {
-        await (_db.delete(_db.songsTable)..where((t) => t.id.isIn(orphanedIds))).go();
+      int deletedCount = 0;
+      if (scannedSongIds.isEmpty) {
+        deletedCount = await _db.delete(_db.songsTable).go();
+      } else {
+        deletedCount = await (_db.delete(_db.songsTable)..where((t) => t.id.isNotIn(scannedSongIds))).go();
       }
-      return Right(orphanedIds.length);
+
+      // Reconcile and cleanup orphaned albums and artists in single SQL queries
+      await _db.customStatement(
+        'DELETE FROM albums WHERE id NOT IN (SELECT DISTINCT album_id FROM songs WHERE album_id IS NOT NULL);',
+      );
+      await _db.customStatement(
+        'DELETE FROM artists WHERE id NOT IN (SELECT DISTINCT artist_id FROM songs WHERE artist_id IS NOT NULL);',
+      );
+
+      // Recalculate song counts using GROUP BY
+      final albumCounts = await (_db.selectOnly(_db.songsTable)
+            ..addColumns([_db.songsTable.albumId, _db.songsTable.id.count()])
+            ..where(_db.songsTable.albumId.isNotNull())
+            ..groupBy([_db.songsTable.albumId]))
+          .get();
+
+      final artistCounts = await (_db.selectOnly(_db.songsTable)
+            ..addColumns([_db.songsTable.artistId, _db.songsTable.id.count()])
+            ..where(_db.songsTable.artistId.isNotNull())
+            ..groupBy([_db.songsTable.artistId]))
+          .get();
+
+      await _db.batch((batch) {
+        for (final row in albumCounts) {
+          final albumId = row.read(_db.songsTable.albumId);
+          final count = row.read(_db.songsTable.id.count());
+          if (albumId != null && count != null) {
+            batch.update(
+              _db.albumsTable,
+              AlbumsTableCompanion(songCount: Value(count)),
+              where: (t) => t.id.equals(albumId),
+            );
+          }
+        }
+        for (final row in artistCounts) {
+          final artistId = row.read(_db.songsTable.artistId);
+          final count = row.read(_db.songsTable.id.count());
+          if (artistId != null && count != null) {
+            batch.update(
+              _db.artistsTable,
+              ArtistsTableCompanion(songCount: Value(count)),
+              where: (t) => t.id.equals(artistId),
+            );
+          }
+        }
+      });
+
+      return Right(deletedCount);
     } catch (e) {
-      return Left(DatabaseFailure('Failed to cleanup orphaned songs', e));
+      return Left(DatabaseFailure('Failed to cleanup orphaned items', e));
     }
   }
 
+  @override
   Future<Result<void>> updateSongTags({
     required String path,
     required String title,
@@ -611,6 +721,7 @@ class MusicRepository {
   }
 
   // --- GENRES ---
+  @override
   Stream<Result<List<GenreItem>>> watchGenres() {
     try {
       final countExp = _db.songsTable.id.count();
@@ -633,6 +744,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Stream<Result<List<SongsTableData>>> watchGenreSongs(String genre) {
     try {
       return (_db.select(_db.songsTable)
@@ -647,6 +759,7 @@ class MusicRepository {
   }
 
   // --- YEARS ---
+  @override
   Stream<Result<List<YearItem>>> watchYears() {
     try {
       final countExp = _db.songsTable.id.count();
@@ -669,6 +782,7 @@ class MusicRepository {
     }
   }
 
+  @override
   Stream<Result<List<SongsTableData>>> watchYearSongs(int year) {
     try {
       return (_db.select(_db.songsTable)

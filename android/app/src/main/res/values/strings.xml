@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Pulsr Music</string>
+    <string name="widget_description">Control Pulsr playback — skip, favorite, and track progress</string>
+</resources>

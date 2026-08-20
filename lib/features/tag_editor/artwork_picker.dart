@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:on_audio_query/on_audio_query.dart';
-import '../../core/constants/app_colors.dart';
+import '../../core/theme/aura_theme.dart';
 import '../../core/widgets/cached_artwork.dart';
 
 class ArtworkPicker extends StatelessWidget {
@@ -26,6 +26,7 @@ class ArtworkPicker extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final bool hasCustomNewImage = newArtworkPath != null && File(newArtworkPath!).existsSync();
     final bool hasBytesImage = artworkBytes != null && artworkBytes!.isNotEmpty && !removeArtwork;
 
@@ -40,7 +41,7 @@ class ArtworkPicker extends StatelessWidget {
                 height: 150,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(20),
-                  color: AppColors.card,
+                  color: p.surfaceContainer,
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withAlpha(50),
@@ -51,8 +52,8 @@ class ArtworkPicker extends StatelessWidget {
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: removeArtwork
-                    ? const Center(
-                        child: Icon(Icons.music_note_rounded, size: 64, color: AppColors.textSecondary),
+                    ? Center(
+                        child: Icon(Icons.music_note_rounded, size: 64, color: p.textSecondary),
                       )
                     : hasCustomNewImage
                         ? Image.file(
@@ -89,7 +90,7 @@ class ArtworkPicker extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withAlpha(200),
+                    color: p.accent.withAlpha(200),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 28),
@@ -106,7 +107,7 @@ class ArtworkPicker extends StatelessWidget {
                 icon: const Icon(Icons.image_outlined, size: 18),
                 label: const Text('Change Cover'),
                 style: TextButton.styleFrom(
-                  foregroundColor: AppColors.primary,
+                  foregroundColor: p.accent,
                 ),
               ),
               if (hasCustomNewImage || hasBytesImage || !removeArtwork) ...[

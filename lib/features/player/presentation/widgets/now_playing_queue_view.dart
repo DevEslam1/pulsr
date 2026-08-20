@@ -2,9 +2,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
-import '../../../../core/constants/app_colors.dart';
-import '../../../../core/constants/app_radii.dart';
+import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/cached_artwork.dart';
+import '../../../../core/widgets/song_tile.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 
@@ -13,6 +13,8 @@ class NowPlayingQueueView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
+
     return BlocBuilder<PlayerCubit, PlayerState>(
       builder: (context, state) {
         final cubit = context.read<PlayerCubit>();
@@ -20,21 +22,25 @@ class NowPlayingQueueView extends StatelessWidget {
 
         return Container(
           decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.5),
-            borderRadius: AppRadii.cardRadius,
+            color: p.surfaceContainer.withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: p.hairline),
           ),
+          clipBehavior: Clip.antiAlias,
           child: Column(
             children: [
               // Queue Slots Switcher Header (Queue 1, Queue 2, Queue 3)
               Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
                   children: [
-                    const Text(
+                    Text(
                       'Queue',
-                      style:
-                          TextStyle(fontWeight: FontWeight.w800, fontSize: 16),
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        fontSize: 16,
+                        color: p.textPrimary,
+                      ),
                     ),
                     const Spacer(),
                     ...List.generate(3, (slotIndex) {
@@ -43,29 +49,23 @@ class NowPlayingQueueView extends StatelessWidget {
                         padding: const EdgeInsets.only(left: 6),
                         child: InkWell(
                           onTap: () => cubit.switchQueueSlot(slotIndex),
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
+                          borderRadius: BorderRadius.circular(10),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 180),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                             decoration: BoxDecoration(
-                              color: isSelected
-                                  ? AppColors.primary
-                                  : AppColors.card,
-                              borderRadius: BorderRadius.circular(8),
+                              color: isSelected ? p.accent : p.surfaceContainerHigh,
+                              borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: isSelected
-                                    ? AppColors.primary
-                                    : AppColors.outline,
+                                color: isSelected ? p.accent : p.hairline,
                               ),
                             ),
                             child: Text(
                               'Q${slotIndex + 1}',
                               style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
-                                color: isSelected
-                                    ? Colors.white
-                                    : AppColors.textSecondary,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w800,
+                                color: isSelected ? Colors.white : p.textSecondary,
                               ),
                             ),
                           ),
@@ -76,15 +76,15 @@ class NowPlayingQueueView extends StatelessWidget {
                 ),
               ),
 
-              const Divider(color: AppColors.outline, height: 1),
+              Divider(color: p.hairline, height: 1),
 
               // Reorderable Queue List
               Expanded(
                 child: queue.isEmpty
-                    ? const Center(
+                    ? Center(
                         child: Text(
                           'Queue is empty',
-                          style: TextStyle(color: AppColors.textSecondary),
+                          style: TextStyle(color: p.textSecondary),
                         ),
                       )
                     : ReorderableListView.builder(
@@ -99,51 +99,57 @@ class NowPlayingQueueView extends StatelessWidget {
 
                           return ListTile(
                             key: ValueKey('queue_${song.id}_$index'),
-                            leading: CachedArtwork(
-                              id: song.id,
-                              type: ArtworkType.AUDIO,
-                              size: 40,
-                              borderRadius: 8,
+                            leading: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                CachedArtwork(
+                                  id: song.id,
+                                  type: ArtworkType.AUDIO,
+                                  size: 42,
+                                  borderRadius: 10,
+                                ),
+                                if (isCurrent)
+                                  Container(
+                                    width: 42,
+                                    height: 42,
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withValues(alpha: 0.5),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Center(
+                                      child: NowPlayingIndicator(color: p.accent),
+                                    ),
+                                  ),
+                              ],
                             ),
                             title: Text(
                               song.title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontWeight: isCurrent
-                                    ? FontWeight.w800
-                                    : FontWeight.w500,
-                                color: isCurrent
-                                    ? AppColors.primary
-                                    : AppColors.textPrimary,
-                                fontSize: 13,
+                                fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
+                                color: isCurrent ? p.accent : p.textPrimary,
+                                fontSize: 13.5,
                               ),
                             ),
                             subtitle: Text(
                               song.artist,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontSize: 11,
+                              style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: 11.5,
                               ),
                             ),
                             trailing: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                if (isCurrent)
-                                  const Icon(Icons.equalizer_rounded,
-                                      color: AppColors.primary, size: 20)
-                                else
+                                if (!isCurrent)
                                   IconButton(
-                                    icon: const Icon(Icons.close_rounded,
-                                        size: 18,
-                                        color: AppColors.textSecondary),
-                                    onPressed: () =>
-                                        cubit.removeQueueItem(index),
+                                    icon: Icon(Icons.close_rounded, size: 18, color: p.textTertiary),
+                                    onPressed: () => cubit.removeQueueItem(index),
                                   ),
-                                const Icon(Icons.drag_handle_rounded,
-                                    color: AppColors.textSecondary, size: 20),
+                                Icon(Icons.drag_handle_rounded, color: p.textTertiary, size: 20),
                               ],
                             ),
                             onTap: () {

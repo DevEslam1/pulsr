@@ -112,7 +112,7 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
             visualizer = vis
             true
         } catch (e: Exception) {
-            e.printStackTrace()
+            android.util.Log.w("VisualizerPlugin", "Hardware visualizer unavailable on this device/emulator: ${e.message}")
             false
         }
     }

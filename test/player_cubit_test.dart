@@ -1,20 +1,24 @@
-// test/player_cubit_test.dart
+import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
-import 'package:pulsr/data/repositories/music_repository.dart';
 import 'package:pulsr/data/scanner/media_scanner_service.dart';
 import 'package:pulsr/domain/models/eq_preset.dart';
 import 'package:pulsr/domain/usecases/toggle_favorite_usecase.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
+import 'package:pulsr/features/widgets/widget_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class MockMusicRepository extends Mock implements MusicRepository {}
+import 'package:pulsr/data/db/app_database.dart';
+import 'package:pulsr/domain/repositories/music_repository_interface.dart';
+
+class MockMusicRepository extends Mock implements IMusicRepository {}
 class MockToggleFavoriteUseCase extends Mock implements ToggleFavoriteUseCase {}
 class MockMediaScannerService extends Mock implements MediaScannerService {}
+class MockWidgetService extends Mock implements WidgetService {}
 
 class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler implements PulsrAudioHandler {
   double _vol = 1.0;
@@ -37,6 +41,11 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
 
   @override
   Duration get crossfadeDuration => currentCrossfadeDuration;
+
+  @override
+  Stream<Duration> get positionStream => _positionController.stream;
+
+  final StreamController<Duration> _positionController = StreamController<Duration>.broadcast();
 
   @override
   void setCrossfadeDuration(Duration d) {
@@ -75,10 +84,10 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   }
 
   @override
-  Future<void> playNext(dynamic song) async {}
+  Future<void> insertNextInQueue(SongsTableData song) async {}
 
   @override
-  Future<void> addToQueue(dynamic song) async {}
+  Future<void> addToQueueEnd(SongsTableData song) async {}
 
   @override
   Future<void> reorderQueue(int oldIndex, int newIndex) async {}
@@ -87,13 +96,25 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   Future<void> removeQueueItemAt(int index) async {}
 
   @override
-  Future<void> loadQueue(List<dynamic> songs, {int initialIndex = 0, Duration? initialPosition}) async {}
+  Future<void> loadQueue(List<SongsTableData> songs, {int initialIndex = 0, Duration? initialPosition}) async {}
 
   @override
-  Future<void> playSongAt(int index) async {}
+  Stream<Duration?> get sleepTimerRemainingStream => const Stream.empty();
+
+  @override
+  void dispose() {
+    _positionController.close();
+  }
+
+  @override
+  Future<void> playSongAt(int index, {Duration? initialPosition}) async {}
 }
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue(Duration.zero);
+  });
+
   late TestPulsrAudioHandler testAudioHandler;
   late MockMusicRepository mockRepository;
   late MockToggleFavoriteUseCase mockToggleFavorite;
@@ -193,6 +214,56 @@ void main() {
 
       cubit.close();
       await settingsCubit.close();
+    });
+
+    test('updates widget with playback state and favorite status', () async {
+      final mockWidgetService = MockWidgetService();
+      when(() => mockWidgetService.listenToWidgetClicks(any())).thenReturn(
+        StreamController<Uri?>().stream.listen((_) {}),
+      );
+      when(
+        () => mockWidgetService.updateNowPlaying(
+          song: any(named: 'song'),
+          isPlaying: any(named: 'isPlaying'),
+          position: any(named: 'position'),
+          duration: any(named: 'duration'),
+          isFavorite: any(named: 'isFavorite'),
+          isShuffle: any(named: 'isShuffle'),
+          repeatMode: any(named: 'repeatMode'),
+        ),
+      ).thenAnswer((_) async {});
+
+      final cubit = PlayerCubit(
+        audioHandler: testAudioHandler,
+        repository: mockRepository,
+        toggleFavoriteUseCase: mockToggleFavorite,
+        widgetService: mockWidgetService,
+      );
+
+      verify(() => mockWidgetService.listenToWidgetClicks(any())).called(1);
+
+      cubit.close();
+    });
+
+    test('position stream only emits when delta exceeds 100ms', () async {
+      final cubit = PlayerCubit(
+        audioHandler: testAudioHandler,
+        repository: mockRepository,
+        toggleFavoriteUseCase: mockToggleFavorite,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+
+      // 50ms delta from zero - should not emit
+      testAudioHandler._positionController.add(const Duration(milliseconds: 50));
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(cubit.state.position, Duration.zero);
+
+      // 200ms delta from 50ms - should emit
+      testAudioHandler._positionController.add(const Duration(milliseconds: 250));
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+      expect(cubit.state.position, const Duration(milliseconds: 250));
+
+      cubit.close();
     });
   });
 }

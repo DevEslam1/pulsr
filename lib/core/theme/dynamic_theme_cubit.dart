@@ -1,11 +1,13 @@
-// lib/core/theme/dynamic_theme_cubit.dart
-import 'dart:typed_data';
+import 'dart:async';
+import 'dart:collection';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:palette_generator/palette_generator.dart';
 import '../constants/app_colors.dart';
+import '../widgets/cached_artwork.dart';
 
 class DynamicThemeState {
   final Color primaryColor;
@@ -46,37 +48,65 @@ class DynamicThemeState {
 @singleton
 class DynamicThemeCubit extends Cubit<DynamicThemeState> {
   final OnAudioQuery _audioQuery = OnAudioQuery();
-  final Map<int, DynamicThemeState> _cachedPalettes = {};
+  static const int _maxCacheSize = 50;
+  final LinkedHashMap<int, DynamicThemeState> _cachedPalettes = LinkedHashMap();
+  Timer? _debounceTimer;
+  int _currentRequestToken = 0;
 
   DynamicThemeCubit() : super(const DynamicThemeState());
 
   Future<void> updateFromSongId(int songId) async {
     if (_cachedPalettes.containsKey(songId)) {
-      emit(_cachedPalettes[songId]!);
+      final cached = _cachedPalettes.remove(songId)!;
+      _cachedPalettes[songId] = cached; // Refresh LRU position
+      emit(cached);
       return;
     }
 
+    final token = ++_currentRequestToken;
+
     try {
-      final Uint8List? rawArt = await _audioQuery.queryArtwork(
-        songId,
-        ArtworkType.AUDIO,
-        format: ArtworkFormat.JPEG,
-        size: 200,
-        quality: 80,
-      );
+      Uint8List? rawArt = ArtworkLruCache().get('AUDIO_$songId');
+      if (rawArt == null || rawArt.isEmpty) {
+        rawArt = await _audioQuery.queryArtwork(
+          songId,
+          ArtworkType.AUDIO,
+          format: ArtworkFormat.JPEG,
+          size: 150,
+          quality: 75,
+        );
+      }
+
+      if (token != _currentRequestToken || isClosed) return;
 
       if (rawArt != null && rawArt.isNotEmpty) {
-        final imageProvider = MemoryImage(rawArt);
         final palette = await PaletteGenerator.fromImageProvider(
-          imageProvider,
-          maximumColorCount: 16,
+          MemoryImage(rawArt),
+          maximumColorCount: 12,
         );
 
-        final dominant = palette.dominantColor?.color;
-        final vibrant = palette.vibrantColor?.color ?? palette.lightVibrantColor?.color ?? dominant;
-        final darkVibrant = palette.darkVibrantColor?.color ?? palette.darkMutedColor?.color;
+        if (token != _currentRequestToken || isClosed) return;
 
-        final primary = vibrant ?? dominant ?? AppColors.primary;
+        // Prioritize saturated/vibrant colors from the artwork
+        Color? primary;
+        final candidates = [
+          palette.vibrantColor?.color,
+          palette.lightVibrantColor?.color,
+          palette.darkVibrantColor?.color,
+          palette.dominantColor?.color,
+          palette.mutedColor?.color,
+        ].whereType<Color>().toList();
+
+        for (final c in candidates) {
+          final hsl = HSLColor.fromColor(c);
+          if (hsl.saturation > 0.20 && hsl.lightness > 0.15 && hsl.lightness < 0.85) {
+            primary = c;
+            break;
+          }
+        }
+        primary ??= palette.vibrantColor?.color ?? palette.dominantColor?.color ?? AppColors.primary;
+
+        final darkVibrant = palette.darkVibrantColor?.color ?? palette.darkMutedColor?.color;
         final bg = darkVibrant != null
             ? Color.alphaBlend(Colors.black.withValues(alpha: 0.75), darkVibrant)
             : const Color(0xFF14172B);
@@ -89,17 +119,29 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
           hasCustomArtworkColor: true,
         );
 
+        if (_cachedPalettes.length >= _maxCacheSize) {
+          _cachedPalettes.remove(_cachedPalettes.keys.first);
+        }
         _cachedPalettes[songId] = newState;
         emit(newState);
         return;
       }
     } catch (_) {}
 
-    // Fallback to default
-    emit(const DynamicThemeState());
+    if (token == _currentRequestToken && !isClosed) {
+      emit(const DynamicThemeState());
+    }
   }
 
   void resetToDefault() {
+    _debounceTimer?.cancel();
+    _currentRequestToken++;
     emit(const DynamicThemeState());
+  }
+
+  @override
+  Future<void> close() {
+    _debounceTimer?.cancel();
+    return super.close();
   }
 }

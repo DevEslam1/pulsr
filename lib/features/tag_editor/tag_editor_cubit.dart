@@ -124,6 +124,11 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       await _scannerService.rescanSingleFile(state.song.path);
 
       emit(state.copyWith(status: TagEditorStatus.success));
+    } on PlatformException catch (e) {
+      emit(state.copyWith(
+        status: TagEditorStatus.failure,
+        errorMessage: e.message ?? 'Failed to save tags on this device.',
+      ));
     } catch (e) {
       emit(state.copyWith(
         status: TagEditorStatus.failure,

@@ -6,18 +6,20 @@ import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:injectable/injectable.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:on_audio_query/on_audio_query.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/models/eq_preset.dart';
+import '../../domain/repositories/music_repository_interface.dart';
 import '../db/app_database.dart';
-import '../repositories/music_repository.dart';
+import 'artwork_uri_resolver.dart';
+import 'crossfade_manager.dart';
+import 'equalizer_manager.dart';
+import 'sleep_timer_manager.dart';
 
 @singleton
 class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   @factoryMethod
   @preResolve
-  static Future<PulsrAudioHandler> create(MusicRepository repository) async {
+  static Future<PulsrAudioHandler> create(IMusicRepository repository) async {
     return await AudioService.init(
       builder: () => PulsrAudioHandler(repository),
       config: const AudioServiceConfig(
@@ -39,226 +41,168 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   AudioPlayer get _activePlayer => _isPlayerAActive ? _playerA : _playerB;
   AudioPlayer get _inactivePlayer => _isPlayerAActive ? _playerB : _playerA;
 
-  final MusicRepository _repository;
-  final AndroidEqualizer? _equalizer;
-  final AndroidLoudnessEnhancer? _loudnessEnhancer;
-
-  static final OnAudioQuery _audioQuery = OnAudioQuery();
-  static final Map<int, Uri> _cachedArtworkUris = {};
-  static final Map<int, Uri> _cachedAlbumArtUris = {};
-  static final Map<int, Uri> _cachedArtistArtUris = {};
+  final IMusicRepository _repository;
+  final CrossfadeManager _crossfadeManager = CrossfadeManager();
+  final SleepTimerManager _sleepTimerManager = SleepTimerManager();
+  late final EqualizerManager _equalizerManager;
 
   List<SongsTableData> _songs = [];
   int _currentIndex = 0;
-  Timer? _sleepTimer;
-  Timer? _positionPersistTimer;
-  EqPreset _currentPreset = EqPreset.defaultPresets.first;
-  bool _eqEnabled = false;
 
-  Duration _crossfadeDuration = Duration.zero;
-  bool _isCrossfading = false;
-  int _fadeId = 0;
+  Timer? _positionPeriodicTimer;
+  Timer? _savePositionDebounce;
+  final StreamController<Duration> _positionSubject = StreamController<Duration>.broadcast();
+  Stream<Duration> get positionStream => _positionSubject.stream;
+  Stream<Duration?> get sleepTimerRemainingStream => _sleepTimerManager.sleepTimerRemainingStream;
+  final List<StreamSubscription<dynamic>> _subscriptions = [];
 
   PulsrAudioHandler._({
-    required MusicRepository repository,
+    required IMusicRepository repository,
     required AudioPlayer playerA,
     required AudioPlayer playerB,
-    AndroidEqualizer? equalizer,
-    AndroidLoudnessEnhancer? loudnessEnhancer,
+    AndroidEqualizer? equalizerA,
+    AndroidLoudnessEnhancer? loudnessEnhancerA,
+    AndroidEqualizer? equalizerB,
+    AndroidLoudnessEnhancer? loudnessEnhancerB,
   })  : _repository = repository,
         _playerA = playerA,
-        _playerB = playerB,
-        _equalizer = equalizer,
-        _loudnessEnhancer = loudnessEnhancer {
+        _playerB = playerB {
+    _equalizerManager = EqualizerManager(
+      equalizerA: equalizerA,
+      loudnessEnhancerA: loudnessEnhancerA,
+      equalizerB: equalizerB,
+      loudnessEnhancerB: loudnessEnhancerB,
+    );
     _init();
   }
 
-  factory PulsrAudioHandler(MusicRepository repository) {
+  factory PulsrAudioHandler(IMusicRepository repository) {
     if (Platform.isAndroid) {
-      final eq = AndroidEqualizer();
-      final le = AndroidLoudnessEnhancer();
+      final eqA = AndroidEqualizer();
+      final leA = AndroidLoudnessEnhancer();
+      final eqB = AndroidEqualizer();
+      final leB = AndroidLoudnessEnhancer();
+
       final playerA = AudioPlayer(
-        audioPipeline: AudioPipeline(androidAudioEffects: [eq, le]),
+        audioPipeline: AudioPipeline(androidAudioEffects: [eqA, leA]),
       );
-      final playerB = AudioPlayer();
+      final playerB = AudioPlayer(
+        audioPipeline: AudioPipeline(androidAudioEffects: [eqB, leB]),
+      );
       return PulsrAudioHandler._(
         repository: repository,
         playerA: playerA,
         playerB: playerB,
-        equalizer: eq,
-        loudnessEnhancer: le,
+        equalizerA: eqA,
+        loudnessEnhancerA: leA,
+        equalizerB: eqB,
+        loudnessEnhancerB: leB,
       );
     } else {
-      final playerA = AudioPlayer();
-      final playerB = AudioPlayer();
       return PulsrAudioHandler._(
         repository: repository,
-        playerA: playerA,
-        playerB: playerB,
+        playerA: AudioPlayer(),
+        playerB: AudioPlayer(),
       );
     }
   }
 
-  void setCrossfadeDuration(Duration d) {
-    _crossfadeDuration = d;
+  static MediaItem _songToMediaItem(SongsTableData song, [Uri? artUri]) {
+    return MediaItem(
+      id: song.id.toString(),
+      album: song.album,
+      title: song.title,
+      artist: song.artist,
+      duration: Duration(milliseconds: song.durationMs),
+      artUri: artUri ?? (song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null),
+      extras: {
+        'path': song.path,
+        'uri': song.uri,
+        'albumId': song.albumId,
+        'artistId': song.artistId,
+        'isFavorite': song.isFavorite,
+        'trackNumber': song.trackNumber,
+        'discNumber': song.discNumber,
+        'year': song.year,
+        'genre': song.genre,
+        'playCount': song.playCount,
+      },
+    );
   }
 
-  Duration get crossfadeDuration => _crossfadeDuration;
+  double _volume = 1.0;
+  double get volume => _volume;
 
-  static Future<Uri?> getArtworkUri(int songId) async {
-    if (_cachedArtworkUris.containsKey(songId)) {
-      return _cachedArtworkUris[songId];
-    }
-    try {
-      final bytes = await _audioQuery.queryArtwork(
-        songId,
-        ArtworkType.AUDIO,
-        format: ArtworkFormat.JPEG,
-        size: 500,
-        quality: 95,
-      );
-      if (bytes != null && bytes.isNotEmpty) {
-        final tempDir = await getTemporaryDirectory();
-        final file = File('${tempDir.path}/pulsr_art_$songId.jpg');
-        await file.writeAsBytes(bytes);
-        final uri = Uri.file(file.path);
-        _cachedArtworkUris[songId] = uri;
-        return uri;
+  Future<void> setVolume(double volume) async {
+    _volume = volume.clamp(0.0, 1.0);
+    await _activePlayer.setVolume(_volume);
+  }
+
+  bool get isEqualizerEnabled => _equalizerManager.isEnabled;
+  EqPreset get currentPreset => _equalizerManager.currentPreset;
+  Duration get crossfadeDuration => _crossfadeManager.duration;
+
+  void setCrossfadeDuration(Duration duration) {
+    _crossfadeManager.duration = duration;
+  }
+
+  Future<void> setEqualizerEnabled(bool enabled) => _equalizerManager.setEqualizerEnabled(enabled);
+  Future<void> setBandGain(int bandIndex, double gain) => _equalizerManager.setBandGain(bandIndex, gain);
+  Future<void> setBassBoost(double value) => _equalizerManager.setBassBoost(value);
+  Future<void> applyPreset(EqPreset preset) => _equalizerManager.applyPreset(preset);
+
+  void _saveCurrentPosition() {
+    _savePositionDebounce?.cancel();
+    _savePositionDebounce = Timer(const Duration(seconds: 3), () {
+      if (_songs.isNotEmpty && _currentIndex >= 0 && _currentIndex < _songs.length) {
+        final currentSong = _songs[_currentIndex];
+        final posMs = _activePlayer.position.inMilliseconds;
+        _repository.updateLastPosition(currentSong.id, posMs);
+        _repository.saveQueue(_songs.map((s) => s.id).toList(), _currentIndex, posMs);
       }
-    } catch (_) {}
-    return null;
-  }
-
-  static Future<Uri?> _albumArtUri(int albumId) async {
-    if (_cachedAlbumArtUris.containsKey(albumId)) {
-      return _cachedAlbumArtUris[albumId];
-    }
-    try {
-      final bytes = await _audioQuery.queryArtwork(
-        albumId,
-        ArtworkType.ALBUM,
-        format: ArtworkFormat.JPEG,
-        size: 500,
-        quality: 95,
-      );
-      if (bytes != null && bytes.isNotEmpty) {
-        final tempDir = await getTemporaryDirectory();
-        final file = File('${tempDir.path}/pulsr_album_art_$albumId.jpg');
-        await file.writeAsBytes(bytes);
-        final uri = Uri.file(file.path);
-        _cachedAlbumArtUris[albumId] = uri;
-        return uri;
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  static Future<Uri?> _artistArtUri(int artistId) async {
-    if (_cachedArtistArtUris.containsKey(artistId)) {
-      return _cachedArtistArtUris[artistId];
-    }
-    try {
-      final bytes = await _audioQuery.queryArtwork(
-        artistId,
-        ArtworkType.ARTIST,
-        format: ArtworkFormat.JPEG,
-        size: 500,
-        quality: 95,
-      );
-      if (bytes != null && bytes.isNotEmpty) {
-        final tempDir = await getTemporaryDirectory();
-        final file = File('${tempDir.path}/pulsr_artist_art_$artistId.jpg');
-        await file.writeAsBytes(bytes);
-        final uri = Uri.file(file.path);
-        _cachedArtistArtUris[artistId] = uri;
-        return uri;
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  static Future<Uri?> _resolveArtworkUri(SongsTableData song) async {
-    var uri = await getArtworkUri(song.id);
-    if (uri == null && song.albumId != null) {
-      uri = await _albumArtUri(song.albumId!);
-    }
-    return uri;
-  }
-
-  Future<void> _fadeVolume(AudioPlayer player, double from, double to, Duration duration, int fadeId) async {
-    if (duration == Duration.zero) {
-      await player.setVolume(to);
-      return;
-    }
-    const steps = 20;
-    final stepDuration = Duration(milliseconds: (duration.inMilliseconds / steps).round());
-    final volumeDelta = (to - from) / steps;
-
-    await player.setVolume(from);
-    for (int i = 1; i <= steps; i++) {
-      if (_fadeId != fadeId) break;
-      await Future.delayed(stepDuration);
-      if (_fadeId != fadeId) break;
-      final nextVolume = (from + volumeDelta * i).clamp(0.0, 1.0);
-      await player.setVolume(nextVolume);
-    }
-  }
-
-  void _cancelCrossfade() {
-    if (_isCrossfading) {
-      _fadeId++;
-      _isCrossfading = false;
-      _inactivePlayer.stop();
-      _inactivePlayer.setVolume(1.0);
-      _activePlayer.setVolume(1.0);
-    }
+    });
   }
 
   Future<void> _init() async {
+    // Clean temp artwork on startup
+    ArtworkUriResolver.cleanupTempArtwork();
+
     void setupPlayerListeners(AudioPlayer player, bool isPlayerA) {
-      player.playbackEventStream.listen((event) {
-        if (isPlayerA == _isPlayerAActive) {
-          _broadcastState(event);
-        }
-      });
-
-      player.playerStateStream.listen((state) {
-        if (isPlayerA == _isPlayerAActive) {
-          if (state.processingState == ProcessingState.completed && !_isCrossfading) {
-            skipToNext();
+      _subscriptions.add(
+        player.playbackEventStream.listen((event) {
+          if (isPlayerA == _isPlayerAActive) {
+            _broadcastState(event);
           }
-        }
-      });
+        }),
+      );
 
-      player.positionStream.listen((position) async {
-        if (isPlayerA == _isPlayerAActive) {
-          final current = _currentIndex;
-          if (current >= 0 && current < _songs.length) {
-            _positionPersistTimer?.cancel();
-            _positionPersistTimer = Timer(const Duration(seconds: 3), () {
-              _repository.updateLastPosition(_songs[current].id, position.inMilliseconds);
-            });
+      _subscriptions.add(
+        player.playerStateStream.listen((state) {
+          if (isPlayerA == _isPlayerAActive) {
+            if (state.processingState == ProcessingState.completed && !_crossfadeManager.isCrossfading) {
+              skipToNext();
+            }
           }
+        }),
+      );
 
-          // Crossfade trigger logic
-          final duration = player.duration;
-          if (_crossfadeDuration > Duration.zero &&
-              duration != null &&
-              duration > _crossfadeDuration &&
-              position > Duration.zero &&
-              !_isCrossfading &&
-              player.playing &&
-              player.loopMode != LoopMode.one) {
-            final remaining = duration - position;
-            if (remaining <= _crossfadeDuration) {
+      _subscriptions.add(
+        player.positionStream.listen((pos) {
+          if (isPlayerA == _isPlayerAActive) {
+            _positionSubject.add(pos);
+            final duration = player.duration ?? Duration.zero;
+            if (_crossfadeManager.duration > Duration.zero &&
+                duration > _crossfadeManager.duration &&
+                pos >= duration - _crossfadeManager.duration &&
+                !_crossfadeManager.isCrossfading) {
               final nextIdx = _getNextIndex();
-              if (nextIdx != null && nextIdx != _currentIndex) {
+              if (nextIdx != null) {
                 _startCrossfade(nextIdx);
               }
             }
           }
-        }
-      });
+        }),
+      );
     }
 
     setupPlayerListeners(_playerA, true);
@@ -305,34 +249,34 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   }
 
   Future<void> _startCrossfade(int nextIndex) async {
-    if (_isCrossfading) return;
-    _isCrossfading = true;
-    final currentFadeId = ++_fadeId;
+    if (_crossfadeManager.isCrossfading) return;
+    _crossfadeManager.beginCrossfade(nextIndex);
+    final currentFadeId = _crossfadeManager.nextFadeId();
 
     try {
       final nextSong = _songs[nextIndex];
-      final artUri = await _resolveArtworkUri(nextSong);
+      final artUri = await ArtworkUriResolver.resolveArtworkUri(nextSong);
 
       await _inactivePlayer.setAudioSource(
         AudioSource.file(nextSong.path, tag: _songToMediaItem(nextSong, artUri)),
       );
 
-      if (_fadeId != currentFadeId) return;
+      if (_crossfadeManager.currentFadeId != currentFadeId) return;
 
       await _inactivePlayer.setVolume(0.0);
       await _inactivePlayer.play();
 
-      if (_fadeId != currentFadeId) return;
+      if (_crossfadeManager.currentFadeId != currentFadeId) return;
 
       final active = _activePlayer;
       final inactive = _inactivePlayer;
 
       await Future.wait([
-        _fadeVolume(active, 1.0, 0.0, _crossfadeDuration, currentFadeId),
-        _fadeVolume(inactive, 0.0, 1.0, _crossfadeDuration, currentFadeId),
+        _crossfadeManager.fadeVolume(active, 1.0, 0.0, _crossfadeManager.duration, currentFadeId),
+        _crossfadeManager.fadeVolume(inactive, 0.0, 1.0, _crossfadeManager.duration, currentFadeId),
       ]);
 
-      if (_fadeId != currentFadeId) return;
+      if (_crossfadeManager.currentFadeId != currentFadeId) return;
 
       _isPlayerAActive = !_isPlayerAActive;
       _currentIndex = nextIndex;
@@ -345,8 +289,8 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
       await active.setVolume(1.0);
     } catch (_) {
     } finally {
-      if (_fadeId == currentFadeId) {
-        _isCrossfading = false;
+      if (_crossfadeManager.currentFadeId == currentFadeId) {
+        _crossfadeManager.finishCrossfade();
       }
     }
   }
@@ -374,6 +318,9 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
   int? _getPreviousIndex() {
     if (_songs.isEmpty) return null;
+    if (_activePlayer.position.inSeconds > 3) {
+      return _currentIndex;
+    }
     if (_currentIndex - 1 >= 0) {
       return _currentIndex - 1;
     } else if (_activePlayer.loopMode == LoopMode.all) {
@@ -382,42 +329,23 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     return null;
   }
 
-  MediaItem _songToMediaItem(SongsTableData song, [Uri? artUri]) {
-    final uri = artUri ??
-        _cachedArtworkUris[song.id] ??
-        (song.albumId != null ? _cachedAlbumArtUris[song.albumId!] : null) ??
-        (song.artworkUri != null
-            ? Uri.parse('content://media/external/audio/albumart/${song.albumId ?? 0}')
-            : null);
-
-    return MediaItem(
-      id: song.id.toString(),
-      album: song.album,
-      title: song.title,
-      artist: song.artist,
-      duration: Duration(milliseconds: song.durationMs),
-      artUri: uri,
-      playable: true,
-      extras: {
-        'path': song.path,
-        'isFavorite': song.isFavorite,
-        if (song.albumId != null) 'albumId': song.albumId,
-        if (song.artistId != null) 'artistId': song.artistId,
-      },
-    );
-  }
-
   void _broadcastState(PlaybackEvent event) {
-    final playing = _activePlayer.playing;
-    final queueIndex = _currentIndex;
+    final isCompleted = _activePlayer.processingState == ProcessingState.completed;
+    final isPlaying = _activePlayer.playing && !isCompleted;
+    final processingState = const {
+      ProcessingState.idle: AudioProcessingState.idle,
+      ProcessingState.loading: AudioProcessingState.loading,
+      ProcessingState.buffering: AudioProcessingState.buffering,
+      ProcessingState.ready: AudioProcessingState.ready,
+      ProcessingState.completed: AudioProcessingState.completed,
+    }[_activePlayer.processingState]!;
 
     playbackState.add(
       playbackState.value.copyWith(
         controls: [
           MediaControl.skipToPrevious,
-          if (playing) MediaControl.pause else MediaControl.play,
+          if (isPlaying) MediaControl.pause else MediaControl.play,
           MediaControl.skipToNext,
-          MediaControl.stop,
         ],
         systemActions: const {
           MediaAction.seek,
@@ -427,68 +355,52 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
           MediaAction.setRepeatMode,
         },
         androidCompactActionIndices: const [0, 1, 2],
-        processingState: const {
-          ProcessingState.idle: AudioProcessingState.idle,
-          ProcessingState.loading: AudioProcessingState.loading,
-          ProcessingState.buffering: AudioProcessingState.buffering,
-          ProcessingState.ready: AudioProcessingState.ready,
-          ProcessingState.completed: AudioProcessingState.completed,
-        }[_activePlayer.processingState]!,
-        playing: playing,
+        processingState: processingState,
+        playing: isPlaying,
         updatePosition: _activePlayer.position,
         bufferedPosition: _activePlayer.bufferedPosition,
         speed: _activePlayer.speed,
-        queueIndex: queueIndex,
-        shuffleMode: _activePlayer.shuffleModeEnabled ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none,
-        repeatMode: switch (_activePlayer.loopMode) {
-          LoopMode.off => AudioServiceRepeatMode.none,
-          LoopMode.one => AudioServiceRepeatMode.one,
-          LoopMode.all => AudioServiceRepeatMode.all,
-        },
+        queueIndex: _currentIndex,
       ),
     );
   }
 
-  // --- EQUALIZER & AUDIO EFFECTS ---
-  bool get isEqualizerEnabled => _eqEnabled;
-  EqPreset get currentPreset => _currentPreset;
+  // --- QUEUE & PLAYBACK COMMANDS ---
+  Future<void> loadQueue(List<SongsTableData> songs, {int initialIndex = 0, Duration? initialPosition}) async {
+    _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
+    _songs = List.from(songs);
+    _currentIndex = initialIndex.clamp(0, _songs.isEmpty ? 0 : _songs.length - 1);
 
-  Future<void> setEqualizerEnabled(bool enabled) async {
-    _eqEnabled = enabled;
-    final equalizer = _equalizer;
-    if (equalizer != null) {
-      await equalizer.setEnabled(enabled);
+    final mediaItems = _songs.map(_songToMediaItem).toList();
+    queue.add(mediaItems);
+
+    if (_songs.isNotEmpty) {
+      await playSongAt(_currentIndex, initialPosition: initialPosition);
     }
   }
 
-  Future<void> setBandGain(int bandIndex, double gainDb) async {
-    final equalizer = _equalizer;
-    if (equalizer != null) {
-      final parameters = await equalizer.parameters;
-      if (bandIndex >= 0 && bandIndex < parameters.bands.length) {
-        await parameters.bands[bandIndex].setGain(gainDb);
-      }
-    }
-  }
+  Future<void> playSongAt(int index, {Duration? initialPosition}) async {
+    if (index < 0 || index >= _songs.length) return;
+    _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
+    _currentIndex = index;
 
-  Future<void> setBassBoost(double amount) async {
-    final loudnessEnhancer = _loudnessEnhancer;
-    if (loudnessEnhancer != null) {
-      await loudnessEnhancer.setEnabled(amount > 0);
-      await loudnessEnhancer.setTargetGain(amount * 1.5);
-    }
-  }
+    final song = _songs[index];
+    final artUri = await ArtworkUriResolver.resolveArtworkUri(song);
 
-  Future<void> applyPreset(EqPreset preset) async {
-    _currentPreset = preset;
-    final equalizer = _equalizer;
-    if (equalizer != null) {
-      final parameters = await equalizer.parameters;
-      for (int i = 0; i < preset.gains.length && i < parameters.bands.length; i++) {
-        await parameters.bands[i].setGain(preset.gains[i]);
-      }
+    final item = _songToMediaItem(song, artUri);
+    mediaItem.add(item);
+
+    try {
+      await _activePlayer.setAudioSource(
+        AudioSource.file(song.path, tag: item),
+        initialPosition: initialPosition,
+      );
+      await _activePlayer.play();
+      _repository.recordPlayHistory(song.id);
+      _saveCurrentPosition();
+    } catch (e) {
+      skipToNext();
     }
-    await setBassBoost(preset.bassBoost);
   }
 
   // --- PLAYBACK ACTIONS ---
@@ -497,43 +409,58 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
   @override
   Future<void> pause() async {
-    _cancelCrossfade();
+    _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
+    _saveCurrentPosition();
     await _activePlayer.pause();
   }
 
   @override
   Future<void> seek(Duration position) async {
-    _cancelCrossfade();
+    _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
     await _activePlayer.seek(position);
+    _saveCurrentPosition();
   }
 
   @override
   Future<void> skipToNext() async {
-    if (_isCrossfading) {
-      _fadeId++;
-      _isCrossfading = false;
+    if (_crossfadeManager.isCrossfading && _crossfadeManager.pendingIndex != null) {
+      final targetIdx = _crossfadeManager.pendingIndex!;
+      _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
       await _activePlayer.stop();
       await _activePlayer.setVolume(1.0);
       await _inactivePlayer.setVolume(1.0);
       _isPlayerAActive = !_isPlayerAActive;
+      _currentIndex = targetIdx;
+      if (targetIdx < _songs.length) {
+        final song = _songs[targetIdx];
+        final artUri = await ArtworkUriResolver.resolveArtworkUri(song);
+        mediaItem.add(_songToMediaItem(song, artUri));
+        _repository.recordPlayHistory(song.id);
+      }
       _broadcastState(_activePlayer.playbackEvent);
+      _saveCurrentPosition();
       return;
     }
 
     final nextIdx = _getNextIndex();
     if (nextIdx != null) {
       await playSongAt(nextIdx);
+    } else {
+      await _activePlayer.pause();
+      await _activePlayer.seek(Duration.zero);
+      _broadcastState(_activePlayer.playbackEvent);
     }
   }
 
   @override
   Future<void> skipToPrevious() async {
-    _cancelCrossfade();
+    _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
     final prevIdx = _getPreviousIndex();
     if (prevIdx != null) {
       await playSongAt(prevIdx);
     } else {
       await _activePlayer.seek(Duration.zero);
+      _saveCurrentPosition();
     }
   }
 
@@ -542,88 +469,98 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     final enable = shuffleMode != AudioServiceShuffleMode.none;
     await _playerA.setShuffleModeEnabled(enable);
     await _playerB.setShuffleModeEnabled(enable);
-    _broadcastState(_activePlayer.playbackEvent);
+    playbackState.add(playbackState.value.copyWith(shuffleMode: shuffleMode));
   }
 
   @override
   Future<void> setRepeatMode(AudioServiceRepeatMode repeatMode) async {
-    final loopMode = switch (repeatMode) {
-      AudioServiceRepeatMode.none => LoopMode.off,
-      AudioServiceRepeatMode.one => LoopMode.one,
-      AudioServiceRepeatMode.all || AudioServiceRepeatMode.group => LoopMode.all,
-    };
+    LoopMode loopMode;
+    switch (repeatMode) {
+      case AudioServiceRepeatMode.none:
+        loopMode = LoopMode.off;
+        break;
+      case AudioServiceRepeatMode.one:
+        loopMode = LoopMode.one;
+        break;
+      case AudioServiceRepeatMode.all:
+      case AudioServiceRepeatMode.group:
+        loopMode = LoopMode.all;
+        break;
+    }
     await _playerA.setLoopMode(loopMode);
     await _playerB.setLoopMode(loopMode);
-    _broadcastState(_activePlayer.playbackEvent);
+    playbackState.add(playbackState.value.copyWith(repeatMode: repeatMode));
   }
 
   @override
   Future<void> setSpeed(double speed) async {
     await _playerA.setSpeed(speed);
     await _playerB.setSpeed(speed);
-    _broadcastState(_activePlayer.playbackEvent);
+    playbackState.add(playbackState.value.copyWith(speed: speed));
   }
 
-  Future<void> loadQueue(List<SongsTableData> songs, {int initialIndex = 0, Duration? initialPosition}) async {
-    _cancelCrossfade();
-    _songs = List.from(songs);
-    _currentIndex = initialIndex;
-
-    queue.add(songs.map(_songToMediaItem).toList());
-
-    if (songs.isNotEmpty && initialIndex >= 0 && initialIndex < songs.length) {
-      final initialSong = songs[initialIndex];
-      final artUri = await _resolveArtworkUri(initialSong);
-      mediaItem.add(_songToMediaItem(initialSong, artUri));
-
-      await _activePlayer.setAudioSource(
-        AudioSource.file(initialSong.path, tag: _songToMediaItem(initialSong, artUri)),
-      );
-      if (initialPosition != null && initialPosition > Duration.zero) {
-        await _activePlayer.seek(initialPosition);
+  @override
+  Future<dynamic> customAction(String name, [Map<String, dynamic>? extras]) async {
+    if (name == 'toggleFavorite') {
+      if (_songs.isNotEmpty && _currentIndex < _songs.length) {
+        final currentSong = _songs[_currentIndex];
+        await _repository.toggleFavorite(currentSong.id);
       }
-      await play();
+      return true;
     }
-
-    // Persist queue in Drift
-    await _repository.saveQueue(songs.map((s) => s.id).toList(), initialIndex, 0);
+    return super.customAction(name, extras);
   }
 
-  Future<void> playSongAt(int index) async {
-    _cancelCrossfade();
-    if (index >= 0 && index < _songs.length) {
-      _currentIndex = index;
-      final song = _songs[index];
-      final artUri = await _resolveArtworkUri(song);
-      mediaItem.add(_songToMediaItem(song, artUri));
-
-      await _activePlayer.setAudioSource(
-        AudioSource.file(song.path, tag: _songToMediaItem(song, artUri)),
-      );
-      await play();
+  @override
+  Future<void> addQueueItem(MediaItem mediaItem) async {
+    final songId = int.tryParse(mediaItem.id);
+    if (songId != null) {
+      final songRes = await _repository.getSongById(songId);
+      final song = songRes.fold((l) => null, (r) => r);
+      if (song != null) {
+        _songs.add(song);
+        queue.add(_songs.map(_songToMediaItem).toList());
+        _saveCurrentPosition();
+      }
     }
   }
 
-  Future<void> playNext(SongsTableData song) async {
-    final insertIndex = (_songs.isEmpty || _currentIndex >= _songs.length) ? 0 : _currentIndex + 1;
-    _songs.insert(insertIndex, song);
+  Future<void> insertNextInQueue(SongsTableData song) async {
+    final insertIdx = _songs.isEmpty ? 0 : (_currentIndex + 1).clamp(0, _songs.length);
+    _songs.insert(insertIdx, song);
     queue.add(_songs.map(_songToMediaItem).toList());
+    _saveCurrentPosition();
   }
 
-  Future<void> addToQueue(SongsTableData song) async {
+  Future<void> addToQueueEnd(SongsTableData song) async {
     _songs.add(song);
     queue.add(_songs.map(_songToMediaItem).toList());
+    _saveCurrentPosition();
   }
 
   @override
   Future<void> removeQueueItemAt(int index) async {
-    if (index >= 0 && index < _songs.length) {
-      _songs.removeAt(index);
-      if (_currentIndex >= _songs.length) {
-        _currentIndex = (_songs.length - 1).clamp(0, _songs.length);
-      }
-      queue.add(_songs.map(_songToMediaItem).toList());
+    if (index < 0 || index >= _songs.length) return;
+
+    final wasPlayingCurrent = index == _currentIndex;
+    _songs.removeAt(index);
+
+    if (_songs.isEmpty) {
+      _currentIndex = 0;
+      queue.add([]);
+      mediaItem.add(null);
+      await stop();
+      return;
     }
+
+    if (index < _currentIndex) {
+      _currentIndex--;
+    } else if (wasPlayingCurrent) {
+      _currentIndex = _currentIndex.clamp(0, _songs.length - 1);
+      await playSongAt(_currentIndex);
+    }
+    queue.add(_songs.map(_songToMediaItem).toList());
+    _saveCurrentPosition();
   }
 
   @override
@@ -635,44 +572,46 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   }
 
   Future<void> reorderQueue(int oldIndex, int newIndex) async {
+    if (oldIndex < 0 || oldIndex >= _songs.length || newIndex < 0 || newIndex > _songs.length) return;
     if (oldIndex < newIndex) newIndex -= 1;
+    if (oldIndex == newIndex) return;
+
     final song = _songs.removeAt(oldIndex);
     _songs.insert(newIndex, song);
+
+    if (_currentIndex == oldIndex) {
+      _currentIndex = newIndex;
+    } else if (oldIndex < _currentIndex && newIndex >= _currentIndex) {
+      _currentIndex--;
+    } else if (oldIndex > _currentIndex && newIndex <= _currentIndex) {
+      _currentIndex++;
+    }
+
     queue.add(_songs.map(_songToMediaItem).toList());
+    _saveCurrentPosition();
   }
 
   // --- SLEEP TIMER ---
   void startSleepTimer(Duration duration, {bool fadeOut = true}) {
-    _sleepTimer?.cancel();
-    _sleepTimer = Timer(duration, () async {
-      final player = _activePlayer;
-      if (fadeOut) {
-        for (double v = 1.0; v >= 0.0; v -= 0.1) {
-          await player.setVolume(v.clamp(0.0, 1.0));
-          await Future.delayed(const Duration(milliseconds: 300));
-        }
-      }
-      await pause();
-      await player.setVolume(1.0);
-    });
+    _sleepTimerManager.startSleepTimer(
+      duration,
+      fadeOut: fadeOut,
+      onTimerExpired: pause,
+      getActivePlayer: () => _activePlayer,
+    );
   }
 
   void startAbsoluteSleepTimer(DateTime stopTime, {bool fadeOut = true}) {
-    final now = DateTime.now();
-    final difference = stopTime.isAfter(now) ? stopTime.difference(now) : stopTime.add(const Duration(days: 1)).difference(now);
-    startSleepTimer(difference, fadeOut: fadeOut);
+    _sleepTimerManager.startAbsoluteSleepTimer(
+      stopTime,
+      fadeOut: fadeOut,
+      onTimerExpired: pause,
+      getActivePlayer: () => _activePlayer,
+    );
   }
 
   void cancelSleepTimer() {
-    _sleepTimer?.cancel();
-    _sleepTimer = null;
-    _activePlayer.setVolume(1.0);
-  }
-
-  double get volume => _activePlayer.volume;
-
-  Future<void> setVolume(double volume) async {
-    await _activePlayer.setVolume(volume.clamp(0.0, 1.0));
+    _sleepTimerManager.cancelSleepTimer();
   }
 
   // --- ANDROID AUTO / MEDIA BROWSER TREE ---
@@ -680,12 +619,11 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   Future<List<MediaItem>> getChildren(String parentMediaId, [Map<String, dynamic>? options]) async {
     switch (parentMediaId) {
       case AudioService.recentRootId:
-      case 'root_recent':
         final recentRes = await _repository.getRecentlyPlayed();
         final list = recentRes.fold((l) => <SongsTableData>[], (r) => r);
         final items = <MediaItem>[];
         for (final song in list) {
-          final artUri = await _resolveArtworkUri(song);
+          final artUri = await ArtworkUriResolver.resolveArtworkUri(song);
           items.add(_songToMediaItem(song, artUri));
         }
         return items;
@@ -731,7 +669,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
         final list = songsRes.fold((l) => <SongsTableData>[], (r) => r);
         final items = <MediaItem>[];
         for (final song in list) {
-          final artUri = await _resolveArtworkUri(song);
+          final artUri = await ArtworkUriResolver.resolveArtworkUri(song);
           items.add(_songToMediaItem(song, artUri));
         }
         return items;
@@ -742,7 +680,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
         final list = albumsRes.fold((l) => <AlbumsTableData>[], (r) => r);
         final items = <MediaItem>[];
         for (final album in list) {
-          final artUri = await _albumArtUri(album.id);
+          final artUri = await ArtworkUriResolver.getAlbumArtUri(album.id);
           items.add(
             MediaItem(
               id: 'album_${album.id}',
@@ -761,7 +699,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
         final list = artistsRes.fold((l) => <ArtistsTableData>[], (r) => r);
         final items = <MediaItem>[];
         for (final artist in list) {
-          final artUri = await _artistArtUri(artist.id);
+          final artUri = await ArtworkUriResolver.getArtistArtUri(artist.id);
           items.add(
             MediaItem(
               id: 'artist_${artist.id}',
@@ -794,7 +732,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
         final list = favoritesRes.fold((l) => <SongsTableData>[], (r) => r);
         final items = <MediaItem>[];
         for (final song in list) {
-          final artUri = await _resolveArtworkUri(song);
+          final artUri = await ArtworkUriResolver.resolveArtworkUri(song);
           items.add(_songToMediaItem(song, artUri));
         }
         return items;
@@ -807,7 +745,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
           final list = songsRes.fold((l) => <SongsTableData>[], (r) => r);
           final items = <MediaItem>[];
           for (final song in list) {
-            final artUri = await _resolveArtworkUri(song);
+            final artUri = await ArtworkUriResolver.resolveArtworkUri(song);
             items.add(_songToMediaItem(song, artUri));
           }
           return items;
@@ -820,7 +758,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
           final list = songsRes.fold((l) => <SongsTableData>[], (r) => r);
           final items = <MediaItem>[];
           for (final song in list) {
-            final artUri = await _resolveArtworkUri(song);
+            final artUri = await ArtworkUriResolver.resolveArtworkUri(song);
             items.add(_songToMediaItem(song, artUri));
           }
           return items;
@@ -833,7 +771,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
           final list = songsRes.fold((l) => <SongsTableData>[], (r) => r);
           final items = <MediaItem>[];
           for (final song in list) {
-            final artUri = await _resolveArtworkUri(song);
+            final artUri = await ArtworkUriResolver.resolveArtworkUri(song);
             items.add(_songToMediaItem(song, artUri));
           }
           return items;
@@ -847,11 +785,10 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   Future<MediaItem?> getMediaItem(String mediaId) async {
     final id = int.tryParse(mediaId);
     if (id == null) return null;
-    final songsRes = await _repository.getAllSongs();
-    final list = songsRes.fold((l) => <SongsTableData>[], (r) => r);
-    final match = list.where((s) => s.id == id).firstOrNull;
+    final songRes = await _repository.getSongById(id);
+    final match = songRes.fold((l) => null, (r) => r);
     if (match == null) return null;
-    final artUri = await _resolveArtworkUri(match);
+    final artUri = await ArtworkUriResolver.resolveArtworkUri(match);
     return _songToMediaItem(match, artUri);
   }
 
@@ -929,9 +866,21 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
   @override
   Future<void> stop() async {
-    _cancelCrossfade();
+    _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
+    _saveCurrentPosition();
     await _playerA.stop();
     await _playerB.stop();
     await super.stop();
+  }
+
+  void dispose() {
+    _positionPeriodicTimer?.cancel();
+    _savePositionDebounce?.cancel();
+    for (final sub in _subscriptions) {
+      sub.cancel();
+    }
+    _subscriptions.clear();
+    _positionSubject.close();
+    _sleepTimerManager.dispose();
   }
 }

@@ -1,8 +1,8 @@
 // lib/features/tag_editor/tag_editor_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../core/constants/app_colors.dart';
 import '../../core/di/injection.dart';
+import '../../core/theme/aura_theme.dart';
 import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
 import 'artwork_picker.dart';
@@ -32,13 +32,14 @@ class _TagEditorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return BlocConsumer<TagEditorCubit, TagEditorState>(
       listener: (context, state) {
         if (state.status == TagEditorStatus.success) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Audio tags updated successfully'),
-              backgroundColor: AppColors.primary,
+            SnackBar(
+              content: const Text('Audio tags updated successfully'),
+              backgroundColor: context.palette.accent,
             ),
           );
           Navigator.of(context).pop(true);
@@ -57,18 +58,18 @@ class _TagEditorView extends StatelessWidget {
         final isLoading = state.status == TagEditorStatus.loading;
 
         return Scaffold(
-          backgroundColor: AppColors.background,
+          backgroundColor: p.bg,
           appBar: AppBar(
-            backgroundColor: AppColors.background,
+            backgroundColor: p.bg,
             elevation: 0,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary),
+              icon: const Icon(Icons.arrow_back_ios_new_rounded),
               onPressed: () => Navigator.of(context).pop(),
             ),
-            title: const Text(
+            title: Text(
               'Edit Tags',
               style: TextStyle(
-                color: AppColors.textPrimary,
+                color: p.textPrimary,
                 fontWeight: FontWeight.w700,
                 fontSize: 18,
               ),
@@ -77,15 +78,15 @@ class _TagEditorView extends StatelessWidget {
               TextButton(
                 onPressed: isSaving ? null : () => cubit.saveTags(),
                 child: isSaving
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: p.accent),
                       )
-                    : const Text(
+                    : Text(
                         'Save',
                         style: TextStyle(
-                          color: AppColors.primary,
+                          color: p.accent,
                           fontWeight: FontWeight.w700,
                           fontSize: 16,
                         ),
@@ -95,11 +96,14 @@ class _TagEditorView extends StatelessWidget {
             ],
           ),
           body: isLoading
-              ? const Center(child: CircularProgressIndicator(color: AppColors.primary))
-              : Stack(
-                  children: [
-                    SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              ? Center(child: CircularProgressIndicator(color: p.accent))
+              : Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 720),
+                    child: Stack(
+                      children: [
+                        SingleChildScrollView(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -180,14 +184,16 @@ class _TagEditorView extends StatelessWidget {
                     if (isSaving)
                       Container(
                         color: Colors.black45,
-                        child: const Center(
-                          child: CircularProgressIndicator(color: AppColors.primary),
+                        child: Center(
+                          child: CircularProgressIndicator(color: p.accent),
                         ),
                       ),
                   ],
                 ),
+              ),
+            ),
         );
-      }
+      },
     );
   }
 }

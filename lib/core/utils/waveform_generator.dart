@@ -1,6 +1,5 @@
 // lib/core/utils/waveform_generator.dart
 import 'dart:collection';
-import 'dart:io';
 import 'dart:math';
 
 /// Generates downsampled audio waveform samples (0.0 to 1.0) per song ID with LRU caching.
@@ -27,85 +26,16 @@ class WaveformGenerator {
       return cachedSamples;
     }
 
-    List<double> samples = [];
+    // 2. Generate deterministic harmonic waveform
+    final samples = _generateDeterministicWaveform(songId, count);
 
-    // 2. Attempt file-based sample extraction
-    if (filePath != null && filePath.isNotEmpty) {
-      try {
-        samples = await _extractFromFile(filePath, count);
-      } catch (_) {
-        samples = [];
-      }
-    }
-
-    // 3. Fallback to deterministic harmonic waveform if file extraction returns empty
-    if (samples.isEmpty || samples.length != count) {
-      samples = _generateDeterministicWaveform(songId, count);
-    }
-
-    // 4. Cache result with LRU eviction
+    // 3. Cache result with LRU eviction
     if (_cache.length >= _maxCacheSize) {
       _cache.remove(_cache.keys.first);
     }
     _cache[cacheKey] = samples;
 
     return samples;
-  }
-
-  /// Synchronously returns cached waveform samples if present.
-  List<double>? getCachedWaveform({required int songId, int count = 60}) {
-    final cacheKey = '${songId}_$count';
-    if (_cache.containsKey(cacheKey)) {
-      final cachedSamples = _cache.remove(cacheKey)!;
-      _cache[cacheKey] = cachedSamples;
-      return cachedSamples;
-    }
-    return null;
-  }
-
-  /// Clears the LRU waveform cache.
-  void clearCache() {
-    _cache.clear();
-  }
-
-  Future<List<double>> _extractFromFile(String path, int count) async {
-    final file = File(path);
-    if (!await file.exists()) return [];
-
-    final fileSize = await file.length();
-    if (fileSize < 1024) return [];
-
-    final RandomAccessFile raf = await file.open(mode: FileMode.read);
-    final List<double> rawEnergies = [];
-
-    try {
-      final double step = (fileSize - 512) / count;
-      final int chunkSize = 512;
-
-      for (int i = 0; i < count; i++) {
-        final int position = (i * step).clamp(0, fileSize - chunkSize).toInt();
-        await raf.setPosition(position);
-        final bytes = await raf.read(chunkSize);
-
-        if (bytes.isEmpty) {
-          rawEnergies.add(0.1);
-          continue;
-        }
-
-        // Compute RMS energy of sample byte values
-        double sumSq = 0;
-        for (int b in bytes) {
-          final double normalizedVal = (b - 128) / 128.0;
-          sumSq += normalizedVal * normalizedVal;
-        }
-        final double rms = sqrt(sumSq / bytes.length);
-        rawEnergies.add(rms);
-      }
-    } finally {
-      await raf.close();
-    }
-
-    return _normalizeSamples(rawEnergies);
   }
 
   List<double> _generateDeterministicWaveform(int songId, int count) {

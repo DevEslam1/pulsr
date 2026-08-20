@@ -2,12 +2,12 @@
 import 'package:injectable/injectable.dart';
 import '../../core/errors/failures.dart';
 import '../../data/db/app_database.dart';
-import '../../data/repositories/music_repository.dart';
 import '../models/year_item.dart';
+import '../repositories/music_repository_interface.dart';
 
 @singleton
 class GetYearsUseCase {
-  final MusicRepository _repository;
+  final IMusicRepository _repository;
 
   GetYearsUseCase(this._repository);
 

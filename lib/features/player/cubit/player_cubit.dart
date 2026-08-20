@@ -1,38 +1,58 @@
-// lib/features/player/cubit/player_cubit.dart
 import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/router/app_router.dart';
 import '../../../core/utils/lrc_parser.dart';
 import '../../../data/audio/audio_handler.dart';
 import '../../../data/db/app_database.dart';
-import '../../../data/repositories/music_repository.dart';
 import '../../../domain/models/eq_preset.dart';
 import '../../../domain/models/lyrics_line.dart';
+import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../domain/usecases/toggle_favorite_usecase.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../widgets/widget_service.dart';
 import 'player_state.dart';
 
+class _QueueSlotData {
+  final List<SongsTableData> songs;
+  final int currentIndex;
+  final Duration position;
+
+  const _QueueSlotData({
+    required this.songs,
+    required this.currentIndex,
+    required this.position,
+  });
+}
+
 @injectable
 class PlayerCubit extends Cubit<PlayerState> {
   final PulsrAudioHandler _audioHandler;
-  final MusicRepository _repository;
+  final IMusicRepository _repository;
   final ToggleFavoriteUseCase _toggleFavoriteUseCase;
   final SettingsCubit? _settingsCubit;
   final WidgetService? _widgetService;
 
   StreamSubscription? _mediaItemSub;
   StreamSubscription? _playbackStateSub;
+  StreamSubscription? _positionSub;
   StreamSubscription? _settingsSub;
   StreamSubscription? _widgetClickSub;
+  StreamSubscription? _sleepTimerSub;
+  DateTime? _lastWidgetUpdateTime;
 
-  final Map<int, List<SongsTableData>> _queueSlots = {0: [], 1: [], 2: []};
+  final Map<int, _QueueSlotData> _queueSlots = {
+    0: const _QueueSlotData(songs: [], currentIndex: 0, position: Duration.zero),
+    1: const _QueueSlotData(songs: [], currentIndex: 0, position: Duration.zero),
+    2: const _QueueSlotData(songs: [], currentIndex: 0, position: Duration.zero),
+  };
 
   PlayerCubit({
     required PulsrAudioHandler audioHandler,
-    required MusicRepository repository,
+    required IMusicRepository repository,
     required ToggleFavoriteUseCase toggleFavoriteUseCase,
     SettingsCubit? settingsCubit,
     WidgetService? widgetService,
@@ -46,6 +66,7 @@ class PlayerCubit extends Cubit<PlayerState> {
     _loadPlaybackSpeed();
     _listenToSettings();
     _listenToWidgetClicks();
+    _updateWidgetThrottled(force: true);
   }
 
   void clearError() {
@@ -71,8 +92,9 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   void _listenToWidgetClicks() {
     _widgetClickSub = _widgetService?.listenToWidgetClicks((uri) {
-      if (uri != null && uri.scheme == 'pulsrWidget') {
-        switch (uri.host) {
+      if (uri != null && uri.scheme.toLowerCase() == 'pulsrwidget') {
+        final action = uri.host.isNotEmpty ? uri.host : uri.path.replaceAll('/', '');
+        switch (action) {
           case 'play_pause':
             togglePlayPause();
             break;
@@ -82,15 +104,38 @@ class PlayerCubit extends Cubit<PlayerState> {
           case 'next':
             next();
             break;
+          case 'favorite':
+            final song = state.currentSong;
+            if (song != null) toggleFavorite(song.id);
+            break;
+          case 'open':
+          case 'main':
+            final ctx = rootNavigatorKey.currentContext;
+            if (ctx != null) GoRouter.of(ctx).go('/now-playing');
+            break;
         }
       }
     });
   }
 
-  void _updateWidget() {
+  void _updateWidgetThrottled({bool force = false}) {
+    final now = DateTime.now();
+    if (!force && _lastWidgetUpdateTime != null && now.difference(_lastWidgetUpdateTime!).inMilliseconds < 1000) {
+      return;
+    }
+    _lastWidgetUpdateTime = now;
     _widgetService?.updateNowPlaying(
       song: state.currentSong,
       isPlaying: state.isPlaying,
+      position: state.position,
+      duration: state.duration,
+      isFavorite: state.currentSong?.isFavorite ?? false,
+      isShuffle: state.isShuffle,
+      repeatMode: switch (state.repeatMode) {
+        PlayerRepeatMode.one => 'one',
+        PlayerRepeatMode.all => 'all',
+        PlayerRepeatMode.off => 'off',
+      },
     );
   }
 
@@ -99,11 +144,10 @@ class PlayerCubit extends Cubit<PlayerState> {
       if (item != null) {
         final id = int.tryParse(item.id);
         if (id != null) {
-          final songsResult = await _repository.getAllSongs();
-          songsResult.fold(
+          final songResult = await _repository.getSongById(id);
+          songResult.fold(
             (failure) => emit(state.copyWith(errorMessage: failure.message)),
-            (songs) {
-              final song = songs.where((s) => s.id == id).firstOrNull;
+            (song) {
               if (song != null) {
                 emit(
                   state.copyWith(
@@ -113,7 +157,7 @@ class PlayerCubit extends Cubit<PlayerState> {
                   ),
                 );
                 _loadLyricsForSong(song);
-                _updateWidget();
+                _updateWidgetThrottled(force: true);
               }
             },
           );
@@ -122,6 +166,7 @@ class PlayerCubit extends Cubit<PlayerState> {
     });
 
     _playbackStateSub = _audioHandler.playbackState.listen((playbackState) {
+      final isCompleted = playbackState.processingState == AudioProcessingState.completed;
       final repeat = switch (playbackState.repeatMode) {
         AudioServiceRepeatMode.one => PlayerRepeatMode.one,
         AudioServiceRepeatMode.all || AudioServiceRepeatMode.group => PlayerRepeatMode.all,
@@ -130,15 +175,28 @@ class PlayerCubit extends Cubit<PlayerState> {
 
       emit(
         state.copyWith(
-          isPlaying: playbackState.playing,
-          position: playbackState.position,
+          isPlaying: playbackState.playing && !isCompleted,
+          position: isCompleted ? Duration.zero : playbackState.position,
           isShuffle: playbackState.shuffleMode == AudioServiceShuffleMode.all,
           repeatMode: repeat,
           currentIndex: playbackState.queueIndex ?? state.currentIndex,
           playbackSpeed: playbackState.speed,
         ),
       );
-      _updateWidget();
+      _updateWidgetThrottled(force: true);
+    });
+
+    _positionSub = _audioHandler.positionStream.listen((pos) {
+      if ((pos - state.position).abs() > const Duration(milliseconds: 100)) {
+        emit(state.copyWith(position: pos));
+        if (state.isPlaying) {
+          _updateWidgetThrottled(force: false);
+        }
+      }
+    });
+
+    _sleepTimerSub = _audioHandler.sleepTimerRemainingStream.listen((remaining) {
+      emit(state.copyWith(sleepTimerRemaining: remaining));
     });
   }
 
@@ -161,7 +219,11 @@ class PlayerCubit extends Cubit<PlayerState> {
   Future<void> playSong(SongsTableData song, {List<SongsTableData>? queue}) async {
     final effectiveQueue = queue ?? [song];
     final index = effectiveQueue.indexWhere((s) => s.id == song.id);
-    _queueSlots[state.activeQueueSlot] = List.from(effectiveQueue);
+    _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+      songs: List.from(effectiveQueue),
+      currentIndex: index != -1 ? index : 0,
+      position: Duration(milliseconds: song.lastPositionMs),
+    );
     emit(state.copyWith(
       queue: effectiveQueue,
       currentIndex: index != -1 ? index : 0,
@@ -174,22 +236,30 @@ class PlayerCubit extends Cubit<PlayerState> {
       initialPosition: Duration(milliseconds: song.lastPositionMs),
     );
     _loadLyricsForSong(song);
-    _updateWidget();
+    _updateWidgetThrottled(force: true);
   }
 
   Future<void> playNext(SongsTableData song) async {
-    await _audioHandler.playNext(song);
+    await _audioHandler.insertNextInQueue(song);
     final updatedQueue = List<SongsTableData>.from(state.queue);
     final insertIdx = (state.currentIndex + 1).clamp(0, updatedQueue.length);
     updatedQueue.insert(insertIdx, song);
-    _queueSlots[state.activeQueueSlot] = updatedQueue;
+    _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+      songs: updatedQueue,
+      currentIndex: state.currentIndex,
+      position: state.position,
+    );
     emit(state.copyWith(queue: updatedQueue));
   }
 
   Future<void> addToQueue(SongsTableData song) async {
-    await _audioHandler.addToQueue(song);
+    await _audioHandler.addToQueueEnd(song);
     final updatedQueue = List<SongsTableData>.from(state.queue)..add(song);
-    _queueSlots[state.activeQueueSlot] = updatedQueue;
+    _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+      songs: updatedQueue,
+      currentIndex: state.currentIndex,
+      position: state.position,
+    );
     emit(state.copyWith(queue: updatedQueue));
   }
 
@@ -199,24 +269,40 @@ class PlayerCubit extends Cubit<PlayerState> {
     if (oldIndex < newIndex) newIndex -= 1;
     final song = updatedQueue.removeAt(oldIndex);
     updatedQueue.insert(newIndex, song);
-    _queueSlots[state.activeQueueSlot] = updatedQueue;
+    _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+      songs: updatedQueue,
+      currentIndex: state.currentIndex,
+      position: state.position,
+    );
     emit(state.copyWith(queue: updatedQueue));
   }
 
   Future<void> removeQueueItem(int index) async {
     await _audioHandler.removeQueueItemAt(index);
     final updatedQueue = List<SongsTableData>.from(state.queue)..removeAt(index);
-    _queueSlots[state.activeQueueSlot] = updatedQueue;
+    _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+      songs: updatedQueue,
+      currentIndex: state.currentIndex,
+      position: state.position,
+    );
     emit(state.copyWith(queue: updatedQueue));
   }
 
   Future<void> switchQueueSlot(int slot) async {
     if (slot == state.activeQueueSlot || slot < 0 || slot > 2) return;
-    _queueSlots[state.activeQueueSlot] = List.from(state.queue);
-    final nextQueue = _queueSlots[slot] ?? [];
-    emit(state.copyWith(activeQueueSlot: slot, queue: nextQueue));
-    if (nextQueue.isNotEmpty) {
-      await playSong(nextQueue.first, queue: nextQueue);
+    _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+      songs: List.from(state.queue),
+      currentIndex: state.currentIndex,
+      position: state.position,
+    );
+    final targetSlot = _queueSlots[slot] ?? const _QueueSlotData(songs: [], currentIndex: 0, position: Duration.zero);
+    emit(state.copyWith(activeQueueSlot: slot, queue: targetSlot.songs));
+    if (targetSlot.songs.isNotEmpty) {
+      final safeIdx = targetSlot.currentIndex.clamp(0, targetSlot.songs.length - 1);
+      await playSong(targetSlot.songs[safeIdx], queue: targetSlot.songs);
+      if (targetSlot.position > Duration.zero) {
+        await seek(targetSlot.position);
+      }
     }
   }
 
@@ -233,16 +319,6 @@ class PlayerCubit extends Cubit<PlayerState> {
   Future<void> next() => _audioHandler.skipToNext();
 
   Future<void> previous() => _audioHandler.skipToPrevious();
-
-  Future<void> adjustVolume(double delta) async {
-    final current = _audioHandler.volume;
-    final newVol = (current + delta).clamp(0.0, 1.0);
-    await _audioHandler.setVolume(newVol);
-  }
-
-  Future<void> setVolume(double volume) async {
-    await _audioHandler.setVolume(volume.clamp(0.0, 1.0));
-  }
 
   Future<void> toggleShuffle() async {
     final next = !state.isShuffle;
@@ -272,6 +348,7 @@ class PlayerCubit extends Cubit<PlayerState> {
               errorMessage: null,
             ),
           );
+          _updateWidgetThrottled(force: true);
         }
       },
     );
@@ -339,6 +416,17 @@ class PlayerCubit extends Cubit<PlayerState> {
     await prefs.setDouble('playback_speed', speed);
   }
 
+  // Volume Control
+  Future<void> setVolume(double volume) async {
+    await _audioHandler.setVolume(volume);
+  }
+
+  Future<void> adjustVolume(double delta) async {
+    final current = _audioHandler.volume;
+    final target = (current + delta).clamp(0.0, 1.0);
+    await _audioHandler.setVolume(target);
+  }
+
   // Overlay toggles (Lyrics / Queue)
   void toggleLyricsVisibility() {
     emit(state.copyWith(
@@ -358,8 +446,10 @@ class PlayerCubit extends Cubit<PlayerState> {
   Future<void> close() {
     _mediaItemSub?.cancel();
     _playbackStateSub?.cancel();
+    _positionSub?.cancel();
     _settingsSub?.cancel();
     _widgetClickSub?.cancel();
+    _sleepTimerSub?.cancel();
     return super.close();
   }
 }

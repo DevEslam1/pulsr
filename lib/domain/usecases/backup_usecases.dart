@@ -4,7 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/db/app_database.dart';
-import '../../data/repositories/music_repository.dart';
+import '../repositories/music_repository_interface.dart';
 
 class ImportResult {
   final int restoredFavoritesCount;
@@ -26,7 +26,7 @@ class ImportResult {
 
 @singleton
 class ExportBackupUseCase {
-  final MusicRepository _repository;
+  final IMusicRepository _repository;
 
   ExportBackupUseCase(this._repository);
 
@@ -109,14 +109,19 @@ class ExportBackupUseCase {
 
 @singleton
 class ImportBackupUseCase {
-  final MusicRepository _repository;
+  final IMusicRepository _repository;
   final AppDatabase _db;
 
   ImportBackupUseCase(this._repository, this._db);
 
   Future<ImportResult> execute(String jsonString) async {
     final data = jsonDecode(jsonString) as Map<String, dynamic>;
+    final version = data['version'];
+    if (version == null || version is! int || version < 1) {
+      throw const FormatException('Invalid or unsupported backup version');
+    }
 
+    return _db.transaction(() async {
     // Fetch all current library songs for path matching
     final songsResult = await _repository.getAllSongs();
     final allSongs = songsResult.fold((l) => <SongsTableData>[], (r) => r);
@@ -179,9 +184,12 @@ class ImportBackupUseCase {
           final existingList = existingPlaylistsRes.fold((l) => <PlaylistsTableData>[], (r) => r);
           final existing = existingList.where((p) => p.name == name).firstOrNull;
 
-          int playlistId;
+          int? playlistId;
           if (existing != null) {
             playlistId = existing.id;
+            if (isSmart && smartCriteria != null) {
+              await _repository.updateSmartPlaylist(existing.id, name, smartCriteria);
+            }
           } else {
             final createRes = await _repository.createPlaylist(
               name,
@@ -189,27 +197,32 @@ class ImportBackupUseCase {
               smartCriteria: smartCriteria,
             );
             playlistId = createRes.fold(
-              (f) => throw Exception('Failed to create playlist $name: ${f.message}'),
+              (f) => null,
               (id) => id,
             );
           }
 
-          final matchedSongIds = <int>[];
-          for (final path in songPaths) {
-            final matched = matchPath(path);
-            if (matched != null) {
-              if (!matchedSongIds.contains(matched.id)) {
-                matchedSongIds.add(matched.id);
+          if (playlistId != null) {
+            // For smart playlists, song items are evaluated dynamically from criteria, not manual entries
+            if (!isSmart) {
+              final matchedSongIds = <int>[];
+              for (final path in songPaths) {
+                final matched = matchPath(path);
+                if (matched != null) {
+                  if (!matchedSongIds.contains(matched.id)) {
+                    matchedSongIds.add(matched.id);
+                  }
+                } else {
+                  unmatchedPaths.add(path);
+                }
               }
-            } else {
-              unmatchedPaths.add(path);
-            }
-          }
 
-          if (matchedSongIds.isNotEmpty) {
-            await _repository.addSongsToPlaylist(playlistId, matchedSongIds);
+              if (matchedSongIds.isNotEmpty) {
+                await _repository.addSongsToPlaylist(playlistId, matchedSongIds);
+              }
+            }
+            restoredPlaylistsCount++;
           }
-          restoredPlaylistsCount++;
         }
       }
     }
@@ -305,5 +318,6 @@ class ImportBackupUseCase {
       restoredExcludedFoldersCount: restoredExcludedCount,
       unmatchedPaths: unmatchedPaths.toList(),
     );
+    });
   }
 }

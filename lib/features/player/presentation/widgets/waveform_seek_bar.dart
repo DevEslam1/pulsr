@@ -1,6 +1,6 @@
 // lib/features/player/presentation/widgets/waveform_seek_bar.dart
 import 'package:flutter/material.dart';
-import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
 
 /// A interactive gesture-driven waveform seek bar widget.
@@ -19,7 +19,7 @@ class WaveformSeekBar extends StatefulWidget {
     required this.duration,
     required this.onSeek,
     required this.samples,
-    this.activeColor = AppColors.primary,
+    this.activeColor = Colors.white,
     this.inactiveColor,
     this.height = 44.0,
   });
@@ -45,57 +45,56 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
         mainAxisSize: MainAxisSize.min,
         children: [
           // Interactive Waveform Area
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onHorizontalDragStart: (details) {
-              final box = context.findRenderObject() as RenderBox?;
-              if (box != null && maxDuration > 0) {
-                final localX = details.localPosition.dx.clamp(0.0, box.size.width);
-                final ratio = localX / box.size.width;
-                setState(() {
-                  _dragValue = ratio * maxDuration;
-                });
-              }
-            },
-            onHorizontalDragUpdate: (details) {
-              final box = context.findRenderObject() as RenderBox?;
-              if (box != null && maxDuration > 0) {
-                final localX = details.localPosition.dx.clamp(0.0, box.size.width);
-                final ratio = localX / box.size.width;
-                setState(() {
-                  _dragValue = ratio * maxDuration;
-                });
-              }
-            },
-            onHorizontalDragEnd: (details) {
-              if (_dragValue != null) {
-                widget.onSeek(Duration(milliseconds: _dragValue!.round()));
-                setState(() {
-                  _dragValue = null;
-                });
-              }
-            },
-            onTapDown: (details) {
-              final box = context.findRenderObject() as RenderBox?;
-              if (box != null && maxDuration > 0) {
-                final localX = details.localPosition.dx.clamp(0.0, box.size.width);
-                final ratio = localX / box.size.width;
-                final seekMs = ratio * maxDuration;
-                widget.onSeek(Duration(milliseconds: seekMs.round()));
-              }
-            },
-            child: SizedBox(
-              height: widget.height,
-              width: double.infinity,
-              child: CustomPaint(
-                painter: _WaveformPainter(
-                  samples: widget.samples,
-                  progress: progressPercent,
-                  activeColor: widget.activeColor,
-                  inactiveColor: inactiveColor,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final trackWidth = constraints.maxWidth;
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onHorizontalDragStart: (details) {
+                  if (trackWidth > 0 && maxDuration > 0) {
+                    final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                    setState(() {
+                      _dragValue = ratio * maxDuration;
+                    });
+                  }
+                },
+                onHorizontalDragUpdate: (details) {
+                  if (trackWidth > 0 && maxDuration > 0) {
+                    final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                    setState(() {
+                      _dragValue = ratio * maxDuration;
+                    });
+                  }
+                },
+                onHorizontalDragEnd: (details) {
+                  if (_dragValue != null) {
+                    widget.onSeek(Duration(milliseconds: _dragValue!.round()));
+                    setState(() {
+                      _dragValue = null;
+                    });
+                  }
+                },
+                onTapDown: (details) {
+                  if (trackWidth > 0 && maxDuration > 0) {
+                    final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                    final seekMs = ratio * maxDuration;
+                    widget.onSeek(Duration(milliseconds: seekMs.round()));
+                  }
+                },
+                child: SizedBox(
+                  height: widget.height,
+                  width: double.infinity,
+                  child: CustomPaint(
+                    painter: _WaveformPainter(
+                      samples: widget.samples,
+                      progress: progressPercent,
+                      activeColor: widget.activeColor,
+                      inactiveColor: inactiveColor,
+                    ),
+                  ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
           const SizedBox(height: 4),
           // Timestamps Row
@@ -106,16 +105,16 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                 Formatters.formatDuration(
                   _dragValue != null ? Duration(milliseconds: _dragValue!.round()) : widget.position,
                 ),
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
+                style: TextStyle(
+                  color: context.palette.textSecondary,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               Text(
                 Formatters.formatDuration(widget.duration),
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
+                style: TextStyle(
+                  color: context.palette.textSecondary,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                 ),

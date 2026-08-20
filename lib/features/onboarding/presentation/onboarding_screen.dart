@@ -3,9 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../core/constants/app_colors.dart';
+import 'package:permission_handler/permission_handler.dart';
+import '../../../core/theme/aura_theme.dart';
 import '../../../core/constants/app_radii.dart';
-import '../../../core/widgets/waveform_logo.dart';
+import '../../../core/widgets/pulsr_logo.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -37,6 +38,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       final granted = await widget.scannerService.requestPermission();
       if (granted) {
         await widget.scannerService.scanDeviceLibrary();
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Audio access is required to display your music library.'),
+              action: SnackBarAction(
+                label: 'Settings',
+                onPressed: () => openAppSettings(),
+              ),
+            ),
+          );
+        }
       }
 
       final prefs = await SharedPreferences.getInstance();
@@ -73,8 +86,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: p.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -84,22 +99,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'PULSR',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 2,
-                      color: AppColors.primary,
+                      color: p.accent,
                     ),
                   ),
                   if (_currentPage < 2)
                     TextButton(
                       onPressed: _skipToFinal,
-                      child: const Text(
+                      child: Text(
                         'Skip',
                         style: TextStyle(
-                          color: AppColors.textSecondary,
+                          color: p.textSecondary,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -144,7 +159,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         height: 8,
                         width: isActive ? 24 : 8,
                         decoration: BoxDecoration(
-                          color: isActive ? AppColors.primary : AppColors.outline,
+                          color:
+                              isActive ? p.accent : p.hairline,
                           borderRadius: BorderRadius.circular(4),
                         ),
                       );
@@ -159,19 +175,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: _currentPage == 2
                         ? ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.primary,
-                              foregroundColor: AppColors.onPrimary,
-                              shape: RoundedRectangleBorder(borderRadius: AppRadii.cardRadius),
+                              backgroundColor: p.accent,
+                              foregroundColor: p.onAccent,
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: AppRadii.cardRadius),
                               elevation: 4,
                             ),
                             onPressed: _isLoading ? null : _handleGrantAccess,
                             child: _isLoading
-                                ? const SizedBox(
+                                ? SizedBox(
                                     height: 22,
                                     width: 22,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2.5,
-                                      color: AppColors.onPrimary,
+                                      color: p.onAccent,
                                     ),
                                   )
                                 : const Row(
@@ -191,21 +208,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           )
                         : ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: AppColors.card,
-                              foregroundColor: AppColors.textPrimary,
-                              side: const BorderSide(color: AppColors.outline, width: 1.5),
-                              shape: RoundedRectangleBorder(borderRadius: AppRadii.cardRadius),
+                              backgroundColor: p.surfaceContainer,
+                              foregroundColor: p.textPrimary,
+                              side: BorderSide(
+                                  color: p.hairline, width: 1.5),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: AppRadii.cardRadius),
                             ),
                             onPressed: _nextPage,
-                            child: const Row(
+                            child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
                                   'Next',
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                                  style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700),
                                 ),
                                 SizedBox(width: 8),
-                                Icon(Icons.arrow_forward_rounded, size: 20, color: AppColors.primary),
+                                Icon(Icons.arrow_forward_rounded,
+                                    size: 20, color: p.accent),
                               ],
                             ),
                           ),
@@ -221,6 +243,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   // Page 1: "Your Music, Your Privacy"
   Widget _buildPage1(BuildContext context) {
+    final p = context.palette;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 28.0),
       child: Column(
@@ -231,18 +254,25 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             width: 104,
             height: 104,
             decoration: BoxDecoration(
-              color: AppColors.card,
+              color: p.surfaceContainer,
               borderRadius: BorderRadius.circular(30),
-              border: Border.all(color: AppColors.outline, width: 1.5),
+              border: Border.all(color: p.hairline, width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.25),
+                  color: p.accent.withValues(alpha: 0.25),
                   blurRadius: 36,
                   spreadRadius: 6,
                 ),
               ],
             ),
-            child: const Center(child: WaveformLogo(size: 52)),
+            child: Center(
+              child: PulsrLogo(
+                size: 64,
+                color: p.accent,
+                glowColor: p.glow,
+                animate: true,
+              ),
+            ),
           ).animate().scale(duration: 600.ms, curve: Curves.easeOutBack),
           const SizedBox(height: 36),
           Text(
@@ -258,7 +288,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             '100% offline local playback. No accounts, no cloud dependencies, zero tracking, and absolute privacy for your music collection.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: AppColors.textSecondary,
+                  color: p.textSecondary,
                   height: 1.5,
                 ),
           ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1, end: 0),
@@ -266,19 +296,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: AppColors.card,
+              color: p.surfaceContainer,
               borderRadius: AppRadii.cardRadius,
-              border: Border.all(color: AppColors.outline),
+              border: Border.all(color: p.hairline),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.lock_rounded, color: AppColors.primary, size: 22),
-                SizedBox(width: 12),
+                Icon(Icons.lock_rounded, color: p.accent, size: 22),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Text(
                     '100% Offline • Zero Telemetry • Local Storage',
                     style: TextStyle(
-                      color: AppColors.textPrimary,
+                      color: p.textPrimary,
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
                     ),
@@ -295,6 +325,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   // Page 2: "Powerful Playback"
   Widget _buildPage2(BuildContext context) {
+    final p = context.palette;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 28.0),
       child: Column(
@@ -306,12 +337,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             width: double.infinity,
             padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
             decoration: BoxDecoration(
-              color: AppColors.card,
+              color: p.surfaceContainer,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: AppColors.primary.withValues(alpha: 0.3), width: 1.5),
+              border: Border.all(
+                  color: p.accent.withValues(alpha: 0.3), width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.15),
+                  color: p.accent.withValues(alpha: 0.15),
                   blurRadius: 32,
                   spreadRadius: 2,
                 ),
@@ -320,12 +352,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildPlaybackFeatureIcon(Icons.equalizer_rounded, '5-Band EQ', AppColors.primary),
-                _buildPlaybackFeatureIcon(Icons.tune_rounded, 'Crossfade', AppColors.accent),
-                _buildPlaybackFeatureIcon(Icons.timer_rounded, 'Sleep Timer', AppColors.ctaLavender),
+                _buildPlaybackFeatureIcon(
+                    Icons.equalizer_rounded, '5-Band EQ', p.accent),
+                _buildPlaybackFeatureIcon(
+                    Icons.tune_rounded, 'Crossfade', p.accent),
+                _buildPlaybackFeatureIcon(
+                    Icons.timer_rounded, 'Sleep Timer', p.accent),
               ],
             ),
-          ).animate().fadeIn(duration: 500.ms).scale(begin: const Offset(0.9, 0.9)),
+          )
+              .animate()
+              .fadeIn(duration: 500.ms)
+              .scale(begin: const Offset(0.9, 0.9)),
           const SizedBox(height: 36),
           Text(
             'Powerful Playback',
@@ -340,7 +378,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             'Tailor your sound with a 5-band parametric equalizer, smooth crossfade transitions, gapless playback, and smart sleep timers.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: AppColors.textSecondary,
+                  color: p.textSecondary,
                   height: 1.5,
                 ),
           ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1, end: 0),
@@ -364,6 +402,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   // Page 3: "Beautiful & Personal"
   Widget _buildPage3(BuildContext context) {
+    final p = context.palette;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 28.0),
       child: Column(
@@ -374,12 +413,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AppColors.card,
+              color: p.surfaceContainer,
               borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: AppColors.outline, width: 1.5),
+              border: Border.all(color: p.hairline, width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.2),
+                  color: p.accent.withValues(alpha: 0.2),
                   blurRadius: 36,
                   spreadRadius: 4,
                 ),
@@ -387,18 +426,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
             child: Column(
               children: [
-                const Row(
+                Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.palette_rounded, color: AppColors.primary, size: 24),
-                    SizedBox(width: 8),
+                    Icon(Icons.palette_rounded,
+                        color: p.accent, size: 24),
+                    const SizedBox(width: 8),
                     Text(
                       '4 DISTINCT PLAYER THEMES',
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w800,
                         letterSpacing: 1.2,
-                        color: AppColors.textPrimary,
+                        color: p.textPrimary,
                       ),
                     ),
                   ],
@@ -407,15 +447,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    _buildThemeSwatch('Pulsr Modern', const [Color(0xFF9B9EF5), Color(0xFF6C70DC)]),
-                    _buildThemeSwatch('Glassmorphism', const [Color(0xFF00E676), Color(0xFF1DE9B6)]),
-                    _buildThemeSwatch('Dynamic Palette', const [Color(0xFFFF9100), Color(0xFFFF4081)]),
-                    _buildThemeSwatch('Cyberpunk Aura', const [Color(0xFFD500F9), Color(0xFF40C4FF)]),
+                    _buildThemeSwatch('Pulsr Modern',
+                        const [Color(0xFF9B9EF5), Color(0xFF6C70DC)]),
+                    _buildThemeSwatch('Glassmorphism',
+                        const [Color(0xFF00E676), Color(0xFF1DE9B6)]),
+                    _buildThemeSwatch('Dynamic Palette',
+                        const [Color(0xFFFF9100), Color(0xFFFF4081)]),
+                    _buildThemeSwatch('Cyberpunk Aura',
+                        const [Color(0xFFD500F9), Color(0xFF40C4FF)]),
                   ],
                 ),
               ],
             ),
-          ).animate().fadeIn(duration: 500.ms).scale(begin: const Offset(0.9, 0.9)),
+          )
+              .animate()
+              .fadeIn(duration: 500.ms)
+              .scale(begin: const Offset(0.9, 0.9)),
           const SizedBox(height: 36),
           Text(
             'Beautiful & Personal',
@@ -430,7 +477,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             'Express your style with real-time dynamic color extraction from album art and switch between 4 unique player themes.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                  color: AppColors.textSecondary,
+                  color: p.textSecondary,
                   height: 1.5,
                 ),
           ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1, end: 0),
@@ -441,6 +488,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildPlaybackFeatureIcon(IconData icon, String label, Color color) {
+    final p = context.palette;
     return Column(
       children: [
         Container(
@@ -456,8 +504,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         const SizedBox(height: 8),
         Text(
           label,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
+          style: TextStyle(
+            color: p.textPrimary,
             fontSize: 12,
             fontWeight: FontWeight.w700,
           ),
@@ -467,6 +515,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   Widget _buildThemeSwatch(String name, List<Color> colors) {
+    final p = context.palette;
     return Column(
       children: [
         Container(
@@ -496,8 +545,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             textAlign: TextAlign.center,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
+            style: TextStyle(
+              color: p.textSecondary,
               fontSize: 10,
               fontWeight: FontWeight.w600,
             ),
@@ -515,17 +564,18 @@ class _FeatureBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.card,
+        color: p.surfaceContainer,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.outline),
+        border: Border.all(color: p.hairline),
       ),
       child: Text(
         label,
-        style: const TextStyle(
-          color: AppColors.textPrimary,
+        style: TextStyle(
+          color: p.textPrimary,
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),

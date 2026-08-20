@@ -2,13 +2,13 @@
 import 'package:injectable/injectable.dart';
 import '../../core/errors/failures.dart';
 import '../../data/db/app_database.dart';
-import '../../data/repositories/music_repository.dart';
 import '../../data/repositories/smart_playlist_engine.dart';
 import '../models/smart_playlist_criteria.dart';
+import '../repositories/music_repository_interface.dart';
 
 @singleton
 class PlaylistUseCases {
-  final MusicRepository _repository;
+  final IMusicRepository _repository;
   final SmartPlaylistEngine _smartPlaylistEngine;
 
   PlaylistUseCases(this._repository, this._smartPlaylistEngine);

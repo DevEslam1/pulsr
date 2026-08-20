@@ -85,12 +85,13 @@ class SmartPlaylistEngine {
 
       case SmartRuleField.genre:
         if (valStr.isEmpty) return null;
+        final escaped = valStr.replaceAll('\\', r'\\').replaceAll('%', r'\%').replaceAll('_', r'\_').toLowerCase();
         switch (rule.operator) {
           case SmartOperator.equals:
             return t.genre.lower().equals(valStr.toLowerCase());
           case SmartOperator.contains:
           default:
-            return t.genre.lower().like('%${valStr.toLowerCase()}%');
+            return t.genre.lower().like('%$escaped%');
         }
 
       case SmartRuleField.year:
@@ -114,8 +115,7 @@ class SmartPlaylistEngine {
         if (rule.operator == SmartOperator.withinDays) {
           final days = valInt ?? 30;
           final cutoffSec = (DateTime.now().millisecondsSinceEpoch ~/ 1000) - (days * 86400);
-          final cutoffMs = DateTime.now().millisecondsSinceEpoch - (days * 86400 * 1000);
-          return t.dateAdded.isBiggerOrEqualValue(cutoffSec) | t.dateAdded.isBiggerOrEqualValue(cutoffMs);
+          return t.dateAdded.isBiggerOrEqualValue(cutoffSec);
         }
         if (valInt == null) return null;
         switch (rule.operator) {

@@ -2,11 +2,11 @@
 import 'package:injectable/injectable.dart';
 import '../../core/errors/failures.dart';
 import '../../data/db/app_database.dart';
-import '../../data/repositories/music_repository.dart';
+import '../repositories/music_repository_interface.dart';
 
 @singleton
 class GetSongsUseCase {
-  final MusicRepository _repository;
+  final IMusicRepository _repository;
 
   GetSongsUseCase(this._repository);
 
@@ -38,5 +38,19 @@ class GetSongsUseCase {
 
   Stream<Result<List<SongsTableData>>> watchTopPlayed({int limit = 30}) {
     return _repository.watchTopPlayed(limit: limit);
+  }
+
+  Future<Result<List<SongsTableData>>> getAllSongs({
+    String sortBy = 'title',
+    bool ascending = true,
+    int? limit,
+    int? offset,
+  }) {
+    return _repository.getAllSongs(
+      sortBy: sortBy,
+      ascending: ascending,
+      limit: limit,
+      offset: offset,
+    );
   }
 }

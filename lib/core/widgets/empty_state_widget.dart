@@ -1,8 +1,8 @@
 // lib/core/widgets/empty_state_widget.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../constants/app_colors.dart';
 import '../constants/app_radii.dart';
+import '../theme/aura_theme.dart';
 
 class EmptyStateWidget extends StatelessWidget {
   final IconData icon;
@@ -34,7 +34,8 @@ class EmptyStateWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveIconColor = iconColor ?? AppColors.primary;
+    final p = context.palette;
+    final effectiveIconColor = iconColor ?? p.accent;
 
     return Center(
       child: SingleChildScrollView(
@@ -65,7 +66,7 @@ class EmptyStateWidget extends StatelessWidget {
                   height: 84,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: AppColors.card,
+                    color: p.surfaceContainer,
                     border: Border.all(
                       color: effectiveIconColor.withValues(alpha: 0.35),
                       width: 1.5,
@@ -108,8 +109,8 @@ class EmptyStateWidget extends StatelessWidget {
               child: Text(
                 subtitle,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
+                style: TextStyle(
+                  color: p.textSecondary,
                   fontSize: 14,
                   height: 1.45,
                 ),
@@ -122,20 +123,20 @@ class EmptyStateWidget extends StatelessWidget {
                 height: 46,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: AppColors.onPrimary,
+                    backgroundColor: p.accent,
+                    foregroundColor: p.onAccent,
                     padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: AppRadii.cardRadius),
                     elevation: 2,
                   ),
                   onPressed: isPrimaryLoading ? null : onPrimaryAction,
                   child: isPrimaryLoading
-                      ? const SizedBox(
+                      ? SizedBox(
                           height: 20,
                           width: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: AppColors.onPrimary,
+                            color: p.onAccent,
                           ),
                         )
                       : Row(
@@ -159,8 +160,8 @@ class EmptyStateWidget extends StatelessWidget {
               const SizedBox(height: 12),
               OutlinedButton(
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppColors.textPrimary,
-                  side: const BorderSide(color: AppColors.outline),
+                  foregroundColor: p.textPrimary,
+                  side: BorderSide(color: p.hairline),
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                   shape: RoundedRectangleBorder(borderRadius: AppRadii.cardRadius),
                 ),
@@ -169,7 +170,7 @@ class EmptyStateWidget extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (secondaryActionIcon != null) ...[
-                      Icon(secondaryActionIcon, size: 18, color: AppColors.textSecondary),
+                      Icon(secondaryActionIcon, size: 18, color: p.textSecondary),
                       const SizedBox(width: 8),
                     ],
                     Text(

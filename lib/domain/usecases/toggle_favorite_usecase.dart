@@ -1,11 +1,11 @@
 // lib/domain/usecases/toggle_favorite_usecase.dart
 import 'package:injectable/injectable.dart';
 import '../../core/errors/failures.dart';
-import '../../data/repositories/music_repository.dart';
+import '../repositories/music_repository_interface.dart';
 
 @singleton
 class ToggleFavoriteUseCase {
-  final MusicRepository _repository;
+  final IMusicRepository _repository;
 
   ToggleFavoriteUseCase(this._repository);
 

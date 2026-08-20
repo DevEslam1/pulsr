@@ -24,7 +24,6 @@ dependencies:
   flutter_animate: ^4.5.2
   permission_handler: ^11.4.0
   shared_preferences: ^2.5.2
-  google_fonts: ^6.2.1
   fpdart: ^1.1.0
   get_it: ^8.0.3
   injectable: ^2.5.0
@@ -44,6 +43,31 @@ dev_dependencies:
   bloc_test: ^10.0.0
   injectable_generator: ^2.6.2
   freezed: ^3.2.5
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/app_icon/
+
+  fonts:
+    - family: Manrope
+      fonts:
+        - asset: assets/fonts/Manrope-VariableFont_wght.ttf
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/app_icon/app_icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#030A2E"
+  adaptive_icon_foreground: "assets/app_icon/app_icon.png"
+  web:
+    generate: true
+    image_path: "assets/app_icon/app_icon.png"
+  windows:
+    generate: true
+    image_path: "assets/app_icon/app_icon.png"
+
+

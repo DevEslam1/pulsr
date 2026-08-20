@@ -1,11 +1,9 @@
-// lib/features/splash/presentation/splash_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
-import '../../../core/widgets/waveform_logo.dart';
+import '../../../core/theme/aura_theme.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -37,16 +35,36 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: p.bg,
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const SizedBox(
-              width: 64,
-              height: 64,
-              child: WaveformLogo(size: 64),
+            Container(
+              width: 96,
+              height: 96,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: p.accent.withValues(alpha: 0.4),
+                    blurRadius: 36,
+                    spreadRadius: 4,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Image.asset(
+                  'assets/app_icon/app_icon.png',
+                  width: 96,
+                  height: 96,
+                  fit: BoxFit.cover,
+                ),
+              ),
             )
                 .animate()
                 .scale(duration: const Duration(milliseconds: 800), curve: Curves.easeOutBack)
@@ -57,6 +75,7 @@ class _SplashScreenState extends State<SplashScreen> {
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.5,
+                    color: p.textPrimary,
                   ),
             )
                 .animate()
@@ -66,7 +85,7 @@ class _SplashScreenState extends State<SplashScreen> {
             Text(
               AppStrings.appTagline,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondary,
+                    color: p.textSecondary,
                     letterSpacing: 0.5,
                   ),
             )

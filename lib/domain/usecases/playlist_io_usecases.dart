@@ -1,11 +1,13 @@
 // lib/domain/usecases/playlist_io_usecases.dart
 import 'dart:io';
 
+import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../core/errors/failures.dart';
 import '../../data/db/app_database.dart';
-import '../../data/repositories/music_repository.dart';
+import '../repositories/music_repository_interface.dart';
 
 @singleton
 class PlaylistExportUseCase {
@@ -52,7 +54,7 @@ class M3uImportResult {
 
 @singleton
 class PlaylistImportUseCase {
-  final MusicRepository _repository;
+  final IMusicRepository _repository;
 
   PlaylistImportUseCase(this._repository);
 
@@ -74,79 +76,84 @@ class PlaylistImportUseCase {
 
   /// Reads M3U file, matches paths against SongsTable, creates a new playlist,
   /// and adds matched songs.
-  Future<M3uImportResult> importPlaylistFromFile({
+  Future<Result<M3uImportResult>> importPlaylistFromFile({
     required String filePath,
     required String playlistName,
   }) async {
-    final file = File(filePath);
-    final content = await file.readAsString();
-    final rawPaths = parseM3uContent(content);
-
-    final songsResult = await _repository.getAllSongs();
-    final allSongs = songsResult.fold((l) => <SongsTableData>[], (r) => r);
-
-    // Build lookup maps for efficient matching:
-    // 1) Exact path match
-    // 2) Normalized path match (lowercase & forward slashes)
-    // 3) Filename match (fallback)
-    final exactMap = <String, SongsTableData>{};
-    final normalizedMap = <String, SongsTableData>{};
-    final filenameMap = <String, SongsTableData>{};
-
-    for (final song in allSongs) {
-      exactMap[song.path] = song;
-      final normPath = song.path.replaceAll('\\', '/').toLowerCase();
-      normalizedMap[normPath] = song;
-      final filename = song.path.replaceAll('\\', '/').split('/').last.toLowerCase();
-      if (filename.isNotEmpty) {
-        filenameMap[filename] = song;
+    try {
+      final file = File(filePath);
+      if (!await file.exists()) {
+        return Left(DatabaseFailure('File not found: $filePath'));
       }
-    }
+      final content = await file.readAsString();
+      final rawPaths = parseM3uContent(content);
 
-    final matchedSongIds = <int>[];
-    final matchedSet = <int>{};
-    final unmatchedPaths = <String>[];
+      final songsResult = await _repository.getAllSongs();
+      final allSongs = songsResult.fold((l) => <SongsTableData>[], (r) => r);
 
-    for (final path in rawPaths) {
-      SongsTableData? matchedSong = exactMap[path];
+      final exactMap = <String, SongsTableData>{};
+      final normalizedMap = <String, SongsTableData>{};
+      final filenameMap = <String, SongsTableData>{};
 
-      if (matchedSong == null) {
-        final normPath = path.replaceAll('\\', '/').toLowerCase();
-        matchedSong = normalizedMap[normPath];
-      }
-
-      if (matchedSong == null) {
-        final filename = path.replaceAll('\\', '/').split('/').last.toLowerCase();
-        matchedSong = filenameMap[filename];
-      }
-
-      if (matchedSong != null) {
-        if (!matchedSet.contains(matchedSong.id)) {
-          matchedSet.add(matchedSong.id);
-          matchedSongIds.add(matchedSong.id);
+      for (final song in allSongs) {
+        exactMap[song.path] = song;
+        final normPath = song.path.replaceAll('\\', '/').toLowerCase();
+        normalizedMap[normPath] = song;
+        final filename = song.path.replaceAll('\\', '/').split('/').last.toLowerCase();
+        if (filename.isNotEmpty) {
+          filenameMap[filename] = song;
         }
-      } else {
-        unmatchedPaths.add(path);
       }
+
+      final matchedSongIds = <int>[];
+      final matchedSet = <int>{};
+      final unmatchedPaths = <String>[];
+
+      for (final path in rawPaths) {
+        SongsTableData? matchedSong = exactMap[path];
+
+        if (matchedSong == null) {
+          final normPath = path.replaceAll('\\', '/').toLowerCase();
+          matchedSong = normalizedMap[normPath];
+        }
+
+        if (matchedSong == null) {
+          final filename = path.replaceAll('\\', '/').split('/').last.toLowerCase();
+          matchedSong = filenameMap[filename];
+        }
+
+        if (matchedSong != null) {
+          if (!matchedSet.contains(matchedSong.id)) {
+            matchedSet.add(matchedSong.id);
+            matchedSongIds.add(matchedSong.id);
+          }
+        } else {
+          unmatchedPaths.add(path);
+        }
+      }
+
+      // Create new playlist with the given name
+      final createRes = await _repository.createPlaylist(playlistName);
+      return createRes.fold(
+        (failure) => Left(failure),
+        (playlistId) async {
+          if (matchedSongIds.isNotEmpty) {
+            await _repository.addSongsToPlaylist(playlistId, matchedSongIds);
+          }
+
+          return Right(
+            M3uImportResult(
+              playlistName: playlistName,
+              totalExtractedPaths: rawPaths.length,
+              matchedTrackCount: matchedSongIds.length,
+              createdPlaylistId: playlistId,
+              unmatchedPaths: unmatchedPaths,
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to import playlist', e));
     }
-
-    // Create new playlist with the given name
-    final createRes = await _repository.createPlaylist(playlistName);
-    final playlistId = createRes.fold(
-      (failure) => throw Exception('Failed to create playlist: ${failure.message}'),
-      (id) => id,
-    );
-
-    if (matchedSongIds.isNotEmpty) {
-      await _repository.addSongsToPlaylist(playlistId, matchedSongIds);
-    }
-
-    return M3uImportResult(
-      playlistName: playlistName,
-      totalExtractedPaths: rawPaths.length,
-      matchedTrackCount: matchedSongIds.length,
-      createdPlaylistId: playlistId,
-      unmatchedPaths: unmatchedPaths,
-    );
   }
 }

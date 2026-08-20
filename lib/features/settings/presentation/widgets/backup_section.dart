@@ -7,8 +7,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../core/constants/app_colors.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/theme/aura_theme.dart';
 import '../../../../domain/usecases/backup_usecases.dart';
 import '../../cubit/settings_cubit.dart';
 
@@ -24,7 +24,7 @@ class _BackupSectionState extends State<BackupSection> {
   bool _isImporting = false;
 
   static Widget _buildIconContainer(BuildContext context, IconData icon) {
-    final cardColor = Theme.of(context).cardTheme.color ?? AppColors.card;
+    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
     final outlineColor = Theme.of(context).colorScheme.outline;
     final primaryColor = Theme.of(context).colorScheme.primary;
 
@@ -68,7 +68,7 @@ class _BackupSectionState extends State<BackupSection> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Backup exported successfully to ${file.path.split(Platform.pathSeparator).last}'),
-              backgroundColor: AppColors.primary,
+              backgroundColor: context.palette.accent,
             ),
           );
         }
@@ -139,11 +139,11 @@ class _BackupSectionState extends State<BackupSection> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Theme.of(context).colorScheme.surface,
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.restore_rounded, color: AppColors.primary),
-            SizedBox(width: 8),
-            Text('Confirm Restore'),
+            Icon(Icons.restore_rounded, color: context.palette.accent),
+            const SizedBox(width: 8),
+            const Text('Confirm Restore'),
           ],
         ),
         content: Column(
@@ -160,21 +160,21 @@ class _BackupSectionState extends State<BackupSection> {
             Text('• Play History: $historyCount entries'),
             Text('• Settings: ${hasSettings ? "Included" : "None"}'),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Existing library matching tracks will be updated.',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 12, color: context.palette.textSecondary),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+            child: Text('Cancel', style: TextStyle(color: context.palette.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
+              backgroundColor: context.palette.accent,
               foregroundColor: Colors.white,
             ),
             child: const Text('Restore Backup'),
@@ -201,11 +201,11 @@ class _BackupSectionState extends State<BackupSection> {
           context: context,
           builder: (ctx) => AlertDialog(
             backgroundColor: Theme.of(context).colorScheme.surface,
-            title: const Row(
+            title: Row(
               children: [
-                Icon(Icons.check_circle_rounded, color: AppColors.primary),
-                SizedBox(width: 8),
-                Text('Backup Restored'),
+                Icon(Icons.check_circle_rounded, color: context.palette.accent),
+                const SizedBox(width: 8),
+                const Text('Backup Restored'),
               ],
             ),
             content: Column(
@@ -252,7 +252,7 @@ class _BackupSectionState extends State<BackupSection> {
 
   @override
   Widget build(BuildContext context) {
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? AppColors.textSecondary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
 
     return Column(
       children: [

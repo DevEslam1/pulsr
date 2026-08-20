@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/theme/dynamic_theme_cubit.dart';
-import '../../../data/repositories/music_repository.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../settings/cubit/settings_state.dart';
 import '../cubit/player_cubit.dart';
@@ -20,25 +19,28 @@ class NowPlayingScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final settingsState = context.watch<SettingsCubit>().state;
 
-    return BlocBuilder<PlayerCubit, PlayerState>(
-      builder: (context, state) {
+    return BlocConsumer<PlayerCubit, PlayerState>(
+      listenWhen: (prev, curr) => prev.currentSong?.id != curr.currentSong?.id,
+      listener: (context, state) {
         final song = state.currentSong;
-        final cubit = context.read<PlayerCubit>();
-        final repository = context.read<MusicRepository>();
-        final dynamicTheme = context.watch<DynamicThemeCubit>().state;
-
-        // Trigger dynamic color extraction whenever song changes
-        if (song != null) {
+        if (song != null && settingsState.dynamicThemingEnabled) {
           context.read<DynamicThemeCubit>().updateFromSongId(song.id);
         }
+      },
+      builder: (context, state) {
+        final cubit = context.read<PlayerCubit>();
+        final dynamicTheme = context.watch<DynamicThemeCubit>().state;
 
-        final activeColor = dynamicTheme.primaryColor;
-        final bgColor = dynamicTheme.backgroundColor;
+        final activeColor = settingsState.dynamicThemingEnabled
+            ? dynamicTheme.primaryColor
+            : settingsState.customAccentColor;
+        final bgColor = settingsState.dynamicThemingEnabled
+            ? dynamicTheme.backgroundColor
+            : const Color(0xFF14172B);
 
         final props = PlayerThemeProps(
           state: state,
           cubit: cubit,
-          repository: repository,
           activeColor: activeColor,
           bgColor: bgColor,
         );
@@ -59,15 +61,103 @@ class NowPlayingScreen extends StatelessWidget {
             break;
         }
 
-        return Dismissible(
-          key: const Key('now_playing_dismissible'),
-          direction: DismissDirection.down,
-          onDismissed: (_) => Navigator.of(context).pop(),
-          child: Scaffold(
-            body: themeWidget,
+        return Scaffold(
+          backgroundColor: bgColor,
+          body: _SwipeDownToDismiss(
+            onDismiss: () => Navigator.of(context).maybePop(),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.orientationOf(context) == Orientation.landscape ? 960 : 560,
+                ),
+                child: themeWidget,
+              ),
+            ),
           ),
         );
       },
+    );
+  }
+}
+
+class _SwipeDownToDismiss extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onDismiss;
+
+  const _SwipeDownToDismiss({
+    required this.child,
+    required this.onDismiss,
+  });
+
+  @override
+  State<_SwipeDownToDismiss> createState() => _SwipeDownToDismissState();
+}
+
+class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _animController;
+  double _dragOffset = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 240),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  void _onVerticalDragUpdate(DragUpdateDetails details) {
+    if (details.primaryDelta != null) {
+      final newOffset = _dragOffset + details.primaryDelta!;
+      if (newOffset >= 0) {
+        setState(() {
+          _dragOffset = newOffset;
+        });
+      }
+    }
+  }
+
+  void _onVerticalDragEnd(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    if (_dragOffset > 100 || velocity > 450) {
+      widget.onDismiss();
+    } else if (_dragOffset > 0) {
+      final start = _dragOffset;
+      final anim = Tween<double>(begin: start, end: 0.0).animate(
+        CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
+      );
+      anim.addListener(() {
+        setState(() {
+          _dragOffset = anim.value;
+        });
+      });
+      _animController.forward(from: 0.0);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final progress = (_dragOffset / screenHeight).clamp(0.0, 1.0);
+
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onVerticalDragUpdate: _onVerticalDragUpdate,
+      onVerticalDragEnd: _onVerticalDragEnd,
+      child: Transform.translate(
+        offset: Offset(0, _dragOffset),
+        child: Opacity(
+          opacity: (1.0 - progress * 0.4).clamp(0.0, 1.0),
+          child: widget.child,
+        ),
+      ),
     );
   }
 }

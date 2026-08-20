@@ -1,19 +1,27 @@
 // lib/core/router/app_router.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
-import '../../features/splash/presentation/splash_screen.dart';
-import '../../features/onboarding/presentation/onboarding_screen.dart';
+import '../../domain/models/genre_item.dart';
+import '../../domain/models/year_item.dart';
+import '../../features/album_detail/presentation/album_detail_screen.dart';
+import '../../features/artist_detail/presentation/artist_detail_screen.dart';
+import '../../features/genre_detail/presentation/genre_detail_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/library/presentation/library_screen.dart';
-import '../../features/search/presentation/search_screen.dart';
-import '../../features/playlists/presentation/playlists_screen.dart';
-import '../../features/settings/presentation/settings_screen.dart';
+import '../../features/onboarding/presentation/onboarding_screen.dart';
 import '../../features/player/presentation/now_playing_screen.dart';
+import '../../features/playlist_detail/presentation/playlist_detail_screen.dart';
+import '../../features/playlists/presentation/playlists_screen.dart';
+import '../../features/queue/presentation/queue_screen.dart';
+import '../../features/search/presentation/search_screen.dart';
+import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/shell/presentation/app_shell.dart';
-
+import '../../features/smart_playlist_builder/smart_playlist_builder_screen.dart';
+import '../../features/splash/presentation/splash_screen.dart';
 import '../../features/tag_editor/tag_editor_screen.dart';
-import '../../data/db/app_database.dart';
+import '../../features/year_detail/presentation/year_detail_screen.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
@@ -123,6 +131,68 @@ GoRouter createRouter(MediaScannerService scannerService) {
         ),
       ),
       GoRoute(
+        path: '/album',
+        name: 'album',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final album = state.extra as AlbumsTableData;
+          return AlbumDetailScreen(album: album);
+        },
+      ),
+      GoRoute(
+        path: '/artist',
+        name: 'artist',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final artist = state.extra as ArtistsTableData;
+          return ArtistDetailScreen(artist: artist);
+        },
+      ),
+      GoRoute(
+        path: '/genre',
+        name: 'genre',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final genre = state.extra as GenreItem;
+          return GenreDetailScreen(genreItem: genre);
+        },
+      ),
+      GoRoute(
+        path: '/year',
+        name: 'year',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final year = state.extra as YearItem;
+          return YearDetailScreen(yearItem: year);
+        },
+      ),
+      GoRoute(
+        path: '/playlist',
+        name: 'playlist',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final playlist = state.extra as PlaylistsTableData;
+          return PlaylistDetailScreen(playlist: playlist);
+        },
+      ),
+      GoRoute(
+        path: '/smart-playlist-builder',
+        name: 'smart-playlist-builder',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final initial = state.extra;
+          return SmartPlaylistBuilderScreen(
+            initialPlaylist: initial is PlaylistsTableData ? initial : null,
+          );
+        },
+      ),
+      GoRoute(
+        path: '/queue',
+        name: 'queue',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const QueueScreen(),
+      ),
+      GoRoute(
         path: '/tag-editor',
         name: 'tag-editor',
         parentNavigatorKey: rootNavigatorKey,
@@ -134,4 +204,3 @@ GoRouter createRouter(MediaScannerService scannerService) {
     ],
   );
 }
-

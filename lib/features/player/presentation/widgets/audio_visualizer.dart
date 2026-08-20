@@ -1,9 +1,10 @@
 // lib/features/player/presentation/widgets/audio_visualizer.dart
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/aura_theme.dart';
 
 enum VisualizerStyle {
   off,
@@ -38,31 +39,50 @@ class _AudioVisualizerState extends State<AudioVisualizer> with SingleTickerProv
 
   StreamSubscription? _subscription;
   late AnimationController _animController;
+  int _frameSkip = 0;
 
   static const int _numBands = 32;
   final List<double> _currentData = List.filled(_numBands, 0.0);
   final List<double> _targetData = List.filled(_numBands, 0.0);
+  late final ValueNotifier<List<double>> _dataNotifier;
   DateTime _lastNativeDataTime = DateTime.fromMillisecondsSinceEpoch(0);
 
   @override
   void initState() {
     super.initState();
+    _dataNotifier = ValueNotifier<List<double>>(List.from(_currentData));
     _animController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 1),
     )..addListener(_updateFftFrame);
 
-    _animController.repeat();
-    _startNativeVisualizer();
+    if (widget.style != VisualizerStyle.off && widget.isPlaying) {
+      _animController.repeat();
+      if (Platform.isAndroid) {
+        _startNativeVisualizer();
+      }
+    }
   }
 
   @override
   void didUpdateWidget(AudioVisualizer oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.style != oldWidget.style || widget.isPlaying != oldWidget.isPlaying) {
-      if (widget.style != VisualizerStyle.off && widget.isPlaying) {
+    if (widget.style != oldWidget.style) {
+      if (widget.style == VisualizerStyle.off) {
+        _animController.stop();
+        _stopNativeVisualizer();
+      } else if (widget.isPlaying) {
         if (!_animController.isAnimating) _animController.repeat();
-        _startNativeVisualizer();
+        if (Platform.isAndroid) {
+          _startNativeVisualizer();
+        }
+      }
+    } else if (widget.isPlaying != oldWidget.isPlaying) {
+      if (widget.isPlaying) {
+        if (!_animController.isAnimating) _animController.repeat();
+        if (Platform.isAndroid) {
+          _startNativeVisualizer();
+        }
       } else {
         _stopNativeVisualizer();
       }
@@ -73,6 +93,7 @@ class _AudioVisualizerState extends State<AudioVisualizer> with SingleTickerProv
   void dispose() {
     _stopNativeVisualizer();
     _animController.dispose();
+    _dataNotifier.dispose();
     super.dispose();
   }
 
@@ -111,36 +132,43 @@ class _AudioVisualizerState extends State<AudioVisualizer> with SingleTickerProv
 
   void _updateFftFrame() {
     if (!mounted) return;
+    _frameSkip++;
+    if (_frameSkip % 2 != 0) return; // 30fps
     final now = DateTime.now();
     final isNativeActive = now.difference(_lastNativeDataTime).inMilliseconds < 300;
 
-    setState(() {
-      if (!widget.isPlaying) {
-        // Smoothly decay to zero when paused/stopped
-        for (int i = 0; i < _numBands; i++) {
-          _currentData[i] = _currentData[i] * 0.85;
-        }
-      } else if (isNativeActive) {
-        // Interpolate target native FFT data
-        for (int i = 0; i < _numBands; i++) {
-          _currentData[i] += (_targetData[i] - _currentData[i]) * 0.25;
-        }
-      } else {
-        // Simulated organic FFT frequencies when native audio is silent/unavailable
-        final t = _animController.value * 2 * math.pi * 2;
-        for (int i = 0; i < _numBands; i++) {
-          final freq = (i + 1) * 0.4;
-          final val = (math.sin(t * freq + i * 0.3).abs() * 0.6 +
-                  math.cos(t * 0.5 + i * 0.5).abs() * 0.4)
-              .clamp(0.15, 0.95);
-
-          // Apply bass to treble magnitude falloff
-          final factor = (1.0 - (i / _numBands) * 0.4);
-          final simulated = val * factor;
-          _currentData[i] += (simulated - _currentData[i]) * 0.15;
-        }
+    if (!widget.isPlaying) {
+      // Smoothly decay to zero when paused/stopped
+      bool allDecayed = true;
+      for (int i = 0; i < _numBands; i++) {
+        _currentData[i] *= 0.85;
+        if (_currentData[i] > 0.01) allDecayed = false;
       }
-    });
+      if (allDecayed) {
+        _animController.stop();
+      }
+    } else if (isNativeActive) {
+      // Interpolate target native FFT data
+      for (int i = 0; i < _numBands; i++) {
+        _currentData[i] += (_targetData[i] - _currentData[i]) * 0.25;
+      }
+    } else {
+      // Simulated organic FFT frequencies when native audio is silent/unavailable
+      final t = _animController.value * 2 * math.pi * 2;
+      for (int i = 0; i < _numBands; i++) {
+        final freq = (i + 1) * 0.4;
+        final val = (math.sin(t * freq + i * 0.3).abs() * 0.6 +
+                math.cos(t * 0.5 + i * 0.5).abs() * 0.4)
+            .clamp(0.15, 0.95);
+
+        // Apply bass to treble magnitude falloff
+        final factor = (1.0 - (i / _numBands) * 0.4);
+        final simulated = val * factor;
+        _currentData[i] += (simulated - _currentData[i]) * 0.15;
+      }
+    }
+
+    _dataNotifier.value = List.from(_currentData);
   }
 
   @override
@@ -149,27 +177,34 @@ class _AudioVisualizerState extends State<AudioVisualizer> with SingleTickerProv
       return const SizedBox.shrink();
     }
 
-    final activeColor = widget.color ?? AppColors.primary;
+    final activeColor = widget.color ?? context.palette.accent;
 
-    return SizedBox(
-      width: widget.width,
-      height: widget.height,
-      child: CustomPaint(
-        painter: switch (widget.style) {
-          VisualizerStyle.bar => _BarVisualizerPainter(
-              data: _currentData,
-              color: activeColor,
-            ),
-          VisualizerStyle.wave => _WaveVisualizerPainter(
-              data: _currentData,
-              color: activeColor,
-            ),
-          VisualizerStyle.circular => _CircularVisualizerPainter(
-              data: _currentData,
-              color: activeColor,
-            ),
-          VisualizerStyle.off => null,
-        },
+    return RepaintBoundary(
+      child: SizedBox(
+        width: widget.width,
+        height: widget.height,
+        child: ValueListenableBuilder<List<double>>(
+          valueListenable: _dataNotifier,
+          builder: (context, data, _) {
+            return CustomPaint(
+              painter: switch (widget.style) {
+                VisualizerStyle.bar => _BarVisualizerPainter(
+                    data: data,
+                    color: activeColor,
+                  ),
+                VisualizerStyle.wave => _WaveVisualizerPainter(
+                    data: data,
+                    color: activeColor,
+                  ),
+                VisualizerStyle.circular => _CircularVisualizerPainter(
+                    data: data,
+                    color: activeColor,
+                  ),
+                VisualizerStyle.off => null,
+              },
+            );
+          },
+        ),
       ),
     );
   }

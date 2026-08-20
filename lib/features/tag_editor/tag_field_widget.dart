@@ -1,6 +1,6 @@
 // lib/features/tag_editor/tag_field_widget.dart
 import 'package:flutter/material.dart';
-import '../../core/constants/app_colors.dart';
+import '../../../core/theme/aura_theme.dart';
 
 class TagFieldWidget extends StatelessWidget {
   final String label;
@@ -24,6 +24,7 @@ class TagFieldWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
       child: Column(
@@ -31,8 +32,8 @@ class TagFieldWidget extends StatelessWidget {
         children: [
           Text(
             label,
-            style: const TextStyle(
-              color: AppColors.textSecondary,
+            style: TextStyle(
+              color: p.textSecondary,
               fontSize: 13,
               fontWeight: FontWeight.w600,
             ),
@@ -43,22 +44,22 @@ class TagFieldWidget extends StatelessWidget {
             onChanged: onChanged,
             keyboardType: keyboardType,
             maxLines: maxLines,
-            style: const TextStyle(
-              color: AppColors.textPrimary,
+            style: TextStyle(
+              color: p.textPrimary,
               fontSize: 14,
               fontWeight: FontWeight.w500,
             ),
             decoration: InputDecoration(
               hintText: hintText ?? 'Enter $label',
-              hintStyle: const TextStyle(
-                color: AppColors.textSecondary,
+              hintStyle: TextStyle(
+                color: p.textSecondary,
                 fontSize: 13,
               ),
               prefixIcon: icon != null
-                  ? Icon(icon, color: AppColors.textSecondary, size: 20)
+                  ? Icon(icon, color: p.textSecondary, size: 20)
                   : null,
               filled: true,
-              fillColor: AppColors.card,
+              fillColor: p.surfaceContainer,
               contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
@@ -70,7 +71,7 @@ class TagFieldWidget extends StatelessWidget {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
-                borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                borderSide: BorderSide(color: p.accent, width: 1.5),
               ),
             ),
           ),

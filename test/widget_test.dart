@@ -11,6 +11,7 @@ import 'package:pulsr/data/repositories/music_repository.dart';
 import 'package:pulsr/data/repositories/smart_playlist_engine.dart';
 import 'package:pulsr/data/scanner/media_scanner_service.dart';
 import 'package:pulsr/domain/models/eq_preset.dart';
+import 'package:pulsr/domain/repositories/music_repository_interface.dart';
 import 'package:pulsr/domain/usecases/folder_usecases.dart';
 import 'package:pulsr/domain/usecases/get_albums_usecase.dart';
 import 'package:pulsr/domain/usecases/get_artists_usecase.dart';
@@ -26,11 +27,22 @@ import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/playlists/cubit/playlist_cubit.dart';
 import 'package:pulsr/features/search/cubit/search_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
+import 'package:pulsr/features/widgets/widget_service.dart';
 import 'package:pulsr/main.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler implements PulsrAudioHandler {
+  MockPulsrAudioHandler() {
+    playbackState.add(PlaybackState(
+      controls: [],
+      systemActions: const {},
+      processingState: AudioProcessingState.idle,
+      playing: false,
+    ));
+    queue.add([]);
+  }
+
   @override
   double get volume => 1.0;
   @override
@@ -41,6 +53,8 @@ class MockPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   EqPreset get currentPreset => EqPreset.defaultPresets.first;
   @override
   Duration get crossfadeDuration => Duration.zero;
+  @override
+  Stream<Duration> get positionStream => const Stream.empty();
   @override
   void setCrossfadeDuration(Duration d) {}
   @override
@@ -58,20 +72,28 @@ class MockPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   @override
   void cancelSleepTimer() {}
   @override
-  Future<void> playNext(dynamic song) async {}
+  Future<void> insertNextInQueue(SongsTableData song) async {}
   @override
-  Future<void> addToQueue(dynamic song) async {}
+  Future<void> addToQueueEnd(SongsTableData song) async {}
   @override
   Future<void> reorderQueue(int oldIndex, int newIndex) async {}
   @override
   Future<void> removeQueueItemAt(int index) async {}
   @override
-  Future<void> loadQueue(List<dynamic> songs, {int initialIndex = 0, Duration? initialPosition}) async {}
+  Future<void> loadQueue(List<SongsTableData> songs, {int initialIndex = 0, Duration? initialPosition}) async {}
   @override
-  Future<void> playSongAt(int index) async {}
+  Stream<Duration?> get sleepTimerRemainingStream => const Stream.empty();
+  @override
+  void dispose() {}
+  @override
+  Future<void> playSongAt(int index, {Duration? initialPosition}) async {}
 }
 
 void main() {
+  setUp(() async {
+    await getIt.reset();
+  });
+
   testWidgets('App smoke test', (WidgetTester tester) async {
     SharedPreferences.setMockInitialValues({});
     final db = AppDatabase.forTesting(NativeDatabase.memory());
@@ -90,53 +112,60 @@ void main() {
     final searchMusicUseCase = SearchMusicUseCase(repo);
     final playlistUseCases = PlaylistUseCases(repo, smartEngine);
     final folderUseCases = FolderUseCases(repo);
+    final widgetService = WidgetService();
 
-    if (!getIt.isRegistered<AppDatabase>()) {
-      getIt.registerSingleton<AppDatabase>(db);
-      getIt.registerSingleton<MusicRepository>(repo);
-      getIt.registerSingleton<PulsrAudioHandler>(audioHandler);
-      getIt.registerSingleton<MediaScannerService>(scannerService);
-      getIt.registerSingleton<GetSongsUseCase>(getSongsUseCase);
-      getIt.registerSingleton<GetAlbumsUseCase>(getAlbumsUseCase);
-      getIt.registerSingleton<GetArtistsUseCase>(getArtistsUseCase);
-      getIt.registerSingleton<GetGenresUseCase>(getGenresUseCase);
-      getIt.registerSingleton<GetYearsUseCase>(getYearsUseCase);
-      getIt.registerSingleton<GetFavoritesUseCase>(getFavoritesUseCase);
-      getIt.registerSingleton<ToggleFavoriteUseCase>(toggleFavoriteUseCase);
-      getIt.registerSingleton<SearchMusicUseCase>(searchMusicUseCase);
-      getIt.registerSingleton<PlaylistUseCases>(playlistUseCases);
-      getIt.registerSingleton<FolderUseCases>(folderUseCases);
+    getIt.registerSingleton<AppDatabase>(db);
+    getIt.registerSingleton<IMusicRepository>(repo);
+    getIt.registerSingleton<MusicRepository>(repo);
+    getIt.registerSingleton<PulsrAudioHandler>(audioHandler);
+    getIt.registerSingleton<MediaScannerService>(scannerService);
+    getIt.registerSingleton<GetSongsUseCase>(getSongsUseCase);
+    getIt.registerSingleton<GetAlbumsUseCase>(getAlbumsUseCase);
+    getIt.registerSingleton<GetArtistsUseCase>(getArtistsUseCase);
+    getIt.registerSingleton<GetGenresUseCase>(getGenresUseCase);
+    getIt.registerSingleton<GetYearsUseCase>(getYearsUseCase);
+    getIt.registerSingleton<GetFavoritesUseCase>(getFavoritesUseCase);
+    getIt.registerSingleton<ToggleFavoriteUseCase>(toggleFavoriteUseCase);
+    getIt.registerSingleton<SearchMusicUseCase>(searchMusicUseCase);
+    getIt.registerSingleton<PlaylistUseCases>(playlistUseCases);
+    getIt.registerSingleton<FolderUseCases>(folderUseCases);
+    getIt.registerSingleton<WidgetService>(widgetService);
 
-      getIt.registerFactory<DynamicThemeCubit>(() => DynamicThemeCubit());
-      getIt.registerFactory<PlayerCubit>(() => PlayerCubit(
-            audioHandler: audioHandler,
-            repository: repo,
-            toggleFavoriteUseCase: toggleFavoriteUseCase,
-          ));
-      getIt.registerFactory<LibraryCubit>(() => LibraryCubit(
-            getSongsUseCase: getSongsUseCase,
-            getAlbumsUseCase: getAlbumsUseCase,
-            getArtistsUseCase: getArtistsUseCase,
-            getGenresUseCase: getGenresUseCase,
-            getYearsUseCase: getYearsUseCase,
-            getFavoritesUseCase: getFavoritesUseCase,
-            toggleFavoriteUseCase: toggleFavoriteUseCase,
-            folderUseCases: folderUseCases,
-          ));
-      getIt.registerFactory<SearchCubit>(
-          () => SearchCubit(searchUseCase: searchMusicUseCase));
-      getIt.registerFactory<PlaylistCubit>(
-          () => PlaylistCubit(playlistUseCases: playlistUseCases));
-      getIt.registerFactory<SettingsCubit>(
-          () => SettingsCubit(scannerService: scannerService));
-    }
+    getIt.registerSingleton<DynamicThemeCubit>(DynamicThemeCubit());
+    getIt.registerFactory<PlayerCubit>(() => PlayerCubit(
+          audioHandler: audioHandler,
+          repository: repo,
+          toggleFavoriteUseCase: toggleFavoriteUseCase,
+        ));
+    getIt.registerFactory<LibraryCubit>(() => LibraryCubit(
+          getSongsUseCase: getSongsUseCase,
+          getAlbumsUseCase: getAlbumsUseCase,
+          getArtistsUseCase: getArtistsUseCase,
+          getGenresUseCase: getGenresUseCase,
+          getYearsUseCase: getYearsUseCase,
+          getFavoritesUseCase: getFavoritesUseCase,
+          toggleFavoriteUseCase: toggleFavoriteUseCase,
+          folderUseCases: folderUseCases,
+        ));
+    getIt.registerFactory<SearchCubit>(
+        () => SearchCubit(searchUseCase: searchMusicUseCase, folderUseCases: folderUseCases));
+    getIt.registerFactory<PlaylistCubit>(
+        () => PlaylistCubit(playlistUseCases: playlistUseCases));
+    getIt.registerSingleton<SettingsCubit>(
+        SettingsCubit(scannerService: scannerService));
 
-    await tester.pumpWidget(const PulsrApp());
-    await tester.pump(const Duration(milliseconds: 100));
-
-    expect(find.byType(PulsrApp), findsOneWidget);
-    await tester.pumpWidget(const SizedBox());
-    await audioHandler.stop();
-    await db.close();
+    await tester.runAsync(() async {
+      await tester.pumpWidget(const PulsrApp());
+      await tester.pump();
+      expect(find.byType(PulsrApp), findsOneWidget);
+      // Splash shows first
+      expect(find.text('Pulsr Music'), findsOneWidget);
+      await Future.delayed(const Duration(milliseconds: 100));
+      await tester.pump();
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump();
+      await audioHandler.stop();
+      await db.close();
+    });
   });
 }

@@ -52,8 +52,9 @@ class LibraryCubit extends Cubit<LibraryState> {
     init();
   }
 
-  void init() {
-    _subscribeSongs();
+  Future<void> init() async {
+    await _subscribeSongs();
+    if (isClosed) return;
     _subscribeAlbums();
     _subscribeArtists();
     _subscribeGenres();
@@ -66,14 +67,19 @@ class LibraryCubit extends Cubit<LibraryState> {
     emit(state.copyWith(errorMessage: null));
   }
 
-  void _subscribeSongs() {
+  Future<void> _subscribeSongs() async {
     _songsSub?.cancel();
+    final excludedRes = await _folderUseCases.getExcludedFolders();
+    if (isClosed) return;
+    final excluded = excludedRes.fold((l) => <String>[], (r) => r);
     _songsSub = _getSongsUseCase
         .watchSongs(
       sortBy: state.sortBy,
       ascending: state.ascending,
+      excludedFolders: excluded,
     )
         .listen((result) {
+      if (isClosed) return;
       result.fold(
         (failure) => emit(state.copyWith(errorMessage: failure.message)),
         (songs) => emit(state.copyWith(songs: songs, errorMessage: null)),
@@ -84,6 +90,7 @@ class LibraryCubit extends Cubit<LibraryState> {
   void _subscribeAlbums() {
     _albumsSub?.cancel();
     _albumsSub = _getAlbumsUseCase.watchAlbums().listen((result) {
+      if (isClosed) return;
       result.fold(
         (failure) => emit(state.copyWith(errorMessage: failure.message)),
         (albums) => emit(state.copyWith(albums: albums, errorMessage: null)),
@@ -94,6 +101,7 @@ class LibraryCubit extends Cubit<LibraryState> {
   void _subscribeArtists() {
     _artistsSub?.cancel();
     _artistsSub = _getArtistsUseCase.watchArtists().listen((result) {
+      if (isClosed) return;
       result.fold(
         (failure) => emit(state.copyWith(errorMessage: failure.message)),
         (artists) => emit(state.copyWith(artists: artists, errorMessage: null)),
@@ -104,6 +112,7 @@ class LibraryCubit extends Cubit<LibraryState> {
   void _subscribeGenres() {
     _genresSub?.cancel();
     _genresSub = _getGenresUseCase.watchGenres().listen((result) {
+      if (isClosed) return;
       result.fold(
         (failure) => emit(state.copyWith(errorMessage: failure.message)),
         (genres) => emit(state.copyWith(genres: genres, errorMessage: null)),
@@ -114,6 +123,7 @@ class LibraryCubit extends Cubit<LibraryState> {
   void _subscribeYears() {
     _yearsSub?.cancel();
     _yearsSub = _getYearsUseCase.watchYears().listen((result) {
+      if (isClosed) return;
       result.fold(
         (failure) => emit(state.copyWith(errorMessage: failure.message)),
         (years) => emit(state.copyWith(years: years, errorMessage: null)),
@@ -124,6 +134,7 @@ class LibraryCubit extends Cubit<LibraryState> {
   void _subscribeFavorites() {
     _favoritesSub?.cancel();
     _favoritesSub = _getFavoritesUseCase.watchFavorites().listen((result) {
+      if (isClosed) return;
       result.fold(
         (failure) => emit(state.copyWith(errorMessage: failure.message)),
         (favs) => emit(state.copyWith(favorites: favs, errorMessage: null)),

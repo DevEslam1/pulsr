@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/adaptive.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
 import '../../player/presentation/widgets/equalizer_sheet.dart';
 import '../../sheets/sleep_timer_sheet.dart';
@@ -14,367 +16,220 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
+
     return BlocBuilder<SettingsCubit, SettingsState>(
       builder: (context, state) {
         final cubit = context.read<SettingsCubit>();
-        final primaryColor = Theme.of(context).colorScheme.primary;
 
         return Scaffold(
-          appBar: AppBar(
-            title: const Text(
-              'Settings',
-              style: TextStyle(fontWeight: FontWeight.w900),
-            ),
-          ),
-          body: ListView(
-            padding: const EdgeInsets.only(bottom: 120, top: 8),
-            children: [
-              _buildSettingsCategory(
-                context,
-                title: 'AUDIO & PLAYBACK',
-                items: [
-                  _buildSettingsTile(
-                    context,
-                    icon: Icons.equalizer_rounded,
-                    title: 'Equalizer & Sound Effects',
-                    subtitle: '5-band graphical EQ, bass boost, and presets',
-                    onTap: () {
-                      showModalBottomSheet(
-                        context: context,
-                        isScrollControlled: true,
-                        builder: (_) => const EqualizerSheet(),
-                      );
-                    },
-                  ),
-                  _buildSettingsTile(
-                    context,
-                    icon: Icons.timer_outlined,
-                    title: 'Sleep Timer',
-                    subtitle: 'Auto pause audio with gentle fade-out',
-                    onTap: () {
-                      showModalBottomSheet(
-                        context: context,
-                        builder: (_) => const SleepTimerSheet(),
-                      );
-                    },
-                  ),
-                  ListTile(
-                    leading: _buildIconContainer(context, Icons.graphic_eq_rounded),
-                    title: const Text('Gapless Playback', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                    subtitle: Text('Continuous audio without silence', style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color, fontSize: 12)),
-                    trailing: Switch.adaptive(
-                      value: state.gaplessPlayback,
-                      activeTrackColor: primaryColor,
-                      activeThumbColor: Colors.white,
-                      onChanged: (val) => cubit.setGapless(val),
-                    ),
-                  ),
-                  ListTile(
-                    leading: _buildIconContainer(context, Icons.play_circle_outline_rounded),
-                    title: const Text('Resume After Interruption', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                    subtitle: Text('Automatically resume playback after phone calls or interruptions', style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color, fontSize: 12)),
-                    trailing: Switch.adaptive(
-                      value: state.resumeAfterInterruption,
-                      activeTrackColor: primaryColor,
-                      activeThumbColor: Colors.white,
-                      onChanged: (val) => cubit.setResumeAfterInterruption(val),
-                    ),
-                  ),
-                  ListTile(
-                    leading: _buildIconContainer(context, Icons.graphic_eq_rounded),
-                    title: const Text('Waveform Seek Bar', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                    subtitle: Text('Display dynamic audio waveform frequency visualization in player seek bar', style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color, fontSize: 12)),
-                    trailing: Switch.adaptive(
-                      value: state.waveformSeekBarEnabled,
-                      activeTrackColor: primaryColor,
-                      activeThumbColor: Colors.white,
-                      onChanged: (val) => cubit.setWaveformSeekBar(val),
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text('Crossfade Duration', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                            Text('${state.crossfadeSeconds.toStringAsFixed(1)}s', style: TextStyle(color: primaryColor, fontWeight: FontWeight.w700)),
-                          ],
-                        ),
-                        Slider(
-                          value: state.crossfadeSeconds,
-                          min: 0.0,
-                          max: 12.0,
-                          divisions: 24,
-                          activeColor: primaryColor,
-                          inactiveColor: Theme.of(context).cardTheme.color,
-                          onChanged: (val) => cubit.setCrossfade(val),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-
-              _buildSettingsCategory(
-                context,
-                title: 'THEME & APPEARANCE',
-                items: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Theme Mode', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          width: double.infinity,
-                          child: SegmentedButton<AppThemeMode>(
-                            segments: const [
-                              ButtonSegment(
-                                value: AppThemeMode.system,
-                                label: Text('System'),
-                                icon: Icon(Icons.brightness_auto_rounded, size: 16),
-                              ),
-                              ButtonSegment(
-                                value: AppThemeMode.light,
-                                label: Text('Light'),
-                                icon: Icon(Icons.light_mode_rounded, size: 16),
-                              ),
-                              ButtonSegment(
-                                value: AppThemeMode.dark,
-                                label: Text('Dark'),
-                                icon: Icon(Icons.dark_mode_rounded, size: 16),
-                              ),
-                              ButtonSegment(
-                                value: AppThemeMode.amoled,
-                                label: Text('AMOLED'),
-                                icon: Icon(Icons.contrast_rounded, size: 16),
+          appBar: AppBar(title: const Text('Settings')),
+          body: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 760), // readable on tablets
+              child: ListView(
+                padding: EdgeInsets.only(bottom: 160, top: 8, left: Adaptive.pagePadding(context), right: Adaptive.pagePadding(context)),
+                children: [
+                  _section(context, 'Audio & Playback', [
+                    _navTile(context, Icons.equalizer_rounded, 'Equalizer & Sound Effects', '5-band EQ, bass boost, presets',
+                        onTap: () => showModalBottomSheet(context: context, useRootNavigator: true, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => const EqualizerSheet())),
+                    _divider(p),
+                    _navTile(context, Icons.timer_outlined, 'Sleep Timer', 'Auto pause with gentle fade-out',
+                        onTap: () => showModalBottomSheet(context: context, useRootNavigator: true, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => const SleepTimerSheet())),
+                    _divider(p),
+                    _switchTile(context, Icons.graphic_eq_rounded, 'Gapless Playback', 'Continuous audio without silence',
+                        value: state.gaplessPlayback, onChanged: cubit.setGapless),
+                    _divider(p),
+                    _switchTile(context, Icons.play_circle_outline_rounded, 'Resume After Interruption', 'Resume after calls & interruptions',
+                        value: state.resumeAfterInterruption, onChanged: cubit.setResumeAfterInterruption),
+                    _divider(p),
+                    _switchTile(context, Icons.waves_rounded, 'Waveform Seek Bar', 'Waveform visualization in the player',
+                        value: state.waveformSeekBarEnabled, onChanged: cubit.setWaveformSeekBar),
+                    _divider(p),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text('Crossfade Duration', style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14)),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(color: p.accentContainer, borderRadius: BorderRadius.circular(8)),
+                                child: Text('${state.crossfadeSeconds.toStringAsFixed(1)}s',
+                                    style: TextStyle(color: p.accent, fontWeight: FontWeight.w800, fontSize: 12)),
                               ),
                             ],
-                            selected: {state.themeMode},
-                            onSelectionChanged: (newSelection) {
-                              cubit.setThemeMode(newSelection.first);
-                            },
                           ),
-                        ),
-                      ],
+                          Slider(value: state.crossfadeSeconds, min: 0, max: 12, divisions: 24, onChanged: cubit.setCrossfade),
+                        ],
+                      ),
                     ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Custom Accent Color', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                        const SizedBox(height: 4),
-                        Text(
-                          state.dynamicThemingEnabled
-                              ? 'Used as fallback when dynamic artwork theme is off or unavailable'
-                              : 'Applied across the player and app UI',
-                          style: TextStyle(color: Theme.of(context).textTheme.bodySmall?.color, fontSize: 12),
+                  ]),
+                  _section(context, 'Theme & Appearance', [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: SegmentedButton<AppThemeMode>(
+                          segments: const [
+                            ButtonSegment(value: AppThemeMode.system, label: Text('Auto'), icon: Icon(Icons.brightness_auto_rounded, size: 15)),
+                            ButtonSegment(value: AppThemeMode.light, label: Text('Light'), icon: Icon(Icons.light_mode_rounded, size: 15)),
+                            ButtonSegment(value: AppThemeMode.dark, label: Text('Dark'), icon: Icon(Icons.dark_mode_rounded, size: 15)),
+                            ButtonSegment(value: AppThemeMode.amoled, label: Text('AMOLED'), icon: Icon(Icons.contrast_rounded, size: 15)),
+                          ],
+                          selected: {state.themeMode},
+                          onSelectionChanged: (sel) => cubit.setThemeMode(sel.first),
                         ),
-                        const SizedBox(height: 12),
-                        Wrap(
-                          spacing: 12,
-                          runSpacing: 12,
-                          children: AppColors.customAccents.map((color) {
-                            final isSelected = state.customAccentColorValue == color.toARGB32();
-                            final onColor = color.computeLuminance() > 0.5 ? Colors.black : Colors.white;
-                            return GestureDetector(
-                              onTap: () => cubit.setCustomAccentColor(color),
-                              child: Container(
-                                width: 40,
-                                height: 40,
-                                decoration: BoxDecoration(
-                                  color: color,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: isSelected ? Theme.of(context).colorScheme.onSurface : Colors.transparent,
-                                    width: 3,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Accent Color', style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14)),
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 12, runSpacing: 12,
+                            children: AppColors.customAccents.map((color) {
+                              final isSelected = state.customAccentColorValue == color.toARGB32();
+                              return GestureDetector(
+                                onTap: () => cubit.setCustomAccentColor(color),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  width: 42, height: 42,
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: isSelected ? p.textPrimary : Colors.transparent, width: 2.5),
+                                    boxShadow: isSelected ? [BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 12, spreadRadius: 1)] : null,
                                   ),
-                                  boxShadow: isSelected
-                                      ? [
-                                          BoxShadow(
-                                            color: color.withValues(alpha: 0.5),
-                                            blurRadius: 8,
-                                            spreadRadius: 2,
-                                          )
-                                        ]
+                                  child: isSelected
+                                      ? Icon(Icons.check_rounded, size: 20,
+                                          color: color.computeLuminance() > 0.5 ? Colors.black : Colors.white)
                                       : null,
                                 ),
-                                child: isSelected
-                                    ? Icon(
-                                        Icons.check_rounded,
-                                        color: onColor,
-                                        size: 20,
-                                      )
-                                    : null,
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      ],
+                              );
+                            }).toList(),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  _buildSettingsTile(
-                    context,
-                    icon: Icons.art_track_rounded,
-                    title: 'Now Playing Theme',
-                    subtitle: _getThemeModeTitle(state.playerThemeMode),
-                    onTap: () {
-                      _showThemePickerSheet(context, cubit, state.playerThemeMode);
-                    },
-                  ),
-                  _buildSettingsTile(
-                    context,
-                    icon: Icons.graphic_eq_rounded,
-                    title: 'Audio Visualizer Style',
-                    subtitle: _getVisualizerStyleTitle(state.visualizerStyle),
-                    onTap: () {
-                      _showVisualizerStylePickerSheet(context, cubit, state.visualizerStyle);
-                    },
-                  ),
-                  ListTile(
-                    leading: _buildIconContainer(context, Icons.palette_outlined),
-                    title: const Text('Dynamic Artwork Theming', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                    subtitle: Text('Adapt player colors from album artwork', style: TextStyle(color: Theme.of(context).textTheme.bodyMedium?.color, fontSize: 12)),
-                    trailing: Switch.adaptive(
-                      value: state.dynamicThemingEnabled,
-                      activeTrackColor: primaryColor,
-                      activeThumbColor: Colors.white,
-                      onChanged: (val) => cubit.setDynamicTheming(val),
-                    ),
-                  ),
+                    _divider(p),
+                    _navTile(context, Icons.art_track_rounded, 'Now Playing Theme', _getThemeModeTitle(state.playerThemeMode),
+                        onTap: () => _showThemePickerSheet(context, cubit, state.playerThemeMode)),
+                    _divider(p),
+                    _navTile(context, Icons.graphic_eq_rounded, 'Visualizer Style', _getVisualizerStyleTitle(state.visualizerStyle),
+                        onTap: () => _showVisualizerStylePickerSheet(context, cubit, state.visualizerStyle)),
+                    _divider(p),
+                    _switchTile(context, Icons.palette_outlined, 'Dynamic Artwork Theming', 'Adapt colors from album art',
+                        value: state.dynamicThemingEnabled, onChanged: cubit.setDynamicTheming),
+                  ]),
+                  _section(context, 'Gestures', [
+                    _navTile(context, Icons.swipe_left_rounded, 'Mini Player Swipe Left', _getMiniPlayerSwipeTitle(state.miniPlayerSwipeLeft),
+                        onTap: () => _showMiniPlayerSwipePickerSheet(context, cubit, isLeft: true, currentAction: state.miniPlayerSwipeLeft)),
+                    _divider(p),
+                    _navTile(context, Icons.swipe_right_rounded, 'Mini Player Swipe Right', _getMiniPlayerSwipeTitle(state.miniPlayerSwipeRight),
+                        onTap: () => _showMiniPlayerSwipePickerSheet(context, cubit, isLeft: false, currentAction: state.miniPlayerSwipeRight)),
+                    _divider(p),
+                    _navTile(context, Icons.touch_app_rounded, 'Now Playing Double-Tap', _getNowPlayingDoubleTapTitle(state.nowPlayingDoubleTap),
+                        onTap: () => _showNowPlayingDoubleTapPickerSheet(context, cubit, state.nowPlayingDoubleTap)),
+                    _divider(p),
+                    _navTile(context, Icons.gesture_rounded, 'Artwork Swipe', _getNowPlayingArtworkSwipeTitle(state.nowPlayingArtworkSwipe),
+                        onTap: () => _showNowPlayingArtworkSwipePickerSheet(context, cubit, state.nowPlayingArtworkSwipe)),
+                  ]),
+                  _section(context, 'Library & Scanning', [
+                    _navTile(context, Icons.refresh_rounded,
+                        state.isScanning ? 'Scanning storage…' : 'Rescan Media Library',
+                        state.scanResultCount != null ? 'Last scan: ${state.scanResultCount} tracks' : 'Scan device storage for audio',
+                        trailing: state.isScanning
+                            ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: p.accent))
+                            : null,
+                        onTap: state.isScanning ? () {} : () => cubit.rescanLibrary()),
+                    _divider(p),
+                    _navTile(context, Icons.filter_list_rounded, 'Short Audio Filter', 'Ignore files under ${state.minDurationSec}s',
+                        onTap: () => _showDurationFilterDialog(context, cubit, state.minDurationSec)),
+                  ]),
+                  _section(context, 'Privacy & Data', [
+                    const BackupSection(),
+                    _divider(p),
+                    _navTile(context, Icons.security_rounded, 'Privacy Guarantee', '100% offline. Zero telemetry, zero tracking.', onTap: () {}),
+                  ]),
+                  _section(context, 'About', [
+                    _navTile(context, Icons.info_outline_rounded, 'Pulsr Music', 'Version 1.0.0 • Pure Offline Sound', onTap: () {}),
+                  ]),
                 ],
               ),
-
-              _buildSettingsCategory(
-                context,
-                title: 'GESTURES',
-                items: [
-                  _buildSettingsTile(
-                    context,
-                    icon: Icons.swipe_left_rounded,
-                    title: 'MiniPlayer Swipe Left',
-                    subtitle: _getMiniPlayerSwipeTitle(state.miniPlayerSwipeLeft),
-                    onTap: () {
-                      _showMiniPlayerSwipePickerSheet(context, cubit, isLeft: true, currentAction: state.miniPlayerSwipeLeft);
-                    },
-                  ),
-                  _buildSettingsTile(
-                    context,
-                    icon: Icons.swipe_right_rounded,
-                    title: 'MiniPlayer Swipe Right',
-                    subtitle: _getMiniPlayerSwipeTitle(state.miniPlayerSwipeRight),
-                    onTap: () {
-                      _showMiniPlayerSwipePickerSheet(context, cubit, isLeft: false, currentAction: state.miniPlayerSwipeRight);
-                    },
-                  ),
-                  _buildSettingsTile(
-                    context,
-                    icon: Icons.touch_app_rounded,
-                    title: 'Now Playing Double-Tap',
-                    subtitle: _getNowPlayingDoubleTapTitle(state.nowPlayingDoubleTap),
-                    onTap: () {
-                      _showNowPlayingDoubleTapPickerSheet(context, cubit, state.nowPlayingDoubleTap);
-                    },
-                  ),
-                  _buildSettingsTile(
-                    context,
-                    icon: Icons.gesture_rounded,
-                    title: 'Now Playing Artwork Swipe',
-                    subtitle: _getNowPlayingArtworkSwipeTitle(state.nowPlayingArtworkSwipe),
-                    onTap: () {
-                      _showNowPlayingArtworkSwipePickerSheet(context, cubit, state.nowPlayingArtworkSwipe);
-                    },
-                  ),
-                ],
-              ),
-
-              _buildSettingsCategory(
-                context,
-                title: 'LIBRARY & SCANNING',
-                items: [
-                  _buildSettingsTile(
-                    context,
-                    icon: Icons.refresh_rounded,
-                    title: state.isScanning ? 'Scanning storage...' : 'Rescan Media Library',
-                    subtitle: state.scanResultCount != null
-                        ? 'Last scan: ${state.scanResultCount} tracks discovered'
-                        : 'Scan device storage for new audio files',
-                    trailing: state.isScanning
-                        ? SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: primaryColor),
-                          )
-                        : null,
-                    onTap: state.isScanning ? () {} : () => cubit.rescanLibrary(),
-                  ),
-                  _buildSettingsTile(
-                    context,
-                    icon: Icons.filter_list_rounded,
-                    title: 'Short Audio Filter',
-                    subtitle: 'Ignore audio files shorter than ${state.minDurationSec} seconds',
-                    onTap: () {
-                      _showDurationFilterDialog(context, cubit, state.minDurationSec);
-                    },
-                  ),
-                ],
-              ),
-
-              _buildSettingsCategory(
-                context,
-                title: 'PRIVACY & DATA',
-                items: [
-                  const BackupSection(),
-                  _buildSettingsTile(
-                    context,
-                    icon: Icons.security_rounded,
-                    title: 'Privacy Guarantee',
-                    subtitle: '100% offline. Zero telemetry, zero cloud tracking.',
-                    onTap: () {},
-                  ),
-                ],
-              ),
-
-              _buildSettingsCategory(
-                context,
-                title: 'ABOUT',
-                items: [
-                  _buildSettingsTile(
-                    context,
-                    icon: Icons.info_outline_rounded,
-                    title: 'Pulsr Music',
-                    subtitle: 'Version 1.0.0 (Pro Audio Edition) • Pure Offline Sound',
-                    onTap: () {},
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
         );
       },
     );
   }
 
-  static Widget _buildIconContainer(BuildContext context, IconData icon) {
-    final cardColor = Theme.of(context).cardTheme.color ?? AppColors.card;
-    final outlineColor = Theme.of(context).colorScheme.outline;
-    final primaryColor = Theme.of(context).colorScheme.primary;
-
-    return Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        color: cardColor,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: outlineColor, width: 1),
+  // ---------- premium section + tile helpers ----------
+  Widget _section(BuildContext context, String title, List<Widget> children) {
+    final p = context.palette;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 22),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(6, 0, 0, 10),
+            child: Text(title.toUpperCase(), style: Theme.of(context).textTheme.labelSmall?.copyWith(color: p.textTertiary)),
+          ),
+          Material(
+            color: p.surfaceContainer,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+              side: BorderSide(color: p.hairline),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(children: children),
+          ),
+        ],
       ),
-      child: Icon(icon, color: primaryColor, size: 20),
+    );
+  }
+
+  Widget _divider(PulsrPalette p) => Divider(height: 1, indent: 68, color: p.hairline);
+
+  Widget _iconBox(BuildContext context, IconData icon) {
+    final p = context.palette;
+    return Container(
+      width: 38, height: 38,
+      decoration: BoxDecoration(
+        color: p.accentContainer,
+        borderRadius: BorderRadius.circular(11),
+      ),
+      child: Icon(icon, color: p.accent, size: 19),
+    );
+  }
+
+  Widget _navTile(BuildContext context, IconData icon, String title, String subtitle,
+      {Widget? trailing, required VoidCallback onTap}) {
+    final p = context.palette;
+    return ListTile(
+      leading: _iconBox(context, icon),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+      subtitle: Text(subtitle, style: TextStyle(color: p.textSecondary, fontSize: 12)),
+      trailing: trailing ?? Icon(Icons.chevron_right_rounded, color: p.textTertiary, size: 20),
+      onTap: onTap,
+    );
+  }
+
+  Widget _switchTile(BuildContext context, IconData icon, String title, String subtitle,
+      {required bool value, required ValueChanged<bool> onChanged}) {
+    final p = context.palette;
+    return ListTile(
+      leading: _iconBox(context, icon),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+      subtitle: Text(subtitle, style: TextStyle(color: p.textSecondary, fontSize: 12)),
+      trailing: Switch.adaptive(value: value, activeTrackColor: p.accent, activeThumbColor: Colors.white, onChanged: onChanged),
     );
   }
 
@@ -419,54 +274,6 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildSettingsCategory(
-    BuildContext context, {
-    required String title,
-    required List<Widget> items,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Text(
-            title,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  letterSpacing: 1.2,
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-        ),
-        ...items,
-      ],
-    );
-  }
-
-  Widget _buildSettingsTile(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    Widget? trailing,
-    required VoidCallback onTap,
-  }) {
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? AppColors.textSecondary;
-
-    return ListTile(
-      leading: _buildIconContainer(context, icon),
-      title: Text(
-        title,
-        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(color: textSecondary, fontSize: 12),
-      ),
-      trailing: trailing ?? Icon(Icons.chevron_right_rounded, color: textSecondary),
-      onTap: onTap,
-    );
-  }
-
   String _getThemeModeTitle(PlayerThemeMode mode) {
     switch (mode) {
       case PlayerThemeMode.classic:
@@ -500,10 +307,10 @@ class SettingsScreen extends StatelessWidget {
   ) {
     final primaryColor = Theme.of(context).colorScheme.primary;
     final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor = Theme.of(context).cardTheme.color ?? AppColors.card;
+    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
     final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? AppColors.textSecondary;
+    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? context.palette.textPrimary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
 
     final themes = [
       (
@@ -534,6 +341,7 @@ class SettingsScreen extends StatelessWidget {
 
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: surfaceColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -559,37 +367,39 @@ class SettingsScreen extends StatelessWidget {
               final isSelected = t.mode == currentMode;
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
+                child: Material(
                   color: isSelected ? primaryColor.withValues(alpha: 0.12) : cardColor,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isSelected ? primaryColor : outlineColor,
-                    width: isSelected ? 1.5 : 1.0,
-                  ),
-                ),
-                child: ListTile(
-                  leading: Icon(
-                    t.icon,
-                    color: isSelected ? primaryColor : textSecondary,
-                  ),
-                  title: Text(
-                    t.title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: isSelected ? primaryColor : textPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: isSelected ? primaryColor : outlineColor,
+                      width: isSelected ? 1.5 : 1.0,
                     ),
                   ),
-                  subtitle: Text(
-                    t.subtitle,
-                    style: TextStyle(fontSize: 12, color: textSecondary),
+                  child: ListTile(
+                    leading: Icon(
+                      t.icon,
+                      color: isSelected ? primaryColor : textSecondary,
+                    ),
+                    title: Text(
+                      t.title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: isSelected ? primaryColor : textPrimary,
+                      ),
+                    ),
+                    subtitle: Text(
+                      t.subtitle,
+                      style: TextStyle(fontSize: 12, color: textSecondary),
+                    ),
+                    trailing: isSelected
+                        ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                        : null,
+                    onTap: () {
+                      cubit.setPlayerThemeMode(t.mode);
+                      Navigator.pop(ctx);
+                    },
                   ),
-                  trailing: isSelected
-                      ? Icon(Icons.check_circle_rounded, color: primaryColor)
-                      : null,
-                  onTap: () {
-                    cubit.setPlayerThemeMode(t.mode);
-                    Navigator.pop(ctx);
-                  },
                 ),
               );
             }),
@@ -606,10 +416,10 @@ class SettingsScreen extends StatelessWidget {
   ) {
     final primaryColor = Theme.of(context).colorScheme.primary;
     final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor = Theme.of(context).cardTheme.color ?? AppColors.card;
+    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
     final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? AppColors.textSecondary;
+    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? context.palette.textPrimary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
 
     final styles = [
       (
@@ -640,6 +450,7 @@ class SettingsScreen extends StatelessWidget {
 
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: surfaceColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -665,37 +476,39 @@ class SettingsScreen extends StatelessWidget {
               final isSelected = s.style == currentStyle;
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
+                child: Material(
                   color: isSelected ? primaryColor.withValues(alpha: 0.12) : cardColor,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isSelected ? primaryColor : outlineColor,
-                    width: isSelected ? 1.5 : 1.0,
-                  ),
-                ),
-                child: ListTile(
-                  leading: Icon(
-                    s.icon,
-                    color: isSelected ? primaryColor : textSecondary,
-                  ),
-                  title: Text(
-                    s.title,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: isSelected ? primaryColor : textPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: isSelected ? primaryColor : outlineColor,
+                      width: isSelected ? 1.5 : 1.0,
                     ),
                   ),
-                  subtitle: Text(
-                    s.subtitle,
-                    style: TextStyle(fontSize: 12, color: textSecondary),
+                  child: ListTile(
+                    leading: Icon(
+                      s.icon,
+                      color: isSelected ? primaryColor : textSecondary,
+                    ),
+                    title: Text(
+                      s.title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: isSelected ? primaryColor : textPrimary,
+                      ),
+                    ),
+                    subtitle: Text(
+                      s.subtitle,
+                      style: TextStyle(fontSize: 12, color: textSecondary),
+                    ),
+                    trailing: isSelected
+                        ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                        : null,
+                    onTap: () {
+                      cubit.setVisualizerStyle(s.style);
+                      Navigator.pop(ctx);
+                    },
                   ),
-                  trailing: isSelected
-                      ? Icon(Icons.check_circle_rounded, color: primaryColor)
-                      : null,
-                  onTap: () {
-                    cubit.setVisualizerStyle(s.style);
-                    Navigator.pop(ctx);
-                  },
                 ),
               );
             }),
@@ -746,10 +559,10 @@ class SettingsScreen extends StatelessWidget {
   }) {
     final primaryColor = Theme.of(context).colorScheme.primary;
     final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor = Theme.of(context).cardTheme.color ?? AppColors.card;
+    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
     final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? AppColors.textSecondary;
+    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? context.palette.textPrimary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
 
     final options = [
       (
@@ -780,6 +593,7 @@ class SettingsScreen extends StatelessWidget {
 
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: surfaceColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -802,27 +616,29 @@ class SettingsScreen extends StatelessWidget {
               final isSelected = opt.action == currentAction;
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
+                child: Material(
                   color: isSelected ? primaryColor.withValues(alpha: 0.12) : cardColor,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isSelected ? primaryColor : outlineColor,
-                    width: isSelected ? 1.5 : 1.0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: isSelected ? primaryColor : outlineColor,
+                      width: isSelected ? 1.5 : 1.0,
+                    ),
                   ),
-                ),
-                child: ListTile(
-                  leading: Icon(opt.icon, color: isSelected ? primaryColor : textSecondary),
-                  title: Text(opt.title, style: TextStyle(fontWeight: FontWeight.w700, color: isSelected ? primaryColor : textPrimary)),
-                  subtitle: Text(opt.subtitle, style: TextStyle(fontSize: 12, color: textSecondary)),
-                  trailing: isSelected ? Icon(Icons.check_circle_rounded, color: primaryColor) : null,
-                  onTap: () {
-                    if (isLeft) {
-                      cubit.setMiniPlayerSwipeLeft(opt.action);
-                    } else {
-                      cubit.setMiniPlayerSwipeRight(opt.action);
-                    }
-                    Navigator.pop(ctx);
-                  },
+                  child: ListTile(
+                    leading: Icon(opt.icon, color: isSelected ? primaryColor : textSecondary),
+                    title: Text(opt.title, style: TextStyle(fontWeight: FontWeight.w700, color: isSelected ? primaryColor : textPrimary)),
+                    subtitle: Text(opt.subtitle, style: TextStyle(fontSize: 12, color: textSecondary)),
+                    trailing: isSelected ? Icon(Icons.check_circle_rounded, color: primaryColor) : null,
+                    onTap: () {
+                      if (isLeft) {
+                        cubit.setMiniPlayerSwipeLeft(opt.action);
+                      } else {
+                        cubit.setMiniPlayerSwipeRight(opt.action);
+                      }
+                      Navigator.pop(ctx);
+                    },
+                  ),
                 ),
               );
             }),
@@ -839,10 +655,10 @@ class SettingsScreen extends StatelessWidget {
   ) {
     final primaryColor = Theme.of(context).colorScheme.primary;
     final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor = Theme.of(context).cardTheme.color ?? AppColors.card;
+    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
     final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? AppColors.textSecondary;
+    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? context.palette.textPrimary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
 
     final options = [
       (
@@ -867,6 +683,7 @@ class SettingsScreen extends StatelessWidget {
 
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: surfaceColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -889,23 +706,25 @@ class SettingsScreen extends StatelessWidget {
               final isSelected = opt.action == currentAction;
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
+                child: Material(
                   color: isSelected ? primaryColor.withValues(alpha: 0.12) : cardColor,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isSelected ? primaryColor : outlineColor,
-                    width: isSelected ? 1.5 : 1.0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: isSelected ? primaryColor : outlineColor,
+                      width: isSelected ? 1.5 : 1.0,
+                    ),
                   ),
-                ),
-                child: ListTile(
-                  leading: Icon(opt.icon, color: isSelected ? primaryColor : textSecondary),
-                  title: Text(opt.title, style: TextStyle(fontWeight: FontWeight.w700, color: isSelected ? primaryColor : textPrimary)),
-                  subtitle: Text(opt.subtitle, style: TextStyle(fontSize: 12, color: textSecondary)),
-                  trailing: isSelected ? Icon(Icons.check_circle_rounded, color: primaryColor) : null,
-                  onTap: () {
-                    cubit.setNowPlayingDoubleTap(opt.action);
-                    Navigator.pop(ctx);
-                  },
+                  child: ListTile(
+                    leading: Icon(opt.icon, color: isSelected ? primaryColor : textSecondary),
+                    title: Text(opt.title, style: TextStyle(fontWeight: FontWeight.w700, color: isSelected ? primaryColor : textPrimary)),
+                    subtitle: Text(opt.subtitle, style: TextStyle(fontSize: 12, color: textSecondary)),
+                    trailing: isSelected ? Icon(Icons.check_circle_rounded, color: primaryColor) : null,
+                    onTap: () {
+                      cubit.setNowPlayingDoubleTap(opt.action);
+                      Navigator.pop(ctx);
+                    },
+                  ),
                 ),
               );
             }),
@@ -922,10 +741,10 @@ class SettingsScreen extends StatelessWidget {
   ) {
     final primaryColor = Theme.of(context).colorScheme.primary;
     final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor = Theme.of(context).cardTheme.color ?? AppColors.card;
+    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
     final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? AppColors.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? AppColors.textSecondary;
+    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? context.palette.textPrimary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
 
     final options = [
       (
@@ -944,6 +763,7 @@ class SettingsScreen extends StatelessWidget {
 
     showModalBottomSheet(
       context: context,
+      useRootNavigator: true,
       backgroundColor: surfaceColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -966,23 +786,25 @@ class SettingsScreen extends StatelessWidget {
               final isSelected = opt.action == currentAction;
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
+                child: Material(
                   color: isSelected ? primaryColor.withValues(alpha: 0.12) : cardColor,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: isSelected ? primaryColor : outlineColor,
-                    width: isSelected ? 1.5 : 1.0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: isSelected ? primaryColor : outlineColor,
+                      width: isSelected ? 1.5 : 1.0,
+                    ),
                   ),
-                ),
-                child: ListTile(
-                  leading: Icon(opt.icon, color: isSelected ? primaryColor : textSecondary),
-                  title: Text(opt.title, style: TextStyle(fontWeight: FontWeight.w700, color: isSelected ? primaryColor : textPrimary)),
-                  subtitle: Text(opt.subtitle, style: TextStyle(fontSize: 12, color: textSecondary)),
-                  trailing: isSelected ? Icon(Icons.check_circle_rounded, color: primaryColor) : null,
-                  onTap: () {
-                    cubit.setNowPlayingArtworkSwipe(opt.action);
-                    Navigator.pop(ctx);
-                  },
+                  child: ListTile(
+                    leading: Icon(opt.icon, color: isSelected ? primaryColor : textSecondary),
+                    title: Text(opt.title, style: TextStyle(fontWeight: FontWeight.w700, color: isSelected ? primaryColor : textPrimary)),
+                    subtitle: Text(opt.subtitle, style: TextStyle(fontSize: 12, color: textSecondary)),
+                    trailing: isSelected ? Icon(Icons.check_circle_rounded, color: primaryColor) : null,
+                    onTap: () {
+                      cubit.setNowPlayingArtworkSwipe(opt.action);
+                      Navigator.pop(ctx);
+                    },
+                  ),
                 ),
               );
             }),

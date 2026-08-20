@@ -3,7 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
-import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/waveform_logo.dart';
 import '../../../settings/cubit/settings_cubit.dart';
@@ -11,6 +11,7 @@ import '../../../settings/cubit/settings_state.dart';
 import '../../../sheets/add_to_playlist_sheet.dart';
 import '../../../sheets/sleep_timer_sheet.dart';
 import '../../../sheets/song_info_sheet.dart';
+import '../widgets/audio_quality_badge.dart';
 import '../widgets/equalizer_sheet.dart';
 import '../widgets/lyrics_view.dart';
 import '../widgets/now_playing_queue_view.dart';
@@ -64,9 +65,9 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme> with SingleTicker
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final state = widget.props.state;
     final cubit = widget.props.cubit;
-    final repository = widget.props.repository;
     final activeColor = widget.props.activeColor;
     final bgColor = widget.props.bgColor;
     final song = state.currentSong;
@@ -81,7 +82,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme> with SingleTicker
           radius: 1.2,
           colors: [
             bgColor,
-            AppColors.background,
+            p.bg,
           ],
         ),
       ),
@@ -95,7 +96,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme> with SingleTicker
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 32),
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 32, color: Colors.white),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   Column(
@@ -105,7 +106,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme> with SingleTicker
                         children: [
                           WaveformLogo(
                             size: 16,
-                            color: state.isPlaying ? activeColor : AppColors.textSecondary,
+                            color: state.isPlaying ? activeColor : Colors.white70,
                             animate: state.isPlaying,
                           ),
                           const SizedBox(width: 6),
@@ -114,8 +115,8 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme> with SingleTicker
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                   fontSize: 10,
                                   letterSpacing: 1.2,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.textSecondary,
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white70,
                                 ),
                           ),
                         ],
@@ -124,14 +125,14 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme> with SingleTicker
                       Text(
                         song?.album ?? 'Library',
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
                             ),
                       ),
                     ],
                   ),
                   IconButton(
-                    icon: const Icon(Icons.more_vert_rounded),
+                    icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
                     onPressed: () {
                       if (song != null) {
                         showModalBottomSheet(
@@ -202,7 +203,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme> with SingleTicker
                                           shape: BoxShape.circle,
                                           color: const Color(0xFF121212),
                                           border: Border.all(
-                                            color: AppColors.outline.withValues(alpha: 0.6),
+                                            color: p.hairline.withValues(alpha: 0.6),
                                             width: 3,
                                           ),
                                           boxShadow: [
@@ -257,9 +258,9 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme> with SingleTicker
                                               height: 22,
                                               decoration: BoxDecoration(
                                                 shape: BoxShape.circle,
-                                                color: AppColors.background,
+                                                color: p.bg,
                                                 border: Border.all(
-                                                  color: AppColors.outline,
+                                                  color: p.hairline,
                                                   width: 2,
                                                 ),
                                               ),
@@ -293,6 +294,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme> with SingleTicker
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                                 fontWeight: FontWeight.w900,
+                                color: p.textPrimary,
                               ),
                         ),
                         const SizedBox(height: 4),
@@ -301,10 +303,14 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme> with SingleTicker
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                color: AppColors.textSecondary,
+                                color: p.textSecondary,
                                 fontWeight: FontWeight.w600,
                               ),
                         ),
+                        if (song != null) ...[
+                          const SizedBox(height: 6),
+                          AudioQualityBadge(song: song, activeColor: activeColor),
+                        ],
                       ],
                     ),
                   ),
@@ -314,8 +320,8 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme> with SingleTicker
                           ? Icons.favorite_rounded
                           : Icons.favorite_border_rounded,
                       color: song?.isFavorite == true
-                          ? AppColors.favorite
-                          : AppColors.textSecondary,
+                          ? p.favorite
+                          : p.textSecondary,
                       size: 28,
                     ),
                     onPressed: () {
@@ -366,38 +372,32 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme> with SingleTicker
                   IconButton(
                     icon: Icon(
                       Icons.equalizer_rounded,
-                      color: state.isEqEnabled ? activeColor : AppColors.textSecondary,
+                      color: state.isEqEnabled ? activeColor : p.textSecondary,
                     ),
                     onPressed: () {
                       showModalBottomSheet(
                         context: context,
                         isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
                         builder: (_) => const EqualizerSheet(),
                       );
                     },
                     tooltip: 'Equalizer',
                   ),
-                  Badge(
-                    isLabelVisible: state.playbackSpeed != 1.0,
-                    label: Text(SpeedPickerSheet.formatSpeed(state.playbackSpeed)),
-                    child: IconButton(
-                      icon: Icon(
-                        Icons.speed_rounded,
-                        color: state.playbackSpeed != 1.0 ? activeColor : AppColors.textSecondary,
-                      ),
-                      onPressed: () {
-                        showModalBottomSheet(
-                          context: context,
-                          builder: (_) => const SpeedPickerSheet(),
-                        );
-                      },
-                      tooltip: 'Playback Speed',
-                    ),
+                  IconButton(
+                    icon: Icon(Icons.speed_rounded, color: p.textSecondary),
+                    onPressed: () {
+                      showModalBottomSheet(
+                        context: context,
+                        builder: (_) => const SpeedPickerSheet(),
+                      );
+                    },
+                    tooltip: 'Playback Speed',
                   ),
                   IconButton(
                     icon: Icon(
                       Icons.lyrics_rounded,
-                      color: state.isLyricsVisible ? activeColor : AppColors.textSecondary,
+                      color: state.isLyricsVisible ? activeColor : p.textSecondary,
                     ),
                     onPressed: () => cubit.toggleLyricsVisibility(),
                     tooltip: 'Lyrics',
@@ -405,24 +405,29 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme> with SingleTicker
                   IconButton(
                     icon: Icon(
                       Icons.timer_outlined,
-                      color: state.sleepTimerRemaining != null ? activeColor : AppColors.textSecondary,
+                      color: state.sleepTimerRemaining != null ? activeColor : p.textSecondary,
                     ),
                     onPressed: () {
                       showModalBottomSheet(
                         context: context,
+                        useRootNavigator: true,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
                         builder: (_) => const SleepTimerSheet(),
                       );
                     },
                     tooltip: 'Sleep Timer',
                   ),
                   IconButton(
-                    icon: const Icon(Icons.playlist_add_rounded),
-                    color: AppColors.textSecondary,
+                    icon: Icon(Icons.playlist_add_rounded, color: p.textSecondary),
                     onPressed: () {
                       if (song != null) {
                         showModalBottomSheet(
                           context: context,
-                          builder: (_) => AddToPlaylistSheet(song: song, repository: repository),
+                          useRootNavigator: true,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => AddToPlaylistSheet(song: song),
                         );
                       }
                     },
@@ -431,7 +436,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme> with SingleTicker
                   IconButton(
                     icon: Icon(
                       Icons.queue_music_rounded,
-                      color: state.isQueueVisible ? activeColor : AppColors.textSecondary,
+                      color: state.isQueueVisible ? activeColor : p.textSecondary,
                     ),
                     onPressed: () => cubit.toggleQueueVisibility(),
                     tooltip: 'Queue',

@@ -2,12 +2,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
-import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../../sheets/add_to_playlist_sheet.dart';
 import '../../../sheets/song_info_sheet.dart';
+import '../widgets/audio_quality_badge.dart';
 import '../widgets/audio_visualizer.dart';
 import '../widgets/equalizer_sheet.dart';
 import '../widgets/lyrics_view.dart';
@@ -23,9 +24,9 @@ class MinimalPlayerTheme extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
     final state = props.state;
     final cubit = props.cubit;
-    final repository = props.repository;
     final activeColor = props.activeColor;
     final bgColor = props.bgColor;
     final song = state.currentSong;
@@ -47,7 +48,7 @@ class MinimalPlayerTheme extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 30),
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 30, color: Colors.white),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   Text(
@@ -56,11 +57,11 @@ class MinimalPlayerTheme extends StatelessWidget {
                           fontSize: 11,
                           letterSpacing: 2.0,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.textSecondary,
+                          color: Colors.white70,
                         ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.more_horiz_rounded),
+                    icon: const Icon(Icons.more_horiz_rounded, color: Colors.white),
                     onPressed: () {
                       if (song != null) {
                         showModalBottomSheet(
@@ -185,6 +186,7 @@ class MinimalPlayerTheme extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.w900,
+                          color: p.textPrimary,
                         ),
                   ),
                   const SizedBox(height: 6),
@@ -194,10 +196,14 @@ class MinimalPlayerTheme extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: AppColors.textSecondary,
+                          color: p.textSecondary,
                           fontWeight: FontWeight.w600,
                         ),
                   ),
+                  if (song != null) ...[
+                    const SizedBox(height: 8),
+                    AudioQualityBadge(song: song, activeColor: activeColor),
+                  ],
                 ],
               ),
             ),
@@ -240,12 +246,13 @@ class MinimalPlayerTheme extends StatelessWidget {
                   IconButton(
                     icon: Icon(
                       Icons.equalizer_rounded,
-                      color: state.isEqEnabled ? activeColor : AppColors.textSecondary,
+                      color: state.isEqEnabled ? activeColor : p.textSecondary,
                     ),
                     onPressed: () {
                       showModalBottomSheet(
                         context: context,
                         isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
                         builder: (_) => const EqualizerSheet(),
                       );
                     },
@@ -253,26 +260,29 @@ class MinimalPlayerTheme extends StatelessWidget {
                   IconButton(
                     icon: Icon(
                       Icons.lyrics_rounded,
-                      color: state.isLyricsVisible ? activeColor : AppColors.textSecondary,
+                      color: state.isLyricsVisible ? activeColor : p.textSecondary,
                     ),
                     onPressed: () => cubit.toggleLyricsVisibility(),
                   ),
                   IconButton(
                     icon: Icon(
                       song?.isFavorite == true ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                      color: song?.isFavorite == true ? AppColors.favorite : AppColors.textSecondary,
+                      color: song?.isFavorite == true ? p.favorite : p.textSecondary,
                     ),
                     onPressed: () {
                       if (song != null) cubit.toggleFavorite(song.id);
                     },
                   ),
                   IconButton(
-                    icon: const Icon(Icons.playlist_add_rounded, color: AppColors.textSecondary),
+                    icon: Icon(Icons.playlist_add_rounded, color: p.textSecondary),
                     onPressed: () {
                       if (song != null) {
                         showModalBottomSheet(
                           context: context,
-                          builder: (_) => AddToPlaylistSheet(song: song, repository: repository),
+                          useRootNavigator: true,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => AddToPlaylistSheet(song: song),
                         );
                       }
                     },
@@ -280,7 +290,7 @@ class MinimalPlayerTheme extends StatelessWidget {
                   IconButton(
                     icon: Icon(
                       Icons.queue_music_rounded,
-                      color: state.isQueueVisible ? activeColor : AppColors.textSecondary,
+                      color: state.isQueueVisible ? activeColor : p.textSecondary,
                     ),
                     onPressed: () => cubit.toggleQueueVisibility(),
                   ),

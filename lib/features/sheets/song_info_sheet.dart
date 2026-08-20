@@ -3,15 +3,18 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:share_plus/share_plus.dart';
 
-import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_radii.dart';
+import '../../core/theme/aura_theme.dart';
+import '../../core/utils/adaptive.dart';
 import '../../core/utils/formatters.dart';
 import '../../core/widgets/cached_artwork.dart';
 import '../../data/db/app_database.dart';
-import '../tag_editor/tag_editor_screen.dart';
+import '../../domain/models/audio_quality_info.dart';
+import '../player/presentation/widgets/audio_quality_badge.dart';
 
 class SongInfoSheet extends StatelessWidget {
   final SongsTableData song;
@@ -73,9 +76,11 @@ class SongInfoSheet extends StatelessWidget {
   }
 
   void _showRingtoneOptions(BuildContext context) {
+    final p = context.palette;
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.surface,
+      useRootNavigator: true,
+      backgroundColor: p.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: AppRadii.bottomSheetRadius,
       ),
@@ -91,36 +96,37 @@ class SongInfoSheet extends StatelessWidget {
                   height: 4,
                   margin: const EdgeInsets.only(bottom: 16),
                   decoration: BoxDecoration(
-                    color: AppColors.outline,
+                    color: p.hairline,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
                 Text(
                   'Set Audio As',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
+                        color: p.textPrimary,
                       ),
                 ),
                 const SizedBox(height: 12),
                 ListTile(
-                  leading: const Icon(Icons.ring_volume_rounded, color: AppColors.primary),
-                  title: const Text('Phone Ringtone'),
+                  leading: Icon(Icons.ring_volume_rounded, color: p.accent),
+                  title: Text('Phone Ringtone', style: TextStyle(color: p.textPrimary)),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
                     _setRingtone(context, 'ringtone');
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.notifications_active_rounded, color: AppColors.primary),
-                  title: const Text('Notification Sound'),
+                  leading: Icon(Icons.notifications_active_rounded, color: p.accent),
+                  title: Text('Notification Sound', style: TextStyle(color: p.textPrimary)),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
                     _setRingtone(context, 'notification');
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.alarm_rounded, color: AppColors.primary),
-                  title: const Text('Alarm Sound'),
+                  leading: Icon(Icons.alarm_rounded, color: p.accent),
+                  title: Text('Alarm Sound', style: TextStyle(color: p.textPrimary)),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
                     _setRingtone(context, 'alarm');
@@ -136,155 +142,201 @@ class SongInfoSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: AppRadii.bottomSheetRadius,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.outline,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              CachedArtwork(id: song.id, type: ArtworkType.AUDIO, size: 64, borderRadius: 14),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      song.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      song.artist,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          const Divider(),
-          const SizedBox(height: 12),
-          _buildInfoRow('Album', song.album),
-          _buildInfoRow('Duration', Formatters.formatDuration(Duration(milliseconds: song.durationMs))),
-          _buildInfoRow('File Path', song.path),
-          _buildInfoRow('Play Count', '${song.playCount} times'),
-          if (song.fileSize != null)
-            _buildInfoRow('File Size', '${(song.fileSize! / (1024 * 1024)).toStringAsFixed(2)} MB'),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    side: const BorderSide(color: AppColors.outline),
-                  ),
-                  onPressed: () => _shareSong(context),
-                  icon: const Icon(Icons.share_rounded, size: 20, color: AppColors.textPrimary),
-                  label: const Text(
-                    'Share',
-                    style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
-                  ),
-                ),
-              ),
-              if (defaultTargetPlatform == TargetPlatform.android) ...[
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+    final p = context.palette;
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: Adaptive.sheetConstraints(context).maxWidth,
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
+        ),
+        child: Material(
+          color: p.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          clipBehavior: Clip.antiAlias,
+          child: SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 14, 24, 28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: p.hairline,
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                      side: const BorderSide(color: AppColors.outline),
-                    ),
-                    onPressed: () => _showRingtoneOptions(context),
-                    icon: const Icon(Icons.ring_volume_rounded, size: 20, color: AppColors.textPrimary),
-                    label: const Text(
-                      'Ringtone',
-                      style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textPrimary),
                     ),
                   ),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              onPressed: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => TagEditorScreen(song: song),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      CachedArtwork(id: song.id, type: ArtworkType.AUDIO, size: 64, borderRadius: 14),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              song.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: p.textPrimary,
+                                  ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              song.artist,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(color: p.textSecondary, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                );
-              },
-              icon: const Icon(Icons.edit_note_rounded, size: 20),
-              label: const Text(
-                'Edit Tags',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                  const SizedBox(height: 20),
+                  Divider(color: p.hairline),
+                  const SizedBox(height: 8),
+                  Builder(
+                    builder: (context) {
+                      final quality = AudioQualityInfo.fromSong(song);
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                'QUALITY & CODEC',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 1.2,
+                                  color: p.textSecondary,
+                                ),
+                              ),
+                              AudioQualityBadge(song: song, activeColor: p.accent, compact: true),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          _buildInfoRow('Audio Format', quality.format, p),
+                          if (quality.bitrateKbps != null)
+                            _buildInfoRow('Bitrate', '${quality.bitrateKbps} kbps (${quality.tierLabel})', p),
+                          _buildInfoRow('Sample Rate', '${quality.bitDepth} / ${quality.sampleRate}', p),
+                          _buildInfoRow('Channels', quality.channels, p),
+                          const SizedBox(height: 6),
+                          Divider(color: p.hairline),
+                          const SizedBox(height: 6),
+                        ],
+                      );
+                    },
+                  ),
+                  _buildInfoRow('Album', song.album, p),
+                  _buildInfoRow('Duration', Formatters.formatDuration(Duration(milliseconds: song.durationMs)), p),
+                  _buildInfoRow('File Path', song.path, p),
+                  _buildInfoRow('Play Count', '${song.playCount} times', p),
+                  if (song.fileSize != null)
+                    _buildInfoRow('File Size', '${(song.fileSize! / (1024 * 1024)).toStringAsFixed(2)} MB', p),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            side: BorderSide(color: p.hairline),
+                          ),
+                          onPressed: () => _shareSong(context),
+                          icon: Icon(Icons.share_rounded, size: 20, color: p.textPrimary),
+                          label: Text(
+                            'Share',
+                            style: TextStyle(fontWeight: FontWeight.w600, color: p.textPrimary),
+                          ),
+                        ),
+                      ),
+                      if (defaultTargetPlatform == TargetPlatform.android) ...[
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                              side: BorderSide(color: p.hairline),
+                            ),
+                            onPressed: () => _showRingtoneOptions(context),
+                            icon: Icon(Icons.ring_volume_rounded, size: 20, color: p.textPrimary),
+                            label: Text(
+                              'Ringtone',
+                              style: TextStyle(fontWeight: FontWeight.w600, color: p.textPrimary),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  if (defaultTargetPlatform == TargetPlatform.android)
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: p.accent,
+                          foregroundColor: p.onAccent,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          context.push('/tag-editor', extra: song);
+                        },
+                        icon: const Icon(Icons.edit_note_rounded, size: 20),
+                        label: const Text(
+                          'Edit Tags',
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           ),
-        ],
+        ),
       ),
     );
-  }
+}
 
-  Widget _buildInfoRow(String label, String value) {
+  Widget _buildInfoRow(String label, String value, PulsrPalette p) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: 100,
+          ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 80, maxWidth: 100),
             child: Text(
               label,
-              style: const TextStyle(color: AppColors.textSecondary, fontSize: 13, fontWeight: FontWeight.w500),
+              style: TextStyle(color: p.textSecondary, fontSize: 13, fontWeight: FontWeight.w500),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(color: AppColors.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
+              style: TextStyle(color: p.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
             ),
           ),
         ],

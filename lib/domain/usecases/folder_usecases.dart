@@ -4,7 +4,7 @@ import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 import '../../core/errors/failures.dart';
 import '../../data/db/app_database.dart';
-import '../../data/repositories/music_repository.dart';
+import '../repositories/music_repository_interface.dart';
 
 class FolderItem {
   final String path;
@@ -22,12 +22,16 @@ class FolderItem {
 
 @singleton
 class FolderUseCases {
-  final MusicRepository _repository;
+  final IMusicRepository _repository;
 
   FolderUseCases(this._repository);
 
   Stream<Result<List<ExcludedFoldersTableData>>> watchExcludedFolders() {
     return _repository.watchExcludedFolders();
+  }
+
+  Future<Result<List<String>>> getExcludedFolders() {
+    return _repository.getExcludedFolderPaths();
   }
 
   Future<Result<void>> toggleExcludeFolder(String path) {

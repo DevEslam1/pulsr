@@ -1,7 +1,7 @@
 // lib/features/player/presentation/widgets/player_controls.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../../../../core/constants/app_colors.dart';
+import '../../../../core/theme/aura_theme.dart';
 import '../../cubit/player_state.dart';
 
 class PlayerControls extends StatelessWidget {
@@ -27,11 +27,14 @@ class PlayerControls extends StatelessWidget {
     required this.onToggleShuffle,
     required this.onToggleRepeat,
     this.mainButtonSize = 64.0,
-    this.primaryColor = AppColors.ctaLavender,
+    required this.primaryColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final p = context.palette;
+    final onPrimaryColor = primaryColor.computeLuminance() > 0.5 ? const Color(0xFF101223) : Colors.white;
+
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
@@ -39,15 +42,15 @@ class PlayerControls extends StatelessWidget {
           onPressed: onToggleShuffle,
           icon: Icon(
             Icons.shuffle_rounded,
-            color: isShuffle ? primaryColor : AppColors.textSecondary,
+            color: isShuffle ? primaryColor : p.textSecondary,
             size: 24,
           ),
         ),
         IconButton(
           onPressed: onPrevious,
-          icon: const Icon(
+          icon: Icon(
             Icons.skip_previous_rounded,
-            color: AppColors.textPrimary,
+            color: p.textPrimary,
             size: 38,
           ),
         ),
@@ -70,7 +73,7 @@ class PlayerControls extends StatelessWidget {
             ),
             child: Icon(
               isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-              color: Colors.black,
+              color: onPrimaryColor,
               size: mainButtonSize * 0.55,
             ),
           )
@@ -79,9 +82,9 @@ class PlayerControls extends StatelessWidget {
         ),
         IconButton(
           onPressed: onNext,
-          icon: const Icon(
+          icon: Icon(
             Icons.skip_next_rounded,
-            color: AppColors.textPrimary,
+            color: p.textPrimary,
             size: 38,
           ),
         ),
@@ -93,7 +96,7 @@ class PlayerControls extends StatelessWidget {
                 : Icons.repeat_rounded,
             color: repeatMode != PlayerRepeatMode.off
                 ? primaryColor
-                : AppColors.textSecondary,
+                : p.textSecondary,
             size: 24,
           ),
         ),

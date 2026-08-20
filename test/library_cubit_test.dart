@@ -2,6 +2,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:fpdart/fpdart.dart';
+import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/usecases/folder_usecases.dart';
 import 'package:pulsr/domain/usecases/get_albums_usecase.dart';
 import 'package:pulsr/domain/usecases/get_artists_usecase.dart';
@@ -42,18 +43,22 @@ void main() {
     mockToggleFavorite = MockToggleFavoriteUseCase();
     mockFolderUseCases = MockFolderUseCases();
 
-    when(() => mockGetSongs.watchSongs(sortBy: any(named: 'sortBy'), ascending: any(named: 'ascending')))
-        .thenAnswer((_) => Stream.value(const Right([])));
+    when(() => mockGetSongs.watchSongs(
+          sortBy: any(named: 'sortBy'),
+          ascending: any(named: 'ascending'),
+          excludedFolders: any(named: 'excludedFolders'),
+        )).thenAnswer((_) => Stream.value(const Right([])));
     when(() => mockGetAlbums.watchAlbums()).thenAnswer((_) => Stream.value(const Right([])));
     when(() => mockGetArtists.watchArtists()).thenAnswer((_) => Stream.value(const Right([])));
     when(() => mockGetGenres.watchGenres()).thenAnswer((_) => Stream.value(const Right([])));
     when(() => mockGetYears.watchYears()).thenAnswer((_) => Stream.value(const Right([])));
     when(() => mockGetFavorites.watchFavorites()).thenAnswer((_) => Stream.value(const Right([])));
     when(() => mockFolderUseCases.getFolderHierarchy()).thenAnswer((_) async => const Right([]));
+    when(() => mockFolderUseCases.getExcludedFolders()).thenAnswer((_) async => const Right([]));
   });
 
   group('LibraryCubit', () {
-    test('initial state has default list view and empty selection', () {
+    test('initial state has default list view and empty selection', () async {
       final cubit = LibraryCubit(
         getSongsUseCase: mockGetSongs,
         getAlbumsUseCase: mockGetAlbums,
@@ -69,10 +74,10 @@ void main() {
       expect(cubit.state.isMultiSelectMode, false);
       expect(cubit.state.selectedSongIds, isEmpty);
 
-      cubit.close();
+      await cubit.close();
     });
 
-    test('toggleViewMode switches between list and grid', () {
+    test('toggleViewMode switches between list and grid', () async {
       final cubit = LibraryCubit(
         getSongsUseCase: mockGetSongs,
         getAlbumsUseCase: mockGetAlbums,
@@ -90,10 +95,10 @@ void main() {
       cubit.toggleViewMode();
       expect(cubit.state.viewMode, LibraryViewMode.list);
 
-      cubit.close();
+      await cubit.close();
     });
 
-    test('multi-select selects and deselects song IDs', () {
+    test('multi-select selects and deselects song IDs', () async {
       final cubit = LibraryCubit(
         getSongsUseCase: mockGetSongs,
         getAlbumsUseCase: mockGetAlbums,
@@ -113,7 +118,7 @@ void main() {
       expect(cubit.state.isMultiSelectMode, false);
       expect(cubit.state.selectedSongIds.isEmpty, true);
 
-      cubit.close();
+      await cubit.close();
     });
 
     test('toggleFavorite delegates to ToggleFavoriteUseCase', () async {
@@ -133,7 +138,50 @@ void main() {
       await cubit.toggleFavorite(101);
       verify(() => mockToggleFavorite(101)).called(1);
 
-      cubit.close();
+      await cubit.close();
+    });
+
+    test('init subscribes to songs stream and populates state', () async {
+      const song = SongsTableData(
+        id: 1,
+        title: 'Streamed Song',
+        artist: 'Artist',
+        album: 'Album',
+        durationMs: 1000,
+        path: '/path/s.mp3',
+        isFavorite: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+      when(() => mockGetSongs.watchSongs(
+            sortBy: any(named: 'sortBy'),
+            ascending: any(named: 'ascending'),
+            excludedFolders: any(named: 'excludedFolders'),
+          )).thenAnswer((_) => Stream.value(const Right([song])));
+      when(() => mockGetAlbums.watchAlbums()).thenAnswer((_) => Stream.value(const Right([])));
+      when(() => mockGetArtists.watchArtists()).thenAnswer((_) => Stream.value(const Right([])));
+      when(() => mockGetGenres.watchGenres()).thenAnswer((_) => Stream.value(const Right([])));
+      when(() => mockGetYears.watchYears()).thenAnswer((_) => Stream.value(const Right([])));
+      when(() => mockGetFavorites.watchFavorites()).thenAnswer((_) => Stream.value(const Right([])));
+      when(() => mockFolderUseCases.getFolderHierarchy()).thenAnswer((_) async => const Right([]));
+      when(() => mockFolderUseCases.getExcludedFolders()).thenAnswer((_) async => const Right([]));
+
+      final cubit = LibraryCubit(
+        getSongsUseCase: mockGetSongs,
+        getAlbumsUseCase: mockGetAlbums,
+        getArtistsUseCase: mockGetArtists,
+        getGenresUseCase: mockGetGenres,
+        getYearsUseCase: mockGetYears,
+        getFavoritesUseCase: mockGetFavorites,
+        toggleFavoriteUseCase: mockToggleFavorite,
+        folderUseCases: mockFolderUseCases,
+      );
+      await Future.delayed(const Duration(milliseconds: 50));
+
+      expect(cubit.state.songs.length, equals(1));
+      expect(cubit.state.songs.first.title, equals('Streamed Song'));
+
+      await cubit.close();
     });
   });
 }

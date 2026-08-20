@@ -11,12 +11,15 @@
 // ignore_for_file: no_leading_underscores_for_library_prefixes
 import 'package:get_it/get_it.dart' as _i174;
 import 'package:injectable/injectable.dart' as _i526;
+import 'package:pulsr/core/services/file_intent_handler.dart' as _i134;
 import 'package:pulsr/core/theme/dynamic_theme_cubit.dart' as _i401;
 import 'package:pulsr/data/audio/audio_handler.dart' as _i366;
 import 'package:pulsr/data/db/app_database.dart' as _i682;
 import 'package:pulsr/data/repositories/music_repository.dart' as _i626;
 import 'package:pulsr/data/repositories/smart_playlist_engine.dart' as _i399;
 import 'package:pulsr/data/scanner/media_scanner_service.dart' as _i483;
+import 'package:pulsr/domain/repositories/music_repository_interface.dart'
+    as _i320;
 import 'package:pulsr/domain/usecases/backup_usecases.dart' as _i545;
 import 'package:pulsr/domain/usecases/folder_usecases.dart' as _i1017;
 import 'package:pulsr/domain/usecases/get_albums_usecase.dart' as _i496;
@@ -53,15 +56,39 @@ extension GetItInjectableX on _i174.GetIt {
     gh.singleton<_i682.AppDatabase>(() => _i682.AppDatabase());
     gh.singleton<_i265.PlaylistExportUseCase>(
         () => _i265.PlaylistExportUseCase());
-    gh.singleton<_i42.WidgetService>(() => _i42.WidgetService());
-    gh.singleton<_i626.MusicRepository>(
-        () => _i626.MusicRepository(gh<_i682.AppDatabase>()));
+    gh.lazySingleton<_i42.WidgetService>(() => _i42.WidgetService());
     gh.singleton<_i399.SmartPlaylistEngine>(
         () => _i399.SmartPlaylistEngine(gh<_i682.AppDatabase>()));
+    gh.singleton<_i320.IMusicRepository>(
+        () => _i626.MusicRepository(gh<_i682.AppDatabase>()));
     gh.singleton<_i792.PlaylistUseCases>(() => _i792.PlaylistUseCases(
-          gh<_i626.MusicRepository>(),
+          gh<_i320.IMusicRepository>(),
           gh<_i399.SmartPlaylistEngine>(),
         ));
+    gh.singleton<_i483.MediaScannerService>(
+        () => _i483.MediaScannerService(gh<_i320.IMusicRepository>()));
+    gh.singleton<_i545.ExportBackupUseCase>(
+        () => _i545.ExportBackupUseCase(gh<_i320.IMusicRepository>()));
+    gh.singleton<_i1017.FolderUseCases>(
+        () => _i1017.FolderUseCases(gh<_i320.IMusicRepository>()));
+    gh.singleton<_i496.GetAlbumsUseCase>(
+        () => _i496.GetAlbumsUseCase(gh<_i320.IMusicRepository>()));
+    gh.singleton<_i602.GetArtistsUseCase>(
+        () => _i602.GetArtistsUseCase(gh<_i320.IMusicRepository>()));
+    gh.singleton<_i117.GetFavoritesUseCase>(
+        () => _i117.GetFavoritesUseCase(gh<_i320.IMusicRepository>()));
+    gh.singleton<_i485.GetGenresUseCase>(
+        () => _i485.GetGenresUseCase(gh<_i320.IMusicRepository>()));
+    gh.singleton<_i168.GetSongsUseCase>(
+        () => _i168.GetSongsUseCase(gh<_i320.IMusicRepository>()));
+    gh.singleton<_i651.GetYearsUseCase>(
+        () => _i651.GetYearsUseCase(gh<_i320.IMusicRepository>()));
+    gh.singleton<_i265.PlaylistImportUseCase>(
+        () => _i265.PlaylistImportUseCase(gh<_i320.IMusicRepository>()));
+    gh.singleton<_i644.SearchMusicUseCase>(
+        () => _i644.SearchMusicUseCase(gh<_i320.IMusicRepository>()));
+    gh.singleton<_i800.ToggleFavoriteUseCase>(
+        () => _i800.ToggleFavoriteUseCase(gh<_i320.IMusicRepository>()));
     gh.factory<_i431.PlaylistCubit>(() =>
         _i431.PlaylistCubit(playlistUseCases: gh<_i792.PlaylistUseCases>()));
     gh.factory<_i790.SmartPlaylistBuilderCubit>(
@@ -69,38 +96,25 @@ extension GetItInjectableX on _i174.GetIt {
               gh<_i399.SmartPlaylistEngine>(),
               gh<_i792.PlaylistUseCases>(),
             ));
-    await gh.singletonAsync<_i366.PulsrAudioHandler>(
-      () => _i366.PulsrAudioHandler.create(gh<_i626.MusicRepository>()),
-      preResolve: true,
-    );
     gh.singleton<_i545.ImportBackupUseCase>(() => _i545.ImportBackupUseCase(
-          gh<_i626.MusicRepository>(),
+          gh<_i320.IMusicRepository>(),
           gh<_i682.AppDatabase>(),
         ));
-    gh.singleton<_i483.MediaScannerService>(
-        () => _i483.MediaScannerService(gh<_i626.MusicRepository>()));
-    gh.singleton<_i545.ExportBackupUseCase>(
-        () => _i545.ExportBackupUseCase(gh<_i626.MusicRepository>()));
-    gh.singleton<_i1017.FolderUseCases>(
-        () => _i1017.FolderUseCases(gh<_i626.MusicRepository>()));
-    gh.singleton<_i496.GetAlbumsUseCase>(
-        () => _i496.GetAlbumsUseCase(gh<_i626.MusicRepository>()));
-    gh.singleton<_i602.GetArtistsUseCase>(
-        () => _i602.GetArtistsUseCase(gh<_i626.MusicRepository>()));
-    gh.singleton<_i117.GetFavoritesUseCase>(
-        () => _i117.GetFavoritesUseCase(gh<_i626.MusicRepository>()));
-    gh.singleton<_i485.GetGenresUseCase>(
-        () => _i485.GetGenresUseCase(gh<_i626.MusicRepository>()));
-    gh.singleton<_i168.GetSongsUseCase>(
-        () => _i168.GetSongsUseCase(gh<_i626.MusicRepository>()));
-    gh.singleton<_i651.GetYearsUseCase>(
-        () => _i651.GetYearsUseCase(gh<_i626.MusicRepository>()));
-    gh.singleton<_i265.PlaylistImportUseCase>(
-        () => _i265.PlaylistImportUseCase(gh<_i626.MusicRepository>()));
-    gh.singleton<_i644.SearchMusicUseCase>(
-        () => _i644.SearchMusicUseCase(gh<_i626.MusicRepository>()));
-    gh.singleton<_i800.ToggleFavoriteUseCase>(
-        () => _i800.ToggleFavoriteUseCase(gh<_i626.MusicRepository>()));
+    await gh.singletonAsync<_i366.PulsrAudioHandler>(
+      () => _i366.PulsrAudioHandler.create(gh<_i320.IMusicRepository>()),
+      preResolve: true,
+    );
+    gh.factory<_i984.SearchCubit>(() => _i984.SearchCubit(
+          searchUseCase: gh<_i644.SearchMusicUseCase>(),
+          folderUseCases: gh<_i1017.FolderUseCases>(),
+        ));
+    gh.factory<_i147.PlayerCubit>(() => _i147.PlayerCubit(
+          audioHandler: gh<_i366.PulsrAudioHandler>(),
+          repository: gh<_i320.IMusicRepository>(),
+          toggleFavoriteUseCase: gh<_i800.ToggleFavoriteUseCase>(),
+          settingsCubit: gh<_i41.SettingsCubit>(),
+          widgetService: gh<_i42.WidgetService>(),
+        ));
     gh.singleton<_i41.SettingsCubit>(() =>
         _i41.SettingsCubit(scannerService: gh<_i483.MediaScannerService>()));
     gh.factory<_i633.LibraryCubit>(() => _i633.LibraryCubit(
@@ -113,14 +127,9 @@ extension GetItInjectableX on _i174.GetIt {
           toggleFavoriteUseCase: gh<_i800.ToggleFavoriteUseCase>(),
           folderUseCases: gh<_i1017.FolderUseCases>(),
         ));
-    gh.factory<_i984.SearchCubit>(
-        () => _i984.SearchCubit(searchUseCase: gh<_i644.SearchMusicUseCase>()));
-    gh.factory<_i147.PlayerCubit>(() => _i147.PlayerCubit(
-          audioHandler: gh<_i366.PulsrAudioHandler>(),
-          repository: gh<_i626.MusicRepository>(),
-          toggleFavoriteUseCase: gh<_i800.ToggleFavoriteUseCase>(),
-          settingsCubit: gh<_i41.SettingsCubit>(),
-          widgetService: gh<_i42.WidgetService>(),
+    gh.singleton<_i134.FileIntentHandler>(() => _i134.FileIntentHandler(
+          gh<_i320.IMusicRepository>(),
+          gh<_i147.PlayerCubit>(),
         ));
     return this;
   }
