@@ -259,7 +259,10 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                       fontWeight: FontWeight.w700,
                       fontSize: 12,
                     ),
-                    onSelected: isEnabled ? (_) => cubit.applyPreset(presetItem) : null,
+                    onSelected: (_) {
+                      if (!state.isEqEnabled) cubit.setEqualizerEnabled(true);
+                      cubit.applyPreset(presetItem);
+                    },
                   ),
                 );
               },
@@ -315,224 +318,190 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
 
           // 5-Band Equalizer Vertical Sliders
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 6),
             decoration: BoxDecoration(
               color: p.surfaceContainer,
               borderRadius: AppRadii.cardRadius,
               border: Border.all(color: p.hairline),
             ),
-            child: Opacity(
-              opacity: isEnabled ? 1.0 : 0.35,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: List.generate(5, (index) {
-                  final gain = index < preset.gains.length ? preset.gains[index] : 0.0;
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: (gain.abs() > 0.1 ? p.accent : p.hairline).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          '${gain > 0 ? '+' : ''}${gain.toStringAsFixed(1)}',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: gain.abs() > 0.1 ? p.accent : p.textSecondary,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      SizedBox(
-                        height: 140,
-                        child: RotatedBox(
-                          quarterTurns: 3,
-                          child: SliderTheme(
-                            data: SliderTheme.of(context).copyWith(
-                              trackHeight: 4,
-                              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-                              activeTrackColor: p.accent,
-                              inactiveTrackColor: p.surface,
-                              thumbColor: p.accent,
-                              overlayColor: p.accent.withValues(alpha: 0.2),
-                            ),
-                            child: Slider(
-                              value: gain.clamp(-15.0, 15.0),
-                              min: -15.0,
-                              max: 15.0,
-                              onChanged: isEnabled ? (val) => cubit.setBandGain(index, val) : null,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _bandLabels[index],
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          color: p.textPrimary,
-                        ),
-                      ),
-                    ],
-                  );
-                }),
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: List.generate(5, (index) {
+                final gain = index < preset.gains.length ? preset.gains[index] : 0.0;
+                return _VerticalEqSlider(
+                  value: gain,
+                  label: _bandLabels[index],
+                  isEnabled: isEnabled,
+                  accentColor: p.accent,
+                  trackColor: p.hairline,
+                  surfaceColor: p.surface,
+                  textColor: p.textPrimary,
+                  onInteraction: () {
+                    if (!state.isEqEnabled) {
+                      cubit.setEqualizerEnabled(true);
+                    }
+                  },
+                  onChanged: (val) {
+                    if (!state.isEqEnabled) {
+                      cubit.setEqualizerEnabled(true);
+                    }
+                    cubit.setBandGain(index, val);
+                  },
+                );
+              }),
             ),
           ),
           const SizedBox(height: 16),
 
           // Bass Boost Slider
-          Opacity(
-            opacity: isEnabled ? 1.0 : 0.35,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: p.surfaceContainer,
-                borderRadius: AppRadii.cardRadius,
-                border: Border.all(color: p.hairline),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: p.accent.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(Icons.speaker_group_rounded, color: p.accent, size: 20),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: p.surfaceContainer,
+              borderRadius: AppRadii.cardRadius,
+              border: Border.all(color: p.hairline),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: p.accent.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Bass Enhancer',
-                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: p.textPrimary),
-                        ),
-                        Text(
-                          '${(preset.bassBoost * 100).round()}% punch',
-                          style: TextStyle(fontSize: 11, color: p.textTertiary),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(
-                    width: 140,
-                    child: SliderTheme(
-                      data: SliderTheme.of(context).copyWith(
-                        trackHeight: 4,
-                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                        activeTrackColor: p.accent,
-                        inactiveTrackColor: p.surface,
-                        thumbColor: p.accent,
+                  child: Icon(Icons.speaker_group_rounded, color: p.accent, size: 20),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Bass Enhancer',
+                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: p.textPrimary),
                       ),
-                      child: Slider(
-                        value: preset.bassBoost.clamp(0.0, 1.0),
-                        min: 0.0,
-                        max: 1.0,
-                        onChanged: isEnabled ? (val) => cubit.setBassBoost(val) : null,
+                      Text(
+                        '${(preset.bassBoost * 100).round()}% punch',
+                        style: TextStyle(fontSize: 11, color: p.textTertiary),
                       ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  width: 140,
+                  child: SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 4,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                      activeTrackColor: p.accent,
+                      inactiveTrackColor: p.surface,
+                      thumbColor: p.accent,
+                    ),
+                    child: Slider(
+                      value: preset.bassBoost.clamp(0.0, 1.0),
+                      min: 0.0,
+                      max: 1.0,
+                      onChanged: (val) {
+                        if (!state.isEqEnabled) cubit.setEqualizerEnabled(true);
+                        cubit.setBassBoost(val);
+                      },
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 12),
 
           // Volume Boost Slider (LoudnessEnhancer)
-          Opacity(
-            opacity: isEnabled ? 1.0 : 0.35,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: p.surfaceContainer,
-                borderRadius: AppRadii.cardRadius,
-                border: Border.all(color: p.hairline),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: (state.volumeBoost > 0.6 ? p.error : p.accent).withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          Icons.volume_up_rounded,
-                          color: state.volumeBoost > 0.6 ? p.error : p.accent,
-                          size: 20,
-                        ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: p.surfaceContainer,
+              borderRadius: AppRadii.cardRadius,
+              border: Border.all(color: p.hairline),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: (state.volumeBoost > 0.6 ? p.error : p.accent).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Volume Boost',
-                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: p.textPrimary),
-                            ),
-                            Text(
-                              state.volumeBoost > 0
-                                  ? '+${(state.volumeBoost * 10).toStringAsFixed(1)} dB hardware gain'
-                                  : 'Hardware gain bypassed',
-                              style: TextStyle(fontSize: 11, color: p.textTertiary),
-                            ),
-                          ],
-                        ),
+                      child: Icon(
+                        Icons.volume_up_rounded,
+                        color: state.volumeBoost > 0.6 ? p.error : p.accent,
+                        size: 20,
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: (state.volumeBoost > 0.6
-                                  ? p.error
-                                  : (state.volumeBoost > 0 ? p.accent : p.surface))
-                              .withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: state.volumeBoost > 0.6
-                                ? p.error.withValues(alpha: 0.4)
-                                : (state.volumeBoost > 0 ? p.accent.withValues(alpha: 0.3) : p.hairline),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Volume Boost',
+                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: p.textPrimary),
                           ),
-                        ),
-                        child: Text(
-                          state.volumeBoost > 0 ? '+${(state.volumeBoost * 10).toStringAsFixed(1)} dB' : 'Off',
-                          style: TextStyle(
-                            color: state.volumeBoost > 0.6
+                          Text(
+                            state.volumeBoost > 0
+                                ? '+${(state.volumeBoost * 10).toStringAsFixed(1)} dB hardware gain'
+                                : 'Hardware gain bypassed',
+                            style: TextStyle(fontSize: 11, color: p.textTertiary),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: (state.volumeBoost > 0.6
                                 ? p.error
-                                : (state.volumeBoost > 0 ? p.accent : p.textSecondary),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                          ),
+                                : (state.volumeBoost > 0 ? p.accent : p.surface))
+                            .withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: state.volumeBoost > 0.6
+                              ? p.error.withValues(alpha: 0.4)
+                              : (state.volumeBoost > 0 ? p.accent.withValues(alpha: 0.3) : p.hairline),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 4,
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                      activeTrackColor: state.volumeBoost > 0.6 ? p.error : p.accent,
-                      inactiveTrackColor: p.surface,
-                      thumbColor: state.volumeBoost > 0.6 ? p.error : p.accent,
+                      child: Text(
+                        state.volumeBoost > 0 ? '+${(state.volumeBoost * 10).toStringAsFixed(1)} dB' : 'Off',
+                        style: TextStyle(
+                          color: state.volumeBoost > 0.6
+                              ? p.error
+                              : (state.volumeBoost > 0 ? p.accent : p.textSecondary),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
-                    child: Slider(
-                      value: state.volumeBoost.clamp(0.0, 1.0),
-                      min: 0.0,
-                      max: 1.0,
-                      onChanged: isEnabled ? (val) => cubit.setVolumeBoost(val) : null,
-                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 4,
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                    activeTrackColor: state.volumeBoost > 0.6 ? p.error : p.accent,
+                    inactiveTrackColor: p.surface,
+                    thumbColor: state.volumeBoost > 0.6 ? p.error : p.accent,
                   ),
+                  child: Slider(
+                    value: state.volumeBoost.clamp(0.0, 1.0),
+                    min: 0.0,
+                    max: 1.0,
+                    onChanged: (val) {
+                      if (!state.isEqEnabled) cubit.setEqualizerEnabled(true);
+                      cubit.setVolumeBoost(val);
+                    },
+                  ),
+                ),
                   if (state.volumeBoost > 0.6)
                     Padding(
                       padding: const EdgeInsets.only(top: 2, left: 4),
@@ -552,7 +521,6 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                 ],
               ),
             ),
-          ),
           const SizedBox(height: 12),
 
           // Dolby Atmos / Spatial Audio Toggle
@@ -1266,5 +1234,258 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
         ],
       ),
     );
+  }
+}
+
+class _VerticalEqSlider extends StatefulWidget {
+  final double value;
+  final bool isEnabled;
+  final String label;
+  final Color accentColor;
+  final Color trackColor;
+  final Color surfaceColor;
+  final Color textColor;
+  final ValueChanged<double> onChanged;
+  final VoidCallback? onInteraction;
+
+  static const double min = -15.0;
+  static const double max = 15.0;
+
+  const _VerticalEqSlider({
+    required this.value,
+    required this.isEnabled,
+    required this.label,
+    required this.accentColor,
+    required this.trackColor,
+    required this.surfaceColor,
+    required this.textColor,
+    required this.onChanged,
+    this.onInteraction,
+  });
+
+  @override
+  State<_VerticalEqSlider> createState() => _VerticalEqSliderState();
+}
+
+class _VerticalEqSliderState extends State<_VerticalEqSlider> {
+  bool _isDragging = false;
+  double? _dragGain;
+
+  void _handlePointer(double localY, double totalHeight) {
+    widget.onInteraction?.call();
+    const topMargin = 12.0;
+    const bottomMargin = 12.0;
+    final trackHeight = totalHeight - topMargin - bottomMargin;
+    if (trackHeight <= 0) return;
+    final clampedY = (localY - topMargin).clamp(0.0, trackHeight);
+    final fraction = 1.0 - (clampedY / trackHeight);
+    final newGain = _VerticalEqSlider.min + fraction * (_VerticalEqSlider.max - _VerticalEqSlider.min);
+    final roundedGain = double.parse(newGain.toStringAsFixed(1));
+    setState(() {
+      _dragGain = roundedGain;
+    });
+    widget.onChanged(roundedGain);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final gain = (_isDragging && _dragGain != null ? _dragGain! : widget.value)
+        .clamp(_VerticalEqSlider.min, _VerticalEqSlider.max);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Value Pill
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: (gain.abs() > 0.1 ? widget.accentColor : widget.trackColor).withValues(alpha: 0.15),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            '${gain > 0 ? '+' : ''}${gain.toStringAsFixed(1)}',
+            style: TextStyle(
+              fontSize: 10,
+              color: gain.abs() > 0.1 ? widget.accentColor : widget.textColor,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Vertical Slider Track
+        SizedBox(
+          height: 140,
+          width: 48,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final height = constraints.maxHeight;
+              const topMargin = 12.0;
+              const bottomMargin = 12.0;
+              final trackHeight = height - topMargin - bottomMargin;
+              final fraction = (gain - _VerticalEqSlider.min) / (_VerticalEqSlider.max - _VerticalEqSlider.min);
+              final thumbY = topMargin + (1.0 - fraction) * trackHeight;
+              final centerY = topMargin + trackHeight / 2;
+
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onVerticalDragStart: (details) {
+                  setState(() => _isDragging = true);
+                  _handlePointer(details.localPosition.dy, height);
+                },
+                onVerticalDragUpdate: (details) {
+                  _handlePointer(details.localPosition.dy, height);
+                },
+                onVerticalDragEnd: (_) {
+                  setState(() {
+                    _isDragging = false;
+                    _dragGain = null;
+                  });
+                },
+                onVerticalDragCancel: () {
+                  setState(() {
+                    _isDragging = false;
+                    _dragGain = null;
+                  });
+                },
+                onTapDown: (details) {
+                  _handlePointer(details.localPosition.dy, height);
+                },
+                child: CustomPaint(
+                  size: Size(constraints.maxWidth, height),
+                  painter: _VerticalSliderPainter(
+                    fraction: fraction,
+                    thumbY: thumbY,
+                    centerY: centerY,
+                    topMargin: topMargin,
+                    bottomMargin: bottomMargin,
+                    isDragging: _isDragging,
+                    isEnabled: widget.isEnabled,
+                    accentColor: widget.accentColor,
+                    trackColor: widget.trackColor,
+                    surfaceColor: widget.surfaceColor,
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Frequency Label
+        Text(
+          widget.label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: widget.textColor,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _VerticalSliderPainter extends CustomPainter {
+  final double fraction;
+  final double thumbY;
+  final double centerY;
+  final double topMargin;
+  final double bottomMargin;
+  final bool isDragging;
+  final bool isEnabled;
+  final Color accentColor;
+  final Color trackColor;
+  final Color surfaceColor;
+
+  _VerticalSliderPainter({
+    required this.fraction,
+    required this.thumbY,
+    required this.centerY,
+    required this.topMargin,
+    required this.bottomMargin,
+    required this.isDragging,
+    required this.isEnabled,
+    required this.accentColor,
+    required this.trackColor,
+    required this.surfaceColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final centerX = size.width / 2;
+    final trackTop = topMargin;
+    final trackBottom = size.height - bottomMargin;
+
+    // Background track (Pill)
+    final bgPaint = Paint()
+      ..color = trackColor.withValues(alpha: 0.35)
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 5.0;
+
+    canvas.drawLine(
+      Offset(centerX, trackTop),
+      Offset(centerX, trackBottom),
+      bgPaint,
+    );
+
+    // Center 0 dB notch tick
+    final notchPaint = Paint()
+      ..color = trackColor.withValues(alpha: 0.8)
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 2.0;
+
+    canvas.drawLine(
+      Offset(centerX - 6, centerY),
+      Offset(centerX + 6, centerY),
+      notchPaint,
+    );
+
+    // Active fill from center (0dB) to thumbY
+    final activePaint = Paint()
+      ..color = isEnabled ? accentColor : trackColor
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 5.0;
+
+    canvas.drawLine(
+      Offset(centerX, centerY),
+      Offset(centerX, thumbY),
+      activePaint,
+    );
+
+    // Thumb Glow / Halo when dragging
+    if (isDragging && isEnabled) {
+      final haloPaint = Paint()
+        ..color = accentColor.withValues(alpha: 0.25)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(Offset(centerX, thumbY), 16.0, haloPaint);
+    }
+
+    // Thumb Outer Shadow
+    final shadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.25)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.0);
+    canvas.drawCircle(Offset(centerX, thumbY + 1), isDragging ? 9.0 : 8.0, shadowPaint);
+
+    // Thumb Main Circle
+    final thumbPaint = Paint()
+      ..color = isEnabled ? accentColor : trackColor
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(centerX, thumbY), isDragging ? 9.0 : 8.0, thumbPaint);
+
+    // Thumb Inner Core
+    final corePaint = Paint()
+      ..color = isEnabled ? Colors.white : surfaceColor
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(centerX, thumbY), isDragging ? 3.5 : 3.0, corePaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _VerticalSliderPainter oldDelegate) {
+    return oldDelegate.fraction != fraction ||
+        oldDelegate.thumbY != thumbY ||
+        oldDelegate.isDragging != isDragging ||
+        oldDelegate.isEnabled != isEnabled ||
+        oldDelegate.accentColor != accentColor;
   }
 }

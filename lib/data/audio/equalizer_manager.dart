@@ -1,4 +1,5 @@
 // lib/data/audio/equalizer_manager.dart
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:just_audio/just_audio.dart';
@@ -15,6 +16,7 @@ class EqualizerManager {
   final AndroidEqualizer? equalizerB;
   final AndroidLoudnessEnhancer? loudnessEnhancerB;
   final AudioEffectsChannel _effectsChannel = AudioEffectsChannel();
+  Timer? _saveDebounce;
 
   EqPreset currentPreset = EqPreset.defaultPresets.first;
   bool isEnabled = false;
@@ -37,6 +39,13 @@ class EqualizerManager {
     this.equalizerB,
     this.loudnessEnhancerB,
   });
+
+  void _debouncedSavePreferences() {
+    _saveDebounce?.cancel();
+    _saveDebounce = Timer(const Duration(milliseconds: 350), () {
+      _savePreferences();
+    });
+  }
 
   Future<void> init() async {
     await _effectsChannel.init();
@@ -164,14 +173,14 @@ class EqualizerManager {
         } catch (_) {}
       }
     }
-    await _savePreferences();
+    _debouncedSavePreferences();
   }
 
   Future<void> setVolumeBoost(double value) async {
     volumeBoost = value.clamp(0.0, 1.0);
     final milliBels = (volumeBoost * 1000).round();
     await _effectsChannel.setVolumeBoost(milliBels);
-    await _savePreferences();
+    _debouncedSavePreferences();
   }
 
   Future<void> setBassBoost(double value) async {
@@ -185,7 +194,7 @@ class EqualizerManager {
         } catch (_) {}
       }
     }
-    await _savePreferences();
+    _debouncedSavePreferences();
   }
 
   Future<void> applyPreset(EqPreset preset) async {

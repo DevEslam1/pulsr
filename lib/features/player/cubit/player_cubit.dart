@@ -374,22 +374,24 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   // Equalizer & Audio Effects
   Future<void> setEqualizerEnabled(bool enabled) async {
-    await _audioHandler.setEqualizerEnabled(enabled);
     emit(state.copyWith(isEqEnabled: enabled));
+    await _audioHandler.setEqualizerEnabled(enabled);
   }
 
   Future<void> applyPreset(EqPreset preset) async {
-    await _audioHandler.applyPreset(preset);
     emit(state.copyWith(
+      isEqEnabled: true,
       eqPreset: preset,
       selectedHeadphoneProfile: null,
     ));
+    await _audioHandler.setEqualizerEnabled(true);
+    await _audioHandler.applyPreset(preset);
   }
 
   Future<void> applyHeadphoneProfile(HeadphoneProfile? profile) async {
-    await _audioHandler.applyHeadphoneProfile(profile);
     if (profile != null) {
       emit(state.copyWith(
+        isEqEnabled: true,
         eqPreset: EqPreset(
           name: profile.name,
           gains: profile.gains,
@@ -397,13 +399,14 @@ class PlayerCubit extends Cubit<PlayerState> {
         ),
         selectedHeadphoneProfile: profile,
       ));
+      await _audioHandler.setEqualizerEnabled(true);
     } else {
       emit(state.copyWith(selectedHeadphoneProfile: null));
     }
+    await _audioHandler.applyHeadphoneProfile(profile);
   }
 
   Future<void> setBandGain(int bandIndex, double gain) async {
-    await _audioHandler.setBandGain(bandIndex, gain);
     final gains = List<double>.from(state.eqPreset.gains);
     if (bandIndex >= 0 && bandIndex < gains.length) {
       gains[bandIndex] = gain;
@@ -412,37 +415,38 @@ class PlayerCubit extends Cubit<PlayerState> {
         selectedHeadphoneProfile: null,
       ));
     }
+    await _audioHandler.setBandGain(bandIndex, gain);
   }
 
   Future<void> setBassBoost(double amount) async {
-    await _audioHandler.setBassBoost(amount);
     emit(state.copyWith(
       eqPreset: EqPreset(name: state.eqPreset.name, gains: state.eqPreset.gains, bassBoost: amount),
     ));
+    await _audioHandler.setBassBoost(amount);
   }
 
   Future<void> setVirtualizerEnabled(bool enabled) async {
-    await _audioHandler.setVirtualizerEnabled(enabled);
     emit(state.copyWith(isVirtualizerEnabled: enabled));
+    await _audioHandler.setVirtualizerEnabled(enabled);
   }
 
   Future<void> setVirtualizerStrength(double strength) async {
-    await _audioHandler.setVirtualizerStrength(strength);
     emit(state.copyWith(virtualizerStrength: strength));
+    await _audioHandler.setVirtualizerStrength(strength);
   }
 
   Future<void> setDynamicsPreset(DynamicsPreset preset, {bool? enabled}) async {
-    await _audioHandler.setDynamicsPreset(preset, enabled: enabled);
     final isEnabled = enabled ?? (preset != DynamicsPreset.off);
     emit(state.copyWith(
       dynamicsPreset: preset,
       isDynamicsEnabled: isEnabled,
     ));
+    await _audioHandler.setDynamicsPreset(preset, enabled: enabled);
   }
 
   Future<void> setVolumeBoost(double value) async {
-    await _audioHandler.setVolumeBoost(value);
     emit(state.copyWith(volumeBoost: value));
+    await _audioHandler.setVolumeBoost(value);
   }
 
   Future<void> setSpatializerEnabled(bool enabled) async {

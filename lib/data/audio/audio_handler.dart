@@ -28,11 +28,11 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.example.pulsr.audio',
         androidNotificationChannelName: 'Pulsr Audio Playback',
-        androidNotificationOngoing: true,
+        androidNotificationOngoing: false,
         androidNotificationClickStartsActivity: true,
-        androidStopForegroundOnPause: true,
+        androidStopForegroundOnPause: false,
         androidResumeOnClick: true,
-        androidNotificationIcon: 'mipmap/ic_launcher',
+        androidNotificationIcon: 'drawable/ic_notification',
       ),
     );
   }
@@ -469,6 +469,21 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     final item = _songToMediaItem(song, artUri);
     mediaItem.add(item);
 
+    // Keep notification controls alive during track transition
+    playbackState.add(
+      playbackState.value.copyWith(
+        controls: [
+          MediaControl.skipToPrevious,
+          MediaControl.pause,
+          MediaControl.skipToNext,
+        ],
+        androidCompactActionIndices: const [0, 1, 2],
+        processingState: AudioProcessingState.loading,
+        playing: true,
+        queueIndex: _currentIndex,
+      ),
+    );
+
     try {
       await _activePlayer.setAudioSource(
         AudioSource.file(song.path, tag: item),
@@ -502,23 +517,11 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
   @override
   Future<void> skipToNext() async {
-    if (_crossfadeManager.isCrossfading && _crossfadeManager.pendingIndex != null) {
-      final targetIdx = _crossfadeManager.pendingIndex!;
+    if (_crossfadeManager.isCrossfading) {
       _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
-      await _activePlayer.stop();
-      await _activePlayer.setVolume(1.0);
+      await _inactivePlayer.stop();
       await _inactivePlayer.setVolume(1.0);
-      _isPlayerAActive = !_isPlayerAActive;
-      _currentIndex = targetIdx;
-      if (targetIdx < _songs.length) {
-        final song = _songs[targetIdx];
-        final artUri = await ArtworkUriResolver.resolveArtworkUri(song);
-        mediaItem.add(_songToMediaItem(song, artUri));
-        _repository.recordPlayHistory(song.id);
-      }
-      _broadcastState(_activePlayer.playbackEvent);
-      _saveCurrentPosition();
-      return;
+      await _activePlayer.setVolume(1.0);
     }
 
     final nextIdx = _getNextIndex();
@@ -533,7 +536,17 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
   @override
   Future<void> skipToPrevious() async {
-    _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
+    if (_crossfadeManager.isCrossfading) {
+      _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
+      await _inactivePlayer.stop();
+      await _inactivePlayer.setVolume(1.0);
+      await _activePlayer.setVolume(1.0);
+    }
+    if (_activePlayer.position.inSeconds > 3) {
+      await _activePlayer.seek(Duration.zero);
+      _saveCurrentPosition();
+      return;
+    }
     final prevIdx = _getPreviousIndex();
     if (prevIdx != null) {
       await playSongAt(prevIdx);
