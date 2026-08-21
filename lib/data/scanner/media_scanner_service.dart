@@ -31,6 +31,9 @@ class MediaScannerService {
 
   Future<bool> requestPermission() async {
     if (Platform.isAndroid) {
+      // Request notification permission for foreground playback on Android 13+ (H2)
+      await Permission.notification.request();
+
       final audioStatus = await Permission.audio.request();
       if (audioStatus.isGranted) return true;
       if (!audioStatus.isPermanentlyDenied) {

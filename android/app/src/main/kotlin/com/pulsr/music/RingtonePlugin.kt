@@ -26,11 +26,12 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
     companion object {
         const val CHANNEL_NAME = "com.pulsr.music/ringtone"
 
-        fun registerWith(flutterEngine: FlutterEngine) {
+        fun registerWith(flutterEngine: FlutterEngine, context: Context): RingtonePlugin {
             val plugin = RingtonePlugin()
+            plugin.context = context
             plugin.channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
             plugin.channel.setMethodCallHandler(plugin)
-            flutterEngine.plugins.add(plugin)
+            return plugin
         }
     }
 
@@ -41,7 +42,13 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-        channel.setMethodCallHandler(null)
+        cleanup()
+    }
+
+    fun cleanup() {
+        if (::channel.isInitialized) {
+            channel.setMethodCallHandler(null)
+        }
         context = null
     }
 

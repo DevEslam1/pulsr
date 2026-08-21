@@ -1,10 +1,13 @@
 // lib/core/utils/lrc_parser.dart
+import 'dart:collection';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import '../../domain/models/lyrics_line.dart';
 
 class LrcParser {
   static const MethodChannel _lyricsChannel = MethodChannel('com.pulsr.music/lyrics');
+  static const int _maxCacheSize = 50;
+  static final LinkedHashMap<String, LyricsResult?> _lyricsCache = LinkedHashMap();
 
   /// Parses raw LRC string content into a sorted list of `LyricsLine`.
   static List<LyricsLine> parse(String lrcContent, {LyricsSource source = LyricsSource.none}) {
@@ -104,31 +107,53 @@ class LrcParser {
     return null;
   }
 
-  /// Resolves lyrics following the fallback chain:
-  /// 1. Embedded lyrics via platform channel / tag reader
-  /// 2. External .lrc file
-  /// 3. null
+  /// Resolves lyrics following the fallback chain with in-memory caching:
+  /// 1. Check in-memory LRU cache
+  /// 2. Embedded lyrics via platform channel / tag reader
+  /// 3. External .lrc file
+  /// 4. null
   static Future<LyricsResult?> resolveLyrics(String audioFilePath) async {
+    if (_lyricsCache.containsKey(audioFilePath)) {
+      final cached = _lyricsCache.remove(audioFilePath);
+      _lyricsCache[audioFilePath] = cached;
+      return cached;
+    }
+
+    LyricsResult? resolved;
+
     // 1. Embedded lyrics via platform channel / tag reader
     final embeddedText = await getEmbeddedLyrics(audioFilePath);
     if (embeddedText != null && embeddedText.trim().isNotEmpty) {
       final syncedLines = parse(embeddedText, source: LyricsSource.embedded);
       if (syncedLines.isNotEmpty) {
-        return LyricsResult(lines: syncedLines, source: LyricsSource.embedded);
-      }
-      final plainLines = parsePlainText(embeddedText, source: LyricsSource.embedded);
-      if (plainLines.isNotEmpty) {
-        return LyricsResult(lines: plainLines, source: LyricsSource.embedded);
+        resolved = LyricsResult(lines: syncedLines, source: LyricsSource.embedded);
+      } else {
+        final plainLines = parsePlainText(embeddedText, source: LyricsSource.embedded);
+        if (plainLines.isNotEmpty) {
+          resolved = LyricsResult(lines: plainLines, source: LyricsSource.embedded);
+        }
       }
     }
 
     // 2. External .lrc file
-    final lrcLines = await findAndParseLrc(audioFilePath, source: LyricsSource.externalLrc);
-    if (lrcLines != null && lrcLines.isNotEmpty) {
-      return LyricsResult(lines: lrcLines, source: LyricsSource.externalLrc);
+    if (resolved == null) {
+      final lrcLines = await findAndParseLrc(audioFilePath, source: LyricsSource.externalLrc);
+      if (lrcLines != null && lrcLines.isNotEmpty) {
+        resolved = LyricsResult(lines: lrcLines, source: LyricsSource.externalLrc);
+      }
     }
 
-    // 3. Fallback to null
-    return null;
+    // Cache the result (including null to avoid repeated failing lookups)
+    if (_lyricsCache.length >= _maxCacheSize) {
+      _lyricsCache.remove(_lyricsCache.keys.first);
+    }
+    _lyricsCache[audioFilePath] = resolved;
+
+    return resolved;
+  }
+
+  /// Clear the lyrics cache (e.g. on tag edit or rescan)
+  static void clearCache() {
+    _lyricsCache.clear();
   }
 }

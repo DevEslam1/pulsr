@@ -62,20 +62,17 @@ class NowPlayingWidget : AppWidgetProvider() {
             ACTION_PLAY_PAUSE -> {
                 val newPlaying = !currentIsPlaying
                 prefs.edit().putBoolean("isPlaying", newPlaying).apply()
-                sendExplicitMediaButton(context, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE)
-                performMediaAction(context) { controls, isPlaying, _, _ ->
+                performMediaAction(context, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) { controls, isPlaying, _, _ ->
                     if (isPlaying) controls.pause() else controls.play()
                 }
             }
             ACTION_NEXT -> {
-                sendExplicitMediaButton(context, KeyEvent.KEYCODE_MEDIA_NEXT)
-                performMediaAction(context) { controls, _, _, _ ->
+                performMediaAction(context, KeyEvent.KEYCODE_MEDIA_NEXT) { controls, _, _, _ ->
                     controls.skipToNext()
                 }
             }
             ACTION_PREV -> {
-                sendExplicitMediaButton(context, KeyEvent.KEYCODE_MEDIA_PREVIOUS)
-                performMediaAction(context) { controls, _, _, _ ->
+                performMediaAction(context, KeyEvent.KEYCODE_MEDIA_PREVIOUS) { controls, _, _, _ ->
                     controls.skipToPrevious()
                 }
             }
@@ -174,6 +171,7 @@ class NowPlayingWidget : AppWidgetProvider() {
 
         private fun performMediaAction(
             context: Context,
+            fallbackKeyCode: Int? = null,
             action: (MediaControllerCompat.TransportControls, Boolean, Long, Long) -> Unit
         ) {
             try {
@@ -190,7 +188,6 @@ class NowPlayingWidget : AppWidgetProvider() {
 
                 val component = ComponentName(context, "com.ryanheise.audioservice.AudioService")
                 val appContext = context.applicationContext ?: context
-                val handler = Handler(Looper.getMainLooper())
 
                 val connectionCallback = object : MediaBrowserCompat.ConnectionCallback() {
                     override fun onConnected() {
@@ -200,20 +197,32 @@ class NowPlayingWidget : AppWidgetProvider() {
                                 val newController = MediaControllerCompat(appContext, token)
                                 cachedMediaController = newController
                                 action(newController.transportControls, isPlaying, position, duration)
+                            } else if (fallbackKeyCode != null) {
+                                sendExplicitMediaButton(appContext, fallbackKeyCode)
                             }
                         } catch (_: Throwable) {
+                            if (fallbackKeyCode != null) {
+                                sendExplicitMediaButton(appContext, fallbackKeyCode)
+                            }
                         }
                     }
 
                     override fun onConnectionFailed() {
                         cachedMediaBrowser = null
                         cachedMediaController = null
+                        if (fallbackKeyCode != null) {
+                            sendExplicitMediaButton(appContext, fallbackKeyCode)
+                        }
                     }
                 }
 
                 cachedMediaBrowser = MediaBrowserCompat(appContext, component, connectionCallback, null)
                 cachedMediaBrowser?.connect()
-            } catch (_: Throwable) {}
+            } catch (_: Throwable) {
+                if (fallbackKeyCode != null) {
+                    sendExplicitMediaButton(context, fallbackKeyCode)
+                }
+            }
         }
 
         private fun getSafeLong(prefs: SharedPreferences, key: String, default: Long = 0L): Long {

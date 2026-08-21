@@ -42,89 +42,91 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
     final Color inactiveColor = widget.inactiveColor ??
         (isDark ? Colors.white.withValues(alpha: 0.22) : p.hairline.withValues(alpha: 0.8));
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Interactive Waveform Area
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final trackWidth = constraints.maxWidth;
-              return GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onHorizontalDragStart: (details) {
-                  if (trackWidth > 0 && maxDuration > 0) {
-                    final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
-                    setState(() {
-                      _dragValue = ratio * maxDuration;
-                    });
-                  }
-                },
-                onHorizontalDragUpdate: (details) {
-                  if (trackWidth > 0 && maxDuration > 0) {
-                    final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
-                    setState(() {
-                      _dragValue = ratio * maxDuration;
-                    });
-                  }
-                },
-                onHorizontalDragEnd: (details) {
-                  if (_dragValue != null) {
-                    widget.onSeek(Duration(milliseconds: _dragValue!.round()));
-                    setState(() {
-                      _dragValue = null;
-                    });
-                  }
-                },
-                onTapDown: (details) {
-                  if (trackWidth > 0 && maxDuration > 0) {
-                    final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
-                    final seekMs = ratio * maxDuration;
-                    widget.onSeek(Duration(milliseconds: seekMs.round()));
-                  }
-                },
-                child: SizedBox(
-                  height: widget.height,
-                  width: double.infinity,
-                  child: CustomPaint(
-                    painter: _WaveformPainter(
-                      samples: widget.samples,
-                      progress: progressPercent,
-                      activeColor: widget.activeColor,
-                      inactiveColor: inactiveColor,
+    return RepaintBoundary(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Interactive Waveform Area
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final trackWidth = constraints.maxWidth;
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onHorizontalDragStart: (details) {
+                    if (trackWidth > 0 && maxDuration > 0) {
+                      final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                      setState(() {
+                        _dragValue = ratio * maxDuration;
+                      });
+                    }
+                  },
+                  onHorizontalDragUpdate: (details) {
+                    if (trackWidth > 0 && maxDuration > 0) {
+                      final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                      setState(() {
+                        _dragValue = ratio * maxDuration;
+                      });
+                    }
+                  },
+                  onHorizontalDragEnd: (details) {
+                    if (_dragValue != null) {
+                      widget.onSeek(Duration(milliseconds: _dragValue!.round()));
+                      setState(() {
+                        _dragValue = null;
+                      });
+                    }
+                  },
+                  onTapDown: (details) {
+                    if (trackWidth > 0 && maxDuration > 0) {
+                      final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                      final seekMs = ratio * maxDuration;
+                      widget.onSeek(Duration(milliseconds: seekMs.round()));
+                    }
+                  },
+                  child: SizedBox(
+                    height: widget.height,
+                    width: double.infinity,
+                    child: CustomPaint(
+                      painter: _WaveformPainter(
+                        samples: widget.samples,
+                        progress: progressPercent,
+                        activeColor: widget.activeColor,
+                        inactiveColor: inactiveColor,
+                      ),
                     ),
                   ),
+                );
+              },
+            ),
+            const SizedBox(height: 4),
+            // Timestamps Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  Formatters.formatDuration(
+                    _dragValue != null ? Duration(milliseconds: _dragValue!.round()) : widget.position,
+                  ),
+                  style: TextStyle(
+                    color: context.palette.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              );
-            },
-          ),
-          const SizedBox(height: 4),
-          // Timestamps Row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                Formatters.formatDuration(
-                  _dragValue != null ? Duration(milliseconds: _dragValue!.round()) : widget.position,
+                Text(
+                  Formatters.formatDuration(widget.duration),
+                  style: TextStyle(
+                    color: context.palette.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-                style: TextStyle(
-                  color: context.palette.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              Text(
-                Formatters.formatDuration(widget.duration),
-                style: TextStyle(
-                  color: context.palette.textSecondary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

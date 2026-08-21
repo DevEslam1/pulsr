@@ -54,6 +54,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   int _currentIndex = 0;
   bool _queueDirty = false;
   double? _preDuckVolume;
+  int _consecutiveFailures = 0;
   final List<int> _shuffleHistory = [];
 
   Timer? _savePositionDebounce;
@@ -310,7 +311,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
         final item = queueItems[i];
         final songRes = await _repository.getSongById(item.songId);
         final song = songRes.fold((l) => null, (r) => r);
-        if (song != null) {
+        if (song != null && File(song.path).existsSync()) {
           songs.add(song);
           if (item.isCurrent) {
             targetIndex = songs.length - 1;
@@ -363,8 +364,8 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
       final inactive = _inactivePlayer;
 
       await Future.wait([
-        _crossfadeManager.fadeVolume(active, 1.0, 0.0, _crossfadeManager.duration, currentFadeId),
-        _crossfadeManager.fadeVolume(inactive, 0.0, 1.0, _crossfadeManager.duration, currentFadeId),
+        _crossfadeManager.fadeVolume(active, _volume, 0.0, _crossfadeManager.duration, currentFadeId),
+        _crossfadeManager.fadeVolume(inactive, 0.0, _volume, _crossfadeManager.duration, currentFadeId),
       ]);
 
       if (_crossfadeManager.currentFadeId != currentFadeId) return;
@@ -382,7 +383,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
       _broadcastState(_activePlayer.playbackEvent);
 
       await active.stop();
-      await active.setVolume(1.0);
+      await active.setVolume(_volume);
     } catch (_) {
     } finally {
       if (_crossfadeManager.currentFadeId == currentFadeId) {
@@ -397,6 +398,10 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
       return _currentIndex;
     }
     if (_activePlayer.shuffleModeEnabled && _songs.length > 1) {
+      _shuffleHistory.add(_currentIndex);
+      if (_shuffleHistory.length > 50) {
+        _shuffleHistory.removeAt(0);
+      }
       final random = math.Random();
       final recentWindow = math.min(_songs.length - 1, 10);
       final recent = _shuffleHistory.length >= recentWindow
@@ -408,10 +413,6 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
       while ((next == _currentIndex || recent.contains(next)) && attempts < 20 && _songs.length > 2) {
         next = random.nextInt(_songs.length);
         attempts++;
-      }
-      _shuffleHistory.add(next);
-      if (_shuffleHistory.length > 50) {
-        _shuffleHistory.removeAt(0);
       }
       return next;
     }
@@ -427,6 +428,9 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     if (_songs.isEmpty) return null;
     if (_activePlayer.position.inSeconds > 3) {
       return _currentIndex;
+    }
+    if (_activePlayer.shuffleModeEnabled && _shuffleHistory.isNotEmpty) {
+      return _shuffleHistory.removeLast();
     }
     if (_currentIndex - 1 >= 0) {
       return _currentIndex - 1;
@@ -474,7 +478,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
   // --- QUEUE & PLAYBACK COMMANDS ---
   Future<void> loadQueue(List<SongsTableData> songs, {int initialIndex = 0, Duration? initialPosition}) async {
-    await _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
+    await _crossfadeManager.cancel(_inactivePlayer, _activePlayer, restoreVolume: _volume);
     _songs = List.from(songs);
     _currentIndex = initialIndex.clamp(0, _songs.isEmpty ? 0 : _songs.length - 1);
     _queueDirty = true;
@@ -489,7 +493,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {
     if (index < 0 || index >= _songs.length) return;
-    await _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
+    await _crossfadeManager.cancel(_inactivePlayer, _activePlayer, restoreVolume: _volume);
     _currentIndex = index;
 
     final song = _songs[index];
@@ -518,11 +522,20 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
         AudioSource.file(song.path, tag: item),
         initialPosition: initialPosition,
       );
+      await _activePlayer.setVolume(_volume);
       await _activePlayer.play();
+      _consecutiveFailures = 0;
       _repository.recordPlayHistory(song.id);
       _saveCurrentPosition();
     } catch (e) {
-      skipToNext();
+      _consecutiveFailures++;
+      if (_consecutiveFailures >= 5 || _consecutiveFailures >= _songs.length) {
+        _consecutiveFailures = 0;
+        await _activePlayer.pause();
+        _broadcastState(_activePlayer.playbackEvent);
+      } else {
+        skipToNext();
+      }
     }
   }
 
@@ -532,14 +545,14 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
   @override
   Future<void> pause() async {
-    await _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
+    await _crossfadeManager.cancel(_inactivePlayer, _activePlayer, restoreVolume: _volume);
     _saveCurrentPosition();
     await _activePlayer.pause();
   }
 
   @override
   Future<void> seek(Duration position) async {
-    await _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
+    await _crossfadeManager.cancel(_inactivePlayer, _activePlayer, restoreVolume: _volume);
     await _activePlayer.seek(position);
     _saveCurrentPosition();
   }
@@ -547,7 +560,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   @override
   Future<void> skipToNext() async {
     if (_crossfadeManager.isCrossfading) {
-      await _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
+      await _crossfadeManager.cancel(_inactivePlayer, _activePlayer, restoreVolume: _volume);
     }
 
     final nextIdx = _getNextIndex();
@@ -563,7 +576,7 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   @override
   Future<void> skipToPrevious() async {
     if (_crossfadeManager.isCrossfading) {
-      await _crossfadeManager.cancel(_inactivePlayer, _activePlayer);
+      await _crossfadeManager.cancel(_inactivePlayer, _activePlayer, restoreVolume: _volume);
     }
     if (_activePlayer.position.inSeconds > 3) {
       await _activePlayer.seek(Duration.zero);

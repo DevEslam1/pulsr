@@ -1,5 +1,7 @@
 package com.pulsr.music
 
+import android.content.Context
+import android.media.MediaScannerConnection
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
@@ -15,15 +17,18 @@ import java.util.logging.Logger
 
 class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
+    private var context: Context? = null
 
     companion object {
         const val CHANNEL_NAME = "com.pulsr.music/tag_editor"
 
-        fun registerWith(flutterEngine: FlutterEngine) {
+        fun registerWith(flutterEngine: FlutterEngine, context: Context): TagEditorPlugin {
             val plugin = TagEditorPlugin()
+            plugin.context = context
             plugin.channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
             plugin.channel.setMethodCallHandler(plugin)
             disableLogger()
+            return plugin
         }
 
         private fun disableLogger() {
@@ -34,13 +39,21 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        context = binding.applicationContext
         channel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME)
         channel.setMethodCallHandler(this)
         disableLogger()
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-        channel.setMethodCallHandler(null)
+        cleanup()
+    }
+
+    fun cleanup() {
+        if (::channel.isInitialized) {
+            channel.setMethodCallHandler(null)
+        }
+        context = null
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
@@ -158,6 +171,14 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                     }
 
                     AudioFileIO.write(audioFile)
+
+                    // Trigger Android system MediaStore scan so changes are indexed immediately
+                    context?.let { ctx ->
+                        try {
+                            MediaScannerConnection.scanFile(ctx, arrayOf(path), null, null)
+                        } catch (_: Exception) {}
+                    }
+
                     result.success(true)
                 } catch (e: Exception) {
                     result.error("WRITE_TAGS_ERROR", e.message, e.stackTraceToString())

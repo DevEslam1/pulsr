@@ -42,15 +42,15 @@ class CrossfadeManager {
     }
   }
 
-  Future<void> cancel(AudioPlayer inactivePlayer, AudioPlayer activePlayer) async {
+  Future<void> cancel(AudioPlayer inactivePlayer, AudioPlayer activePlayer, {double restoreVolume = 1.0}) async {
     if (isCrossfading) {
       _fadeId++;
       isCrossfading = false;
       pendingIndex = null;
       try {
         await inactivePlayer.stop();
-        await inactivePlayer.setVolume(1.0);
-        await activePlayer.setVolume(1.0);
+        await inactivePlayer.setVolume(restoreVolume);
+        await activePlayer.setVolume(restoreVolume);
       } catch (_) {}
       if (_crossfadeCompleter != null && !_crossfadeCompleter!.isCompleted) {
         _crossfadeCompleter!.complete();

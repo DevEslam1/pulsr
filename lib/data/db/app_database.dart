@@ -57,7 +57,9 @@ class AppDatabase extends _$AppDatabase {
       }
     },
     beforeOpen: (details) async {
-      await customStatement('PRAGMA foreign_keys = ON');
+      await customStatement('PRAGMA foreign_keys = ON;');
+      await customStatement('PRAGMA journal_mode = WAL;');
+      await customStatement('PRAGMA synchronous = NORMAL;');
     },
   );
 }

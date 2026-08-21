@@ -2,6 +2,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../core/utils/lrc_parser.dart';
 import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
 import 'tag_editor_state.dart';
@@ -120,7 +121,8 @@ class TagEditorCubit extends Cubit<TagEditorState> {
         'removeArtwork': state.removeArtwork,
       });
 
-      // Update Drift DB
+      // Update Drift DB and clear cached parsed lyrics
+      LrcParser.clearCache();
       await _scannerService.rescanSingleFile(state.song.path);
 
       emit(state.copyWith(status: TagEditorStatus.success));

@@ -33,7 +33,8 @@ class AudioVisualizer extends StatefulWidget {
   State<AudioVisualizer> createState() => _AudioVisualizerState();
 }
 
-class _AudioVisualizerState extends State<AudioVisualizer> with SingleTickerProviderStateMixin {
+class _AudioVisualizerState extends State<AudioVisualizer>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   static const MethodChannel _methodChannel = MethodChannel('com.pulsr.music/visualizer');
   static const EventChannel _eventChannel = EventChannel('com.pulsr.music/visualizer_stream');
 
@@ -50,6 +51,7 @@ class _AudioVisualizerState extends State<AudioVisualizer> with SingleTickerProv
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _dataNotifier = ValueNotifier<List<double>>(List.from(_currentData));
     _animController = AnimationController(
       vsync: this,
@@ -60,6 +62,23 @@ class _AudioVisualizerState extends State<AudioVisualizer> with SingleTickerProv
       _animController.repeat();
       if (Platform.isAndroid) {
         _startNativeVisualizer();
+      }
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      _stopNativeVisualizer();
+      _animController.stop();
+    } else if (state == AppLifecycleState.resumed) {
+      if (widget.style != VisualizerStyle.off && widget.isPlaying) {
+        if (!_animController.isAnimating) _animController.repeat();
+        if (Platform.isAndroid) {
+          _startNativeVisualizer();
+        }
       }
     }
   }
@@ -91,6 +110,7 @@ class _AudioVisualizerState extends State<AudioVisualizer> with SingleTickerProv
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _stopNativeVisualizer();
     _animController.dispose();
     _dataNotifier.dispose();

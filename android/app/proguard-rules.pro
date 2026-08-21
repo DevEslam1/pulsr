@@ -6,7 +6,7 @@
 -keep class com.ryanheise.audioservice.** { *; }
 -dontwarn com.ryanheise.audioservice.**
 
-# Flutter and Native Media
+# Media and App Rules
 -keep class androidx.media.** { *; }
 -dontwarn androidx.media.**
 -keep class com.pulsr.music.** { *; }

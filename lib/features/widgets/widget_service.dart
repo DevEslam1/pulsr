@@ -19,6 +19,7 @@ class WidgetService {
 
   int? _lastArtworkSongId;
   String? _lastArtworkPath;
+  int? _lastSavedArtworkSongId;
 
   Future<void> updateNowPlaying({
     required SongsTableData? song,
@@ -48,10 +49,16 @@ class WidgetService {
       await HomeWidget.saveWidgetData<String>('repeatMode', repeatMode);
 
       if (hasSong) {
-        final artPath = await _resolveArtworkPath(song.id);
-        await HomeWidget.saveWidgetData<String>('artwork', artPath ?? '');
+        if (_lastSavedArtworkSongId != song.id) {
+          final artPath = await _resolveArtworkPath(song.id);
+          await HomeWidget.saveWidgetData<String>('artwork', artPath ?? '');
+          _lastSavedArtworkSongId = song.id;
+        }
       } else {
-        await HomeWidget.saveWidgetData<String>('artwork', '');
+        if (_lastSavedArtworkSongId != null) {
+          await HomeWidget.saveWidgetData<String>('artwork', '');
+          _lastSavedArtworkSongId = null;
+        }
       }
 
       await HomeWidget.updateWidget(

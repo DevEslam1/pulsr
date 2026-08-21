@@ -20,13 +20,14 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
         const val METHOD_CHANNEL = "com.pulsr.music/visualizer"
         const val EVENT_CHANNEL = "com.pulsr.music/visualizer_stream"
 
-        fun registerWith(flutterEngine: FlutterEngine) {
+        fun registerWith(flutterEngine: FlutterEngine): VisualizerPlugin {
             val plugin = VisualizerPlugin()
             plugin.methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, METHOD_CHANNEL)
             plugin.methodChannel.setMethodCallHandler(plugin)
 
             plugin.eventChannel = EventChannel(flutterEngine.dartExecutor.binaryMessenger, EVENT_CHANNEL)
             plugin.eventChannel.setStreamHandler(plugin)
+            return plugin
         }
     }
 
@@ -39,9 +40,17 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        cleanup()
+    }
+
+    fun cleanup() {
         stopVisualizer()
-        methodChannel.setMethodCallHandler(null)
-        eventChannel.setStreamHandler(null)
+        if (::methodChannel.isInitialized) {
+            methodChannel.setMethodCallHandler(null)
+        }
+        if (::eventChannel.isInitialized) {
+            eventChannel.setStreamHandler(null)
+        }
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {

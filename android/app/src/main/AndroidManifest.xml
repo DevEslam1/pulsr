@@ -16,6 +16,8 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="false"
+        android:supportsRtl="true"
+        android:enableOnBackInvokedCallback="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules">
         <activity
@@ -63,18 +65,42 @@
                 <data android:scheme="file" />
                 <data android:scheme="content" />
                 <data android:host="*" />
+                <!-- Layered pathPattern matchers for filenames with multiple dots (B7) -->
                 <data android:pathPattern=".*\\.mp3" />
+                <data android:pathPattern=".*\\..*\\.mp3" />
+                <data android:pathPattern=".*\\..*\\..*\\.mp3" />
                 <data android:pathPattern=".*\\.flac" />
+                <data android:pathPattern=".*\\..*\\.flac" />
+                <data android:pathPattern=".*\\..*\\..*\\.flac" />
                 <data android:pathPattern=".*\\.wav" />
+                <data android:pathPattern=".*\\..*\\.wav" />
+                <data android:pathPattern=".*\\..*\\..*\\.wav" />
                 <data android:pathPattern=".*\\.aac" />
+                <data android:pathPattern=".*\\..*\\.aac" />
+                <data android:pathPattern=".*\\..*\\..*\\.aac" />
                 <data android:pathPattern=".*\\.m4a" />
+                <data android:pathPattern=".*\\..*\\.m4a" />
+                <data android:pathPattern=".*\\..*\\..*\\.m4a" />
                 <data android:pathPattern=".*\\.ogg" />
+                <data android:pathPattern=".*\\..*\\.ogg" />
+                <data android:pathPattern=".*\\..*\\..*\\.ogg" />
                 <data android:pathPattern=".*\\.opus" />
+                <data android:pathPattern=".*\\..*\\.opus" />
+                <data android:pathPattern=".*\\..*\\..*\\.opus" />
                 <data android:pathPattern=".*\\.wma" />
+                <data android:pathPattern=".*\\..*\\.wma" />
                 <data android:pathPattern=".*\\.alac" />
+                <data android:pathPattern=".*\\..*\\.alac" />
+                <data android:pathPattern=".*\\..*\\..*\\.alac" />
                 <data android:pathPattern=".*\\.aiff" />
+                <data android:pathPattern=".*\\..*\\.aiff" />
+                <data android:pathPattern=".*\\..*\\..*\\.aiff" />
                 <data android:pathPattern=".*\\.dsf" />
+                <data android:pathPattern=".*\\..*\\.dsf" />
+                <data android:pathPattern=".*\\..*\\..*\\.dsf" />
                 <data android:pathPattern=".*\\.dff" />
+                <data android:pathPattern=".*\\..*\\.dff" />
+                <data android:pathPattern=".*\\..*\\..*\\.dff" />
             </intent-filter>
         </activity>
         
@@ -110,10 +136,6 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info" />
         </receiver>
-
-        <meta-data
-            android:name="com.google.android.gms.car.application"
-            android:resource="@xml/automotive_app_desc"/>
 
         <meta-data
             android:name="flutterEmbedding"

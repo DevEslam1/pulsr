@@ -37,12 +37,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     companion object {
         const val CHANNEL_NAME = "com.pulsr.music/audio_effects"
+        private var cachedSupportedEffects: Array<AudioEffect.Descriptor>? = null
 
-        fun registerWith(flutterEngine: FlutterEngine, context: Context) {
+        fun registerWith(flutterEngine: FlutterEngine, context: Context): AudioEffectsPlugin {
             val plugin = AudioEffectsPlugin()
             plugin.context = context
             plugin.methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
             plugin.methodChannel.setMethodCallHandler(plugin)
+            return plugin
         }
     }
 
@@ -142,7 +144,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     private fun ensureVirtualizer() {
-        if (virtualizer == null) {
+        if (virtualizer == null && currentAudioSessionId != 0) {
             try {
                 virtualizer = Virtualizer(0, currentAudioSessionId)
                 if (virtualizer?.strengthSupported == true && virtualizerStrength > 0) {
@@ -255,10 +257,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun applyDynamicsPreset(preset: String) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
+        if (currentAudioSessionId == 0) return
 
         try {
             dynamicsProcessing?.release()
         } catch (_: Exception) {}
+        dynamicsProcessing = null
 
         // Setup 3-band Multiband Compressor (Low, Mid, High)
         val channelCount = 2 // Stereo
@@ -486,6 +490,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     limiter.threshold = -1.0f
                     limiter.postGain = 0.5f
                 }
+
+                else -> return
             }
         }
 
@@ -534,28 +540,24 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     private fun recreateEffects() {
+        // Always release — stale instances are bound to the dead session
+        try { virtualizer?.release() } catch (_: Exception) {}
+        try { loudnessEnhancer?.release() } catch (_: Exception) {}
+        try { bassBoost?.release() } catch (_: Exception) {}
+        virtualizer = null
+        loudnessEnhancer = null
+        bassBoost = null
+
         if (isVirtualizerEnabled || virtualizerStrength > 0) {
-            try {
-                virtualizer?.release()
-            } catch (_: Exception) {}
-            virtualizer = null
             setVirtualizerState(isVirtualizerEnabled)
             setVirtualizerStrengthValue(virtualizerStrength.toInt())
         }
 
         if (volumeBoostMilliBels > 0) {
-            try {
-                loudnessEnhancer?.release()
-            } catch (_: Exception) {}
-            loudnessEnhancer = null
             setVolumeBoost(volumeBoostMilliBels)
         }
 
         if (bassBoostStrength > 0) {
-            try {
-                bassBoost?.release()
-            } catch (_: Exception) {}
-            bassBoost = null
             setBassBoostStrengthValue(bassBoostStrength.toInt())
         }
 
@@ -564,7 +566,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private fun releaseEffects() {
+    fun releaseEffects() {
         try {
             virtualizer?.enabled = false
             virtualizer?.release()
@@ -592,7 +594,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun isEffectTypeSupported(effectType: UUID): Boolean {
         return try {
-            val effects = AudioEffect.queryEffects() ?: return false
+            val effects = cachedSupportedEffects ?: AudioEffect.queryEffects()?.also {
+                cachedSupportedEffects = it
+            } ?: return false
             effects.any { it.type == effectType }
         } catch (_: Exception) {
             false
