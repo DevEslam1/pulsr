@@ -49,13 +49,7 @@ android {
     buildTypes {
         release {
             val releaseConfig = signingConfigs.getByName("release")
-            val isReleaseTask = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) || it.contains("bundle", ignoreCase = true) }
             val hasKeystore = releaseConfig.storeFile != null && releaseConfig.storeFile!!.exists()
-            if (isReleaseTask && !hasKeystore) {
-                throw GradleException(
-                    "Release keystore not configured. Create android/key.properties with storeFile/keyAlias/keyPassword/storePassword."
-                )
-            }
             signingConfig = if (hasKeystore) releaseConfig else signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
