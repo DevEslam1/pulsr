@@ -11,6 +11,7 @@ import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
 import 'hidden_folders_screen.dart';
 import 'widgets/backup_section.dart';
+import 'widgets/love_dedication_card.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -31,6 +32,7 @@ class SettingsScreen extends StatelessWidget {
               child: ListView(
                 padding: EdgeInsets.only(bottom: 160, top: 8, left: Adaptive.pagePadding(context), right: Adaptive.pagePadding(context)),
                 children: [
+                  const LoveDedicationCard(),
                   _section(context, 'Audio & Playback', [
                     _navTile(context, Icons.equalizer_rounded, 'Equalizer & Sound Effects', '5-band EQ, bass boost, presets',
                         onTap: () => showModalBottomSheet(context: context, useRootNavigator: true, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => const EqualizerSheet())),
@@ -222,7 +224,42 @@ class SettingsScreen extends StatelessWidget {
                     _navTile(context, Icons.security_rounded, 'Privacy Guarantee', '100% offline. Zero telemetry, zero tracking.', onTap: () {}),
                   ]),
                   _section(context, 'About', [
-                    _navTile(context, Icons.info_outline_rounded, 'Pulsr Music', 'Version 1.0.0 • Pure Offline Sound', onTap: () {}),
+                    _navTile(
+                      context,
+                      Icons.favorite_rounded,
+                      'Pulsr — Dr. Basbosa Edition 💖',
+                      'Version 1.0.0 • Handcrafted for Dr. Basbosa by Eng. Eslam',
+                      onTap: () => showAboutDialog(
+                        context: context,
+                        applicationName: 'Pulsr — Dr. Basbosa Edition',
+                        applicationVersion: '1.0.0',
+                        applicationIcon: ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Image.asset(
+                            'assets/app_icon/appicon2.png',
+                            width: 52,
+                            height: 52,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        children: const [
+                          SizedBox(height: 14),
+                          Text(
+                            'A special, customized music player crafted with endless love for Dr. Basbosa 🌸',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                          ),
+                          SizedBox(height: 10),
+                          Text(
+                            'Forever Yours,\nEng. Eslam ✨',
+                            style: TextStyle(
+                              fontSize: 13.5,
+                              color: Color(0xFFFF2A85),
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ]),
                 ],
               ),

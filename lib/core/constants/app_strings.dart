@@ -1,7 +1,7 @@
 // lib/core/constants/app_strings.dart
 abstract class AppStrings {
-  static const String appName = 'Pulsr Music';
-  static const String appTagline = 'Pure Offline Sound';
+  static const String appName = 'Pulsr — Dr. Basbosa Edition';
+  static const String appTagline = 'Custom Edition for Dr. Basbosa ❤️';
 
   // Navigation
   static const String navHome = 'Home';

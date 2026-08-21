@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/love_feedback.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/waveform_logo.dart';
 import '../../../settings/cubit/settings_cubit.dart';
@@ -112,12 +113,12 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme> with SingleTicker
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            'VINYL CIRCLE',
+                            'DR. BASBOSA EDITION',
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                   fontSize: 10,
                                   letterSpacing: 1.2,
                                   fontWeight: FontWeight.w800,
-                                  color: p.textSecondary,
+                                  color: const Color(0xFFFF85BC),
                                 ),
                           ),
                         ],
@@ -310,7 +311,45 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme> with SingleTicker
                         ),
                         if (song != null) ...[
                           const SizedBox(height: 6),
-                          AudioQualityBadge(song: song, activeColor: activeColor),
+                          Row(
+                            children: [
+                              AudioQualityBadge(song: song, activeColor: activeColor),
+                              const SizedBox(width: 8),
+                              InkWell(
+                                borderRadius: BorderRadius.circular(6),
+                                onTap: () => showNowPlayingLoveMessage(
+                                  context,
+                                  songTitle: song.title,
+                                ),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFFF2A85).withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: const Color(0xFFFF2A85).withValues(alpha: 0.3),
+                                      width: 0.8,
+                                    ),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.favorite_rounded, size: 10, color: Color(0xFFFF2A85)),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'For Dr. Basbosa ❤️',
+                                        style: TextStyle(
+                                          color: Color(0xFFFF85BC),
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ],
                       ],
                     ),
@@ -328,6 +367,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme> with SingleTicker
                     onPressed: () {
                       if (song != null) {
                         cubit.toggleFavorite(song.id);
+                        showFavoriteFeedback(context, !song.isFavorite);
                       }
                     },
                   ),

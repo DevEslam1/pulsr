@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/love_feedback.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
@@ -53,12 +54,12 @@ class MinimalPlayerTheme extends StatelessWidget {
                     onPressed: () => context.canPop() ? context.pop() : context.go('/'),
                   ),
                   Text(
-                    'NOW PLAYING',
+                    'DR. BASBOSA EDITION',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontSize: 11,
-                          letterSpacing: 2.0,
+                          fontSize: 10,
+                          letterSpacing: 1.5,
                           fontWeight: FontWeight.w800,
-                          color: p.textSecondary,
+                          color: const Color(0xFFFF85BC),
                         ),
                   ),
                   IconButton(
@@ -203,7 +204,46 @@ class MinimalPlayerTheme extends StatelessWidget {
                   ),
                   if (song != null) ...[
                     const SizedBox(height: 8),
-                    AudioQualityBadge(song: song, activeColor: activeColor),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        AudioQualityBadge(song: song, activeColor: activeColor),
+                        const SizedBox(width: 8),
+                        InkWell(
+                          borderRadius: BorderRadius.circular(6),
+                          onTap: () => showNowPlayingLoveMessage(
+                            context,
+                            songTitle: song.title,
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFF2A85).withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: const Color(0xFFFF2A85).withValues(alpha: 0.3),
+                                width: 0.8,
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.favorite_rounded, size: 10, color: Color(0xFFFF2A85)),
+                                SizedBox(width: 4),
+                                Text(
+                                  'For Dr. Basbosa ❤️',
+                                  style: TextStyle(
+                                    color: Color(0xFFFF85BC),
+                                    fontSize: 9.5,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ],
               ),
@@ -271,7 +311,10 @@ class MinimalPlayerTheme extends StatelessWidget {
                       color: song?.isFavorite == true ? p.favorite : p.textSecondary,
                     ),
                     onPressed: () {
-                      if (song != null) cubit.toggleFavorite(song.id);
+                      if (song != null) {
+                        cubit.toggleFavorite(song.id);
+                        showFavoriteFeedback(context, !song.isFavorite);
+                      }
                     },
                   ),
                   IconButton(

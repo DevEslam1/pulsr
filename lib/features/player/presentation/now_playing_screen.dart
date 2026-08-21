@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
+import '../../../core/theme/aura_theme.dart';
 import '../../../core/theme/dynamic_theme_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../settings/cubit/settings_state.dart';
@@ -37,7 +38,7 @@ class NowPlayingScreen extends StatelessWidget {
             : settingsState.customAccentColor;
         final bgColor = settingsState.dynamicThemingEnabled
             ? dynamicTheme.backgroundColor
-            : const Color(0xFF14172B);
+            : context.palette.bg;
 
         final props = PlayerThemeProps(
           state: state,

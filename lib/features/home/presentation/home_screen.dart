@@ -15,6 +15,7 @@ import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../../core/errors/failures.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
+import 'widgets/home_love_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -50,49 +51,91 @@ class _HomeScreenState extends State<HomeScreen> {
                 // ---------- Hero header ----------
                 Padding(
                   padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 4),
-                  child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          Text(
-                            MaterialLocalizations.of(context).formatMediumDate(DateTime.now()),
-                            style: Theme.of(context).textTheme.labelSmall?.copyWith(color: p.textTertiary),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      MaterialLocalizations.of(context).formatMediumDate(DateTime.now()),
+                                      style: Theme.of(context).textTheme.labelSmall?.copyWith(color: p.textTertiary),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFF2A85).withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: const Text(
+                                        'By Eng. Eslam 💖',
+                                        style: TextStyle(
+                                          color: Color(0xFFFF85BC),
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  '${_getGreeting()}, Dr. Basbosa ✨',
+                                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                    fontSize: 22,
+                                    fontWeight: FontWeight.w900,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            _getGreeting(),
-                            style: Theme.of(context).textTheme.headlineMedium,
+                          const SizedBox(width: 12),
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: p.accentContainer,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: p.hairline),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: p.glow,
+                                  blurRadius: 24,
+                                  spreadRadius: -4,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
+                            ),
+                            child: PulsrLogo(
+                              size: 26,
+                              color: p.accent,
+                              glowColor: p.glow,
+                              animate: false,
+                            ),
                           ),
                         ],
                       ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: p.accentContainer,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: p.hairline),
-                        boxShadow: [
-                          BoxShadow(color: p.glow, blurRadius: 24, spreadRadius: -4, offset: const Offset(0, 8)),
-                        ],
-                      ),
-                      child: PulsrLogo(size: 26, color: p.accent, glowColor: p.glow, animate: false),
-                    ),
-                  ],
-                ),
-              ),
 
-              // ---------- Quick actions ----------
+                      // Love message card on Home Screen
+                      const HomeLoveCard(),
+                    ],
+                  ),
+                ),
+
+                // ---------- Quick actions ----------
               Padding(
                 padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context), vertical: 20),
                 child: Row(
                   children: [
                     _QuickCard(
-                      title: AppStrings.favorites,
-                      subtitle: 'Liked tracks',
+                      title: 'Favorites ❤️',
+                      subtitle: 'Dr. Basbosa\'s Picks',
                       icon: Icons.favorite_rounded,
                       color: p.favorite,
                       onTap: () async {

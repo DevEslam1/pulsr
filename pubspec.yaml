@@ -60,15 +60,15 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/app_icon/app_icon.png"
+  image_path: "assets/app_icon/appicon2.png"
   min_sdk_android: 21
-  adaptive_icon_background: "#030A2E"
-  adaptive_icon_foreground: "assets/app_icon/app_icon.png"
+  adaptive_icon_background: "#1A0214"
+  adaptive_icon_foreground: "assets/app_icon/appicon2.png"
   web:
     generate: true
-    image_path: "assets/app_icon/app_icon.png"
+    image_path: "assets/app_icon/appicon2.png"
   windows:
     generate: true
-    image_path: "assets/app_icon/app_icon.png"
+    image_path: "assets/app_icon/appicon2.png"
 
 

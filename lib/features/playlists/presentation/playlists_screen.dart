@@ -98,8 +98,8 @@ class PlaylistsScreen extends StatelessWidget {
                   Padding(
                     padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 12, Adaptive.pagePadding(context), 4),
                     child: _PlaylistHeroCard(
-                      title: 'Liked Songs',
-                      subtitle: 'Auto-populated from favorites',
+                      title: 'Dr. Basbosa\'s Liked Songs 💕',
+                      subtitle: 'Your favorites • Made for my #1 favorite person',
                       icon: Icons.favorite_rounded,
                       colors: [p.favorite, const Color(0xFFB0316B)],
                       onTap: () async {

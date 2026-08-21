@@ -529,7 +529,7 @@ class _SettingsState extends SettingsState {
       this.resumeAfterInterruption = true,
       this.waveformSeekBarEnabled = true,
       this.themeMode = AppThemeMode.dark,
-      this.customAccentColorValue = 0xFF9B9EF5,
+      this.customAccentColorValue = 0xFFFF2A85,
       this.playerThemeMode = PlayerThemeMode.classic,
       this.visualizerStyle = VisualizerStyle.bar,
       this.miniPlayerSwipeLeft = MiniPlayerSwipeAction.next,
