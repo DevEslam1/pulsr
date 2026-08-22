@@ -1,6 +1,6 @@
 // lib/domain/models/lyrics_line.dart
 
-enum LyricsSource { embedded, externalLrc, none }
+enum LyricsSource { embedded, externalLrc, lrclib, none }
 
 class LyricsLine {
   final Duration timestamp;

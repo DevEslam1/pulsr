@@ -114,8 +114,16 @@ class LrcParser {
   /// 1. Check in-memory LRU cache
   /// 2. Embedded lyrics via platform channel / tag reader
   /// 3. External .lrc file
-  /// 4. null
-  static Future<LyricsResult?> resolveLyrics(String audioFilePath) async {
+  /// 4. Online LRCLIB database query
+  /// 5. null
+  static Future<LyricsResult?> resolveLyrics(
+    String audioFilePath, {
+    String? trackTitle,
+    String? artist,
+    String? album,
+    int? durationSec,
+    dynamic lrclibService,
+  }) async {
     if (_lyricsCache.containsKey(audioFilePath)) {
       final cached = _lyricsCache.remove(audioFilePath);
       _lyricsCache[audioFilePath] = cached;
@@ -143,6 +151,22 @@ class LrcParser {
       final lrcLines = await findAndParseLrc(audioFilePath, source: LyricsSource.externalLrc);
       if (lrcLines != null && lrcLines.isNotEmpty) {
         resolved = LyricsResult(lines: lrcLines, source: LyricsSource.externalLrc);
+      }
+    }
+
+    // 3. Online LRCLIB query
+    if (resolved == null && trackTitle != null && trackTitle.isNotEmpty && artist != null && artist.isNotEmpty) {
+      try {
+        if (lrclibService != null) {
+          resolved = await lrclibService.fetchLyrics(
+            trackName: trackTitle,
+            artistName: artist,
+            albumName: album,
+            durationSeconds: durationSec,
+          );
+        }
+      } catch (e, st) {
+        ErrorLogger.log('Failed to fetch lyrics from LRCLIB for $trackTitle', error: e, stackTrace: st, category: 'LrcParser');
       }
     }
 
