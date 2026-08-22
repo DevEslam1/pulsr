@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/services/scrobbler_service.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/lrc_parser.dart';
 import '../../../data/audio/audio_handler.dart';
@@ -38,6 +39,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   final ToggleFavoriteUseCase _toggleFavoriteUseCase;
   final SettingsCubit? _settingsCubit;
   final WidgetService? _widgetService;
+  final ScrobblerService? _scrobblerService;
 
   StreamSubscription? _mediaItemSub;
   StreamSubscription? _playbackStateSub;
@@ -59,11 +61,13 @@ class PlayerCubit extends Cubit<PlayerState> {
     required ToggleFavoriteUseCase toggleFavoriteUseCase,
     SettingsCubit? settingsCubit,
     WidgetService? widgetService,
+    ScrobblerService? scrobblerService,
   })  : _audioHandler = audioHandler,
         _repository = repository,
         _toggleFavoriteUseCase = toggleFavoriteUseCase,
         _settingsCubit = settingsCubit,
         _widgetService = widgetService,
+        _scrobblerService = scrobblerService,
         super(const PlayerState()) {
     _listenToAudioService();
     _loadPlaybackSpeed();
@@ -177,6 +181,15 @@ class PlayerCubit extends Cubit<PlayerState> {
                 );
                 _loadLyricsForSong(song);
                 _updateWidgetThrottled(force: true);
+                _scrobblerService?.notifyPlaybackState(
+                  id: song.id,
+                  artist: song.artist,
+                  track: song.title,
+                  album: song.album,
+                  durationMs: song.durationMs,
+                  positionMs: state.position.inMilliseconds,
+                  isPlaying: state.isPlaying,
+                );
               }
             },
           );
@@ -192,9 +205,10 @@ class PlayerCubit extends Cubit<PlayerState> {
         _ => PlayerRepeatMode.off,
       };
 
+      final isPlaying = playbackState.playing && !isCompleted;
       emit(
         state.copyWith(
-          isPlaying: playbackState.playing && !isCompleted,
+          isPlaying: isPlaying,
           position: isCompleted ? Duration.zero : playbackState.position,
           isShuffle: playbackState.shuffleMode == AudioServiceShuffleMode.all,
           repeatMode: repeat,
@@ -202,11 +216,23 @@ class PlayerCubit extends Cubit<PlayerState> {
           playbackSpeed: playbackState.speed,
         ),
       );
-      _updateWidgetThrottled(force: true);
+      _updateWidgetThrottled(force: false);
+      final currentSong = state.currentSong;
+      if (currentSong != null) {
+        _scrobblerService?.notifyPlaybackState(
+          id: currentSong.id,
+          artist: currentSong.artist,
+          track: currentSong.title,
+          album: currentSong.album,
+          durationMs: currentSong.durationMs,
+          positionMs: playbackState.position.inMilliseconds,
+          isPlaying: isPlaying,
+        );
+      }
     });
 
     _positionSub = _audioHandler.positionStream.listen((pos) {
-      if ((pos - state.position).abs() > const Duration(milliseconds: 100)) {
+      if ((pos - state.position).abs() > const Duration(milliseconds: 250)) {
         emit(state.copyWith(position: pos));
         if (state.isPlaying) {
           _updateWidgetThrottled(force: false);
@@ -235,24 +261,26 @@ class PlayerCubit extends Cubit<PlayerState> {
     ));
   }
 
-  Future<void> playSong(SongsTableData song, {List<SongsTableData>? queue}) async {
+  Future<void> playSong(SongsTableData song, {List<SongsTableData>? queue, Duration? initialPosition}) async {
     final effectiveQueue = queue ?? [song];
     final index = effectiveQueue.indexWhere((s) => s.id == song.id);
+    final startPos = initialPosition ?? Duration.zero;
     _queueSlots[state.activeQueueSlot] = _QueueSlotData(
       songs: List.from(effectiveQueue),
       currentIndex: index != -1 ? index : 0,
-      position: Duration(milliseconds: song.lastPositionMs),
+      position: startPos,
     );
     emit(state.copyWith(
       queue: effectiveQueue,
       currentIndex: index != -1 ? index : 0,
       currentSong: song,
+      position: startPos,
       duration: Duration(milliseconds: song.durationMs),
     ));
     await _audioHandler.loadQueue(
       effectiveQueue,
       initialIndex: index != -1 ? index : 0,
-      initialPosition: Duration(milliseconds: song.lastPositionMs),
+      initialPosition: startPos,
     );
     _loadLyricsForSong(song);
     _updateWidgetThrottled(force: true);
@@ -309,6 +337,7 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   Future<void> switchQueueSlot(int slot) async {
     if (slot == state.activeQueueSlot || slot < 0 || slot > 2) return;
+    final wasPlaying = state.isPlaying;
     _queueSlots[state.activeQueueSlot] = _QueueSlotData(
       songs: List.from(state.queue),
       currentIndex: state.currentIndex,
@@ -318,10 +347,22 @@ class PlayerCubit extends Cubit<PlayerState> {
     emit(state.copyWith(activeQueueSlot: slot, queue: targetSlot.songs));
     if (targetSlot.songs.isNotEmpty) {
       final safeIdx = targetSlot.currentIndex.clamp(0, targetSlot.songs.length - 1);
-      await playSong(targetSlot.songs[safeIdx], queue: targetSlot.songs);
-      if (targetSlot.position > Duration.zero) {
-        await seek(targetSlot.position);
+      final song = targetSlot.songs[safeIdx];
+      emit(state.copyWith(
+        currentIndex: safeIdx,
+        currentSong: song,
+        duration: Duration(milliseconds: song.durationMs),
+        position: targetSlot.position,
+      ));
+      await _audioHandler.loadQueue(
+        targetSlot.songs,
+        initialIndex: safeIdx,
+        initialPosition: targetSlot.position,
+      );
+      if (!wasPlaying) {
+        await _audioHandler.pause();
       }
+      _loadLyricsForSong(song);
     }
   }
 

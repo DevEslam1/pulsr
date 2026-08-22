@@ -23,6 +23,7 @@ class MainActivity : AudioServiceActivity() {
     private var tagEditorPlugin: TagEditorPlugin? = null
     private var visualizerPlugin: VisualizerPlugin? = null
     private var ringtonePlugin: RingtonePlugin? = null
+    private var scrobblerPlugin: ScrobblerPlugin? = null
     private val backgroundExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
  
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -97,6 +98,7 @@ class MainActivity : AudioServiceActivity() {
         visualizerPlugin = VisualizerPlugin.registerWith(flutterEngine)
         ringtonePlugin = RingtonePlugin.registerWith(flutterEngine, applicationContext)
         audioEffectsPlugin = AudioEffectsPlugin.registerWith(flutterEngine, applicationContext)
+        scrobblerPlugin = ScrobblerPlugin.registerWith(flutterEngine, applicationContext)
  
         val fileChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FILE_OPENER_CHANNEL)
         fileOpenerChannel = fileChannel
@@ -198,6 +200,8 @@ class MainActivity : AudioServiceActivity() {
         visualizerPlugin = null
         ringtonePlugin?.cleanup()
         ringtonePlugin = null
+        scrobblerPlugin?.cleanup()
+        scrobblerPlugin = null
         fileOpenerChannel?.setMethodCallHandler(null)
         fileOpenerChannel = null
         lyricsChannel?.setMethodCallHandler(null)
