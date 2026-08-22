@@ -12,6 +12,7 @@ import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
 import 'hidden_folders_screen.dart';
 import 'widgets/backup_section.dart';
+import 'widgets/battery_optimization_card.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -83,6 +84,7 @@ class SettingsScreen extends StatelessWidget {
                         ],
                       ),
                     ),
+                    const BatteryOptimizationCard(),
                   ]),
                   _section(context, 'Theme & Appearance', [
                     Padding(
