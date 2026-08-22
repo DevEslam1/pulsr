@@ -48,6 +48,9 @@ Future<void> main() async {
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
       systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarDividerColor: Colors.transparent,
+      systemNavigationBarContrastEnforced: false,
+      systemStatusBarContrastEnforced: false,
     ),
   );
 
