@@ -26,6 +26,9 @@ class SettingsCubit extends Cubit<SettingsState> {
   static const String _keyMiniPlayerSwipeRight = 'setting_mini_player_swipe_right';
   static const String _keyNowPlayingDoubleTap = 'setting_now_playing_double_tap';
   static const String _keyNowPlayingArtworkSwipe = 'setting_now_playing_artwork_swipe';
+  static const String _keyReplayGainMode = 'setting_replay_gain_mode';
+  static const String _keyReplayGainPreampWithRg = 'setting_replay_gain_preamp_with_rg';
+  static const String _keyReplayGainPreampWithoutRg = 'setting_replay_gain_preamp_without_rg';
 
   SettingsCubit({required MediaScannerService scannerService})
       : _scannerService = scannerService,
@@ -87,6 +90,14 @@ class SettingsCubit extends Cubit<SettingsState> {
         orElse: () => NowPlayingArtworkSwipeAction.nextPrev,
       );
 
+      final replayGainModeStr = prefs.getString(_keyReplayGainMode) ?? ReplayGainMode.track.name;
+      final replayGainMode = ReplayGainMode.values.firstWhere(
+        (e) => e.name == replayGainModeStr,
+        orElse: () => ReplayGainMode.track,
+      );
+      final replayGainPreampWithRg = prefs.getDouble(_keyReplayGainPreampWithRg) ?? 0.0;
+      final replayGainPreampWithoutRg = prefs.getDouble(_keyReplayGainPreampWithoutRg) ?? -3.0;
+
       emit(state.copyWith(
         gaplessPlayback: prefs.getBool(_keyGapless) ?? true,
         crossfadeSeconds: prefs.getDouble(_keyCrossfade) ?? 0.0,
@@ -103,6 +114,9 @@ class SettingsCubit extends Cubit<SettingsState> {
         miniPlayerSwipeRight: miniPlayerSwipeRight,
         nowPlayingDoubleTap: nowPlayingDoubleTap,
         nowPlayingArtworkSwipe: nowPlayingArtworkSwipe,
+        replayGainMode: replayGainMode,
+        replayGainPreampWithRg: replayGainPreampWithRg,
+        replayGainPreampWithoutRg: replayGainPreampWithoutRg,
       ));
     } catch (e, st) {
       ErrorLogger.log('Failed to load settings preferences from SharedPreferences', error: e, stackTrace: st, category: 'SettingsCubit');
@@ -198,6 +212,24 @@ class SettingsCubit extends Cubit<SettingsState> {
     emit(state.copyWith(nowPlayingArtworkSwipe: action));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyNowPlayingArtworkSwipe, action.name);
+  }
+
+  Future<void> setReplayGainMode(ReplayGainMode mode) async {
+    emit(state.copyWith(replayGainMode: mode));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyReplayGainMode, mode.name);
+  }
+
+  Future<void> setReplayGainPreampWithRg(double db) async {
+    emit(state.copyWith(replayGainPreampWithRg: db));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_keyReplayGainPreampWithRg, db);
+  }
+
+  Future<void> setReplayGainPreampWithoutRg(double db) async {
+    emit(state.copyWith(replayGainPreampWithoutRg: db));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_keyReplayGainPreampWithoutRg, db);
   }
 
   Future<int> rescanLibrary() async {

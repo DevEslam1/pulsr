@@ -15,6 +15,8 @@ enum NowPlayingDoubleTapAction { toggleFavorite, toggleLyrics, none }
 
 enum NowPlayingArtworkSwipeAction { nextPrev, none }
 
+enum ReplayGainMode { off, track, album }
+
 @freezed
 abstract class SettingsState with _$SettingsState {
   const SettingsState._();
@@ -35,6 +37,9 @@ abstract class SettingsState with _$SettingsState {
     @Default(MiniPlayerSwipeAction.prev) MiniPlayerSwipeAction miniPlayerSwipeRight,
     @Default(NowPlayingDoubleTapAction.toggleFavorite) NowPlayingDoubleTapAction nowPlayingDoubleTap,
     @Default(NowPlayingArtworkSwipeAction.nextPrev) NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
+    @Default(ReplayGainMode.track) ReplayGainMode replayGainMode,
+    @Default(0.0) double replayGainPreampWithRg,
+    @Default(-3.0) double replayGainPreampWithoutRg,
     @Default(false) bool isScanning,
     int? scanResultCount,
     String? errorMessage,

@@ -63,6 +63,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   final StreamController<Duration> _positionSubject =
       StreamController<Duration>.broadcast();
   Stream<Duration> get positionStream => _positionSubject.stream;
+  SongsTableData? get currentSong => (_songs.isNotEmpty && _currentIndex >= 0 && _currentIndex < _songs.length) ? _songs[_currentIndex] : null;
   Stream<Duration?> get sleepTimerRemainingStream =>
       _sleepTimerManager.sleepTimerRemainingStream;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
@@ -145,9 +146,20 @@ class PulsrAudioHandler extends BaseAudioHandler
   double _volume = 1.0;
   double get volume => _volume;
 
+  double _calculateReplayGainVolume(SongsTableData? song) {
+    if (song == null) return _volume;
+    final rg = song.replayGain;
+    if (rg != null && rg != 0.0) {
+      final mult = math.pow(10.0, rg / 20.0);
+      return (_volume * mult).clamp(0.0, 1.0).toDouble();
+    }
+    return _volume;
+  }
+
   Future<void> setVolume(double volume) async {
     _volume = volume.clamp(0.0, 1.0);
-    await _activePlayer.setVolume(_volume);
+    final song = currentSong;
+    await _activePlayer.setVolume(_calculateReplayGainVolume(song));
   }
 
   bool get isEqualizerEnabled => _equalizerManager.isEnabled;
@@ -595,7 +607,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         _createAudioSource(song, item),
         initialPosition: initialPosition,
       );
-      await _activePlayer.setVolume(_volume);
+      await _activePlayer.setVolume(_calculateReplayGainVolume(song));
       await _activePlayer.play();
       _consecutiveFailures = 0;
       _repository.recordPlayHistory(song.id);

@@ -27,6 +27,8 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   @override
   double get volume => _vol;
   @override
+  SongsTableData? get currentSong => null;
+  @override
   Future<void> setVolume(double volume) async {
     _vol = volume;
   }
@@ -295,7 +297,7 @@ void main() {
       cubit.close();
     });
 
-    test('position stream only emits when delta exceeds 100ms', () async {
+    test('position stream only emits when delta exceeds 250ms', () async {
       final cubit = PlayerCubit(
         audioHandler: testAudioHandler,
         repository: mockRepository,
@@ -303,15 +305,15 @@ void main() {
       );
       await Future<void>.delayed(const Duration(milliseconds: 10));
 
-      // 50ms delta from zero - should not emit
-      testAudioHandler._positionController.add(const Duration(milliseconds: 50));
+      // 100ms delta from zero - should not emit
+      testAudioHandler._positionController.add(const Duration(milliseconds: 100));
       await Future<void>.delayed(const Duration(milliseconds: 10));
       expect(cubit.state.position, Duration.zero);
 
-      // 200ms delta from 50ms - should emit
-      testAudioHandler._positionController.add(const Duration(milliseconds: 250));
+      // 300ms delta from zero - should emit
+      testAudioHandler._positionController.add(const Duration(milliseconds: 300));
       await Future<void>.delayed(const Duration(milliseconds: 10));
-      expect(cubit.state.position, const Duration(milliseconds: 250));
+      expect(cubit.state.position, const Duration(milliseconds: 300));
 
       cubit.close();
     });
