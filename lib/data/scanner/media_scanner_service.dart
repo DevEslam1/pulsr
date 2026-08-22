@@ -1,4 +1,5 @@
 // lib/data/scanner/media_scanner_service.dart
+import 'dart:async';
 import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
@@ -15,6 +16,9 @@ import '../db/app_database.dart';
 class MediaScannerService {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   final IMusicRepository _repository;
+  final StreamController<double> _progressController = StreamController<double>.broadcast();
+
+  Stream<double> get scanProgress => _progressController.stream;
 
   MediaScannerService(this._repository);
 
@@ -100,48 +104,62 @@ class MediaScannerService {
     int minDurationSec = 30,
     bool autoHideSystemMedia = true,
   }) async {
-    final hasPermission = await checkPermission();
-    if (!hasPermission) {
-      final granted = await requestPermission();
-      if (!granted) return 0;
+    _progressController.add(0.0);
+    try {
+      final hasPermission = await checkPermission();
+      if (!hasPermission) {
+        final granted = await requestPermission();
+        if (!granted) return 0;
+      }
+
+      _progressController.add(0.1);
+      final excludedRes = await _repository.getExcludedFolderPaths();
+      final excludedFolders = excludedRes.fold((l) => <String>[], (r) => r);
+
+      // Query songs using on_audio_query
+      final List<SongModel> songs = await _audioQuery.querySongs(
+        sortType: SongSortType.DATE_ADDED,
+        orderType: OrderType.DESC_OR_GREATER,
+        uriType: UriType.EXTERNAL,
+        ignoreCase: true,
+      );
+
+      final minDurationMs = ignoreShortFiles ? minDurationSec * 1000 : 0;
+      ErrorLogger.addBreadcrumb('Scanner started with ${songs.length} raw MediaStore songs', category: 'scanner');
+
+      _progressController.add(0.3);
+
+      // Offload CPU-heavy metadata parsing and aggregation to background isolate
+      final parseInput = _ScanMediaInput(
+        rawSongs: songs.map((s) => s.getMap).toList(),
+        excludedFolders: excludedFolders,
+        minDurationMs: minDurationMs,
+        autoHideSystemMedia: autoHideSystemMedia,
+        pathSeparator: Platform.pathSeparator,
+      );
+
+      final parseResult = await compute(_parseScannedMediaInIsolate, parseInput);
+      _progressController.add(0.7);
+
+      await _repository.syncScannedMusic(
+        songs: parseResult.songs,
+        albums: parseResult.albums,
+        artists: parseResult.artists,
+      );
+
+      _progressController.add(0.9);
+
+      // Clean up orphaned entries
+      await _repository.cleanupOrphanedSongs(parseResult.validSongIds);
+      _progressController.add(1.0);
+
+      ErrorLogger.addBreadcrumb('Scanner completed: ${parseResult.songs.length} valid songs indexed', category: 'scanner');
+
+      return parseResult.songs.length;
+    } catch (e, st) {
+      ErrorLogger.log('Media scanner failed', error: e, stackTrace: st, category: 'scanner');
+      rethrow;
     }
-
-    final excludedRes = await _repository.getExcludedFolderPaths();
-    final excludedFolders = excludedRes.fold((l) => <String>[], (r) => r);
-
-    // Query songs using on_audio_query
-    final List<SongModel> songs = await _audioQuery.querySongs(
-      sortType: SongSortType.DATE_ADDED,
-      orderType: OrderType.DESC_OR_GREATER,
-      uriType: UriType.EXTERNAL,
-      ignoreCase: true,
-    );
-
-    final minDurationMs = ignoreShortFiles ? minDurationSec * 1000 : 0;
-    ErrorLogger.addBreadcrumb('Scanner started with ${songs.length} raw MediaStore songs', category: 'scanner');
-
-    // Offload CPU-heavy metadata parsing and aggregation to background isolate
-    final parseInput = _ScanMediaInput(
-      rawSongs: songs.map((s) => s.getMap).toList(),
-      excludedFolders: excludedFolders,
-      minDurationMs: minDurationMs,
-      autoHideSystemMedia: autoHideSystemMedia,
-      pathSeparator: Platform.pathSeparator,
-    );
-
-    final parseResult = await compute(_parseScannedMediaInIsolate, parseInput);
-
-    await _repository.syncScannedMusic(
-      songs: parseResult.songs,
-      albums: parseResult.albums,
-      artists: parseResult.artists,
-    );
-
-    // Clean up orphaned entries
-    await _repository.cleanupOrphanedSongs(parseResult.validSongIds);
-    ErrorLogger.addBreadcrumb('Scanner completed: ${parseResult.songs.length} valid songs indexed', category: 'scanner');
-
-    return parseResult.songs.length;
   }
 
   Future<void> rescanSingleFile(String path) async {
