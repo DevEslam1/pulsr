@@ -30,3 +30,17 @@
 -keep class androidx.media3.** { *; }
 -dontwarn androidx.media3.**
 -keep class com.pulsr.music.** { *; }
+
+# Sentry Crash Reporting
+-keepattributes *Annotation*
+-keepattributes SourceFile,LineNumberTable
+-keep class io.sentry.** { *; }
+-dontwarn io.sentry.**
+
+# Home Widget
+-keep class es.antonborri.home_widget.** { *; }
+-dontwarn es.antonborri.home_widget.**
+
+# Kotlin Coroutines
+-keep class kotlinx.coroutines.** { *; }
+-dontwarn kotlinx.coroutines.**
