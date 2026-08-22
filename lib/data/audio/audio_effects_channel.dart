@@ -113,4 +113,13 @@ class AudioEffectsChannel {
       ErrorLogger.log('Failed to set spatializer enabled ($enabled)', error: e, stackTrace: st, category: 'AudioEffectsChannel');
     }
   }
+
+  Future<void> releaseEffects() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('releaseEffects');
+    } catch (e, st) {
+      ErrorLogger.log('Failed to release audio effects', error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+  }
 }

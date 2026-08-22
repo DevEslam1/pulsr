@@ -1141,6 +1141,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     _saveCurrentPosition();
     await _playerA.stop();
     await _playerB.stop();
+    await AudioEffectsChannel().releaseEffects();
     await super.stop();
   }
 
@@ -1154,6 +1155,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     _positionSubject.close();
     _sleepTimerManager.dispose();
     _equalizerManager.dispose();
+    AudioEffectsChannel().releaseEffects();
     _playerA.dispose();
     _playerB.dispose();
   }

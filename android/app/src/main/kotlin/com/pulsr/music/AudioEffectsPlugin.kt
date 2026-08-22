@@ -152,6 +152,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(caps)
                 }
 
+                "releaseEffects" -> {
+                    releaseEffects()
+                    result.success(true)
+                }
+
                 else -> result.notImplemented()
             }
         } catch (e: Exception) {
@@ -552,9 +557,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         try { virtualizer?.release() } catch (_: Exception) {}
         try { loudnessEnhancer?.release() } catch (_: Exception) {}
         try { bassBoost?.release() } catch (_: Exception) {}
+        try { dynamicsProcessing?.release() } catch (_: Exception) {}
         virtualizer = null
         loudnessEnhancer = null
         bassBoost = null
+        dynamicsProcessing = null
 
         if (isVirtualizerEnabled || virtualizerStrength > 0) {
             setVirtualizerState(isVirtualizerEnabled)
