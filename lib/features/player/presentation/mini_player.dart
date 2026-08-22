@@ -120,6 +120,7 @@ class MiniPlayer extends StatelessWidget {
                             ),
                             const SizedBox(width: 4),
                             IconButton(
+                              tooltip: state.isPlaying ? 'Pause' : 'Play',
                               icon: Icon(
                                 state.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
                                 color: activeAccent,
@@ -128,6 +129,7 @@ class MiniPlayer extends StatelessWidget {
                               onPressed: cubit.togglePlayPause,
                             ),
                             IconButton(
+                              tooltip: 'Next track',
                               icon: Icon(
                                 Icons.skip_next_rounded,
                                 color: p.textPrimary,
