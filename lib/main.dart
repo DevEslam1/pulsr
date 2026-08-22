@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'core/config/app_config.dart';
 import 'core/di/injection.dart';
 import 'core/theme/aura_theme.dart';
@@ -53,7 +54,20 @@ Future<void> main() async {
   // Early registration of file intent handler so warm-start file opens are never dropped
   getIt<FileIntentHandler>();
 
-  runApp(const PulsrApp());
+  if (AppConfig.sentryDsn.isNotEmpty) {
+    await SentryFlutter.init(
+      (options) {
+        options.dsn = AppConfig.sentryDsn;
+        options.environment = AppConfig.envName;
+        options.tracesSampleRate = AppConfig.isProd ? 0.2 : 1.0;
+        options.sendDefaultPii = false;
+        options.enableAutoPerformanceTracing = true;
+      },
+      appRunner: () => runApp(const PulsrApp()),
+    );
+  } else {
+    runApp(const PulsrApp());
+  }
 }
 
 class PulsrApp extends StatefulWidget {

@@ -120,6 +120,7 @@ class MediaScannerService {
     );
 
     final minDurationMs = ignoreShortFiles ? minDurationSec * 1000 : 0;
+    ErrorLogger.addBreadcrumb('Scanner started with ${songs.length} raw MediaStore songs', category: 'scanner');
 
     // Offload CPU-heavy metadata parsing and aggregation to background isolate
     final parseInput = _ScanMediaInput(
@@ -140,6 +141,7 @@ class MediaScannerService {
 
     // Clean up orphaned entries
     await _repository.cleanupOrphanedSongs(parseResult.validSongIds);
+    ErrorLogger.addBreadcrumb('Scanner completed: ${parseResult.songs.length} valid songs indexed', category: 'scanner');
 
     return parseResult.songs.length;
   }
@@ -147,7 +149,10 @@ class MediaScannerService {
   Future<void> rescanSingleFile(String path) async {
     const channel = MethodChannel('com.pulsr.music/tag_editor');
     try {
-      final Map<dynamic, dynamic>? tags = await channel.invokeMapMethod<dynamic, dynamic>('readTags', {'path': path});
+      final Map<dynamic, dynamic>? tags = await channel.invokeMapMethod<dynamic, dynamic>('readTags', {
+        'path': path,
+        'includeArtwork': false,
+      });
       if (tags != null) {
         final title = (tags['title'] as String?)?.trim();
         final artist = (tags['artist'] as String?)?.trim();
