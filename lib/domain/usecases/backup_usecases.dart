@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/utils/error_logger.dart';
 import '../../data/db/app_database.dart';
 import '../repositories/music_repository_interface.dart';
 
@@ -58,8 +59,13 @@ class ExportBackupUseCase {
     final eqPresetStr = prefs.getString('setting_eq_preset');
     if (eqPresetStr != null) {
       try {
-        eqPresetMap = jsonDecode(eqPresetStr) as Map<String, dynamic>;
-      } catch (_) {}
+        final decoded = jsonDecode(eqPresetStr);
+        if (decoded is Map<String, dynamic>) {
+          eqPresetMap = decoded;
+        }
+      } catch (e, st) {
+        ErrorLogger.log('Failed to decode eqPreset from prefs', error: e, stackTrace: st, category: 'Backup');
+      }
     }
 
     final settingsMap = {
@@ -109,13 +115,31 @@ class ExportBackupUseCase {
 
 @singleton
 class ImportBackupUseCase {
+  static const int maxBackupSizeBytes = 10 * 1024 * 1024; // 10 MB payload limit
+
   final IMusicRepository _repository;
   final AppDatabase _db;
 
   ImportBackupUseCase(this._repository, this._db);
 
   Future<ImportResult> execute(String jsonString) async {
-    final data = jsonDecode(jsonString) as Map<String, dynamic>;
+    if (jsonString.length > maxBackupSizeBytes) {
+      throw const FormatException('Backup file exceeds maximum allowed size of 10 MB');
+    }
+
+    final dynamic decoded;
+    try {
+      decoded = jsonDecode(jsonString);
+    } catch (e, st) {
+      ErrorLogger.log('Corrupted JSON structure in backup file', error: e, stackTrace: st, category: 'Backup');
+      throw const FormatException('Corrupted or invalid JSON format');
+    }
+
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Invalid backup payload: root object must be a JSON map');
+    }
+
+    final data = decoded;
     final version = data['version'];
     if (version == null || version is! int || version < 1) {
       throw const FormatException('Invalid or unsupported backup version');

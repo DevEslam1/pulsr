@@ -1,6 +1,7 @@
 // lib/data/audio/crossfade_manager.dart
 import 'dart:async';
 import 'package:just_audio/just_audio.dart';
+import '../../core/utils/error_logger.dart';
 
 class CrossfadeManager {
   Duration duration = Duration.zero;
@@ -37,7 +38,12 @@ class CrossfadeManager {
       final elapsed = DateTime.now().difference(startTime).inMilliseconds.toDouble();
       final fraction = (elapsed / totalMs).clamp(0.0, 1.0);
       final currentVol = from + (to - from) * fraction;
-      await player.setVolume(currentVol.clamp(0.0, 1.0));
+      try {
+        await player.setVolume(currentVol.clamp(0.0, 1.0));
+      } catch (e, st) {
+        ErrorLogger.log('Error adjusting volume during fade', error: e, stackTrace: st, category: 'CrossfadeManager');
+        break;
+      }
       if (fraction >= 1.0) break;
     }
   }
@@ -51,7 +57,9 @@ class CrossfadeManager {
         await inactivePlayer.stop();
         await inactivePlayer.setVolume(restoreVolume);
         await activePlayer.setVolume(restoreVolume);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Error canceling crossfade players', error: e, stackTrace: st, category: 'CrossfadeManager');
+      }
       if (_crossfadeCompleter != null && !_crossfadeCompleter!.isCompleted) {
         _crossfadeCompleter!.complete();
       }
@@ -63,7 +71,9 @@ class CrossfadeManager {
     if (isCrossfading && _crossfadeCompleter != null) {
       try {
         await _crossfadeCompleter!.future.timeout(const Duration(seconds: 2));
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Timeout waiting for active crossfade to finish', error: e, stackTrace: st, category: 'CrossfadeManager');
+      }
     }
   }
 

@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/prefs_keys.dart';
+import '../../core/utils/error_logger.dart';
 import '../../domain/models/audio_effects_config.dart';
 import '../../domain/models/eq_preset.dart';
 import '../../domain/models/headphone_profile.dart';
@@ -67,7 +68,9 @@ class EqualizerManager {
         try {
           final decoded = json.decode(gainsJson) as List<dynamic>;
           gains = decoded.map((e) => (e as num).toDouble()).toList();
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Failed to decode equalizer gains from prefs', error: e, stackTrace: st, category: 'EqualizerManager');
+        }
       } else {
         final match = EqPreset.defaultPresets.where((p) => p.name == presetName);
         if (match.isNotEmpty) {
@@ -112,7 +115,9 @@ class EqualizerManager {
       if (isSpatializerEnabled) {
         await setSpatializerEnabled(true);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to restore equalizer preferences', error: e, stackTrace: st, category: 'EqualizerManager');
+    }
   }
 
   Future<void> _savePreferences() async {
@@ -133,7 +138,9 @@ class EqualizerManager {
       } else {
         await prefs.remove(PrefsKeys.eqHeadphoneProfileId);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to save equalizer preferences', error: e, stackTrace: st, category: 'EqualizerManager');
+    }
   }
 
   Future<void> setEqualizerEnabled(bool enabled) async {
@@ -143,14 +150,18 @@ class EqualizerManager {
         if (eq != null) {
           try {
             await eq.setEnabled(enabled);
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('Failed to set equalizer enabled state', error: e, stackTrace: st, category: 'EqualizerManager');
+          }
         }
       }
       for (final le in [loudnessEnhancerA, loudnessEnhancerB]) {
         if (le != null) {
           try {
             await le.setEnabled(enabled);
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('Failed to set loudness enhancer enabled state', error: e, stackTrace: st, category: 'EqualizerManager');
+          }
         }
       }
     }
@@ -171,7 +182,9 @@ class EqualizerManager {
           if (bandIndex < parameters.bands.length) {
             await parameters.bands[bandIndex].setGain(gain);
           }
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Failed to set band gain on equalizer', error: e, stackTrace: st, category: 'EqualizerManager');
+        }
       }
     }
     _debouncedSavePreferences();
@@ -201,7 +214,9 @@ class EqualizerManager {
           for (int i = 0; i < preset.gains.length && i < parameters.bands.length; i++) {
             await parameters.bands[i].setGain(preset.gains[i]);
           }
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Failed to apply preset band gains', error: e, stackTrace: st, category: 'EqualizerManager');
+        }
       }
     }
     await setBassBoost(preset.bassBoost);
@@ -223,7 +238,9 @@ class EqualizerManager {
             for (int i = 0; i < profile.gains.length && i < parameters.bands.length; i++) {
               await parameters.bands[i].setGain(profile.gains[i]);
             }
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('Failed to apply headphone profile gains', error: e, stackTrace: st, category: 'EqualizerManager');
+          }
         }
       }
       if (profile.preampGain != 0.0) {

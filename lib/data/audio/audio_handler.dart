@@ -8,6 +8,7 @@ import 'package:injectable/injectable.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/prefs_keys.dart';
+import '../../core/utils/error_logger.dart';
 import '../../domain/models/audio_effects_config.dart';
 import '../../domain/models/eq_preset.dart';
 import '../../domain/models/headphone_profile.dart';
@@ -172,18 +173,23 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   double get volumeBoost => _equalizerManager.volumeBoost;
   Future<void> setVolumeBoost(double value) => _equalizerManager.setVolumeBoost(value);
 
+  void saveCurrentPositionImmediate() {
+    _savePositionDebounce?.cancel();
+    if (_songs.isNotEmpty && _currentIndex >= 0 && _currentIndex < _songs.length) {
+      final currentSong = _songs[_currentIndex];
+      final posMs = _activePlayer.position.inMilliseconds;
+      _repository.updateLastPosition(currentSong.id, posMs);
+      if (_queueDirty) {
+        _repository.saveQueue(_songs.map((s) => s.id).toList(), _currentIndex, posMs);
+        _queueDirty = false;
+      }
+    }
+  }
+
   void _saveCurrentPosition() {
     _savePositionDebounce?.cancel();
     _savePositionDebounce = Timer(const Duration(seconds: 3), () {
-      if (_songs.isNotEmpty && _currentIndex >= 0 && _currentIndex < _songs.length) {
-        final currentSong = _songs[_currentIndex];
-        final posMs = _activePlayer.position.inMilliseconds;
-        _repository.updateLastPosition(currentSong.id, posMs);
-        if (_queueDirty) {
-          _repository.saveQueue(_songs.map((s) => s.id).toList(), _currentIndex, posMs);
-          _queueDirty = false;
-        }
-      }
+      saveCurrentPositionImmediate();
     });
   }
 
@@ -288,7 +294,9 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
           pause();
         }),
       );
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Error configuring AudioSession', error: e, stackTrace: st, category: 'AudioHandler');
+    }
 
     // Initialize audio effects & equalizer preferences
     await _equalizerManager.init();
@@ -337,7 +345,9 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
         _broadcastState(_activePlayer.playbackEvent);
         _positionSubject.add(pos);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Error restoring last playback session', error: e, stackTrace: st, category: 'AudioHandler');
+    }
   }
 
   Future<void> _startCrossfade(int nextIndex) async {
@@ -384,7 +394,8 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
       await active.stop();
       await active.setVolume(_volume);
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Error during crossfade playback', error: e, stackTrace: st, category: 'AudioHandler');
     } finally {
       if (_crossfadeManager.currentFadeId == currentFadeId) {
         _crossfadeManager.finishCrossfade();
@@ -527,7 +538,8 @@ class PulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
       _consecutiveFailures = 0;
       _repository.recordPlayHistory(song.id);
       _saveCurrentPosition();
-    } catch (e) {
+    } catch (e, st) {
+      ErrorLogger.log('Error playing song ${song.title} (${song.path})', error: e, stackTrace: st, category: 'AudioHandler');
       _consecutiveFailures++;
       if (_consecutiveFailures >= 5 || _consecutiveFailures >= _songs.length) {
         _consecutiveFailures = 0;

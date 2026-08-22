@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../domain/models/smart_playlist_criteria.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
 import 'playlist_state.dart';
@@ -48,7 +49,9 @@ class PlaylistCubit extends Cubit<PlaylistState> {
           await _playlistUseCases.seedDefaultSmartPlaylists();
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to check or seed default smart playlists', error: e, stackTrace: st, category: 'PlaylistCubit');
+    }
   }
 
   void _updateSmartCounts(List playlists) {

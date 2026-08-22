@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import '../../domain/models/lyrics_line.dart';
+import 'error_logger.dart';
 
 class LrcParser {
   static const MethodChannel _lyricsChannel = MethodChannel('com.pulsr.music/lyrics');
@@ -87,7 +88,9 @@ class LrcParser {
         final lines = parse(content, source: source);
         if (lines.isNotEmpty) return lines;
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read external .lrc file for $audioFilePath', error: e, stackTrace: st, category: 'LrcParser');
+    }
     return null;
   }
 
@@ -101,8 +104,8 @@ class LrcParser {
       if (lyrics != null && lyrics.trim().isNotEmpty) {
         return lyrics.trim();
       }
-    } catch (_) {
-      // Platform channel error or unsupported platform
+    } catch (e, st) {
+      ErrorLogger.log('Failed to query embedded lyrics for $audioFilePath', error: e, stackTrace: st, category: 'LrcParser');
     }
     return null;
   }

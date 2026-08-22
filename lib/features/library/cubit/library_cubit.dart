@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../../domain/usecases/get_albums_usecase.dart';
@@ -69,7 +70,9 @@ class LibraryCubit extends Cubit<LibraryState> {
           viewMode: savedViewMode,
         ));
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load library preferences from SharedPreferences', error: e, stackTrace: st, category: 'LibraryCubit');
+    }
 
     await _subscribeSongs();
     if (isClosed) return;

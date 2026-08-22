@@ -62,6 +62,8 @@ class MockPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   @override
   Future<void> restoreLastPlaybackSession() async {}
   @override
+  void saveCurrentPositionImmediate() {}
+  @override
   Future<void> setEqualizerEnabled(bool enabled) async {}
   @override
   Future<void> applyPreset(EqPreset preset) async {}

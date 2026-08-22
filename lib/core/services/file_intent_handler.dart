@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:injectable/injectable.dart';
 import '../router/app_router.dart';
+import '../utils/error_logger.dart';
 import '../../data/db/app_database.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../../features/player/cubit/player_cubit.dart';
@@ -36,7 +37,9 @@ class FileIntentHandler {
       if (initialUri != null) {
         await handleAudioUri(initialUri);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to check initial audio URI', error: e, stackTrace: st, category: 'FileIntentHandler');
+    }
   }
 
   Future<void> handleAudioUri(String uriOrPath) async {
@@ -86,6 +89,8 @@ class FileIntentHandler {
 
       await _playerCubit.playSong(tempSong);
       rootNavigatorKey.currentContext?.push('/now-playing');
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to handle external audio URI: $uriOrPath', error: e, stackTrace: st, category: 'FileIntentHandler');
+    }
   }
 }

@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/error_logger.dart';
 
 enum VisualizerStyle {
   off,
@@ -136,10 +137,14 @@ class _AudioVisualizerState extends State<AudioVisualizer>
             }
           }
         },
-        onError: (_) {},
+        onError: (e, st) {
+          ErrorLogger.log('Visualizer event stream error', error: e, stackTrace: st, category: 'AudioVisualizer');
+        },
       );
       await _methodChannel.invokeMethod('start', {'audioSessionId': 0});
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to start native audio visualizer', error: e, stackTrace: st, category: 'AudioVisualizer');
+    }
   }
 
   Future<void> _stopNativeVisualizer() async {
@@ -147,7 +152,9 @@ class _AudioVisualizerState extends State<AudioVisualizer>
       await _subscription?.cancel();
       _subscription = null;
       await _methodChannel.invokeMethod('stop');
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to stop native audio visualizer', error: e, stackTrace: st, category: 'AudioVisualizer');
+    }
   }
 
   void _updateFftFrame() {

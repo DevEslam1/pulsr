@@ -1,6 +1,7 @@
 // lib/data/audio/sleep_timer_manager.dart
 import 'dart:async';
 import 'package:just_audio/just_audio.dart';
+import '../../core/utils/error_logger.dart';
 
 class SleepTimerManager {
   Timer? _sleepTimer;
@@ -53,13 +54,26 @@ class SleepTimerManager {
         final baseVol = _preFadeVolume ?? 1.0;
         for (int i = 10; i >= 0; i--) {
           if (_sleepFadeToken != currentToken) return;
-          await player.setVolume(((i / 10.0) * baseVol).clamp(0.0, 1.0));
+          try {
+            await player.setVolume(((i / 10.0) * baseVol).clamp(0.0, 1.0));
+          } catch (e, st) {
+            ErrorLogger.log('Error adjusting volume during sleep timer fade out', error: e, stackTrace: st, category: 'SleepTimer');
+            break;
+          }
           await Future.delayed(const Duration(milliseconds: 300));
         }
       }
       if (_sleepFadeToken != currentToken) return;
-      await onTimerExpired();
-      await player.setVolume(_preFadeVolume ?? 1.0);
+      try {
+        await onTimerExpired();
+      } catch (e, st) {
+        ErrorLogger.log('Error triggering sleep timer expiration callback', error: e, stackTrace: st, category: 'SleepTimer');
+      }
+      try {
+        await player.setVolume(_preFadeVolume ?? 1.0);
+      } catch (e, st) {
+        ErrorLogger.log('Error restoring volume after sleep timer expiry', error: e, stackTrace: st, category: 'SleepTimer');
+      }
       _preFadeVolume = null;
     });
   }
@@ -93,7 +107,9 @@ class SleepTimerManager {
     if (_preFadeVolume != null && _lastPlayerGetter != null) {
       try {
         _lastPlayerGetter!().setVolume(_preFadeVolume!);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Error restoring player volume upon canceling sleep timer', error: e, stackTrace: st, category: 'SleepTimer');
+      }
       _preFadeVolume = null;
     }
   }

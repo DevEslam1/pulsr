@@ -77,7 +77,9 @@ class _PulsrAppState extends State<PulsrApp> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
         await getIt<FileIntentHandler>().checkInitialUri();
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Failed to process initial audio intent on startup', error: e, stackTrace: st, category: 'Startup');
+      }
     });
   }
 
@@ -90,7 +92,9 @@ class _PulsrAppState extends State<PulsrApp> {
           final settingsCubit = getIt<SettingsCubit>();
           await settingsCubit.rescanLibrary();
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Failed to execute automatic startup media scan', error: e, stackTrace: st, category: 'Startup');
+      }
     });
   }
 

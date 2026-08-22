@@ -7,6 +7,7 @@ import 'package:injectable/injectable.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:palette_generator/palette_generator.dart';
 import '../constants/app_colors.dart';
+import '../utils/error_logger.dart';
 import '../widgets/cached_artwork.dart';
 
 class DynamicThemeState {
@@ -127,7 +128,9 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
         emit(newState);
         return;
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to generate dynamic theme palette for song $songId', error: e, stackTrace: st, category: 'DynamicTheme');
+    }
 
     if (token == _currentRequestToken && !isClosed) {
       emit(const DynamicThemeState());

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/lrc_parser.dart';
 import '../../../data/audio/audio_handler.dart';
 import '../../../data/db/app_database.dart';
@@ -479,7 +480,9 @@ class PlayerCubit extends Cubit<PlayerState> {
       final speed = prefs.getDouble('playback_speed') ?? 1.0;
       await _audioHandler.setSpeed(speed);
       emit(state.copyWith(playbackSpeed: speed));
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load playback speed from SharedPreferences', error: e, stackTrace: st, category: 'PlayerCubit');
+    }
   }
 
   Future<void> setPlaybackSpeed(double speed) async {

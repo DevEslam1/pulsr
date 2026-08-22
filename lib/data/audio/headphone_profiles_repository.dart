@@ -1,6 +1,7 @@
 // lib/data/audio/headphone_profiles_repository.dart
 import 'dart:convert';
 import 'package:flutter/services.dart';
+import '../../core/utils/error_logger.dart';
 import '../../domain/models/headphone_profile.dart';
 
 class HeadphoneProfilesRepository {
@@ -24,18 +25,18 @@ class HeadphoneProfilesRepository {
           .map((item) => HeadphoneProfile.fromJson(item as Map<String, dynamic>))
           .toList();
       _isLoaded = true;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load headphone profiles from assets', error: e, stackTrace: st, category: 'HeadphoneProfilesRepository');
       _profiles = [];
     }
     return _profiles;
   }
 
   HeadphoneProfile? getProfileById(String id) {
-    try {
-      return _profiles.firstWhere((p) => p.id == id);
-    } catch (_) {
-      return null;
+    for (final p in _profiles) {
+      if (p.id == id) return p;
     }
+    return null;
   }
 
   List<String> getCategories() {

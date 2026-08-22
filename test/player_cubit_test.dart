@@ -58,6 +58,9 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   Future<void> restoreLastPlaybackSession() async {}
 
   @override
+  void saveCurrentPositionImmediate() {}
+
+  @override
   Future<void> setEqualizerEnabled(bool enabled) async {
     eqEnabled = enabled;
   }

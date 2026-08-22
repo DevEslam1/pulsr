@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
 import 'settings_state.dart';
@@ -103,7 +104,9 @@ class SettingsCubit extends Cubit<SettingsState> {
         nowPlayingDoubleTap: nowPlayingDoubleTap,
         nowPlayingArtworkSwipe: nowPlayingArtworkSwipe,
       ));
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load settings preferences from SharedPreferences', error: e, stackTrace: st, category: 'SettingsCubit');
+    }
   }
 
   Future<void> setGapless(bool value) async {
