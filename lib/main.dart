@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'core/config/app_config.dart';
 import 'core/di/injection.dart';
 import 'core/theme/aura_theme.dart';
 import 'core/theme/dynamic_theme_cubit.dart';
@@ -39,13 +40,12 @@ Future<void> main() async {
     debugPrint('[Pulsr.CrashReport][$category] $error\n$stackTrace');
   };
 
-  // System Chrome configuration
+  // System Chrome configuration for true edge-to-edge UI
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
       systemNavigationBarColor: Colors.transparent,
-      systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
 
@@ -218,13 +218,25 @@ class _PulsrAppState extends State<PulsrApp> {
                       break;
                   }
 
-                  return MaterialApp.router(
-                    title: 'Pulsr Music',
-                    debugShowCheckedModeBanner: false,
-                    themeMode: flutterThemeMode,
-                    theme: lightTheme,
-                    darkTheme: darkTheme,
-                    routerConfig: _router,
+                  final isDarkTheme = flutterThemeMode == ThemeMode.dark ||
+                      (flutterThemeMode == ThemeMode.system &&
+                          WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark);
+
+                  return AnnotatedRegion<SystemUiOverlayStyle>(
+                    value: SystemUiOverlayStyle(
+                      statusBarColor: Colors.transparent,
+                      statusBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
+                      systemNavigationBarColor: Colors.transparent,
+                      systemNavigationBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
+                    ),
+                    child: MaterialApp.router(
+                      title: AppConfig.appTitle,
+                      debugShowCheckedModeBanner: false,
+                      themeMode: flutterThemeMode,
+                      theme: lightTheme,
+                      darkTheme: darkTheme,
+                      routerConfig: _router,
+                    ),
                   );
                 },
               );

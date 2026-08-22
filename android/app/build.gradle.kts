@@ -26,6 +26,20 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["appName"] = "Pulsr Music"
+    }
+
+    flavorDimensions += "default"
+    productFlavors {
+        create("dev") {
+            dimension = "default"
+            applicationIdSuffix = ".dev"
+            manifestPlaceholders["appName"] = "Pulsr Dev"
+        }
+        create("prod") {
+            dimension = "default"
+            manifestPlaceholders["appName"] = "Pulsr Music"
+        }
     }
 
     val keystoreProperties = Properties().apply {
