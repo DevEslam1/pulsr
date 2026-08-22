@@ -33,17 +33,49 @@ class SongInfoSheet extends StatelessWidget {
 
   Future<void> _setRingtone(BuildContext context, String type) async {
     const channel = MethodChannel('com.pulsr.music/ringtone');
+    final label = type == 'notification'
+        ? 'Notification sound'
+        : type == 'alarm'
+            ? 'Alarm sound'
+            : 'Ringtone';
+
     try {
+      if (Platform.isAndroid) {
+        final canWrite = await channel.invokeMethod<bool>('checkWriteSettingsPermission') ?? true;
+        if (!canWrite) {
+          if (!context.mounted) return;
+          final proceed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Permission Required'),
+              content: Text(
+                'To set $label directly, Android requires the "Modify system settings" permission.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    Navigator.of(ctx).pop(true);
+                    channel.invokeMethod('openWriteSettings');
+                  },
+                  child: const Text('Open Settings'),
+                ),
+              ],
+            ),
+          );
+          if (proceed != true) return;
+          return;
+        }
+      }
+
       final success = await channel.invokeMethod<bool>('setRingtone', {
         'filePath': song.path,
         'type': type,
       });
       if (context.mounted && (success ?? false)) {
-        final label = type == 'notification'
-            ? 'Notification sound'
-            : type == 'alarm'
-                ? 'Alarm sound'
-                : 'Ringtone';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('$label set successfully!')),
         );

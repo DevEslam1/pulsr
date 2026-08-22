@@ -37,6 +37,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     try {
       final granted = await widget.scannerService.requestPermission();
       if (granted) {
+        try {
+          await Permission.notification.request();
+        } catch (_) {}
         await widget.scannerService.scanDeviceLibrary();
       } else {
         if (mounted) {

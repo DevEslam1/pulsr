@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/error_logger.dart';
 
@@ -118,9 +119,45 @@ class _AudioVisualizerState extends State<AudioVisualizer>
     super.dispose();
   }
 
+  static bool _hasPromptedRationale = false;
+
   Future<void> _startNativeVisualizer() async {
     if (widget.style == VisualizerStyle.off) return;
     try {
+      if (Platform.isAndroid) {
+        final status = await Permission.microphone.status;
+        if (!status.isGranted) {
+          if (_hasPromptedRationale) {
+            // User already made a decision, seamlessly use simulation fallback
+            return;
+          }
+          _hasPromptedRationale = true;
+          if (mounted) {
+            final shouldAsk = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Audio Visualizer Permission'),
+                content: const Text(
+                  'The visualizer reads audio output, not your microphone. Android requires the Record Audio permission to process FFT visualizer frequency data.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: const Text('Use Simulation'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    child: const Text('Continue'),
+                  ),
+                ],
+              ),
+            );
+            if (shouldAsk != true) return;
+          }
+          final res = await Permission.microphone.request();
+          if (!res.isGranted) return;
+        }
+      }
       await _subscription?.cancel();
       _subscription = _eventChannel.receiveBroadcastStream().listen(
         (data) {
