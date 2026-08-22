@@ -206,7 +206,7 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   void _saveCurrentPosition() {
     _savePositionDebounce?.cancel();
-    _savePositionDebounce = Timer(const Duration(seconds: 3), () {
+    _savePositionDebounce = Timer(const Duration(milliseconds: 1500), () {
       saveCurrentPositionImmediate();
     });
   }
@@ -236,6 +236,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         player.positionStream.listen((pos) {
           if (isPlayerA == _isPlayerAActive) {
             _positionSubject.add(pos);
+            _saveCurrentPosition();
             final duration = player.duration ?? Duration.zero;
             if (_crossfadeManager.duration > Duration.zero &&
                 duration > _crossfadeManager.duration &&
