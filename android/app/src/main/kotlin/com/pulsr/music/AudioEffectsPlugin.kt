@@ -136,6 +136,22 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(true)
                 }
 
+                "getCapabilities" -> {
+                    val caps = mapOf(
+                        "hasEqualizer" to true,
+                        "hasAudioEffects" to true,
+                        "hasTagEditor" to true,
+                        "hasRingtoneManager" to true,
+                        "hasVisualizer" to true,
+                        "hasAppWidget" to true,
+                        "isVolumeBoostSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_LOUDNESS_ENHANCER),
+                        "isBassBoostSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_BASS_BOOST),
+                        "isDynamicsSupported" to (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && isEffectTypeSupported(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING)),
+                        "isVirtualizerSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_VIRTUALIZER)
+                    )
+                    result.success(caps)
+                }
+
                 else -> result.notImplemented()
             }
         } catch (e: Exception) {
@@ -524,18 +540,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     private fun setSpatializerState(enabled: Boolean) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S_V2) return // API 32+
-        try {
-            val audioManager = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
-            val sp = audioManager.spatializer
-            if (sp.isAvailable) {
-                try {
-                    val method = sp.javaClass.getMethod("setEnabled", Boolean::class.javaPrimitiveType)
-                    method.invoke(sp, enabled)
-                } catch (_: Exception) {}
-            }
-        } catch (e: Exception) {
-            android.util.Log.w("AudioEffectsPlugin", "Failed to set spatializer state: ${e.message}")
+        // Public API compliant: engage hardware 3D surround sound via Virtualizer
+        setVirtualizerState(enabled)
+        if (enabled && virtualizerStrength <= 0) {
+            setVirtualizerStrengthValue(800)
         }
     }
 

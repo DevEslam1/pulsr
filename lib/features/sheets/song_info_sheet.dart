@@ -1,6 +1,5 @@
 // lib/features/sheets/song_info_sheet.dart
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +10,7 @@ import '../../core/constants/app_radii.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/adaptive.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/platform_capabilities.dart';
 import '../../core/widgets/cached_artwork.dart';
 import '../../data/db/app_database.dart';
 import '../../domain/models/audio_quality_info.dart';
@@ -297,7 +297,7 @@ class SongInfoSheet extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (defaultTargetPlatform == TargetPlatform.android) ...[
+                      if (PlatformCapabilities.hasRingtoneManager) ...[
                         const SizedBox(width: 12),
                         Expanded(
                           child: OutlinedButton.icon(
@@ -320,7 +320,7 @@ class SongInfoSheet extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  if (defaultTargetPlatform == TargetPlatform.android)
+                  if (PlatformCapabilities.hasTagEditor)
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(

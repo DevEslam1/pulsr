@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/platform_capabilities.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
 import '../../player/presentation/widgets/equalizer_sheet.dart';
 import '../../sheets/sleep_timer_sheet.dart';
@@ -32,8 +33,22 @@ class SettingsScreen extends StatelessWidget {
                 padding: EdgeInsets.only(bottom: 160, top: 8, left: Adaptive.pagePadding(context), right: Adaptive.pagePadding(context)),
                 children: [
                   _section(context, 'Audio & Playback', [
-                    _navTile(context, Icons.equalizer_rounded, 'Equalizer & Sound Effects', '5-band EQ, bass boost, presets',
-                        onTap: () => showModalBottomSheet(context: context, useRootNavigator: true, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => const EqualizerSheet())),
+                    _navTile(
+                      context,
+                      Icons.equalizer_rounded,
+                      'Equalizer & Sound Effects',
+                      PlatformCapabilities.hasEqualizer
+                          ? '5-band EQ, bass boost, presets'
+                          : 'Not available on this platform',
+                      onTap: PlatformCapabilities.hasEqualizer
+                          ? () => showModalBottomSheet(
+                              context: context,
+                              useRootNavigator: true,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (_) => const EqualizerSheet())
+                          : null,
+                    ),
                     _divider(p),
                     _navTile(context, Icons.timer_outlined, 'Sleep Timer', 'Auto pause with gentle fade-out',
                         onTap: () => showModalBottomSheet(context: context, useRootNavigator: true, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => const SleepTimerSheet())),
@@ -274,7 +289,7 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Widget _navTile(BuildContext context, IconData icon, String title, String subtitle,
-      {Widget? trailing, required VoidCallback onTap}) {
+      {Widget? trailing, VoidCallback? onTap}) {
     final p = context.palette;
     return ListTile(
       leading: _iconBox(context, icon),
