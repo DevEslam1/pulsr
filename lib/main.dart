@@ -9,6 +9,7 @@ import 'core/theme/aura_theme.dart';
 import 'core/theme/dynamic_theme_cubit.dart';
 import 'core/router/app_router.dart';
 import 'core/services/file_intent_handler.dart';
+import 'core/services/restore_detection_service.dart';
 import 'core/utils/error_logger.dart';
 import 'data/audio/audio_handler.dart';
 import 'data/db/app_database.dart';
@@ -101,6 +102,7 @@ class _PulsrAppState extends State<PulsrApp> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
         final scanner = getIt<MediaScannerService>();
+        await RestoreDetectionService.checkAndHandleRestore(scanner);
         final hasPermission = await scanner.checkPermission();
         if (hasPermission) {
           final settingsCubit = getIt<SettingsCubit>();
