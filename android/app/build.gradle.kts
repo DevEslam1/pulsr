@@ -64,7 +64,13 @@ android {
         release {
             val releaseConfig = signingConfigs.getByName("release")
             val hasKeystore = releaseConfig.storeFile != null && releaseConfig.storeFile!!.exists()
-            signingConfig = if (hasKeystore) releaseConfig else signingConfigs.getByName("debug")
+            val isReleaseTaskRequested = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) }
+            if (!hasKeystore && isReleaseTaskRequested) {
+                throw org.gradle.api.GradleException("Release build requires key.properties with a valid keystore.")
+            }
+            if (hasKeystore) {
+                signingConfig = releaseConfig
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
