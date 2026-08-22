@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'l10n/generated/app_localizations.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'core/config/app_config.dart';
 import 'core/di/injection.dart';
@@ -254,6 +256,13 @@ class _PulsrAppState extends State<PulsrApp> {
                       themeMode: flutterThemeMode,
                       theme: lightTheme,
                       darkTheme: darkTheme,
+                      localizationsDelegates: const [
+                        AppLocalizations.delegate,
+                        GlobalMaterialLocalizations.delegate,
+                        GlobalWidgetsLocalizations.delegate,
+                        GlobalCupertinoLocalizations.delegate,
+                      ],
+                      supportedLocales: AppLocalizations.supportedLocales,
                       routerConfig: _router,
                     ),
                   );
