@@ -92,20 +92,9 @@
                 <data android:pathPattern=".*\\.opus" />
                 <data android:pathPattern=".*\\..*\\.opus" />
                 <data android:pathPattern=".*\\..*\\..*\\.opus" />
-                <data android:pathPattern=".*\\.wma" />
-                <data android:pathPattern=".*\\..*\\.wma" />
-                <data android:pathPattern=".*\\.alac" />
-                <data android:pathPattern=".*\\..*\\.alac" />
-                <data android:pathPattern=".*\\..*\\..*\\.alac" />
-                <data android:pathPattern=".*\\.aiff" />
-                <data android:pathPattern=".*\\..*\\.aiff" />
-                <data android:pathPattern=".*\\..*\\..*\\.aiff" />
-                <data android:pathPattern=".*\\.dsf" />
-                <data android:pathPattern=".*\\..*\\.dsf" />
-                <data android:pathPattern=".*\\..*\\..*\\.dsf" />
-                <data android:pathPattern=".*\\.dff" />
-                <data android:pathPattern=".*\\..*\\.dff" />
-                <data android:pathPattern=".*\\..*\\..*\\.dff" />
+                <data android:pathPattern=".*\\.mka" />
+                <data android:pathPattern=".*\\..*\\.mka" />
+                <data android:pathPattern=".*\\..*\\..*\\.mka" />
             </intent-filter>
         </activity>
         

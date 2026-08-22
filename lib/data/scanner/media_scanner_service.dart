@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../../core/constants/audio_formats.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../db/app_database.dart';
@@ -227,6 +228,9 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
     if (duration < input.minDurationMs) continue;
 
     final path = (raw['_data'] as String?) ?? (raw['data'] as String?) ?? '';
+    if (path.isEmpty || !AudioFormats.isSupportedExtension(path)) {
+      continue;
+    }
 
     // Auto-hide system media / messenger voice notes
     if (input.autoHideSystemMedia && MediaScannerService.isSystemIgnoredPath(path)) {
