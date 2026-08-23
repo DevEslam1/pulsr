@@ -576,7 +576,44 @@ document.addEventListener('DOMContentLoaded', () => {
       let latestTag = 'v1.0.0';
 
       if (Array.isArray(releases) && releases.length > 0) {
-        latestTag = releases[0].tag_name || 'v1.0.0';
+        const latestRelease = releases[0];
+        latestTag = latestRelease.tag_name || 'v1.0.0';
+
+        // Check assets for direct APK links
+        if (latestRelease.assets && Array.isArray(latestRelease.assets)) {
+          latestRelease.assets.forEach(asset => {
+            const name = (asset.name || '').toLowerCase();
+            const downloadUrl = asset.browser_download_url;
+
+            if (name.endsWith('.apk')) {
+              // Direct auto download button (universal or main apk)
+              const autoBtn = document.getElementById('autoDownloadBtn');
+              if (autoBtn && (!name.includes('arm') && !name.includes('x86') || name.includes('universal') || name.includes('release.apk'))) {
+                autoBtn.href = downloadUrl;
+              }
+
+              // ARM64
+              const arm64Btn = document.getElementById('abiArm64Btn');
+              if (arm64Btn && (name.includes('arm64') || name.includes('v8a'))) {
+                arm64Btn.href = downloadUrl;
+              }
+
+              // ARMv7
+              const armv7Btn = document.getElementById('abiArmv7Btn');
+              if (armv7Btn && (name.includes('armv7') || name.includes('v7a') || name.includes('armeabi'))) {
+                armv7Btn.href = downloadUrl;
+              }
+
+              // x86_64
+              const x86Btn = document.getElementById('abiX86Btn');
+              if (x86Btn && (name.includes('x86_64') || name.includes('x64'))) {
+                x86Btn.href = downloadUrl;
+              }
+            }
+          });
+        }
+
+        // Sum downloads across all releases
         releases.forEach(rel => {
           if (rel.assets && Array.isArray(rel.assets)) {
             rel.assets.forEach(asset => {

@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="styles.css?v=3.0.0">
+  <link rel="stylesheet" href="styles.css?v=3.2.0">
 </head>
 <body>
   <!-- Navigation Bar -->
@@ -29,15 +29,15 @@
         <li><a href="#lyrics" class="nav-link">Synced Lyrics</a></li>
         <li><a href="#formats" class="nav-link">Hi-Res Formats</a></li>
         <li><a href="#comparison" class="nav-link">Comparison</a></li>
+        <li><a href="#download" class="nav-link">Download</a></li>
         <li><a href="#faq" class="nav-link">FAQ</a></li>
       </ul>
 
       <div class="nav-actions">
         <a href="https://github.com/DevEslam1/pulsr" target="_blank" class="btn btn-secondary btn-sm">GitHub</a>
         <a href="#download" class="btn btn-primary btn-sm">Get APK</a>
+        <button class="mobile-toggle" aria-label="Toggle Navigation">☰</button>
       </div>
-
-      <button class="mobile-toggle" aria-label="Toggle Navigation">☰</button>
     </div>
   </header>
 
@@ -525,55 +525,56 @@
   <!-- Download & Release Hub -->
   <section class="download-section" id="download">
     <div class="container">
-      <div class="download-card">
-        <div class="download-info">
-          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
-            <span class="section-tag" id="releaseTagText" style="margin-bottom: 0;">Release v1.0.0</span>
-            <span class="feature-tag-item" id="liveDownloadsBadge" style="background: rgba(155,158,245,0.15); color: var(--primary); border-color: rgba(155,158,245,0.3);">📥 0 Downloads</span>
-          </div>
-          <h2 style="font-size: 2.2rem; margin-bottom: 16px;">Download Pulsr for Android</h2>
-          <p style="color: var(--text-secondary); margin-bottom: 24px;">
-            Compatible with Android 5.0 (Lollipop) up to Android 15. Minified with R8, 64-bit compliant, and zero external trackers.
+      <div class="section-header" style="margin-bottom: 40px;">
+        <span class="section-tag" id="releaseTagText">Release v1.0.0</span>
+        <h2 class="section-title">Download Pulsr for Android</h2>
+        <p class="section-desc">Compatible with Android 5.0 (Lollipop) up to Android 15. Minified with R8, zero telemetry, and 100% offline.</p>
+        <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 16px;">
+          <span class="feature-tag-item" id="liveDownloadsBadge" style="background: rgba(155,158,245,0.15); color: var(--primary); border-color: rgba(155,158,245,0.3);">📥 0 Downloads</span>
+          <span class="feature-tag-item" style="background: rgba(0,242,255,0.1); color: var(--accent-cyan); border-color: rgba(0,242,255,0.25);">✓ 64-bit & 32-bit Native</span>
+          <span class="feature-tag-item" style="background: rgba(0,230,118,0.1); color: #00e676; border-color: rgba(0,230,118,0.25);">🔒 Verified Safe</span>
+        </div>
+      </div>
+
+      <!-- Main Auto-Download Card -->
+      <div class="download-hero-card">
+        <div class="download-hero-info">
+          <span class="download-badge-auto">⚡ RECOMMENDED FOR MOST USERS</span>
+          <h3 style="font-size: 1.8rem; margin: 10px 0 12px; color: #fff;">Auto-Download Latest Universal APK</h3>
+          <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 0.95rem; line-height: 1.6;">
+            Instantly downloads the complete standalone installer containing all device architectures in one package. Compatible with 100% of Android smartphones, tablets, and emulators.
           </p>
 
-          <div style="display: flex; flex-wrap: wrap; gap: 16px;">
-            <a href="https://github.com/DevEslam1/pulsr/releases/latest" target="_blank" class="btn btn-primary">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Download APK (Universal)
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px;">
+            <a href="https://github.com/DevEslam1/pulsr/releases/latest" id="autoDownloadBtn" target="_blank" class="btn btn-primary btn-lg">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Download Latest APK (Universal)
             </a>
             <a href="https://github.com/DevEslam1/pulsr" target="_blank" class="btn btn-secondary">
               View on GitHub
             </a>
           </div>
 
-          <div class="download-meta">
+          <div class="download-meta" style="margin-top: 20px;">
             <div class="checksum-pill" id="checksumPill" data-hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" title="Click to copy SHA-256 hash">
               <span>SHA-256: <code>e3b0c442...52b855</code> 📋</span>
-            </div>
-            <div style="font-size: 0.8rem; color: var(--text-muted);">
-              Target SDK 34/35 • arm64-v8a • armeabi-v7a • x86_64
             </div>
           </div>
         </div>
 
         <div class="qr-box">
-          <!-- QR Code vector graphic placeholder -->
+          <!-- QR Code vector graphic -->
           <svg viewBox="0 0 100 100" width="100%" height="100%">
             <rect width="100" height="100" fill="#ffffff" />
-            <!-- Corners -->
             <rect x="10" y="10" width="25" height="25" fill="#030a2e" rx="4"/>
             <rect x="15" y="15" width="15" height="15" fill="#ffffff" rx="2"/>
             <rect x="18" y="18" width="9" height="9" fill="#0077ff" rx="1"/>
-
             <rect x="65" y="10" width="25" height="25" fill="#030a2e" rx="4"/>
             <rect x="70" y="15" width="15" height="15" fill="#ffffff" rx="2"/>
             <rect x="73" y="18" width="9" height="9" fill="#0077ff" rx="1"/>
-
             <rect x="10" y="65" width="25" height="25" fill="#030a2e" rx="4"/>
             <rect x="15" y="70" width="15" height="15" fill="#ffffff" rx="2"/>
             <rect x="18" y="73" width="9" height="9" fill="#0077ff" rx="1"/>
-
-            <!-- Pattern Blocks -->
             <rect x="42" y="12" width="6" height="12" fill="#030a2e"/>
             <rect x="52" y="18" width="8" height="6" fill="#0077ff"/>
             <rect x="40" y="40" width="20" height="20" fill="#9b9ef5" rx="3"/>
@@ -587,6 +588,69 @@
             <rect x="74" y="74" width="14" height="14" fill="#9b9ef5"/>
           </svg>
           <span class="qr-label">Scan to Install APK</span>
+        </div>
+      </div>
+
+      <!-- Specific ABI Architecture Downloads Section -->
+      <div style="margin-top: 48px;">
+        <h3 style="font-size: 1.35rem; margin-bottom: 24px; text-align: center; color: #fff;">
+          Download by CPU Architecture (Smaller File Size)
+        </h3>
+        
+        <div class="abi-grid">
+          <!-- 1. ARM64 (v8a) -->
+          <div class="abi-card">
+            <div>
+              <div class="abi-header">
+                <div class="abi-title">ARM64 (v8a)</div>
+                <span class="abi-pill abi-recommended">⚡ Most Devices</span>
+              </div>
+              <p class="abi-desc">Optimized for almost all modern Android phones & tablets (Samsung, Xiaomi, Pixel, OnePlus, etc.). Faster execution and smaller download (~30MB).</p>
+            </div>
+            <div>
+              <div class="abi-meta">Target: 64-bit ARM • Android 8.0+</div>
+              <a href="https://github.com/DevEslam1/pulsr/releases/latest" id="abiArm64Btn" target="_blank" class="btn btn-secondary abi-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download ARM64 APK
+              </a>
+            </div>
+          </div>
+
+          <!-- 2. ARMeabi-v7a (a7v) -->
+          <div class="abi-card">
+            <div>
+              <div class="abi-header">
+                <div class="abi-title">ARMv7 (a7v)</div>
+                <span class="abi-pill">Legacy 32-Bit</span>
+              </div>
+              <p class="abi-desc">For older 32-bit Android phones, budget legacy processors, and older devices running Android 5.0 through 7.0.</p>
+            </div>
+            <div>
+              <div class="abi-meta">Target: 32-bit ARM • Android 5.0+</div>
+              <a href="https://github.com/DevEslam1/pulsr/releases/latest" id="abiArmv7Btn" target="_blank" class="btn btn-secondary abi-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download ARMv7 APK
+              </a>
+            </div>
+          </div>
+
+          <!-- 3. x86_64 -->
+          <div class="abi-card">
+            <div>
+              <div class="abi-header">
+                <div class="abi-title">x86_64</div>
+                <span class="abi-pill">PC & Emulators</span>
+              </div>
+              <p class="abi-desc">For Android emulators on PC & Mac (BlueStacks, Android Studio, LDPlayer), Windows Subsystem for Android (WSA), and Intel Chromebooks.</p>
+            </div>
+            <div>
+              <div class="abi-meta">Target: 64-bit Intel/AMD • Emulators & PCs</div>
+              <a href="https://github.com/DevEslam1/pulsr/releases/latest" id="abiX86Btn" target="_blank" class="btn btn-secondary abi-btn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                Download x86_64 APK
+              </a>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -696,6 +760,6 @@
     </div>
   </footer>
 
-  <script src="app.js?v=3.0.0"></script>
+  <script src="app.js?v=3.2.0"></script>
 </body>
 </html>
