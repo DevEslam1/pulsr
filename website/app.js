@@ -536,10 +536,38 @@ document.addEventListener('DOMContentLoaded', () => {
           behavior: 'smooth'
         });
 
-        if (navLinks && navLinks.classList.contains('mobile-open')) {
-          navLinks.classList.remove('mobile-open');
-        }
+  // --- Live GitHub Download Counter & Release Fetcher ---
+  async function fetchGitHubStats() {
+    try {
+      const response = await fetch('https://api.github.com/repos/DevEslam1/pulsr/releases');
+      if (!response.ok) return;
+      const releases = await response.json();
+      let totalDownloads = 0;
+      let latestTag = 'v1.0.0';
+
+      if (Array.isArray(releases) && releases.length > 0) {
+        latestTag = releases[0].tag_name || 'v1.0.0';
+        releases.forEach(rel => {
+          if (rel.assets && Array.isArray(rel.assets)) {
+            rel.assets.forEach(asset => {
+              totalDownloads += (asset.download_count || 0);
+            });
+          }
+        });
       }
-    });
-  });
+
+      const downloadsBadge = document.getElementById('liveDownloadsBadge');
+      if (downloadsBadge) {
+        downloadsBadge.innerHTML = `📥 <strong>${totalDownloads.toLocaleString()}</strong> APK Downloads`;
+      }
+
+      const releaseTagEl = document.getElementById('releaseTagText');
+      if (releaseTagEl) {
+        releaseTagEl.textContent = `Release ${latestTag}`;
+      }
+    } catch (e) {
+      console.log('GitHub API stats notice:', e);
+    }
+  }
+  fetchGitHubStats();
 });

@@ -13,7 +13,7 @@
     <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-3.x-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter"></a>
     <a href="https://dart.dev"><img src="https://img.shields.io/badge/Dart-3.x-0175C2?style=for-the-badge&logo=dart&logoColor=white" alt="Dart"></a>
     <a href="#"><img src="https://img.shields.io/badge/Android-14%20%2F%2015%20Ready-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android 14/15"></a>
-    <a href="#"><img src="https://img.shields.io/badge/Privacy-Zero%20Telemetry-blueviolet?style=for-the-badge" alt="Zero Telemetry"></a>
+    <a href="https://github.com/DevEslam1/pulsr/releases"><img src="https://img.shields.io/github/downloads/DevEslam1/pulsr/total?style=for-the-badge&color=blueviolet&logo=github" alt="GitHub Total Downloads"></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge" alt="License MIT"></a>
   </p>
 
