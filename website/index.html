@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="styles.css?v=3.3.0">
+  <link rel="stylesheet" href="styles.css?v=3.4.0">
 </head>
 <body>
   <!-- Navigation Bar -->
@@ -546,7 +546,7 @@
           </p>
 
           <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px;">
-            <a href="https://github.com/DevEslam1/pulsr/releases/latest" id="autoDownloadBtn" target="_blank" class="btn btn-primary btn-lg">
+            <a href="https://github.com/DevEslam1/pulsr/releases/latest/download/app-prod-release.apk" id="autoDownloadBtn" download="pulsr-universal.apk" class="btn btn-primary btn-lg">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Download Latest APK (Universal)
             </a>
@@ -609,7 +609,7 @@
             </div>
             <div>
               <div class="abi-meta">Target: 64-bit ARM • Android 8.0+</div>
-              <a href="https://github.com/DevEslam1/pulsr/releases/latest" id="abiArm64Btn" target="_blank" class="btn btn-secondary abi-btn">
+              <a href="https://github.com/DevEslam1/pulsr/releases/latest/download/app-arm64-v8a-prod-release.apk" id="abiArm64Btn" download="pulsr-arm64-v8a.apk" class="btn btn-secondary abi-btn">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Download ARM64 APK
               </a>
@@ -627,7 +627,7 @@
             </div>
             <div>
               <div class="abi-meta">Target: 32-bit ARM • Android 5.0+</div>
-              <a href="https://github.com/DevEslam1/pulsr/releases/latest" id="abiArmv7Btn" target="_blank" class="btn btn-secondary abi-btn">
+              <a href="https://github.com/DevEslam1/pulsr/releases/latest/download/app-armeabi-v7a-prod-release.apk" id="abiArmv7Btn" download="pulsr-armeabi-v7a.apk" class="btn btn-secondary abi-btn">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Download ARMv7 APK
               </a>
@@ -645,7 +645,7 @@
             </div>
             <div>
               <div class="abi-meta">Target: 64-bit Intel/AMD • Emulators & PCs</div>
-              <a href="https://github.com/DevEslam1/pulsr/releases/latest" id="abiX86Btn" target="_blank" class="btn btn-secondary abi-btn">
+              <a href="https://github.com/DevEslam1/pulsr/releases/latest/download/app-x86_64-prod-release.apk" id="abiX86Btn" download="pulsr-x86_64.apk" class="btn btn-secondary abi-btn">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                 Download x86_64 APK
               </a>
@@ -798,6 +798,12 @@
     </div>
   </footer>
 
-  <script src="app.js?v=3.3.0"></script>
+  <!-- Download Feedback Toast -->
+  <div id="downloadToast" class="download-toast">
+    <div class="toast-icon">⬇</div>
+    <div id="toastMessage">Starting Pulsr APK download...</div>
+  </div>
+
+  <script src="app.js?v=3.4.0"></script>
 </body>
 </html>

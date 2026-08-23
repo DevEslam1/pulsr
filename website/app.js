@@ -566,6 +566,30 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // --- Download Toast Feedback Helper ---
+  const downloadToast = document.getElementById('downloadToast');
+  const toastMessage = document.getElementById('toastMessage');
+  let toastTimer = null;
+
+  function showDownloadToast(message) {
+    if (!downloadToast || !toastMessage) return;
+    toastMessage.textContent = message || 'Starting Pulsr APK download...';
+    downloadToast.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => {
+      downloadToast.classList.remove('show');
+    }, 4000);
+  }
+
+  // Intercept all APK download buttons for instant auto-download feedback
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('a[download], a.version-apk-btn, #autoDownloadBtn, #abiArm64Btn, #abiArmv7Btn, #abiX86Btn');
+    if (btn && btn.href && btn.href.includes('.apk')) {
+      const fileName = btn.getAttribute('download') || btn.href.split('/').pop() || 'pulsr.apk';
+      showDownloadToast(`⬇ Downloading ${fileName}...`);
+    }
+  });
+
   // --- Live GitHub Download Counter & Release Fetcher ---
   async function fetchGitHubStats() {
     try {
@@ -590,24 +614,28 @@ document.addEventListener('DOMContentLoaded', () => {
               const autoBtn = document.getElementById('autoDownloadBtn');
               if (autoBtn && (!name.includes('arm') && !name.includes('x86') || name.includes('universal') || name.includes('release.apk'))) {
                 autoBtn.href = downloadUrl;
+                autoBtn.setAttribute('download', asset.name || 'pulsr-universal.apk');
               }
 
               // ARM64
               const arm64Btn = document.getElementById('abiArm64Btn');
               if (arm64Btn && (name.includes('arm64') || name.includes('v8a'))) {
                 arm64Btn.href = downloadUrl;
+                arm64Btn.setAttribute('download', asset.name || 'pulsr-arm64-v8a.apk');
               }
 
               // ARMv7
               const armv7Btn = document.getElementById('abiArmv7Btn');
               if (armv7Btn && (name.includes('armv7') || name.includes('v7a') || name.includes('armeabi'))) {
                 armv7Btn.href = downloadUrl;
+                armv7Btn.setAttribute('download', asset.name || 'pulsr-armeabi-v7a.apk');
               }
 
               // x86_64
               const x86Btn = document.getElementById('abiX86Btn');
               if (x86Btn && (name.includes('x86_64') || name.includes('x64'))) {
                 x86Btn.href = downloadUrl;
+                x86Btn.setAttribute('download', asset.name || 'pulsr-x86_64.apk');
               }
             }
           });
@@ -645,7 +673,7 @@ document.addEventListener('DOMContentLoaded', () => {
                   }
 
                   apkButtonsHtml += `
-                    <a href="${apk.browser_download_url}" target="_blank" class="version-apk-btn ${isPrimary ? 'primary-apk' : ''}">
+                    <a href="${apk.browser_download_url}" download="${apk.name}" class="version-apk-btn ${isPrimary ? 'primary-apk' : ''}">
                       ${label}
                     </a>
                   `;
