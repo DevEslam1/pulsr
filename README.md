@@ -249,20 +249,20 @@ flutter test
 
 #### Build Universal APK
 ```bash
-flutter build apk --release
+flutter build apk --flavor prod --release
 ```
-*Output: `build/app/outputs/flutter-apk/app-release.apk`*
+*Output: `build/app/outputs/flutter-apk/app-prod-release.apk`*
 
 #### Build Split Per-ABI APKs (Smaller file size)
 ```bash
-flutter build apk --release --split-per-abi
+flutter build apk --flavor prod --release --split-per-abi
 ```
 
 #### Build Google Play App Bundle (AAB)
 ```bash
-flutter build appbundle --release
+flutter build appbundle --flavor prod --release
 ```
-*Output: `build/app/outputs/bundle/release/app-release.aab`*
+*Output: `build/app/outputs/bundle/prodRelease/app-prod-release.aab`*
 
 ---
 
