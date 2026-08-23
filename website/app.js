@@ -30,11 +30,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const heroBtnText = document.getElementById('heroDetectedText');
 
         if (isAndroid) {
-            if (detectorEl) detectorEl.textContent = '✓ Android Device Detected • Direct APK Download • 100% Offline';
-            if (heroBtnText) heroBtnText.textContent = 'Download Android APK (Direct)';
+            if (detectorEl) detectorEl.textContent = '✓ Android Device Detected • Direct ARM64 (v8a) APK • 100% Offline';
+            if (heroBtnText) heroBtnText.textContent = 'Download Android APK (ARM64)';
         } else {
-            if (detectorEl) detectorEl.textContent = '✓ Android (5.0+) Live Build • Desktop Ports in Active Roadmap';
-            if (heroBtnText) heroBtnText.textContent = 'Download Android APK (v1.0)';
+            if (detectorEl) detectorEl.textContent = '✓ Android (5.0+) Live Build • Direct ARM64 (v8a) APK';
+            if (heroBtnText) heroBtnText.textContent = 'Download Android APK (ARM64)';
         }
     };
     detectUserOS();
@@ -650,6 +650,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (Array.isArray(releases) && releases.length > 0) {
                     if (archiveList) archiveList.innerHTML = '';
 
+                    // Update main download links with latest ARM64 asset
+                    const latestRel = releases[0];
+                    if (latestRel && latestRel.assets && Array.isArray(latestRel.assets)) {
+                        const apkAssets = latestRel.assets.filter(a => a.name.endsWith('.apk'));
+                        const arm64Asset = apkAssets.find(a => a.name.includes('arm64-v8a') || a.name.includes('a8v')) || apkAssets[0];
+                        if (arm64Asset) {
+                            const heroAutoBtn = document.getElementById('heroAutoDownloadBtn');
+                            if (heroAutoBtn) {
+                                heroAutoBtn.href = arm64Asset.browser_download_url;
+                                heroAutoBtn.setAttribute('download', arm64Asset.name);
+                            }
+                            const autoBtn = document.getElementById('autoDownloadBtn');
+                            if (autoBtn) {
+                                autoBtn.href = arm64Asset.browser_download_url;
+                                autoBtn.setAttribute('download', arm64Asset.name);
+                            }
+                        }
+                    }
+
                     releases.forEach((rel, index) => {
                         let rawTag = rel.tag_name || 'v1.0.0';
                         const tag = rawTag.replace(/^Pulsr_Music_/i, '').replace(/^Pulsr_/i, '');
@@ -663,13 +682,20 @@ document.addEventListener('DOMContentLoaded', () => {
                                 apkAssets.forEach(apk => {
                                     totalDownloads += (apk.download_count || 0);
                                     let label = apk.name;
-                                    if (label.includes('arm64-v8a')) label = 'ARM64 (v8a)';
-                                    else if (label.includes('armeabi-v7a')) label = 'ARMv7 (a7v)';
-                                    else if (label.includes('x86_64')) label = 'x86_64';
-                                    else label = 'Universal APK';
+                                    let isPrimary = false;
+                                    if (label.includes('arm64-v8a') || label.includes('a8v')) {
+                                        label = 'ARM64 (v8a)';
+                                        isPrimary = true;
+                                    } else if (label.includes('armeabi-v7a') || label.includes('a7v')) {
+                                        label = 'ARMv7 (a7v)';
+                                    } else if (label.includes('x86_64') || label.includes('x86')) {
+                                        label = 'x86_64';
+                                    } else {
+                                        label = 'APK Build';
+                                    }
 
                                     apkButtonsHtml += `
-                                        <a href="${apk.browser_download_url}" download="${apk.name}" class="version-apk-btn ${label.includes('Universal') ? 'primary-apk' : ''}">
+                                        <a href="${apk.browser_download_url}" download="${apk.name}" class="version-apk-btn ${isPrimary ? 'primary-apk' : ''}">
                                             ⬇ ${label}
                                         </a>
                                     `;
