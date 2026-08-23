@@ -1,809 +1,1343 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="cyber">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pulsr Music — Premium Offline-First Local Music Player</title>
-  <meta name="description" content="Audiophile-grade offline music player with 10-band EQ, AutoEQ headphone presets, real-time synced lyrics, dynamic Aura theming, and zero telemetry.">
-  <link rel="icon" type="image/svg+xml" href="assets/app_icon.svg">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pulsr Music — Premium Offline-First Audiophile Local Music Player</title>
+    <meta name="description" content="Pulsr is a next-generation offline local music player engineered for audiophiles. Bit-perfect 24-bit/192kHz playback, 10-band graphic EQ, AutoEQ headphone calibration, synced lyrics, dynamic Aura theming, and zero telemetry.">
+    <meta name="keywords" content="music player, pulsr, audiophile music player, 10-band equalizer, AutoEQ, harman target, offline music player, synced lyrics, FLAC player, Hi-Res audio, drift sqlite, flutter music player">
+    <meta name="author" content="DevEslam1">
+    <meta name="theme-color" content="#0B0D13">
 
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://deveslam1.github.io/pulsr/">
+    <meta property="og:title" content="Pulsr Music — Pure Offline Sound. Unrivaled Aura Design.">
+    <meta property="og:description" content="Audiophile-grade offline music player with 10-band EQ, AutoEQ headphone presets, real-time synced lyrics, dynamic Aura theming, and zero telemetry. Free &amp; Open Source.">
+    <meta property="og:image" content="assets/app_icon.svg">
 
-  <link rel="stylesheet" href="styles.css?v=3.4.0">
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Pulsr Music — Audiophile Offline Music Player">
+    <meta name="twitter:description" content="10-Band Graphic EQ, AutoEQ headphone targets, synced lyrics, 4 player themes, and zero telemetry.">
+    <meta name="twitter:image" content="assets/app_icon.svg">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="assets/app_icon.svg">
+    <link rel="apple-touch-icon" href="assets/app_icon.svg">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="styles.css?v=4.0.0">
 </head>
 <body>
-  <!-- Navigation Bar -->
-  <header class="navbar">
-    <div class="container nav-container">
-      <a href="#" class="brand">
-        <img src="assets/app_icon.svg" alt="Pulsr Music Logo" class="brand-icon">
-        <div class="brand-name">Pulsr<span>.</span></div>
-      </a>
+    <a href="#main" class="skip-link">Skip to Content</a>
 
-      <ul class="nav-links">
-        <li><a href="#features" class="nav-link">Features</a></li>
-        <li><a href="#equalizer" class="nav-link">Equalizer & AutoEQ</a></li>
-        <li><a href="#lyrics" class="nav-link">Synced Lyrics</a></li>
-        <li><a href="#formats" class="nav-link">Hi-Res Formats</a></li>
-        <li><a href="#comparison" class="nav-link">Comparison</a></li>
-        <li><a href="#download" class="nav-link">Download</a></li>
-        <li><a href="#faq" class="nav-link">FAQ</a></li>
-      </ul>
-
-      <div class="nav-actions">
-        <a href="https://github.com/DevEslam1/pulsr" target="_blank" class="btn btn-secondary btn-sm">GitHub</a>
-        <a href="#download" class="btn btn-primary btn-sm">Get APK</a>
-        <button class="mobile-toggle" aria-label="Toggle Navigation">☰</button>
-      </div>
+    <!-- Ambient Background Lighting & Cyber Grid -->
+    <div class="ambient-bg" aria-hidden="true">
+        <div class="cyber-grid"></div>
+        <div class="glow-orb orb-1"></div>
+        <div class="glow-orb orb-2"></div>
+        <div class="glow-orb orb-3"></div>
     </div>
-  </header>
 
-  <!-- Hero Section -->
-  <section class="hero">
-    <div class="container hero-grid">
-      <div class="hero-content">
-        <div class="badge-pill">
-          <span class="pulse-dot"></span>
-          <span>FLUTTER 3.X • AUDIOPHILE DSP • ZERO TELEMETRY</span>
-        </div>
-
-        <h1 class="hero-title">
-          Pure Offline Sound.<br>
-          <span class="gradient-text">Unrivaled Aura Design.</span>
-        </h1>
-
-        <p class="hero-subtitle">
-          Pulsr is a next-generation local music player engineered for audiophiles and design purists. 
-          Experience bit-perfect playback, 10-band AutoEQ calibration, live synced lyrics, and dynamic visual themes — completely offline with zero tracking.
-        </p>
-
-        <div class="hero-cta-group">
-          <a href="#download" class="btn btn-primary">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Download Pulsr APK
-          </a>
-        </div>
-
-        <div class="hero-metrics">
-          <div class="metric-item">
-            <span class="metric-number">10-Band</span>
-            <span class="metric-label">Graphic DSP & AutoEQ</span>
-          </div>
-          <div class="metric-item">
-            <span class="metric-number">24-Bit</span>
-            <span class="metric-label">192kHz Hi-Res Audio</span>
-          </div>
-          <div class="metric-item">
-            <span class="metric-number">0ms</span>
-            <span class="metric-label">Zero Telemetry & Offline</span>
-          </div>
-          <div class="metric-item">
-            <span class="metric-number">&lt; 2s</span>
-            <span class="metric-label">10k+ Songs SQLite Scan</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Phone Mockup Container -->
-      <div class="mockup-wrapper" id="interactive-demo">
-        <div class="mockup-glow" id="mockupGlow"></div>
-        <div class="phone-frame" id="phoneFrame">
-          <div class="phone-island">
-            <div class="island-camera"></div>
-            <div class="island-indicator"></div>
-          </div>
-
-          <div class="phone-screen">
-            <!-- Now Playing Header -->
-            <div class="now-playing-header">
-              <button class="nav-icon-btn" title="Back">▼</button>
-              <div class="header-meta">
-                <div class="header-subtitle">NOW PLAYING</div>
-              </div>
-              <button class="nav-icon-btn" title="Queue">☰</button>
+    <!-- Floating Capsule Navigation Bar -->
+    <header class="nav-header" id="navHeader">
+        <nav class="nav" id="nav">
+            <div class="nav-left">
+                <a href="#main" class="nav-logo" aria-label="Pulsr Music Home">
+                    <div class="logo-badge">
+                        <img src="assets/app_icon.svg" alt="Pulsr Music Logo" class="logo-img" width="28" height="28">
+                    </div>
+                    <div class="logo-text-group">
+                        <span class="logo-text">Pulsr<span class="logo-dot">.</span></span>
+                        <span class="logo-version" id="navVersionTag">v1.0.0</span>
+                    </div>
+                </a>
             </div>
 
-            <!-- Album Artwork & Hi-Res Badge -->
-            <div class="album-art-container" id="albumArtBox">
-              <span class="quality-badge" id="qualityBadge">FLAC 24-bit / 96kHz</span>
-              <img src="assets/app_icon.svg" alt="Album Art Preview" class="album-art-img" style="opacity: 0.85;">
+            <div class="nav-center" id="navLinks">
+                <a href="#features" class="nav-link active">Features</a>
+                <a href="#equalizer" class="nav-link">Equalizer</a>
+                <a href="#lyrics" class="nav-link">Lyrics</a>
+                <a href="#themes" class="nav-link">Themes</a>
+                <a href="#comparison" class="nav-link">Compare</a>
+                <a href="#download" class="nav-link">Downloads</a>
+                <a href="#faq" class="nav-link">FAQ</a>
             </div>
 
-            <!-- Real-time Audio Visualizer -->
-            <canvas id="visualizerCanvas" class="visualizer-canvas"></canvas>
+            <div class="nav-right">
+                <!-- Theme Switcher Dropdown -->
+                <div class="theme-menu-wrapper">
+                    <button class="theme-btn" id="themeToggle" aria-label="Change Theme" title="Switch UI Theme">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="4"></circle>
+                            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+                        </svg>
+                    </button>
+                    <div class="theme-dropdown" id="themeDropdown">
+                        <button class="theme-opt active" data-theme-val="cyber">
+                            <span class="theme-dot dot-cyber"></span> Cyber Blue
+                        </button>
+                        <button class="theme-opt" data-theme-val="amoled">
+                            <span class="theme-dot dot-amoled"></span> Pure AMOLED
+                        </button>
+                        <button class="theme-opt" data-theme-val="emerald">
+                            <span class="theme-dot dot-emerald"></span> Emerald Neon
+                        </button>
+                        <button class="theme-opt" data-theme-val="violet">
+                            <span class="theme-dot dot-violet"></span> Aurora Violet
+                        </button>
+                        <button class="theme-opt" data-theme-val="light">
+                            <span class="theme-dot dot-light"></span> Light Deck
+                        </button>
+                    </div>
+                </div>
 
-            <!-- Song Info Row -->
-            <div class="song-info-row">
-              <div class="song-meta">
-                <h4 id="songTitle">Resonance (Hyperdrive Mix)</h4>
-                <p id="songArtist">Aura Soundworks • Cybernetic Echoes</p>
-              </div>
-              <button class="favorite-btn active" id="favBtn" title="Favorite">♥</button>
+                <!-- GitHub Stars Pill -->
+                <a href="https://github.com/DevEslam1/pulsr" class="btn btn-github" target="_blank" rel="noopener" aria-label="GitHub Repository">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2A10 10 0 002 12c0 4.42 2.87 8.17 6.84 9.5.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.56 9.56 0 015 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85V21c0 .27.18.58.69.48A10 10 0 0022 12 10 10 0 0012 2z"/>
+                    </svg>
+                    <span>Star</span>
+                    <span class="gh-star-count" id="githubStars">★ 1.0k</span>
+                </a>
+
+                <!-- Share App Trigger -->
+                <button class="btn btn-share" id="openShareModal" aria-label="Share Pulsr" title="Share Pulsr Music">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="18" cy="5" r="3"></circle>
+                        <circle cx="6" cy="12" r="3"></circle>
+                        <circle cx="18" cy="19" r="3"></circle>
+                        <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                        <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                    </svg>
+                    <span class="share-btn-text">Share</span>
+                </button>
+
+                <div class="nav-divider"></div>
+
+                <!-- Primary Download Link -->
+                <a href="#download" class="btn btn-primary btn-sm nav-download-btn">
+                    <span>Get APK</span>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 5v14M19 12l-7 7-7-7"/>
+                    </svg>
+                </a>
+
+                <!-- Mobile Hamburger Button -->
+                <button class="nav-mobile-toggle" id="mobileToggle" aria-label="Toggle mobile menu" aria-expanded="false">
+                    <span></span><span></span><span></span>
+                </button>
             </div>
+        </nav>
+    </header>
 
-            <!-- Waveform Progress Bar -->
-            <div class="progress-container">
-              <div class="progress-bar-interactive" id="progressBar">
-                <div class="progress-fill" id="progressFill"></div>
-              </div>
-              <div class="time-row">
-                <span id="currentTime">0:42</span>
-                <span id="totalDuration">3:38</span>
-              </div>
-            </div>
-
-            <!-- Playback Controls -->
-            <div class="controls-row">
-              <button class="ctrl-btn" title="Shuffle">⇄</button>
-              <button class="ctrl-btn" id="prevTrackBtn" title="Previous">⏮</button>
-              <button class="play-pause-circle" id="playPauseBtn" title="Play/Pause">❚❚</button>
-              <button class="ctrl-btn" id="nextTrackBtn" title="Next">⏭</button>
-              <button class="ctrl-btn" title="Repeat">↻</button>
-            </div>
-          </div>
-
-          <!-- Dynamic Theme Switcher Pill -->
-          <div class="mockup-controls-card">
-            <span class="theme-pill-label">Aura Dynamic Palette:</span>
-            <div class="theme-palette-swatches">
-              <div class="swatch swatch-aura active" data-theme="aura" title="Aura Midnight"></div>
-              <div class="swatch swatch-cyan" data-theme="cyan" title="Electric Cyan"></div>
-              <div class="swatch swatch-magenta" data-theme="magenta" title="Neon Magenta"></div>
-              <div class="swatch swatch-amber" data-theme="amber" title="Sunset Amber"></div>
-              <div class="swatch swatch-amoled" data-theme="amoled" title="Pure AMOLED Black"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Features Grid Section -->
-  <section class="section" id="features">
-    <div class="container">
-      <div class="section-header">
-        <span class="section-tag">Engineered for Perfection</span>
-        <h2 class="section-title">Everything You Want in a Music Player. Nothing You Don't.</h2>
-        <p class="section-desc">Pulsr strips away cloud bloat, algorithmic paywalls, and annoying ads to deliver pure, uninterrupted local audio playback.</p>
-      </div>
-
-      <div class="features-grid">
-        <!-- Feature 1 -->
-        <div class="feature-card">
-          <div class="feature-icon-box">🎛️</div>
-          <h3 class="feature-title">10-Band DSP & AutoEQ</h3>
-          <p class="feature-text">Precision graphic equalizer with bass boost, audio virtualizer, reverb environments, and bundled AutoEQ calibration curves for industry-leading headphones.</p>
-          <div class="feature-tags">
-            <span class="feature-tag-item">10-Band EQ</span>
-            <span class="feature-tag-item">Harman Curve</span>
-            <span class="feature-tag-item">AirPods & Sony</span>
-            <span class="feature-tag-item">ReplayGain</span>
-          </div>
-        </div>
-
-        <!-- Feature 2 -->
-        <div class="feature-card">
-          <div class="feature-icon-box">✨</div>
-          <h3 class="feature-title">Aura Dynamic Theming</h3>
-          <p class="feature-text">Dynamic PaletteGenerator extracts ambient color tones straight from your album artwork. Choose between 4 distinct Now Playing layouts including Modern Vinyl and Glassmorphism.</p>
-          <div class="feature-tags">
-            <span class="feature-tag-item">4 Player Themes</span>
-            <span class="feature-tag-item">AMOLED Black</span>
-            <span class="feature-tag-item">120fps Animations</span>
-            <span class="feature-tag-item">Edge-to-Edge UI</span>
-          </div>
-        </div>
-
-        <!-- Feature 3 -->
-        <div class="feature-card">
-          <div class="feature-icon-box">⚡</div>
-          <h3 class="feature-title">SQLite Indexed Library</h3>
-          <p class="feature-text">Powered by Drift SQLite, Pulsr indexes tens of thousands of tracks in under two seconds with instant fuzzy search, folder browser, blacklisting, and zero lag.</p>
-          <div class="feature-tags">
-            <span class="feature-tag-item">Drift SQLite</span>
-            <span class="feature-tag-item">Folder Blacklisting</span>
-            <span class="feature-tag-item">Instant Search</span>
-            <span class="feature-tag-item">.nomedia Support</span>
-          </div>
-        </div>
-
-        <!-- Feature 4 -->
-        <div class="feature-card">
-          <div class="feature-icon-box">🎤</div>
-          <h3 class="feature-title">Real-Time Synced Lyrics</h3>
-          <p class="feature-text">Karaoke-style LRC lyrics engine with millisecond precision, smooth autoscroll, click-to-seek line jumps, and fallback to embedded ID3 lyrics and plain text.</p>
-          <div class="feature-tags">
-            <span class="feature-tag-item">LRC Sync</span>
-            <span class="feature-tag-item">Auto-Scroll</span>
-            <span class="feature-tag-item">Click-to-Seek</span>
-            <span class="feature-tag-item">Embedded Tags</span>
-          </div>
-        </div>
-
-        <!-- Feature 5 -->
-        <div class="feature-card">
-          <div class="feature-icon-box">🏷️</div>
-          <h3 class="feature-title">ID3 Tag & Artwork Editor</h3>
-          <p class="feature-text">Direct on-device audio tag editor. Modify song titles, artists, albums, genres, release years, and inject high-resolution cover art directly into audio files without external tools.</p>
-          <div class="feature-tags">
-            <span class="feature-tag-item">ID3v2 / Vorbis</span>
-            <span class="feature-tag-item">Artwork Injector</span>
-            <span class="feature-tag-item">FLAC & M4A</span>
-            <span class="feature-tag-item">Batch Safe</span>
-          </div>
-        </div>
-
-        <!-- Feature 6 -->
-        <div class="feature-card">
-          <div class="feature-icon-box">🛡️</div>
-          <h3 class="feature-title">100% Offline & Private</h3>
-          <p class="feature-text">Zero telemetry, zero user tracking, zero account sign-ins, and zero third-party ads. Your library, play counts, and playlists never leave your device.</p>
-          <div class="feature-tags">
-            <span class="feature-tag-item">No Ads</span>
-            <span class="feature-tag-item">No Accounts</span>
-            <span class="feature-tag-item">Zero Telemetry</span>
-            <span class="feature-tag-item">Offline First</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Interactive Equalizer & AutoEQ Section -->
-  <section class="section" id="equalizer">
-    <div class="container">
-      <div class="section-header">
-        <span class="section-tag">Audio Engineering</span>
-        <h2 class="section-title">Audiophile 10-Band EQ & AutoEQ Sandbox</h2>
-        <p class="section-desc">Fine-tune your acoustic spectrum with interactive graphic sliders or select curated AutoEQ targets tailored for top audiophile headphones.</p>
-      </div>
-
-      <div class="sandbox-grid">
-        <!-- Interactive Curve Canvas & Sliders -->
-        <div class="eq-curve-card">
-          <div class="eq-canvas-wrapper">
-            <canvas id="eqCanvas"></canvas>
-          </div>
-
-          <!-- 10 Band Sliders -->
-          <div class="eq-sliders-row">
-            <div class="eq-band-col">
-              <input type="range" class="eq-slider" min="-12" max="12" step="0.5" value="5.5" orient="vertical">
-              <span class="eq-band-db">+5.5dB</span>
-              <span class="eq-band-freq">31Hz</span>
-            </div>
-            <div class="eq-band-col">
-              <input type="range" class="eq-slider" min="-12" max="12" step="0.5" value="3.8" orient="vertical">
-              <span class="eq-band-db">+3.8dB</span>
-              <span class="eq-band-freq">63Hz</span>
-            </div>
-            <div class="eq-band-col">
-              <input type="range" class="eq-slider" min="-12" max="12" step="0.5" value="1.5" orient="vertical">
-              <span class="eq-band-db">+1.5dB</span>
-              <span class="eq-band-freq">125Hz</span>
-            </div>
-            <div class="eq-band-col">
-              <input type="range" class="eq-slider" min="-12" max="12" step="0.5" value="0.0" orient="vertical">
-              <span class="eq-band-db">0.0dB</span>
-              <span class="eq-band-freq">250Hz</span>
-            </div>
-            <div class="eq-band-col">
-              <input type="range" class="eq-slider" min="-12" max="12" step="0.5" value="-1.0" orient="vertical">
-              <span class="eq-band-db">-1.0dB</span>
-              <span class="eq-band-freq">500Hz</span>
-            </div>
-            <div class="eq-band-col">
-              <input type="range" class="eq-slider" min="-12" max="12" step="0.5" value="1.2" orient="vertical">
-              <span class="eq-band-db">+1.2dB</span>
-              <span class="eq-band-freq">1kHz</span>
-            </div>
-            <div class="eq-band-col">
-              <input type="range" class="eq-slider" min="-12" max="12" step="0.5" value="3.5" orient="vertical">
-              <span class="eq-band-db">+3.5dB</span>
-              <span class="eq-band-freq">2kHz</span>
-            </div>
-            <div class="eq-band-col">
-              <input type="range" class="eq-slider" min="-12" max="12" step="0.5" value="4.0" orient="vertical">
-              <span class="eq-band-db">+4.0dB</span>
-              <span class="eq-band-freq">4kHz</span>
-            </div>
-            <div class="eq-band-col">
-              <input type="range" class="eq-slider" min="-12" max="12" step="0.5" value="2.5" orient="vertical">
-              <span class="eq-band-db">+2.5dB</span>
-              <span class="eq-band-freq">8kHz</span>
-            </div>
-            <div class="eq-band-col">
-              <input type="range" class="eq-slider" min="-12" max="12" step="0.5" value="1.5" orient="vertical">
-              <span class="eq-band-db">+1.5dB</span>
-              <span class="eq-band-freq">16kHz</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Presets Explorer Column -->
-        <div class="preset-selector-card">
-          <h3 style="font-size: 1.2rem;">Headphone Target Calibration</h3>
-          <p style="font-size: 0.88rem; color: var(--text-secondary);">Click any profile to instantly load its parametric compensation target curve:</p>
-
-          <div class="preset-list">
-            <button class="preset-btn active" data-preset="harman">
-              <div>
-                <div class="preset-name">Harman In-Ear Target (2019)</div>
-                <div class="preset-cat">Acoustic Reference Benchmark</div>
-              </div>
-              <span class="preset-badge">Reference</span>
+    <!-- Mobile Menu Drawer -->
+    <div class="mobile-menu" id="mobileMenu">
+        <a href="#features" class="mobile-link">⚡ Core Features</a>
+        <a href="#equalizer" class="mobile-link">🎛️ 10-Band EQ &amp; AutoEQ</a>
+        <a href="#lyrics" class="mobile-link">🎤 Synced Lyrics</a>
+        <a href="#themes" class="mobile-link">🎨 4 Aura Themes</a>
+        <a href="#comparison" class="mobile-link">⚖️ Compare Players</a>
+        <a href="#download" class="mobile-link">📦 Downloads &amp; Builds</a>
+        <a href="#faq" class="mobile-link">❓ FAQ</a>
+        <div class="mobile-actions">
+            <button class="btn btn-share btn-block" id="mobileShareBtn">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle>
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                </svg>
+                Share App with Friends
             </button>
-
-            <button class="preset-btn" data-preset="airpods">
-              <div>
-                <div class="preset-name">Apple AirPods Pro (2nd Gen)</div>
-                <div class="preset-cat">TWS Earbuds Calibration</div>
-              </div>
-              <span class="preset-badge">Apple</span>
-            </button>
-
-            <button class="preset-btn" data-preset="sony">
-              <div>
-                <div class="preset-name">Sony WH-1000XM5</div>
-                <div class="preset-cat">Over-Ear ANC Profile</div>
-              </div>
-              <span class="preset-badge">Sony</span>
-            </button>
-
-            <button class="preset-btn" data-preset="sennheiser">
-              <div>
-                <div class="preset-name">Sennheiser HD 600</div>
-                <div class="preset-cat">Open-Back Reference Headphones</div>
-              </div>
-              <span class="preset-badge">Audiophile</span>
-            </button>
-
-            <button class="preset-btn" data-preset="bassboost">
-              <div>
-                <div class="preset-name">Club Bass Boost</div>
-                <div class="preset-cat">Sub-Bass & Punch Enhancement</div>
-              </div>
-              <span class="preset-badge">Dynamic</span>
-            </button>
-
-            <button class="preset-btn" data-preset="flat">
-              <div>
-                <div class="preset-name">Flat / Studio Neutral</div>
-                <div class="preset-cat">Zero Equalization Bypass</div>
-              </div>
-              <span class="preset-badge">Direct</span>
-            </button>
-          </div>
+            <a href="#download" class="btn btn-primary btn-block">Download APK Free</a>
         </div>
-      </div>
     </div>
-  </section>
 
-  <!-- Interactive Synced Lyrics Section -->
-  <section class="section" id="lyrics">
-    <div class="container">
-      <div class="lyrics-showcase-grid">
-        <div>
-          <span class="section-tag">Interactive Lyrics View</span>
-          <h2 class="section-title">Sing Along with Millisecond Synced Lyrics.</h2>
-          <p class="section-desc" style="margin-bottom: 24px;">
-            Pulsr natively decodes standard <code>.lrc</code> files and embedded ID3 synchronized lyric tags. 
-            Enjoy smooth kinetic scrolling, real-time karaoke highlights, and tap any line to seek directly to that exact musical verse.
-          </p>
-          <ul style="list-style: none; display: flex; flex-direction: column; gap: 14px; color: var(--text-secondary); font-size: 0.95rem;">
-            <li style="display: flex; align-items: center; gap: 10px;">
-              <span style="color: var(--accent-cyan); font-weight: 800;">✓</span>
-              <span><strong>Interactive Tap-to-Seek</strong>: Jump directly to guitar solos or vocal refrains.</span>
-            </li>
-            <li style="display: flex; align-items: center; gap: 10px;">
-              <span style="color: var(--accent-cyan); font-weight: 800;">✓</span>
-              <span><strong>Offset Adjustment</strong>: Fine-tune lyric sync latency by ±50ms intervals.</span>
-            </li>
-            <li style="display: flex; align-items: center; gap: 10px;">
-              <span style="color: var(--accent-cyan); font-weight: 800;">✓</span>
-              <span><strong>Auto-Scroll Focus</strong>: Active line stays locked center-screen with ambient glow.</span>
-            </li>
-          </ul>
+    <main id="main">
+        <!-- Hero Section -->
+        <section class="hero-section">
+            <div class="container hero-grid">
+                <div class="hero-content">
+                    <div class="hero-badge reveal">
+                        <span class="badge-pulsing-dot"></span>
+                        <span class="badge-tag">PULSR v1.0.0 // AUDIOPHILE DSP RELEASE</span>
+                        <span class="badge-sep">|</span>
+                        <span class="badge-info">24-Bit / 192kHz &amp; AutoEQ</span>
+                    </div>
+
+                    <h1 class="hero-title reveal">
+                        Pure Offline Sound.<br>
+                        <span class="gradient-text">Unrivaled Aura Design.</span>
+                    </h1>
+
+                    <p class="hero-description reveal">
+                        A next-generation local music player engineered for audiophiles and design purists. Experience bit-perfect playback, 10-band AutoEQ headphone calibration, millisecond live synced lyrics, and dynamic visual themes — 100% offline with zero tracking.
+                    </p>
+
+                    <div class="hero-cta-group reveal">
+                        <a href="https://github.com/DevEslam1/pulsr/releases/latest/download/app-prod-release.apk" download="pulsr-universal.apk" class="btn btn-primary btn-lg hero-main-btn" id="heroAutoDownloadBtn">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                            </svg>
+                            <span id="heroDetectedText">Download Android APK</span>
+                        </a>
+
+                        <a href="#equalizer" class="btn btn-secondary btn-lg">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line>
+                                <line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line>
+                                <line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line>
+                                <line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line>
+                            </svg>
+                            Test 10-Band EQ Sandbox
+                        </a>
+                    </div>
+
+                    <div class="hero-os-detector reveal">
+                        <span class="os-detect-dot"></span>
+                        <span class="os-detect-text" id="osDetectorLabel">✓ Android (5.0+) Compatible • 100% Offline • Zero Telemetry &amp; No Ads</span>
+                    </div>
+
+                    <!-- Live Highlight Stats Cards -->
+                    <div class="hero-stats reveal">
+                        <div class="stat-card">
+                            <div class="stat-num">10-Band</div>
+                            <div class="stat-title">Graphic DSP &amp; AutoEQ</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-num">24-Bit</div>
+                            <div class="stat-title">192kHz Hi-Res Audio</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-num">0 ms</div>
+                            <div class="stat-title">Zero Telemetry &amp; Offline</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-num">&lt; 2s</div>
+                            <div class="stat-title">10k+ Songs SQLite Scan</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Hero Interactive Audio Deck Cockpit Preview -->
+                <div class="hero-visual reveal">
+                    <div class="cockpit-card">
+                        <div class="cockpit-header">
+                            <div class="window-controls">
+                                <span class="win-btn win-close"></span>
+                                <span class="win-btn win-min"></span>
+                                <span class="win-btn win-max"></span>
+                            </div>
+                            <div class="cockpit-title">Pulsr Signal Deck — Aura Core</div>
+                            <div class="cockpit-meter">
+                                <span class="meter-live-indicator"></span>
+                                <span id="heroLiveBitrate">FLAC 24-Bit / 192kHz</span>
+                            </div>
+                        </div>
+
+                        <div class="cockpit-body">
+                            <!-- Player Preview Deck -->
+                            <div class="player-cockpit-deck">
+                                <div class="album-art-wrap">
+                                    <div class="album-art-box" id="heroAlbumArt">
+                                        <div class="album-art-glow"></div>
+                                        <svg viewBox="0 0 100 100" class="album-svg-note">
+                                            <circle cx="50" cy="50" r="44" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="2"/>
+                                            <circle cx="50" cy="50" r="28" fill="none" stroke="rgba(0,242,255,0.3)" stroke-width="1.5"/>
+                                            <circle cx="50" cy="50" r="14" fill="none" stroke="rgba(155,158,245,0.4)" stroke-width="1.5"/>
+                                            <path d="M44 64 A 8 8 0 1 1 52 56 V 34 H 66 V 42 H 52 V 64 Z" fill="#ffffff" filter="drop-shadow(0 0 8px rgba(0,242,255,0.8))"/>
+                                        </svg>
+                                        <span class="hi-res-badge">Hi-Res Lossless</span>
+                                    </div>
+                                </div>
+
+                                <div class="track-meta-row">
+                                    <div class="track-info">
+                                        <h3 class="track-title" id="heroTrackTitle">Resonance (Hyperdrive Mix)</h3>
+                                        <p class="track-artist" id="heroTrackArtist">Aura Soundworks • Cybernetic Echoes</p>
+                                    </div>
+                                    <button class="track-fav-btn" aria-label="Favorite Track" title="Add to Favorites">♥</button>
+                                </div>
+
+                                <!-- Real-time Spectrum Visualizer Canvas -->
+                                <div class="visualizer-container">
+                                    <canvas id="heroVisualizerCanvas"></canvas>
+                                </div>
+
+                                <!-- Interactive Scrubber -->
+                                <div class="playback-scrubber-wrap">
+                                    <div class="scrubber-bar" id="heroScrubberBar">
+                                        <div class="scrubber-progress" id="heroScrubberFill" style="width: 45%;"></div>
+                                        <div class="scrubber-thumb" style="left: 45%;"></div>
+                                    </div>
+                                    <div class="time-row">
+                                        <span id="heroTimeCurrent">1:48</span>
+                                        <span id="heroTimeTotal">3:56</span>
+                                    </div>
+                                </div>
+
+                                <!-- Transport Controls -->
+                                <div class="cockpit-transport-controls">
+                                    <button class="transport-btn btn-shuffle" aria-label="Shuffle" title="Shuffle">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></svg>
+                                    </button>
+                                    <button class="transport-btn btn-prev" id="heroPrevBtn" aria-label="Previous Track">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="19 20 9 12 19 4 19 20"/><line x1="5" y1="19" x2="5" y2="5" stroke="currentColor" stroke-width="2"/></svg>
+                                    </button>
+                                    <button class="transport-btn btn-play-main" id="heroPlayBtn" aria-label="Play or Pause">
+                                        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" id="heroPlayIcon">
+                                            <rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>
+                                        </svg>
+                                    </button>
+                                    <button class="transport-btn btn-next" id="heroNextBtn" aria-label="Next Track">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19" stroke="currentColor" stroke-width="2"/></svg>
+                                    </button>
+                                    <button class="transport-btn btn-repeat" aria-label="Repeat" title="Repeat Track">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+                                    </button>
+                                </div>
+
+                                <!-- Dynamic Aura Palette Swatches -->
+                                <div class="aura-palette-box">
+                                    <span class="aura-palette-label">Aura Palette:</span>
+                                    <div class="palette-swatches">
+                                        <button class="palette-dot dot-cyan active" data-palette="cyan" title="Cyber Cyan"></button>
+                                        <button class="palette-dot dot-lavender" data-palette="lavender" title="Aurora Lavender"></button>
+                                        <button class="palette-dot dot-magenta" data-palette="magenta" title="Neon Crimson"></button>
+                                        <button class="palette-dot dot-amber" data-palette="amber" title="Amber Glow"></button>
+                                        <button class="palette-dot dot-dark" data-palette="dark" title="AMOLED Void"></button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Live DSP Frequency Response Sparkline -->
+                            <div class="cockpit-graph-box">
+                                <div class="graph-top-label">
+                                    <span>Real-Time DSP Acoustic Curve</span>
+                                    <span class="graph-stat-badge">AutoEQ: Harman 2019 Active</span>
+                                </div>
+                                <svg class="hero-sparkline-svg" viewBox="0 0 360 70" preserveAspectRatio="none">
+                                    <defs>
+                                        <linearGradient id="heroGradient" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stop-color="var(--primary-color)" stop-opacity="0.35"/>
+                                            <stop offset="100%" stop-color="var(--primary-color)" stop-opacity="0"/>
+                                        </linearGradient>
+                                    </defs>
+                                    <path id="heroSparkArea" fill="url(#heroGradient)"></path>
+                                    <path id="heroSparkLine" fill="none" stroke="var(--primary-color)" stroke-width="2.5" stroke-linecap="round"></path>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Continuous Feature Marquee Strip -->
+        <section class="marquee-strip" aria-hidden="true">
+            <div class="marquee-track">
+                <div class="marquee-group">
+                    <span class="marquee-item">⚡ 10-Band Graphic DSP &amp; AutoEQ</span>
+                    <span class="marquee-item">💎 Bit-Perfect 24-Bit / 192kHz FLAC</span>
+                    <span class="marquee-item">🎤 Real-Time Synced LRC Lyrics</span>
+                    <span class="marquee-item">🎨 4 Dynamic Aura Player Themes</span>
+                    <span class="marquee-item">🗄️ Drift SQLite Sub-2s Scanner</span>
+                    <span class="marquee-item">🏷️ In-Place ID3 Tag &amp; Artwork Editor</span>
+                    <span class="marquee-item">📱 Android Home Screen Widgets</span>
+                    <span class="marquee-item">🛡️ 100% Offline &amp; Zero Telemetry</span>
+                    <span class="marquee-item">🌐 English, Spanish &amp; Arabic (RTL)</span>
+                </div>
+                <div class="marquee-group">
+                    <span class="marquee-item">⚡ 10-Band Graphic DSP &amp; AutoEQ</span>
+                    <span class="marquee-item">💎 Bit-Perfect 24-Bit / 192kHz FLAC</span>
+                    <span class="marquee-item">🎤 Real-Time Synced LRC Lyrics</span>
+                    <span class="marquee-item">🎨 4 Dynamic Aura Player Themes</span>
+                    <span class="marquee-item">🗄️ Drift SQLite Sub-2s Scanner</span>
+                    <span class="marquee-item">🏷️ In-Place ID3 Tag &amp; Artwork Editor</span>
+                    <span class="marquee-item">📱 Android Home Screen Widgets</span>
+                    <span class="marquee-item">🛡️ 100% Offline &amp; Zero Telemetry</span>
+                    <span class="marquee-item">🌐 English, Spanish &amp; Arabic (RTL)</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Core Architecture Features Grid -->
+        <section class="section" id="features">
+            <div class="container">
+                <div class="section-header reveal">
+                    <span class="section-tag">Core Architecture</span>
+                    <h2 class="section-title">Engineered For <span class="gradient-text">Audiophile Purity</span></h2>
+                    <p class="section-subtitle">No ads, no accounts, no analytics tracking. Built on Flutter 3, Dart isolate DSP pipelines, and high-performance Drift SQLite indexing.</p>
+                </div>
+
+                <div class="features-grid">
+                    <!-- Feature 1: 10-Band EQ & AutoEQ -->
+                    <div class="feature-card feature-highlight reveal">
+                        <div class="feature-card-glow"></div>
+                        <div class="feature-icon feature-icon-cyan">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line>
+                                <line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line>
+                                <line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line>
+                                <line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line>
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">10-Band Graphic DSP &amp; AutoEQ</h3>
+                        <p class="feature-desc">Fine-tune acoustic frequencies with ±12dB sliders from 31Hz to 16kHz. Includes pre-calibrated compensation curves for industry-leading headphones like AirPods Pro, Sony WH-1000XM5, and Sennheiser HD600.</p>
+                        <div class="feature-mini-visual">
+                            <div class="threads-visual-bar">
+                                <span>10-Band Frequency Range:</span>
+                                <div class="thread-bars-grid">
+                                    <div class="t-bar tb-1"></div><div class="t-bar tb-2"></div>
+                                    <div class="t-bar tb-3"></div><div class="t-bar tb-4"></div>
+                                    <div class="t-bar tb-5"></div><div class="t-bar tb-6"></div>
+                                    <div class="t-bar tb-7"></div><div class="t-bar tb-8"></div>
+                                    <div class="t-bar tb-9"></div><div class="t-bar tb-10"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Feature 2: Drift SQLite Library Scanner -->
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-emerald">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
+                                <path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
+                                <path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">Drift SQLite Sub-2s Scanner</h3>
+                        <p class="feature-desc">Scans and indexes 10,000+ local audio tracks in under 2 seconds. Multi-dimensional sorting by Artists, Albums, Genres, Folders, Years, and smart auto-playlists.</p>
+                    </div>
+
+                    <!-- Feature 3: Hi-Res Bit-Perfect Playback -->
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-violet">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+                                <polyline points="2 17 12 22 22 17"></polyline>
+                                <polyline points="2 12 12 17 22 12"></polyline>
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">24-Bit / 192kHz Bit-Perfect Lossless</h3>
+                        <p class="feature-desc">Hardware DAC pass-through for uncompressed FLAC, ALAC, WAV, AAC, and OPUS containers. Includes gapless playback, crossfade, and pitch control.</p>
+                    </div>
+
+                    <!-- Feature 4: Synced LRC Lyrics Engine -->
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-amber">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M9 18V5l12-2v13"></path>
+                                <circle cx="6" cy="18" r="3"></circle>
+                                <circle cx="18" cy="16" r="3"></circle>
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">Millisecond Synced LRC Lyrics</h3>
+                        <p class="feature-desc">Kinetic karaoke-style autoscrolling lyrics view with interactive tap-to-seek verse jumping and manual ±50ms sync calibration.</p>
+                    </div>
+
+                    <!-- Feature 5: In-Place Tag & Art Injector -->
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-pink">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path>
+                                <line x1="7" y1="7" x2="7.01" y2="7"></line>
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">ID3 Tag &amp; Cover Art Editor</h3>
+                        <p class="feature-desc">Modify Title, Artist, Album, Genre, Year, and Track Number directly in audio files. Inject custom high-res album artwork straight from your photo gallery.</p>
+                    </div>
+
+                    <!-- Feature 6: Zero Telemetry & 100% Offline -->
+                    <div class="feature-card reveal">
+                        <div class="feature-icon feature-icon-red">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="feature-title">100% Offline &amp; Zero Telemetry</h3>
+                        <p class="feature-desc">Zero external pings, zero advertising SDKs, and zero accounts. Your listening history and music library remain 100% private on your physical device.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Interactive Equalizer & AutoEQ Sandbox Section -->
+        <section class="section section-simulator" id="equalizer">
+            <div class="container">
+                <div class="simulator-wrapper reveal">
+                    <div class="simulator-intro">
+                        <span class="section-tag">Acoustic Engineering</span>
+                        <h2 class="section-title">10-Band EQ &amp; <span class="gradient-text">AutoEQ Sandbox</span></h2>
+                        <p class="section-subtitle">Interact with real-time parametric frequency filters or load calibrated target curves tailored for top audiophile headphones.</p>
+                    </div>
+
+                    <div class="simulator-console">
+                        <div class="sim-topbar">
+                            <div class="eq-preset-select-wrap">
+                                <span class="sim-protocol">AutoEQ Profile:</span>
+                                <select id="eqPresetSelect" class="sim-select">
+                                    <option value="harman" selected>Harman Target 2019 (Over-Ear)</option>
+                                    <option value="airpods">Apple AirPods Pro 2</option>
+                                    <option value="sony">Sony WH-1000XM5</option>
+                                    <option value="sennheiser">Sennheiser HD600 (Reference)</option>
+                                    <option value="beyer">Beyerdynamic DT 770 Pro (80Ω)</option>
+                                    <option value="bass">Bass Boost (+6dB Sub-Bass)</option>
+                                    <option value="vocal">Vocal &amp; Acoustic Clarity</option>
+                                    <option value="flat">Flat Studio Reference (0dB)</option>
+                                </select>
+                            </div>
+                            <div class="sim-controls">
+                                <button class="btn btn-secondary btn-sm" id="resetEqBtn">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                                    Reset Flat (0dB)
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Equalizer Canvas & Sliders Matrix -->
+                        <div class="eq-sandbox-container">
+                            <!-- Curve Canvas -->
+                            <div class="eq-canvas-card">
+                                <div class="eq-canvas-header">
+                                    <span>Real-Time Catmull-Rom Spline Curve (±12dB Range)</span>
+                                    <span class="eq-active-preset-badge" id="eqActiveBadge">Target: Harman 2019</span>
+                                </div>
+                                <div class="eq-canvas-wrapper">
+                                    <canvas id="eqCanvas"></canvas>
+                                </div>
+                            </div>
+
+                            <!-- 10 Vertical Sliders Row -->
+                            <div class="eq-sliders-row" id="eqSlidersRow">
+                                <!-- Band 1: 31Hz -->
+                                <div class="eq-band-col">
+                                    <span class="eq-band-db" id="db-0">+5.5dB</span>
+                                    <input type="range" min="-12" max="12" step="0.5" value="5.5" class="eq-slider" data-band="0" aria-label="31 Hz Band">
+                                    <span class="eq-band-freq">31Hz</span>
+                                </div>
+                                <!-- Band 2: 63Hz -->
+                                <div class="eq-band-col">
+                                    <span class="eq-band-db" id="db-1">+3.8dB</span>
+                                    <input type="range" min="-12" max="12" step="0.5" value="3.8" class="eq-slider" data-band="1" aria-label="63 Hz Band">
+                                    <span class="eq-band-freq">63Hz</span>
+                                </div>
+                                <!-- Band 3: 125Hz -->
+                                <div class="eq-band-col">
+                                    <span class="eq-band-db" id="db-2">+1.5dB</span>
+                                    <input type="range" min="-12" max="12" step="0.5" value="1.5" class="eq-slider" data-band="2" aria-label="125 Hz Band">
+                                    <span class="eq-band-freq">125Hz</span>
+                                </div>
+                                <!-- Band 4: 250Hz -->
+                                <div class="eq-band-col">
+                                    <span class="eq-band-db" id="db-3">0dB</span>
+                                    <input type="range" min="-12" max="12" step="0.5" value="0" class="eq-slider" data-band="3" aria-label="250 Hz Band">
+                                    <span class="eq-band-freq">250Hz</span>
+                                </div>
+                                <!-- Band 5: 500Hz -->
+                                <div class="eq-band-col">
+                                    <span class="eq-band-db" id="db-4">-1dB</span>
+                                    <input type="range" min="-12" max="12" step="0.5" value="-1" class="eq-slider" data-band="4" aria-label="500 Hz Band">
+                                    <span class="eq-band-freq">500Hz</span>
+                                </div>
+                                <!-- Band 6: 1kHz -->
+                                <div class="eq-band-col">
+                                    <span class="eq-band-db" id="db-5">+1.2dB</span>
+                                    <input type="range" min="-12" max="12" step="0.5" value="1.2" class="eq-slider" data-band="5" aria-label="1 kHz Band">
+                                    <span class="eq-band-freq">1kHz</span>
+                                </div>
+                                <!-- Band 7: 2kHz -->
+                                <div class="eq-band-col">
+                                    <span class="eq-band-db" id="db-6">+2.5dB</span>
+                                    <input type="range" min="-12" max="12" step="0.5" value="2.5" class="eq-slider" data-band="6" aria-label="2 kHz Band">
+                                    <span class="eq-band-freq">2kHz</span>
+                                </div>
+                                <!-- Band 8: 4kHz -->
+                                <div class="eq-band-col">
+                                    <span class="eq-band-db" id="db-7">+4.0dB</span>
+                                    <input type="range" min="-12" max="12" step="0.5" value="4" class="eq-slider" data-band="7" aria-label="4 kHz Band">
+                                    <span class="eq-band-freq">4kHz</span>
+                                </div>
+                                <!-- Band 9: 8kHz -->
+                                <div class="eq-band-col">
+                                    <span class="eq-band-db" id="db-8">+2.0dB</span>
+                                    <input type="range" min="-12" max="12" step="0.5" value="2" class="eq-slider" data-band="8" aria-label="8 kHz Band">
+                                    <span class="eq-band-freq">8kHz</span>
+                                </div>
+                                <!-- Band 10: 16kHz -->
+                                <div class="eq-band-col">
+                                    <span class="eq-band-db" id="db-9">+1.0dB</span>
+                                    <input type="range" min="-12" max="12" step="0.5" value="1" class="eq-slider" data-band="9" aria-label="16 kHz Band">
+                                    <span class="eq-band-freq">16kHz</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Acoustic Enhancement Suite Toggles -->
+                        <div class="dsp-enhancers-row">
+                            <div class="enhancer-pill active" id="pillBass">
+                                <span class="enhancer-dot"></span>
+                                <span>Bass Boost: +4.5dB</span>
+                            </div>
+                            <div class="enhancer-pill active" id="pillSpatial">
+                                <span class="enhancer-dot"></span>
+                                <span>3D Spatial Virtualizer: 40%</span>
+                            </div>
+                            <div class="enhancer-pill" id="pillPreamp">
+                                <span class="enhancer-dot"></span>
+                                <span>Preamp Gain: +2.0dB</span>
+                            </div>
+                            <div class="enhancer-pill" id="pillGapless">
+                                <span class="enhancer-dot"></span>
+                                <span>Gapless Crossfade: 2.5s</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Synced Lyrics Showcase Section -->
+        <section class="section" id="lyrics">
+            <div class="container">
+                <div class="split-layout">
+                    <div class="split-text reveal">
+                        <span class="section-tag">Karaoke Engine</span>
+                        <h2 class="section-title">Millisecond-Synced <span class="gradient-text">LRC Lyrics</span></h2>
+                        <p class="section-subtitle">Sing along with perfectly timed lyric line highlights. Tap any verse to jump directly to that point in the song, with ±50ms manual offset latency calibration.</p>
+                        
+                        <div class="bullet-features">
+                            <div class="bullet-item">
+                                <div class="bullet-icon">🎤</div>
+                                <div>
+                                    <h4>Kinetic Karaoke Autoscroll</h4>
+                                    <p>Smooth momentum-based scrolling keeps the current singing verse centered with luminous glow.</p>
+                                </div>
+                            </div>
+                            <div class="bullet-item">
+                                <div class="bullet-icon">⚡</div>
+                                <div>
+                                    <h4>Interactive Tap-to-Seek</h4>
+                                    <p>Click or tap any lyric verse to instantaneously seek audio playback to that exact millisecond.</p>
+                                </div>
+                            </div>
+                            <div class="bullet-item">
+                                <div class="bullet-icon">⏱️</div>
+                                <div>
+                                    <h4>Manual Offset Fine-Tuning</h4>
+                                    <p>Calibrate lyric timing by ±50ms increments to achieve bit-perfect syllable synchronization.</p>
+                                </div>
+                            </div>
+                            <div class="bullet-item">
+                                <div class="bullet-icon">📁</div>
+                                <div>
+                                    <h4>Embedded ID3 &amp; .LRC Fallback</h4>
+                                    <p>Reads embedded SYLT/USLT tags, external .lrc files in your song folder, and plain text notes.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="split-visual reveal">
+                        <div class="lyrics-cockpit-card">
+                            <div class="lyrics-cockpit-head">
+                                <div class="lyrics-track-tag">
+                                    <span class="pulse-dot"></span>
+                                    <span>Now Singing: Midnight Tokyo Drift</span>
+                                </div>
+                                <div class="lyrics-offset-tag">Offset: 0 ms</div>
+                            </div>
+                            
+                            <div class="lyrics-scroll-box" id="lyricsScrollBox">
+                                <div class="lyric-line" data-time="0">[00:00.00] (Instrumental Synthwave Intro)</div>
+                                <div class="lyric-line" data-time="12">[00:12.40] Electric pulse running through the night</div>
+                                <div class="lyric-line" data-time="24">[00:24.15] Neon reflections on the dashboard light</div>
+                                <div class="lyric-line active-lyric" data-time="36">[00:36.80] Frequencies align with the beating drum</div>
+                                <div class="lyric-line" data-time="48">[00:48.50] Bit-perfect sound where the melodies come</div>
+                                <div class="lyric-line" data-time="60">[01:00.20] In the aura of the midnight drift</div>
+                                <div class="lyric-line" data-time="72">[01:12.00] Clean pure acoustic uplift</div>
+                                <div class="lyric-line" data-time="84">[01:24.30] 10 bands of power shaping the wave</div>
+                                <div class="lyric-line" data-time="96">[01:36.90] Offline music we will always crave</div>
+                            </div>
+
+                            <div class="lyrics-bottom-bar">
+                                <span>Tap any line above to seek track</span>
+                                <div class="offset-controls-mini">
+                                    <button class="btn btn-ghost btn-sm" id="lyricOffsetMinus">-50ms</button>
+                                    <button class="btn btn-ghost btn-sm" id="lyricOffsetPlus">+50ms</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Aura Dynamic Themes Showcase Section -->
+        <section class="section section-dark" id="themes">
+            <div class="container">
+                <div class="section-header reveal">
+                    <span class="section-tag">Aura Design System</span>
+                    <h2 class="section-title">4 Now Playing <span class="gradient-text">Visual Themes</span></h2>
+                    <p class="section-subtitle">Personalize your player screen with dynamic palettes extracted in real time from album art, pure AMOLED battery saver modes, and fluid 120 FPS animations.</p>
+                </div>
+
+                <div class="themes-grid reveal">
+                    <!-- Theme 1 -->
+                    <div class="theme-card active">
+                        <div class="theme-card-preview theme-preview-glass">
+                            <div class="mini-player-art"></div>
+                            <div class="mini-player-lines">
+                                <span class="mpl-1"></span>
+                                <span class="mpl-2"></span>
+                            </div>
+                        </div>
+                        <div class="theme-card-info">
+                            <h4>Classic Glassmorphism</h4>
+                            <p>Radiant neon lighting with frosted glass blur layers matching the dominant cover art color.</p>
+                        </div>
+                    </div>
+
+                    <!-- Theme 2 -->
+                    <div class="theme-card">
+                        <div class="theme-card-preview theme-preview-minimal">
+                            <div class="mini-player-art minimal-art"></div>
+                            <div class="mini-player-lines">
+                                <span class="mpl-1"></span>
+                                <span class="mpl-2"></span>
+                            </div>
+                        </div>
+                        <div class="theme-card-info">
+                            <h4>Minimalist Typography</h4>
+                            <p>Distraction-free high contrast typography with elegant monochrome waveforms.</p>
+                        </div>
+                    </div>
+
+                    <!-- Theme 3 -->
+                    <div class="theme-card">
+                        <div class="theme-card-preview theme-preview-deck">
+                            <div class="mini-player-art deck-art"></div>
+                            <div class="mini-player-lines">
+                                <span class="mpl-1"></span>
+                                <span class="mpl-2"></span>
+                            </div>
+                        </div>
+                        <div class="theme-card-info">
+                            <h4>Card Deck Stack</h4>
+                            <p>Tactile swipeable stacked artwork cards with smooth 3D depth and swipe transitions.</p>
+                        </div>
+                    </div>
+
+                    <!-- Theme 4 -->
+                    <div class="theme-card">
+                        <div class="theme-card-preview theme-preview-vinyl">
+                            <div class="vinyl-disc">
+                                <div class="vinyl-center"></div>
+                            </div>
+                        </div>
+                        <div class="theme-card-info">
+                            <h4>Modern Vinyl Turntable</h4>
+                            <p>Rotating high-res vinyl disc with acoustic grooves and tonearm needle animations.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Feature Comparison Matrix -->
+        <section class="section" id="comparison">
+            <div class="container">
+                <div class="section-header reveal">
+                    <span class="section-tag">Direct Comparison</span>
+                    <h2 class="section-title">Why Audiophiles Choose <span class="gradient-text">Pulsr</span></h2>
+                    <p class="section-subtitle">See how Pulsr compares against legacy players and streaming applications.</p>
+                </div>
+
+                <div class="comparison-table-wrapper reveal">
+                    <table class="comparison-table">
+                        <thead>
+                            <tr>
+                                <th>Feature</th>
+                                <th class="col-highlight">Pulsr Music (v1.0.0)</th>
+                                <th>Poweramp</th>
+                                <th>Musicolet</th>
+                                <th>Retro Music</th>
+                                <th>Spotify (Local)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Price &amp; License</strong></td>
+                                <td class="col-highlight"><span class="badge-win">100% Free &amp; Open Source</span></td>
+                                <td>Paid ($5.49 License)</td>
+                                <td>Free (Closed)</td>
+                                <td>Freemium (In-App)</td>
+                                <td>Subscription ($11.99/mo)</td>
+                            </tr>
+                            <tr>
+                                <td><strong>10-Band EQ &amp; AutoEQ</strong></td>
+                                <td class="col-highlight">✅ Built-in AutoEQ Presets</td>
+                                <td>✅ 10-32 Band Manual</td>
+                                <td>✅ 5-Band Manual</td>
+                                <td>❌ System EQ Only</td>
+                                <td>❌ 6-Band Basic</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Synced Lyrics (.LRC)</strong></td>
+                                <td class="col-highlight">✅ Millisecond Autoscroll</td>
+                                <td>⚠️ Basic Text Only</td>
+                                <td>✅ Supported</td>
+                                <td>✅ Supported</td>
+                                <td>❌ Online Streams Only</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Dynamic Aura Theming</strong></td>
+                                <td class="col-highlight">✅ 4 Player Themes + AMOLED</td>
+                                <td>⚠️ Skinnable</td>
+                                <td>⚠️ Basic Dark</td>
+                                <td>✅ Material You</td>
+                                <td>❌ Fixed Dark</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Telemetry / Ads / Trackers</strong></td>
+                                <td class="col-highlight"><span class="badge-win">Zero (0%) Telemetry</span></td>
+                                <td>⚠️ Licensing Checks</td>
+                                <td>Zero</td>
+                                <td>⚠️ Analytics</td>
+                                <td>❌ Heavy Telemetry</td>
+                            </tr>
+                            <tr>
+                                <td><strong>SQLite Sub-2s Scanner</strong></td>
+                                <td class="col-highlight">✅ Drift SQLite Engine</td>
+                                <td>✅ Fast C++ Engine</td>
+                                <td>✅ SQLite</td>
+                                <td>⚠️ Slower MediaStore</td>
+                                <td>❌ Not Indexed</td>
+                            </tr>
+                            <tr>
+                                <td><strong>In-Place ID3 Tag Editor</strong></td>
+                                <td class="col-highlight">✅ Lossless Tag &amp; Art Injector</td>
+                                <td>✅ Built-in</td>
+                                <td>✅ Built-in</td>
+                                <td>✅ Built-in</td>
+                                <td>❌ No Editing</td>
+                            </tr>
+                            <tr>
+                                <td><strong>Home Screen Widgets</strong></td>
+                                <td class="col-highlight">✅ 4 Interactive Widgets</td>
+                                <td>✅ Supported</td>
+                                <td>✅ Supported</td>
+                                <td>✅ Supported</td>
+                                <td>⚠️ Basic Widget</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- Platform Download Command Center -->
+        <section class="section section-downloads" id="download">
+            <div class="container">
+                <div class="section-header reveal">
+                    <span class="section-tag">Cross-Platform &amp; Architecture Builds</span>
+                    <h2 class="section-title">Get Pulsr for <span class="gradient-text">Your Device</span></h2>
+                    <p class="section-subtitle">Official standalone packages with clean, verified SHA-256 checksums.</p>
+                </div>
+
+                <!-- Platform Tabs -->
+                <div class="platform-tabs-nav reveal">
+                    <button class="plat-tab active" data-platform="android">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 18h12v-5.5a6 6 0 00-12 0V18zM8.5 9.5L7 7M15.5 9.5L17 7"/><circle cx="9.5" cy="13" r="1"/><circle cx="14.5" cy="13" r="1"/></svg>
+                        <span>Android (Live)</span>
+                    </button>
+                    <button class="plat-tab" data-platform="windows">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 3h8v8H3V3zm10 0h8v8h-8V3zM3 13h8v8H3v-8zm10 0h8v8h-8v-8z"/></svg>
+                        <span>Windows (Roadmap)</span>
+                    </button>
+                    <button class="plat-tab" data-platform="macos">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 0.93-2.85-.9.04-1.99.6-2.64 1.35-.57.65-1.06 1.7-0.93 2.71 1 .08 2.02-.46 2.64-1.21z"/></svg>
+                        <span>macOS (Roadmap)</span>
+                    </button>
+                    <button class="plat-tab" data-platform="linux">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C8.13 2 5 5.13 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.87-3.13-7-7-7z"/></svg>
+                        <span>Linux (Roadmap)</span>
+                    </button>
+                    <button class="plat-tab" data-platform="ios">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="7" y="2" width="10" height="20" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><line x1="11" y1="18" x2="13" y2="18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+                        <span>iOS (Roadmap)</span>
+                    </button>
+                </div>
+
+                <!-- Platform Panels -->
+                <div class="platform-panels-container reveal">
+                    <!-- Android Panel (LIVE) -->
+                    <div class="plat-panel active" id="panel-android">
+                        <!-- Main Auto Download Card -->
+                        <div class="download-hero-card">
+                            <div class="download-hero-info">
+                                <div class="badge-live-release mb-3">✓ Official Stable Release v1.0.0</div>
+                                <h3>Android (5.0+) Universal APK</h3>
+                                <p>Standalone installer containing all CPU architectures (arm64-v8a, armeabi-v7a, x86_64). Compatible with 100% of Android phones and tablets.</p>
+                                
+                                <div class="dl-buttons-row">
+                                    <a href="https://github.com/DevEslam1/pulsr/releases/latest/download/app-prod-release.apk" id="autoDownloadBtn" download="pulsr-universal.apk" class="btn btn-primary btn-lg">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                        Download Universal APK
+                                    </a>
+                                    <a href="https://github.com/DevEslam1/pulsr/releases" target="_blank" class="btn btn-secondary btn-lg">
+                                        All GitHub Builds
+                                    </a>
+                                </div>
+
+                                <div class="download-meta" style="margin-top: 20px;">
+                                    <div class="checksum-pill copy-checksum-btn" data-copy="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" title="Click to copy SHA-256 hash">
+                                        <span>SHA-256: <code>e3b0c442...52b855</code> 📋</span>
+                                    </div>
+                                    <div class="live-count-badge" id="liveDownloadsBadge">📥 0 Downloads</div>
+                                </div>
+                            </div>
+
+                            <div class="qr-box">
+                                <svg viewBox="0 0 100 100" width="100%" height="100%">
+                                    <rect width="100" height="100" fill="#ffffff" />
+                                    <rect x="10" y="10" width="25" height="25" fill="#030a2e" rx="4"/>
+                                    <rect x="15" y="15" width="15" height="15" fill="#ffffff" rx="2"/>
+                                    <rect x="18" y="18" width="9" height="9" fill="#0077ff" rx="1"/>
+                                    <rect x="65" y="10" width="25" height="25" fill="#030a2e" rx="4"/>
+                                    <rect x="70" y="15" width="15" height="15" fill="#ffffff" rx="2"/>
+                                    <rect x="73" y="18" width="9" height="9" fill="#0077ff" rx="1"/>
+                                    <rect x="10" y="65" width="25" height="25" fill="#030a2e" rx="4"/>
+                                    <rect x="15" y="70" width="15" height="15" fill="#ffffff" rx="2"/>
+                                    <rect x="18" y="73" width="9" height="9" fill="#0077ff" rx="1"/>
+                                    <rect x="42" y="12" width="6" height="12" fill="#030a2e"/>
+                                    <rect x="52" y="18" width="8" height="6" fill="#0077ff"/>
+                                    <rect x="40" y="40" width="20" height="20" fill="#9b9ef5" rx="3"/>
+                                    <rect x="45" y="45" width="10" height="10" fill="#030a2e" rx="2"/>
+                                    <rect x="12" y="42" width="10" height="8" fill="#030a2e"/>
+                                    <rect x="25" y="48" width="8" height="10" fill="#0077ff"/>
+                                    <rect x="68" y="42" width="12" height="6" fill="#030a2e"/>
+                                    <rect x="82" y="48" width="6" height="14" fill="#0077ff"/>
+                                    <rect x="42" y="68" width="8" height="12" fill="#030a2e"/>
+                                    <rect x="54" y="72" width="14" height="6" fill="#030a2e"/>
+                                    <rect x="74" y="74" width="14" height="14" fill="#9b9ef5"/>
+                                </svg>
+                                <span class="qr-label">Scan to Install APK</span>
+                            </div>
+                        </div>
+
+                        <!-- Per-Architecture Download Grid -->
+                        <div style="margin-top: 48px;">
+                            <h3 style="font-size: 1.35rem; margin-bottom: 24px; text-align: center; color: #fff;">
+                                Download by CPU Architecture (Smaller File Size)
+                            </h3>
+                            
+                            <div class="abi-grid">
+                                <!-- 1. ARM64 (v8a) -->
+                                <div class="abi-card">
+                                    <div>
+                                        <div class="abi-header">
+                                            <div class="abi-title">ARM64 (v8a)</div>
+                                            <span class="abi-pill abi-recommended">⚡ Most Devices</span>
+                                        </div>
+                                        <p class="abi-desc">Optimized for almost all modern Android phones &amp; tablets (Samsung, Xiaomi, Pixel, OnePlus, etc.). Faster execution and smaller download size.</p>
+                                    </div>
+                                    <div>
+                                        <div class="abi-meta">Target: 64-bit ARM • Android 8.0+</div>
+                                        <a href="https://github.com/DevEslam1/pulsr/releases/latest/download/app-arm64-v8a-prod-release.apk" id="abiArm64Btn" download="pulsr-arm64-v8a.apk" class="btn btn-secondary abi-btn">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                            Download ARM64 APK
+                                        </a>
+                                    </div>
+                                </div>
+
+                                <!-- 2. ARMeabi-v7a (a7v) -->
+                                <div class="abi-card">
+                                    <div>
+                                        <div class="abi-header">
+                                            <div class="abi-title">ARMv7 (a7v)</div>
+                                            <span class="abi-pill">Legacy 32-Bit</span>
+                                        </div>
+                                        <p class="abi-desc">For older 32-bit Android phones, budget legacy processors, and older devices running Android 5.0 through 7.0.</p>
+                                    </div>
+                                    <div>
+                                        <div class="abi-meta">Target: 32-bit ARM • Android 5.0+</div>
+                                        <a href="https://github.com/DevEslam1/pulsr/releases/latest/download/app-armeabi-v7a-prod-release.apk" id="abiArmv7Btn" download="pulsr-armeabi-v7a.apk" class="btn btn-secondary abi-btn">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                            Download ARMv7 APK
+                                        </a>
+                                    </div>
+                                </div>
+
+                                <!-- 3. x86_64 -->
+                                <div class="abi-card">
+                                    <div>
+                                        <div class="abi-header">
+                                            <div class="abi-title">x86_64</div>
+                                            <span class="abi-pill">PC &amp; Emulators</span>
+                                        </div>
+                                        <p class="abi-desc">For Android emulators on PC &amp; Mac (BlueStacks, Android Studio, LDPlayer), Windows Subsystem for Android (WSA), and Intel Chromebooks.</p>
+                                    </div>
+                                    <div>
+                                        <div class="abi-meta">Target: 64-bit Intel/AMD • Emulators &amp; PCs</div>
+                                        <a href="https://github.com/DevEslam1/pulsr/releases/latest/download/app-x86_64-prod-release.apk" id="abiX86Btn" download="pulsr-x86_64.apk" class="btn btn-secondary abi-btn">
+                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                            Download x86_64 APK
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- All Release Versions Archive Container -->
+                        <div style="margin-top: 56px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+                                <div>
+                                    <h3 style="font-size: 1.35rem; color: #fff; margin-bottom: 4px;">📦 Release Versions &amp; Downloads Archive</h3>
+                                    <p style="font-size: 0.88rem; color: var(--text-secondary);">Direct download buttons for every published Pulsr release:</p>
+                                </div>
+                                <a href="https://github.com/DevEslam1/pulsr/releases" target="_blank" class="btn btn-secondary btn-sm" style="border-radius: var(--radius-full);">
+                                    View All on GitHub ↗
+                                </a>
+                            </div>
+
+                            <div class="versions-list" id="versionsArchiveList">
+                                <!-- Populated dynamically by app.js from GitHub Releases API -->
+                                <div class="version-release-row">
+                                    <div class="version-release-header">
+                                        <span class="version-tag-pill">v1.0.0</span>
+                                        <span class="version-badge-latest">⚡ Latest Release</span>
+                                        <span class="version-date-text">Initial Public Release</span>
+                                    </div>
+                                    <div class="version-downloads-actions">
+                                        <a href="https://github.com/DevEslam1/pulsr/releases/latest/download/app-prod-release.apk" download="pulsr-v1.0.0-universal.apk" class="version-apk-btn primary-apk">
+                                            ⬇ Universal APK
+                                        </a>
+                                        <a href="https://github.com/DevEslam1/pulsr/releases/latest/download/app-arm64-v8a-prod-release.apk" download="pulsr-v1.0.0-arm64-v8a.apk" class="version-apk-btn">
+                                            ⬇ ARM64 (v8a)
+                                        </a>
+                                        <a href="https://github.com/DevEslam1/pulsr/releases/latest/download/app-armeabi-v7a-prod-release.apk" download="pulsr-v1.0.0-armeabi-v7a.apk" class="version-apk-btn">
+                                            ⬇ ARMv7 (a7v)
+                                        </a>
+                                        <a href="https://github.com/DevEslam1/pulsr/releases/latest/download/app-x86_64-prod-release.apk" download="pulsr-v1.0.0-x86_64.apk" class="version-apk-btn">
+                                            ⬇ x86_64
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Windows Panel (Roadmap) -->
+                    <div class="plat-panel" id="panel-windows">
+                        <div class="plat-card-grid">
+                            <div class="plat-main-download">
+                                <div class="badge-roadmap mb-3">⏳ In Active Development</div>
+                                <h3>Windows 10 / 11 (64-bit)</h3>
+                                <p>Desktop port with WASAPI bit-perfect audio driver, system tray playback companion, and global hotkeys.</p>
+                                <div class="dl-buttons-row">
+                                    <a href="https://github.com/DevEslam1/pulsr" class="btn btn-primary btn-lg" target="_blank" rel="noopener">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2A10 10 0 002 12c0 4.42 2.87 8.17 6.84 9.5.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.56 9.56 0 015 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85V21c0 .27.18.58.69.48A10 10 0 0022 12 10 10 0 0012 2z"/></svg>
+                                        Star on GitHub for Release Updates
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="plat-cli-box">
+                                <h4>Planned Package Managers</h4>
+                                <div class="cli-command-row">
+                                    <code>winget install DevEslam.Pulsr (Coming Soon)</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- macOS Panel (Roadmap) -->
+                    <div class="plat-panel" id="panel-macos">
+                        <div class="plat-card-grid">
+                            <div class="plat-main-download">
+                                <div class="badge-roadmap mb-3">⏳ In Active Development</div>
+                                <h3>macOS (Apple Silicon &amp; Intel)</h3>
+                                <p>Native macOS app with CoreAudio bit-perfect output, Menu Bar mini-controller, and Touch Bar controls.</p>
+                                <div class="dl-buttons-row">
+                                    <a href="https://github.com/DevEslam1/pulsr" class="btn btn-primary btn-lg" target="_blank" rel="noopener">
+                                        Watch GitHub Releases
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="plat-cli-box">
+                                <h4>Planned Homebrew Cask</h4>
+                                <div class="cli-command-row">
+                                    <code>brew install --cask pulsr (Coming Soon)</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Linux Panel (Roadmap) -->
+                    <div class="plat-panel" id="panel-linux">
+                        <div class="plat-card-grid">
+                            <div class="plat-main-download">
+                                <div class="badge-roadmap mb-3">⏳ In Active Development</div>
+                                <h3>Linux (AppImage, Flatpak &amp; AUR)</h3>
+                                <p>ALSA and PipeWire bit-perfect audio integration with MPRIS D-Bus media controls.</p>
+                                <div class="dl-buttons-row">
+                                    <a href="https://github.com/DevEslam1/pulsr" class="btn btn-primary btn-lg" target="_blank" rel="noopener">
+                                        Follow Linux Progress
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="plat-cli-box">
+                                <h4>Planned Flatpak</h4>
+                                <div class="cli-command-row">
+                                    <code>flatpak install flathub org.pulsr.Pulsr (Coming Soon)</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- iOS Panel (Roadmap) -->
+                    <div class="plat-panel" id="panel-ios">
+                        <div class="plat-card-grid">
+                            <div class="plat-main-download">
+                                <div class="badge-roadmap mb-3">⏳ TestFlight Beta in Preparation</div>
+                                <h3>iOS &amp; iPadOS</h3>
+                                <p>AVAudioEngine audiophile pipeline with Dynamic Island Live Activities and CarPlay support.</p>
+                                <div class="dl-buttons-row">
+                                    <a href="https://github.com/DevEslam1/pulsr" class="btn btn-primary btn-lg" target="_blank" rel="noopener">
+                                        Sign up for TestFlight Beta
+                                    </a>
+                                </div>
+                            </div>
+                            <div class="plat-cli-box">
+                                <h4>iOS Lock Screen Widgets</h4>
+                                <p class="text-sm text-secondary">Will support Live Activities, Control Center media controls, and lossless USB DAC output.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FAQ Section -->
+        <section class="section" id="faq">
+            <div class="container">
+                <div class="section-header reveal">
+                    <span class="section-tag">Frequently Asked Questions</span>
+                    <h2 class="section-title">Got Questions? <span class="gradient-text">We Have Answers</span></h2>
+                    <p class="section-subtitle">Everything you need to know about Pulsr's audio engine, AutoEQ, and privacy.</p>
+                </div>
+
+                <div class="faq-accordion-list reveal">
+                    <div class="faq-item">
+                        <button class="faq-question">
+                            <span>How does AutoEQ headphone calibration work in Pulsr?</span>
+                            <span class="faq-chevron">+</span>
+                        </button>
+                        <div class="faq-answer">
+                            <p>AutoEQ is a curated open-source acoustic database of frequency response measurements. Pulsr embeds parametric compensation target curves (including Harman Target 2019/2018) for popular audiophile and wireless headphones (AirPods Pro, Sony XM5, Sennheiser HD600) to automatically flatten headphone peaks and restore natural acoustic balance.</p>
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <button class="faq-question">
+                            <span>Does Pulsr support 24-bit / 192kHz Hi-Res Lossless files?</span>
+                            <span class="faq-chevron">+</span>
+                        </button>
+                        <div class="faq-answer">
+                            <p>Yes. Pulsr supports bit-perfect decoding of uncompressed and lossless formats including FLAC, ALAC, WAV, AAC, MP3, OPUS, and OGG Vorbis up to 24-bit / 192kHz sample rates. If connected to an external USB DAC, audio streams bypass Android's mixer where supported.</p>
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <button class="faq-question">
+                            <span>Is Pulsr really 100% offline with zero telemetry?</span>
+                            <span class="faq-chevron">+</span>
+                        </button>
+                        <div class="faq-answer">
+                            <p>Absolutely. Pulsr contains zero advertising SDKs, zero analytics trackers, and zero network telemetry. It does not require any account creation. All metadata scanning, SQLite indexing, and playlist management happen strictly on your local device.</p>
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <button class="faq-question">
+                            <span>How do I load synced (.LRC) lyrics for my songs?</span>
+                            <span class="faq-chevron">+</span>
+                        </button>
+                        <div class="faq-answer">
+                            <p>Pulsr automatically detects synced LRC files with the same filename in your song folder (e.g. <code>song.lrc</code> next to <code>song.flac</code>) as well as embedded ID3 SYLT/USLT metadata tags. You can also manually adjust lyrics sync with ±50ms latency tuning directly in the Now Playing screen.</p>
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <button class="faq-question">
+                            <span>Can I edit ID3 tags and embed album cover artwork directly?</span>
+                            <span class="faq-chevron">+</span>
+                        </button>
+                        <div class="faq-answer">
+                            <p>Yes. Pulsr includes an in-place metadata tag editor that allows you to modify song titles, artists, albums, genres, years, and track numbers, as well as pick and embed high-resolution album cover artwork directly into audio files.</p>
+                        </div>
+                    </div>
+
+                    <div class="faq-item">
+                        <button class="faq-question">
+                            <span>Which Android versions are supported?</span>
+                            <span class="faq-chevron">+</span>
+                        </button>
+                        <div class="faq-answer">
+                            <p>Pulsr supports Android 5.0 (Lollipop) all the way up to Android 14 and Android 15 with full edge-to-edge transparent system navigation, Android Home Screen widgets, and MediaStyle notification shade controls.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Final Viral Share & CTA Banner -->
+        <section class="section section-cta-banner">
+            <div class="container">
+                <div class="cta-banner-card reveal">
+                    <div class="cta-banner-glow"></div>
+                    <div class="cta-banner-content">
+                        <h2 class="cta-banner-title">Elevate Your Listening Experience Today</h2>
+                        <p class="cta-banner-desc">Step into the future of local audiophile music playback. 10-band EQ, AutoEQ presets, synced lyrics, and dynamic Aura theming — free forever.</p>
+                        
+                        <div class="cta-banner-actions">
+                            <a href="https://github.com/DevEslam1/pulsr/releases/latest/download/app-prod-release.apk" download="pulsr-universal.apk" class="btn btn-primary btn-xl">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                Download Pulsr Free APK
+                            </a>
+                            <button class="btn btn-secondary btn-xl" id="ctaShareBtn">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle>
+                                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                                </svg>
+                                Share Pulsr With Others
+                            </button>
+                        </div>
+
+                        <div class="cta-trust-tags">
+                            <span>✓ MIT Open Source</span>
+                            <span>✓ 100% Offline</span>
+                            <span>✓ Zero Telemetry</span>
+                            <span>✓ Bit-Perfect Hi-Res</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container footer-grid">
+            <div class="footer-brand">
+                <div class="footer-logo">
+                    <img src="assets/app_icon.svg" alt="Pulsr Icon" width="28" height="28">
+                    <span class="footer-brand-name">Pulsr<span class="logo-dot">.</span></span>
+                </div>
+                <p class="footer-desc">Pulsr Music — the next-generation offline-first local audiophile music player built with Flutter, Dart, and Drift SQLite.</p>
+                <div class="footer-social-links">
+                    <a href="https://github.com/DevEslam1/pulsr" target="_blank" rel="noopener" aria-label="GitHub">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2A10 10 0 002 12c0 4.42 2.87 8.17 6.84 9.5.5.09.68-.22.68-.48v-1.7c-2.78.6-3.37-1.34-3.37-1.34-.45-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.6.07-.6 1 .07 1.53 1.03 1.53 1.03.9 1.53 2.34 1.09 2.91.83.09-.65.35-1.09.63-1.34-2.22-.25-4.56-1.11-4.56-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02a9.56 9.56 0 015 0c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85V21c0 .27.18.58.69.48A10 10 0 0022 12 10 10 0 0012 2z"/></svg>
+                    </a>
+                </div>
+            </div>
+
+            <div class="footer-links-col">
+                <h4>Engine</h4>
+                <a href="#features">10-Band Graphic DSP</a>
+                <a href="#equalizer">AutoEQ Presets</a>
+                <a href="#lyrics">Synced LRC Lyrics</a>
+                <a href="#themes">4 Aura Themes</a>
+            </div>
+
+            <div class="footer-links-col">
+                <h4>Platforms</h4>
+                <a href="#download">Android APK (Live)</a>
+                <a href="#download">ARM64-v8a Package</a>
+                <a href="#download">ARMv7-a7v Package</a>
+                <a href="#download">x86_64 Emulator Build</a>
+                <a href="#download">Desktop Roadmap</a>
+            </div>
+
+            <div class="footer-links-col">
+                <h4>Open Source</h4>
+                <a href="https://github.com/DevEslam1/pulsr" target="_blank" rel="noopener">GitHub Repository</a>
+                <a href="https://github.com/DevEslam1/pulsr/releases" target="_blank" rel="noopener">Release Changelog</a>
+                <a href="https://github.com/DevEslam1/pulsr/blob/master/LICENSE" target="_blank" rel="noopener">MIT License</a>
+                <a href="https://github.com/DevEslam1" target="_blank" rel="noopener">DevEslam1 Profile</a>
+            </div>
         </div>
 
-        <div class="lyrics-box" id="lyricsBox">
-          <!-- Populated dynamically by app.js -->
+        <div class="footer-bottom-bar">
+            <div class="container footer-bottom-inner">
+                <span>© 2026 Pulsr Music Project. Crafted with precision for audiophiles and design purists.</span>
+                <span>Open Source • Built with Flutter &amp; Dart</span>
+            </div>
         </div>
-      </div>
+    </footer>
+
+    <!-- Floating Share Modal -->
+    <div class="modal-backdrop" id="shareModalBackdrop" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-labelledby="modalTitle" aria-modal="true">
+            <div class="modal-header">
+                <div class="modal-title-group">
+                    <span class="modal-icon">🎵</span>
+                    <h3 id="modalTitle">Share Pulsr Music</h3>
+                </div>
+                <button class="modal-close-btn" id="closeShareModal" aria-label="Close modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-desc">Share Pulsr Music with audiophiles, friends, and music lovers:</p>
+                
+                <div class="social-share-grid">
+                    <a href="https://twitter.com/intent/tweet?text=Experience%20Pulsr%20Music%20%E2%80%94%20the%20audiophile%20offline%20player%20with%2010-band%20AutoEQ%2C%20synced%20lyrics%2C%20and%20zero%20telemetry!&url=https%3A%2F%2Fdeveslam1.github.io%2Fpulsr%2F" target="_blank" rel="noopener" class="social-share-btn share-twitter">
+                        <span>Twitter / X</span>
+                    </a>
+                    <a href="https://reddit.com/submit?url=https%3A%2F%2Fdeveslam1.github.io%2Fpulsr%2F&title=Pulsr%20Music%20-%20Free%20Audiophile%20Offline%20Player%20with%2010-Band%20AutoEQ" target="_blank" rel="noopener" class="social-share-btn share-reddit">
+                        <span>Reddit</span>
+                    </a>
+                    <a href="https://t.me/share/url?url=https%3A%2F%2Fdeveslam1.github.io%2Fpulsr%2F&text=Pulsr%20Music%20-%20Premium%20Offline%20Audiophile%20Player" target="_blank" rel="noopener" class="social-share-btn share-telegram">
+                        <span>Telegram</span>
+                    </a>
+                    <a href="https://api.whatsapp.com/send?text=Check%20out%20Pulsr%20Music%20Player%3A%20https%3A%2F%2Fdeveslam1.github.io%2Fpulsr%2F" target="_blank" rel="noopener" class="social-share-btn share-whatsapp">
+                        <span>WhatsApp</span>
+                    </a>
+                    <a href="https://www.linkedin.com/sharing/share-offsite/?url=https%3A%2F%2Fdeveslam1.github.io%2Fpulsr%2F" target="_blank" rel="noopener" class="social-share-btn share-linkedin">
+                        <span>LinkedIn</span>
+                    </a>
+                    <a href="https://www.facebook.com/sharer/sharer.php?u=https%3A%2F%2Fdeveslam1.github.io%2Fpulsr%2F" target="_blank" rel="noopener" class="social-share-btn share-facebook">
+                        <span>Facebook</span>
+                    </a>
+                </div>
+
+                <div class="share-copy-box">
+                    <input type="text" id="shareUrlInput" value="https://deveslam1.github.io/pulsr/" readonly>
+                    <button class="btn btn-primary btn-sm" id="copyShareUrlBtn">Copy Link</button>
+                </div>
+            </div>
+        </div>
     </div>
-  </section>
 
-  <!-- Hi-Res Audio Formats Section -->
-  <section class="section" id="formats">
-    <div class="container">
-      <div class="section-header">
-        <span class="section-tag">Audio Decoder Engine</span>
-        <h2 class="section-title">Lossless & Hi-Res Format Compatibility</h2>
-        <p class="section-desc">Equipped with <code>just_audio</code> and low-latency native platform decoders for bit-perfect output.</p>
-      </div>
-
-      <div class="formats-strip">
-        <div class="format-pill">
-          <span class="format-dot" style="background: #00f2ff; box-shadow: 0 0 10px #00f2ff;"></span>
-          <span>FLAC (Up to 24-bit / 192kHz)</span>
-        </div>
-        <div class="format-pill">
-          <span class="format-dot" style="background: #9b9ef5; box-shadow: 0 0 10px #9b9ef5;"></span>
-          <span>ALAC (Apple Lossless)</span>
-        </div>
-        <div class="format-pill">
-          <span class="format-dot" style="background: #ff4081; box-shadow: 0 0 10px #ff4081;"></span>
-          <span>WAV (PCM Studio Masters)</span>
-        </div>
-        <div class="format-pill">
-          <span class="format-dot" style="background: #00e676; box-shadow: 0 0 10px #00e676;"></span>
-          <span>AAC / M4A (High Efficiency)</span>
-        </div>
-        <div class="format-pill">
-          <span class="format-dot" style="background: #ff9100; box-shadow: 0 0 10px #ff9100;"></span>
-          <span>MP3 (320kbps CBR / VBR)</span>
-        </div>
-        <div class="format-pill">
-          <span class="format-dot" style="background: #d500f9; box-shadow: 0 0 10px #d500f9;"></span>
-          <span>OPUS / OGG Vorbis</span>
-        </div>
-      </div>
+    <!-- Download Feedback Toast -->
+    <div class="toast-bubble" id="toastBubble" aria-live="polite">
+        <span class="toast-icon">✓</span>
+        <span class="toast-message" id="toastMessage">Link copied to clipboard!</span>
     </div>
-  </section>
 
-  <!-- Comparison Matrix Table -->
-  <section class="section" id="comparison">
-    <div class="container">
-      <div class="section-header">
-        <span class="section-tag">Transparent Comparison</span>
-        <h2 class="section-title">Why Pulsr Stands Out</h2>
-        <p class="section-desc">See how Pulsr compares against streaming platforms and generic local media players.</p>
-      </div>
+    <!-- Back to Top Floating Button -->
+    <button class="back-to-top" id="backToTop" aria-label="Back to top">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="18 15 12 9 6 15"></polyline>
+        </svg>
+    </button>
 
-      <div class="comparison-table-wrapper">
-        <table class="comparison-table">
-          <thead>
-            <tr>
-              <th>Feature</th>
-              <th class="pulsr-col">Pulsr Music</th>
-              <th>Streaming Apps</th>
-              <th>Stock OEM Players</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><strong>100% Offline & No Internet Required</strong></td>
-              <td class="pulsr-col"><span class="check-icon">✓</span> Included</td>
-              <td><span class="cross-icon">✗</span> Requires Account</td>
-              <td><span class="check-icon">✓</span> Included</td>
-            </tr>
-            <tr>
-              <td><strong>Zero Telemetry & Absolute Privacy</strong></td>
-              <td class="pulsr-col"><span class="check-icon">✓</span> 100% Private</td>
-              <td><span class="cross-icon">✗</span> Extensive Tracking</td>
-              <td><span class="cross-icon">✗</span> Analytics / Ads</td>
-            </tr>
-            <tr>
-              <td><strong>10-Band Graphic EQ + AutoEQ Presets</strong></td>
-              <td class="pulsr-col"><span class="check-icon">✓</span> Professional DSP</td>
-              <td><span class="cross-icon">✗</span> Basic 5-band</td>
-              <td><span class="cross-icon">✗</span> Basic or Missing</td>
-            </tr>
-            <tr>
-              <td><strong>Embedded ID3 Tag & Artwork Editor</strong></td>
-              <td class="pulsr-col"><span class="check-icon">✓</span> In-Place Editing</td>
-              <td><span class="cross-icon">✗</span> Not Available</td>
-              <td><span class="cross-icon">✗</span> Not Available</td>
-            </tr>
-            <tr>
-              <td><strong>Real-Time Synced LRC Karaoke Lyrics</strong></td>
-              <td class="pulsr-col"><span class="check-icon">✓</span> Millisecond Precision</td>
-              <td><span class="check-icon">✓</span> Cloud Locked</td>
-              <td><span class="cross-icon">✗</span> Static Text Only</td>
-            </tr>
-            <tr>
-              <td><strong>Dynamic Aura Theming & AMOLED Mode</strong></td>
-              <td class="pulsr-col"><span class="check-icon">✓</span> 4 Unique Themes</td>
-              <td><span class="cross-icon">✗</span> Fixed Dark Mode</td>
-              <td><span class="cross-icon">✗</span> Generic System UI</td>
-            </tr>
-            <tr>
-              <td><strong>No Subscriptions / 100% Free</strong></td>
-              <td class="pulsr-col"><span class="check-icon">✓</span> Completely Free</td>
-              <td><span class="cross-icon">✗</span> $10 - $20 / Month</td>
-              <td><span class="cross-icon">✗</span> Often Has Ads</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
-  <!-- Download & Release Hub -->
-  <section class="download-section" id="download">
-    <div class="container">
-      <div class="section-header" style="margin-bottom: 40px;">
-        <span class="section-tag" id="releaseTagText">Release v1.0.0</span>
-        <h2 class="section-title">Download Pulsr for Android</h2>
-        <p class="section-desc">Compatible with Android 5.0 (Lollipop) up to Android 15. Minified with R8, zero telemetry, and 100% offline.</p>
-        <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; margin-top: 16px;">
-          <span class="feature-tag-item" id="liveDownloadsBadge" style="background: rgba(155,158,245,0.15); color: var(--primary); border-color: rgba(155,158,245,0.3);">📥 0 Downloads</span>
-          <span class="feature-tag-item" style="background: rgba(0,242,255,0.1); color: var(--accent-cyan); border-color: rgba(0,242,255,0.25);">✓ 64-bit & 32-bit Native</span>
-          <span class="feature-tag-item" style="background: rgba(0,230,118,0.1); color: #00e676; border-color: rgba(0,230,118,0.25);">🔒 Verified Safe</span>
-        </div>
-      </div>
-
-      <!-- Main Auto-Download Card -->
-      <div class="download-hero-card">
-        <div class="download-hero-info">
-          <span class="download-badge-auto">⚡ RECOMMENDED FOR MOST USERS</span>
-          <h3 style="font-size: 1.8rem; margin: 10px 0 12px; color: #fff;">Auto-Download Latest Universal APK</h3>
-          <p style="color: var(--text-secondary); margin-bottom: 24px; font-size: 0.95rem; line-height: 1.6;">
-            Instantly downloads the complete standalone installer containing all device architectures in one package. Compatible with 100% of Android smartphones, tablets, and emulators.
-          </p>
-
-          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px;">
-            <a href="https://github.com/DevEslam1/pulsr/releases/latest/download/app-prod-release.apk" id="autoDownloadBtn" download="pulsr-universal.apk" class="btn btn-primary btn-lg">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Download Latest APK (Universal)
-            </a>
-            <a href="https://github.com/DevEslam1/pulsr" target="_blank" class="btn btn-secondary">
-              View on GitHub
-            </a>
-          </div>
-
-          <div class="download-meta" style="margin-top: 20px;">
-            <div class="checksum-pill" id="checksumPill" data-hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" title="Click to copy SHA-256 hash">
-              <span>SHA-256: <code>e3b0c442...52b855</code> 📋</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="qr-box">
-          <!-- QR Code vector graphic -->
-          <svg viewBox="0 0 100 100" width="100%" height="100%">
-            <rect width="100" height="100" fill="#ffffff" />
-            <rect x="10" y="10" width="25" height="25" fill="#030a2e" rx="4"/>
-            <rect x="15" y="15" width="15" height="15" fill="#ffffff" rx="2"/>
-            <rect x="18" y="18" width="9" height="9" fill="#0077ff" rx="1"/>
-            <rect x="65" y="10" width="25" height="25" fill="#030a2e" rx="4"/>
-            <rect x="70" y="15" width="15" height="15" fill="#ffffff" rx="2"/>
-            <rect x="73" y="18" width="9" height="9" fill="#0077ff" rx="1"/>
-            <rect x="10" y="65" width="25" height="25" fill="#030a2e" rx="4"/>
-            <rect x="15" y="70" width="15" height="15" fill="#ffffff" rx="2"/>
-            <rect x="18" y="73" width="9" height="9" fill="#0077ff" rx="1"/>
-            <rect x="42" y="12" width="6" height="12" fill="#030a2e"/>
-            <rect x="52" y="18" width="8" height="6" fill="#0077ff"/>
-            <rect x="40" y="40" width="20" height="20" fill="#9b9ef5" rx="3"/>
-            <rect x="45" y="45" width="10" height="10" fill="#030a2e" rx="2"/>
-            <rect x="12" y="42" width="10" height="8" fill="#030a2e"/>
-            <rect x="25" y="48" width="8" height="10" fill="#0077ff"/>
-            <rect x="68" y="42" width="12" height="6" fill="#030a2e"/>
-            <rect x="82" y="48" width="6" height="14" fill="#0077ff"/>
-            <rect x="42" y="68" width="8" height="12" fill="#030a2e"/>
-            <rect x="54" y="72" width="14" height="6" fill="#030a2e"/>
-            <rect x="74" y="74" width="14" height="14" fill="#9b9ef5"/>
-          </svg>
-          <span class="qr-label">Scan to Install APK</span>
-        </div>
-      </div>
-
-      <!-- Specific ABI Architecture Downloads Section -->
-      <div style="margin-top: 48px;">
-        <h3 style="font-size: 1.35rem; margin-bottom: 24px; text-align: center; color: #fff;">
-          Download by CPU Architecture (Smaller File Size)
-        </h3>
-        
-        <div class="abi-grid">
-          <!-- 1. ARM64 (v8a) -->
-          <div class="abi-card">
-            <div>
-              <div class="abi-header">
-                <div class="abi-title">ARM64 (v8a)</div>
-                <span class="abi-pill abi-recommended">⚡ Most Devices</span>
-              </div>
-              <p class="abi-desc">Optimized for almost all modern Android phones & tablets (Samsung, Xiaomi, Pixel, OnePlus, etc.). Faster execution and smaller download (~30MB).</p>
-            </div>
-            <div>
-              <div class="abi-meta">Target: 64-bit ARM • Android 8.0+</div>
-              <a href="https://github.com/DevEslam1/pulsr/releases/latest/download/app-arm64-v8a-prod-release.apk" id="abiArm64Btn" download="pulsr-arm64-v8a.apk" class="btn btn-secondary abi-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                Download ARM64 APK
-              </a>
-            </div>
-          </div>
-
-          <!-- 2. ARMeabi-v7a (a7v) -->
-          <div class="abi-card">
-            <div>
-              <div class="abi-header">
-                <div class="abi-title">ARMv7 (a7v)</div>
-                <span class="abi-pill">Legacy 32-Bit</span>
-              </div>
-              <p class="abi-desc">For older 32-bit Android phones, budget legacy processors, and older devices running Android 5.0 through 7.0.</p>
-            </div>
-            <div>
-              <div class="abi-meta">Target: 32-bit ARM • Android 5.0+</div>
-              <a href="https://github.com/DevEslam1/pulsr/releases/latest/download/app-armeabi-v7a-prod-release.apk" id="abiArmv7Btn" download="pulsr-armeabi-v7a.apk" class="btn btn-secondary abi-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                Download ARMv7 APK
-              </a>
-            </div>
-          </div>
-
-          <!-- 3. x86_64 -->
-          <div class="abi-card">
-            <div>
-              <div class="abi-header">
-                <div class="abi-title">x86_64</div>
-                <span class="abi-pill">PC & Emulators</span>
-              </div>
-              <p class="abi-desc">For Android emulators on PC & Mac (BlueStacks, Android Studio, LDPlayer), Windows Subsystem for Android (WSA), and Intel Chromebooks.</p>
-            </div>
-            <div>
-              <div class="abi-meta">Target: 64-bit Intel/AMD • Emulators & PCs</div>
-              <a href="https://github.com/DevEslam1/pulsr/releases/latest/download/app-x86_64-prod-release.apk" id="abiX86Btn" download="pulsr-x86_64.apk" class="btn btn-secondary abi-btn">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                Download x86_64 APK
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- All Release Versions Archive Container -->
-      <div style="margin-top: 56px;">
-        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
-          <div>
-            <h3 style="font-size: 1.35rem; color: #fff; margin-bottom: 4px;">📦 Release Versions & Downloads</h3>
-            <p style="font-size: 0.88rem; color: var(--text-secondary);">Direct download buttons for every published Pulsr release:</p>
-          </div>
-          <a href="https://github.com/DevEslam1/pulsr/releases" target="_blank" class="btn btn-secondary btn-sm" style="border-radius: var(--radius-full);">
-            View All on GitHub ↗
-          </a>
-        </div>
-
-        <div class="versions-list" id="versionsArchiveList">
-          <!-- Populated dynamically by app.js from GitHub Releases API -->
-          <div class="version-release-row">
-            <div class="version-release-header">
-              <span class="version-tag-pill">v1.0.0</span>
-              <span class="version-badge-latest">⚡ Latest Release</span>
-              <span class="version-date-text">Initial Public Release</span>
-            </div>
-            <div class="version-downloads-actions">
-              <a href="https://github.com/DevEslam1/pulsr/releases/latest" target="_blank" class="version-apk-btn primary-apk">
-                ⬇ Universal APK
-              </a>
-              <a href="https://github.com/DevEslam1/pulsr/releases/latest" target="_blank" class="version-apk-btn">
-                ⬇ ARM64 (v8a)
-              </a>
-              <a href="https://github.com/DevEslam1/pulsr/releases/latest" target="_blank" class="version-apk-btn">
-                ⬇ ARMv7 (a7v)
-              </a>
-              <a href="https://github.com/DevEslam1/pulsr/releases/latest" target="_blank" class="version-apk-btn">
-                ⬇ x86_64
-              </a>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- FAQ Accordion Section -->
-  <section class="section" id="faq">
-    <div class="container">
-      <div class="section-header">
-        <span class="section-tag">Frequently Asked Questions</span>
-        <h2 class="section-title">Got Questions? We Have Answers.</h2>
-      </div>
-
-      <div class="faq-list">
-        <div class="faq-item active">
-          <button class="faq-question">
-            <span>Is Pulsr really 100% offline and telemetry-free?</span>
-            <span class="faq-icon">+</span>
-          </button>
-          <div class="faq-answer">
-            <p>Yes. Pulsr never connects to the internet to track your listening history, upload files, or profile your listening habits. All your metadata, playlists, and settings remain on your local SQLite database.</p>
-          </div>
-        </div>
-
-        <div class="faq-item">
-          <button class="faq-question">
-            <span>How does the AutoEQ headphone calibration work?</span>
-            <span class="faq-icon">+</span>
-          </button>
-          <div class="faq-answer">
-            <p>Pulsr bundles scientifically measured parametric target curves (such as the Harman Target 2019/2018) and compensations for top popular headphones (AirPods Pro, Sony WH-1000XM4/5, Sennheiser HD600/650, etc.). Selecting a profile automatically sets the 10-band equalizer to neutralize frequency distortions.</p>
-          </div>
-        </div>
-
-        <div class="faq-item">
-          <button class="faq-question">
-            <span>Can I edit tags and album art directly in my audio files?</span>
-            <span class="faq-icon">+</span>
-          </button>
-          <div class="faq-answer">
-            <p>Yes. The built-in Tag Editor writes standard ID3v2, Vorbis, and MP4 metadata directly to your MP3, FLAC, M4A, OGG, and WAV files, including embedding custom cover artwork from your photo gallery.</p>
-          </div>
-        </div>
-
-        <div class="faq-item">
-          <button class="faq-question">
-            <span>Does Pulsr support Android Home Screen Widgets & Lock Screen?</span>
-            <span class="faq-icon">+</span>
-          </button>
-          <div class="faq-answer">
-            <p>Yes! Pulsr includes native Android interactive home screen widgets via <code>home_widget</code> as well as native MediaStyle notification shade and lockscreen controls with playback scrubbing.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- Footer -->
-  <footer class="footer">
-    <div class="container">
-      <div class="footer-grid">
-        <div class="footer-brand">
-          <a href="#" class="brand">
-            <img src="assets/app_icon.svg" alt="Pulsr Logo" class="brand-icon">
-            <div class="brand-name">Pulsr<span>.</span></div>
-          </a>
-          <p>Premium offline-first music player with audiophile DSP and dynamic Aura design.</p>
-        </div>
-
-        <div class="footer-col">
-          <h5>Navigation</h5>
-          <ul class="footer-links">
-            <li><a href="#features">Features</a></li>
-            <li><a href="#equalizer">Equalizer & AutoEQ</a></li>
-            <li><a href="#lyrics">Synced Lyrics</a></li>
-            <li><a href="#formats">Hi-Res Formats</a></li>
-            <li><a href="#comparison">Comparison</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-col">
-          <h5>Resources</h5>
-          <ul class="footer-links">
-            <li><a href="https://github.com/DevEslam1/pulsr" target="_blank">GitHub Repository</a></li>
-            <li><a href="https://github.com/DevEslam1/pulsr/releases" target="_blank">Releases & Changelog</a></li>
-            <li><a href="https://github.com/DevEslam1/pulsr/issues" target="_blank">Report an Issue</a></li>
-            <li><a href="#download">Download APK</a></li>
-          </ul>
-        </div>
-
-        <div class="footer-col">
-          <h5>Legal & Safety</h5>
-          <ul class="footer-links">
-            <li><a href="#faq">Privacy Policy</a></li>
-            <li><a href="https://github.com/DevEslam1/pulsr/blob/main/LICENSE" target="_blank">MIT License</a></li>
-            <li><a href="#download">SHA-256 Verifications</a></li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="footer-bottom">
-        <div>© 2026 Pulsr Music. Built with Flutter, Dart & Drift. Released under the MIT License.</div>
-        <div style="display: flex; gap: 16px;">
-          <a href="https://github.com/DevEslam1/pulsr" target="_blank" style="color: var(--text-secondary);">GitHub</a>
-        </div>
-      </div>
-    </div>
-  </footer>
-
-  <!-- Download Feedback Toast -->
-  <div id="downloadToast" class="download-toast">
-    <div class="toast-icon">⬇</div>
-    <div id="toastMessage">Starting Pulsr APK download...</div>
-  </div>
-
-  <script src="app.js?v=3.4.0"></script>
+    <script src="app.js?v=4.0.0"></script>
 </body>
 </html>

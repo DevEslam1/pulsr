@@ -1,735 +1,776 @@
+/* ==========================================================================
+   PULSR MUSIC — Audiophile Offline Local Music Player
+   Interactive Engine JavaScript
+   ========================================================================== */
+
 document.addEventListener('DOMContentLoaded', () => {
-  // --- Audio Player State & Simulation ---
-  const tracks = [
-    {
-      title: "Resonance (Hyperdrive Mix)",
-      artist: "Aura Soundworks",
-      album: "Cybernetic Echoes",
-      duration: 218, // 3:38
-      badge: "FLAC 24-bit / 96kHz",
-      coverGradient: "linear-gradient(135deg, #1b2038 0%, #070913 100%)",
-      lyrics: [
-        { time: 0, text: "♪ Ambient synthesizer intro ♪" },
-        { time: 12, text: "Frequencies pulse through the neon dark" },
-        { time: 24, text: "A digital heartbeat ignites the spark" },
-        { time: 36, text: "Lossless waves cascading down the wire" },
-        { time: 48, text: "High-resolution dreams in acoustic fire" },
-        { time: 60, text: "No telemetry, no tracking, just pure sound" },
-        { time: 72, text: "Where pristine melodies are finally found" },
-        { time: 88, text: "♪ Audiophile guitar solo & sub-bass drop ♪" },
-        { time: 110, text: "Feel the resonance inside your mind" },
-        { time: 130, text: "The cleanest offline groove you'll ever find" }
-      ]
-    },
-    {
-      title: "Midnight Tokyo Drift",
-      artist: "Kavinsky Wave",
-      album: "Analog Outrun 1984",
-      duration: 194, // 3:14
-      badge: "FLAC 24-bit / 192kHz",
-      coverGradient: "linear-gradient(135deg, #2b1055 0%, #7597de 100%)",
-      lyrics: [
-        { time: 0, text: "♪ Synthesizer chords reverberate ♪" },
-        { time: 15, text: "City lights reflected on the hood" },
-        { time: 30, text: "Cruising fast through the neighborhood" },
-        { time: 45, text: "10-band EQ dialed in so tight" },
-        { time: 60, text: "Bass boost rattling through the night" }
-      ]
-    },
-    {
-      title: "Etherial Sanctuary",
-      artist: "Luminary Ensemble",
-      album: "Spatial Atmosphere",
-      duration: 245, // 4:05
-      badge: "ALAC 24-bit / 96kHz",
-      coverGradient: "linear-gradient(135deg, #0f2027 0%, #203a43 50%, #2c5364 100%)",
-      lyrics: [
-        { time: 0, text: "♪ Deep atmospheric soundscapes ♪" },
-        { time: 20, text: "Breathe in the calm of harmonic space" },
-        { time: 40, text: "Floating gently in time and place" },
-        { time: 65, text: "Zero compression, lossless clarity" }
-      ]
+    'use strict';
+
+    // 1. --- TOAST NOTIFICATIONS ---
+    const toastBubble = document.getElementById('toastBubble');
+    const toastMessage = document.getElementById('toastMessage');
+    let toastTimeout = null;
+
+    function showToast(msg) {
+        if (!toastBubble || !toastMessage) return;
+        toastMessage.textContent = msg;
+        toastBubble.classList.add('show');
+        clearTimeout(toastTimeout);
+        toastTimeout = setTimeout(() => {
+            toastBubble.classList.remove('show');
+        }, 2800);
     }
-  ];
 
-  let currentTrackIdx = 0;
-  let isPlaying = true;
-  let currentTime = 42; // starts at 0:42
-  let playbackInterval = null;
+    // 2. --- OS DETECTION & HERO CTA ---
+    const detectUserOS = () => {
+        const ua = navigator.userAgent;
+        const isAndroid = /Android/i.test(ua);
+        
+        const detectorEl = document.getElementById('osDetectorLabel');
+        const heroBtnText = document.getElementById('heroDetectedText');
 
-  // DOM Elements - Player
-  const playBtn = document.getElementById('playPauseBtn');
-  const prevBtn = document.getElementById('prevTrackBtn');
-  const nextBtn = document.getElementById('nextTrackBtn');
-  const favBtn = document.getElementById('favBtn');
-  const songTitleEl = document.getElementById('songTitle');
-  const songArtistEl = document.getElementById('songArtist');
-  const qualityBadgeEl = document.getElementById('qualityBadge');
-  const progressFill = document.getElementById('progressFill');
-  const progressBar = document.getElementById('progressBar');
-  const currentTimeEl = document.getElementById('currentTime');
-  const totalDurationEl = document.getElementById('totalDuration');
-  const albumArtBox = document.getElementById('albumArtBox');
-
-  // Format Time Helper
-  function formatTime(secs) {
-    const m = Math.floor(secs / 60);
-    const s = Math.floor(secs % 60);
-    return `${m}:${s < 10 ? '0' : ''}${s}`;
-  }
-
-  // Load Track UI
-  function loadTrack(idx) {
-    const track = tracks[idx];
-    songTitleEl.textContent = track.title;
-    songArtistEl.textContent = `${track.artist} • ${track.album}`;
-    qualityBadgeEl.textContent = track.badge;
-    totalDurationEl.textContent = formatTime(track.duration);
-    albumArtBox.style.background = track.coverGradient;
-    updateProgress();
-    renderLyrics();
-  }
-
-  function updateProgress() {
-    const track = tracks[currentTrackIdx];
-    const pct = (currentTime / track.duration) * 100;
-    progressFill.style.width = `${pct}%`;
-    currentTimeEl.textContent = formatTime(currentTime);
-    updateLyricsActiveState();
-  }
-
-  // Toggle Play / Pause
-  function togglePlay() {
-    isPlaying = !isPlaying;
-    if (isPlaying) {
-      playBtn.innerHTML = '❚❚';
-      startTimer();
-    } else {
-      playBtn.innerHTML = '▶';
-      clearInterval(playbackInterval);
-    }
-  }
-
-  function startTimer() {
-    clearInterval(playbackInterval);
-    playbackInterval = setInterval(() => {
-      if (!isPlaying) return;
-      const track = tracks[currentTrackIdx];
-      currentTime += 1;
-      if (currentTime >= track.duration) {
-        currentTime = 0;
-        currentTrackIdx = (currentTrackIdx + 1) % tracks.length;
-        loadTrack(currentTrackIdx);
-      }
-      updateProgress();
-    }, 1000);
-  }
-
-  if (playBtn) {
-    playBtn.addEventListener('click', togglePlay);
-    startTimer();
-  }
-
-  if (nextBtn) {
-    nextBtn.addEventListener('click', () => {
-      currentTrackIdx = (currentTrackIdx + 1) % tracks.length;
-      currentTime = 0;
-      loadTrack(currentTrackIdx);
-    });
-  }
-
-  if (prevBtn) {
-    prevBtn.addEventListener('click', () => {
-      currentTrackIdx = (currentTrackIdx - 1 + tracks.length) % tracks.length;
-      currentTime = 0;
-      loadTrack(currentTrackIdx);
-    });
-  }
-
-  if (favBtn) {
-    favBtn.addEventListener('click', () => {
-      favBtn.classList.toggle('active');
-      favBtn.textContent = favBtn.classList.contains('active') ? '♥' : '♡';
-    });
-  }
-
-  if (progressBar) {
-    progressBar.addEventListener('click', (e) => {
-      const rect = progressBar.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const width = rect.width;
-      const track = tracks[currentTrackIdx];
-      currentTime = Math.floor((clickX / width) * track.duration);
-      updateProgress();
-    });
-  }
-
-  // --- Real-time Visualizer Canvas ---
-  const visualizerCanvas = document.getElementById('visualizerCanvas');
-  if (visualizerCanvas) {
-    const ctx = visualizerCanvas.getContext('2d');
-    let animationFrameId;
-    const numBars = 32;
-    let barHeights = new Array(numBars).fill(10);
-
-    function resizeCanvas() {
-      visualizerCanvas.width = visualizerCanvas.offsetWidth * window.devicePixelRatio;
-      visualizerCanvas.height = visualizerCanvas.offsetHeight * window.devicePixelRatio;
-      ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-    }
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
-
-    function drawVisualizer() {
-      const w = visualizerCanvas.offsetWidth;
-      const h = visualizerCanvas.offsetHeight;
-      ctx.clearRect(0, 0, w, h);
-
-      const barWidth = (w / numBars) - 2;
-
-      for (let i = 0; i < numBars; i++) {
-        if (isPlaying) {
-          // Dynamic frequency oscillation
-          const target = Math.sin(Date.now() * 0.005 + i * 0.3) * (h * 0.38) + (h * 0.45) + (Math.random() * 8 - 4);
-          barHeights[i] += (target - barHeights[i]) * 0.2;
+        if (isAndroid) {
+            if (detectorEl) detectorEl.textContent = '✓ Android Device Detected • Direct APK Download • 100% Offline';
+            if (heroBtnText) heroBtnText.textContent = 'Download Android APK (Direct)';
         } else {
-          barHeights[i] += (4 - barHeights[i]) * 0.1;
+            if (detectorEl) detectorEl.textContent = '✓ Android (5.0+) Live Build • Desktop Ports in Active Roadmap';
+            if (heroBtnText) heroBtnText.textContent = 'Download Android APK (v1.0)';
         }
+    };
+    detectUserOS();
 
-        const barH = Math.max(3, barHeights[i]);
-        const x = i * (barWidth + 2);
-        const y = h - barH;
+    // 3. --- THEME SWITCHER ---
+    const htmlEl = document.documentElement;
+    const themeToggle = document.getElementById('themeToggle');
+    const themeDropdown = document.getElementById('themeDropdown');
+    const themeOptions = document.querySelectorAll('.theme-opt');
 
-        // Gradient for bars
-        const grad = ctx.createLinearGradient(0, y, 0, h);
-        grad.addColorStop(0, '#00f2ff');
-        grad.addColorStop(0.5, '#9b9ef5');
-        grad.addColorStop(1, '#6c70dc');
+    const savedTheme = localStorage.getItem('pulsr-landing-theme') || 'cyber';
+    htmlEl.setAttribute('data-theme', savedTheme);
+    updateActiveThemeOption(savedTheme);
 
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.roundRect(x, y, barWidth, barH, [3, 3, 0, 0]);
-        ctx.fill();
-      }
-
-      animationFrameId = requestAnimationFrame(drawVisualizer);
-    }
-    drawVisualizer();
-  }
-
-  // --- Theme Swatches ---
-  const swatches = document.querySelectorAll('.swatch');
-  const phoneFrame = document.getElementById('phoneFrame');
-  const mockupGlow = document.getElementById('mockupGlow');
-
-  const themePalettes = {
-    aura: {
-      bg: '#030a2e',
-      border: 'rgba(255, 255, 255, 0.15)',
-      glow: 'radial-gradient(circle, rgba(155, 158, 245, 0.35) 0%, rgba(0, 242, 255, 0.15) 50%, transparent 80%)'
-    },
-    cyan: {
-      bg: '#041724',
-      border: 'rgba(0, 242, 255, 0.3)',
-      glow: 'radial-gradient(circle, rgba(0, 242, 255, 0.4) 0%, rgba(10, 80, 120, 0.2) 50%, transparent 80%)'
-    },
-    magenta: {
-      bg: '#1f0717',
-      border: 'rgba(255, 64, 129, 0.3)',
-      glow: 'radial-gradient(circle, rgba(255, 64, 129, 0.4) 0%, rgba(120, 10, 80, 0.2) 50%, transparent 80%)'
-    },
-    amber: {
-      bg: '#1f1304',
-      border: 'rgba(255, 145, 0, 0.3)',
-      glow: 'radial-gradient(circle, rgba(255, 145, 0, 0.4) 0%, rgba(120, 60, 10, 0.2) 50%, transparent 80%)'
-    },
-    amoled: {
-      bg: '#000000',
-      border: 'rgba(255, 255, 255, 0.2)',
-      glow: 'radial-gradient(circle, rgba(255, 255, 255, 0.15) 0%, transparent 70%)'
-    }
-  };
-
-  swatches.forEach(swatch => {
-    swatch.addEventListener('click', () => {
-      swatches.forEach(s => s.classList.remove('active'));
-      swatch.classList.add('active');
-      const themeKey = swatch.dataset.theme;
-      const pal = themePalettes[themeKey];
-      if (pal && phoneFrame && mockupGlow) {
-        phoneFrame.style.background = pal.bg;
-        phoneFrame.style.borderColor = pal.border;
-        mockupGlow.style.background = pal.glow;
-      }
-    });
-  });
-
-  // --- Interactive Synced Lyrics Demo ---
-  const lyricsContainer = document.getElementById('lyricsBox');
-
-  function renderLyrics() {
-    if (!lyricsContainer) return;
-    const track = tracks[currentTrackIdx];
-    lyricsContainer.innerHTML = '';
-    track.lyrics.forEach((line, i) => {
-      const div = document.createElement('div');
-      div.className = 'lyrics-line';
-      div.dataset.time = line.time;
-      div.textContent = line.text;
-      div.addEventListener('click', () => {
-        currentTime = line.time;
-        updateProgress();
-      });
-      lyricsContainer.appendChild(div);
-    });
-    updateLyricsActiveState();
-  }
-
-  function updateLyricsActiveState() {
-    if (!lyricsContainer) return;
-    const track = tracks[currentTrackIdx];
-    const lines = lyricsContainer.querySelectorAll('.lyrics-line');
-    let activeIdx = 0;
-
-    track.lyrics.forEach((l, i) => {
-      if (currentTime >= l.time) {
-        activeIdx = i;
-      }
-    });
-
-    lines.forEach((line, i) => {
-      if (i === activeIdx) {
-        line.classList.add('active');
-        // Scroll ONLY the lyrics container without scrolling the main window!
-        const lineOffset = line.offsetTop;
-        const containerHeight = lyricsContainer.clientHeight;
-        const targetScrollTop = lineOffset - (containerHeight / 2) + (line.clientHeight / 2);
-        lyricsContainer.scrollTo({
-          top: targetScrollTop,
-          behavior: 'smooth'
-        });
-      } else {
-        line.classList.remove('active');
-      }
-    });
-  }
-
-  // --- 10-Band Equalizer & AutoEQ Sandbox ---
-  const eqCanvas = document.getElementById('eqCanvas');
-  const eqSliders = document.querySelectorAll('.eq-slider');
-  const presetButtons = document.querySelectorAll('.preset-btn');
-
-  const eqPresets = {
-    harman: {
-      name: "Harman In-Ear Target",
-      gains: [5.5, 3.8, 1.5, 0.0, -1.0, 1.2, 3.5, 4.0, 2.5, 1.5]
-    },
-    airpods: {
-      name: "AirPods Pro (2nd Gen)",
-      gains: [2.5, 1.8, 0.5, -0.5, 0.0, 1.0, -1.5, 0.5, 2.0, 2.8]
-    },
-    sony: {
-      name: "Sony WH-1000XM5",
-      gains: [-3.0, -1.5, 0.0, 1.5, 2.0, 2.5, 1.0, 2.0, 3.5, 1.0]
-    },
-    sennheiser: {
-      name: "Sennheiser HD 600",
-      gains: [4.5, 3.0, 1.0, 0.0, 0.0, -0.5, 1.0, 2.0, 1.5, -1.0]
-    },
-    bassboost: {
-      name: "Club Bass Boost",
-      gains: [8.0, 6.5, 4.5, 2.0, 0.0, 0.0, 0.5, 1.5, 2.5, 3.0]
-    },
-    flat: {
-      name: "Flat / Neutral",
-      gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-    }
-  };
-
-  let currentGains = [...eqPresets.harman.gains];
-
-  function drawEqCurve() {
-    if (!eqCanvas) return;
-    const ctx = eqCanvas.getContext('2d');
-    const w = eqCanvas.offsetWidth;
-    const h = eqCanvas.offsetHeight;
-
-    eqCanvas.width = w * window.devicePixelRatio;
-    eqCanvas.height = h * window.devicePixelRatio;
-    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-
-    ctx.clearRect(0, 0, w, h);
-
-    // Draw 0dB reference line
-    const zeroY = h / 2;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, zeroY);
-    ctx.lineTo(w, zeroY);
-    ctx.stroke();
-
-    // Grid lines for +6dB / -6dB
-    const dbScale = (h / 2) / 12; // 12dB max range
-
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
-    ctx.beginPath();
-    ctx.moveTo(0, zeroY - 6 * dbScale);
-    ctx.lineTo(w, zeroY - 6 * dbScale);
-    ctx.moveTo(0, zeroY + 6 * dbScale);
-    ctx.lineTo(w, zeroY + 6 * dbScale);
-    ctx.stroke();
-
-    // Calculate curve points aligned to slider column centers
-    const points = [];
-    const sliderCols = document.querySelectorAll('.eq-band-col');
-    const canvasRect = eqCanvas.getBoundingClientRect();
-
-    currentGains.forEach((gain, i) => {
-      let x = (i / (currentGains.length - 1)) * w;
-      if (sliderCols.length === currentGains.length && canvasRect.width > 0) {
-        const colRect = sliderCols[i].getBoundingClientRect();
-        x = colRect.left + (colRect.width / 2) - canvasRect.left;
-      }
-      x = Math.max(0, Math.min(w, x));
-      const y = Math.max(10, Math.min(h - 10, zeroY - (gain * dbScale)));
-      points.push({ x, y });
-    });
-
-    if (points.length < 2) return;
-
-    // Draw Smooth Catmull-Rom Spline (passes exactly through all nodes)
-    ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-
-    for (let i = 0; i < points.length - 1; i++) {
-      const p0 = i > 0 ? points[i - 1] : points[i];
-      const p1 = points[i];
-      const p2 = points[i + 1];
-      const p3 = (i < points.length - 2) ? points[i + 2] : p2;
-
-      const cp1x = p1.x + (p2.x - p0.x) / 6;
-      const cp1y = p1.y + (p2.y - p0.y) / 6;
-
-      const cp2x = p2.x - (p3.x - p1.x) / 6;
-      const cp2y = p2.y - (p3.y - p1.y) / 6;
-
-      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
-    }
-
-    // Gradient Stroke for Curve
-    const strokeGrad = ctx.createLinearGradient(0, 0, w, 0);
-    strokeGrad.addColorStop(0, '#00f2ff');
-    strokeGrad.addColorStop(0.5, '#9b9ef5');
-    strokeGrad.addColorStop(1, '#ff4081');
-
-    ctx.strokeStyle = strokeGrad;
-    ctx.lineWidth = 3.5;
-    ctx.shadowColor = 'rgba(0, 242, 255, 0.6)';
-    ctx.shadowBlur = 10;
-    ctx.stroke();
-
-    // Fill under curve
-    ctx.lineTo(points[points.length - 1].x, h);
-    ctx.lineTo(points[0].x, h);
-    ctx.closePath();
-
-    const fillGrad = ctx.createLinearGradient(0, 0, 0, h);
-    fillGrad.addColorStop(0, 'rgba(155, 158, 245, 0.22)');
-    fillGrad.addColorStop(1, 'rgba(155, 158, 245, 0.0)');
-    ctx.fillStyle = fillGrad;
-    ctx.shadowBlur = 0;
-    ctx.fill();
-
-    // Draw control nodes directly on top of the spline
-    points.forEach((pt) => {
-      // Outer glow
-      ctx.beginPath();
-      ctx.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(0, 242, 255, 0.35)';
-      ctx.fill();
-
-      // Inner solid node
-      ctx.beginPath();
-      ctx.arc(pt.x, pt.y, 3.5, 0, Math.PI * 2);
-      ctx.fillStyle = '#ffffff';
-      ctx.shadowColor = '#00f2ff';
-      ctx.shadowBlur = 6;
-      ctx.fill();
-    });
-  }
-
-  function applyPreset(presetKey) {
-    const preset = eqPresets[presetKey];
-    if (!preset) return;
-    currentGains = [...preset.gains];
-
-    eqSliders.forEach((slider, i) => {
-      slider.value = currentGains[i];
-      const dbDisplay = slider.parentElement.querySelector('.eq-band-db');
-      if (dbDisplay) {
-        const val = currentGains[i];
-        dbDisplay.textContent = (val > 0 ? `+${val}` : `${val}`) + 'dB';
-      }
-    });
-
-    drawEqCurve();
-  }
-
-  eqSliders.forEach((slider, idx) => {
-    slider.addEventListener('input', (e) => {
-      const val = parseFloat(e.target.value);
-      currentGains[idx] = val;
-      const dbDisplay = slider.parentElement.querySelector('.eq-band-db');
-      if (dbDisplay) {
-        dbDisplay.textContent = (val > 0 ? `+${val}` : `${val}`) + 'dB';
-      }
-      // Uncheck active presets
-      presetButtons.forEach(btn => btn.classList.remove('active'));
-      drawEqCurve();
-    });
-  });
-
-  presetButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-      presetButtons.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      applyPreset(btn.dataset.preset);
-    });
-  });
-
-  window.addEventListener('resize', drawEqCurve);
-  // Initial draw
-  setTimeout(() => {
-    applyPreset('harman');
-    loadTrack(0);
-  }, 100);
-
-  // --- FAQ Accordion ---
-  const faqItems = document.querySelectorAll('.faq-item');
-  faqItems.forEach(item => {
-    const question = item.querySelector('.faq-question');
-    question.addEventListener('click', () => {
-      const isOpen = item.classList.contains('active');
-      faqItems.forEach(i => i.classList.remove('active'));
-      if (!isOpen) {
-        item.classList.add('active');
-      }
-    });
-  });
-
-  // --- Checksum Copy Utility ---
-  const checksumPill = document.getElementById('checksumPill');
-  if (checksumPill) {
-    checksumPill.addEventListener('click', () => {
-      const hash = checksumPill.dataset.hash || "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
-      navigator.clipboard.writeText(hash).then(() => {
-        const originalText = checksumPill.innerHTML;
-        checksumPill.innerHTML = '<span>✔ SHA-256 Copied to clipboard!</span>';
-        setTimeout(() => {
-          checksumPill.innerHTML = originalText;
-        }, 2500);
-      });
-    });
-  }
-
-  // --- Smooth Scroll Anchor Links & Mobile Menu Toggle ---
-  const mobileToggle = document.querySelector('.mobile-toggle');
-  const navLinks = document.querySelector('.nav-links');
-
-  if (mobileToggle && navLinks) {
-    mobileToggle.addEventListener('click', () => {
-      navLinks.classList.toggle('mobile-open');
-    });
-  }
-
-  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-    anchor.addEventListener('click', function (e) {
-      const targetId = this.getAttribute('href');
-      if (targetId === '#' || !targetId) return;
-      const target = document.querySelector(targetId);
-      if (target) {
-        e.preventDefault();
-        const headerOffset = 80;
-        const elementPosition = target.getBoundingClientRect().top;
-        const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
-
-        window.scrollTo({
-          top: offsetPosition,
-          behavior: 'smooth'
+    if (themeToggle && themeDropdown) {
+        themeToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            themeDropdown.classList.toggle('show');
         });
 
-        if (navLinks && navLinks.classList.contains('mobile-open')) {
-          navLinks.classList.remove('mobile-open');
-        }
-      }
-    });
-  });
+        document.addEventListener('click', () => {
+            themeDropdown.classList.remove('show');
+        });
 
-  // --- Download Toast Feedback Helper ---
-  const downloadToast = document.getElementById('downloadToast');
-  const toastMessage = document.getElementById('toastMessage');
-  let toastTimer = null;
-
-  function showDownloadToast(message) {
-    if (!downloadToast || !toastMessage) return;
-    toastMessage.textContent = message || 'Starting Pulsr APK download...';
-    downloadToast.classList.add('show');
-    if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => {
-      downloadToast.classList.remove('show');
-    }, 4000);
-  }
-
-  // Intercept all APK download buttons for instant auto-download feedback
-  document.addEventListener('click', (e) => {
-    const btn = e.target.closest('a[download], a.version-apk-btn, #autoDownloadBtn, #abiArm64Btn, #abiArmv7Btn, #abiX86Btn');
-    if (btn && btn.href && btn.href.includes('.apk')) {
-      const fileName = btn.getAttribute('download') || btn.href.split('/').pop() || 'pulsr.apk';
-      showDownloadToast(`⬇ Downloading ${fileName}...`);
-    }
-  });
-
-  // --- Live GitHub Download Counter & Release Fetcher ---
-  async function fetchGitHubStats() {
-    try {
-      const response = await fetch('https://api.github.com/repos/DevEslam1/pulsr/releases');
-      if (!response.ok) return;
-      const releases = await response.json();
-      let totalDownloads = 0;
-      let latestTag = 'v1.0.0';
-
-      if (Array.isArray(releases) && releases.length > 0) {
-        const latestRelease = releases[0];
-        latestTag = latestRelease.tag_name || 'v1.0.0';
-
-        // Check assets for direct APK links
-        if (latestRelease.assets && Array.isArray(latestRelease.assets)) {
-          latestRelease.assets.forEach(asset => {
-            const name = (asset.name || '').toLowerCase();
-            const downloadUrl = asset.browser_download_url;
-
-            if (name.endsWith('.apk')) {
-              // Direct auto download button (universal or main apk)
-              const autoBtn = document.getElementById('autoDownloadBtn');
-              if (autoBtn && (!name.includes('arm') && !name.includes('x86') || name.includes('universal') || name.includes('release.apk'))) {
-                autoBtn.href = downloadUrl;
-                autoBtn.setAttribute('download', asset.name || 'pulsr-universal.apk');
-              }
-
-              // ARM64
-              const arm64Btn = document.getElementById('abiArm64Btn');
-              if (arm64Btn && (name.includes('arm64') || name.includes('v8a'))) {
-                arm64Btn.href = downloadUrl;
-                arm64Btn.setAttribute('download', asset.name || 'pulsr-arm64-v8a.apk');
-              }
-
-              // ARMv7
-              const armv7Btn = document.getElementById('abiArmv7Btn');
-              if (armv7Btn && (name.includes('armv7') || name.includes('v7a') || name.includes('armeabi'))) {
-                armv7Btn.href = downloadUrl;
-                armv7Btn.setAttribute('download', asset.name || 'pulsr-armeabi-v7a.apk');
-              }
-
-              // x86_64
-              const x86Btn = document.getElementById('abiX86Btn');
-              if (x86Btn && (name.includes('x86_64') || name.includes('x64'))) {
-                x86Btn.href = downloadUrl;
-                x86Btn.setAttribute('download', asset.name || 'pulsr-x86_64.apk');
-              }
-            }
-          });
-        }
-
-        // Populate All Versions Archive List
-        const archiveList = document.getElementById('versionsArchiveList');
-        if (archiveList && Array.isArray(releases) && releases.length > 0) {
-          archiveList.innerHTML = '';
-          releases.forEach((rel, index) => {
-            const tag = rel.tag_name || 'v1.0.0';
-            const isLatest = index === 0;
-            const pubDate = rel.published_at ? new Date(rel.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
-            
-            let apkButtonsHtml = '';
-            if (rel.assets && Array.isArray(rel.assets)) {
-              const apkAssets = rel.assets.filter(a => (a.name || '').toLowerCase().endsWith('.apk'));
-              
-              if (apkAssets.length > 0) {
-                apkAssets.forEach(apk => {
-                  const name = apk.name.toLowerCase();
-                  const sizeMb = apk.size ? ` (${(apk.size / (1024 * 1024)).toFixed(1)} MB)` : '';
-                  let label = '⬇ APK' + sizeMb;
-                  let isPrimary = false;
-
-                  if (name.includes('arm64') || name.includes('v8a')) {
-                    label = '⬇ ARM64' + sizeMb;
-                  } else if (name.includes('armv7') || name.includes('v7a') || name.includes('armeabi')) {
-                    label = '⬇ ARMv7' + sizeMb;
-                  } else if (name.includes('x86_64') || name.includes('x64')) {
-                    label = '⬇ x86_64' + sizeMb;
-                  } else {
-                    label = '⬇ Universal' + sizeMb;
-                    isPrimary = true;
-                  }
-
-                  apkButtonsHtml += `
-                    <a href="${apk.browser_download_url}" download="${apk.name}" class="version-apk-btn ${isPrimary ? 'primary-apk' : ''}">
-                      ${label}
-                    </a>
-                  `;
-                });
-              }
-            }
-
-            if (!apkButtonsHtml) {
-              apkButtonsHtml = `
-                <a href="${rel.html_url}" target="_blank" class="version-apk-btn primary-apk">
-                  ⬇ Download on GitHub
-                </a>
-              `;
-            }
-
-            const row = document.createElement('div');
-            row.className = 'version-release-row';
-            row.innerHTML = `
-              <div class="version-release-header">
-                <span class="version-tag-pill">${tag}</span>
-                ${isLatest ? '<span class="version-badge-latest">⚡ Latest Release</span>' : ''}
-                ${pubDate ? `<span class="version-date-text">${pubDate}</span>` : ''}
-              </div>
-              <div class="version-downloads-actions">
-                ${apkButtonsHtml}
-                <a href="${rel.html_url}" target="_blank" class="version-apk-btn" style="color: var(--text-muted);" title="View changelog on GitHub">
-                  Notes ↗
-                </a>
-              </div>
-            `;
-            archiveList.appendChild(row);
-          });
-        }
-
-        // Sum downloads across all releases
-        releases.forEach(rel => {
-          if (rel.assets && Array.isArray(rel.assets)) {
-            rel.assets.forEach(asset => {
-              totalDownloads += (asset.download_count || 0);
+        themeOptions.forEach(opt => {
+            opt.addEventListener('click', () => {
+                const themeVal = opt.dataset.themeVal;
+                htmlEl.setAttribute('data-theme', themeVal);
+                localStorage.setItem('pulsr-landing-theme', themeVal);
+                updateActiveThemeOption(themeVal);
+                themeDropdown.classList.remove('show');
+                showToast(`Switched to ${opt.textContent.trim()} theme`);
+                if (typeof drawEqCurve === 'function') drawEqCurve();
             });
-          }
         });
-      }
-
-      const downloadsBadge = document.getElementById('liveDownloadsBadge');
-      if (downloadsBadge) {
-        downloadsBadge.innerHTML = `📥 <strong>${totalDownloads.toLocaleString()}</strong> APK Downloads`;
-      }
-
-      const releaseTagEl = document.getElementById('releaseTagText');
-      if (releaseTagEl) {
-        releaseTagEl.textContent = `Release ${latestTag}`;
-      }
-    } catch (e) {
-      console.log('GitHub API stats notice:', e);
     }
-  }
-  fetchGitHubStats();
+
+    function updateActiveThemeOption(theme) {
+        themeOptions.forEach(opt => {
+            opt.classList.toggle('active', opt.dataset.themeVal === theme);
+        });
+    }
+
+    // 4. --- MOBILE MENU TOGGLE ---
+    const mobileToggle = document.getElementById('mobileToggle');
+    const mobileMenu = document.getElementById('mobileMenu');
+    if (mobileToggle && mobileMenu) {
+        mobileToggle.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = mobileMenu.classList.toggle('open');
+            mobileToggle.classList.toggle('open', isOpen);
+            mobileToggle.setAttribute('aria-expanded', String(isOpen));
+        });
+
+        document.querySelectorAll('.mobile-link, .mobile-actions a, .mobile-actions button').forEach(link => {
+            link.addEventListener('click', () => {
+                mobileMenu.classList.remove('open');
+                mobileToggle.classList.remove('open');
+                mobileToggle.setAttribute('aria-expanded', 'false');
+            });
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!mobileMenu.contains(e.target) && !mobileToggle.contains(e.target)) {
+                mobileMenu.classList.remove('open');
+                mobileToggle.classList.remove('open');
+                mobileToggle.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }
+
+    // 5. --- PLATFORM TABS ---
+    const platTabs = document.querySelectorAll('.plat-tab');
+    const platPanels = document.querySelectorAll('.plat-panel');
+
+    function switchPlatformTab(platform) {
+        platTabs.forEach(tab => {
+            tab.classList.toggle('active', tab.dataset.platform === platform);
+        });
+        platPanels.forEach(panel => {
+            panel.classList.toggle('active', panel.id === `panel-${platform}`);
+        });
+    }
+
+    platTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            switchPlatformTab(tab.dataset.platform);
+        });
+    });
+
+    // 6. --- HERO AUDIO PLAYER SIMULATION & SPECTRUM VISUALIZER ---
+    const sampleTracks = [
+        {
+            title: "Resonance (Hyperdrive Mix)",
+            artist: "Aura Soundworks • Cybernetic Echoes",
+            bitrate: "FLAC 24-Bit / 192kHz",
+            duration: 236 // 3:56
+        },
+        {
+            title: "Midnight Tokyo Drift",
+            artist: "Kavinsky Wave • Synth Outrun",
+            bitrate: "FLAC 24-Bit / 96kHz",
+            duration: 218 // 3:38
+        },
+        {
+            title: "Etherial Sanctuary",
+            artist: "Luminary Ensemble • Spatial Atmosphere",
+            bitrate: "ALAC 24-Bit / 192kHz",
+            duration: 260 // 4:20
+        }
+    ];
+
+    let currentTrackIdx = 0;
+    let isPlaying = true;
+    let currentSeconds = 108; // 1:48
+
+    const heroTrackTitle = document.getElementById('heroTrackTitle');
+    const heroTrackArtist = document.getElementById('heroTrackArtist');
+    const heroLiveBitrate = document.getElementById('heroLiveBitrate');
+    const heroScrubberFill = document.getElementById('heroScrubberFill');
+    const heroScrubberBar = document.getElementById('heroScrubberBar');
+    const heroTimeCurrent = document.getElementById('heroTimeCurrent');
+    const heroTimeTotal = document.getElementById('heroTimeTotal');
+    const heroPlayBtn = document.getElementById('heroPlayBtn');
+    const heroPlayIcon = document.getElementById('heroPlayIcon');
+    const heroPrevBtn = document.getElementById('heroPrevBtn');
+    const heroNextBtn = document.getElementById('heroNextBtn');
+    const heroVisualizerCanvas = document.getElementById('heroVisualizerCanvas');
+
+    function formatSecs(sec) {
+        const m = Math.floor(sec / 60);
+        const s = Math.floor(sec % 60);
+        return `${m}:${s < 10 ? '0' : ''}${s}`;
+    }
+
+    function updateTrackDisplay() {
+        const trk = sampleTracks[currentTrackIdx];
+        if (heroTrackTitle) heroTrackTitle.textContent = trk.title;
+        if (heroTrackArtist) heroTrackArtist.textContent = trk.artist;
+        if (heroLiveBitrate) heroLiveBitrate.textContent = trk.bitrate;
+        if (heroTimeTotal) heroTimeTotal.textContent = formatSecs(trk.duration);
+        updateProgress();
+    }
+
+    function updateProgress() {
+        const trk = sampleTracks[currentTrackIdx];
+        const pct = (currentSeconds / trk.duration) * 100;
+        if (heroScrubberFill) {
+            heroScrubberFill.style.width = `${pct}%`;
+            const thumb = heroScrubberFill.nextElementSibling;
+            if (thumb) thumb.style.left = `${pct}%`;
+        }
+        if (heroTimeCurrent) heroTimeCurrent.textContent = formatSecs(currentSeconds);
+    }
+
+    if (heroPlayBtn) {
+        heroPlayBtn.addEventListener('click', () => {
+            isPlaying = !isPlaying;
+            if (heroPlayIcon) {
+                if (isPlaying) {
+                    heroPlayIcon.innerHTML = '<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>';
+                } else {
+                    heroPlayIcon.innerHTML = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+                }
+            }
+        });
+    }
+
+    if (heroPrevBtn) {
+        heroPrevBtn.addEventListener('click', () => {
+            currentTrackIdx = (currentTrackIdx - 1 + sampleTracks.length) % sampleTracks.length;
+            currentSeconds = 0;
+            updateTrackDisplay();
+        });
+    }
+
+    if (heroNextBtn) {
+        heroNextBtn.addEventListener('click', () => {
+            currentTrackIdx = (currentTrackIdx + 1) % sampleTracks.length;
+            currentSeconds = 0;
+            updateTrackDisplay();
+        });
+    }
+
+    if (heroScrubberBar) {
+        heroScrubberBar.addEventListener('click', (e) => {
+            const rect = heroScrubberBar.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const pct = Math.max(0, Math.min(1, clickX / rect.width));
+            const trk = sampleTracks[currentTrackIdx];
+            currentSeconds = Math.round(pct * trk.duration);
+            updateProgress();
+        });
+    }
+
+    // Timer tick for player
+    setInterval(() => {
+        if (!isPlaying) return;
+        const trk = sampleTracks[currentTrackIdx];
+        currentSeconds++;
+        if (currentSeconds >= trk.duration) {
+            currentSeconds = 0;
+            currentTrackIdx = (currentTrackIdx + 1) % sampleTracks.length;
+            updateTrackDisplay();
+        } else {
+            updateProgress();
+        }
+    }, 1000);
+
+    // Aura Palette Swatches
+    const paletteDots = document.querySelectorAll('.palette-dot');
+    const heroAlbumArt = document.getElementById('heroAlbumArt');
+    paletteDots.forEach(dot => {
+        dot.addEventListener('click', () => {
+            paletteDots.forEach(d => d.classList.remove('active'));
+            dot.classList.add('active');
+            const pal = dot.dataset.palette;
+            if (heroAlbumArt) {
+                if (pal === 'cyan') heroAlbumArt.style.borderColor = '#00F2FF';
+                if (pal === 'lavender') heroAlbumArt.style.borderColor = '#9B9EF5';
+                if (pal === 'magenta') heroAlbumArt.style.borderColor = '#FF4081';
+                if (pal === 'amber') heroAlbumArt.style.borderColor = '#FFAB00';
+                if (pal === 'dark') heroAlbumArt.style.borderColor = 'rgba(255,255,255,0.2)';
+            }
+            showToast(`Aura Palette changed to ${dot.title}`);
+        });
+    });
+
+    // Real-Time Canvas Spectrum Visualizer
+    if (heroVisualizerCanvas) {
+        const ctx = heroVisualizerCanvas.getContext('2d');
+        const numBars = 32;
+        let barHeights = Array(numBars).fill(10);
+
+        const resizeVis = () => {
+            heroVisualizerCanvas.width = heroVisualizerCanvas.parentElement.clientWidth * window.devicePixelRatio;
+            heroVisualizerCanvas.height = heroVisualizerCanvas.parentElement.clientHeight * window.devicePixelRatio;
+            ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        };
+        resizeVis();
+        window.addEventListener('resize', resizeVis);
+
+        function drawVisualizer() {
+            const w = heroVisualizerCanvas.parentElement.clientWidth;
+            const h = heroVisualizerCanvas.parentElement.clientHeight;
+            ctx.clearRect(0, 0, w, h);
+
+            const barWidth = (w / numBars) - 2;
+            const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim() || '#3B82F6';
+            const cyanColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-cyan').trim() || '#06B6D4';
+
+            for (let i = 0; i < numBars; i++) {
+                if (isPlaying) {
+                    const target = 4 + Math.random() * (h - 8);
+                    barHeights[i] += (target - barHeights[i]) * 0.25;
+                } else {
+                    barHeights[i] += (4 - barHeights[i]) * 0.1;
+                }
+
+                const grad = ctx.createLinearGradient(0, h, 0, 0);
+                grad.addColorStop(0, primaryColor);
+                grad.addColorStop(1, cyanColor);
+
+                ctx.fillStyle = grad;
+                ctx.fillRect(i * (barWidth + 2), h - barHeights[i], barWidth, barHeights[i]);
+            }
+
+            requestAnimationFrame(drawVisualizer);
+        }
+        drawVisualizer();
+    }
+
+    // 7. --- HERO LIVE SPARKLINE GRAPH ---
+    const heroSparkLine = document.getElementById('heroSparkLine');
+    const heroSparkArea = document.getElementById('heroSparkArea');
+
+    if (heroSparkLine && heroSparkArea) {
+        const W = 360, H = 70, POINTS = 20;
+        let dataPoints = Array.from({ length: POINTS }, () => 35 + Math.random() * 20);
+
+        const drawSparkline = () => {
+            const step = W / (POINTS - 1);
+            let path = '';
+            dataPoints.forEach((val, i) => {
+                const x = i * step;
+                const y = H - (val / 70) * H;
+                path += (i === 0 ? 'M' : 'L') + x.toFixed(1) + ',' + y.toFixed(1) + ' ';
+            });
+            heroSparkLine.setAttribute('d', path);
+            heroSparkArea.setAttribute('d', path + `L${W},${H} L0,${H} Z`);
+        };
+
+        drawSparkline();
+
+        setInterval(() => {
+            dataPoints.shift();
+            const last = dataPoints[dataPoints.length - 1];
+            const next = Math.min(60, Math.max(15, last + (Math.random() - 0.5) * 14));
+            dataPoints.push(next);
+            drawSparkline();
+        }, 900);
+    }
+
+    // 8. --- 10-BAND EQUALIZER & AUTOEQ SANDBOX ---
+    const eqCanvas = document.getElementById('eqCanvas');
+    const eqSliders = document.querySelectorAll('.eq-slider');
+    const eqPresetSelect = document.getElementById('eqPresetSelect');
+    const resetEqBtn = document.getElementById('resetEqBtn');
+    const eqActiveBadge = document.getElementById('eqActiveBadge');
+
+    const eqPresets = {
+        harman: [5.5, 3.8, 1.5, 0.0, -1.0, 1.2, 2.5, 4.0, 2.0, 1.0],
+        airpods: [4.0, 2.5, 0.5, -0.5, 0.0, 2.0, 3.0, 1.5, -1.0, 0.5],
+        sony: [1.5, 0.5, -1.0, -2.0, 0.0, 1.5, 3.5, 4.5, 2.0, 1.5],
+        sennheiser: [6.0, 4.5, 2.0, 0.0, -0.5, 0.5, 1.0, 2.0, 1.5, 0.0],
+        beyer: [3.0, 1.5, 0.0, -1.0, -1.5, 0.0, 1.5, -2.0, -3.5, -1.0],
+        bass: [7.0, 5.5, 3.5, 1.0, 0.0, 0.0, 0.0, 1.0, 1.5, 2.0],
+        vocal: [-2.0, -1.5, 0.0, 1.0, 2.5, 3.5, 4.0, 2.5, 1.0, 0.0],
+        flat: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    };
+
+    let currentBands = [...eqPresets.harman];
+
+    function drawEqCurve() {
+        if (!eqCanvas) return;
+        const ctx = eqCanvas.getContext('2d');
+        const parent = eqCanvas.parentElement;
+        const width = parent.clientWidth;
+        const height = parent.clientHeight;
+
+        eqCanvas.width = width * window.devicePixelRatio;
+        eqCanvas.height = height * window.devicePixelRatio;
+        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+
+        ctx.clearRect(0, 0, width, height);
+
+        // Draw horizontal 0dB grid line
+        const midY = height / 2;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.moveTo(0, midY);
+        ctx.lineTo(width, midY);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Calculate 10 points
+        const numBands = 10;
+        const step = width / (numBands + 1);
+        const points = [];
+
+        // Left anchor point
+        points.push({ x: 0, y: midY - (currentBands[0] / 12) * (height * 0.4) });
+
+        for (let i = 0; i < numBands; i++) {
+            const x = (i + 1) * step;
+            const y = midY - (currentBands[i] / 12) * (height * 0.4);
+            points.push({ x, y });
+        }
+
+        // Right anchor point
+        points.push({ x: width, y: midY - (currentBands[numBands - 1] / 12) * (height * 0.4) });
+
+        // Catmull-Rom spline curve drawing
+        const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary-color').trim() || '#3B82F6';
+        const cyanColor = getComputedStyle(document.documentElement).getPropertyValue('--accent-cyan').trim() || '#06B6D4';
+
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+
+        for (let i = 0; i < points.length - 1; i++) {
+            const p0 = points[i === 0 ? 0 : i - 1];
+            const p1 = points[i];
+            const p2 = points[i + 1];
+            const p3 = points[i + 2 >= points.length ? points.length - 1 : i + 2];
+
+            for (let t = 0; t <= 1; t += 0.05) {
+                const t2 = t * t;
+                const t3 = t2 * t;
+
+                const x = 0.5 * (
+                    (2 * p1.x) +
+                    (-p0.x + p2.x) * t +
+                    (2 * p0.x - 5 * p1.x + 4 * p2.x - p3.x) * t2 +
+                    (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) * t3
+                );
+                const y = 0.5 * (
+                    (2 * p1.y) +
+                    (-p0.y + p2.y) * t +
+                    (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 +
+                    (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3
+                );
+                ctx.lineTo(x, y);
+            }
+        }
+
+        // Stroke line
+        ctx.strokeStyle = cyanColor;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+
+        // Draw nodes
+        for (let i = 1; i <= numBands; i++) {
+            ctx.beginPath();
+            ctx.arc(points[i].x, points[i].y, 4.5, 0, Math.PI * 2);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fill();
+            ctx.strokeStyle = primaryColor;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+        }
+    }
+
+    function applyPreset(presetKey) {
+        if (!eqPresets[presetKey]) return;
+        currentBands = [...eqPresets[presetKey]];
+
+        eqSliders.forEach((slider, idx) => {
+            const val = currentBands[idx];
+            slider.value = val;
+            const dbEl = document.getElementById(`db-${idx}`);
+            if (dbEl) {
+                dbEl.textContent = (val > 0 ? `+${val}` : `${val}`) + 'dB';
+            }
+        });
+
+        if (eqActiveBadge) {
+            const sel = eqPresetSelect;
+            const text = sel ? sel.options[sel.selectedIndex].text : presetKey;
+            eqActiveBadge.textContent = `Target: ${text}`;
+        }
+
+        drawEqCurve();
+    }
+
+    eqSliders.forEach((slider) => {
+        slider.addEventListener('input', (e) => {
+            const idx = parseInt(e.target.dataset.band, 10);
+            const val = parseFloat(e.target.value);
+            currentBands[idx] = val;
+            const dbEl = document.getElementById(`db-${idx}`);
+            if (dbEl) {
+                dbEl.textContent = (val > 0 ? `+${val}` : `${val}`) + 'dB';
+            }
+            if (eqActiveBadge) eqActiveBadge.textContent = 'Custom Tuning (User)';
+            drawEqCurve();
+        });
+    });
+
+    if (eqPresetSelect) {
+        eqPresetSelect.addEventListener('change', (e) => {
+            applyPreset(e.target.value);
+            showToast(`Loaded ${eqPresetSelect.options[eqPresetSelect.selectedIndex].text}`);
+        });
+    }
+
+    if (resetEqBtn) {
+        resetEqBtn.addEventListener('click', () => {
+            if (eqPresetSelect) eqPresetSelect.value = 'flat';
+            applyPreset('flat');
+            showToast('Equalizer reset to Flat 0dB');
+        });
+    }
+
+    window.addEventListener('resize', drawEqCurve);
+    drawEqCurve();
+
+    // Enhancer pills toggle
+    document.querySelectorAll('.enhancer-pill').forEach(pill => {
+        pill.addEventListener('click', () => {
+            pill.classList.toggle('active');
+            showToast(`${pill.textContent.trim()} toggled`);
+        });
+    });
+
+    // 9. --- SYNCED LYRICS SCROLLER ---
+    const lyricsScrollBox = document.getElementById('lyricsScrollBox');
+    const lyricLines = document.querySelectorAll('.lyric-line');
+    const lyricOffsetMinus = document.getElementById('lyricOffsetMinus');
+    const lyricOffsetPlus = document.getElementById('lyricOffsetPlus');
+    let lyricOffset = 0;
+
+    lyricLines.forEach(line => {
+        line.addEventListener('click', () => {
+            lyricLines.forEach(l => l.classList.remove('active-lyric'));
+            line.classList.add('active-lyric');
+            const sec = parseInt(line.dataset.time, 10);
+            currentSeconds = sec;
+            updateProgress();
+            showToast(`Seeked audio to ${formatSecs(sec)}`);
+        });
+    });
+
+    if (lyricOffsetMinus) {
+        lyricOffsetMinus.addEventListener('click', () => {
+            lyricOffset -= 50;
+            const offsetTag = document.querySelector('.lyrics-offset-tag');
+            if (offsetTag) offsetTag.textContent = `Offset: ${lyricOffset} ms`;
+            showToast(`Lyrics offset adjusted: ${lyricOffset}ms`);
+        });
+    }
+
+    if (lyricOffsetPlus) {
+        lyricOffsetPlus.addEventListener('click', () => {
+            lyricOffset += 50;
+            const offsetTag = document.querySelector('.lyrics-offset-tag');
+            if (offsetTag) offsetTag.textContent = `Offset: ${lyricOffset} ms`;
+            showToast(`Lyrics offset adjusted: ${lyricOffset}ms`);
+        });
+    }
+
+    // 10. --- CLIPBOARD COPY HANDLERS ---
+    document.querySelectorAll('.copy-checksum-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const hash = btn.dataset.copy;
+            if (hash) {
+                navigator.clipboard.writeText(hash).then(() => {
+                    showToast('SHA-256 Checksum copied!');
+                });
+            }
+        });
+    });
+
+    // 11. --- SHARE MODAL ---
+    const shareModalBackdrop = document.getElementById('shareModalBackdrop');
+    const openShareModal = document.getElementById('openShareModal');
+    const mobileShareBtn = document.getElementById('mobileShareBtn');
+    const ctaShareBtn = document.getElementById('ctaShareBtn');
+    const closeShareModal = document.getElementById('closeShareModal');
+    const copyShareUrlBtn = document.getElementById('copyShareUrlBtn');
+    const shareUrlInput = document.getElementById('shareUrlInput');
+
+    const handleShare = () => {
+        if (navigator.share) {
+            navigator.share({
+                title: 'Pulsr Music — Premium Offline Audiophile Player',
+                text: 'Check out Pulsr Music — bit-perfect offline player with 10-band AutoEQ, synced lyrics, and zero telemetry!',
+                url: window.location.href
+            }).catch(() => {
+                showShareModal();
+            });
+        } else {
+            showShareModal();
+        }
+    };
+
+    function showShareModal() {
+        if (shareModalBackdrop) {
+            shareModalBackdrop.classList.add('open');
+            shareModalBackdrop.setAttribute('aria-hidden', 'false');
+        }
+    }
+
+    function hideShareModal() {
+        if (shareModalBackdrop) {
+            shareModalBackdrop.classList.remove('open');
+            shareModalBackdrop.setAttribute('aria-hidden', 'true');
+        }
+    }
+
+    if (openShareModal) openShareModal.addEventListener('click', handleShare);
+    if (mobileShareBtn) mobileShareBtn.addEventListener('click', handleShare);
+    if (ctaShareBtn) ctaShareBtn.addEventListener('click', handleShare);
+    if (closeShareModal) closeShareModal.addEventListener('click', hideShareModal);
+
+    if (shareModalBackdrop) {
+        shareModalBackdrop.addEventListener('click', (e) => {
+            if (e.target === shareModalBackdrop) hideShareModal();
+        });
+    }
+
+    if (copyShareUrlBtn && shareUrlInput) {
+        copyShareUrlBtn.addEventListener('click', () => {
+            navigator.clipboard.writeText(shareUrlInput.value).then(() => {
+                showToast('Pulsr share link copied to clipboard!');
+                copyShareUrlBtn.textContent = 'Copied!';
+                setTimeout(() => { copyShareUrlBtn.textContent = 'Copy Link'; }, 2000);
+            });
+        });
+    }
+
+    // 12. --- FAQ ACCORDION ---
+    document.querySelectorAll('.faq-item').forEach(item => {
+        const questionBtn = item.querySelector('.faq-question');
+        if (questionBtn) {
+            questionBtn.addEventListener('click', () => {
+                const isOpen = item.classList.contains('open');
+                document.querySelectorAll('.faq-item').forEach(other => other.classList.remove('open'));
+                if (!isOpen) item.classList.add('open');
+            });
+        }
+    });
+
+    // 13. --- GITHUB STATS & DYNAMIC RELEASES ARCHIVE ---
+    async function fetchGitHubStats() {
+        try {
+            const res = await fetch('https://api.github.com/repos/DevEslam1/pulsr');
+            if (res.ok) {
+                const data = await res.json();
+                const starEl = document.getElementById('githubStars');
+                if (starEl && data.stargazers_count !== undefined) {
+                    starEl.textContent = `★ ${(data.stargazers_count / 1000).toFixed(1)}k`;
+                }
+            }
+
+            const relRes = await fetch('https://api.github.com/repos/DevEslam1/pulsr/releases');
+            if (relRes.ok) {
+                const releases = await relRes.json();
+                let totalDownloads = 0;
+                const archiveList = document.getElementById('versionsArchiveList');
+
+                if (Array.isArray(releases) && releases.length > 0) {
+                    if (archiveList) archiveList.innerHTML = '';
+
+                    releases.forEach((rel, index) => {
+                        let rawTag = rel.tag_name || 'v1.0.0';
+                        const tag = rawTag.replace(/^Pulsr_Music_/i, '').replace(/^Pulsr_/i, '');
+                        const isLatest = index === 0;
+                        const pubDate = rel.published_at ? new Date(rel.published_at).toLocaleDateString() : '';
+
+                        let apkButtonsHtml = '';
+                        if (rel.assets && Array.isArray(rel.assets)) {
+                            const apkAssets = rel.assets.filter(a => a.name.endsWith('.apk'));
+                            if (apkAssets.length > 0) {
+                                apkAssets.forEach(apk => {
+                                    totalDownloads += (apk.download_count || 0);
+                                    let label = apk.name;
+                                    if (label.includes('arm64-v8a')) label = 'ARM64 (v8a)';
+                                    else if (label.includes('armeabi-v7a')) label = 'ARMv7 (a7v)';
+                                    else if (label.includes('x86_64')) label = 'x86_64';
+                                    else label = 'Universal APK';
+
+                                    apkButtonsHtml += `
+                                        <a href="${apk.browser_download_url}" download="${apk.name}" class="version-apk-btn ${label.includes('Universal') ? 'primary-apk' : ''}">
+                                            ⬇ ${label}
+                                        </a>
+                                    `;
+                                });
+                            }
+                        }
+
+                        if (!apkButtonsHtml) {
+                            apkButtonsHtml = `
+                                <a href="${rel.html_url}" target="_blank" class="version-apk-btn primary-apk">
+                                    ⬇ GitHub Release
+                                </a>
+                            `;
+                        }
+
+                        if (archiveList) {
+                            const row = document.createElement('div');
+                            row.className = 'version-release-row';
+                            row.innerHTML = `
+                                <div class="version-release-header">
+                                    <span class="version-tag-pill">${tag}</span>
+                                    ${isLatest ? '<span class="version-badge-latest">⚡ Latest Release</span>' : ''}
+                                    ${pubDate ? `<span class="version-date-text">${pubDate}</span>` : ''}
+                                </div>
+                                <div class="version-downloads-actions">
+                                    ${apkButtonsHtml}
+                                    <a href="${rel.html_url}" target="_blank" class="version-apk-btn" style="color: var(--text-muted);" title="View changelog">
+                                        Notes ↗
+                                    </a>
+                                </div>
+                            `;
+                            archiveList.appendChild(row);
+                        }
+                    });
+
+                    const liveDownloadsBadge = document.getElementById('liveDownloadsBadge');
+                    if (liveDownloadsBadge) {
+                        liveDownloadsBadge.textContent = `📥 ${totalDownloads.toLocaleString()} Downloads`;
+                    }
+                }
+            }
+        } catch (e) {
+            console.warn('GitHub API fallback active:', e);
+        }
+    }
+    fetchGitHubStats();
+
+    // 14. --- SCROLL BEHAVIOR & REVEALS ---
+    const navHeader = document.getElementById('navHeader');
+    const backToTop = document.getElementById('backToTop');
+    const revealEls = document.querySelectorAll('.reveal');
+    const sections = document.querySelectorAll('section[id]');
+    const navLinks = document.querySelectorAll('.nav-link');
+
+    window.addEventListener('scroll', () => {
+        const scrollY = window.scrollY;
+        if (navHeader) navHeader.classList.toggle('scrolled', scrollY > 20);
+        if (backToTop) backToTop.classList.toggle('visible', scrollY > 400);
+
+        let currentSection = '';
+        sections.forEach(sec => {
+            const top = sec.offsetTop - 140;
+            const height = sec.offsetHeight;
+            if (scrollY >= top && scrollY < top + height) {
+                currentSection = sec.getAttribute('id');
+            }
+        });
+
+        if (currentSection) {
+            navLinks.forEach(link => {
+                const href = link.getAttribute('href');
+                link.classList.toggle('active', href === `#${currentSection}`);
+            });
+        }
+    }, { passive: true });
+
+    if (backToTop) {
+        backToTop.addEventListener('click', () => {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    }
+
+    if ('IntersectionObserver' in window) {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { threshold: 0.08 });
+
+        revealEls.forEach(el => observer.observe(el));
+    } else {
+        revealEls.forEach(el => el.classList.add('visible'));
+    }
+
+    // Direct download toast handler for all APK download links
+    document.querySelectorAll('a[download]').forEach(link => {
+        link.addEventListener('click', () => {
+            showToast('Starting Pulsr APK download...');
+        });
+    });
 });
