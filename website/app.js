@@ -536,6 +536,13 @@ document.addEventListener('DOMContentLoaded', () => {
           behavior: 'smooth'
         });
 
+        if (navLinks && navLinks.classList.contains('mobile-open')) {
+          navLinks.classList.remove('mobile-open');
+        }
+      }
+    });
+  });
+
   // --- Live GitHub Download Counter & Release Fetcher ---
   async function fetchGitHubStats() {
     try {

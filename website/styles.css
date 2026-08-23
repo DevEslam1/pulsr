@@ -279,9 +279,12 @@ a {
 }
 
 .gradient-text {
-  background: linear-gradient(135deg, #ffffff 20%, #9b9ef5 65%, #00f2ff 100%);
+  background: linear-gradient(135deg, #ffffff 10%, #b6b8f8 55%, #00f2ff 100%);
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
+  display: inline-block;
+  filter: drop-shadow(0 0 20px rgba(155, 158, 245, 0.4));
 }
 
 .hero-subtitle {
