@@ -21,6 +21,8 @@ class SongsTable extends Table {
   IntColumn get dateAdded => integer().nullable()();
   TextColumn get genre => text().nullable()();
   BoolColumn get isFavorite => boolean().withDefault(const Constant(false))();
+  BoolColumn get isMissing => boolean().withDefault(const Constant(false))();
+  RealColumn get replayGain => real().nullable()();
   IntColumn get playCount => integer().withDefault(const Constant(0))();
   IntColumn get lastPlayed => integer().nullable()();
   IntColumn get lastPositionMs => integer().withDefault(const Constant(0))();

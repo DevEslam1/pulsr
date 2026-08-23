@@ -26,7 +26,7 @@ class MusicRepository implements IMusicRepository {
     List<String> excludedFolders = const [],
   }) {
     try {
-      final query = _db.select(_db.songsTable);
+      final query = _db.select(_db.songsTable)..where((t) => t.isMissing.equals(false));
 
       if (searchQuery != null && searchQuery.trim().isNotEmpty) {
         final pattern = '%${searchQuery.trim().toLowerCase()}%';
@@ -70,7 +70,7 @@ class MusicRepository implements IMusicRepository {
     int? offset,
   }) async {
     try {
-      final query = _db.select(_db.songsTable);
+      final query = _db.select(_db.songsTable)..where((t) => t.isMissing.equals(false));
       if (sortBy == 'title') {
         query.orderBy([(t) => OrderingTerm(expression: t.title, mode: ascending ? OrderingMode.asc : OrderingMode.desc)]);
       } else if (sortBy == 'artist') {
@@ -97,10 +97,41 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
+  Future<Result<SongsTableData?>> getSongByPath(String path) async {
+    try {
+      final song = await (_db.select(_db.songsTable)..where((t) => t.path.equals(path))).getSingleOrNull();
+      return Right(song);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to fetch song by path', e));
+    }
+  }
+
+  @override
+  Future<Result<SongsTableData?>> getSongByUri(String uri) async {
+    try {
+      final song = await (_db.select(_db.songsTable)..where((t) => t.uri.equals(uri) | t.path.equals(uri))).getSingleOrNull();
+      return Right(song);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to fetch song by uri', e));
+    }
+  }
+
+  @override
+  Future<Result<List<SongsTableData>>> getSongsByIds(List<int> ids) async {
+    if (ids.isEmpty) return const Right([]);
+    try {
+      final songs = await (_db.select(_db.songsTable)..where((t) => t.id.isIn(ids))).get();
+      return Right(songs);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to fetch songs by ids', e));
+    }
+  }
+
+  @override
   Stream<Result<List<SongsTableData>>> watchFavorites() {
     try {
       return (_db.select(_db.songsTable)
-            ..where((t) => t.isFavorite.equals(true))
+            ..where((t) => t.isFavorite.equals(true) & t.isMissing.equals(false))
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
@@ -114,7 +145,7 @@ class MusicRepository implements IMusicRepository {
   Future<Result<List<SongsTableData>>> getFavorites() async {
     try {
       final songs = await (_db.select(_db.songsTable)
-            ..where((t) => t.isFavorite.equals(true))
+            ..where((t) => t.isFavorite.equals(true) & t.isMissing.equals(false))
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .get();
       return Right(songs);
@@ -127,7 +158,7 @@ class MusicRepository implements IMusicRepository {
   Stream<Result<List<SongsTableData>>> watchRecentlyPlayed({int limit = 20}) {
     try {
       return (_db.select(_db.songsTable)
-            ..where((t) => t.lastPlayed.isNotNull())
+            ..where((t) => t.lastPlayed.isNotNull() & t.isMissing.equals(false))
             ..orderBy([(t) => OrderingTerm(expression: t.lastPlayed, mode: OrderingMode.desc)])
             ..limit(limit))
           .watch()
@@ -266,7 +297,7 @@ class MusicRepository implements IMusicRepository {
   Stream<Result<List<SongsTableData>>> watchAlbumSongs(int albumId) {
     try {
       return (_db.select(_db.songsTable)
-            ..where((t) => t.albumId.equals(albumId))
+            ..where((t) => t.albumId.equals(albumId) & t.isMissing.equals(false))
             ..orderBy([(t) => OrderingTerm(expression: t.trackNumber)]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
@@ -280,6 +311,7 @@ class MusicRepository implements IMusicRepository {
   Future<Result<List<AlbumsTableData>>> getAlbums() async {
     try {
       final albums = await (_db.select(_db.albumsTable)
+            ..where((t) => t.songCount.isBiggerThanValue(0))
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .get();
       return Right(albums);
@@ -292,7 +324,7 @@ class MusicRepository implements IMusicRepository {
   Future<Result<List<SongsTableData>>> getAlbumSongs(int albumId) async {
     try {
       final songs = await (_db.select(_db.songsTable)
-            ..where((t) => t.albumId.equals(albumId))
+            ..where((t) => t.albumId.equals(albumId) & t.isMissing.equals(false))
             ..orderBy([(t) => OrderingTerm(expression: t.trackNumber)]))
           .get();
       return Right(songs);
@@ -305,7 +337,9 @@ class MusicRepository implements IMusicRepository {
   @override
   Stream<Result<List<ArtistsTableData>>> watchArtists() {
     try {
-      return (_db.select(_db.artistsTable)..orderBy([(t) => OrderingTerm(expression: t.name)]))
+      return (_db.select(_db.artistsTable)
+            ..where((t) => t.songCount.isBiggerThanValue(0))
+            ..orderBy([(t) => OrderingTerm(expression: t.name)]))
           .watch()
           .map((artists) => Right<AppFailure, List<ArtistsTableData>>(artists))
           .handleError((e) => Left<AppFailure, List<ArtistsTableData>>(DatabaseFailure('Failed to watch artists', e)));
@@ -317,7 +351,7 @@ class MusicRepository implements IMusicRepository {
   @override
   Stream<Result<List<SongsTableData>>> watchArtistSongs(int artistId) {
     try {
-      return (_db.select(_db.songsTable)..where((t) => t.artistId.equals(artistId)))
+      return (_db.select(_db.songsTable)..where((t) => t.artistId.equals(artistId) & t.isMissing.equals(false)))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
           .handleError((e) => Left<AppFailure, List<SongsTableData>>(DatabaseFailure('Failed to watch artist songs', e)));
@@ -329,7 +363,9 @@ class MusicRepository implements IMusicRepository {
   @override
   Future<Result<List<ArtistsTableData>>> getArtists() async {
     try {
-      final artists = await (_db.select(_db.artistsTable)..orderBy([(t) => OrderingTerm(expression: t.name)]))
+      final artists = await (_db.select(_db.artistsTable)
+            ..where((t) => t.songCount.isBiggerThanValue(0))
+            ..orderBy([(t) => OrderingTerm(expression: t.name)]))
           .get();
       return Right(artists);
     } catch (e) {
@@ -340,7 +376,7 @@ class MusicRepository implements IMusicRepository {
   @override
   Future<Result<List<SongsTableData>>> getArtistSongs(int artistId) async {
     try {
-      final songs = await (_db.select(_db.songsTable)..where((t) => t.artistId.equals(artistId)))
+      final songs = await (_db.select(_db.songsTable)..where((t) => t.artistId.equals(artistId) & t.isMissing.equals(false)))
           .get();
       return Right(songs);
     } catch (e) {
@@ -649,12 +685,72 @@ class MusicRepository implements IMusicRepository {
   @override
   Future<Result<int>> cleanupOrphanedSongs(Set<int> scannedSongIds) async {
     try {
-      int deletedCount = 0;
+      // NEVER delete or mark missing on an empty scan result (protect against unmounted SD cards, OS indexing, permission drops)
       if (scannedSongIds.isEmpty) {
-        deletedCount = await _db.delete(_db.songsTable).go();
-      } else {
-        deletedCount = await (_db.delete(_db.songsTable)..where((t) => t.id.isNotIn(scannedSongIds))).go();
+        return const Right(0);
       }
+
+      int markedMissingCount = 0;
+      await _db.transaction(() async {
+        // Soft delete: mark missing songs instead of hard deleting to preserve playlist entries, play history & favorites
+        markedMissingCount = await (_db.update(_db.songsTable)..where((t) => t.id.isNotIn(scannedSongIds))).write(
+          const SongsTableCompanion(isMissing: Value(true)),
+        );
+
+        // Ensure newly/currently scanned songs are marked active (not missing)
+        await (_db.update(_db.songsTable)..where((t) => t.id.isIn(scannedSongIds))).write(
+          const SongsTableCompanion(isMissing: Value(false)),
+        );
+
+        // Recalculate song counts using active (non-missing) songs
+        final albumCounts = await (_db.selectOnly(_db.songsTable)
+              ..addColumns([_db.songsTable.albumId, _db.songsTable.id.count()])
+              ..where(_db.songsTable.albumId.isNotNull() & _db.songsTable.isMissing.equals(false))
+              ..groupBy([_db.songsTable.albumId]))
+            .get();
+
+        final artistCounts = await (_db.selectOnly(_db.songsTable)
+              ..addColumns([_db.songsTable.artistId, _db.songsTable.id.count()])
+              ..where(_db.songsTable.artistId.isNotNull() & _db.songsTable.isMissing.equals(false))
+              ..groupBy([_db.songsTable.artistId]))
+            .get();
+
+        await _db.batch((batch) {
+          for (final row in albumCounts) {
+            final albumId = row.read(_db.songsTable.albumId);
+            final count = row.read(_db.songsTable.id.count());
+            if (albumId != null && count != null) {
+              batch.update(
+                _db.albumsTable,
+                AlbumsTableCompanion(songCount: Value(count)),
+                where: (t) => t.id.equals(albumId),
+              );
+            }
+          }
+          for (final row in artistCounts) {
+            final artistId = row.read(_db.songsTable.artistId);
+            final count = row.read(_db.songsTable.id.count());
+            if (artistId != null && count != null) {
+              batch.update(
+                _db.artistsTable,
+                ArtistsTableCompanion(songCount: Value(count)),
+                where: (t) => t.id.equals(artistId),
+              );
+            }
+          }
+        });
+      });
+
+      return Right(markedMissingCount);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to cleanup orphaned items', e));
+    }
+  }
+
+  @override
+  Future<Result<int>> hardDeleteMissingSongs() async {
+    try {
+      final deletedCount = await (_db.delete(_db.songsTable)..where((t) => t.isMissing.equals(true))).go();
 
       // Reconcile and cleanup orphaned albums and artists in single SQL queries
       await _db.customStatement(
@@ -664,47 +760,9 @@ class MusicRepository implements IMusicRepository {
         'DELETE FROM artists WHERE id NOT IN (SELECT DISTINCT artist_id FROM songs WHERE artist_id IS NOT NULL);',
       );
 
-      // Recalculate song counts using GROUP BY
-      final albumCounts = await (_db.selectOnly(_db.songsTable)
-            ..addColumns([_db.songsTable.albumId, _db.songsTable.id.count()])
-            ..where(_db.songsTable.albumId.isNotNull())
-            ..groupBy([_db.songsTable.albumId]))
-          .get();
-
-      final artistCounts = await (_db.selectOnly(_db.songsTable)
-            ..addColumns([_db.songsTable.artistId, _db.songsTable.id.count()])
-            ..where(_db.songsTable.artistId.isNotNull())
-            ..groupBy([_db.songsTable.artistId]))
-          .get();
-
-      await _db.batch((batch) {
-        for (final row in albumCounts) {
-          final albumId = row.read(_db.songsTable.albumId);
-          final count = row.read(_db.songsTable.id.count());
-          if (albumId != null && count != null) {
-            batch.update(
-              _db.albumsTable,
-              AlbumsTableCompanion(songCount: Value(count)),
-              where: (t) => t.id.equals(albumId),
-            );
-          }
-        }
-        for (final row in artistCounts) {
-          final artistId = row.read(_db.songsTable.artistId);
-          final count = row.read(_db.songsTable.id.count());
-          if (artistId != null && count != null) {
-            batch.update(
-              _db.artistsTable,
-              ArtistsTableCompanion(songCount: Value(count)),
-              where: (t) => t.id.equals(artistId),
-            );
-          }
-        }
-      });
-
       return Right(deletedCount);
     } catch (e) {
-      return Left(DatabaseFailure('Failed to cleanup orphaned items', e));
+      return Left(DatabaseFailure('Failed to hard delete missing songs', e));
     }
   }
 

@@ -23,6 +23,10 @@ abstract class IMusicRepository {
   });
 
   Future<Result<SongsTableData?>> getSongById(int id);
+  Future<Result<SongsTableData?>> getSongByPath(String path);
+  Future<Result<SongsTableData?>> getSongByUri(String uri);
+  Future<Result<List<SongsTableData>>> getSongsByIds(List<int> ids);
+  Future<Result<int>> hardDeleteMissingSongs();
 
   Stream<Result<List<SongsTableData>>> watchFavorites();
   Future<Result<List<SongsTableData>>> getFavorites();

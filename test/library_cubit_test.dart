@@ -150,6 +150,7 @@ void main() {
         durationMs: 1000,
         path: '/path/s.mp3',
         isFavorite: false,
+        isMissing: false,
         playCount: 0,
         lastPositionMs: 0,
       );

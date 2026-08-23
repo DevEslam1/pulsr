@@ -19,8 +19,8 @@ void main() {
   });
 
   group('MusicRepository & AppDatabase Tests', () {
-    test('AppDatabase schema migration to v3 creates indexes successfully', () async {
-      expect(db.schemaVersion, equals(3));
+    test('AppDatabase schema migration to v4 creates indexes successfully', () async {
+      expect(db.schemaVersion, equals(4));
 
       // Query pragma index_list for songs table
       final indexes = await db.customSelect('PRAGMA index_list("songs");').get();
@@ -30,6 +30,27 @@ void main() {
       expect(indexNames, contains('idx_songs_artist'));
       expect(indexNames, contains('idx_songs_album_id'));
       expect(indexNames, contains('idx_songs_is_favorite'));
+      expect(indexNames, contains('idx_songs_path'));
+      expect(indexNames, contains('idx_songs_is_missing'));
+    });
+
+    test('Empty scan does not wipe existing songs or playlists (Issue #1)', () async {
+      final song = SongsTableCompanion.insert(
+        id: const Value(10),
+        title: 'Preserved Track',
+        path: '/storage/music/preserved.mp3',
+        isFavorite: const Value(true),
+      );
+      await db.into(db.songsTable).insert(song);
+
+      // Run cleanup with empty scanned list (e.g. unmounted SD card or permission issue)
+      final res = await repository.cleanupOrphanedSongs({});
+      expect(res.isRight(), isTrue);
+
+      final songsRes = await repository.getAllSongs();
+      final songs = songsRes.getOrElse((_) => []);
+      expect(songs.length, equals(1));
+      expect(songs.first.id, equals(10));
     });
 
     test('Insert and retrieve songs from repository', () async {

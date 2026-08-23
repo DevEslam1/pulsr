@@ -76,8 +76,8 @@ class ArtworkUriResolver {
         songId,
         ArtworkType.AUDIO,
         format: ArtworkFormat.JPEG,
-        size: 300,
-        quality: 90,
+        size: 800,
+        quality: 95,
       );
       if (bytes != null && bytes.isNotEmpty) {
         await file.writeAsBytes(bytes);
@@ -109,8 +109,8 @@ class ArtworkUriResolver {
         albumId,
         ArtworkType.ALBUM,
         format: ArtworkFormat.JPEG,
-        size: 300,
-        quality: 90,
+        size: 800,
+        quality: 95,
       );
       if (bytes != null && bytes.isNotEmpty) {
         await file.writeAsBytes(bytes);
@@ -142,8 +142,8 @@ class ArtworkUriResolver {
         artistId,
         ArtworkType.ARTIST,
         format: ArtworkFormat.JPEG,
-        size: 300,
-        quality: 90,
+        size: 800,
+        quality: 95,
       );
       if (bytes != null && bytes.isNotEmpty) {
         await file.writeAsBytes(bytes);

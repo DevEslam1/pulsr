@@ -18,4 +18,6 @@ class PrefsKeys {
   static const String dynamicThemingEnabled = 'setting_dynamic_theming_enabled';
   static const String playerThemeMode = 'setting_player_theme_mode';
   static const String crossfadeDurationSec = 'setting_crossfade_duration_sec';
+  static const String playbackShuffle = 'setting_playback_shuffle';
+  static const String playbackRepeatMode = 'setting_playback_repeat_mode';
 }

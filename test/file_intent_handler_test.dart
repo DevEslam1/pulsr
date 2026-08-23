@@ -26,6 +26,7 @@ void main() {
       durationMs: 180000,
       path: '/fallback.mp3',
       isFavorite: false,
+      isMissing: false,
       playCount: 0,
       lastPositionMs: 0,
     ));
@@ -48,12 +49,13 @@ void main() {
         durationMs: 354000,
         path: '/storage/music/queen.mp3',
         isFavorite: false,
+        isMissing: false,
         playCount: 0,
         lastPositionMs: 0,
       );
 
-      when(() => repository.getAllSongs()).thenAnswer(
-        (_) async => const Right([existingSong]),
+      when(() => repository.getSongByPath('/storage/music/queen.mp3')).thenAnswer(
+        (_) async => const Right(existingSong),
       );
 
       await fileIntentHandler.handleAudioUri('file:///storage/music/queen.mp3');
@@ -62,8 +64,11 @@ void main() {
     });
 
     test('Plays external unregistered audio file with synthetic metadata', () async {
-      when(() => repository.getAllSongs()).thenAnswer(
-        (_) async => const Right([]),
+      when(() => repository.getSongByPath('/storage/downloads/new_podcast.flac')).thenAnswer(
+        (_) async => const Right(null),
+      );
+      when(() => repository.getSongByUri('/storage/downloads/new_podcast.flac')).thenAnswer(
+        (_) async => const Right(null),
       );
 
       await fileIntentHandler.handleAudioUri('/storage/downloads/new_podcast.flac');

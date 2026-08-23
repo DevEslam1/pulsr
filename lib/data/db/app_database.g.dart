@@ -101,6 +101,22 @@ class $SongsTableTable extends SongsTable
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('CHECK ("is_favorite" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _isMissingMeta =
+      const VerificationMeta('isMissing');
+  @override
+  late final GeneratedColumn<bool> isMissing = GeneratedColumn<bool>(
+      'is_missing', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_missing" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _replayGainMeta =
+      const VerificationMeta('replayGain');
+  @override
+  late final GeneratedColumn<double> replayGain = GeneratedColumn<double>(
+      'replay_gain', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
   static const VerificationMeta _playCountMeta =
       const VerificationMeta('playCount');
   @override
@@ -152,6 +168,8 @@ class $SongsTableTable extends SongsTable
         dateAdded,
         genre,
         isFavorite,
+        isMissing,
+        replayGain,
         playCount,
         lastPlayed,
         lastPositionMs,
@@ -239,6 +257,16 @@ class $SongsTableTable extends SongsTable
           isFavorite.isAcceptableOrUnknown(
               data['is_favorite']!, _isFavoriteMeta));
     }
+    if (data.containsKey('is_missing')) {
+      context.handle(_isMissingMeta,
+          isMissing.isAcceptableOrUnknown(data['is_missing']!, _isMissingMeta));
+    }
+    if (data.containsKey('replay_gain')) {
+      context.handle(
+          _replayGainMeta,
+          replayGain.isAcceptableOrUnknown(
+              data['replay_gain']!, _replayGainMeta));
+    }
     if (data.containsKey('play_count')) {
       context.handle(_playCountMeta,
           playCount.isAcceptableOrUnknown(data['play_count']!, _playCountMeta));
@@ -304,6 +332,10 @@ class $SongsTableTable extends SongsTable
           .read(DriftSqlType.string, data['${effectivePrefix}genre']),
       isFavorite: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_favorite'])!,
+      isMissing: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_missing'])!,
+      replayGain: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}replay_gain']),
       playCount: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}play_count'])!,
       lastPlayed: attachedDatabase.typeMapping
@@ -341,6 +373,8 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
   final int? dateAdded;
   final String? genre;
   final bool isFavorite;
+  final bool isMissing;
+  final double? replayGain;
   final int playCount;
   final int? lastPlayed;
   final int lastPositionMs;
@@ -362,6 +396,8 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       this.dateAdded,
       this.genre,
       required this.isFavorite,
+      required this.isMissing,
+      this.replayGain,
       required this.playCount,
       this.lastPlayed,
       required this.lastPositionMs,
@@ -401,6 +437,10 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       map['genre'] = Variable<String>(genre);
     }
     map['is_favorite'] = Variable<bool>(isFavorite);
+    map['is_missing'] = Variable<bool>(isMissing);
+    if (!nullToAbsent || replayGain != null) {
+      map['replay_gain'] = Variable<double>(replayGain);
+    }
     map['play_count'] = Variable<int>(playCount);
     if (!nullToAbsent || lastPlayed != null) {
       map['last_played'] = Variable<int>(lastPlayed);
@@ -443,6 +483,10 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       genre:
           genre == null && nullToAbsent ? const Value.absent() : Value(genre),
       isFavorite: Value(isFavorite),
+      isMissing: Value(isMissing),
+      replayGain: replayGain == null && nullToAbsent
+          ? const Value.absent()
+          : Value(replayGain),
       playCount: Value(playCount),
       lastPlayed: lastPlayed == null && nullToAbsent
           ? const Value.absent()
@@ -476,6 +520,8 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       dateAdded: serializer.fromJson<int?>(json['dateAdded']),
       genre: serializer.fromJson<String?>(json['genre']),
       isFavorite: serializer.fromJson<bool>(json['isFavorite']),
+      isMissing: serializer.fromJson<bool>(json['isMissing']),
+      replayGain: serializer.fromJson<double?>(json['replayGain']),
       playCount: serializer.fromJson<int>(json['playCount']),
       lastPlayed: serializer.fromJson<int?>(json['lastPlayed']),
       lastPositionMs: serializer.fromJson<int>(json['lastPositionMs']),
@@ -502,6 +548,8 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       'dateAdded': serializer.toJson<int?>(dateAdded),
       'genre': serializer.toJson<String?>(genre),
       'isFavorite': serializer.toJson<bool>(isFavorite),
+      'isMissing': serializer.toJson<bool>(isMissing),
+      'replayGain': serializer.toJson<double?>(replayGain),
       'playCount': serializer.toJson<int>(playCount),
       'lastPlayed': serializer.toJson<int?>(lastPlayed),
       'lastPositionMs': serializer.toJson<int>(lastPositionMs),
@@ -526,6 +574,8 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           Value<int?> dateAdded = const Value.absent(),
           Value<String?> genre = const Value.absent(),
           bool? isFavorite,
+          bool? isMissing,
+          Value<double?> replayGain = const Value.absent(),
           int? playCount,
           Value<int?> lastPlayed = const Value.absent(),
           int? lastPositionMs,
@@ -547,6 +597,8 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
         dateAdded: dateAdded.present ? dateAdded.value : this.dateAdded,
         genre: genre.present ? genre.value : this.genre,
         isFavorite: isFavorite ?? this.isFavorite,
+        isMissing: isMissing ?? this.isMissing,
+        replayGain: replayGain.present ? replayGain.value : this.replayGain,
         playCount: playCount ?? this.playCount,
         lastPlayed: lastPlayed.present ? lastPlayed.value : this.lastPlayed,
         lastPositionMs: lastPositionMs ?? this.lastPositionMs,
@@ -574,6 +626,9 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       genre: data.genre.present ? data.genre.value : this.genre,
       isFavorite:
           data.isFavorite.present ? data.isFavorite.value : this.isFavorite,
+      isMissing: data.isMissing.present ? data.isMissing.value : this.isMissing,
+      replayGain:
+          data.replayGain.present ? data.replayGain.value : this.replayGain,
       playCount: data.playCount.present ? data.playCount.value : this.playCount,
       lastPlayed:
           data.lastPlayed.present ? data.lastPlayed.value : this.lastPlayed,
@@ -604,6 +659,8 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           ..write('dateAdded: $dateAdded, ')
           ..write('genre: $genre, ')
           ..write('isFavorite: $isFavorite, ')
+          ..write('isMissing: $isMissing, ')
+          ..write('replayGain: $replayGain, ')
           ..write('playCount: $playCount, ')
           ..write('lastPlayed: $lastPlayed, ')
           ..write('lastPositionMs: $lastPositionMs, ')
@@ -614,27 +671,30 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
   }
 
   @override
-  int get hashCode => Object.hash(
-      id,
-      title,
-      artist,
-      artistId,
-      album,
-      albumId,
-      durationMs,
-      path,
-      uri,
-      trackNumber,
-      discNumber,
-      year,
-      dateAdded,
-      genre,
-      isFavorite,
-      playCount,
-      lastPlayed,
-      lastPositionMs,
-      artworkUri,
-      fileSize);
+  int get hashCode => Object.hashAll([
+        id,
+        title,
+        artist,
+        artistId,
+        album,
+        albumId,
+        durationMs,
+        path,
+        uri,
+        trackNumber,
+        discNumber,
+        year,
+        dateAdded,
+        genre,
+        isFavorite,
+        isMissing,
+        replayGain,
+        playCount,
+        lastPlayed,
+        lastPositionMs,
+        artworkUri,
+        fileSize
+      ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -654,6 +714,8 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           other.dateAdded == this.dateAdded &&
           other.genre == this.genre &&
           other.isFavorite == this.isFavorite &&
+          other.isMissing == this.isMissing &&
+          other.replayGain == this.replayGain &&
           other.playCount == this.playCount &&
           other.lastPlayed == this.lastPlayed &&
           other.lastPositionMs == this.lastPositionMs &&
@@ -677,6 +739,8 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
   final Value<int?> dateAdded;
   final Value<String?> genre;
   final Value<bool> isFavorite;
+  final Value<bool> isMissing;
+  final Value<double?> replayGain;
   final Value<int> playCount;
   final Value<int?> lastPlayed;
   final Value<int> lastPositionMs;
@@ -698,6 +762,8 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     this.dateAdded = const Value.absent(),
     this.genre = const Value.absent(),
     this.isFavorite = const Value.absent(),
+    this.isMissing = const Value.absent(),
+    this.replayGain = const Value.absent(),
     this.playCount = const Value.absent(),
     this.lastPlayed = const Value.absent(),
     this.lastPositionMs = const Value.absent(),
@@ -720,6 +786,8 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     this.dateAdded = const Value.absent(),
     this.genre = const Value.absent(),
     this.isFavorite = const Value.absent(),
+    this.isMissing = const Value.absent(),
+    this.replayGain = const Value.absent(),
     this.playCount = const Value.absent(),
     this.lastPlayed = const Value.absent(),
     this.lastPositionMs = const Value.absent(),
@@ -743,6 +811,8 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     Expression<int>? dateAdded,
     Expression<String>? genre,
     Expression<bool>? isFavorite,
+    Expression<bool>? isMissing,
+    Expression<double>? replayGain,
     Expression<int>? playCount,
     Expression<int>? lastPlayed,
     Expression<int>? lastPositionMs,
@@ -765,6 +835,8 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       if (dateAdded != null) 'date_added': dateAdded,
       if (genre != null) 'genre': genre,
       if (isFavorite != null) 'is_favorite': isFavorite,
+      if (isMissing != null) 'is_missing': isMissing,
+      if (replayGain != null) 'replay_gain': replayGain,
       if (playCount != null) 'play_count': playCount,
       if (lastPlayed != null) 'last_played': lastPlayed,
       if (lastPositionMs != null) 'last_position_ms': lastPositionMs,
@@ -789,6 +861,8 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       Value<int?>? dateAdded,
       Value<String?>? genre,
       Value<bool>? isFavorite,
+      Value<bool>? isMissing,
+      Value<double?>? replayGain,
       Value<int>? playCount,
       Value<int?>? lastPlayed,
       Value<int>? lastPositionMs,
@@ -810,6 +884,8 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       dateAdded: dateAdded ?? this.dateAdded,
       genre: genre ?? this.genre,
       isFavorite: isFavorite ?? this.isFavorite,
+      isMissing: isMissing ?? this.isMissing,
+      replayGain: replayGain ?? this.replayGain,
       playCount: playCount ?? this.playCount,
       lastPlayed: lastPlayed ?? this.lastPlayed,
       lastPositionMs: lastPositionMs ?? this.lastPositionMs,
@@ -866,6 +942,12 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     if (isFavorite.present) {
       map['is_favorite'] = Variable<bool>(isFavorite.value);
     }
+    if (isMissing.present) {
+      map['is_missing'] = Variable<bool>(isMissing.value);
+    }
+    if (replayGain.present) {
+      map['replay_gain'] = Variable<double>(replayGain.value);
+    }
     if (playCount.present) {
       map['play_count'] = Variable<int>(playCount.value);
     }
@@ -902,6 +984,8 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
           ..write('dateAdded: $dateAdded, ')
           ..write('genre: $genre, ')
           ..write('isFavorite: $isFavorite, ')
+          ..write('isMissing: $isMissing, ')
+          ..write('replayGain: $replayGain, ')
           ..write('playCount: $playCount, ')
           ..write('lastPlayed: $lastPlayed, ')
           ..write('lastPositionMs: $lastPositionMs, ')
@@ -3071,6 +3155,8 @@ typedef $$SongsTableTableCreateCompanionBuilder = SongsTableCompanion Function({
   Value<int?> dateAdded,
   Value<String?> genre,
   Value<bool> isFavorite,
+  Value<bool> isMissing,
+  Value<double?> replayGain,
   Value<int> playCount,
   Value<int?> lastPlayed,
   Value<int> lastPositionMs,
@@ -3093,6 +3179,8 @@ typedef $$SongsTableTableUpdateCompanionBuilder = SongsTableCompanion Function({
   Value<int?> dateAdded,
   Value<String?> genre,
   Value<bool> isFavorite,
+  Value<bool> isMissing,
+  Value<double?> replayGain,
   Value<int> playCount,
   Value<int?> lastPlayed,
   Value<int> lastPositionMs,
@@ -3153,6 +3241,12 @@ class $$SongsTableTableFilterComposer
 
   ColumnFilters<bool> get isFavorite => $composableBuilder(
       column: $table.isFavorite, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isMissing => $composableBuilder(
+      column: $table.isMissing, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get replayGain => $composableBuilder(
+      column: $table.replayGain, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<int> get playCount => $composableBuilder(
       column: $table.playCount, builder: (column) => ColumnFilters(column));
@@ -3225,6 +3319,12 @@ class $$SongsTableTableOrderingComposer
   ColumnOrderings<bool> get isFavorite => $composableBuilder(
       column: $table.isFavorite, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<bool> get isMissing => $composableBuilder(
+      column: $table.isMissing, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get replayGain => $composableBuilder(
+      column: $table.replayGain, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<int> get playCount => $composableBuilder(
       column: $table.playCount, builder: (column) => ColumnOrderings(column));
 
@@ -3296,6 +3396,12 @@ class $$SongsTableTableAnnotationComposer
   GeneratedColumn<bool> get isFavorite => $composableBuilder(
       column: $table.isFavorite, builder: (column) => column);
 
+  GeneratedColumn<bool> get isMissing =>
+      $composableBuilder(column: $table.isMissing, builder: (column) => column);
+
+  GeneratedColumn<double> get replayGain => $composableBuilder(
+      column: $table.replayGain, builder: (column) => column);
+
   GeneratedColumn<int> get playCount =>
       $composableBuilder(column: $table.playCount, builder: (column) => column);
 
@@ -3353,6 +3459,8 @@ class $$SongsTableTableTableManager extends RootTableManager<
             Value<int?> dateAdded = const Value.absent(),
             Value<String?> genre = const Value.absent(),
             Value<bool> isFavorite = const Value.absent(),
+            Value<bool> isMissing = const Value.absent(),
+            Value<double?> replayGain = const Value.absent(),
             Value<int> playCount = const Value.absent(),
             Value<int?> lastPlayed = const Value.absent(),
             Value<int> lastPositionMs = const Value.absent(),
@@ -3375,6 +3483,8 @@ class $$SongsTableTableTableManager extends RootTableManager<
             dateAdded: dateAdded,
             genre: genre,
             isFavorite: isFavorite,
+            isMissing: isMissing,
+            replayGain: replayGain,
             playCount: playCount,
             lastPlayed: lastPlayed,
             lastPositionMs: lastPositionMs,
@@ -3397,6 +3507,8 @@ class $$SongsTableTableTableManager extends RootTableManager<
             Value<int?> dateAdded = const Value.absent(),
             Value<String?> genre = const Value.absent(),
             Value<bool> isFavorite = const Value.absent(),
+            Value<bool> isMissing = const Value.absent(),
+            Value<double?> replayGain = const Value.absent(),
             Value<int> playCount = const Value.absent(),
             Value<int?> lastPlayed = const Value.absent(),
             Value<int> lastPositionMs = const Value.absent(),
@@ -3419,6 +3531,8 @@ class $$SongsTableTableTableManager extends RootTableManager<
             dateAdded: dateAdded,
             genre: genre,
             isFavorite: isFavorite,
+            isMissing: isMissing,
+            replayGain: replayGain,
             playCount: playCount,
             lastPlayed: lastPlayed,
             lastPositionMs: lastPositionMs,

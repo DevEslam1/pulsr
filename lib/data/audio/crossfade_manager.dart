@@ -1,5 +1,5 @@
-// lib/data/audio/crossfade_manager.dart
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:just_audio/just_audio.dart';
 import '../../core/utils/error_logger.dart';
 
@@ -33,11 +33,22 @@ class CrossfadeManager {
 
     await player.setVolume(from);
     while (_fadeId == fadeId) {
-      await Future.delayed(const Duration(milliseconds: 20));
+      await Future.delayed(const Duration(milliseconds: 50));
       if (_fadeId != fadeId) break;
       final elapsed = DateTime.now().difference(startTime).inMilliseconds.toDouble();
       final fraction = (elapsed / totalMs).clamp(0.0, 1.0);
-      final currentVol = from + (to - from) * fraction;
+
+      // Equal-power crossfade curve: constant perceived acoustic energy
+      final double curveFraction;
+      if (to > from) {
+        // Fade in
+        curveFraction = math.sin(fraction * (math.pi / 2));
+      } else {
+        // Fade out
+        curveFraction = 1.0 - math.cos((1.0 - fraction) * (math.pi / 2));
+      }
+
+      final currentVol = from + (to - from) * curveFraction;
       try {
         await player.setVolume(currentVol.clamp(0.0, 1.0));
       } catch (e, st) {

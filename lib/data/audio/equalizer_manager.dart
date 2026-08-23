@@ -164,6 +164,13 @@ class EqualizerManager {
           }
         }
       }
+      if (!enabled) {
+        await _effectsChannel.setVolumeBoost(0);
+        await _effectsChannel.setBassBoost(0);
+      } else {
+        await setVolumeBoost(volumeBoost);
+        await setBassBoost(currentPreset.bassBoost);
+      }
     }
     await _savePreferences();
   }
@@ -243,9 +250,12 @@ class EqualizerManager {
           }
         }
       }
-      if (profile.preampGain != 0.0) {
-        final normalizedPreamp = ((profile.preampGain.abs()) / 12.0).clamp(0.0, 1.0);
+      if (profile.preampGain > 0.0) {
+        final normalizedPreamp = (profile.preampGain / 12.0).clamp(0.0, 1.0);
         await setVolumeBoost(normalizedPreamp);
+      } else {
+        // Negative preamp gain provides headroom for EQ boosts — do not amplify volume
+        await setVolumeBoost(0.0);
       }
       await setBassBoost(profile.bassBoost);
     }

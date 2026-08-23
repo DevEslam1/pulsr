@@ -24,13 +24,18 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   static Future<void> _createIndexes(Future<void> Function(String) executeSql) async {
     await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_title ON songs (title);');
     await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_artist ON songs (artist);');
     await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_album_id ON songs (album_id);');
+    await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_artist_id ON songs (artist_id);');
+    await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_path ON songs (path);');
+    await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_genre ON songs (genre);');
+    await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_year ON songs (year);');
     await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_is_favorite ON songs (is_favorite);');
+    await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_is_missing ON songs (is_missing);');
     await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_last_played ON songs (last_played);');
     await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_date_added ON songs (date_added);');
     await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_play_count ON songs (play_count);');
@@ -53,6 +58,11 @@ class AppDatabase extends _$AppDatabase {
         await m.createTable(excludedFoldersTable);
       }
       if (from < 3) {
+        await _createIndexes(customStatement);
+      }
+      if (from < 4) {
+        await m.addColumn(songsTable, songsTable.isMissing);
+        await m.addColumn(songsTable, songsTable.replayGain);
         await _createIndexes(customStatement);
       }
     },

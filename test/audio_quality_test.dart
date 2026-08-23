@@ -15,6 +15,7 @@ void main() {
         path: '/storage/emulated/0/Music/track_24bit_96k.flac',
         fileSize: 40 * 1024 * 1024, // 40MB
         isFavorite: false,
+        isMissing: false,
         playCount: 0,
         lastPositionMs: 0,
       );
@@ -37,6 +38,7 @@ void main() {
         path: '/storage/emulated/0/Music/track.flac',
         fileSize: 20 * 1024 * 1024, // 20MB -> ~838 kbps
         isFavorite: false,
+        isMissing: false,
         playCount: 0,
         lastPositionMs: 0,
       );
@@ -59,6 +61,7 @@ void main() {
         path: '/storage/emulated/0/Music/track.mp3',
         fileSize: 9600000, // 9.6MB -> 320 kbps
         isFavorite: false,
+        isMissing: false,
         playCount: 0,
         lastPositionMs: 0,
       );
@@ -87,6 +90,7 @@ void main() {
         path: '/storage/emulated/0/Music/track.flac',
         fileSize: 35000000,
         isFavorite: false,
+        isMissing: false,
         playCount: 0,
         lastPositionMs: 0,
       );
@@ -116,6 +120,7 @@ void main() {
         path: '/storage/emulated/0/Music/track.dsf',
         fileSize: 100000000,
         isFavorite: false,
+        isMissing: false,
         playCount: 0,
         lastPositionMs: 0,
       );

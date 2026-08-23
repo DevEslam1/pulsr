@@ -75,11 +75,27 @@ subprojects {
             val jvmTarget = compilerOptions.javaClass.getMethod("getJvmTarget").invoke(compilerOptions)
             val setMethod = jvmTarget.javaClass.getMethod("set", Object::class.java)
             setMethod.invoke(jvmTarget, org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+
+            try {
+                val langVersion = compilerOptions.javaClass.getMethod("getLanguageVersion").invoke(compilerOptions)
+                val setLang = langVersion.javaClass.getMethod("set", Object::class.java)
+                setLang.invoke(langVersion, org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
+
+                val apiVersion = compilerOptions.javaClass.getMethod("getApiVersion").invoke(compilerOptions)
+                val setApi = apiVersion.javaClass.getMethod("set", Object::class.java)
+                setApi.invoke(apiVersion, org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
+            } catch (_: Throwable) {}
         } catch (_: Throwable) {
             try {
                 val kotlinOptions = this.javaClass.getMethod("getKotlinOptions").invoke(this)
                 val setJvmTarget = kotlinOptions.javaClass.getMethod("setJvmTarget", String::class.java)
                 setJvmTarget.invoke(kotlinOptions, "17")
+                try {
+                    val setLang = kotlinOptions.javaClass.getMethod("setLanguageVersion", String::class.java)
+                    setLang.invoke(kotlinOptions, "2.0")
+                    val setApi = kotlinOptions.javaClass.getMethod("setApiVersion", String::class.java)
+                    setApi.invoke(kotlinOptions, "2.0")
+                } catch (_: Throwable) {}
             } catch (_: Throwable) {}
         }
     }
