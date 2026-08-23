@@ -134,8 +134,8 @@ class PlaylistImportUseCase {
 
       // Create new playlist with the given name
       final createRes = await _repository.createPlaylist(playlistName);
-      return createRes.fold(
-        (failure) => Left(failure),
+      return await createRes.fold(
+        (failure) async => Left(failure),
         (playlistId) async {
           if (matchedSongIds.isNotEmpty) {
             await _repository.addSongsToPlaylist(playlistId, matchedSongIds);
