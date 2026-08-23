@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="styles.css?v=3.2.0">
+  <link rel="stylesheet" href="styles.css?v=3.3.0">
 </head>
 <body>
   <!-- Navigation Bar -->
@@ -653,6 +653,44 @@
           </div>
         </div>
       </div>
+
+      <!-- All Release Versions Archive Container -->
+      <div style="margin-top: 56px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h3 style="font-size: 1.35rem; color: #fff; margin-bottom: 4px;">📦 Release Versions & Downloads</h3>
+            <p style="font-size: 0.88rem; color: var(--text-secondary);">Direct download buttons for every published Pulsr release:</p>
+          </div>
+          <a href="https://github.com/DevEslam1/pulsr/releases" target="_blank" class="btn btn-secondary btn-sm" style="border-radius: var(--radius-full);">
+            View All on GitHub ↗
+          </a>
+        </div>
+
+        <div class="versions-list" id="versionsArchiveList">
+          <!-- Populated dynamically by app.js from GitHub Releases API -->
+          <div class="version-release-row">
+            <div class="version-release-header">
+              <span class="version-tag-pill">v1.0.0</span>
+              <span class="version-badge-latest">⚡ Latest Release</span>
+              <span class="version-date-text">Initial Public Release</span>
+            </div>
+            <div class="version-downloads-actions">
+              <a href="https://github.com/DevEslam1/pulsr/releases/latest" target="_blank" class="version-apk-btn primary-apk">
+                ⬇ Universal APK
+              </a>
+              <a href="https://github.com/DevEslam1/pulsr/releases/latest" target="_blank" class="version-apk-btn">
+                ⬇ ARM64 (v8a)
+              </a>
+              <a href="https://github.com/DevEslam1/pulsr/releases/latest" target="_blank" class="version-apk-btn">
+                ⬇ ARMv7 (a7v)
+              </a>
+              <a href="https://github.com/DevEslam1/pulsr/releases/latest" target="_blank" class="version-apk-btn">
+                ⬇ x86_64
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -760,6 +798,6 @@
     </div>
   </footer>
 
-  <script src="app.js?v=3.2.0"></script>
+  <script src="app.js?v=3.3.0"></script>
 </body>
 </html>

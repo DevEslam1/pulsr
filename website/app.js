@@ -613,6 +613,73 @@ document.addEventListener('DOMContentLoaded', () => {
           });
         }
 
+        // Populate All Versions Archive List
+        const archiveList = document.getElementById('versionsArchiveList');
+        if (archiveList && Array.isArray(releases) && releases.length > 0) {
+          archiveList.innerHTML = '';
+          releases.forEach((rel, index) => {
+            const tag = rel.tag_name || 'v1.0.0';
+            const isLatest = index === 0;
+            const pubDate = rel.published_at ? new Date(rel.published_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+            
+            let apkButtonsHtml = '';
+            if (rel.assets && Array.isArray(rel.assets)) {
+              const apkAssets = rel.assets.filter(a => (a.name || '').toLowerCase().endsWith('.apk'));
+              
+              if (apkAssets.length > 0) {
+                apkAssets.forEach(apk => {
+                  const name = apk.name.toLowerCase();
+                  const sizeMb = apk.size ? ` (${(apk.size / (1024 * 1024)).toFixed(1)} MB)` : '';
+                  let label = '⬇ APK' + sizeMb;
+                  let isPrimary = false;
+
+                  if (name.includes('arm64') || name.includes('v8a')) {
+                    label = '⬇ ARM64' + sizeMb;
+                  } else if (name.includes('armv7') || name.includes('v7a') || name.includes('armeabi')) {
+                    label = '⬇ ARMv7' + sizeMb;
+                  } else if (name.includes('x86_64') || name.includes('x64')) {
+                    label = '⬇ x86_64' + sizeMb;
+                  } else {
+                    label = '⬇ Universal' + sizeMb;
+                    isPrimary = true;
+                  }
+
+                  apkButtonsHtml += `
+                    <a href="${apk.browser_download_url}" target="_blank" class="version-apk-btn ${isPrimary ? 'primary-apk' : ''}">
+                      ${label}
+                    </a>
+                  `;
+                });
+              }
+            }
+
+            if (!apkButtonsHtml) {
+              apkButtonsHtml = `
+                <a href="${rel.html_url}" target="_blank" class="version-apk-btn primary-apk">
+                  ⬇ Download on GitHub
+                </a>
+              `;
+            }
+
+            const row = document.createElement('div');
+            row.className = 'version-release-row';
+            row.innerHTML = `
+              <div class="version-release-header">
+                <span class="version-tag-pill">${tag}</span>
+                ${isLatest ? '<span class="version-badge-latest">⚡ Latest Release</span>' : ''}
+                ${pubDate ? `<span class="version-date-text">${pubDate}</span>` : ''}
+              </div>
+              <div class="version-downloads-actions">
+                ${apkButtonsHtml}
+                <a href="${rel.html_url}" target="_blank" class="version-apk-btn" style="color: var(--text-muted);" title="View changelog on GitHub">
+                  Notes ↗
+                </a>
+              </div>
+            `;
+            archiveList.appendChild(row);
+          });
+        }
+
         // Sum downloads across all releases
         releases.forEach(rel => {
           if (rel.assets && Array.isArray(rel.assets)) {
