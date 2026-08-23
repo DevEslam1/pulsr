@@ -247,20 +247,22 @@ flutter test
 
 ### 5. Build Release Artifacts
 
+> **Production builds must pass `--dart-define=ENV=prod`** so the Dart layer runs in production mode (correct app title, reduced Sentry trace sampling). Sentry only initializes when a DSN is supplied via `--dart-define=SENTRY_DSN=<your-dsn>`; omit it to build without crash reporting. The Gradle `--flavor prod` alone does **not** set the Dart environment.
+
 #### Build Universal APK
 ```bash
-flutter build apk --flavor prod --release
+flutter build apk --flavor prod --release --dart-define=ENV=prod --dart-define=SENTRY_DSN=$SENTRY_DSN
 ```
 *Output: `build/app/outputs/flutter-apk/app-prod-release.apk`*
 
 #### Build Split Per-ABI APKs (Smaller file size)
 ```bash
-flutter build apk --flavor prod --release --split-per-abi
+flutter build apk --flavor prod --release --split-per-abi --dart-define=ENV=prod --dart-define=SENTRY_DSN=$SENTRY_DSN
 ```
 
 #### Build Google Play App Bundle (AAB)
 ```bash
-flutter build appbundle --flavor prod --release
+flutter build appbundle --flavor prod --release --dart-define=ENV=prod --dart-define=SENTRY_DSN=$SENTRY_DSN
 ```
 *Output: `build/app/outputs/bundle/prodRelease/app-prod-release.aab`*
 
@@ -274,12 +276,14 @@ Pulsr adheres strictly to Google Play Store data safety and permission guideline
 |---|---|---|---|
 | `READ_MEDIA_AUDIO` | API 33+ (Android 13+) | Storage | Discover and index user audio files locally. |
 | `READ_EXTERNAL_STORAGE` | API &le; 32 (Legacy) | Storage | Read audio files on older Android devices. |
+| `WRITE_EXTERNAL_STORAGE` | API &le; 29 (Legacy) | Storage | Save edited tags / exported artwork on pre-scoped-storage devices. |
 | `FOREGROUND_SERVICE` | API 28+ | Background | Continuous audio playback while the screen is locked. |
 | `FOREGROUND_SERVICE_MEDIA_PLAYBACK` | API 34+ (Android 14+) | Background | Mandated by Android 14 for media player services. |
 | `POST_NOTIFICATIONS` | API 33+ | Notifications| Display MediaStyle playback controls and scrub bars. |
 | `RECORD_AUDIO` | All | Optional | Live audio visualizer DSP analysis *(Denied fallback: synthetic waveforms)*. |
+| `MODIFY_AUDIO_SETTINGS` | All | Playback | Configure the equalizer and audio output session. |
+| `WRITE_SETTINGS` | All | Optional | Set a track as the system ringtone *(user-initiated only)*. |
 | `WAKE_LOCK` | All | Playback | Prevents CPU sleep while streaming local audio. |
-| `VIBRATE` | All | Haptics | Tactile feedback on button taps and slider adjustments. |
 
 ---
 

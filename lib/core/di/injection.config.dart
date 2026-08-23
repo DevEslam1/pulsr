@@ -9,9 +9,13 @@
 // coverage:ignore-file
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+import 'dart:io' as _i497;
+
 import 'package:get_it/get_it.dart' as _i174;
 import 'package:injectable/injectable.dart' as _i526;
 import 'package:pulsr/core/services/file_intent_handler.dart' as _i134;
+import 'package:pulsr/core/services/lrclib_service.dart' as _i621;
+import 'package:pulsr/core/services/scrobbler_service.dart' as _i629;
 import 'package:pulsr/core/theme/dynamic_theme_cubit.dart' as _i401;
 import 'package:pulsr/data/audio/audio_handler.dart' as _i366;
 import 'package:pulsr/data/db/app_database.dart' as _i682;
@@ -52,6 +56,7 @@ extension GetItInjectableX on _i174.GetIt {
       environment,
       environmentFilter,
     );
+    gh.singleton<_i629.ScrobblerService>(() => _i629.ScrobblerService());
     gh.singleton<_i401.DynamicThemeCubit>(() => _i401.DynamicThemeCubit());
     gh.singleton<_i682.AppDatabase>(() => _i682.AppDatabase());
     gh.singleton<_i265.PlaylistExportUseCase>(
@@ -65,6 +70,8 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i320.IMusicRepository>(),
           gh<_i399.SmartPlaylistEngine>(),
         ));
+    gh.singleton<_i621.LrclibService>(
+        () => _i621.LrclibService(client: gh<_i497.HttpClient>()));
     gh.singleton<_i483.MediaScannerService>(
         () => _i483.MediaScannerService(gh<_i320.IMusicRepository>()));
     gh.singleton<_i545.ExportBackupUseCase>(
@@ -109,13 +116,6 @@ extension GetItInjectableX on _i174.GetIt {
           searchUseCase: gh<_i644.SearchMusicUseCase>(),
           folderUseCases: gh<_i1017.FolderUseCases>(),
         ));
-    gh.lazySingleton<_i147.PlayerCubit>(() => _i147.PlayerCubit(
-          audioHandler: gh<_i366.PulsrAudioHandler>(),
-          repository: gh<_i320.IMusicRepository>(),
-          toggleFavoriteUseCase: gh<_i800.ToggleFavoriteUseCase>(),
-          settingsCubit: gh<_i41.SettingsCubit>(),
-          widgetService: gh<_i42.WidgetService>(),
-        ));
     gh.singleton<_i41.SettingsCubit>(() =>
         _i41.SettingsCubit(scannerService: gh<_i483.MediaScannerService>()));
     gh.factory<_i633.LibraryCubit>(() => _i633.LibraryCubit(
@@ -127,6 +127,14 @@ extension GetItInjectableX on _i174.GetIt {
           getFavoritesUseCase: gh<_i117.GetFavoritesUseCase>(),
           toggleFavoriteUseCase: gh<_i800.ToggleFavoriteUseCase>(),
           folderUseCases: gh<_i1017.FolderUseCases>(),
+        ));
+    gh.lazySingleton<_i147.PlayerCubit>(() => _i147.PlayerCubit(
+          audioHandler: gh<_i366.PulsrAudioHandler>(),
+          repository: gh<_i320.IMusicRepository>(),
+          toggleFavoriteUseCase: gh<_i800.ToggleFavoriteUseCase>(),
+          settingsCubit: gh<_i41.SettingsCubit>(),
+          widgetService: gh<_i42.WidgetService>(),
+          scrobblerService: gh<_i629.ScrobblerService>(),
         ));
     gh.singleton<_i134.FileIntentHandler>(() => _i134.FileIntentHandler(
           gh<_i320.IMusicRepository>(),

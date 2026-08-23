@@ -6,7 +6,7 @@ This document contains the release compliance audit, permission justifications, 
 
 ## 1. Target SDK & Platform Compliance
 - **Target SDK**: `34` (Android 14) / `35` (Android 15 ready).
-- **Min SDK**: `21` (Android 5.0 Lollipop).
+- **Min SDK**: `24` (Android 7.0 Nougat).
 - **64-bit Compliance**: Native libraries (`libsqlite3`, etc.) include `arm64-v8a` and `x86_64` ABIs.
 - **R8 / ProGuard Minification**: Configured with keep rules for Drift, Jaudiotagger, JustAudio, AudioService, and Sentry.
 - **App Bundle (AAB)**: Supported with resource splitting and keystore fail-fast verification.
@@ -19,12 +19,14 @@ This document contains the release compliance audit, permission justifications, 
 |---|---|---|---|
 | `READ_MEDIA_AUDIO` | API 33+ | Storage | Required to discover, index, and play user-stored audio files. |
 | `READ_EXTERNAL_STORAGE` | API <= 32 | Storage (Legacy) | Required to discover, index, and play audio files on older Android versions. |
+| `WRITE_EXTERNAL_STORAGE` | API <= 29 | Storage (Legacy) | Persist edited audio tags and exported artwork on pre-scoped-storage devices. |
 | `FOREGROUND_SERVICE` | API 28+ | Background | Essential for continuous background audio playback while the screen is locked or another app is open. |
 | `FOREGROUND_SERVICE_MEDIA_PLAYBACK` | API 34+ | Background (A14+) | Mandated by Android 14+ for foreground services handling media playback. |
 | `POST_NOTIFICATIONS` | API 33+ | Notifications | Displaying interactive Now Playing media controls on the lock screen and notification shade. |
 | `RECORD_AUDIO` | All | Optional Feature | Required solely for the live audio visualizer DSP analysis. If denied, Pulsr gracefully falls back to synthetic simulated waveforms with zero functionality loss. |
+| `MODIFY_AUDIO_SETTINGS` | All | Playback | Required to configure the 10-band equalizer and manage the audio output session. |
+| `WRITE_SETTINGS` | All | Optional Feature | Used only for the user-initiated "Set as Ringtone" action; requires the system Modify-Settings grant and is never written silently. |
 | `WAKE_LOCK` | All | Core | Prevents CPU sleep while processing audio playback streams. |
-| `VIBRATE` | All | UX | Subtle haptic feedback on UI taps and slider scrubs. |
 
 ---
 
