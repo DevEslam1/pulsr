@@ -1274,11 +1274,57 @@ a {
   }
 
   .hero-title {
-    font-size: 2.5rem;
+    font-size: 2.35rem;
+    line-height: 1.2;
   }
 
   .features-grid {
     grid-template-columns: 1fr;
+  }
+
+  .sandbox-grid {
+    grid-template-columns: 1fr;
+    padding: 20px 12px;
+    gap: 20px;
+    border-radius: var(--radius-lg);
+  }
+
+  .eq-curve-card {
+    gap: 14px;
+    width: 100%;
+  }
+
+  .eq-canvas-wrapper {
+    height: 140px;
+  }
+
+  .eq-sliders-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 2px;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+  }
+
+  .eq-band-col {
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .eq-slider {
+    width: 14px;
+    height: 90px;
+  }
+
+  .eq-band-db {
+    font-size: 0.58rem;
+    letter-spacing: -0.04em;
+  }
+
+  .eq-band-freq {
+    font-size: 0.58rem;
   }
 
   .footer-grid {

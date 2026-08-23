@@ -362,7 +362,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Draw 0dB reference line
     const zeroY = h / 2;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, zeroY);
@@ -372,7 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Grid lines for +6dB / -6dB
     const dbScale = (h / 2) / 12; // 12dB max range
 
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
     ctx.beginPath();
     ctx.moveTo(0, zeroY - 6 * dbScale);
     ctx.lineTo(w, zeroY - 6 * dbScale);
@@ -380,58 +380,81 @@ document.addEventListener('DOMContentLoaded', () => {
     ctx.lineTo(w, zeroY + 6 * dbScale);
     ctx.stroke();
 
-    // Calculate curve points
+    // Calculate curve points aligned to slider column centers
     const points = [];
-    const step = w / (currentGains.length - 1);
+    const sliderCols = document.querySelectorAll('.eq-band-col');
+    const canvasRect = eqCanvas.getBoundingClientRect();
 
     currentGains.forEach((gain, i) => {
-      const x = i * step;
-      const y = zeroY - (gain * dbScale);
+      let x = (i / (currentGains.length - 1)) * w;
+      if (sliderCols.length === currentGains.length && canvasRect.width > 0) {
+        const colRect = sliderCols[i].getBoundingClientRect();
+        x = colRect.left + (colRect.width / 2) - canvasRect.left;
+      }
+      x = Math.max(0, Math.min(w, x));
+      const y = Math.max(10, Math.min(h - 10, zeroY - (gain * dbScale)));
       points.push({ x, y });
     });
 
-    // Draw Smooth Bezier Spline
+    if (points.length < 2) return;
+
+    // Draw Smooth Catmull-Rom Spline (passes exactly through all nodes)
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
 
     for (let i = 0; i < points.length - 1; i++) {
-      const xc = (points[i].x + points[i + 1].x) / 2;
-      const yc = (points[i].y + points[i + 1].y) / 2;
-      ctx.quadraticCurveTo(points[i].x, points[i].y, xc, yc);
-    }
-    ctx.lineTo(points[points.length - 1].x, points[points.length - 1].y);
+      const p0 = i > 0 ? points[i - 1] : points[i];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = (i < points.length - 2) ? points[i + 2] : p2;
 
-    // Gradient Stroke
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+    }
+
+    // Gradient Stroke for Curve
     const strokeGrad = ctx.createLinearGradient(0, 0, w, 0);
     strokeGrad.addColorStop(0, '#00f2ff');
     strokeGrad.addColorStop(0.5, '#9b9ef5');
     strokeGrad.addColorStop(1, '#ff4081');
 
     ctx.strokeStyle = strokeGrad;
-    ctx.lineWidth = 3;
-    ctx.shadowColor = 'rgba(155, 158, 245, 0.6)';
-    ctx.shadowBlur = 12;
+    ctx.lineWidth = 3.5;
+    ctx.shadowColor = 'rgba(0, 242, 255, 0.6)';
+    ctx.shadowBlur = 10;
     ctx.stroke();
 
-    // Draw fill under curve
-    ctx.lineTo(w, h);
-    ctx.lineTo(0, h);
+    // Fill under curve
+    ctx.lineTo(points[points.length - 1].x, h);
+    ctx.lineTo(points[0].x, h);
     ctx.closePath();
 
     const fillGrad = ctx.createLinearGradient(0, 0, 0, h);
-    fillGrad.addColorStop(0, 'rgba(155, 158, 245, 0.25)');
+    fillGrad.addColorStop(0, 'rgba(155, 158, 245, 0.22)');
     fillGrad.addColorStop(1, 'rgba(155, 158, 245, 0.0)');
     ctx.fillStyle = fillGrad;
     ctx.shadowBlur = 0;
     ctx.fill();
 
-    // Draw control nodes
+    // Draw control nodes directly on top of the spline
     points.forEach((pt) => {
+      // Outer glow
       ctx.beginPath();
-      ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
-      ctx.fillStyle = '#fff';
+      ctx.arc(pt.x, pt.y, 6, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0, 242, 255, 0.35)';
+      ctx.fill();
+
+      // Inner solid node
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
       ctx.shadowColor = '#00f2ff';
-      ctx.shadowBlur = 8;
+      ctx.shadowBlur = 6;
       ctx.fill();
     });
   }
