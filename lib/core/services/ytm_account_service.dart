@@ -6,8 +6,10 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../domain/models/lyrics_line.dart';
 import '../../domain/models/ytm_track.dart';
 import '../utils/error_logger.dart';
+import '../utils/lrc_parser.dart';
 
 class YtmAccountPlaylist {
   final String playlistId;
@@ -277,6 +279,118 @@ class YtmAccountService {
       debugPrint('[YTM_ACCOUNT] Failed to fetch personalized home feed: $e');
     }
     return [];
+  }
+
+  /// Fetches native lyrics from YouTube Music for a given [videoId].
+  Future<LyricsResult?> fetchYtmLyrics(String videoId) async {
+    if (videoId.isEmpty) return null;
+    final headers = _buildHeaders();
+
+    try {
+      // 1. Query Next endpoint to find lyrics browse ID
+      final nextBody = jsonEncode({
+        'context': {
+          'client': {
+            'clientName': 'WEB_REMIX',
+            'clientVersion': '1.20240417.01.00',
+            'hl': 'en',
+            'gl': 'US',
+          }
+        },
+        'videoId': videoId,
+      });
+
+      final nextRes = await http
+          .post(Uri.parse('https://music.youtube.com/youtubei/v1/next?prettyPrint=false'),
+              headers: headers, body: nextBody)
+          .timeout(const Duration(seconds: 8));
+
+      if (nextRes.statusCode != 200) return null;
+      final nextJson = jsonDecode(nextRes.body) as Map<String, dynamic>;
+
+      String? lyricsBrowseId;
+      void findLyricsBrowseId(dynamic node) {
+        if (lyricsBrowseId != null) return;
+        if (node is Map<String, dynamic>) {
+          if (node.containsKey('tabRenderer')) {
+            final tab = node['tabRenderer'] as Map<String, dynamic>;
+            final title = tab['title'] as String? ?? '';
+            final endpoint = tab['endpoint']?['browseEndpoint'] as Map<String, dynamic>?;
+            final bId = endpoint?['browseId'] as String?;
+            if (title.toLowerCase().contains('lyric') || (bId != null && bId.startsWith('MPLYt'))) {
+              lyricsBrowseId = bId;
+              return;
+            }
+          }
+          for (final val in node.values) {
+            findLyricsBrowseId(val);
+          }
+        } else if (node is List) {
+          for (final item in node) {
+            findLyricsBrowseId(item);
+          }
+        }
+      }
+
+      findLyricsBrowseId(nextJson);
+      if (lyricsBrowseId == null) return null;
+
+      // 2. Fetch the lyrics browse payload
+      final browseBody = jsonEncode({
+        'context': {
+          'client': {
+            'clientName': 'WEB_REMIX',
+            'clientVersion': '1.20240417.01.00',
+            'hl': 'en',
+            'gl': 'US',
+          }
+        },
+        'browseId': lyricsBrowseId,
+      });
+
+      final browseRes = await http
+          .post(Uri.parse(_innertubeBrowseUrl), headers: headers, body: browseBody)
+          .timeout(const Duration(seconds: 8));
+
+      if (browseRes.statusCode != 200) return null;
+      final browseJson = jsonDecode(browseRes.body) as Map<String, dynamic>;
+
+      final List<LyricsLine> lines = [];
+      void parseLyrics(dynamic node) {
+        if (node is Map<String, dynamic>) {
+          if (node.containsKey('musicDescriptionShelfRenderer')) {
+            final shelf = node['musicDescriptionShelfRenderer'] as Map<String, dynamic>;
+            final desc = shelf['description'];
+            String plainText = '';
+            if (desc is Map && desc.containsKey('runs')) {
+              final runs = desc['runs'] as List<dynamic>;
+              plainText = runs.map((r) => r['text'] as String? ?? '').join();
+            } else if (desc is String) {
+              plainText = desc;
+            }
+            if (plainText.isNotEmpty) {
+              lines.addAll(LrcParser.parsePlainText(plainText, source: LyricsSource.ytmusic));
+            }
+            return;
+          }
+          for (final val in node.values) {
+            parseLyrics(val);
+          }
+        } else if (node is List) {
+          for (final item in node) {
+            parseLyrics(item);
+          }
+        }
+      }
+
+      parseLyrics(browseJson);
+      if (lines.isNotEmpty) {
+        return LyricsResult(lines: lines, source: LyricsSource.ytmusic);
+      }
+    } catch (e) {
+      debugPrint('[YTM_LYRICS] Error fetching YTM lyrics: $e');
+    }
+    return null;
   }
 
   /// Fetches the user's private Liked Music playlist (`FEmusic_liked_videos`).

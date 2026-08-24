@@ -82,12 +82,14 @@ class _LyricsViewState extends State<LyricsView> {
       LyricsSource.embedded => 'Embedded',
       LyricsSource.externalLrc => 'LRC File',
       LyricsSource.lrclib => 'LRCLIB Synced',
+      LyricsSource.ytmusic => 'YouTube Music',
       LyricsSource.none => '',
     };
     final IconData icon = switch (source) {
       LyricsSource.embedded => Icons.music_note,
       LyricsSource.externalLrc => Icons.subtitles_outlined,
       LyricsSource.lrclib => Icons.cloud_done_rounded,
+      LyricsSource.ytmusic => Icons.lyrics_rounded,
       LyricsSource.none => Icons.music_note,
     };
 

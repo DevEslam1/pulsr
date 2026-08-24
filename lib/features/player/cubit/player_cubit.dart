@@ -5,8 +5,11 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/di/injection.dart';
 import '../../../core/router/app_router.dart';
+import '../../../core/services/lrclib_service.dart';
 import '../../../core/services/scrobbler_service.dart';
+import '../../../core/services/ytm_account_service.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/lrc_parser.dart';
 import '../../../data/audio/audio_handler.dart';
@@ -248,23 +251,41 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   Future<void> _loadLyricsForSong(SongsTableData song) async {
     if (isClosed) return;
-    // A YouTube row's path is a ytmusic:// sentinel, not a file on disk, so
-    // LrcParser (which reads sidecar/embedded lyrics off the path) has nothing
-    // to resolve. Clear lyrics and skip the lookup.
-    if (song.source != SongSource.local) {
-      emit(state.copyWith(
-        isLoadingLyrics: false,
-        lyrics: [],
-        lyricsSource: LyricsSource.none,
-      ));
-      return;
-    }
     emit(state.copyWith(
       isLoadingLyrics: true,
       lyrics: [],
       lyricsSource: LyricsSource.none,
     ));
-    final lyricsResult = await LrcParser.resolveLyrics(song.path);
+
+    LyricsResult? lyricsResult;
+
+    // 1. For local files, check embedded metadata and sidecar .lrc files
+    if (song.source == SongSource.local && !song.path.startsWith('http') && !song.path.startsWith('ytmusic://')) {
+      lyricsResult = await LrcParser.resolveLyrics(song.path);
+    }
+
+    // 2. Query LRCLIB for synchronized karaoke lyrics (works for local and online tracks)
+    if (lyricsResult == null || lyricsResult.lines.isEmpty) {
+      try {
+        final lrclib = getIt<LrclibService>();
+        lyricsResult = await lrclib.fetchLyrics(
+          trackName: song.title,
+          artistName: song.artist,
+          albumName: song.album,
+          durationSeconds: song.durationMs > 0 ? song.durationMs ~/ 1000 : null,
+        );
+      } catch (_) {}
+    }
+
+    // 3. For YouTube Music tracks without LRCLIB matches, fetch native YTM lyrics
+    final videoId = song.remoteId;
+    if ((lyricsResult == null || lyricsResult.lines.isEmpty) && videoId != null && videoId.isNotEmpty) {
+      try {
+        final ytmAccount = getIt<YtmAccountService>();
+        lyricsResult = await ytmAccount.fetchYtmLyrics(videoId);
+      } catch (_) {}
+    }
+
     if (isClosed) return;
     emit(state.copyWith(
       isLoadingLyrics: false,
