@@ -45,6 +45,16 @@
 -keep class kotlinx.coroutines.** { *; }
 -dontwarn kotlinx.coroutines.**
 
+# Firebase & Google Play Services Rules
+-keep class com.google.firebase.** { *; }
+-dontwarn com.google.firebase.**
+-keep class com.google.android.gms.** { *; }
+-dontwarn com.google.android.gms.**
+
+# Google Protobuf
+-keep class com.google.protobuf.** { *; }
+-dontwarn com.google.protobuf.**
+
 # NewPipeExtractor -- present only in the ytm/dev flavors, absent from prod.
 # Rhino compiles YouTube's player JS at runtime and resolves classes
 # reflectively, so it must not be minified. The extractor reflects into
@@ -61,3 +71,4 @@
 -dontwarn javax.script.**
 -dontwarn java.beans.**
 -dontwarn org.mozilla.javascript.tools.**
+

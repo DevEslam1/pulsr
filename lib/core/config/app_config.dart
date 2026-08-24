@@ -16,6 +16,9 @@ class AppConfig {
   static const bool ytmEnabled = bool.fromEnvironment('ENABLE_YTM', defaultValue: false);
 
   static AppEnvironment get environment {
+    if (flavor.toLowerCase() == 'prod') {
+      return AppEnvironment.prod;
+    }
     switch (envName.toLowerCase()) {
       case 'prod':
       case 'production':
@@ -31,4 +34,12 @@ class AppConfig {
   static bool get isDev => environment == AppEnvironment.dev;
 
   static String get appTitle => isProd ? 'Pulsr Music' : 'Pulsr Dev';
+
+  /// Validates that build flavor and runtime environment configuration are aligned.
+  static void validateConfiguration() {
+    assert(
+      !(flavor.toLowerCase() == 'prod' && envName.toLowerCase() == 'dev'),
+      'CRITICAL: Production flavor cannot run with ENV=dev',
+    );
+  }
 }

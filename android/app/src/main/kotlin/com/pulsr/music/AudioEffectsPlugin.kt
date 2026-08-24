@@ -554,14 +554,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun recreateEffects() {
         // Always release — stale instances are bound to the dead session
-        try { virtualizer?.release() } catch (_: Exception) {}
-        try { loudnessEnhancer?.release() } catch (_: Exception) {}
-        try { bassBoost?.release() } catch (_: Exception) {}
-        try { dynamicsProcessing?.release() } catch (_: Exception) {}
+        try { virtualizer?.release() } catch (e: Exception) { android.util.Log.w("AudioEffectsPlugin", "Virtualizer release error: ${e.message}") }
+        try { loudnessEnhancer?.release() } catch (e: Exception) { android.util.Log.w("AudioEffectsPlugin", "LoudnessEnhancer release error: ${e.message}") }
+        try { bassBoost?.release() } catch (e: Exception) { android.util.Log.w("AudioEffectsPlugin", "BassBoost release error: ${e.message}") }
+        try { dynamicsProcessing?.release() } catch (e: Exception) { android.util.Log.w("AudioEffectsPlugin", "DynamicsProcessing release error: ${e.message}") }
         virtualizer = null
         loudnessEnhancer = null
         bassBoost = null
         dynamicsProcessing = null
+        cachedSupportedEffects = null
 
         if (isVirtualizerEnabled || virtualizerStrength > 0) {
             setVirtualizerState(isVirtualizerEnabled)
@@ -585,26 +586,35 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         try {
             virtualizer?.enabled = false
             virtualizer?.release()
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            android.util.Log.w("AudioEffectsPlugin", "Virtualizer cleanup error: ${e.message}")
+        }
         virtualizer = null
 
         try {
             loudnessEnhancer?.enabled = false
             loudnessEnhancer?.release()
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            android.util.Log.w("AudioEffectsPlugin", "LoudnessEnhancer cleanup error: ${e.message}")
+        }
         loudnessEnhancer = null
 
         try {
             bassBoost?.enabled = false
             bassBoost?.release()
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            android.util.Log.w("AudioEffectsPlugin", "BassBoost cleanup error: ${e.message}")
+        }
         bassBoost = null
 
         try {
             dynamicsProcessing?.enabled = false
             dynamicsProcessing?.release()
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            android.util.Log.w("AudioEffectsPlugin", "DynamicsProcessing cleanup error: ${e.message}")
+        }
         dynamicsProcessing = null
+        cachedSupportedEffects = null
     }
 
     private fun isEffectTypeSupported(effectType: UUID): Boolean {
@@ -613,7 +623,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 cachedSupportedEffects = it
             } ?: return false
             effects.any { it.type == effectType }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            android.util.Log.w("AudioEffectsPlugin", "Effect support query failed: ${e.message}")
             false
         }
     }

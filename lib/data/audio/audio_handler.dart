@@ -61,6 +61,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   double? _preDuckVolume;
   int _consecutiveFailures = 0;
   final List<int> _shuffleHistory = [];
+  bool _wasPlayingBeforeInterruption = false;
 
   // Bumped on every playSongAt/play entry so a slow async resolve from a
   // superseded call cannot load its source into the player.
@@ -308,15 +309,18 @@ class PulsrAudioHandler extends BaseAudioHandler
       _subscriptions.add(
         session.interruptionEventStream.listen((event) async {
           if (event.begin) {
-            switch (event.type) {
-              case AudioInterruptionType.duck:
-                _preDuckVolume = _activePlayer.volume;
-                await _activePlayer.setVolume(0.3 * (_preDuckVolume ?? 1.0));
-                break;
-              case AudioInterruptionType.pause:
-              case AudioInterruptionType.unknown:
-                await pause();
-                break;
+            _wasPlayingBeforeInterruption = _activePlayer.playing;
+            if (_wasPlayingBeforeInterruption) {
+              switch (event.type) {
+                case AudioInterruptionType.duck:
+                  _preDuckVolume = _activePlayer.volume;
+                  await _activePlayer.setVolume(0.3 * (_preDuckVolume ?? 1.0));
+                  break;
+                case AudioInterruptionType.pause:
+                case AudioInterruptionType.unknown:
+                  await _activePlayer.pause();
+                  break;
+              }
             }
           } else {
             switch (event.type) {
@@ -330,14 +334,18 @@ class PulsrAudioHandler extends BaseAudioHandler
                 }
                 break;
               case AudioInterruptionType.pause:
-                final prefs = await SharedPreferences.getInstance();
-                final resume =
-                    prefs.getBool(PrefsKeys.resumeAfterInterruption) ?? true;
-                if (resume) {
-                  await play();
+                if (_wasPlayingBeforeInterruption) {
+                  _wasPlayingBeforeInterruption = false;
+                  final prefs = await SharedPreferences.getInstance();
+                  final resume =
+                      prefs.getBool(PrefsKeys.resumeAfterInterruption) ?? true;
+                  if (resume && !_activePlayer.playing) {
+                    await _activePlayer.play();
+                  }
                 }
                 break;
               case AudioInterruptionType.unknown:
+                _wasPlayingBeforeInterruption = false;
                 break;
             }
           }
@@ -723,11 +731,16 @@ class PulsrAudioHandler extends BaseAudioHandler
     _currentIndex = index;
 
     final song = _songs[index];
-    final artUri = await ArtworkUriResolver.resolveArtworkUri(song);
-    if (generation != _playGeneration) return;
-
-    final item = _songToMediaItem(song, artUri);
+    final fastArtUri = song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
+    final item = _songToMediaItem(song, fastArtUri);
     mediaItem.add(item);
+
+    // Resolve high-res artwork in background without blocking audio source loading
+    ArtworkUriResolver.resolveArtworkUri(song).then((artUri) {
+      if (artUri != null && artUri != fastArtUri && generation == _playGeneration) {
+        mediaItem.add(_songToMediaItem(song, artUri));
+      }
+    }).catchError((_) {});
 
     // Keep notification controls alive during track transition
     playbackState.add(
@@ -747,13 +760,19 @@ class PulsrAudioHandler extends BaseAudioHandler
     try {
       final source = await _resolveAudioSource(song, item);
       if (generation != _playGeneration) return;
-      await _activePlayer.setAudioSource(source, initialPosition: initialPosition);
+      await _activePlayer.setAudioSource(source, initialPosition: initialPosition, preload: true);
       if (generation != _playGeneration) return;
       await _activePlayer.setVolume(_calculateReplayGainVolume(song));
       await _activePlayer.play();
       _consecutiveFailures = 0;
       _repository.recordPlayHistory(song.id);
       _saveCurrentPosition();
+
+      // Early prefetch next stream so next track switch is instantaneous
+      final peekIdx = _peekNextIndex();
+      if (peekIdx != null && peekIdx < _songs.length) {
+        _prefetchStream(_songs[peekIdx]);
+      }
     } on YtmException catch (e, st) {
       if (generation != _playGeneration) return;
       ErrorLogger.log(
@@ -805,6 +824,7 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> pause() async {
+    _wasPlayingBeforeInterruption = false;
     ErrorLogger.addBreadcrumb('Playback paused', category: 'player');
     await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
         restoreVolume: _volume);

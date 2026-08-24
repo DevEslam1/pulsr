@@ -40,7 +40,12 @@ class MainActivity : AudioServiceActivity() {
     }
 
     override fun onDestroy() {
-        backgroundExecutor.shutdown()
+        pendingAudioUri = null
+        try {
+            backgroundExecutor.shutdown()
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Error shutting down background executor: ${e.message}")
+        }
         super.onDestroy()
     }
  
@@ -58,8 +63,7 @@ class MainActivity : AudioServiceActivity() {
         val path = uri.path?.lowercase() ?: ""
         val isAudioExt = path.endsWith(".mp3") || path.endsWith(".flac") || path.endsWith(".wav") ||
             path.endsWith(".aac") || path.endsWith(".m4a") || path.endsWith(".ogg") ||
-            path.endsWith(".opus") || path.endsWith(".wma") || path.endsWith(".alac") ||
-            path.endsWith(".aiff") || path.endsWith(".dsf") || path.endsWith(".dff")
+            path.endsWith(".opus") || path.endsWith(".mka")
         return isAudioExt || (scheme == "content" && intent.type == null)
     }
 

@@ -41,6 +41,7 @@ import 'features/ytm_search/cubit/ytm_download_cubit.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  AppConfig.validateConfiguration();
   ErrorLogger.initialize();
   ErrorLogger.onCrashReported = (error, stackTrace, category) {
     // Production crash reporting hook (FirebaseCrashlytics / Sentry / Bugsnag)

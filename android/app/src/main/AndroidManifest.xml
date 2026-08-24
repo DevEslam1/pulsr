@@ -13,6 +13,11 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
     <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions"/>
 
+    <!-- Custom signature permission to protect internal widget & playback broadcasts -->
+    <permission android:name="com.pulsr.music.permission.WIDGET_CONTROL"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="com.pulsr.music.permission.WIDGET_CONTROL" />
+
     <application
         android:label="${appName}"
         android:name="${applicationName}"
@@ -57,7 +62,6 @@
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="pulsrWidget" />
             </intent-filter>
             <!-- Intent filter to open YouTube Music & YouTube links -->
@@ -146,16 +150,10 @@
 
         <receiver
             android:name=".NowPlayingWidget"
+            android:label="${appName} Widget"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.pulsr.music.widget.PLAY_PAUSE" />
-                <action android:name="com.pulsr.music.widget.NEXT" />
-                <action android:name="com.pulsr.music.widget.PREV" />
-                <action android:name="com.pulsr.music.widget.REWIND" />
-                <action android:name="com.pulsr.music.widget.FORWARD" />
-                <action android:name="com.pulsr.music.widget.SEEK_RATIO" />
-                <action android:name="com.pulsr.music.widget.FAVORITE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"

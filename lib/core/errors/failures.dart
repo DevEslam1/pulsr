@@ -11,6 +11,18 @@ abstract class AppFailure {
 
   @override
   String toString() => '$runtimeType: $message';
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is AppFailure &&
+        other.runtimeType == runtimeType &&
+        other.message == message &&
+        other.error == error;
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, message, error);
 }
 
 class DatabaseFailure extends AppFailure {

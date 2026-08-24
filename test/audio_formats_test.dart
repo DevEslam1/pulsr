@@ -19,10 +19,15 @@ void main() {
       }
     });
 
-    test('extractExtension handles urls and query params correctly', () {
+    test('extractExtension handles urls, dotfiles, and query params correctly', () {
       expect(AudioFormats.extractExtension('content://media/external/audio/media/123.flac?param=1'), 'flac');
       expect(AudioFormats.extractExtension('/storage/emulated/0/Music/song.MP3'), 'mp3');
-      expect(AudioFormats.extractExtension('raw_filename_without_ext'), 'raw_filename_without_ext');
+      expect(AudioFormats.extractExtension('/storage/emulated/0/Music/song.part1.flac'), 'flac');
+      expect(AudioFormats.extractExtension('.gitignore'), '');
+      expect(AudioFormats.extractExtension('/path/to/.mp3'), '');
+      expect(AudioFormats.extractExtension('mp3'), 'mp3');
+      expect(AudioFormats.isSupportedExtension('mp3'), isTrue);
+      expect(AudioFormats.isSupportedExtension('/path/to/.gitignore'), isFalse);
     });
   });
 }
