@@ -60,6 +60,25 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="pulsrWidget" />
             </intent-filter>
+            <!-- Intent filter to open YouTube Music & YouTube links -->
+            <intent-filter android:label="${appName}">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="music.youtube.com" />
+                <data android:host="www.youtube.com" />
+                <data android:host="youtube.com" />
+                <data android:host="m.youtube.com" />
+                <data android:host="youtu.be" />
+            </intent-filter>
+            <!-- Intent filter for shared YouTube / YouTube Music links (Share via Pulsr) -->
+            <intent-filter android:label="${appName}">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
             <!-- Intent filter to open audio files from File Explorers & Downloads -->
             <intent-filter android:label="${appName}">
                 <action android:name="android.intent.action.VIEW" />

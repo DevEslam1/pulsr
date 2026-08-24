@@ -45,6 +45,15 @@ class YtmDownloadButton extends StatelessWidget {
           a.itemFor(videoId).progress != b.itemFor(videoId).progress,
       builder: (context, state) {
         final item = state.itemFor(videoId);
+        final isAlreadyLocal = song.source == SongSource.local && (song.remoteId != null && song.remoteId!.isNotEmpty);
+        if (isAlreadyLocal || item.status == YtDownloadStatus.done) {
+          return SizedBox(
+            width: 40,
+            height: 40,
+            child: Icon(Icons.download_done_rounded, size: iconSize, color: tintColor),
+          );
+        }
+
         switch (item.status) {
           case YtDownloadStatus.running:
             return SizedBox(

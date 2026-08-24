@@ -4,7 +4,9 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 
+import '../../../core/services/file_intent_handler.dart';
 import '../../../core/services/ytm_service.dart';
+import '../../../domain/models/ytm_track.dart';
 import 'ytm_search_state.dart';
 
 @injectable
@@ -49,6 +51,25 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
 
     emit(state.copyWith(isLoading: true, errorMessage: null));
     try {
+      final videoId = FileIntentHandler.extractYouTubeVideoId(query);
+      if (videoId != null) {
+        try {
+          final stream = await _service.resolveStream(videoId);
+          if (generation != _generation || isClosed) return;
+          final track = YtmTrack(
+            videoId: videoId,
+            title: stream.title.isNotEmpty ? stream.title : 'YouTube Track',
+            artist: stream.artist.isNotEmpty ? stream.artist : 'YouTube Music',
+            duration: stream.duration,
+            artworkUrl: stream.artworkUrl,
+          );
+          emit(state.copyWith(results: [track], isLoading: false, errorMessage: null));
+          return;
+        } catch (_) {
+          // Fall through to regular search if resolving by ID fails
+        }
+      }
+
       final results = await _service.search(query);
       if (generation != _generation || isClosed) return;
       emit(state.copyWith(results: results, isLoading: false, errorMessage: null));

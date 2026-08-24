@@ -47,7 +47,10 @@ class MainActivity : AudioServiceActivity() {
     private fun isAudioIntent(intent: Intent, uri: Uri): Boolean {
         val scheme = uri.scheme?.lowercase() ?: return false
         if (scheme == "pulsrwidget") return false
+        if (isYouTubeUri(uri)) return true
         if (intent.action == Intent.ACTION_SEND) {
+            val text = intent.getStringExtra(Intent.EXTRA_TEXT)
+            if (!text.isNullOrEmpty() && isYouTubeUrl(text)) return true
             return intent.type?.startsWith("audio/") == true ||
                 (scheme == "content" && intent.type == null)
         }
@@ -60,15 +63,27 @@ class MainActivity : AudioServiceActivity() {
         return isAudioExt || (scheme == "content" && intent.type == null)
     }
 
+    private fun isYouTubeUri(uri: Uri): Boolean {
+        val host = uri.host?.lowercase() ?: ""
+        return host == "music.youtube.com" || host == "youtube.com" || host == "www.youtube.com" ||
+            host == "m.youtube.com" || host == "youtu.be"
+    }
+
+    private fun isYouTubeUrl(text: String): Boolean {
+        val lower = text.lowercase()
+        return lower.contains("music.youtube.com") || lower.contains("youtube.com") || lower.contains("youtu.be")
+    }
+
     private fun handleAudioIntent(intent: Intent?, fromColdStart: Boolean) {
         if (intent?.action != Intent.ACTION_VIEW && intent?.action != Intent.ACTION_SEND) return
+        val textExtra = intent.getStringExtra(Intent.EXTRA_TEXT)
         val streamUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
         } else {
             @Suppress("DEPRECATION")
             intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
         }
-        val uri = intent.data ?: streamUri ?: return
+        val uri = intent.data ?: streamUri ?: (if (!textExtra.isNullOrEmpty() && isYouTubeUrl(textExtra)) Uri.parse(textExtra) else null) ?: return
         if (!isAudioIntent(intent, uri)) return
 
         if (uri.scheme?.equals("content", ignoreCase = true) == true) {

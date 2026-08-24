@@ -14,6 +14,7 @@ import '../../data/scanner/media_scanner_service.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../errors/failures.dart';
 import '../utils/error_logger.dart';
+import '../widgets/cached_artwork.dart';
 import 'ytm_service.dart';
 
 /// Where a download currently is, for driving progress UI.
@@ -80,13 +81,38 @@ class YtDownloadService {
       final dir = await getTemporaryDirectory();
       temp = File(p.join(dir.path, 'ytdl_$videoId.$ext'));
 
+      // Download high-res master artwork in parallel with the audio stream
+      File? tempArt;
+      Future<String?>? artworkFuture;
+      final rawArtUrl = song.remoteArtworkUrl;
+      if (rawArtUrl != null && rawArtUrl.isNotEmpty) {
+        final artUrl = CachedArtwork.upgradeToHighResArtwork(rawArtUrl);
+        artworkFuture = Future(() async {
+          try {
+            final artFile = File(p.join(dir.path, 'ytdl_art_$videoId.jpg'));
+            await _downloadTo(artUrl, artFile, null);
+            if (await artFile.exists() && await artFile.length() > 0) {
+              tempArt = artFile;
+              return artFile.path;
+            }
+          } catch (e) {
+            ErrorLogger.log('Parallel artwork download failed', error: e, category: 'YTM');
+          }
+          return null;
+        });
+      }
+
       onProgress?.call(const YtDownloadProgress(YtDownloadStage.downloading, 0));
       await _downloadTo(stream.url, temp, onProgress);
 
       // jaudiotagger can only write real M4A; skip tagging Opus/WebM downloads.
       if (stream.isTaggable) {
         onProgress?.call(const YtDownloadProgress(YtDownloadStage.tagging));
-        await _tag(temp.path, song);
+        final artPath = artworkFuture != null ? await artworkFuture : null;
+        await _tag(temp.path, song, artworkPath: artPath);
+        if (tempArt != null && await tempArt!.exists()) {
+          await tempArt!.delete().catchError((_) => tempArt!);
+        }
       }
 
       onProgress?.call(const YtDownloadProgress(YtDownloadStage.saving));
@@ -102,13 +128,15 @@ class YtDownloadService {
       }
 
       onProgress?.call(const YtDownloadProgress(YtDownloadStage.indexing));
-      await Future<void>.delayed(const Duration(milliseconds: 350));
-      await _scanner.scanDeviceLibrary();
-
       final reconciled = await _repository.reconcileDownloadedSong(
         oldId: song.id,
         newPath: finalPath,
+        fallbackSong: song,
       );
+
+      // Trigger media scanner in background without blocking the UI
+      unawaited(_scanner.scanDeviceLibrary());
+
       return reconciled.fold(
         (f) => Left(f),
         (newId) {
@@ -137,21 +165,139 @@ class YtDownloadService {
     }
   }
 
+  static const int _concurrentChunks = 4;
+  static const int _minChunkThreshold = 1024 * 1024; // 1 MB
+
   Future<void> _downloadTo(String url, File dest, void Function(YtDownloadProgress)? onProgress) async {
-    final request = await _http.getUrl(Uri.parse(url));
+    final uri = Uri.parse(url);
+
+    // Initial probe to test HTTP Range support and fetch content length
+    try {
+      final probeReq = await _http.openUrl('GET', uri);
+      probeReq.headers.set(HttpHeaders.rangeHeader, 'bytes=0-0');
+      final probeResp = await probeReq.close();
+
+      final contentRange = probeResp.headers.value(HttpHeaders.contentRangeHeader);
+      int total = -1;
+      if (contentRange != null && contentRange.contains('/')) {
+        total = int.tryParse(contentRange.split('/').last) ?? -1;
+      }
+      await probeResp.drain<void>();
+
+      // If server supports HTTP Range and file is larger than 1MB, download in 4 parallel threads!
+      if (probeResp.statusCode == HttpStatus.partialContent && total >= _minChunkThreshold) {
+        await _downloadParallel(uri, dest, total, onProgress);
+        return;
+      }
+    } catch (_) {
+      // If probe fails, continue to sequential fallback
+    }
+
+    // Fallback: Full single-stream download
+    await _downloadSequential(uri, dest, onProgress);
+  }
+
+  Future<void> _downloadParallel(
+    Uri uri,
+    File dest,
+    int total,
+    void Function(YtDownloadProgress)? onProgress,
+  ) async {
+    final chunkSize = (total / _concurrentChunks).ceil();
+    final tempParts = <File>[];
+    final dir = dest.parent;
+
+    var totalReceived = 0;
+    var lastEmitTime = 0;
+
+    try {
+      final futures = <Future<void>>[];
+
+      for (var i = 0; i < _concurrentChunks; i++) {
+        final start = i * chunkSize;
+        final end = (i == _concurrentChunks - 1) ? total - 1 : (start + chunkSize - 1);
+        if (start >= total) break;
+
+        final partFile = File(p.join(dir.path, '${p.basename(dest.path)}.part$i'));
+        tempParts.add(partFile);
+
+        futures.add(() async {
+          final req = await _http.getUrl(uri);
+          req.headers.set(HttpHeaders.rangeHeader, 'bytes=$start-$end');
+          final resp = await req.close();
+          if (resp.statusCode != HttpStatus.partialContent && resp.statusCode != HttpStatus.ok) {
+            throw DownloadFailure('Server returned ${resp.statusCode} for chunk $i');
+          }
+          final sink = partFile.openWrite();
+          try {
+            await for (final chunk in resp) {
+              sink.add(chunk);
+              totalReceived += chunk.length;
+              if (onProgress != null && total > 0) {
+                final now = DateTime.now().millisecondsSinceEpoch;
+                if (now - lastEmitTime > 80 || totalReceived == total) {
+                  lastEmitTime = now;
+                  onProgress(YtDownloadProgress(
+                    YtDownloadStage.downloading,
+                    (totalReceived / total).clamp(0.0, 1.0),
+                  ));
+                }
+              }
+            }
+            await sink.flush();
+          } finally {
+            await sink.close();
+          }
+        }());
+      }
+
+      await Future.wait(futures);
+
+      // Concatenate downloaded parts into the destination file
+      final outSink = dest.openWrite();
+      try {
+        for (final part in tempParts) {
+          if (await part.exists()) {
+            await outSink.addStream(part.openRead());
+          }
+        }
+        await outSink.flush();
+      } finally {
+        await outSink.close();
+      }
+    } finally {
+      for (final part in tempParts) {
+        if (await part.exists()) {
+          await part.delete().catchError((_) => part);
+        }
+      }
+    }
+  }
+
+  Future<void> _downloadSequential(
+    Uri uri,
+    File dest,
+    void Function(YtDownloadProgress)? onProgress,
+  ) async {
+    final request = await _http.getUrl(uri);
     final response = await request.close();
-    if (response.statusCode != 200) {
+    if (response.statusCode != HttpStatus.ok && response.statusCode != HttpStatus.partialContent) {
       throw DownloadFailure('Server returned ${response.statusCode}');
     }
     final total = response.contentLength;
     final sink = dest.openWrite();
     var received = 0;
+    var lastEmitTime = 0;
     try {
       await for (final chunk in response) {
         received += chunk.length;
         sink.add(chunk);
         if (onProgress != null && total > 0) {
-          onProgress(YtDownloadProgress(YtDownloadStage.downloading, received / total));
+          final now = DateTime.now().millisecondsSinceEpoch;
+          if (now - lastEmitTime > 80 || received == total) {
+            lastEmitTime = now;
+            onProgress(YtDownloadProgress(YtDownloadStage.downloading, received / total));
+          }
         }
       }
       await sink.flush();
@@ -160,26 +306,8 @@ class YtDownloadService {
     }
   }
 
-  Future<void> _tag(String path, SongsTableData song) async {
-    File? tempArt;
+  Future<void> _tag(String path, SongsTableData song, {String? artworkPath}) async {
     try {
-      String? artworkPath;
-      final artUrl = song.remoteArtworkUrl;
-      if (artUrl != null && artUrl.isNotEmpty) {
-        try {
-          final dir = await getTemporaryDirectory();
-          final videoId = song.remoteId ?? song.id.toString();
-          tempArt = File(p.join(dir.path, 'ytdl_art_$videoId.jpg'));
-          await _downloadTo(artUrl, tempArt, null);
-          if (await tempArt.exists() && await tempArt.length() > 0) {
-            artworkPath = tempArt.path;
-          }
-        } catch (e) {
-          // If artwork download fails, still write text metadata
-          ErrorLogger.log('Downloading artwork for tag failed', error: e, category: 'YTM');
-        }
-      }
-
       await _tagChannel.invokeMethod('writeTags', {
         'path': path,
         'title': song.title,
@@ -196,10 +324,6 @@ class YtDownloadService {
     } on PlatformException catch (e) {
       // A tag failure must not abort the download — the file still plays.
       ErrorLogger.log('Tagging downloaded track failed: ${e.code}', category: 'YTM');
-    } finally {
-      if (tempArt != null && await tempArt.exists()) {
-        await tempArt.delete().catchError((_) => tempArt!);
-      }
     }
   }
 

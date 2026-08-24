@@ -35,6 +35,7 @@ abstract class IMusicRepository {
   Future<Result<int?>> reconcileDownloadedSong({
     required int oldId,
     required String newPath,
+    SongsTableData? fallbackSong,
   });
 
   Stream<Result<List<SongsTableData>>> watchFavorites();

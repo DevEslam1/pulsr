@@ -77,6 +77,15 @@ class CachedArtwork extends StatefulWidget {
     this.remoteUrl,
   });
 
+  static String upgradeToHighResArtwork(String url) {
+    var upgraded = url;
+    if (upgraded.contains('googleusercontent.com') || upgraded.contains('ggpht.com')) {
+      upgraded = upgraded.replaceAll(RegExp(r'=w\d+-h\d+[^?]*'), '=s1200');
+      upgraded = upgraded.replaceAll(RegExp(r'=s\d+[^?]*'), '=s1200');
+    }
+    return upgraded;
+  }
+
   @override
   State<CachedArtwork> createState() => _CachedArtworkState();
 }
@@ -108,16 +117,31 @@ class _CachedArtworkState extends State<CachedArtwork> {
   }
 
   static Future<Uint8List?> _fetchRemote(String url) async {
-    final uri = Uri.tryParse(url);
-    // Artwork URLs come from a third party, so refuse anything but HTTPS.
+    final highResUrl = CachedArtwork.upgradeToHighResArtwork(url);
+    var uri = Uri.tryParse(highResUrl);
     if (uri == null || !uri.isScheme('https')) return null;
-    final request = await getIt<HttpClient>().getUrl(uri);
-    final response = await request.close().timeout(const Duration(seconds: 8));
-    if (response.statusCode != 200 || response.contentLength > _maxRemoteBytes) {
-      await response.drain<void>();
+    try {
+      var request = await getIt<HttpClient>().getUrl(uri);
+      var response = await request.close().timeout(const Duration(seconds: 8));
+
+      // Fall back to original URL if high-res 1200px URL returned non-200
+      if (response.statusCode != 200 && highResUrl != url) {
+        await response.drain<void>();
+        final fallbackUri = Uri.tryParse(url);
+        if (fallbackUri != null) {
+          request = await getIt<HttpClient>().getUrl(fallbackUri);
+          response = await request.close().timeout(const Duration(seconds: 8));
+        }
+      }
+
+      if (response.statusCode != 200 || response.contentLength > _maxRemoteBytes) {
+        await response.drain<void>();
+        return null;
+      }
+      return consolidateHttpClientResponseBytes(response);
+    } catch (_) {
       return null;
     }
-    return consolidateHttpClientResponseBytes(response);
   }
 
   void _loadArtwork() {
@@ -140,8 +164,8 @@ class _CachedArtworkState extends State<CachedArtwork> {
             widget.id,
             widget.type,
             format: ArtworkFormat.JPEG,
-            size: widget.size > 200 ? 300 : 150,
-            quality: 80,
+            size: widget.size > 200 ? 500 : 250,
+            quality: 100,
           );
         }
         return null;
@@ -151,8 +175,8 @@ class _CachedArtworkState extends State<CachedArtwork> {
         widget.id,
         widget.type,
         format: ArtworkFormat.JPEG,
-        size: widget.size > 200 ? 300 : 150,
-        quality: 80,
+        size: widget.size > 200 ? 500 : 250,
+        quality: 100,
       );
     }
 
@@ -194,7 +218,7 @@ class _CachedArtworkState extends State<CachedArtwork> {
           icon: widget.fallbackIcon,
         );
 
-        final decodeDim = (effectiveSize * 2).clamp(64, 600).round();
+        final decodeDim = (effectiveSize * 3).clamp(120, 1400).round();
 
         final content = _cachedBytes != null
             ? Image.memory(
@@ -204,7 +228,7 @@ class _CachedArtworkState extends State<CachedArtwork> {
                 cacheWidth: decodeDim,
                 cacheHeight: decodeDim,
                 fit: BoxFit.cover,
-                filterQuality: FilterQuality.low,
+                filterQuality: FilterQuality.medium,
                 errorBuilder: (context, error, stackTrace) => placeholder,
               )
             : placeholder;

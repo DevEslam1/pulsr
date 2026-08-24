@@ -778,6 +778,7 @@ class MusicRepository implements IMusicRepository {
   Future<Result<int?>> reconcileDownloadedSong({
     required int oldId,
     required String newPath,
+    SongsTableData? fallbackSong,
   }) async {
     try {
       int? survivingId;
@@ -795,32 +796,53 @@ class MusicRepository implements IMusicRepository {
 
         // Fallback: MediaStore may rename the file to dodge a collision, so the
         // path won't match. Match on normalized metadata instead.
-        if (newRow == null && oldRow != null) {
+        final matchMetadata = oldRow ?? fallbackSong;
+        if (newRow == null && matchMetadata != null) {
           newRow = await (_db.select(_db.songsTable)
                 ..where((t) =>
                     t.id.isBiggerThanValue(0) &
                     t.source.equals(SongSource.local) &
-                    t.title.lower().equals(oldRow.title.toLowerCase()) &
-                    t.artist.lower().equals(oldRow.artist.toLowerCase()) &
-                    t.durationMs.isBetweenValues(oldRow.durationMs - 2000, oldRow.durationMs + 2000))
+                    t.title.lower().equals(matchMetadata.title.toLowerCase()) &
+                    t.artist.lower().equals(matchMetadata.artist.toLowerCase()) &
+                    t.durationMs.isBetweenValues(matchMetadata.durationMs - 2000, matchMetadata.durationMs + 2000))
                 ..orderBy([(t) => OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)])
                 ..limit(1))
               .getSingleOrNull();
         }
 
         if (newRow == null) {
-          if (oldRow != null) {
+          if (File(newPath).existsSync()) {
             final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-            await (_db.update(_db.songsTable)..where((t) => t.id.equals(oldId))).write(
-              SongsTableCompanion(
-                path: Value(newPath),
-                source: const Value(SongSource.local),
-                isMissing: const Value(false),
-                dateAdded: Value((oldRow.dateAdded ?? 0) > 0 ? oldRow.dateAdded! : nowSec),
-                pendingDownloadPath: const Value(null),
-              ),
-            );
-            survivingId = oldId;
+            if (oldRow != null) {
+              await (_db.update(_db.songsTable)..where((t) => t.id.equals(oldId))).write(
+                SongsTableCompanion(
+                  path: Value(newPath),
+                  source: const Value(SongSource.local),
+                  isMissing: const Value(false),
+                  dateAdded: Value((oldRow.dateAdded ?? 0) > 0 ? oldRow.dateAdded! : nowSec),
+                  pendingDownloadPath: const Value(null),
+                ),
+              );
+              survivingId = oldId;
+            } else if (fallbackSong != null) {
+              await _db.into(_db.songsTable).insert(
+                SongsTableCompanion(
+                  id: Value(oldId),
+                  title: Value(fallbackSong.title),
+                  artist: Value(fallbackSong.artist),
+                  album: Value(fallbackSong.album.isNotEmpty ? fallbackSong.album : 'YouTube Music'),
+                  durationMs: Value(fallbackSong.durationMs),
+                  path: Value(newPath),
+                  source: const Value(SongSource.local),
+                  isMissing: const Value(false),
+                  remoteId: Value(fallbackSong.remoteId),
+                  remoteArtworkUrl: Value(fallbackSong.remoteArtworkUrl),
+                  dateAdded: Value(nowSec),
+                ),
+                mode: InsertMode.insertOrReplace,
+              );
+              survivingId = oldId;
+            }
           }
           return;
         }

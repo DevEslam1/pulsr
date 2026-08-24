@@ -4,12 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:injectable/injectable.dart';
+import '../config/app_config.dart';
 import '../constants/audio_formats.dart';
+import '../di/injection.dart';
 import '../router/app_router.dart';
 import '../utils/error_logger.dart';
 import '../../data/db/app_database.dart';
+import '../../domain/models/ytm_track.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../../features/player/cubit/player_cubit.dart';
+import 'ytm_service.dart';
 
 @singleton
 class FileIntentHandler {
@@ -43,8 +47,72 @@ class FileIntentHandler {
     }
   }
 
+  static String? extractYouTubeVideoId(String input) {
+    final trimmed = input.trim();
+    if (RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(trimmed)) {
+      return trimmed;
+    }
+    final youTubeShort = RegExp(r'youtu\.be\/([a-zA-Z0-9_-]{11})').firstMatch(trimmed);
+    if (youTubeShort != null) return youTubeShort.group(1);
+
+    final youTubeLong = RegExp(r'(?:v=|\/shorts\/|\/embed\/|\/watch\/|\/v\/)([a-zA-Z0-9_-]{11})').firstMatch(trimmed);
+    if (youTubeLong != null) return youTubeLong.group(1);
+
+    final fallback = RegExp(r'[?&]v=([a-zA-Z0-9_-]{11})').firstMatch(trimmed);
+    if (fallback != null) return fallback.group(1);
+
+    return null;
+  }
+
+  Future<void> _handleYouTubeLink(String videoId) async {
+    final context = rootNavigatorKey.currentContext;
+    if (context != null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Opening YouTube Music track...'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+
+    try {
+      final ytmService = getIt<YtmService>();
+      final stream = await ytmService.resolveStream(videoId);
+
+      final track = YtmTrack(
+        videoId: videoId,
+        title: stream.title.isNotEmpty ? stream.title : 'YouTube Track',
+        artist: stream.artist.isNotEmpty ? stream.artist : 'YouTube Music',
+        duration: stream.duration,
+        artworkUrl: stream.artworkUrl,
+      );
+
+      final song = track.toSongData();
+      await _playerCubit.playSong(song);
+      rootNavigatorKey.currentContext?.push('/now-playing');
+    } catch (e, st) {
+      ErrorLogger.log('Failed to resolve YouTube link: $videoId', error: e, stackTrace: st, category: 'FileIntentHandler');
+      final ctx = rootNavigatorKey.currentContext;
+      if (ctx != null && ctx.mounted) {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load YouTube track: ${e.toString()}'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
   Future<void> handleAudioUri(String uriOrPath) async {
     try {
+      final videoId = extractYouTubeVideoId(uriOrPath);
+      if (videoId != null && AppConfig.ytmEnabled) {
+        await _handleYouTubeLink(videoId);
+        return;
+      }
+
       String cleanPath = Uri.decodeFull(uriOrPath);
       if (cleanPath.startsWith('file://')) {
         cleanPath = cleanPath.replaceFirst('file://', '');

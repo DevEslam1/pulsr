@@ -261,9 +261,20 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
     private fun bestArtwork(images: List<Image>?): String? {
         if (images.isNullOrEmpty()) return null
         val sized = images.filter { it.width > 0 }
-        return sized.filter { it.width >= PREFERRED_ARTWORK_PX }.minByOrNull { it.width }?.url
+        val rawUrl = sized.maxByOrNull { it.width * it.height }?.url
             ?: sized.maxByOrNull { it.width }?.url
             ?: images.last().url
+
+        return upgradeToHighRes(rawUrl)
+    }
+
+    private fun upgradeToHighRes(url: String): String {
+        var upgraded = url
+        if (upgraded.contains("googleusercontent.com") || upgraded.contains("ggpht.com")) {
+            upgraded = upgraded.replace(Regex("=w\\d+-h\\d+[^?]*"), "=s1200")
+            upgraded = upgraded.replace(Regex("=s\\d+[^?]*"), "=s1200")
+        }
+        return upgraded
     }
 
     fun cleanup() {
