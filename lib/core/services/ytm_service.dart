@@ -1,5 +1,6 @@
 // lib/core/services/ytm_service.dart
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
@@ -42,6 +43,19 @@ class YtmService {
 
   bool? _available;
 
+  /// The device locale, forwarded to the native extractor so trending and
+  /// search results follow the user's region/language instead of a hardcoded
+  /// one. Read from the platform each call so a locale change is picked up.
+  Map<String, String> _localeArgs() {
+    final locale = ui.PlatformDispatcher.instance.locale;
+    final country = locale.countryCode;
+    final lang = locale.languageCode;
+    return {
+      if (country != null && country.isNotEmpty) 'country': country,
+      if (lang.isNotEmpty) 'lang': lang,
+    };
+  }
+
   /// False in the Play Store build, where the native extractor is replaced by a
   /// stub. Cached because the answer is fixed at compile time.
   Future<bool> isAvailable() async {
@@ -78,6 +92,7 @@ class YtmService {
       () => _channel.invokeMethod<List<Object?>>('search', {
         'query': trimmed,
         'limit': limit,
+        ..._localeArgs(),
       }),
       timeout: _searchTimeout,
     );
@@ -89,7 +104,10 @@ class YtmService {
   /// it can include non-music videos; used to seed the Home discovery section.
   Future<List<YtmTrack>> trending({int limit = 30}) async {
     final raw = await _guard(
-      () => _channel.invokeMethod<List<Object?>>('trending', {'limit': limit}),
+      () => _channel.invokeMethod<List<Object?>>('trending', {
+        'limit': limit,
+        ..._localeArgs(),
+      }),
       timeout: _searchTimeout,
     );
 

@@ -20,6 +20,7 @@ import 'audio_effects_channel.dart';
 import 'crossfade_manager.dart';
 import 'equalizer_manager.dart';
 import 'sleep_timer_manager.dart';
+import 'ytm_resolving_source.dart';
 
 @singleton
 class PulsrAudioHandler extends BaseAudioHandler
@@ -73,10 +74,31 @@ class PulsrAudioHandler extends BaseAudioHandler
   // Video ids with an in-flight prefetch, so we resolve each at most once.
   final Set<String> _prefetching = {};
 
+  // Gapless engine: when crossfade is off, a ConcatenatingAudioSource on the
+  // active player is the source of truth for track order/advance, and just_audio
+  // joins consecutive items seamlessly. Null while crossfade (duration > 0) is
+  // active, which keeps the manual dual-player path below.
+  ConcatenatingAudioSource? _gaplessSource;
+  // Last index reacted to from currentIndexStream, to drop duplicate emits.
+  int _lastGaplessIndex = -1;
+
+  /// Gapless is the default engine. Enabling crossfade (duration > 0) switches
+  /// to the overlapping dual-player engine, which cannot also produce a seamless
+  /// join, so the two are mutually exclusive by construction.
+  bool get _gaplessMode => _crossfadeManager.duration <= Duration.zero;
+
   Timer? _savePositionDebounce;
   final StreamController<Duration> _positionSubject =
       StreamController<Duration>.broadcast();
   Stream<Duration> get positionStream => _positionSubject.stream;
+  int? _currentAudioSessionId;
+  final StreamController<int?> _audioSessionIdSubject =
+      StreamController<int?>.broadcast();
+  /// The Android audio session id of the active player, or null when the
+  /// platform has not yet assigned one (or on non-Android). Consumers such as
+  /// the visualizer attach to this real session instead of the global mix.
+  int? get currentAudioSessionId => _currentAudioSessionId;
+  Stream<int?> get audioSessionIdStream => _audioSessionIdSubject.stream;
   SongsTableData? get currentSong => (_songs.isNotEmpty && _currentIndex >= 0 && _currentIndex < _songs.length) ? _songs[_currentIndex] : null;
   Stream<Duration?> get sleepTimerRemainingStream =>
       _sleepTimerManager.sleepTimerRemainingStream;
@@ -87,18 +109,14 @@ class PulsrAudioHandler extends BaseAudioHandler
     required YtmService ytmService,
     required AudioPlayer playerA,
     required AudioPlayer playerB,
-    AndroidEqualizer? equalizerA,
     AndroidLoudnessEnhancer? loudnessEnhancerA,
-    AndroidEqualizer? equalizerB,
     AndroidLoudnessEnhancer? loudnessEnhancerB,
   })  : _repository = repository,
         _ytmService = ytmService,
         _playerA = playerA,
         _playerB = playerB {
     _equalizerManager = EqualizerManager(
-      equalizerA: equalizerA,
       loudnessEnhancerA: loudnessEnhancerA,
-      equalizerB: equalizerB,
       loudnessEnhancerB: loudnessEnhancerB,
     );
     _init();
@@ -106,25 +124,24 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   factory PulsrAudioHandler(IMusicRepository repository, YtmService ytmService) {
     if (Platform.isAndroid) {
-      final eqA = AndroidEqualizer();
+      // The 10-band EQ now runs natively (DynamicsProcessing postEq). Only the
+      // loudness enhancers remain in the just_audio pipeline, as inert anchors
+      // that make ExoPlayer allocate the audio session the native effects bind to.
       final leA = AndroidLoudnessEnhancer();
-      final eqB = AndroidEqualizer();
       final leB = AndroidLoudnessEnhancer();
 
       final playerA = AudioPlayer(
-        audioPipeline: AudioPipeline(androidAudioEffects: [eqA, leA]),
+        audioPipeline: AudioPipeline(androidAudioEffects: [leA]),
       );
       final playerB = AudioPlayer(
-        audioPipeline: AudioPipeline(androidAudioEffects: [eqB, leB]),
+        audioPipeline: AudioPipeline(androidAudioEffects: [leB]),
       );
       return PulsrAudioHandler._(
         repository: repository,
         ytmService: ytmService,
         playerA: playerA,
         playerB: playerB,
-        equalizerA: eqA,
         loudnessEnhancerA: leA,
-        equalizerB: eqB,
         loudnessEnhancerB: leB,
       );
     } else {
@@ -191,7 +208,36 @@ class PulsrAudioHandler extends BaseAudioHandler
   Duration get crossfadeDuration => _crossfadeManager.duration;
 
   void setCrossfadeDuration(Duration duration) {
+    final wasGapless = _gaplessMode;
     _crossfadeManager.duration = duration;
+    final isGapless = _gaplessMode;
+    // Crossing zero swaps the playback engine (single-source crossfade vs. one
+    // ConcatenatingAudioSource). If a queue is playing, reload the current track
+    // at its position in the new engine's form so the toggle is seamless.
+    if (wasGapless != isGapless &&
+        _songs.isNotEmpty &&
+        _currentIndex >= 0 &&
+        _currentIndex < _songs.length) {
+      unawaited(_switchPlaybackEngine(toGapless: isGapless));
+    }
+  }
+
+  Future<void> _switchPlaybackEngine({required bool toGapless}) async {
+    final resumePos = _activePlayer.position;
+    final wasPlaying = _activePlayer.playing;
+    try {
+      if (toGapless) {
+        await _loadGaplessQueue(
+            initialPosition: resumePos, preload: wasPlaying);
+      } else {
+        _gaplessSource = null;
+        await playSongAt(_currentIndex, initialPosition: resumePos);
+        if (!wasPlaying) await _activePlayer.pause();
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Error switching playback engine on crossfade toggle',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
   }
 
   Future<void> setEqualizerEnabled(bool enabled) =>
@@ -265,7 +311,11 @@ class PulsrAudioHandler extends BaseAudioHandler
       _subscriptions.add(
         player.playerStateStream.listen((state) {
           if (isPlayerA == _isPlayerAActive) {
-            if (state.processingState == ProcessingState.completed &&
+            // In gapless mode the ConcatenatingAudioSource advances itself; only
+            // the crossfade engine (one source per track) needs a manual skip on
+            // completion. A completed event at the very end (loop off) just stops.
+            if (!_gaplessMode &&
+                state.processingState == ProcessingState.completed &&
                 !_crossfadeManager.isCrossfading) {
               skipToNext();
             }
@@ -304,6 +354,22 @@ class PulsrAudioHandler extends BaseAudioHandler
         player.androidAudioSessionIdStream.listen((sessionId) {
           if (sessionId != null && isPlayerA == _isPlayerAActive) {
             AudioEffectsChannel().setAudioSessionId(sessionId);
+            _currentAudioSessionId = sessionId;
+            _audioSessionIdSubject.add(sessionId);
+          }
+        }),
+      );
+
+      _subscriptions.add(
+        player.currentIndexStream.listen((index) {
+          // Native gapless advance: the concat moved to a new item on its own.
+          // Reconcile our queue model, notification, history and position-save
+          // off this single source of truth instead of a manual skip.
+          if (_gaplessMode &&
+              isPlayerA == _isPlayerAActive &&
+              index != null &&
+              index != _lastGaplessIndex) {
+            _onGaplessIndexChanged(index);
           }
         }),
       );
@@ -388,10 +454,40 @@ class PulsrAudioHandler extends BaseAudioHandler
     return AudioSource.file(song.path, tag: tag);
   }
 
+  /// Builds a gapless-queue child for [song] with no network I/O, so an entire
+  /// queue can be assembled up front. Local tracks resolve to a file/content
+  /// source; a YouTube row (not yet downloaded) becomes a [YtmResolvingSource]
+  /// that resolves its URL and caches its bytes lazily on first playback. A
+  /// downloaded YouTube row with a real file on disk plays straight off disk.
+  AudioSource _buildGaplessChild(SongsTableData song) {
+    final tag = _songToMediaItem(song);
+    final isRemote = song.source == SongSource.youtube &&
+        (song.path.startsWith('ytmusic://') ||
+            song.path.isEmpty ||
+            !File(song.path).existsSync());
+    if (isRemote) {
+      return YtmResolvingSource(
+        videoId: song.remoteId ?? '',
+        resolve: () => _resolveStreamUrl(song),
+        tag: tag,
+      );
+    }
+    return _createAudioSource(song, tag);
+  }
+
+  ConcatenatingAudioSource _buildConcat(List<SongsTableData> songs) {
+    return ConcatenatingAudioSource(
+      useLazyPreparation: true,
+      children: songs.map(_buildGaplessChild).toList(),
+    );
+  }
+
   /// A local song plays straight off disk; a YouTube row needs a freshly
   /// resolved URL, because the last one expires within hours and is pinned to
-  /// this device's IP. `LockCachingAudioSource` keeps the fetched bytes so
-  /// seeking backwards does not re-hit an already-expired URL.
+  /// this device's IP. Used by the crossfade engine, which loads one track at a
+  /// time. (The gapless engine instead uses [_buildGaplessChild], whose
+  /// [YtmResolvingSource] both resolves lazily and caches fetched bytes so a
+  /// backward seek does not re-hit an already-expired URL.)
   Future<AudioSource> _resolveAudioSource(
       SongsTableData song, MediaItem tag) async {
     if (song.source != SongSource.youtube) {
@@ -529,22 +625,30 @@ class PulsrAudioHandler extends BaseAudioHandler
         _songs = songs;
         _currentIndex = targetIndex.clamp(0, songs.length - 1);
         final currentSong = _songs[_currentIndex];
-        final artUri = await ArtworkUriResolver.resolveArtworkUri(currentSong);
-        final item = _songToMediaItem(currentSong, artUri);
-        mediaItem.add(item);
         queue.add(_songs.map(_songToMediaItem).toList());
 
         final pos = Duration(milliseconds: savedPositionMs);
-        if (currentSong.source == SongSource.youtube) {
-          // Resolving a stream URL here runs unawaited at cold start and, if
-          // offline, would throw into the catch below and lose the whole
-          // restored session. Stay idle; play() resolves it on first tap.
-          _pendingLazyPosition = pos;
+        if (_gaplessMode) {
+          // Build the concat but do not preload, so a restored YouTube track
+          // resolves its (expiring) URL lazily on the first play() rather than
+          // throwing here at cold start when offline and losing the session.
+          await _loadGaplessQueue(initialPosition: pos, preload: false);
         } else {
-          await _activePlayer.setAudioSource(
-            _createAudioSource(currentSong, item),
-            initialPosition: pos,
-          );
+          final artUri =
+              await ArtworkUriResolver.resolveArtworkUri(currentSong);
+          final item = _songToMediaItem(currentSong, artUri);
+          mediaItem.add(item);
+          if (currentSong.source == SongSource.youtube) {
+            // Resolving a stream URL here runs unawaited at cold start and, if
+            // offline, would throw into the catch below and lose the whole
+            // restored session. Stay idle; play() resolves it on first tap.
+            _pendingLazyPosition = pos;
+          } else {
+            await _activePlayer.setAudioSource(
+              _createAudioSource(currentSong, item),
+              initialPosition: pos,
+            );
+          }
         }
         _broadcastState(_activePlayer.playbackEvent);
         _positionSubject.add(pos);
@@ -598,6 +702,8 @@ class PulsrAudioHandler extends BaseAudioHandler
       final currentSessionId = _activePlayer.androidAudioSessionId;
       if (currentSessionId != null) {
         AudioEffectsChannel().setAudioSessionId(currentSessionId);
+        _currentAudioSessionId = currentSessionId;
+        _audioSessionIdSubject.add(currentSessionId);
       }
 
       mediaItem.add(_songToMediaItem(nextSong, artUri));
@@ -725,9 +831,99 @@ class PulsrAudioHandler extends BaseAudioHandler
     final mediaItems = _songs.map(_songToMediaItem).toList();
     queue.add(mediaItems);
 
-    if (_songs.isNotEmpty) {
+    if (_songs.isEmpty) return;
+    if (_gaplessMode) {
+      await _loadGaplessQueue(initialPosition: initialPosition);
+    } else {
       await playSongAt(_currentIndex, initialPosition: initialPosition);
     }
+  }
+
+  /// Loads the whole queue as one [ConcatenatingAudioSource] on the active
+  /// player so ExoPlayer joins consecutive tracks with no gap. With [preload]
+  /// false the source is set but not prepared, so a restored YouTube track
+  /// resolves lazily on the first play() instead of throwing at cold start when
+  /// offline.
+  Future<void> _loadGaplessQueue(
+      {Duration? initialPosition, bool preload = true}) async {
+    if (_songs.isEmpty) return;
+    final generation = ++_playGeneration;
+    _pendingLazyPosition = null;
+    _lastGaplessIndex = _currentIndex;
+
+    final song = _songs[_currentIndex];
+    final fastArtUri =
+        song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
+    mediaItem.add(_songToMediaItem(song, fastArtUri));
+
+    final concat = _buildConcat(_songs);
+    _gaplessSource = concat;
+
+    try {
+      await _activePlayer.setAudioSource(
+        concat,
+        initialIndex: _currentIndex,
+        initialPosition: initialPosition,
+        preload: preload,
+      );
+      if (generation != _playGeneration) return;
+      await _activePlayer.setVolume(_calculateReplayGainVolume(song));
+      // If shuffle is already on, randomize the upcoming order (current first)
+      // so a freshly-loaded or restored shuffled queue actually plays shuffled.
+      if (_activePlayer.shuffleModeEnabled) {
+        await _activePlayer.shuffle();
+      }
+      if (preload) {
+        await _activePlayer.play();
+        _consecutiveFailures = 0;
+        _repository.recordPlayHistory(song.id);
+      }
+      _saveCurrentPosition();
+
+      // Resolve high-res artwork off the hot path, like the crossfade engine.
+      ArtworkUriResolver.resolveArtworkUri(song).then((artUri) {
+        if (artUri != null &&
+            artUri != fastArtUri &&
+            generation == _playGeneration) {
+          mediaItem.add(_songToMediaItem(song, artUri));
+        }
+      }).catchError((_) {});
+    } on YtmException catch (e, st) {
+      if (generation != _playGeneration) return;
+      ErrorLogger.log(
+          'Error loading gapless YouTube source for ${song.title} (${e.code})',
+          error: e, stackTrace: st, category: 'AudioHandler');
+      await _failCurrentPlayback(fatal: e.isNetwork || e.isDisabled);
+    } catch (e, st) {
+      if (generation != _playGeneration) return;
+      ErrorLogger.log('Error loading gapless queue for ${song.title}',
+          error: e, stackTrace: st, category: 'AudioHandler');
+      await _failCurrentPlayback(fatal: false);
+    }
+  }
+
+  /// Reacts to a native gapless advance (currentIndexStream): keeps the queue
+  /// model, notification, play history, replay-gain volume and saved position in
+  /// step with the item ExoPlayer moved to on its own.
+  Future<void> _onGaplessIndexChanged(int index) async {
+    if (index < 0 || index >= _songs.length) return;
+    _lastGaplessIndex = index;
+    _currentIndex = index;
+    final song = _songs[index];
+
+    final fastArtUri =
+        song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
+    mediaItem.add(_songToMediaItem(song, fastArtUri));
+    await _activePlayer.setVolume(_calculateReplayGainVolume(song));
+    _repository.recordPlayHistory(song.id);
+    _broadcastState(_activePlayer.playbackEvent);
+    _saveCurrentPosition();
+
+    ArtworkUriResolver.resolveArtworkUri(song).then((artUri) {
+      if (artUri != null && artUri != fastArtUri && _currentIndex == index) {
+        mediaItem.add(_songToMediaItem(song, artUri));
+      }
+    }).catchError((_) {});
   }
 
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {
@@ -828,10 +1024,12 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> play() {
     ErrorLogger.addBreadcrumb('Playback started', category: 'player');
-    // A restored YouTube session was left with no source loaded (see
-    // restoreLastPlaybackSession); resolve and start it on the first play.
+    // A restored YouTube session in the crossfade engine is left with no source
+    // loaded (see restoreLastPlaybackSession); resolve and start it on the first
+    // play. The gapless engine instead sets a non-preloaded concat at restore,
+    // so play() below prepares and starts it lazily with no special-casing.
     final pending = _pendingLazyPosition;
-    if (pending != null && currentSong != null) {
+    if (pending != null && currentSong != null && !_gaplessMode) {
       _pendingLazyPosition = null;
       return playSongAt(_currentIndex, initialPosition: pending);
     }
@@ -861,6 +1059,16 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> skipToNext() async {
     ErrorLogger.addBreadcrumb('Playback skipToNext', category: 'player');
+    if (_gaplessMode && _gaplessSource != null) {
+      if (_activePlayer.hasNext) {
+        await _activePlayer.seekToNext();
+      } else {
+        await _activePlayer.pause();
+        await _activePlayer.seek(Duration.zero);
+        _broadcastState(_activePlayer.playbackEvent);
+      }
+      return;
+    }
     if (_crossfadeManager.isCrossfading) {
       await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
           restoreVolume: _volume);
@@ -879,6 +1087,20 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> skipToPrevious() async {
     ErrorLogger.addBreadcrumb('Playback skipToPrevious', category: 'player');
+    if (_gaplessMode && _gaplessSource != null) {
+      if (_activePlayer.position.inSeconds > 3) {
+        await _activePlayer.seek(Duration.zero);
+        _saveCurrentPosition();
+        return;
+      }
+      if (_activePlayer.hasPrevious) {
+        await _activePlayer.seekToPrevious();
+      } else {
+        await _activePlayer.seek(Duration.zero);
+        _saveCurrentPosition();
+      }
+      return;
+    }
     if (_crossfadeManager.isCrossfading) {
       await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
           restoreVolume: _volume);
@@ -902,6 +1124,13 @@ class PulsrAudioHandler extends BaseAudioHandler
     final enable = shuffleMode != AudioServiceShuffleMode.none;
     await _playerA.setShuffleModeEnabled(enable);
     await _playerB.setShuffleModeEnabled(enable);
+    // In gapless mode the concat's shuffle order drives playback; reshuffle so
+    // enabling shuffle actually reorders upcoming tracks (current stays put).
+    if (enable && _gaplessMode && _gaplessSource != null) {
+      await _activePlayer.shuffle();
+    }
+    // The crossfade engine draws its own random order from _getNextIndex, so no
+    // native reshuffle is needed there.
     playbackState.add(playbackState.value.copyWith(shuffleMode: shuffleMode));
   }
 
@@ -959,6 +1188,9 @@ class PulsrAudioHandler extends BaseAudioHandler
       if (song != null) {
         _songs.add(song);
         _queueDirty = true;
+        if (_gaplessMode && _gaplessSource != null) {
+          await _gaplessSource!.add(_buildGaplessChild(song));
+        }
         queue.add(_songs.map(_songToMediaItem).toList());
         _saveCurrentPosition();
       }
@@ -970,6 +1202,10 @@ class PulsrAudioHandler extends BaseAudioHandler
         _songs.isEmpty ? 0 : (_currentIndex + 1).clamp(0, _songs.length);
     _songs.insert(insertIdx, song);
     _queueDirty = true;
+    // Insert sits after the current track, so the playing index never shifts.
+    if (_gaplessMode && _gaplessSource != null) {
+      await _gaplessSource!.insert(insertIdx, _buildGaplessChild(song));
+    }
     queue.add(_songs.map(_songToMediaItem).toList());
     _saveCurrentPosition();
   }
@@ -977,6 +1213,9 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<void> addToQueueEnd(SongsTableData song) async {
     _songs.add(song);
     _queueDirty = true;
+    if (_gaplessMode && _gaplessSource != null) {
+      await _gaplessSource!.add(_buildGaplessChild(song));
+    }
     queue.add(_songs.map(_songToMediaItem).toList());
     _saveCurrentPosition();
   }
@@ -991,17 +1230,34 @@ class PulsrAudioHandler extends BaseAudioHandler
 
     if (_songs.isEmpty) {
       _currentIndex = 0;
+      _gaplessSource = null;
       queue.add([]);
       mediaItem.add(null);
       await stop();
       return;
     }
 
-    if (index < _currentIndex) {
-      _currentIndex--;
-    } else if (wasPlayingCurrent) {
-      _currentIndex = _currentIndex.clamp(0, _songs.length - 1);
-      await playSongAt(_currentIndex);
+    if (_gaplessMode) {
+      if (wasPlayingCurrent) {
+        // Removing the playing track changes the current song. Rebuild the
+        // concat at the clamped index so the new current starts cleanly,
+        // rather than leaning on ExoPlayer's silent same-index auto-advance
+        // (which would leave the notification and play history stale).
+        _currentIndex = _currentIndex.clamp(0, _songs.length - 1);
+        await _loadGaplessQueue();
+      } else {
+        if (index < _currentIndex) _currentIndex--;
+        // Pre-set so the shift emit from currentIndexStream is a no-op.
+        _lastGaplessIndex = _currentIndex;
+        if (_gaplessSource != null) await _gaplessSource!.removeAt(index);
+      }
+    } else {
+      if (index < _currentIndex) {
+        _currentIndex--;
+      } else if (wasPlayingCurrent) {
+        _currentIndex = _currentIndex.clamp(0, _songs.length - 1);
+        await playSongAt(_currentIndex);
+      }
     }
     queue.add(_songs.map(_songToMediaItem).toList());
     _saveCurrentPosition();
@@ -1035,6 +1291,14 @@ class PulsrAudioHandler extends BaseAudioHandler
       _currentIndex--;
     } else if (oldIndex > _currentIndex && newIndex <= _currentIndex) {
       _currentIndex++;
+    }
+
+    // move() replays remove(oldIndex)+insert(newIndex) on the concat's still-old
+    // layout, reaching the same order as _songs. Pre-set _lastGaplessIndex so a
+    // shift emit for the (unchanged) current song is swallowed.
+    if (_gaplessMode && _gaplessSource != null) {
+      _lastGaplessIndex = _currentIndex;
+      await _gaplessSource!.move(oldIndex, newIndex);
     }
 
     queue.add(_songs.map(_songToMediaItem).toList());
@@ -1373,6 +1637,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
     _subscriptions.clear();
     _positionSubject.close();
+    _audioSessionIdSubject.close();
     _sleepTimerManager.dispose();
     _equalizerManager.dispose();
     AudioEffectsChannel().releaseEffects();

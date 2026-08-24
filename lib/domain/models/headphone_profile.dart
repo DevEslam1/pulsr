@@ -1,4 +1,5 @@
 // lib/domain/models/headphone_profile.dart
+import 'eq_preset.dart';
 
 class HeadphoneProfile {
   final String id;
@@ -6,7 +7,7 @@ class HeadphoneProfile {
   final String brand;
   final String model;
   final String category; // 'Target Curve', 'In-Ear', 'TWS Earbuds', 'Over-Ear', 'On-Ear', 'Earbuds'
-  final List<double> gains; // 5-band gains in dB [60Hz, 230Hz, 910Hz, 3.6kHz, 14kHz]
+  final List<double> gains; // 10-band gains in dB, aligned to EqPreset.centerFrequencies
   final double bassBoost; // 0.0 to 1.0
   final double preampGain; // in dB
 
@@ -28,7 +29,10 @@ class HeadphoneProfile {
       brand: json['brand'] as String,
       model: json['model'] as String,
       category: json['category'] as String? ?? 'Headphone',
-      gains: (json['gains'] as List<dynamic>).map((e) => (e as num).toDouble()).toList(),
+      // Bundled profiles ship 5-band curves; up-sample to the 10 ISO centers.
+      gains: EqPreset.interpolateGains(
+        (json['gains'] as List<dynamic>).map((e) => (e as num).toDouble()).toList(),
+      ),
       bassBoost: (json['bassBoost'] as num?)?.toDouble() ?? 0.0,
       preampGain: (json['preampGain'] as num?)?.toDouble() ?? 0.0,
     );

@@ -115,6 +115,10 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                             tagMap["channels"] = header.channels
                             tagMap["trackLength"] = header.trackLength
                             tagMap["isLossless"] = header.isLossless
+                            // Bit depth is only meaningful for PCM/lossless; lossy
+                            // formats report 0 here, which the Dart side treats as
+                            // "unknown" and falls back to codec defaults.
+                            tagMap["bitsPerSample"] = runCatching { header.bitsPerSample }.getOrDefault(0)
                         }
 
                         android.os.Handler(android.os.Looper.getMainLooper()).post {

@@ -13,9 +13,7 @@ import 'audio_effects_channel.dart';
 import 'headphone_profiles_repository.dart';
 
 class EqualizerManager {
-  final AndroidEqualizer? equalizerA;
   final AndroidLoudnessEnhancer? loudnessEnhancerA;
-  final AndroidEqualizer? equalizerB;
   final AndroidLoudnessEnhancer? loudnessEnhancerB;
   final AudioEffectsChannel _effectsChannel = AudioEffectsChannel();
   Timer? _saveDebounce;
@@ -36,9 +34,7 @@ class EqualizerManager {
   HeadphoneProfile? selectedHeadphoneProfile;
 
   EqualizerManager({
-    this.equalizerA,
     this.loudnessEnhancerA,
-    this.equalizerB,
     this.loudnessEnhancerB,
   });
 
@@ -51,6 +47,8 @@ class EqualizerManager {
 
   Future<void> init() async {
     await _effectsChannel.init();
+    // Push the fixed 10-band ISO layout so native builds the postEq correctly.
+    await _effectsChannel.setEqBands(EqPreset.centerFrequencies);
     await _restorePreferences();
   }
 
@@ -63,11 +61,14 @@ class EqualizerManager {
       final bass = prefs.getDouble(PrefsKeys.eqBassBoost) ?? 0.0;
       volumeBoost = prefs.getDouble(PrefsKeys.eqVolumeBoost) ?? 0.0;
 
-      List<double> gains = [0.0, 0.0, 0.0, 0.0, 0.0];
+      List<double> gains = List<double>.filled(EqPreset.centerFrequencies.length, 0.0);
       if (gainsJson != null) {
         try {
           final decoded = json.decode(gainsJson) as List<dynamic>;
-          gains = decoded.map((e) => (e as num).toDouble()).toList();
+          // Migrate any legacy (5-band) persisted gains up to the 10 ISO centers.
+          gains = EqPreset.interpolateGains(
+            decoded.map((e) => (e as num).toDouble()).toList(),
+          );
         } catch (e, st) {
           ErrorLogger.log('Failed to decode equalizer gains from prefs', error: e, stackTrace: st, category: 'EqualizerManager');
         }
@@ -146,15 +147,8 @@ class EqualizerManager {
   Future<void> setEqualizerEnabled(bool enabled) async {
     isEnabled = enabled;
     if (Platform.isAndroid) {
-      for (final eq in [equalizerA, equalizerB]) {
-        if (eq != null) {
-          try {
-            await eq.setEnabled(enabled);
-          } catch (e, st) {
-            ErrorLogger.log('Failed to set equalizer enabled state', error: e, stackTrace: st, category: 'EqualizerManager');
-          }
-        }
-      }
+      // The just_audio loudness enhancers are kept only as inert session
+      // anchors; the real EQ runs through the native DynamicsProcessing postEq.
       for (final le in [loudnessEnhancerA, loudnessEnhancerB]) {
         if (le != null) {
           try {
@@ -164,10 +158,13 @@ class EqualizerManager {
           }
         }
       }
+      await _effectsChannel.setEqEnabled(enabled);
       if (!enabled) {
         await _effectsChannel.setVolumeBoost(0);
         await _effectsChannel.setBassBoost(0);
       } else {
+        await _effectsChannel.setEqBandGains(currentPreset.gains);
+        await _effectsChannel.setEqPreamp(selectedHeadphoneProfile?.preampGain ?? 0.0);
         await setVolumeBoost(volumeBoost);
         await setBassBoost(currentPreset.bassBoost);
       }
@@ -178,21 +175,13 @@ class EqualizerManager {
   Future<void> setBandGain(int bandIndex, double gain) async {
     final updatedGains = List<double>.from(currentPreset.gains);
     if (bandIndex >= 0 && bandIndex < updatedGains.length) {
+      final hadProfile = selectedHeadphoneProfile != null;
       updatedGains[bandIndex] = gain;
       currentPreset = currentPreset.copyWith(name: 'Custom', gains: updatedGains);
       selectedHeadphoneProfile = null;
-    }
-    for (final eq in [equalizerA, equalizerB]) {
-      if (eq != null) {
-        try {
-          final parameters = await eq.parameters;
-          if (bandIndex < parameters.bands.length) {
-            await parameters.bands[bandIndex].setGain(gain);
-          }
-        } catch (e, st) {
-          ErrorLogger.log('Failed to set band gain on equalizer', error: e, stackTrace: st, category: 'EqualizerManager');
-        }
-      }
+      await _effectsChannel.setEqBandGain(bandIndex, gain);
+      // A hand tweak abandons any profile preamp; drop back to unity headroom.
+      if (hadProfile) await _effectsChannel.setEqPreamp(0.0);
     }
     _debouncedSavePreferences();
   }
@@ -214,18 +203,9 @@ class EqualizerManager {
   Future<void> applyPreset(EqPreset preset) async {
     currentPreset = preset;
     selectedHeadphoneProfile = null;
-    for (final eq in [equalizerA, equalizerB]) {
-      if (eq != null) {
-        try {
-          final parameters = await eq.parameters;
-          for (int i = 0; i < preset.gains.length && i < parameters.bands.length; i++) {
-            await parameters.bands[i].setGain(preset.gains[i]);
-          }
-        } catch (e, st) {
-          ErrorLogger.log('Failed to apply preset band gains', error: e, stackTrace: st, category: 'EqualizerManager');
-        }
-      }
-    }
+    await _effectsChannel.setEqBandGains(preset.gains);
+    // Built-in presets carry no preamp; keep headroom at unity.
+    await _effectsChannel.setEqPreamp(0.0);
     await setBassBoost(preset.bassBoost);
     await _savePreferences();
   }
@@ -238,25 +218,10 @@ class EqualizerManager {
         gains: profile.gains,
         bassBoost: profile.bassBoost,
       );
-      for (final eq in [equalizerA, equalizerB]) {
-        if (eq != null) {
-          try {
-            final parameters = await eq.parameters;
-            for (int i = 0; i < profile.gains.length && i < parameters.bands.length; i++) {
-              await parameters.bands[i].setGain(profile.gains[i]);
-            }
-          } catch (e, st) {
-            ErrorLogger.log('Failed to apply headphone profile gains', error: e, stackTrace: st, category: 'EqualizerManager');
-          }
-        }
-      }
-      if (profile.preampGain > 0.0) {
-        final normalizedPreamp = (profile.preampGain / 12.0).clamp(0.0, 1.0);
-        await setVolumeBoost(normalizedPreamp);
-      } else {
-        // Negative preamp gain provides headroom for EQ boosts — do not amplify volume
-        await setVolumeBoost(0.0);
-      }
+      await _effectsChannel.setEqBandGains(profile.gains);
+      // Apply the profile preamp as real headroom — negative attenuates
+      // (protects against EQ-boost clipping) instead of being discarded.
+      await _effectsChannel.setEqPreamp(profile.preampGain);
       await setBassBoost(profile.bassBoost);
     }
     await _savePreferences();

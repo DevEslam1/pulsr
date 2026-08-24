@@ -26,7 +26,7 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
   String _searchQuery = '';
   bool _isLoadingProfiles = true;
 
-  static const List<String> _bandLabels = ['60Hz', '230Hz', '910Hz', '3.6kHz', '14kHz'];
+  static const List<String> _bandLabels = ['32', '64', '125', '250', '500', '1K', '2K', '4K', '8K', '16K'];
 
   @override
   void initState() {
@@ -316,7 +316,7 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
             const SizedBox(height: 16),
           ],
 
-          // 5-Band Equalizer Vertical Sliders
+          // 10-Band Equalizer Vertical Sliders
           Container(
             padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 6),
             decoration: BoxDecoration(
@@ -326,27 +326,29 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: List.generate(5, (index) {
+              children: List.generate(_bandLabels.length, (index) {
                 final gain = index < preset.gains.length ? preset.gains[index] : 0.0;
-                return _VerticalEqSlider(
-                  value: gain,
-                  label: _bandLabels[index],
-                  isEnabled: isEnabled,
-                  accentColor: p.accent,
-                  trackColor: p.hairline,
-                  surfaceColor: p.surface,
-                  textColor: p.textPrimary,
-                  onInteraction: () {
-                    if (!state.isEqEnabled) {
-                      cubit.setEqualizerEnabled(true);
-                    }
-                  },
-                  onChanged: (val) {
-                    if (!state.isEqEnabled) {
-                      cubit.setEqualizerEnabled(true);
-                    }
-                    cubit.setBandGain(index, val);
-                  },
+                return Expanded(
+                  child: _VerticalEqSlider(
+                    value: gain,
+                    label: _bandLabels[index],
+                    isEnabled: isEnabled,
+                    accentColor: p.accent,
+                    trackColor: p.hairline,
+                    surfaceColor: p.surface,
+                    textColor: p.textPrimary,
+                    onInteraction: () {
+                      if (!state.isEqEnabled) {
+                        cubit.setEqualizerEnabled(true);
+                      }
+                    },
+                    onChanged: (val) {
+                      if (!state.isEqEnabled) {
+                        cubit.setEqualizerEnabled(true);
+                      }
+                      cubit.setBandGain(index, val);
+                    },
+                  ),
                 );
               }),
             ),
@@ -1296,18 +1298,21 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
       mainAxisSize: MainAxisSize.min,
       children: [
         // Value Pill
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: (gain.abs() > 0.1 ? widget.accentColor : widget.trackColor).withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(
-            '${gain > 0 ? '+' : ''}${gain.toStringAsFixed(1)}',
-            style: TextStyle(
-              fontSize: 10,
-              color: gain.abs() > 0.1 ? widget.accentColor : widget.textColor,
-              fontWeight: FontWeight.w700,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: (gain.abs() > 0.1 ? widget.accentColor : widget.trackColor).withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              '${gain > 0 ? '+' : ''}${gain.toStringAsFixed(1)}',
+              style: TextStyle(
+                fontSize: 10,
+                color: gain.abs() > 0.1 ? widget.accentColor : widget.textColor,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
         ),
@@ -1316,7 +1321,7 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
         // Vertical Slider Track
         SizedBox(
           height: 140,
-          width: 48,
+          width: double.infinity,
           child: LayoutBuilder(
             builder: (context, constraints) {
               final height = constraints.maxHeight;
@@ -1373,12 +1378,15 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
         const SizedBox(height: 8),
 
         // Frequency Label
-        Text(
-          widget.label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            color: widget.textColor,
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            widget.label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: widget.textColor,
+            ),
           ),
         ),
       ],

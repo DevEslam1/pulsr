@@ -14,6 +14,7 @@ import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/lrc_parser.dart';
 import '../../../data/audio/audio_handler.dart';
 import '../../../data/db/app_database.dart';
+import '../../../data/scanner/media_scanner_service.dart';
 import '../../../domain/models/audio_effects_config.dart';
 import '../../../domain/models/eq_preset.dart';
 import '../../../domain/models/headphone_profile.dart';
@@ -51,6 +52,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   StreamSubscription? _settingsSub;
   StreamSubscription? _widgetClickSub;
   StreamSubscription? _sleepTimerSub;
+  StreamSubscription? _audioSessionIdSub;
   DateTime? _lastWidgetUpdateTime;
 
   final Map<int, _QueueSlotData> _queueSlots = {
@@ -198,6 +200,7 @@ class PlayerCubit extends Cubit<PlayerState> {
 
             if (!isSameSong) {
               _loadLyricsForSong(resolvedSong!);
+              _enrichAudioQuality(resolvedSong!);
             }
             _updateWidgetThrottled(force: true);
             _scrobblerService?.notifyPlaybackState(
@@ -258,6 +261,34 @@ class PlayerCubit extends Cubit<PlayerState> {
     _sleepTimerSub = _audioHandler.sleepTimerRemainingStream.listen((remaining) {
       emit(state.copyWith(sleepTimerRemaining: remaining));
     });
+
+    if (_audioHandler.currentAudioSessionId != null) {
+      emit(state.copyWith(audioSessionId: _audioHandler.currentAudioSessionId));
+    }
+    _audioSessionIdSub = _audioHandler.audioSessionIdStream.listen((id) {
+      emit(state.copyWith(audioSessionId: id));
+    });
+  }
+
+  /// Reads real audio-header fields for a local song the first time it plays
+  /// and caches them, so the quality badge shows actual metadata. Cheap: runs
+  /// once per file (skips songs already enriched) and only for local files.
+  Future<void> _enrichAudioQuality(SongsTableData song) async {
+    if (song.source != SongSource.local) return;
+    if (song.codec != null) return;
+    final path = song.path;
+    if (path.isEmpty || path.startsWith('http') || path.startsWith('ytmusic://')) {
+      return;
+    }
+    try {
+      await getIt<MediaScannerService>().enrichAudioQuality(song.id, path);
+      if (isClosed) return;
+      final refreshed = await _repository.getSongById(song.id);
+      final updated = refreshed.fold((_) => null, (s) => s);
+      if (updated != null && !isClosed && state.currentSong?.id == updated.id) {
+        emit(state.copyWith(currentSong: updated));
+      }
+    } catch (_) {}
   }
 
   Future<void> _loadLyricsForSong(SongsTableData song) async {
@@ -659,6 +690,7 @@ class PlayerCubit extends Cubit<PlayerState> {
     _settingsSub?.cancel();
     _widgetClickSub?.cancel();
     _sleepTimerSub?.cancel();
+    _audioSessionIdSub?.cancel();
     return super.close();
   }
 }

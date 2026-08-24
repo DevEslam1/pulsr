@@ -18,7 +18,7 @@ mixin _$SettingsState {
   double get crossfadeSeconds;
   int get minDurationSec;
   bool get autoHideSystemMedia;
-  bool get dynamicThemingEnabled;
+  ThemeColorSource get themeColorSource;
   bool get resumeAfterInterruption;
   bool get waveformSeekBarEnabled;
   AppThemeMode get themeMode;
@@ -61,8 +61,8 @@ mixin _$SettingsState {
                 other.minDurationSec == minDurationSec) &&
             (identical(other.autoHideSystemMedia, autoHideSystemMedia) ||
                 other.autoHideSystemMedia == autoHideSystemMedia) &&
-            (identical(other.dynamicThemingEnabled, dynamicThemingEnabled) ||
-                other.dynamicThemingEnabled == dynamicThemingEnabled) &&
+            (identical(other.themeColorSource, themeColorSource) ||
+                other.themeColorSource == themeColorSource) &&
             (identical(
                     other.resumeAfterInterruption, resumeAfterInterruption) ||
                 other.resumeAfterInterruption == resumeAfterInterruption) &&
@@ -114,7 +114,7 @@ mixin _$SettingsState {
         crossfadeSeconds,
         minDurationSec,
         autoHideSystemMedia,
-        dynamicThemingEnabled,
+        themeColorSource,
         resumeAfterInterruption,
         waveformSeekBarEnabled,
         themeMode,
@@ -139,7 +139,7 @@ mixin _$SettingsState {
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, dynamicThemingEnabled: $dynamicThemingEnabled, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
   }
 }
 
@@ -154,7 +154,7 @@ abstract mixin class $SettingsStateCopyWith<$Res> {
       double crossfadeSeconds,
       int minDurationSec,
       bool autoHideSystemMedia,
-      bool dynamicThemingEnabled,
+      ThemeColorSource themeColorSource,
       bool resumeAfterInterruption,
       bool waveformSeekBarEnabled,
       AppThemeMode themeMode,
@@ -194,7 +194,7 @@ class _$SettingsStateCopyWithImpl<$Res>
     Object? crossfadeSeconds = null,
     Object? minDurationSec = null,
     Object? autoHideSystemMedia = null,
-    Object? dynamicThemingEnabled = null,
+    Object? themeColorSource = null,
     Object? resumeAfterInterruption = null,
     Object? waveformSeekBarEnabled = null,
     Object? themeMode = null,
@@ -233,10 +233,10 @@ class _$SettingsStateCopyWithImpl<$Res>
           ? _self.autoHideSystemMedia
           : autoHideSystemMedia // ignore: cast_nullable_to_non_nullable
               as bool,
-      dynamicThemingEnabled: null == dynamicThemingEnabled
-          ? _self.dynamicThemingEnabled
-          : dynamicThemingEnabled // ignore: cast_nullable_to_non_nullable
-              as bool,
+      themeColorSource: null == themeColorSource
+          ? _self.themeColorSource
+          : themeColorSource // ignore: cast_nullable_to_non_nullable
+              as ThemeColorSource,
       resumeAfterInterruption: null == resumeAfterInterruption
           ? _self.resumeAfterInterruption
           : resumeAfterInterruption // ignore: cast_nullable_to_non_nullable
@@ -419,7 +419,7 @@ extension SettingsStatePatterns on SettingsState {
             double crossfadeSeconds,
             int minDurationSec,
             bool autoHideSystemMedia,
-            bool dynamicThemingEnabled,
+            ThemeColorSource themeColorSource,
             bool resumeAfterInterruption,
             bool waveformSeekBarEnabled,
             AppThemeMode themeMode,
@@ -451,7 +451,7 @@ extension SettingsStatePatterns on SettingsState {
             _that.crossfadeSeconds,
             _that.minDurationSec,
             _that.autoHideSystemMedia,
-            _that.dynamicThemingEnabled,
+            _that.themeColorSource,
             _that.resumeAfterInterruption,
             _that.waveformSeekBarEnabled,
             _that.themeMode,
@@ -497,7 +497,7 @@ extension SettingsStatePatterns on SettingsState {
             double crossfadeSeconds,
             int minDurationSec,
             bool autoHideSystemMedia,
-            bool dynamicThemingEnabled,
+            ThemeColorSource themeColorSource,
             bool resumeAfterInterruption,
             bool waveformSeekBarEnabled,
             AppThemeMode themeMode,
@@ -528,7 +528,7 @@ extension SettingsStatePatterns on SettingsState {
             _that.crossfadeSeconds,
             _that.minDurationSec,
             _that.autoHideSystemMedia,
-            _that.dynamicThemingEnabled,
+            _that.themeColorSource,
             _that.resumeAfterInterruption,
             _that.waveformSeekBarEnabled,
             _that.themeMode,
@@ -573,7 +573,7 @@ extension SettingsStatePatterns on SettingsState {
             double crossfadeSeconds,
             int minDurationSec,
             bool autoHideSystemMedia,
-            bool dynamicThemingEnabled,
+            ThemeColorSource themeColorSource,
             bool resumeAfterInterruption,
             bool waveformSeekBarEnabled,
             AppThemeMode themeMode,
@@ -604,7 +604,7 @@ extension SettingsStatePatterns on SettingsState {
             _that.crossfadeSeconds,
             _that.minDurationSec,
             _that.autoHideSystemMedia,
-            _that.dynamicThemingEnabled,
+            _that.themeColorSource,
             _that.resumeAfterInterruption,
             _that.waveformSeekBarEnabled,
             _that.themeMode,
@@ -639,7 +639,7 @@ class _SettingsState extends SettingsState {
       this.crossfadeSeconds = 0.0,
       this.minDurationSec = 30,
       this.autoHideSystemMedia = true,
-      this.dynamicThemingEnabled = true,
+      this.themeColorSource = ThemeColorSource.artwork,
       this.resumeAfterInterruption = true,
       this.waveformSeekBarEnabled = true,
       this.themeMode = AppThemeMode.dark,
@@ -676,7 +676,7 @@ class _SettingsState extends SettingsState {
   final bool autoHideSystemMedia;
   @override
   @JsonKey()
-  final bool dynamicThemingEnabled;
+  final ThemeColorSource themeColorSource;
   @override
   @JsonKey()
   final bool resumeAfterInterruption;
@@ -757,8 +757,8 @@ class _SettingsState extends SettingsState {
                 other.minDurationSec == minDurationSec) &&
             (identical(other.autoHideSystemMedia, autoHideSystemMedia) ||
                 other.autoHideSystemMedia == autoHideSystemMedia) &&
-            (identical(other.dynamicThemingEnabled, dynamicThemingEnabled) ||
-                other.dynamicThemingEnabled == dynamicThemingEnabled) &&
+            (identical(other.themeColorSource, themeColorSource) ||
+                other.themeColorSource == themeColorSource) &&
             (identical(
                     other.resumeAfterInterruption, resumeAfterInterruption) ||
                 other.resumeAfterInterruption == resumeAfterInterruption) &&
@@ -810,7 +810,7 @@ class _SettingsState extends SettingsState {
         crossfadeSeconds,
         minDurationSec,
         autoHideSystemMedia,
-        dynamicThemingEnabled,
+        themeColorSource,
         resumeAfterInterruption,
         waveformSeekBarEnabled,
         themeMode,
@@ -835,7 +835,7 @@ class _SettingsState extends SettingsState {
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, dynamicThemingEnabled: $dynamicThemingEnabled, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
   }
 }
 
@@ -852,7 +852,7 @@ abstract mixin class _$SettingsStateCopyWith<$Res>
       double crossfadeSeconds,
       int minDurationSec,
       bool autoHideSystemMedia,
-      bool dynamicThemingEnabled,
+      ThemeColorSource themeColorSource,
       bool resumeAfterInterruption,
       bool waveformSeekBarEnabled,
       AppThemeMode themeMode,
@@ -892,7 +892,7 @@ class __$SettingsStateCopyWithImpl<$Res>
     Object? crossfadeSeconds = null,
     Object? minDurationSec = null,
     Object? autoHideSystemMedia = null,
-    Object? dynamicThemingEnabled = null,
+    Object? themeColorSource = null,
     Object? resumeAfterInterruption = null,
     Object? waveformSeekBarEnabled = null,
     Object? themeMode = null,
@@ -931,10 +931,10 @@ class __$SettingsStateCopyWithImpl<$Res>
           ? _self.autoHideSystemMedia
           : autoHideSystemMedia // ignore: cast_nullable_to_non_nullable
               as bool,
-      dynamicThemingEnabled: null == dynamicThemingEnabled
-          ? _self.dynamicThemingEnabled
-          : dynamicThemingEnabled // ignore: cast_nullable_to_non_nullable
-              as bool,
+      themeColorSource: null == themeColorSource
+          ? _self.themeColorSource
+          : themeColorSource // ignore: cast_nullable_to_non_nullable
+              as ThemeColorSource,
       resumeAfterInterruption: null == resumeAfterInterruption
           ? _self.resumeAfterInterruption
           : resumeAfterInterruption // ignore: cast_nullable_to_non_nullable

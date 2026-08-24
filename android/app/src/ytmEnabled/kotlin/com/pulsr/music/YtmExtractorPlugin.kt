@@ -72,21 +72,61 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             channel.setMethodCallHandler(plugin)
             return plugin
         }
+    }
 
-        private fun ensureExtractorReady() {
+    // Locale the extractor should localize to. Set from the Dart call (device
+    // locale) before the one-time NewPipe.init; falls back to the Android
+    // resource config / JVM default when Dart provides nothing.
+    @Volatile
+    private var pendingCountry: String? = null
+    @Volatile
+    private var pendingLang: String? = null
+
+    private fun ensureExtractorReady() {
+        if (extractorReady) return
+        synchronized(Companion) {
             if (extractorReady) return
-            synchronized(this) {
-                if (extractorReady) return
-                val country = ContentCountry("EG")
-                val localization = Localization.fromLocale(Locale("ar", "EG"))
-                NewPipe.init(
-                    PulsrDownloader(),
-                    localization,
-                    country,
-                )
-                extractorReady = true
-            }
+            val locale = resolveLocale()
+            val countryCode = (pendingCountry?.takeIf { it.isNotBlank() }
+                ?: locale.country).ifBlank { "US" }
+            NewPipe.init(
+                PulsrDownloader(),
+                Localization.fromLocale(locale),
+                ContentCountry(countryCode),
+            )
+            extractorReady = true
         }
+    }
+
+    private fun resolveLocale(): Locale {
+        val lang = pendingLang?.takeIf { it.isNotBlank() }
+        val country = pendingCountry?.takeIf { it.isNotBlank() }
+        if (lang != null) {
+            return if (country != null) Locale(lang, country) else Locale(lang)
+        }
+        val ctx = context
+        if (ctx != null) {
+            val config = ctx.resources.configuration
+            val loc = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                config.locales[0]
+            } else {
+                @Suppress("DEPRECATION")
+                config.locale
+            }
+            if (loc != null) return loc
+        }
+        return Locale.getDefault()
+    }
+
+    /**
+     * Records the caller's locale so the one-time [ensureExtractorReady] can
+     * localize to it. No-op once the extractor is initialized (NewPipe's
+     * localization is global and fixed at init).
+     */
+    private fun captureLocale(call: MethodCall) {
+        if (extractorReady) return
+        call.argument<String>("country")?.let { pendingCountry = it }
+        call.argument<String>("lang")?.let { pendingLang = it }
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -102,10 +142,12 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                     result.error("YTM_INVALID_ARGUMENT", "query is required", null)
                     return
                 }
+                captureLocale(call)
                 val limit = call.argument<Int>("limit") ?: DEFAULT_SEARCH_LIMIT
                 runOffMainThread(result) { search(query, limit) }
             }
             "trending" -> {
+                captureLocale(call)
                 val limit = call.argument<Int>("limit") ?: DEFAULT_SEARCH_LIMIT
                 runOffMainThread(result) { trending(limit) }
             }
@@ -206,21 +248,20 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
     }
 
     /**
-     * Surfaces Egyptian trending music tracks.
+     * Surfaces trending music via YouTube's Trending kiosk. The kiosk is
+     * localized by the [ContentCountry] set at init, so results follow the
+     * device locale instead of a hardcoded region.
      */
     private fun trending(limit: Int): List<Map<String, Any?>> {
-        val list = try {
-            search("أغاني مصرية تريند", limit)
-        } catch (_: Throwable) {
-            emptyList()
-        }
-        if (list.isNotEmpty()) return list
-
         return try {
-            val kioskExtractor = ServiceList.YouTube.kioskList.getExtractorById(ServiceList.YouTube.kioskList.defaultKioskId, null)
+            val kioskList = ServiceList.YouTube.kioskList
+            val kioskExtractor = kioskList.getExtractorById(kioskList.defaultKioskId, null)
             kioskExtractor.fetchPage()
             val kioskInfo = org.schabi.newpipe.extractor.kiosk.KioskInfo.getInfo(kioskExtractor)
-            streamItemsToMaps(kioskInfo.relatedItems.asSequence().filterIsInstance<StreamInfoItem>(), limit)
+            streamItemsToMaps(
+                kioskInfo.relatedItems.asSequence().filterIsInstance<StreamInfoItem>(),
+                limit,
+            )
         } catch (_: Throwable) {
             emptyList()
         }

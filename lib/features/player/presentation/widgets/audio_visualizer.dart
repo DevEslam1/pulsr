@@ -21,6 +21,7 @@ class AudioVisualizer extends StatefulWidget {
   final double width;
   final double height;
   final bool isPlaying;
+  final int? audioSessionId;
 
   const AudioVisualizer({
     super.key,
@@ -29,6 +30,7 @@ class AudioVisualizer extends StatefulWidget {
     this.width = double.infinity,
     this.height = 120.0,
     this.isPlaying = true,
+    this.audioSessionId,
   });
 
   @override
@@ -106,6 +108,13 @@ class _AudioVisualizerState extends State<AudioVisualizer>
       } else {
         _stopNativeVisualizer();
       }
+    } else if (widget.audioSessionId != oldWidget.audioSessionId &&
+        widget.style != VisualizerStyle.off &&
+        widget.isPlaying &&
+        Platform.isAndroid) {
+      // Session changed (first assignment, or a crossfade swap to the other
+      // player) — rebind the native Visualizer to the new session id.
+      _startNativeVisualizer();
     }
   }
 
@@ -154,7 +163,18 @@ class _AudioVisualizerState extends State<AudioVisualizer>
             if (shouldAsk != true) return;
           }
           final res = await Permission.microphone.request();
-          if (!res.isGranted) return;
+          if (!res.isGranted) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Visualizer permission denied — showing a simulated animation instead.',
+                  ),
+                ),
+              );
+            }
+            return;
+          }
         }
       }
       await _subscription?.cancel();
@@ -198,7 +218,9 @@ class _AudioVisualizerState extends State<AudioVisualizer>
           ErrorLogger.log('Visualizer event stream error', error: e, stackTrace: st, category: 'AudioVisualizer');
         },
       );
-      await _methodChannel.invokeMethod('start', {'audioSessionId': 0});
+      await _methodChannel.invokeMethod('start', {
+        'audioSessionId': widget.audioSessionId ?? 0,
+      });
     } catch (e, st) {
       ErrorLogger.log('Failed to start native audio visualizer', error: e, stackTrace: st, category: 'AudioVisualizer');
     }

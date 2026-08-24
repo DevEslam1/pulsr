@@ -54,6 +54,28 @@ class YtmAccountService {
   static const String _innertubeBrowseUrl =
       'https://music.youtube.com/youtubei/v1/browse?prettyPrint=false';
 
+  // InnerTube WEB_REMIX client identifiers, in one place so a refresh is a
+  // single edit. YouTube bumps its client version periodically and eventually
+  // rejects stale values, which surfaces as authenticated calls returning
+  // sign-in pages (HTTP 200, no contents). When that happens, recapture these
+  // from a live music.youtube.com session.
+  static const String _clientName = 'WEB_REMIX';
+  static const String _clientVersion = '1.20240417.01.00';
+  static const String _clientNameId = '67';
+  static const String _apiKey = 'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30';
+  static const String _userAgent =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
+  /// The `context.client` block every InnerTube request shares.
+  static Map<String, dynamic> _clientContext() => {
+        'client': {
+          'clientName': _clientName,
+          'clientVersion': _clientVersion,
+          'hl': 'en',
+          'gl': 'US',
+        }
+      };
+
   String? _cookies;
   String? _accountName;
   String? _accountAvatar;
@@ -144,16 +166,15 @@ class YtmAccountService {
   Map<String, String> _buildHeaders() {
     final headers = <String, String>{
       'Content-Type': 'application/json',
-      'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'User-Agent': _userAgent,
       'Origin': 'https://music.youtube.com',
       'Referer': 'https://music.youtube.com/',
       'x-origin': 'https://music.youtube.com',
-      'x-youtube-client-name': '67',
-      'x-youtube-client-version': '1.20240417.01.00',
+      'x-youtube-client-name': _clientNameId,
+      'x-youtube-client-version': _clientVersion,
       'x-goog-authuser': '0',
       // Required when not using the ?key= query param
-      'X-Goog-Api-Key': 'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30',
+      'X-Goog-Api-Key': _apiKey,
     };
 
     if (_cookies != null && _cookies!.isNotEmpty) {
@@ -201,14 +222,7 @@ class YtmAccountService {
     for (final bId in browseIds) {
       try {
         final body = jsonEncode({
-          'context': {
-            'client': {
-              'clientName': 'WEB_REMIX',
-              'clientVersion': '1.20240417.01.00',
-              'hl': 'en',
-              'gl': 'US',
-            }
-          },
+          'context': _clientContext(),
           'browseId': bId,
         });
 
@@ -243,14 +257,7 @@ class YtmAccountService {
 
     try {
       final body = jsonEncode({
-        'context': {
-          'client': {
-            'clientName': 'WEB_REMIX',
-            'clientVersion': '1.20240417.01.00',
-            'hl': 'en',
-            'gl': 'US',
-          }
-        },
+        'context': _clientContext(),
         'browseId': 'FEmusic_home',
       });
 
@@ -289,14 +296,7 @@ class YtmAccountService {
     try {
       // 1. Query Next endpoint to find lyrics browse ID
       final nextBody = jsonEncode({
-        'context': {
-          'client': {
-            'clientName': 'WEB_REMIX',
-            'clientVersion': '1.20240417.01.00',
-            'hl': 'en',
-            'gl': 'US',
-          }
-        },
+        'context': _clientContext(),
         'videoId': videoId,
       });
 
@@ -337,14 +337,7 @@ class YtmAccountService {
 
       // 2. Fetch the lyrics browse payload
       final browseBody = jsonEncode({
-        'context': {
-          'client': {
-            'clientName': 'WEB_REMIX',
-            'clientVersion': '1.20240417.01.00',
-            'hl': 'en',
-            'gl': 'US',
-          }
-        },
+        'context': _clientContext(),
         'browseId': lyricsBrowseId,
       });
 
@@ -418,14 +411,7 @@ class YtmAccountService {
     for (final bId in browseIds) {
       try {
         final body = jsonEncode({
-          'context': {
-            'client': {
-              'clientName': 'WEB_REMIX',
-              'clientVersion': '1.20240417.01.00',
-              'hl': 'en',
-              'gl': 'US',
-            }
-          },
+          'context': _clientContext(),
           'browseId': bId,
         });
 
@@ -452,25 +438,6 @@ class YtmAccountService {
           if (tracks.isNotEmpty) {
             return tracks;
           }
-
-          // --- DIAGNOSTIC: log response structure so we can fix the parser ---
-          final topKeys = json.keys.toList();
-          debugPrint('[YTM_ACCOUNT] DIAG $bId top-level keys: $topKeys');
-          // Log the shape one level deep to understand the response layout.
-          for (final k in topKeys.take(5)) {
-            final v = json[k];
-            if (v is Map) {
-              debugPrint('[YTM_ACCOUNT] DIAG $bId.$k keys: ${v.keys.toList()}');
-            } else if (v is List) {
-              debugPrint('[YTM_ACCOUNT] DIAG $bId.$k is List[${v.length}]');
-            }
-          }
-          // Also dump a raw snippet for manual inspection.
-          final snippet = response.body.length > 800
-              ? response.body.substring(0, 800)
-              : response.body;
-          debugPrint('[YTM_ACCOUNT] DIAG $bId body snippet: $snippet');
-          // --- END DIAGNOSTIC ---
         } else {
           final snippet = response.body.length > 300
               ? response.body.substring(0, 300)

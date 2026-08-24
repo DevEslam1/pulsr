@@ -50,6 +50,10 @@ class MockPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   @override
   SongsTableData? get currentSong => null;
   @override
+  int? get currentAudioSessionId => null;
+  @override
+  Stream<int?> get audioSessionIdStream => Stream<int?>.empty();
+  @override
   Future<void> setVolume(double volume) async {}
   @override
   bool get isEqualizerEnabled => false;

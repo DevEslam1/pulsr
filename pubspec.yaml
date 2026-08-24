@@ -21,6 +21,7 @@ dependencies:
   path: ^1.9.1
   sqlite3_flutter_libs: ^0.5.28
   palette_generator: ^0.3.3+6
+  dynamic_color: ^1.7.0
   flutter_animate: ^4.5.2
   permission_handler: ^11.4.0
   shared_preferences: ^2.5.2

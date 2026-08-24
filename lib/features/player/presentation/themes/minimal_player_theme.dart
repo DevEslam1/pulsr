@@ -170,6 +170,7 @@ class MinimalPlayerTheme extends StatelessWidget {
                         color: activeColor,
                         height: visualizerStyle == VisualizerStyle.circular ? 100 : 48,
                         isPlaying: state.isPlaying,
+                        audioSessionId: state.audioSessionId,
                       ),
                   ],
                 ),

@@ -252,6 +252,7 @@ class CardPlayerTheme extends StatelessWidget {
                     color: activeColor,
                     height: settingsState.visualizerStyle == VisualizerStyle.circular ? 90 : 56,
                     isPlaying: state.isPlaying,
+                    audioSessionId: state.audioSessionId,
                   ),
                 ),
 

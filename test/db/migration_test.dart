@@ -17,8 +17,8 @@ void main() {
       await db.close();
     });
 
-    test('Fresh database opens at schemaVersion 5 and has all indexes', () async {
-      expect(db.schemaVersion, equals(5));
+    test('Fresh database opens at schemaVersion 6 and has all indexes', () async {
+      expect(db.schemaVersion, equals(6));
 
       // Test inserting a song with schema v4 fields
       final songId = await db.into(db.songsTable).insert(
@@ -38,6 +38,11 @@ void main() {
       expect(song.replayGain, equals(-1.5));
       expect(song.source, equals(SongSource.local));
       expect(song.remoteId, equals(null));
+      // v6 audio-quality columns default to null until enrichment runs.
+      expect(song.sampleRate, equals(null));
+      expect(song.bitDepth, equals(null));
+      expect(song.bitrateKbps, equals(null));
+      expect(song.codec, equals(null));
     });
 
     test('YouTube rows coexist with local rows and remote_id is unique', () async {
@@ -108,7 +113,7 @@ void main() {
       return rows.map((row) => row.read<String>('name')).toSet();
     }
 
-    test('v4 -> v5 backfills source, keeps data, and adds the new indexes', () async {
+    test('v4 -> v6 backfills source, keeps data, and adds the new indexes', () async {
       upgraded = openLegacyDatabase(4);
 
       // Opening is lazy; the first query is what triggers the migration.
@@ -129,7 +134,7 @@ void main() {
       expect(await songIndexNames(), containsAll(['idx_songs_source', 'idx_songs_remote_id']));
 
       final version = await upgraded.customSelect('PRAGMA user_version;').getSingle();
-      expect(version.data['user_version'], equals(5));
+      expect(version.data['user_version'], equals(6));
 
       // The upgraded schema must accept remote rows, not just the fresh one.
       await upgraded.into(upgraded.songsTable).insert(
@@ -143,7 +148,7 @@ void main() {
       );
     });
 
-    test('v2 -> v5 runs the whole ladder without indexing a column that does not exist yet', () async {
+    test('v2 -> v6 runs the whole ladder without indexing a column that does not exist yet', () async {
       upgraded = openLegacyDatabase(2);
 
       final song = await (upgraded.select(upgraded.songsTable)..where((t) => t.id.equals(77))).getSingle();

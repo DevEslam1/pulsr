@@ -151,6 +151,29 @@ class $SongsTableTable extends SongsTable
   late final GeneratedColumn<int> fileSize = GeneratedColumn<int>(
       'file_size', aliasedName, true,
       type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _sampleRateMeta =
+      const VerificationMeta('sampleRate');
+  @override
+  late final GeneratedColumn<int> sampleRate = GeneratedColumn<int>(
+      'sample_rate', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _bitDepthMeta =
+      const VerificationMeta('bitDepth');
+  @override
+  late final GeneratedColumn<int> bitDepth = GeneratedColumn<int>(
+      'bit_depth', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _bitrateKbpsMeta =
+      const VerificationMeta('bitrateKbps');
+  @override
+  late final GeneratedColumn<int> bitrateKbps = GeneratedColumn<int>(
+      'bitrate_kbps', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _codecMeta = const VerificationMeta('codec');
+  @override
+  late final GeneratedColumn<String> codec = GeneratedColumn<String>(
+      'codec', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _sourceMeta = const VerificationMeta('source');
   @override
   late final GeneratedColumn<String> source = GeneratedColumn<String>(
@@ -200,6 +223,10 @@ class $SongsTableTable extends SongsTable
         lastPositionMs,
         artworkUri,
         fileSize,
+        sampleRate,
+        bitDepth,
+        bitrateKbps,
+        codec,
         source,
         remoteId,
         remoteArtworkUrl,
@@ -322,6 +349,26 @@ class $SongsTableTable extends SongsTable
       context.handle(_fileSizeMeta,
           fileSize.isAcceptableOrUnknown(data['file_size']!, _fileSizeMeta));
     }
+    if (data.containsKey('sample_rate')) {
+      context.handle(
+          _sampleRateMeta,
+          sampleRate.isAcceptableOrUnknown(
+              data['sample_rate']!, _sampleRateMeta));
+    }
+    if (data.containsKey('bit_depth')) {
+      context.handle(_bitDepthMeta,
+          bitDepth.isAcceptableOrUnknown(data['bit_depth']!, _bitDepthMeta));
+    }
+    if (data.containsKey('bitrate_kbps')) {
+      context.handle(
+          _bitrateKbpsMeta,
+          bitrateKbps.isAcceptableOrUnknown(
+              data['bitrate_kbps']!, _bitrateKbpsMeta));
+    }
+    if (data.containsKey('codec')) {
+      context.handle(
+          _codecMeta, codec.isAcceptableOrUnknown(data['codec']!, _codecMeta));
+    }
     if (data.containsKey('source')) {
       context.handle(_sourceMeta,
           source.isAcceptableOrUnknown(data['source']!, _sourceMeta));
@@ -395,6 +442,14 @@ class $SongsTableTable extends SongsTable
           .read(DriftSqlType.string, data['${effectivePrefix}artwork_uri']),
       fileSize: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}file_size']),
+      sampleRate: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}sample_rate']),
+      bitDepth: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}bit_depth']),
+      bitrateKbps: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}bitrate_kbps']),
+      codec: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}codec']),
       source: attachedDatabase.typeMapping
           .read(DriftSqlType.string, data['${effectivePrefix}source'])!,
       remoteId: attachedDatabase.typeMapping
@@ -438,6 +493,17 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
   final String? artworkUri;
   final int? fileSize;
 
+  /// Real audio-header fields, read from the file via the tag channel and
+  /// cached so the quality badge reflects actual metadata rather than a guess
+  /// from the filename/extension. Null until a file has been enriched.
+  final int? sampleRate;
+  final int? bitDepth;
+  final int? bitrateKbps;
+
+  /// Real container/codec from the header (e.g. FLAC, MP3, AAC, ALAC), used to
+  /// gate lossless/Hi-Res so a renamed file cannot fake a higher tier.
+  final String? codec;
+
   /// See [SongSource]. Rows that are not [SongSource.local] have no file on
   /// disk, so scanner cleanup and every path-derived query must exclude them.
   final String source;
@@ -473,6 +539,10 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       required this.lastPositionMs,
       this.artworkUri,
       this.fileSize,
+      this.sampleRate,
+      this.bitDepth,
+      this.bitrateKbps,
+      this.codec,
       required this.source,
       this.remoteId,
       this.remoteArtworkUrl,
@@ -525,6 +595,18 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
     }
     if (!nullToAbsent || fileSize != null) {
       map['file_size'] = Variable<int>(fileSize);
+    }
+    if (!nullToAbsent || sampleRate != null) {
+      map['sample_rate'] = Variable<int>(sampleRate);
+    }
+    if (!nullToAbsent || bitDepth != null) {
+      map['bit_depth'] = Variable<int>(bitDepth);
+    }
+    if (!nullToAbsent || bitrateKbps != null) {
+      map['bitrate_kbps'] = Variable<int>(bitrateKbps);
+    }
+    if (!nullToAbsent || codec != null) {
+      map['codec'] = Variable<String>(codec);
     }
     map['source'] = Variable<String>(source);
     if (!nullToAbsent || remoteId != null) {
@@ -582,6 +664,17 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       fileSize: fileSize == null && nullToAbsent
           ? const Value.absent()
           : Value(fileSize),
+      sampleRate: sampleRate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sampleRate),
+      bitDepth: bitDepth == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bitDepth),
+      bitrateKbps: bitrateKbps == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bitrateKbps),
+      codec:
+          codec == null && nullToAbsent ? const Value.absent() : Value(codec),
       source: Value(source),
       remoteId: remoteId == null && nullToAbsent
           ? const Value.absent()
@@ -621,6 +714,10 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       lastPositionMs: serializer.fromJson<int>(json['lastPositionMs']),
       artworkUri: serializer.fromJson<String?>(json['artworkUri']),
       fileSize: serializer.fromJson<int?>(json['fileSize']),
+      sampleRate: serializer.fromJson<int?>(json['sampleRate']),
+      bitDepth: serializer.fromJson<int?>(json['bitDepth']),
+      bitrateKbps: serializer.fromJson<int?>(json['bitrateKbps']),
+      codec: serializer.fromJson<String?>(json['codec']),
       source: serializer.fromJson<String>(json['source']),
       remoteId: serializer.fromJson<String?>(json['remoteId']),
       remoteArtworkUrl: serializer.fromJson<String?>(json['remoteArtworkUrl']),
@@ -654,6 +751,10 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       'lastPositionMs': serializer.toJson<int>(lastPositionMs),
       'artworkUri': serializer.toJson<String?>(artworkUri),
       'fileSize': serializer.toJson<int?>(fileSize),
+      'sampleRate': serializer.toJson<int?>(sampleRate),
+      'bitDepth': serializer.toJson<int?>(bitDepth),
+      'bitrateKbps': serializer.toJson<int?>(bitrateKbps),
+      'codec': serializer.toJson<String?>(codec),
       'source': serializer.toJson<String>(source),
       'remoteId': serializer.toJson<String?>(remoteId),
       'remoteArtworkUrl': serializer.toJson<String?>(remoteArtworkUrl),
@@ -684,6 +785,10 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           int? lastPositionMs,
           Value<String?> artworkUri = const Value.absent(),
           Value<int?> fileSize = const Value.absent(),
+          Value<int?> sampleRate = const Value.absent(),
+          Value<int?> bitDepth = const Value.absent(),
+          Value<int?> bitrateKbps = const Value.absent(),
+          Value<String?> codec = const Value.absent(),
           String? source,
           Value<String?> remoteId = const Value.absent(),
           Value<String?> remoteArtworkUrl = const Value.absent(),
@@ -711,6 +816,10 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
         lastPositionMs: lastPositionMs ?? this.lastPositionMs,
         artworkUri: artworkUri.present ? artworkUri.value : this.artworkUri,
         fileSize: fileSize.present ? fileSize.value : this.fileSize,
+        sampleRate: sampleRate.present ? sampleRate.value : this.sampleRate,
+        bitDepth: bitDepth.present ? bitDepth.value : this.bitDepth,
+        bitrateKbps: bitrateKbps.present ? bitrateKbps.value : this.bitrateKbps,
+        codec: codec.present ? codec.value : this.codec,
         source: source ?? this.source,
         remoteId: remoteId.present ? remoteId.value : this.remoteId,
         remoteArtworkUrl: remoteArtworkUrl.present
@@ -753,6 +862,12 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       artworkUri:
           data.artworkUri.present ? data.artworkUri.value : this.artworkUri,
       fileSize: data.fileSize.present ? data.fileSize.value : this.fileSize,
+      sampleRate:
+          data.sampleRate.present ? data.sampleRate.value : this.sampleRate,
+      bitDepth: data.bitDepth.present ? data.bitDepth.value : this.bitDepth,
+      bitrateKbps:
+          data.bitrateKbps.present ? data.bitrateKbps.value : this.bitrateKbps,
+      codec: data.codec.present ? data.codec.value : this.codec,
       source: data.source.present ? data.source.value : this.source,
       remoteId: data.remoteId.present ? data.remoteId.value : this.remoteId,
       remoteArtworkUrl: data.remoteArtworkUrl.present
@@ -789,6 +904,10 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           ..write('lastPositionMs: $lastPositionMs, ')
           ..write('artworkUri: $artworkUri, ')
           ..write('fileSize: $fileSize, ')
+          ..write('sampleRate: $sampleRate, ')
+          ..write('bitDepth: $bitDepth, ')
+          ..write('bitrateKbps: $bitrateKbps, ')
+          ..write('codec: $codec, ')
           ..write('source: $source, ')
           ..write('remoteId: $remoteId, ')
           ..write('remoteArtworkUrl: $remoteArtworkUrl, ')
@@ -821,6 +940,10 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
         lastPositionMs,
         artworkUri,
         fileSize,
+        sampleRate,
+        bitDepth,
+        bitrateKbps,
+        codec,
         source,
         remoteId,
         remoteArtworkUrl,
@@ -852,6 +975,10 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           other.lastPositionMs == this.lastPositionMs &&
           other.artworkUri == this.artworkUri &&
           other.fileSize == this.fileSize &&
+          other.sampleRate == this.sampleRate &&
+          other.bitDepth == this.bitDepth &&
+          other.bitrateKbps == this.bitrateKbps &&
+          other.codec == this.codec &&
           other.source == this.source &&
           other.remoteId == this.remoteId &&
           other.remoteArtworkUrl == this.remoteArtworkUrl &&
@@ -881,6 +1008,10 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
   final Value<int> lastPositionMs;
   final Value<String?> artworkUri;
   final Value<int?> fileSize;
+  final Value<int?> sampleRate;
+  final Value<int?> bitDepth;
+  final Value<int?> bitrateKbps;
+  final Value<String?> codec;
   final Value<String> source;
   final Value<String?> remoteId;
   final Value<String?> remoteArtworkUrl;
@@ -908,6 +1039,10 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     this.lastPositionMs = const Value.absent(),
     this.artworkUri = const Value.absent(),
     this.fileSize = const Value.absent(),
+    this.sampleRate = const Value.absent(),
+    this.bitDepth = const Value.absent(),
+    this.bitrateKbps = const Value.absent(),
+    this.codec = const Value.absent(),
     this.source = const Value.absent(),
     this.remoteId = const Value.absent(),
     this.remoteArtworkUrl = const Value.absent(),
@@ -936,6 +1071,10 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     this.lastPositionMs = const Value.absent(),
     this.artworkUri = const Value.absent(),
     this.fileSize = const Value.absent(),
+    this.sampleRate = const Value.absent(),
+    this.bitDepth = const Value.absent(),
+    this.bitrateKbps = const Value.absent(),
+    this.codec = const Value.absent(),
     this.source = const Value.absent(),
     this.remoteId = const Value.absent(),
     this.remoteArtworkUrl = const Value.absent(),
@@ -965,6 +1104,10 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     Expression<int>? lastPositionMs,
     Expression<String>? artworkUri,
     Expression<int>? fileSize,
+    Expression<int>? sampleRate,
+    Expression<int>? bitDepth,
+    Expression<int>? bitrateKbps,
+    Expression<String>? codec,
     Expression<String>? source,
     Expression<String>? remoteId,
     Expression<String>? remoteArtworkUrl,
@@ -993,6 +1136,10 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       if (lastPositionMs != null) 'last_position_ms': lastPositionMs,
       if (artworkUri != null) 'artwork_uri': artworkUri,
       if (fileSize != null) 'file_size': fileSize,
+      if (sampleRate != null) 'sample_rate': sampleRate,
+      if (bitDepth != null) 'bit_depth': bitDepth,
+      if (bitrateKbps != null) 'bitrate_kbps': bitrateKbps,
+      if (codec != null) 'codec': codec,
       if (source != null) 'source': source,
       if (remoteId != null) 'remote_id': remoteId,
       if (remoteArtworkUrl != null) 'remote_artwork_url': remoteArtworkUrl,
@@ -1024,6 +1171,10 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       Value<int>? lastPositionMs,
       Value<String?>? artworkUri,
       Value<int?>? fileSize,
+      Value<int?>? sampleRate,
+      Value<int?>? bitDepth,
+      Value<int?>? bitrateKbps,
+      Value<String?>? codec,
       Value<String>? source,
       Value<String?>? remoteId,
       Value<String?>? remoteArtworkUrl,
@@ -1051,6 +1202,10 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       lastPositionMs: lastPositionMs ?? this.lastPositionMs,
       artworkUri: artworkUri ?? this.artworkUri,
       fileSize: fileSize ?? this.fileSize,
+      sampleRate: sampleRate ?? this.sampleRate,
+      bitDepth: bitDepth ?? this.bitDepth,
+      bitrateKbps: bitrateKbps ?? this.bitrateKbps,
+      codec: codec ?? this.codec,
       source: source ?? this.source,
       remoteId: remoteId ?? this.remoteId,
       remoteArtworkUrl: remoteArtworkUrl ?? this.remoteArtworkUrl,
@@ -1127,6 +1282,18 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     if (fileSize.present) {
       map['file_size'] = Variable<int>(fileSize.value);
     }
+    if (sampleRate.present) {
+      map['sample_rate'] = Variable<int>(sampleRate.value);
+    }
+    if (bitDepth.present) {
+      map['bit_depth'] = Variable<int>(bitDepth.value);
+    }
+    if (bitrateKbps.present) {
+      map['bitrate_kbps'] = Variable<int>(bitrateKbps.value);
+    }
+    if (codec.present) {
+      map['codec'] = Variable<String>(codec.value);
+    }
     if (source.present) {
       map['source'] = Variable<String>(source.value);
     }
@@ -1168,6 +1335,10 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
           ..write('lastPositionMs: $lastPositionMs, ')
           ..write('artworkUri: $artworkUri, ')
           ..write('fileSize: $fileSize, ')
+          ..write('sampleRate: $sampleRate, ')
+          ..write('bitDepth: $bitDepth, ')
+          ..write('bitrateKbps: $bitrateKbps, ')
+          ..write('codec: $codec, ')
           ..write('source: $source, ')
           ..write('remoteId: $remoteId, ')
           ..write('remoteArtworkUrl: $remoteArtworkUrl, ')
@@ -3343,6 +3514,10 @@ typedef $$SongsTableTableCreateCompanionBuilder = SongsTableCompanion Function({
   Value<int> lastPositionMs,
   Value<String?> artworkUri,
   Value<int?> fileSize,
+  Value<int?> sampleRate,
+  Value<int?> bitDepth,
+  Value<int?> bitrateKbps,
+  Value<String?> codec,
   Value<String> source,
   Value<String?> remoteId,
   Value<String?> remoteArtworkUrl,
@@ -3371,6 +3546,10 @@ typedef $$SongsTableTableUpdateCompanionBuilder = SongsTableCompanion Function({
   Value<int> lastPositionMs,
   Value<String?> artworkUri,
   Value<int?> fileSize,
+  Value<int?> sampleRate,
+  Value<int?> bitDepth,
+  Value<int?> bitrateKbps,
+  Value<String?> codec,
   Value<String> source,
   Value<String?> remoteId,
   Value<String?> remoteArtworkUrl,
@@ -3452,6 +3631,18 @@ class $$SongsTableTableFilterComposer
 
   ColumnFilters<int> get fileSize => $composableBuilder(
       column: $table.fileSize, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get sampleRate => $composableBuilder(
+      column: $table.sampleRate, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get bitDepth => $composableBuilder(
+      column: $table.bitDepth, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get bitrateKbps => $composableBuilder(
+      column: $table.bitrateKbps, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get codec => $composableBuilder(
+      column: $table.codec, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get source => $composableBuilder(
       column: $table.source, builder: (column) => ColumnFilters(column));
@@ -3544,6 +3735,18 @@ class $$SongsTableTableOrderingComposer
   ColumnOrderings<int> get fileSize => $composableBuilder(
       column: $table.fileSize, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<int> get sampleRate => $composableBuilder(
+      column: $table.sampleRate, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get bitDepth => $composableBuilder(
+      column: $table.bitDepth, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get bitrateKbps => $composableBuilder(
+      column: $table.bitrateKbps, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get codec => $composableBuilder(
+      column: $table.codec, builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<String> get source => $composableBuilder(
       column: $table.source, builder: (column) => ColumnOrderings(column));
 
@@ -3634,6 +3837,18 @@ class $$SongsTableTableAnnotationComposer
   GeneratedColumn<int> get fileSize =>
       $composableBuilder(column: $table.fileSize, builder: (column) => column);
 
+  GeneratedColumn<int> get sampleRate => $composableBuilder(
+      column: $table.sampleRate, builder: (column) => column);
+
+  GeneratedColumn<int> get bitDepth =>
+      $composableBuilder(column: $table.bitDepth, builder: (column) => column);
+
+  GeneratedColumn<int> get bitrateKbps => $composableBuilder(
+      column: $table.bitrateKbps, builder: (column) => column);
+
+  GeneratedColumn<String> get codec =>
+      $composableBuilder(column: $table.codec, builder: (column) => column);
+
   GeneratedColumn<String> get source =>
       $composableBuilder(column: $table.source, builder: (column) => column);
 
@@ -3695,6 +3910,10 @@ class $$SongsTableTableTableManager extends RootTableManager<
             Value<int> lastPositionMs = const Value.absent(),
             Value<String?> artworkUri = const Value.absent(),
             Value<int?> fileSize = const Value.absent(),
+            Value<int?> sampleRate = const Value.absent(),
+            Value<int?> bitDepth = const Value.absent(),
+            Value<int?> bitrateKbps = const Value.absent(),
+            Value<String?> codec = const Value.absent(),
             Value<String> source = const Value.absent(),
             Value<String?> remoteId = const Value.absent(),
             Value<String?> remoteArtworkUrl = const Value.absent(),
@@ -3723,6 +3942,10 @@ class $$SongsTableTableTableManager extends RootTableManager<
             lastPositionMs: lastPositionMs,
             artworkUri: artworkUri,
             fileSize: fileSize,
+            sampleRate: sampleRate,
+            bitDepth: bitDepth,
+            bitrateKbps: bitrateKbps,
+            codec: codec,
             source: source,
             remoteId: remoteId,
             remoteArtworkUrl: remoteArtworkUrl,
@@ -3751,6 +3974,10 @@ class $$SongsTableTableTableManager extends RootTableManager<
             Value<int> lastPositionMs = const Value.absent(),
             Value<String?> artworkUri = const Value.absent(),
             Value<int?> fileSize = const Value.absent(),
+            Value<int?> sampleRate = const Value.absent(),
+            Value<int?> bitDepth = const Value.absent(),
+            Value<int?> bitrateKbps = const Value.absent(),
+            Value<String?> codec = const Value.absent(),
             Value<String> source = const Value.absent(),
             Value<String?> remoteId = const Value.absent(),
             Value<String?> remoteArtworkUrl = const Value.absent(),
@@ -3779,6 +4006,10 @@ class $$SongsTableTableTableManager extends RootTableManager<
             lastPositionMs: lastPositionMs,
             artworkUri: artworkUri,
             fileSize: fileSize,
+            sampleRate: sampleRate,
+            bitDepth: bitDepth,
+            bitrateKbps: bitrateKbps,
+            codec: codec,
             source: source,
             remoteId: remoteId,
             remoteArtworkUrl: remoteArtworkUrl,

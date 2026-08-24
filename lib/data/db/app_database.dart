@@ -26,7 +26,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   static Future<void> _createIndexes(Future<void> Function(String) executeSql) async {
     await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_title ON songs (title);');
@@ -76,6 +76,12 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(songsTable, songsTable.remoteId);
         await m.addColumn(songsTable, songsTable.remoteArtworkUrl);
         await m.addColumn(songsTable, songsTable.pendingDownloadPath);
+      }
+      if (from < 6) {
+        await m.addColumn(songsTable, songsTable.sampleRate);
+        await m.addColumn(songsTable, songsTable.bitDepth);
+        await m.addColumn(songsTable, songsTable.bitrateKbps);
+        await m.addColumn(songsTable, songsTable.codec);
       }
       // Must run after every addColumn above: several indexes cover columns a
       // later branch introduces, so creating them mid-ladder fails on an older

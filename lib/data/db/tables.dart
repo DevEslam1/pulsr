@@ -39,6 +39,16 @@ class SongsTable extends Table {
   TextColumn get artworkUri => text().nullable()();
   IntColumn get fileSize => integer().nullable()();
 
+  /// Real audio-header fields, read from the file via the tag channel and
+  /// cached so the quality badge reflects actual metadata rather than a guess
+  /// from the filename/extension. Null until a file has been enriched.
+  IntColumn get sampleRate => integer().nullable()();
+  IntColumn get bitDepth => integer().nullable()();
+  IntColumn get bitrateKbps => integer().nullable()();
+  /// Real container/codec from the header (e.g. FLAC, MP3, AAC, ALAC), used to
+  /// gate lossless/Hi-Res so a renamed file cannot fake a higher tier.
+  TextColumn get codec => text().nullable()();
+
   /// See [SongSource]. Rows that are not [SongSource.local] have no file on
   /// disk, so scanner cleanup and every path-derived query must exclude them.
   TextColumn get source => text().withDefault(const Constant(SongSource.local))();

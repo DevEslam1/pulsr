@@ -199,6 +199,55 @@ class MediaScannerService {
       );
     }
   }
+
+  /// Reads the real audio-header fields for a local song via the tag channel
+  /// and persists them, so the quality badge reflects actual metadata. Runs
+  /// once per song: callers should skip songs that already have [codec] set.
+  ///
+  /// Must run on the main isolate (uses a platform channel); the bulk scan runs
+  /// in a background isolate and therefore cannot do this inline.
+  Future<void> enrichAudioQuality(int songId, String path) async {
+    if (!Platform.isAndroid) return;
+    if (path.isEmpty || path.startsWith('http') || path.startsWith('ytmusic://')) {
+      return;
+    }
+    const channel = MethodChannel('com.pulsr.music/tag_editor');
+    try {
+      final Map<dynamic, dynamic>? tags = await channel.invokeMapMethod<dynamic, dynamic>('readTags', {
+        'path': path,
+        'includeArtwork': false,
+      });
+      if (tags == null) return;
+
+      final sampleRate = _asInt(tags['sampleRate']);
+      final bitDepth = _asInt(tags['bitsPerSample']);
+      // Header bitRate is in kbps for lossy, bps-ish for some lossless; jaudiotagger
+      // reports kbps here.
+      final bitrateKbps = _asInt(tags['bitRate']);
+      final codec = (tags['format'] as String?)?.trim();
+
+      await _repository.updateAudioQuality(
+        songId: songId,
+        sampleRate: sampleRate != null && sampleRate > 0 ? sampleRate : null,
+        bitDepth: bitDepth != null && bitDepth > 0 ? bitDepth : null,
+        bitrateKbps: bitrateKbps != null && bitrateKbps > 0 ? bitrateKbps : null,
+        codec: (codec != null && codec.isNotEmpty) ? codec : null,
+      );
+    } catch (e, stack) {
+      ErrorLogger.log(
+        'Failed to enrich audio quality: $path',
+        error: e,
+        stackTrace: stack,
+        category: 'MediaScanner',
+      );
+    }
+  }
+
+  static int? _asInt(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
+  }
 }
 
 class _ScanMediaInput {

@@ -14,6 +14,7 @@ import 'dart:io' as _i497;
 import 'package:get_it/get_it.dart' as _i174;
 import 'package:injectable/injectable.dart' as _i526;
 import 'package:pulsr/core/di/injection.dart' as _i953;
+import 'package:pulsr/core/services/artwork_cache_manager.dart' as _i305;
 import 'package:pulsr/core/services/auth_service.dart' as _i535;
 import 'package:pulsr/core/services/cloud_sync_service.dart' as _i225;
 import 'package:pulsr/core/services/file_intent_handler.dart' as _i134;
@@ -68,6 +69,7 @@ extension GetItInjectableX on _i174.GetIt {
     );
     final networkModule = _$NetworkModule();
     gh.singleton<_i497.HttpClient>(() => networkModule.httpClient);
+    gh.singleton<_i305.ArtworkCacheManager>(() => _i305.ArtworkCacheManager());
     gh.singleton<_i535.AuthService>(() => _i535.AuthService());
     gh.singleton<_i629.ScrobblerService>(() => _i629.ScrobblerService());
     gh.singleton<_i631.YtmAccountService>(() => _i631.YtmAccountService());

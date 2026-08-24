@@ -35,8 +35,21 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var currentDynamicsPreset = "off"
     private var currentAudioSessionId = 0
 
+    // Graphic EQ state. The EQ is a 10-band DynamicsProcessing postEq bound to the
+    // same session as the dynamics compressor, so a single engine owns both.
+    private var isEqEnabled = false
+    private var eqBandCount = DEFAULT_EQ_FREQS.size
+    private var eqCenterFreqs = DEFAULT_EQ_FREQS.copyOf()
+    private var eqBandGains = DoubleArray(DEFAULT_EQ_FREQS.size)
+    private var eqPreampDb = 0.0
+
     companion object {
         const val CHANNEL_NAME = "com.pulsr.music/audio_effects"
+        private const val MBC_BAND_COUNT = 3
+        // ISO standard octave centers for a 10-band graphic equalizer.
+        private val DEFAULT_EQ_FREQS = doubleArrayOf(
+            32.0, 64.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0
+        )
         private var cachedSupportedEffects: Array<AudioEffect.Descriptor>? = null
 
         fun registerWith(flutterEngine: FlutterEngine, context: Context): AudioEffectsPlugin {
@@ -111,13 +124,37 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(true)
                 }
 
+                "setEqEnabled" -> {
+                    setEqEnabledState(call.argument<Boolean>("enabled") ?: false)
+                    result.success(true)
+                }
+
+                "setEqBands" -> {
+                    val freqs = call.argument<List<Double>>("frequencies")
+                    setEqBandsLayout(freqs)
+                    result.success(true)
+                }
+
+                "setEqBandGain" -> {
+                    val index = call.argument<Int>("index") ?: -1
+                    val gainDb = call.argument<Double>("gainDb") ?: 0.0
+                    setEqBandGainValue(index, gainDb)
+                    result.success(true)
+                }
+
+                "setEqBandGains" -> {
+                    val gains = call.argument<List<Double>>("gains")
+                    setEqGainsValue(gains)
+                    result.success(true)
+                }
+
+                "setEqPreamp" -> {
+                    setEqPreampValue(call.argument<Double>("preampDb") ?: 0.0)
+                    result.success(true)
+                }
+
                 "isDynamicsSupported" -> {
-                    val supported = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                        isEffectTypeSupported(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING)
-                    } else {
-                        false
-                    }
-                    result.success(supported)
+                    result.success(isEffectTypeSupported(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING))
                 }
 
                 "isVirtualizerSupported" -> {
@@ -137,8 +174,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 "getCapabilities" -> {
+                    val dynamicsSupported = isEffectTypeSupported(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING)
                     val caps = mapOf(
-                        "hasEqualizer" to true,
+                        // The graphic EQ rides on DynamicsProcessing postEq, so the
+                        // real band count is only honest when that effect exists.
+                        "hasEqualizer" to dynamicsSupported,
+                        "eqBandCount" to if (dynamicsSupported) eqBandCount else 0,
+                        "eqCenterFrequencies" to eqCenterFreqs.toList(),
                         "hasAudioEffects" to true,
                         "hasTagEditor" to true,
                         "hasRingtoneManager" to true,
@@ -146,7 +188,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         "hasAppWidget" to true,
                         "isVolumeBoostSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_LOUDNESS_ENHANCER),
                         "isBassBoostSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_BASS_BOOST),
-                        "isDynamicsSupported" to (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && isEffectTypeSupported(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING)),
+                        "isDynamicsSupported" to dynamicsSupported,
                         "isVirtualizerSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_VIRTUALIZER)
                     )
                     result.success(caps)
@@ -254,62 +296,162 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
+    // ---- Graphic EQ + dynamics engine ------------------------------------
+    //
+    // A single DynamicsProcessing instance owns the 10-band graphic EQ (postEq)
+    // and the optional multiband-compressor dynamics presets (mbc + limiter),
+    // both bound to the active audio session. The engine exists whenever EITHER
+    // feature is active; single-band drags update it live, while topology or
+    // preset changes rebuild it.
+
     private fun setDynamicsPresetState(preset: String, enabled: Boolean) {
         currentDynamicsPreset = preset
         isDynamicsEnabled = enabled
+        buildDynamicsProcessing()
+    }
 
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
+    private fun setEqEnabledState(enabled: Boolean) {
+        isEqEnabled = enabled
+        buildDynamicsProcessing()
+    }
+
+    private fun setEqBandsLayout(freqs: List<Double>?) {
+        if (freqs != null && freqs.isNotEmpty()) {
+            eqCenterFreqs = DoubleArray(freqs.size) { freqs[it] }
+            eqBandCount = freqs.size
+            if (eqBandGains.size != eqBandCount) eqBandGains = DoubleArray(eqBandCount)
+        }
+        // Band count is fixed at engine-build time, so a layout change rebuilds.
+        buildDynamicsProcessing()
+    }
+
+    private fun setEqGainsValue(gains: List<Double>?) {
+        if (gains == null) return
+        for (i in 0 until minOf(gains.size, eqBandCount)) eqBandGains[i] = gains[i]
+        if (dynamicsProcessing != null) applyEqGainsLive() else buildDynamicsProcessing()
+    }
+
+    private fun setEqBandGainValue(index: Int, gainDb: Double) {
+        if (index < 0 || index >= eqBandCount) return
+        eqBandGains[index] = gainDb
+        val dp = dynamicsProcessing
+        if (dp == null) {
+            buildDynamicsProcessing()
             return
         }
-
-        if (!enabled || preset == "off") {
-            try {
-                dynamicsProcessing?.enabled = false
-            } catch (_: Exception) {}
-            return
-        }
-
         try {
-            applyDynamicsPreset(preset)
+            val level = if (isEqEnabled) gainDb.toFloat() else 0f
+            dp.setPostEqBandAllChannelsTo(index, DynamicsProcessing.EqBand(true, eqCenterFreqs[index].toFloat(), level))
         } catch (e: Exception) {
-            android.util.Log.w("AudioEffectsPlugin", "DynamicsProcessing configuration failed: ${e.message}")
+            android.util.Log.w("AudioEffectsPlugin", "Failed to set EQ band $index: ${e.message}")
         }
     }
 
-    private fun applyDynamicsPreset(preset: String) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
-        if (currentAudioSessionId == 0) return
-
+    private fun setEqPreampValue(preampDb: Double) {
+        eqPreampDb = preampDb
+        val dp = dynamicsProcessing
+        if (dp == null) {
+            buildDynamicsProcessing()
+            return
+        }
         try {
-            dynamicsProcessing?.release()
-        } catch (_: Exception) {}
+            dp.setInputGainAllChannelsTo(if (isEqEnabled) preampDb.toFloat() else 0f)
+        } catch (e: Exception) {
+            android.util.Log.w("AudioEffectsPlugin", "Failed to set EQ preamp: ${e.message}")
+        }
+    }
+
+    // Pushes the whole EQ curve (flat when disabled) plus the preamp onto the
+    // live engine without rebuilding it.
+    private fun applyEqGainsLive() {
+        val dp = dynamicsProcessing ?: return
+        try {
+            for (i in 0 until eqBandCount) {
+                val level = if (isEqEnabled) eqBandGains[i].toFloat() else 0f
+                dp.setPostEqBandAllChannelsTo(i, DynamicsProcessing.EqBand(true, eqCenterFreqs[i].toFloat(), level))
+            }
+            dp.setInputGainAllChannelsTo(if (isEqEnabled) eqPreampDb.toFloat() else 0f)
+        } catch (e: Exception) {
+            android.util.Log.w("AudioEffectsPlugin", "Failed to apply EQ gains: ${e.message}")
+        }
+    }
+
+    // The 10-band postEq definition (cutoffs + current gains). Bands stay enabled;
+    // a disabled EQ simply carries 0 dB across the board.
+    private fun buildPostEq(): DynamicsProcessing.Eq {
+        val eq = DynamicsProcessing.Eq(true, true, eqBandCount)
+        for (i in 0 until eqBandCount) {
+            val band = eq.getBand(i)
+            band.cutoffFrequency = eqCenterFreqs[i].toFloat()
+            band.gain = if (isEqEnabled) eqBandGains[i].toFloat() else 0f
+            band.isEnabled = true
+        }
+        return eq
+    }
+
+    // (Re)creates the engine to match current EQ + dynamics state. Releases any
+    // prior instance; leaves the engine null (freeing the effect slot) when
+    // neither feature is active.
+    private fun buildDynamicsProcessing() {
+        try { dynamicsProcessing?.release() } catch (_: Exception) {}
         dynamicsProcessing = null
 
-        // Setup 3-band Multiband Compressor (Low, Mid, High)
-        val channelCount = 2 // Stereo
-        val mbcBandCount = 3
+        if (currentAudioSessionId == 0) return
+        val dynamicsActive = isDynamicsEnabled && currentDynamicsPreset != "off"
+        if (!isEqEnabled && !dynamicsActive) return
 
-        val builder = DynamicsProcessing.Config.Builder(
-            DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION,
-            channelCount,
-            false, // preEq
-            0,
-            true,  // mbc
-            mbcBandCount,
-            false, // postEq
-            0,
-            true   // limiter
-        )
-        builder.setPreferredFrameDuration(10f)
+        try {
+            val channelCount = 2 // Stereo
 
-        val config = builder.build()
+            val builder = DynamicsProcessing.Config.Builder(
+                DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION,
+                channelCount,
+                false, // preEq
+                0,
+                true,  // mbc
+                MBC_BAND_COUNT,
+                true,  // postEq — the 10-band graphic EQ
+                eqBandCount,
+                true   // limiter
+            )
+            builder.setPreferredFrameDuration(10f)
+            builder.setPostEqAllChannelsTo(buildPostEq())
 
-        // Configure bands & limiter based on preset
-        for (ch in 0 until channelCount) {
-            val mbc = config.getMbcByChannelIndex(ch)
-            val limiter = config.getLimiterByChannelIndex(ch)
+            val config = builder.build()
 
-            when (preset) {
+            for (ch in 0 until channelCount) {
+                val mbc = config.getMbcByChannelIndex(ch)
+                val limiter = config.getLimiterByChannelIndex(ch)
+                if (dynamicsActive) {
+                    configureMbcAndLimiter(mbc, limiter, currentDynamicsPreset)
+                } else {
+                    neutralizeMbcAndLimiter(mbc, limiter)
+                }
+            }
+
+            val dp = DynamicsProcessing(0, currentAudioSessionId, config)
+            dp.setInputGainAllChannelsTo(if (isEqEnabled) eqPreampDb.toFloat() else 0f)
+            dp.enabled = true
+            dynamicsProcessing = dp
+        } catch (e: Exception) {
+            android.util.Log.w("AudioEffectsPlugin", "DynamicsProcessing build failed: ${e.message}")
+            dynamicsProcessing = null
+        }
+    }
+
+    // Disables the compressor stages so audio passes through untouched while the
+    // engine stays alive purely for the graphic EQ.
+    private fun neutralizeMbcAndLimiter(mbc: DynamicsProcessing.Mbc, limiter: DynamicsProcessing.Limiter) {
+        for (i in 0 until MBC_BAND_COUNT) mbc.getBand(i).isEnabled = false
+        limiter.isEnabled = false
+    }
+
+    private fun configureMbcAndLimiter(
+        mbc: DynamicsProcessing.Mbc,
+        limiter: DynamicsProcessing.Limiter,
+        preset: String
+    ) {
+        when (preset) {
                 "studioPunch" -> {
                     // Low: Punchy kick & bass
                     val band0 = mbc.getBand(0)
@@ -512,12 +654,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     limiter.postGain = 0.5f
                 }
 
-                else -> return
+                else -> neutralizeMbcAndLimiter(mbc, limiter)
             }
-        }
-
-        dynamicsProcessing = DynamicsProcessing(0, currentAudioSessionId, config)
-        dynamicsProcessing?.enabled = true
     }
 
     private fun getSpatializerInfo(): Map<String, Any> {
@@ -577,9 +715,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             setBassBoostStrengthValue(bassBoostStrength.toInt())
         }
 
-        if (isDynamicsEnabled && currentDynamicsPreset != "off") {
-            setDynamicsPresetState(currentDynamicsPreset, isDynamicsEnabled)
-        }
+        // Rebuild the combined EQ + dynamics engine for the new session; it
+        // no-ops when neither the graphic EQ nor a dynamics preset is active.
+        buildDynamicsProcessing()
     }
 
     fun releaseEffects() {

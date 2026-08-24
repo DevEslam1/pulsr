@@ -991,6 +991,29 @@ class MusicRepository implements IMusicRepository {
     }
   }
 
+  @override
+  Future<Result<void>> updateAudioQuality({
+    required int songId,
+    int? sampleRate,
+    int? bitDepth,
+    int? bitrateKbps,
+    String? codec,
+  }) async {
+    try {
+      await (_db.update(_db.songsTable)..where((t) => t.id.equals(songId))).write(
+        SongsTableCompanion(
+          sampleRate: Value(sampleRate),
+          bitDepth: Value(bitDepth),
+          bitrateKbps: Value(bitrateKbps),
+          codec: Value(codec),
+        ),
+      );
+      return const Right(null);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to update audio quality', e));
+    }
+  }
+
   // --- GENRES ---
   @override
   Stream<Result<List<GenreItem>>> watchGenres() {

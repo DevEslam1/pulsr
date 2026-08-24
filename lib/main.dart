@@ -1,6 +1,7 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'l10n/generated/app_localizations.dart';
@@ -195,8 +196,10 @@ class _PulsrAppState extends State<PulsrApp> {
               listenWhen: (prev, curr) => prev.currentSong?.id != curr.currentSong?.id,
               listener: (context, state) {
                 final song = state.currentSong;
-                final isDynamicOn = context.read<SettingsCubit>().state.dynamicThemingEnabled;
-                if (isDynamicOn) {
+                final source = context.read<SettingsCubit>().state.themeColorSource;
+                // Keep the album-art palette fresh for the artwork source and
+                // for system (used as the pre-Android-12 fallback seed).
+                if (source == ThemeColorSource.artwork || source == ThemeColorSource.system) {
                   if (song != null) {
                     context.read<DynamicThemeCubit>().updateFromSong(song);
                   } else {
@@ -206,9 +209,11 @@ class _PulsrAppState extends State<PulsrApp> {
               },
             ),
             BlocListener<SettingsCubit, SettingsState>(
-              listenWhen: (prev, curr) => prev.dynamicThemingEnabled != curr.dynamicThemingEnabled,
+              listenWhen: (prev, curr) => prev.themeColorSource != curr.themeColorSource,
               listener: (context, state) {
-                if (state.dynamicThemingEnabled) {
+                final usesArt = state.themeColorSource == ThemeColorSource.artwork ||
+                    state.themeColorSource == ThemeColorSource.system;
+                if (usesArt) {
                   final song = context.read<PlayerCubit>().state.currentSong;
                   if (song != null) {
                     context.read<DynamicThemeCubit>().updateFromSong(song);
@@ -223,62 +228,79 @@ class _PulsrAppState extends State<PulsrApp> {
             builder: (context, settingsState) {
               return BlocBuilder<DynamicThemeCubit, DynamicThemeState>(
                 builder: (context, dynamicThemeState) {
-                  final isDynamicOn = settingsState.dynamicThemingEnabled;
-                  final activeAccent = isDynamicOn
-                      ? dynamicThemeState.primaryColor
-                      : settingsState.customAccentColor;
+                  return DynamicColorBuilder(
+                    builder: (lightDynamic, darkDynamic) {
+                      // Resolve the accent seed per brightness. For the system
+                      // (Material You) source we take the OS wallpaper primary
+                      // when the platform supplies one (Android 12+); otherwise
+                      // we fall back to the album-art palette, then to custom.
+                      Color resolveAccent(ColorScheme? dynamicScheme) {
+                        switch (settingsState.themeColorSource) {
+                          case ThemeColorSource.system:
+                            if (dynamicScheme != null) return dynamicScheme.primary;
+                            return dynamicThemeState.hasCustomArtworkColor
+                                ? dynamicThemeState.primaryColor
+                                : settingsState.customAccentColor;
+                          case ThemeColorSource.artwork:
+                            return dynamicThemeState.primaryColor;
+                          case ThemeColorSource.custom:
+                            return settingsState.customAccentColor;
+                        }
+                      }
 
-                  final lightTheme = AuraTheme.customTheme(
-                    activeAccent,
-                    brightness: Brightness.light,
-                  );
+                      final lightTheme = AuraTheme.customTheme(
+                        resolveAccent(lightDynamic),
+                        brightness: Brightness.light,
+                      );
 
-                  final darkTheme = AuraTheme.customTheme(
-                    activeAccent,
-                    brightness: Brightness.dark,
-                    isAmoled: settingsState.themeMode == AppThemeMode.amoled,
-                  );
+                      final darkTheme = AuraTheme.customTheme(
+                        resolveAccent(darkDynamic),
+                        brightness: Brightness.dark,
+                        isAmoled: settingsState.themeMode == AppThemeMode.amoled,
+                      );
 
-                  final ThemeMode flutterThemeMode;
-                  switch (settingsState.themeMode) {
-                    case AppThemeMode.light:
-                      flutterThemeMode = ThemeMode.light;
-                      break;
-                    case AppThemeMode.dark:
-                    case AppThemeMode.amoled:
-                      flutterThemeMode = ThemeMode.dark;
-                      break;
-                    case AppThemeMode.system:
-                      flutterThemeMode = ThemeMode.system;
-                      break;
-                  }
+                      final ThemeMode flutterThemeMode;
+                      switch (settingsState.themeMode) {
+                        case AppThemeMode.light:
+                          flutterThemeMode = ThemeMode.light;
+                          break;
+                        case AppThemeMode.dark:
+                        case AppThemeMode.amoled:
+                          flutterThemeMode = ThemeMode.dark;
+                          break;
+                        case AppThemeMode.system:
+                          flutterThemeMode = ThemeMode.system;
+                          break;
+                      }
 
-                  final isDarkTheme = flutterThemeMode == ThemeMode.dark ||
-                      (flutterThemeMode == ThemeMode.system &&
-                          WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark);
+                      final isDarkTheme = flutterThemeMode == ThemeMode.dark ||
+                          (flutterThemeMode == ThemeMode.system &&
+                              WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark);
 
-                  return AnnotatedRegion<SystemUiOverlayStyle>(
-                    value: SystemUiOverlayStyle(
-                      statusBarColor: Colors.transparent,
-                      statusBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
-                      systemNavigationBarColor: Colors.transparent,
-                      systemNavigationBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
-                    ),
-                    child: MaterialApp.router(
-                      title: AppConfig.appTitle,
-                      debugShowCheckedModeBanner: false,
-                      themeMode: flutterThemeMode,
-                      theme: lightTheme,
-                      darkTheme: darkTheme,
-                      localizationsDelegates: const [
-                        AppLocalizations.delegate,
-                        GlobalMaterialLocalizations.delegate,
-                        GlobalWidgetsLocalizations.delegate,
-                        GlobalCupertinoLocalizations.delegate,
-                      ],
-                      supportedLocales: AppLocalizations.supportedLocales,
-                      routerConfig: _router,
-                    ),
+                      return AnnotatedRegion<SystemUiOverlayStyle>(
+                        value: SystemUiOverlayStyle(
+                          statusBarColor: Colors.transparent,
+                          statusBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
+                          systemNavigationBarColor: Colors.transparent,
+                          systemNavigationBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
+                        ),
+                        child: MaterialApp.router(
+                          title: AppConfig.appTitle,
+                          debugShowCheckedModeBanner: false,
+                          themeMode: flutterThemeMode,
+                          theme: lightTheme,
+                          darkTheme: darkTheme,
+                          localizationsDelegates: const [
+                            AppLocalizations.delegate,
+                            GlobalMaterialLocalizations.delegate,
+                            GlobalWidgetsLocalizations.delegate,
+                            GlobalCupertinoLocalizations.delegate,
+                          ],
+                          supportedLocales: AppLocalizations.supportedLocales,
+                          routerConfig: _router,
+                        ),
+                      );
+                    },
                   );
                 },
               );

@@ -114,6 +114,56 @@ class AudioEffectsChannel {
     }
   }
 
+  /// Enables/disables the native 10-band graphic EQ (DynamicsProcessing postEq).
+  Future<void> setEqEnabled(bool enabled) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('setEqEnabled', {'enabled': enabled});
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set EQ enabled ($enabled)', error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+  }
+
+  /// Sets the band center frequencies (Hz). Length defines the band count.
+  Future<void> setEqBands(List<double> frequencies) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('setEqBands', {'frequencies': frequencies});
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set EQ bands ($frequencies)', error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+  }
+
+  /// Live-updates a single band's gain (dB) without rebuilding the effect.
+  Future<void> setEqBandGain(int index, double gainDb) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('setEqBandGain', {'index': index, 'gainDb': gainDb});
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set EQ band gain (index $index, $gainDb dB)', error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+  }
+
+  /// Sets all band gains (dB) at once. Length should match the band count.
+  Future<void> setEqBandGains(List<double> gains) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('setEqBandGains', {'gains': gains});
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set EQ band gains ($gains)', error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+  }
+
+  /// Sets the EQ preamp (dB). Negative values attenuate as real headroom.
+  Future<void> setEqPreamp(double preampDb) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('setEqPreamp', {'preampDb': preampDb});
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set EQ preamp ($preampDb dB)', error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+  }
+
   Future<void> releaseEffects() async {
     if (!Platform.isAndroid) return;
     try {

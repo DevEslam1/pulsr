@@ -16,6 +16,7 @@ class SettingsCubit extends Cubit<SettingsState> {
   static const String _keyMinDuration = 'setting_min_duration';
   static const String _keyAutoHideSystemMedia = 'setting_auto_hide_system_media';
   static const String _keyDynamicTheme = 'setting_dynamic_theme';
+  static const String _keyThemeColorSource = 'setting_theme_color_source';
   static const String _keyResumeAfterInterruption = 'setting_resume_after_interruption';
   static const String _keyWaveformSeekBar = 'setting_waveform_seek_bar';
   static const String _keyThemeMode = 'setting_theme_mode';
@@ -117,12 +118,30 @@ class SettingsCubit extends Cubit<SettingsState> {
       final wifiOnlyMode = prefs.getBool(_keyWifiOnlyMode) ?? false;
       final offlineOnlyMode = prefs.getBool(_keyOfflineOnlyMode) ?? false;
 
+      // Theme color source: prefer the new enum key; migrate from the legacy
+      // `dynamic_theme` bool for upgraders (true → artwork, false → custom) so
+      // an existing custom-accent user is not surprised by wallpaper colors.
+      final ThemeColorSource themeColorSource;
+      final sourceStr = prefs.getString(_keyThemeColorSource);
+      if (sourceStr != null) {
+        themeColorSource = ThemeColorSource.values.firstWhere(
+          (e) => e.name == sourceStr,
+          orElse: () => ThemeColorSource.artwork,
+        );
+      } else if (prefs.containsKey(_keyDynamicTheme)) {
+        themeColorSource = (prefs.getBool(_keyDynamicTheme) ?? true)
+            ? ThemeColorSource.artwork
+            : ThemeColorSource.custom;
+      } else {
+        themeColorSource = ThemeColorSource.artwork;
+      }
+
       emit(state.copyWith(
         gaplessPlayback: prefs.getBool(_keyGapless) ?? true,
         crossfadeSeconds: prefs.getDouble(_keyCrossfade) ?? 0.0,
         minDurationSec: prefs.getInt(_keyMinDuration) ?? 30,
         autoHideSystemMedia: prefs.getBool(_keyAutoHideSystemMedia) ?? true,
-        dynamicThemingEnabled: prefs.getBool(_keyDynamicTheme) ?? true,
+        themeColorSource: themeColorSource,
         resumeAfterInterruption: prefs.getBool(_keyResumeAfterInterruption) ?? true,
         waveformSeekBarEnabled: prefs.getBool(_keyWaveformSeekBar) ?? true,
         themeMode: themeMode,
@@ -170,11 +189,18 @@ class SettingsCubit extends Cubit<SettingsState> {
     await prefs.setBool(_keyAutoHideSystemMedia, value);
   }
 
-  Future<void> setDynamicTheming(bool value) async {
-    emit(state.copyWith(dynamicThemingEnabled: value));
+  Future<void> setThemeColorSource(ThemeColorSource source) async {
+    emit(state.copyWith(themeColorSource: source));
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyDynamicTheme, value);
+    await prefs.setString(_keyThemeColorSource, source.name);
+    // Keep the legacy bool in sync so a downgrade / backup restore still reads
+    // a sensible value (artwork ↔ true, anything else ↔ false).
+    await prefs.setBool(_keyDynamicTheme, source == ThemeColorSource.artwork);
   }
+
+  /// Back-compat shim: the old boolean toggle mapped on→artwork, off→custom.
+  Future<void> setDynamicTheming(bool value) =>
+      setThemeColorSource(value ? ThemeColorSource.artwork : ThemeColorSource.custom);
 
   Future<void> setResumeAfterInterruption(bool value) async {
     emit(state.copyWith(resumeAfterInterruption: value));

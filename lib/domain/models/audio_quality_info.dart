@@ -106,33 +106,55 @@ class AudioQualityInfo {
       ext = path.substring(dotIndex + 1);
     }
 
+    // Prefer real, cached header values (read from the file via the tag
+    // channel) over anything inferred from the filename. Explicit args (a live
+    // read) win over both.
+    final int? realSampleRate = explicitSampleRate ?? song.sampleRate;
+    final int? realBitDepth = explicitBitDepth ?? song.bitDepth;
+    final String? realCodec = (explicitFormat ?? song.codec)?.toLowerCase();
+    final bool hasRealHeader =
+        song.codec != null || song.sampleRate != null || song.bitDepth != null;
+
     // Calculate bitrate if fileSize and durationMs are available
-    int? calculatedBitrate = explicitBitrateKbps;
+    int? calculatedBitrate = explicitBitrateKbps ?? song.bitrateKbps;
     if (calculatedBitrate == null && song.fileSize != null && song.fileSize! > 0 && song.durationMs > 0) {
       final seconds = song.durationMs / 1000.0;
       final bits = song.fileSize! * 8.0;
       calculatedBitrate = (bits / seconds / 1000.0).round();
     }
 
-    final bool isFlac = ext == 'flac';
-    final bool isWav = ext == 'wav';
-    final bool isAlac = ext == 'alac' || (ext == 'm4a' && (calculatedBitrate ?? 0) > 600);
-    final bool isAiff = ext == 'aiff' || ext == 'aif';
-    final bool isDsd = ext == 'dsf' || ext == 'dff';
+    // When a real codec string is known, gate format on it so a mislabeled
+    // extension (e.g. a 128k MP3 renamed to .flac) cannot fake a higher tier.
+    bool codecIs(String needle) => realCodec != null && realCodec.contains(needle);
+    final bool isFlac = realCodec != null ? codecIs('flac') : ext == 'flac';
+    final bool isWav = realCodec != null
+        ? (codecIs('wav') || codecIs('riff') || codecIs('pcm'))
+        : ext == 'wav';
+    final bool isAlac = realCodec != null
+        ? (codecIs('alac') || codecIs('apple lossless'))
+        : (ext == 'alac' || (ext == 'm4a' && (calculatedBitrate ?? 0) > 600));
+    final bool isAiff =
+        realCodec != null ? codecIs('aiff') : (ext == 'aiff' || ext == 'aif');
+    final bool isDsd = realCodec != null
+        ? (codecIs('dsd') || codecIs('dsf') || codecIs('dff'))
+        : (ext == 'dsf' || ext == 'dff');
     final bool isLosslessFormat = isFlac || isWav || isAlac || isAiff || isDsd;
 
-    final bool hasExplicitHiRes = (explicitBitDepth != null && explicitBitDepth >= 24) ||
-        (explicitSampleRate != null && explicitSampleRate > 48000);
+    final bool hasRealHiRes = (realBitDepth != null && realBitDepth >= 24) ||
+        (realSampleRate != null && realSampleRate > 48000);
 
     final bool isHiRes = isLosslessFormat &&
-        (hasExplicitHiRes ||
-            (calculatedBitrate != null && calculatedBitrate >= 1411) ||
-            path.contains('24bit') ||
-            path.contains('96k') ||
-            path.contains('192k') ||
-            path.contains('hi-res') ||
-            path.contains('hires') ||
-            path.contains('master'));
+        (hasRealHiRes ||
+            // Filename heuristics are a last resort, used only when no real
+            // header is available to trust.
+            (!hasRealHeader &&
+                ((calculatedBitrate != null && calculatedBitrate >= 1411) ||
+                    path.contains('24bit') ||
+                    path.contains('96k') ||
+                    path.contains('192k') ||
+                    path.contains('hi-res') ||
+                    path.contains('hires') ||
+                    path.contains('master'))));
 
     final AudioQualityTier tier;
     final String tierLabel;
@@ -145,12 +167,12 @@ class AudioQualityInfo {
     final String sampleRate;
     final String bitDepth;
 
-    final String resolvedSampleRate = explicitSampleRate != null
-        ? '${(explicitSampleRate / 1000).toStringAsFixed(1)} kHz'
+    final String resolvedSampleRate = realSampleRate != null
+        ? '${(realSampleRate / 1000).toStringAsFixed(1)} kHz'
         : (isHiRes ? '96.0 kHz / 192.0 kHz' : '44.1 kHz');
 
-    final String resolvedBitDepth = explicitBitDepth != null
-        ? '$explicitBitDepth-bit'
+    final String resolvedBitDepth = realBitDepth != null
+        ? '$realBitDepth-bit'
         : (isHiRes ? '24-bit' : '16-bit');
 
     if (isDsd) {

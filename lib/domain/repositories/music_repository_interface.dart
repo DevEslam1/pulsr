@@ -108,6 +108,16 @@ abstract class IMusicRepository {
     int? trackNumber,
   });
 
+  /// Persists real audio-header fields (read from the file) so the quality
+  /// badge reflects actual metadata instead of a filename guess.
+  Future<Result<void>> updateAudioQuality({
+    required int songId,
+    int? sampleRate,
+    int? bitDepth,
+    int? bitrateKbps,
+    String? codec,
+  });
+
   // --- GENRES ---
   Stream<Result<List<GenreItem>>> watchGenres();
   Stream<Result<List<SongsTableData>>> watchGenreSongs(String genre);

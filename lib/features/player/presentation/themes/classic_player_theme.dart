@@ -199,6 +199,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                   color: activeColor,
                   height: visualizerStyle == VisualizerStyle.circular ? 90 : 50,
                   isPlaying: state.isPlaying,
+                  audioSessionId: state.audioSessionId,
                 ),
               ),
 

@@ -73,6 +73,7 @@ class ExportBackupUseCase {
       'crossfadeSeconds': prefs.getDouble('setting_crossfade') ?? 0.0,
       'minDurationSec': prefs.getInt('setting_min_duration') ?? 30,
       'dynamicThemingEnabled': prefs.getBool('setting_dynamic_theme') ?? true,
+      'themeColorSource': prefs.getString('setting_theme_color_source'),
       'resumeAfterInterruption': prefs.getBool('setting_resume_after_interruption') ?? true,
       'themeMode': prefs.getString('setting_theme_mode') ?? 'dark',
       'customAccentColorValue': prefs.getInt('setting_custom_accent') ?? 0xFF9B9EF5,
@@ -268,6 +269,9 @@ class ImportBackupUseCase {
       }
       if (settings.containsKey('dynamicThemingEnabled')) {
         await prefs.setBool('setting_dynamic_theme', settings['dynamicThemingEnabled'] as bool);
+      }
+      if (settings['themeColorSource'] is String) {
+        await prefs.setString('setting_theme_color_source', settings['themeColorSource'] as String);
       }
       if (settings.containsKey('resumeAfterInterruption')) {
         await prefs.setBool('setting_resume_after_interruption', settings['resumeAfterInterruption'] as bool);

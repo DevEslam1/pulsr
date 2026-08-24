@@ -49,7 +49,7 @@ class SettingsScreen extends StatelessWidget {
                       Icons.equalizer_rounded,
                       'Equalizer & Sound Effects',
                       PlatformCapabilities.hasEqualizer
-                          ? '5-band EQ, bass boost, presets'
+                          ? '10-band EQ, bass boost, presets'
                           : 'Not available on this platform',
                       onTap: PlatformCapabilities.hasEqualizer
                           ? () => showModalBottomSheet(
@@ -211,8 +211,8 @@ class SettingsScreen extends StatelessWidget {
                     _navTile(context, Icons.graphic_eq_rounded, 'Visualizer Style', _getVisualizerStyleTitle(state.visualizerStyle),
                         onTap: () => _showVisualizerStylePickerSheet(context, cubit, state.visualizerStyle)),
                     _divider(p),
-                    _switchTile(context, Icons.palette_outlined, 'Dynamic Artwork Theming', 'Adapt colors from album art',
-                        value: state.dynamicThemingEnabled, onChanged: cubit.setDynamicTheming),
+                    _navTile(context, Icons.palette_outlined, 'Color Source', _getColorSourceTitle(state.themeColorSource),
+                        onTap: () => _showColorSourcePickerSheet(context, cubit, state.themeColorSource)),
                   ]),
                   _section(context, 'Gestures', [
                     _navTile(context, Icons.swipe_left_rounded, 'Mini Player Swipe Left', _getMiniPlayerSwipeTitle(state.miniPlayerSwipeLeft),
@@ -552,6 +552,120 @@ class SettingsScreen extends StatelessWidget {
                         : null,
                     onTap: () {
                       cubit.setPlayerThemeMode(t.mode);
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getColorSourceTitle(ThemeColorSource source) {
+    switch (source) {
+      case ThemeColorSource.system:
+        return 'Material You (Wallpaper)';
+      case ThemeColorSource.artwork:
+        return 'Album Artwork';
+      case ThemeColorSource.custom:
+        return 'Custom Accent';
+    }
+  }
+
+  void _showColorSourcePickerSheet(
+    BuildContext context,
+    SettingsCubit cubit,
+    ThemeColorSource currentSource,
+  ) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final surfaceColor = Theme.of(context).colorScheme.surface;
+    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
+    final outlineColor = Theme.of(context).colorScheme.outline;
+    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? context.palette.textPrimary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
+
+    final sources = [
+      (
+        source: ThemeColorSource.system,
+        title: 'Material You (Wallpaper)',
+        subtitle: 'Follow the system wallpaper palette on Android 12+ • falls back to album art on older devices',
+        icon: Icons.wallpaper_rounded,
+      ),
+      (
+        source: ThemeColorSource.artwork,
+        title: 'Album Artwork',
+        subtitle: 'Adapt colors from the current track\'s album art (changes per song)',
+        icon: Icons.album_rounded,
+      ),
+      (
+        source: ThemeColorSource.custom,
+        title: 'Custom Accent',
+        subtitle: 'Use the fixed accent color you pick above',
+        icon: Icons.color_lens_rounded,
+      ),
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: surfaceColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Text(
+                'App Color Source',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...sources.map((s) {
+              final isSelected = s.source == currentSource;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color: isSelected ? primaryColor.withValues(alpha: 0.12) : cardColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: isSelected ? primaryColor : outlineColor,
+                      width: isSelected ? 1.5 : 1.0,
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: Icon(
+                      s.icon,
+                      color: isSelected ? primaryColor : textSecondary,
+                    ),
+                    title: Text(
+                      s.title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: isSelected ? primaryColor : textPrimary,
+                      ),
+                    ),
+                    subtitle: Text(
+                      s.subtitle,
+                      style: TextStyle(fontSize: 12, color: textSecondary),
+                    ),
+                    trailing: isSelected
+                        ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                        : null,
+                    onTap: () {
+                      cubit.setThemeColorSource(s.source);
                       Navigator.pop(ctx);
                     },
                   ),

@@ -23,7 +23,9 @@ android {
         applicationId = "com.pulsr.music"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 24
+        // 28 (Android 9) is the floor for the true 10-band graphic EQ, which is
+        // built on DynamicsProcessing postEq — added in API 28.
+        minSdk = 28
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

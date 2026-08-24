@@ -29,6 +29,10 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   @override
   SongsTableData? get currentSong => null;
   @override
+  int? get currentAudioSessionId => null;
+  @override
+  Stream<int?> get audioSessionIdStream => Stream<int?>.empty();
+  @override
   Future<void> setVolume(double volume) async {
     _vol = volume;
   }
