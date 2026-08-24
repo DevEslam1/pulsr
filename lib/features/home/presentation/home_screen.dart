@@ -17,6 +17,7 @@ import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
 import '../../../core/config/app_config.dart';
+import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
 import '../../../domain/models/ytm_track.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
@@ -33,27 +34,47 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedTab = 0; // 0: Local, 1: Online
-  String _selectedOnlineCategory = 'Trending Egypt';
+  String _selectedOnlineCategory = 'Recommended For You';
 
   /// Resolved once and reused across rebuilds so scrolling/retry never refetches.
   /// Only populated in an ENABLE_YTM build; null (and unused) otherwise.
   final Map<String, Future<List<YtmTrack>>> _categoryFutures = {};
 
-  static const List<String> _onlineCategories = [
-    'Trending Egypt',
-    'Mahraganat',
-    'Arabic Pop',
-    'Global Top Hits',
-    'New Releases',
-    'Chill & Lo-Fi',
-    'Pop Mix',
-    'Hip-Hop',
-    'Workout Energy',
-    'Rock & Metal',
-    'Acoustic',
-  ];
+  List<String> get _onlineCategories {
+    final isLoggedIn = getIt<YtmAccountService>().isLoggedIn;
+    if (isLoggedIn) {
+      return const [
+        'Recommended For You',
+        'Trending Egypt',
+        'Mahraganat',
+        'Arabic Pop',
+        'Global Top Hits',
+        'New Releases',
+        'Chill & Lo-Fi',
+        'Pop Mix',
+        'Hip-Hop',
+        'Workout Energy',
+        'Rock & Metal',
+        'Acoustic',
+      ];
+    }
+    return const [
+      'Trending Egypt',
+      'Mahraganat',
+      'Arabic Pop',
+      'Global Top Hits',
+      'New Releases',
+      'Chill & Lo-Fi',
+      'Pop Mix',
+      'Hip-Hop',
+      'Workout Energy',
+      'Rock & Metal',
+      'Acoustic',
+    ];
+  }
 
   static const Map<String, String> _categoryQueries = {
+    'Recommended For You': 'recommended music',
     'Trending Egypt': 'أغاني مصرية جديدة تريند',
     'Mahraganat': 'مهرجانات مصرية جديدة',
     'Arabic Pop': 'أغاني عربي عمرو دياب تامر حسني حماقي',
@@ -70,12 +91,22 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    final isLoggedIn = getIt<YtmAccountService>().isLoggedIn;
+    _selectedOnlineCategory = isLoggedIn ? 'Recommended For You' : 'Trending Egypt';
   }
 
   Future<List<YtmTrack>> _getCategoryFuture(String category) {
     return _categoryFutures.putIfAbsent(
       category,
-      () {
+      () async {
+        if (category == 'Recommended For You') {
+          final account = getIt<YtmAccountService>();
+          if (account.isLoggedIn) {
+            final recs = await account.fetchHomeRecommendations(maxTracks: 50);
+            if (recs.isNotEmpty) return recs;
+          }
+          return getIt<YtmService>().trending(limit: 25);
+        }
         if (category == 'Trending Egypt') {
           return getIt<YtmService>().trending(limit: 25);
         }
@@ -530,6 +561,14 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Row(
             children: [
               _QuickCard(
+                title: getIt<YtmAccountService>().isLoggedIn ? 'For You' : 'Top Hits',
+                subtitle: getIt<YtmAccountService>().isLoggedIn ? 'Personalized' : 'Trending',
+                icon: getIt<YtmAccountService>().isLoggedIn ? Icons.auto_awesome_rounded : Icons.local_fire_department_rounded,
+                color: getIt<YtmAccountService>().isLoggedIn ? p.accent : const Color(0xFFFF5252),
+                onTap: () => setState(() => _selectedOnlineCategory = getIt<YtmAccountService>().isLoggedIn ? 'Recommended For You' : 'Global Top Hits'),
+              ),
+              const SizedBox(width: 10),
+              _QuickCard(
                 title: 'Top Hits',
                 subtitle: 'Trending',
                 icon: Icons.local_fire_department_rounded,
@@ -543,14 +582,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icons.spa_rounded,
                 color: const Color(0xFF7C4DFF),
                 onTap: () => setState(() => _selectedOnlineCategory = 'Chill & Lo-Fi'),
-              ),
-              const SizedBox(width: 10),
-              _QuickCard(
-                title: 'Workout',
-                subtitle: 'Energy',
-                icon: Icons.bolt_rounded,
-                color: const Color(0xFFFFAB00),
-                onTap: () => setState(() => _selectedOnlineCategory = 'Workout Energy'),
               ),
             ],
           ),
@@ -569,6 +600,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
+                    avatar: cat == 'Recommended For You'
+                        ? Icon(Icons.auto_awesome_rounded, size: 14, color: _selectedOnlineCategory == cat ? p.onAccent : p.accent)
+                        : null,
                     label: Text(cat),
                     selected: _selectedOnlineCategory == cat,
                     onSelected: (selected) {
@@ -596,7 +630,11 @@ class _HomeScreenState extends State<HomeScreen> {
         // ---------- Online Category Content (Carousel + Top Charts) ----------
         _OnlineCategorySection(
           key: ValueKey(_selectedOnlineCategory),
-          title: _selectedOnlineCategory == 'Trending Egypt' ? 'Trending in Egypt 🇪🇬' : 'Popular: $_selectedOnlineCategory',
+          title: _selectedOnlineCategory == 'Recommended For You'
+              ? '✨ Recommended For You (YouTube Music)'
+              : (_selectedOnlineCategory == 'Trending Egypt'
+                  ? 'Trending in Egypt 🇪🇬'
+                  : 'Popular: $_selectedOnlineCategory'),
           future: _getCategoryFuture(_selectedOnlineCategory),
           playerCubit: playerCubit,
           onRetry: () => _retryCategory(_selectedOnlineCategory),

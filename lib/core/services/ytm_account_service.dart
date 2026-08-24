@@ -233,6 +233,52 @@ class YtmAccountService {
     return [];
   }
 
+  /// Fetches personalized recommendations and home feed from YouTube Music (`FEmusic_home`).
+  /// Includes Quick Picks, Mixed for You, and personalized artist radios.
+  Future<List<YtmTrack>> fetchHomeRecommendations({int maxTracks = 50}) async {
+    if (!isLoggedIn) return [];
+    final headers = _buildHeaders();
+
+    try {
+      final body = jsonEncode({
+        'context': {
+          'client': {
+            'clientName': 'WEB_REMIX',
+            'clientVersion': '1.20240417.01.00',
+            'hl': 'en',
+            'gl': 'US',
+          }
+        },
+        'browseId': 'FEmusic_home',
+      });
+
+      final response = await http
+          .post(Uri.parse(_innertubeBrowseUrl), headers: headers, body: body)
+          .timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        if (!_isUnauthenticatedResponse(json)) {
+          final tracks = _parseInnertubePlaylistTracks(json);
+          if (tracks.isNotEmpty) {
+            final seen = <String>{};
+            final unique = <YtmTrack>[];
+            for (final t in tracks) {
+              if (seen.add(t.videoId)) {
+                unique.add(t);
+              }
+            }
+            debugPrint('[YTM_ACCOUNT] Parsed ${unique.length} personalized home recommendations');
+            return unique.take(maxTracks).toList();
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[YTM_ACCOUNT] Failed to fetch personalized home feed: $e');
+    }
+    return [];
+  }
+
   /// Fetches the user's private Liked Music playlist (`FEmusic_liked_videos`).
   Future<List<YtmTrack>> fetchLikedSongs({int maxTracks = 200}) async {
     if (!isLoggedIn) {
