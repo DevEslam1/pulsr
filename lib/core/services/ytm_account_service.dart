@@ -547,17 +547,54 @@ class YtmAccountService {
               node['musicTwoRowItemRenderer'] as Map<String, dynamic>;
           final nav = renderer['navigationEndpoint'] as Map<String, dynamic>?;
           final vid = nav?['watchEndpoint']?['videoId'] as String?;
-          final title = renderer['title']?['runs']?[0]?['text'] as String? ??
-              'Unknown Title';
-          final subtitle =
-              renderer['subtitle']?['runs']?[0]?['text'] as String? ??
-                  'Unknown Artist';
           if (vid != null && vid.length == 11) {
+            final titleRuns = renderer['title']?['runs'] as List<dynamic>?;
+            final title = titleRuns?.isNotEmpty == true
+                ? titleRuns![0]['text'] as String? ?? 'Unknown Title'
+                : 'Unknown Title';
+
+            String artist = 'Unknown Artist';
+            int durationMs = 0;
+
+            final subRuns = renderer['subtitle']?['runs'] as List<dynamic>?;
+            if (subRuns != null && subRuns.isNotEmpty) {
+              final texts = subRuns
+                  .map((r) => r['text']?.toString().trim() ?? '')
+                  .where((t) => t.isNotEmpty && t != '•' && t != '·')
+                  .toList();
+
+              for (final t in texts) {
+                final parts = t.split(':').map((e) => int.tryParse(e)).toList();
+                if (parts.length == 2 && parts[0] != null && parts[1] != null) {
+                  durationMs = (parts[0]! * 60 + parts[1]!) * 1000;
+                } else if (parts.length == 3 && parts[0] != null && parts[1] != null && parts[2] != null) {
+                  durationMs = (parts[0]! * 3600 + parts[1]! * 60 + parts[2]!) * 1000;
+                } else if (t.toLowerCase() != 'song' && t.toLowerCase() != 'video' && artist == 'Unknown Artist') {
+                  artist = t;
+                }
+              }
+            }
+
+            // Extract high-res artwork
+            String? artworkUrl;
+            final thumbRenderer = renderer['thumbnailRenderer']?['musicThumbnailRenderer'] ??
+                renderer['thumbnail']?['musicThumbnailRenderer'];
+            final thumbs = (thumbRenderer?['thumbnail']?['thumbnails'] ??
+                renderer['thumbnail']?['thumbnails']) as List<dynamic>?;
+            if (thumbs != null && thumbs.isNotEmpty) {
+              artworkUrl = thumbs.last['url'] as String?;
+              if (artworkUrl != null) {
+                artworkUrl = artworkUrl.replaceAll(RegExp(r'=w\d+-h\d+[^?]*'), '=s1200');
+                artworkUrl = artworkUrl.replaceAll(RegExp(r'=s\d+[^?]*'), '=s1200');
+              }
+            }
+
             tracks.add(YtmTrack(
               videoId: vid,
               title: title,
-              artist: subtitle,
-              duration: Duration.zero,
+              artist: artist,
+              duration: Duration(milliseconds: durationMs),
+              artworkUrl: artworkUrl,
             ));
           }
           return;

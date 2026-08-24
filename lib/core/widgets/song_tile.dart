@@ -167,16 +167,18 @@ class SongTile extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Text(
-                      Formatters.formatDurationMs(song.durationMs),
-                      style: TextStyle(
-                        color: p.textTertiary,
-                        fontSize: isCompact ? 11 : 12,
-                        fontWeight: FontWeight.w600,
-                        fontFeatures: const [FontFeature.tabularFigures()],
+                    if (song.durationMs > 0) ...[
+                      const SizedBox(width: 8),
+                      Text(
+                        Formatters.formatDurationMs(song.durationMs),
+                        style: TextStyle(
+                          color: p.textTertiary,
+                          fontSize: isCompact ? 11 : 12,
+                          fontWeight: FontWeight.w600,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
                       ),
-                    ),
+                    ],
                     if (trailing != null)
                       trailing!
                     else if (onMorePressed != null)

@@ -297,7 +297,7 @@ void main() {
       cubit.close();
     });
 
-    test('position stream only emits when delta exceeds 250ms', () async {
+    test('position stream updates state continuously', () async {
       final cubit = PlayerCubit(
         audioHandler: testAudioHandler,
         repository: mockRepository,
@@ -305,12 +305,10 @@ void main() {
       );
       await Future<void>.delayed(const Duration(milliseconds: 10));
 
-      // 100ms delta from zero - should not emit
       testAudioHandler._positionController.add(const Duration(milliseconds: 100));
       await Future<void>.delayed(const Duration(milliseconds: 10));
-      expect(cubit.state.position, Duration.zero);
+      expect(cubit.state.position, const Duration(milliseconds: 100));
 
-      // 300ms delta from zero - should emit
       testAudioHandler._positionController.add(const Duration(milliseconds: 300));
       await Future<void>.delayed(const Duration(milliseconds: 10));
       expect(cubit.state.position, const Duration(milliseconds: 300));

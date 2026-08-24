@@ -252,6 +252,17 @@ class PulsrAudioHandler extends BaseAudioHandler
       );
 
       _subscriptions.add(
+        player.durationStream.listen((dur) {
+          if (isPlayerA == _isPlayerAActive && dur != null && dur > Duration.zero) {
+            final current = mediaItem.value;
+            if (current != null && current.duration != dur) {
+              mediaItem.add(current.copyWith(duration: dur));
+            }
+          }
+        }),
+      );
+
+      _subscriptions.add(
         player.playerStateStream.listen((state) {
           if (isPlayerA == _isPlayerAActive) {
             if (state.processingState == ProcessingState.completed &&
@@ -387,7 +398,11 @@ class PulsrAudioHandler extends BaseAudioHandler
       return _createAudioSource(song, tag);
     }
 
-    // Check if this online track was downloaded to the device
+    // Direct fast path for downloaded songs with physical file on disk
+    if (!song.path.startsWith('ytmusic://') && song.path.isNotEmpty && File(song.path).existsSync()) {
+      return _createAudioSource(song, tag);
+    }
+
     try {
       final localMatch = await _repository.findMatchingLocalSong(
         remoteId: song.remoteId,
@@ -404,14 +419,18 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
 
     final url = await _resolveStreamUrl(song);
-    // ignore: experimental_member_use
-    return LockCachingAudioSource(Uri.parse(url), tag: tag);
+    return AudioSource.uri(Uri.parse(url), tag: tag);
   }
 
   /// Returns a currently-valid stream URL for a YouTube row, reusing a memoized
   /// one until it nears expiry. Throws [YtmException] when nothing usable comes
   /// back, so the caller can tell "network down" from "skip this track".
   Future<String> _resolveStreamUrl(SongsTableData song) async {
+    final videoId = song.remoteId;
+    if (videoId == null || videoId.isEmpty) {
+      throw const YtmException('YTM_UNAVAILABLE', 'Missing video id');
+    }
+
     final prefs = await SharedPreferences.getInstance();
     final offlineOnly = prefs.getBool('setting_offline_only_mode') ?? false;
     if (offlineOnly) {
@@ -424,10 +443,6 @@ class PulsrAudioHandler extends BaseAudioHandler
         throw const YtmException('WIFI_ONLY', 'Wi-Fi Only Mode is enabled. Connect to Wi-Fi to stream');
       }
     }
-    final videoId = song.remoteId;
-    if (videoId == null || videoId.isEmpty) {
-      throw const YtmException('YTM_UNAVAILABLE', 'Missing video id');
-    }
     final quality = prefs.getString('setting_streaming_quality') ?? 'high';
     final cacheKey = '$videoId-$quality';
 
@@ -436,9 +451,9 @@ class PulsrAudioHandler extends BaseAudioHandler
       return cached.url;
     }
     final stream = await _ytmService.resolveStream(videoId, quality: quality);
-    // Google's URLs sit ~6h out; refresh well before that to stay safe.
+    // Cache stream URLs for 2 hours for instant repeated plays and track skips
     _streamCache[cacheKey] =
-        (url: stream.url, expires: DateTime.now().add(const Duration(minutes: 30)));
+        (url: stream.url, expires: DateTime.now().add(const Duration(hours: 2)));
     return stream.url;
   }
 
@@ -454,14 +469,10 @@ class PulsrAudioHandler extends BaseAudioHandler
     return null;
   }
 
-  /// Warms [_streamCache] for an upcoming YouTube track so the crossfade (which
-  /// *is* the prefetch window) is not truncated by resolve latency. Fire and
-  /// forget: a failure just means the crossfade resolves on demand instead.
+  /// Warms [_streamCache] for an upcoming YouTube track so track switching is instant.
   void _prefetchStream(SongsTableData song) {
     final videoId = song.remoteId;
-    if (song.source != SongSource.youtube || videoId == null) return;
-    final cached = _streamCache[videoId];
-    if (cached != null && cached.expires.isAfter(DateTime.now())) return;
+    if (song.source != SongSource.youtube || videoId == null || videoId.isEmpty) return;
     if (!_prefetching.add(videoId)) return;
     _resolveStreamUrl(song)
         .whenComplete(() => _prefetching.remove(videoId))
@@ -742,6 +753,11 @@ class PulsrAudioHandler extends BaseAudioHandler
       }
     }).catchError((_) {});
 
+    // Kick off background prefetch for next track immediately so next skip is instant
+    if (index + 1 < _songs.length) {
+      _prefetchStream(_songs[index + 1]);
+    }
+
     // Keep notification controls alive during track transition
     playbackState.add(
       playbackState.value.copyWith(
@@ -838,6 +854,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
         restoreVolume: _volume);
     await _activePlayer.seek(position);
+    _positionSubject.add(position);
     _saveCurrentPosition();
   }
 

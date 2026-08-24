@@ -197,7 +197,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                 child: AudioVisualizer(
                   style: visualizerStyle,
                   color: activeColor,
-                  height: visualizerStyle == VisualizerStyle.circular ? 80 : 36,
+                  height: visualizerStyle == VisualizerStyle.circular ? 90 : 50,
                   isPlaying: state.isPlaying,
                 ),
               ),

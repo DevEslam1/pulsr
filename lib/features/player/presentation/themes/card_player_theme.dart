@@ -15,6 +15,7 @@ import '../../../sheets/sleep_timer_sheet.dart';
 import '../../../sheets/song_info_sheet.dart';
 import '../../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../widgets/audio_quality_badge.dart';
+import '../widgets/audio_visualizer.dart';
 import '../widgets/equalizer_sheet.dart';
 import '../widgets/lyrics_view.dart';
 import '../widgets/now_playing_queue_view.dart';
@@ -241,6 +242,18 @@ class CardPlayerTheme extends StatelessWidget {
                   ),
                 ),
               ),
+
+              // Visualizer Strip under cover
+              if (settingsState.visualizerStyle != VisualizerStyle.off && !state.isLyricsVisible && !state.isQueueVisible)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 2),
+                  child: AudioVisualizer(
+                    style: settingsState.visualizerStyle,
+                    color: activeColor,
+                    height: settingsState.visualizerStyle == VisualizerStyle.circular ? 90 : 56,
+                    isPlaying: state.isPlaying,
+                  ),
+                ),
 
               // Bottom Glass Card: Track Meta, Seek, Controls, Actions
               Padding(

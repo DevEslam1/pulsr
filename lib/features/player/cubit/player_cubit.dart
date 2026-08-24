@@ -171,32 +171,45 @@ class PlayerCubit extends Cubit<PlayerState> {
       if (item != null) {
         final id = int.tryParse(item.id);
         if (id != null) {
+          SongsTableData? resolvedSong;
           final songResult = await _repository.getSongById(id);
-          songResult.fold(
-            (failure) => emit(state.copyWith(errorMessage: failure.message)),
-            (song) {
-              if (song != null) {
-                emit(
-                  state.copyWith(
-                    currentSong: song,
-                    duration: Duration(milliseconds: song.durationMs),
-                    errorMessage: null,
-                  ),
-                );
-                _loadLyricsForSong(song);
-                _updateWidgetThrottled(force: true);
-                _scrobblerService?.notifyPlaybackState(
-                  id: song.id,
-                  artist: song.artist,
-                  track: song.title,
-                  album: song.album,
-                  durationMs: song.durationMs,
-                  positionMs: state.position.inMilliseconds,
-                  isPlaying: state.isPlaying,
-                );
-              }
-            },
-          );
+          songResult.fold((_) => null, (song) => resolvedSong = song);
+
+          // Crucial fallback for in-memory online tracks (negative IDs) or newly queued songs
+          resolvedSong ??= _audioHandler.currentSong?.id == id
+              ? _audioHandler.currentSong
+              : state.queue.where((s) => s.id == id).firstOrNull;
+
+          if (resolvedSong != null) {
+            final duration = (item.duration != null && item.duration! > Duration.zero)
+                ? item.duration!
+                : (resolvedSong!.durationMs > 0
+                    ? Duration(milliseconds: resolvedSong!.durationMs)
+                    : state.duration);
+            final isSameSong = state.currentSong?.id == resolvedSong!.id;
+
+            emit(
+              state.copyWith(
+                currentSong: resolvedSong,
+                duration: duration,
+                errorMessage: null,
+              ),
+            );
+
+            if (!isSameSong) {
+              _loadLyricsForSong(resolvedSong!);
+            }
+            _updateWidgetThrottled(force: true);
+            _scrobblerService?.notifyPlaybackState(
+              id: resolvedSong!.id,
+              artist: resolvedSong!.artist,
+              track: resolvedSong!.title,
+              album: resolvedSong!.album,
+              durationMs: duration.inMilliseconds,
+              positionMs: state.position.inMilliseconds,
+              isPlaying: state.isPlaying,
+            );
+          }
         }
       }
     });
@@ -236,11 +249,9 @@ class PlayerCubit extends Cubit<PlayerState> {
     });
 
     _positionSub = _audioHandler.positionStream.listen((pos) {
-      if ((pos - state.position).abs() > const Duration(milliseconds: 250)) {
-        emit(state.copyWith(position: pos));
-        if (state.isPlaying) {
-          _updateWidgetThrottled(force: false);
-        }
+      emit(state.copyWith(position: pos));
+      if (state.isPlaying) {
+        _updateWidgetThrottled(force: false);
       }
     });
 
