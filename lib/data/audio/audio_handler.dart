@@ -378,6 +378,23 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (song.source != SongSource.youtube) {
       return _createAudioSource(song, tag);
     }
+
+    // Check if this online track was downloaded to the device
+    try {
+      final localMatch = await _repository.findMatchingLocalSong(
+        remoteId: song.remoteId,
+        title: song.title,
+        artist: song.artist,
+      );
+      final localSong = localMatch.fold((_) => null, (s) => s);
+      if (localSong != null &&
+          (File(localSong.path).existsSync() || localSong.path.startsWith('content:') || (localSong.uri != null && localSong.uri!.startsWith('content:')))) {
+        return _createAudioSource(localSong, tag);
+      }
+    } catch (_) {
+      // If local check fails, fall through to stream resolution
+    }
+
     final url = await _resolveStreamUrl(song);
     // ignore: experimental_member_use
     return LockCachingAudioSource(Uri.parse(url), tag: tag);

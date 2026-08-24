@@ -58,6 +58,22 @@ class YtmTrack {
         lastPositionMs: 0,
       );
 
+  Map<String, dynamic> toJson() => {
+        'videoId': videoId,
+        'title': title,
+        'artist': artist,
+        'durationMs': duration.inMilliseconds,
+        'artworkUrl': artworkUrl,
+      };
+
+  factory YtmTrack.fromJson(Map<String, dynamic> json) => YtmTrack(
+        videoId: json['videoId'] as String? ?? '',
+        title: json['title'] as String? ?? 'Unknown Title',
+        artist: json['artist'] as String? ?? 'Unknown Artist',
+        duration: Duration(milliseconds: (json['durationMs'] as num?)?.toInt() ?? 0),
+        artworkUrl: json['artworkUrl'] as String?,
+      );
+
   static YtmTrack? fromChannel(Map<Object?, Object?> map) {
     final videoId = map['videoId'] as String?;
     final title = map['title'] as String?;

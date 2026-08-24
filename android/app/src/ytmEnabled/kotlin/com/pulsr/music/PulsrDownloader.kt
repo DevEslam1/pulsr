@@ -34,6 +34,13 @@ class PulsrDownloader : Downloader() {
             }
         }
 
+        val cookie = runCatching {
+            android.webkit.CookieManager.getInstance().getCookie(request.url())
+        }.getOrNull()
+        if (!cookie.isNullOrEmpty()) {
+            connection.setRequestProperty("Cookie", cookie)
+        }
+
         try {
             request.dataToSend()?.let { body ->
                 connection.doOutput = true

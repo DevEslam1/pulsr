@@ -10,8 +10,10 @@ import 'core/di/injection.dart';
 import 'core/theme/aura_theme.dart';
 import 'core/theme/dynamic_theme_cubit.dart';
 import 'core/router/app_router.dart';
+import 'core/services/auth_service.dart';
 import 'core/services/file_intent_handler.dart';
 import 'core/services/restore_detection_service.dart';
+import 'core/services/ytm_account_service.dart';
 import 'core/utils/error_logger.dart';
 import 'data/audio/audio_handler.dart';
 import 'data/db/app_database.dart';
@@ -26,6 +28,7 @@ import 'domain/usecases/toggle_favorite_usecase.dart';
 import 'domain/usecases/search_music_usecase.dart';
 import 'domain/usecases/playlist_usecases.dart';
 import 'domain/usecases/folder_usecases.dart';
+import 'features/auth/cubit/auth_cubit.dart';
 import 'features/library/cubit/library_cubit.dart';
 import 'features/player/cubit/player_cubit.dart';
 import 'features/player/cubit/player_state.dart';
@@ -60,6 +63,8 @@ Future<void> main() async {
   await configureDependencies();
   // Early registration of file intent handler so warm-start file opens are never dropped
   getIt<FileIntentHandler>();
+  await getIt<AuthService>().initialize();
+  await getIt<YtmAccountService>().init();
 
   if (AppConfig.sentryDsn.isNotEmpty) {
     await SentryFlutter.init(
@@ -158,7 +163,7 @@ class _PulsrAppState extends State<PulsrApp> {
               final cubit = getIt<PlayerCubit>();
               final song = cubit.state.currentSong;
               if (song != null) {
-                getIt<DynamicThemeCubit>().updateFromSongId(song.id);
+                getIt<DynamicThemeCubit>().updateFromSong(song);
               }
               return cubit;
             },
@@ -175,6 +180,9 @@ class _PulsrAppState extends State<PulsrApp> {
           BlocProvider<SettingsCubit>(
             create: (_) => getIt<SettingsCubit>(),
           ),
+          BlocProvider<AuthCubit>(
+            create: (_) => getIt<AuthCubit>(),
+          ),
           if (AppConfig.ytmEnabled)
             BlocProvider<YtmDownloadCubit>(
               create: (_) => getIt<YtmDownloadCubit>(),
@@ -189,7 +197,7 @@ class _PulsrAppState extends State<PulsrApp> {
                 final isDynamicOn = context.read<SettingsCubit>().state.dynamicThemingEnabled;
                 if (isDynamicOn) {
                   if (song != null) {
-                    context.read<DynamicThemeCubit>().updateFromSongId(song.id);
+                    context.read<DynamicThemeCubit>().updateFromSong(song);
                   } else {
                     context.read<DynamicThemeCubit>().resetToDefault();
                   }
@@ -202,7 +210,7 @@ class _PulsrAppState extends State<PulsrApp> {
                 if (state.dynamicThemingEnabled) {
                   final song = context.read<PlayerCubit>().state.currentSong;
                   if (song != null) {
-                    context.read<DynamicThemeCubit>().updateFromSongId(song.id);
+                    context.read<DynamicThemeCubit>().updateFromSong(song);
                   }
                 } else {
                   context.read<DynamicThemeCubit>().resetToDefault();

@@ -25,7 +25,7 @@ class NowPlayingScreen extends StatelessWidget {
       listener: (context, state) {
         final song = state.currentSong;
         if (song != null && settingsState.dynamicThemingEnabled) {
-          context.read<DynamicThemeCubit>().updateFromSongId(song.id);
+          context.read<DynamicThemeCubit>().updateFromSong(song);
         }
       },
       builder: (context, state) {

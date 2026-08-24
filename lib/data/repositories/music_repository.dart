@@ -117,6 +117,51 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
+  Future<Result<SongsTableData?>> getSongByRemoteId(String remoteId) async {
+    if (remoteId.isEmpty) return const Right(null);
+    try {
+      final song = await (_db.select(_db.songsTable)
+            ..where((t) => t.remoteId.equals(remoteId) & t.source.equals(SongSource.local) & t.isMissing.equals(false))
+            ..limit(1))
+          .getSingleOrNull();
+      return Right(song);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to fetch song by remoteId', e));
+    }
+  }
+
+  @override
+  Future<Result<SongsTableData?>> findMatchingLocalSong({String? remoteId, String? title, String? artist}) async {
+    try {
+      // 1. Try matching by remoteId first
+      if (remoteId != null && remoteId.isNotEmpty) {
+        final byRemoteId = await (_db.select(_db.songsTable)
+              ..where((t) => t.remoteId.equals(remoteId) & t.source.equals(SongSource.local) & t.isMissing.equals(false))
+              ..limit(1))
+            .getSingleOrNull();
+        if (byRemoteId != null) return Right(byRemoteId);
+      }
+
+      // 2. Try matching by title & artist on local rows
+      if (title != null && title.trim().isNotEmpty && artist != null && artist.trim().isNotEmpty) {
+        final byMeta = await (_db.select(_db.songsTable)
+              ..where((t) =>
+                  t.source.equals(SongSource.local) &
+                  t.isMissing.equals(false) &
+                  t.title.lower().equals(title.trim().toLowerCase()) &
+                  t.artist.lower().equals(artist.trim().toLowerCase()))
+              ..limit(1))
+            .getSingleOrNull();
+        if (byMeta != null) return Right(byMeta);
+      }
+
+      return const Right(null);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to find matching local song', e));
+    }
+  }
+
+  @override
   Future<Result<List<SongsTableData>>> getSongsByIds(List<int> ids) async {
     if (ids.isEmpty) return const Right([]);
     try {

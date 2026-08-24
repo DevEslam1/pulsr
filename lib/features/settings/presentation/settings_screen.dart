@@ -4,9 +4,15 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/di/injection.dart';
+import '../../../core/services/ytm_account_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/platform_capabilities.dart';
+import '../../auth/cubit/auth_cubit.dart';
+import '../../auth/cubit/auth_state.dart';
+import '../../auth/presentation/auth_sheet.dart';
+import '../../auth/presentation/ytm_web_login_sheet.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
 import '../../player/presentation/widgets/equalizer_sheet.dart';
 import '../../sheets/sleep_timer_sheet.dart';
@@ -35,6 +41,7 @@ class SettingsScreen extends StatelessWidget {
               child: ListView(
                 padding: EdgeInsets.only(bottom: 160, top: 8, left: Adaptive.pagePadding(context), right: Adaptive.pagePadding(context)),
                 children: [
+                  _buildCloudSyncCard(context),
                   _section(context, 'Audio & Playback', [
                     _navTile(
                       context,
@@ -237,6 +244,44 @@ class SettingsScreen extends StatelessWidget {
                   ]),
                   if (AppConfig.ytmEnabled)
                     _section(context, 'YouTube Music & Online', [
+                      () {
+                        final ytmAccount = getIt<YtmAccountService>();
+                        return ValueListenableBuilder<bool>(
+                          valueListenable: ytmAccount.loginState,
+                          builder: (context, isLoggedIn, _) {
+                            if (!isLoggedIn) {
+                              return _navTile(
+                                context,
+                                Icons.account_circle_outlined,
+                                'Connect YouTube Music Account',
+                                'Sign in to auto-sync your Liked Music library',
+                                onTap: () async {
+                                  final ok = await YtmWebLoginSheet.show(context);
+                                  // loginState notifier fires automatically in
+                                  // saveSession — no manual setState needed.
+                                  if (ok == true && context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('YouTube Music connected!'),
+                                      ),
+                                    );
+                                  }
+                                },
+                              );
+                            } else {
+                              return _navTile(
+                                context,
+                                Icons.account_circle_rounded,
+                                'YouTube Music Connected',
+                                '${ytmAccount.accountName ?? "Connected"} • Tap to manage',
+                                onTap: () =>
+                                    _showYtmAccountDisconnectDialog(context),
+                              );
+                            }
+                          },
+                        );
+                      }(),
+                      _divider(p),
                       _switchTile(context, Icons.cloud_off_rounded, 'Offline Only Mode',
                           'Disable online features, streaming & web queries',
                           value: state.offlineOnlyMode, onChanged: cubit.setOfflineOnlyMode),
@@ -1024,6 +1069,160 @@ class SettingsScreen extends StatelessWidget {
             }),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildCloudSyncCard(BuildContext context) {
+    final p = context.palette;
+
+    return BlocBuilder<AuthCubit, AuthState>(
+      builder: (context, state) {
+        final authCubit = context.read<AuthCubit>();
+        final user = state.user;
+        final isSyncing = state.syncStatus == SyncStatus.syncing;
+
+        String syncSubtitle = 'Sign in to back up favorites & playlists';
+        if (user != null) {
+          if (state.lastSyncedAt != null) {
+            final diff = DateTime.now().difference(state.lastSyncedAt!);
+            if (diff.inMinutes < 1) {
+              syncSubtitle = 'Last synced: Just now';
+            } else if (diff.inHours < 1) {
+              syncSubtitle = 'Last synced: ${diff.inMinutes}m ago';
+            } else {
+              syncSubtitle = 'Last synced: ${diff.inHours}h ago';
+            }
+          } else {
+            syncSubtitle = 'Connected • Ready to sync';
+          }
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 20, top: 4),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: p.surfaceContainer,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: p.hairline),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: user != null ? p.accent.withValues(alpha: 0.15) : p.surface,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: p.hairline),
+                    ),
+                    child: user?.photoURL != null
+                        ? ClipOval(
+                            child: Image.network(
+                              user!.photoURL!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Icon(Icons.person_rounded, color: p.accent),
+                            ),
+                          )
+                        : Icon(user != null ? Icons.person_rounded : Icons.cloud_outlined, color: p.accent),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user?.displayName ?? user?.email ?? 'Cloud Sync & Backup',
+                          style: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          syncSubtitle,
+                          style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (user == null) ...[
+                    FilledButton(
+                      onPressed: () => AuthSheet.show(context),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: p.accent,
+                        foregroundColor: p.onAccent,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Sign In', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    ),
+                  ] else ...[
+                    IconButton(
+                      tooltip: 'Sync Now',
+                      icon: isSyncing
+                          ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: p.accent))
+                          : Icon(Icons.sync_rounded, color: p.accent),
+                      onPressed: isSyncing ? null : () => authCubit.syncNow(),
+                    ),
+                    IconButton(
+                      tooltip: 'Sign Out',
+                      icon: Icon(Icons.logout_rounded, color: p.textTertiary, size: 20),
+                      onPressed: () => authCubit.signOut(),
+                    ),
+                  ],
+                ],
+              ),
+              if (state.syncError != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  state.syncError!,
+                  style: TextStyle(color: p.error, fontSize: 11),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showYtmAccountDisconnectDialog(BuildContext context) {
+    final account = getIt<YtmAccountService>();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('YouTube Music Account'),
+        content: Text(
+          'Connected as: ${account.accountName ?? "User"}\n\nDo you want to disconnect your YouTube Music account?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              await account.logout();
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Disconnected from YouTube Music')),
+                );
+              }
+            },
+            child: const Text('Disconnect'),
+          ),
+        ],
       ),
     );
   }

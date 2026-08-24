@@ -1,0 +1,234 @@
+// lib/features/auth/presentation/ytm_web_login_sheet.dart
+import 'package:flutter/material.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import '../../../core/di/injection.dart';
+import '../../../core/services/ytm_account_service.dart';
+import '../../../core/theme/aura_theme.dart';
+
+class YtmWebLoginSheet extends StatefulWidget {
+  const YtmWebLoginSheet({super.key});
+
+  static Future<bool?> show(BuildContext context) {
+    return showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      useRootNavigator: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => const YtmWebLoginSheet(),
+    );
+  }
+
+  @override
+  State<YtmWebLoginSheet> createState() => _YtmWebLoginSheetState();
+}
+
+class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
+  late final WebViewController _controller;
+  bool _isLoading = true;
+  double _progress = 0.0;
+  bool _isSuccessHandled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setUserAgent(
+        'Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+      )
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onProgress: (p) {
+            if (mounted) setState(() => _progress = p / 100);
+          },
+          onPageStarted: (url) {
+            if (mounted) setState(() => _isLoading = true);
+          },
+          onPageFinished: (url) async {
+            if (mounted) setState(() => _isLoading = false);
+            await _checkForAuthSuccess(url);
+          },
+        ),
+      )
+      ..loadRequest(
+        Uri.parse(
+          'https://accounts.google.com/ServiceLogin?continue=https%3A%2F%2Fmusic.youtube.com',
+        ),
+      );
+  }
+
+  Future<void> _checkForAuthSuccess(String url) async {
+    if (_isSuccessHandled) return;
+
+    // Only attempt cookie extraction once the user has actually landed on
+    // YouTube Music — NOT on any intermediate Google sign-in page.
+    final isOnYtm = url.contains('music.youtube.com') &&
+        !url.contains('ServiceLogin') &&
+        !url.contains('accounts.google.com') &&
+        !url.contains('signin');
+    if (!isOnYtm) return;
+
+    // Give the page a moment so the browser flushes all Set-Cookie headers
+    // (especially HttpOnly ones like SID/__Secure-3PSID) into CookieManager.
+    await Future<void>.delayed(const Duration(milliseconds: 800));
+    if (!mounted || _isSuccessHandled) return;
+
+    final accountService = getIt<YtmAccountService>();
+
+    // Collect cookies from all relevant Google/YTM domains via the native
+    // Android CookieManager, which has access to HttpOnly cookies that
+    // JS document.cookie cannot read.
+    final cookies = await accountService.getNativeCookiesFromDomains();
+
+    if (cookies != null && cookies.isNotEmpty) {
+      // Log which cookie keys are present (not values) for diagnosis.
+      final keys = cookies.split(';').map((p) => p.trim().split('=').first.trim()).toList();
+      debugPrint('[YTM_LOGIN] Cookie keys collected: $keys');
+
+      // A valid YTM session always has __Secure-3PSID (or __Secure-1PSID)
+      // alongside SAPISID. SID / HSID / SSID alone are NOT enough.
+      final hasSecure3Psid = cookies.contains('__Secure-3PSID');
+      final hasSecure1Psid = cookies.contains('__Secure-1PSID');
+      final hasSapisid = cookies.contains('SAPISID');
+
+      debugPrint('[YTM_LOGIN] hasSecure3PSID=$hasSecure3Psid '
+          'hasSecure1PSID=$hasSecure1Psid hasSAPISID=$hasSapisid');
+
+      if (hasSapisid && (hasSecure3Psid || hasSecure1Psid)) {
+        _isSuccessHandled = true;
+        await accountService.saveSession(cookies);
+        if (mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(true);
+        }
+        return;
+      }
+    }
+
+    // Fallback: JS document.cookie (only gets non-HttpOnly cookies but
+    // is better than nothing if native CookieManager returns nothing).
+    try {
+      final rawCookie = await _controller.runJavaScriptReturningResult(
+        'document.cookie',
+      );
+      String cookieStr = rawCookie.toString();
+      if (cookieStr.startsWith('"') && cookieStr.endsWith('"')) {
+        cookieStr = cookieStr.substring(1, cookieStr.length - 1);
+      }
+      if (cookieStr.contains('SAPISID')) {
+        debugPrint('[YTM_LOGIN] JS cookie fallback, len=${cookieStr.length}');
+        _isSuccessHandled = true;
+        await accountService.saveSession(cookieStr);
+        if (mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(true);
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _forceSaveAndFinish() async {
+    final accountService = getIt<YtmAccountService>();
+    final nativeCookies = await accountService.getNativeCookiesFromDomains();
+    if (nativeCookies != null && nativeCookies.isNotEmpty) {
+      await accountService.saveSession(nativeCookies);
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(true);
+      }
+    } else {
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final size = MediaQuery.of(context).size;
+
+    return Container(
+      height: size.height * 0.88,
+      decoration: BoxDecoration(
+        color: p.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border.all(color: p.hairline),
+      ),
+      child: Column(
+        children: [
+          // Drag handle & Header
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            child: Column(
+              children: [
+                Center(
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: p.textTertiary.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    const Icon(Icons.cloud_sync_rounded,
+                        color: Colors.redAccent, size: 22),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Sign in to YouTube Music',
+                            style: TextStyle(
+                              color: p.textPrimary,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Text(
+                            'Connects your account to sync your Liked Music automatically',
+                            style: TextStyle(
+                                color: p.textSecondary, fontSize: 11.5),
+                          ),
+                        ],
+                      ),
+                    ),
+                    FilledButton.tonal(
+                      onPressed: _forceSaveAndFinish,
+                      style: FilledButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                      ),
+                      child: const Text('Done', style: TextStyle(fontSize: 12)),
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(Icons.close_rounded, size: 20),
+                      onPressed: () => Navigator.of(context).pop(false),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (_isLoading || _progress < 1.0)
+            LinearProgressIndicator(
+              value: _isLoading ? null : _progress,
+              backgroundColor: p.surfaceContainer,
+              color: p.accent,
+              minHeight: 2.5,
+            ),
+          const Divider(height: 1),
+          // WebView Body
+          Expanded(
+            child: ClipRRect(
+              child: WebViewWidget(controller: _controller),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

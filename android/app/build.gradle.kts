@@ -5,6 +5,7 @@ plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -33,8 +34,8 @@ android {
     productFlavors {
         create("dev") {
             dimension = "default"
-            applicationIdSuffix = ".dev"
-            manifestPlaceholders["appName"] = "Pulsr Dev"
+            applicationIdSuffix = ".plus"
+            manifestPlaceholders["appName"] = "Pulsr Plus"
         }
         create("prod") {
             dimension = "default"
@@ -95,6 +96,15 @@ android {
         checkReleaseBuilds = false
         abortOnError = false
     }
+
+    packaging {
+        resources {
+            excludes += "google/protobuf/**"
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/INDEX.LIST"
+            excludes += "META-INF/io.netty.versions.properties"
+        }
+    }
 }
 
 kotlin {
@@ -124,5 +134,11 @@ dependencies {
     val newPipeExtractor = "com.github.TeamNewPipe:NewPipeExtractor:v0.26.5"
     "devImplementation"(newPipeExtractor)
     "ytmImplementation"(newPipeExtractor)
+}
+
+configurations.all {
+    resolutionStrategy {
+        force("com.google.protobuf:protobuf-javalite:3.25.5")
+    }
 }
 

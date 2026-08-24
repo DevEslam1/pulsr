@@ -116,92 +116,113 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Center(
           child: ConstrainedBox(
             constraints: Adaptive.contentConstraints(context),
-            child: ListView(
-              padding: const EdgeInsets.only(bottom: 160),
-              children: [
-                // ---------- Hero header ----------
-                Padding(
-                  padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 4),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              MaterialLocalizations.of(context).formatMediumDate(DateTime.now()),
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: p.textTertiary),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              _getGreeting(),
-                              style: Theme.of(context).textTheme.headlineMedium,
-                            ),
-                          ],
-                        ),
+            child: RefreshIndicator(
+              onRefresh: () async {
+                if (currentTab == 0) {
+                  final count = await context.read<SettingsCubit>().rescanLibrary();
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Rescan complete ($count songs found)'),
+                        duration: const Duration(seconds: 2),
                       ),
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: p.accentContainer,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: p.hairline),
-                          boxShadow: [
-                            BoxShadow(color: p.glow, blurRadius: 24, spreadRadius: -4, offset: const Offset(0, 8)),
-                          ],
-                        ),
-                        child: PulsrLogo(size: 26, color: p.accent, glowColor: p.glow, animate: false),
-                      ),
-                    ],
-                  ),
-                ),
-
-                // ---------- Segmented Tab Selector (Local vs Online) ----------
-                if (showOnlineTab) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    margin: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: p.surfaceContainer,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: p.hairline),
-                    ),
+                    );
+                  }
+                } else {
+                  setState(() {
+                    _categoryFutures.clear();
+                  });
+                  await Future.delayed(const Duration(milliseconds: 300));
+                }
+              },
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.only(bottom: 160),
+                children: [
+                  // ---------- Hero header ----------
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 4),
                     child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Expanded(
-                          child: _buildTabButton(
-                            title: 'Local Music',
-                            icon: Icons.library_music_rounded,
-                            isSelected: currentTab == 0,
-                            p: p,
-                            onTap: () => setState(() => _selectedTab = 0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                MaterialLocalizations.of(context).formatMediumDate(DateTime.now()),
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(color: p.textTertiary),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                _getGreeting(),
+                                style: Theme.of(context).textTheme.headlineMedium,
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: _buildTabButton(
-                            title: 'Online Stream',
-                            icon: Icons.public_rounded,
-                            isSelected: currentTab == 1,
-                            p: p,
-                            onTap: () => setState(() => _selectedTab = 1),
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: p.accentContainer,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: p.hairline),
+                            boxShadow: [
+                              BoxShadow(color: p.glow, blurRadius: 24, spreadRadius: -4, offset: const Offset(0, 8)),
+                            ],
                           ),
+                          child: PulsrLogo(size: 26, color: p.accent, glowColor: p.glow, animate: false),
                         ),
                       ],
                     ),
                   ),
+
+                  // ---------- Segmented Tab Selector (Local vs Online) ----------
+                  if (showOnlineTab) ...[
+                    const SizedBox(height: 12),
+                    Container(
+                      margin: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: p.surfaceContainer,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: p.hairline),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _buildTabButton(
+                              title: 'Local Music',
+                              icon: Icons.library_music_rounded,
+                              isSelected: currentTab == 0,
+                              p: p,
+                              onTap: () => setState(() => _selectedTab = 0),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: _buildTabButton(
+                              title: 'Online Stream',
+                              icon: Icons.public_rounded,
+                              isSelected: currentTab == 1,
+                              p: p,
+                              onTap: () => setState(() => _selectedTab = 1),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 8),
+
+                  // ---------- Content (Local vs Online) ----------
+                  if (currentTab == 0)
+                    _buildLocalView(context, p, getSongsUseCase, playerCubit, isTablet)
+                  else if (showOnlineTab)
+                    _buildOnlineView(context, p, playerCubit, isTablet),
                 ],
-
-                const SizedBox(height: 8),
-
-                // ---------- Content (Local vs Online) ----------
-                if (currentTab == 0)
-                  _buildLocalView(context, p, getSongsUseCase, playerCubit, isTablet)
-                else if (showOnlineTab)
-                  _buildOnlineView(context, p, playerCubit, isTablet),
-              ],
+              ),
             ),
           ),
         ),

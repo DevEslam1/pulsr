@@ -22,6 +22,7 @@ class SongTile extends StatelessWidget {
   final bool selected;
   final VoidCallback? onLongPress;
   final Widget? trailing;
+  final bool? isDownloaded;
 
   const SongTile({
     super.key,
@@ -35,6 +36,7 @@ class SongTile extends StatelessWidget {
     this.selected = false,
     this.onLongPress,
     this.trailing,
+    this.isDownloaded,
   });
 
   @override
@@ -42,6 +44,13 @@ class SongTile extends StatelessWidget {
     final p = context.palette;
     final isCompact = MediaQuery.sizeOf(context).width < 360;
     final effectiveArtworkSize = isCompact ? (artworkSize * 0.88).clamp(42.0, 52.0) : artworkSize;
+
+    final isDownloadedTrack = isDownloaded ??
+        (song.source == SongSource.local &&
+            ((song.remoteId != null && song.remoteId!.isNotEmpty) ||
+                (song.remoteArtworkUrl != null && song.remoteArtworkUrl!.isNotEmpty) ||
+                song.path.contains('ytdl_') ||
+                song.path.toLowerCase().contains('pulsr')));
 
     return BlocBuilder<PlayerCubit, PlayerState>(
       buildWhen: (a, b) =>
@@ -132,14 +141,28 @@ class SongTile extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 2),
-                          Text(
-                            subtitleOverride ?? song.artist,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: p.textSecondary,
-                              fontSize: isCompact ? 11.5 : 12.5,
-                            ),
+                          Row(
+                            children: [
+                              if (isDownloadedTrack) ...[
+                                Icon(
+                                  Icons.download_done_rounded,
+                                  size: isCompact ? 12 : 13,
+                                  color: p.accent,
+                                ),
+                                const SizedBox(width: 4),
+                              ],
+                              Expanded(
+                                child: Text(
+                                  subtitleOverride ?? song.artist,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: isCompact ? 11.5 : 12.5,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),

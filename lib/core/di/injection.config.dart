@@ -14,10 +14,13 @@ import 'dart:io' as _i497;
 import 'package:get_it/get_it.dart' as _i174;
 import 'package:injectable/injectable.dart' as _i526;
 import 'package:pulsr/core/di/injection.dart' as _i953;
+import 'package:pulsr/core/services/auth_service.dart' as _i535;
+import 'package:pulsr/core/services/cloud_sync_service.dart' as _i225;
 import 'package:pulsr/core/services/file_intent_handler.dart' as _i134;
 import 'package:pulsr/core/services/lrclib_service.dart' as _i621;
 import 'package:pulsr/core/services/scrobbler_service.dart' as _i629;
 import 'package:pulsr/core/services/yt_download_service.dart' as _i742;
+import 'package:pulsr/core/services/ytm_account_service.dart' as _i631;
 import 'package:pulsr/core/services/ytm_service.dart' as _i391;
 import 'package:pulsr/core/theme/dynamic_theme_cubit.dart' as _i401;
 import 'package:pulsr/data/audio/audio_handler.dart' as _i366;
@@ -39,6 +42,7 @@ import 'package:pulsr/domain/usecases/playlist_io_usecases.dart' as _i265;
 import 'package:pulsr/domain/usecases/playlist_usecases.dart' as _i792;
 import 'package:pulsr/domain/usecases/search_music_usecase.dart' as _i644;
 import 'package:pulsr/domain/usecases/toggle_favorite_usecase.dart' as _i800;
+import 'package:pulsr/features/auth/cubit/auth_cubit.dart' as _i918;
 import 'package:pulsr/features/library/cubit/library_cubit.dart' as _i633;
 import 'package:pulsr/features/player/cubit/player_cubit.dart' as _i147;
 import 'package:pulsr/features/playlists/cubit/playlist_cubit.dart' as _i431;
@@ -64,7 +68,9 @@ extension GetItInjectableX on _i174.GetIt {
     );
     final networkModule = _$NetworkModule();
     gh.singleton<_i497.HttpClient>(() => networkModule.httpClient);
+    gh.singleton<_i535.AuthService>(() => _i535.AuthService());
     gh.singleton<_i629.ScrobblerService>(() => _i629.ScrobblerService());
+    gh.singleton<_i631.YtmAccountService>(() => _i631.YtmAccountService());
     gh.singleton<_i391.YtmService>(() => _i391.YtmService());
     gh.singleton<_i401.DynamicThemeCubit>(() => _i401.DynamicThemeCubit());
     gh.singleton<_i682.AppDatabase>(() => _i682.AppDatabase());
@@ -109,6 +115,11 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i800.ToggleFavoriteUseCase(gh<_i320.IMusicRepository>()));
     gh.factory<_i431.PlaylistCubit>(() =>
         _i431.PlaylistCubit(playlistUseCases: gh<_i792.PlaylistUseCases>()));
+    gh.singleton<_i225.CloudSyncService>(() => _i225.CloudSyncService(
+          gh<_i535.AuthService>(),
+          gh<_i320.IMusicRepository>(),
+          gh<_i682.AppDatabase>(),
+        ));
     gh.factory<_i790.SmartPlaylistBuilderCubit>(
         () => _i790.SmartPlaylistBuilderCubit(
               gh<_i399.SmartPlaylistEngine>(),
@@ -119,6 +130,10 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i391.YtmService>(),
           gh<_i483.MediaScannerService>(),
           gh<_i320.IMusicRepository>(),
+        ));
+    gh.factory<_i918.AuthCubit>(() => _i918.AuthCubit(
+          gh<_i535.AuthService>(),
+          gh<_i225.CloudSyncService>(),
         ));
     gh.singleton<_i545.ImportBackupUseCase>(() => _i545.ImportBackupUseCase(
           gh<_i320.IMusicRepository>(),

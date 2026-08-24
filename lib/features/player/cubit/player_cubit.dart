@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -273,8 +274,28 @@ class PlayerCubit extends Cubit<PlayerState> {
   }
 
   Future<void> playSong(SongsTableData song, {List<SongsTableData>? queue, Duration? initialPosition}) async {
-    final effectiveQueue = queue ?? [song];
-    final index = effectiveQueue.indexWhere((s) => s.id == song.id);
+    // If playing an online song that has already been downloaded to the device, swap to local song
+    SongsTableData targetSong = song;
+    if (song.source == SongSource.youtube) {
+      try {
+        final match = await _repository.findMatchingLocalSong(
+          remoteId: song.remoteId,
+          title: song.title,
+          artist: song.artist,
+        );
+        final local = match.fold((_) => null, (s) => s);
+        if (local != null && (File(local.path).existsSync() || local.path.startsWith('content:'))) {
+          targetSong = local;
+        }
+      } catch (_) {}
+    }
+
+    var effectiveQueue = queue ?? [targetSong];
+    if (targetSong.id != song.id) {
+      effectiveQueue = effectiveQueue.map((s) => s.id == song.id ? targetSong : s).toList();
+    }
+
+    final index = effectiveQueue.indexWhere((s) => s.id == targetSong.id);
     final startPos = initialPosition ?? Duration.zero;
     _queueSlots[state.activeQueueSlot] = _QueueSlotData(
       songs: List.from(effectiveQueue),
@@ -284,16 +305,16 @@ class PlayerCubit extends Cubit<PlayerState> {
     emit(state.copyWith(
       queue: effectiveQueue,
       currentIndex: index != -1 ? index : 0,
-      currentSong: song,
+      currentSong: targetSong,
       position: startPos,
-      duration: Duration(milliseconds: song.durationMs),
+      duration: Duration(milliseconds: targetSong.durationMs),
     ));
     await _audioHandler.loadQueue(
       effectiveQueue,
       initialIndex: index != -1 ? index : 0,
       initialPosition: startPos,
     );
-    _loadLyricsForSong(song);
+    _loadLyricsForSong(targetSong);
     _updateWidgetThrottled(force: true);
   }
 

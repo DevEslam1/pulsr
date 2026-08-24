@@ -96,6 +96,21 @@ class YtmService {
     return _parseTracks(raw);
   }
 
+  /// Fetches all tracks from a YouTube or YouTube Music playlist link or ID.
+  Future<List<YtmTrack>> getPlaylistTracks(String urlOrId, {int limit = 100}) async {
+    final raw = await _guard(
+      () => _channel.invokeMethod<Map<Object?, Object?>>('getPlaylist', {
+        'url': urlOrId.trim(),
+        'limit': limit,
+      }),
+      timeout: const Duration(seconds: 40),
+    );
+
+    if (raw == null) return const [];
+    final rawTracks = raw['tracks'] as List<Object?>?;
+    return _parseTracks(rawTracks);
+  }
+
   List<YtmTrack> _parseTracks(List<Object?>? raw) {
     if (raw == null) return const [];
     final tracks = <YtmTrack>[];

@@ -25,6 +25,8 @@ abstract class IMusicRepository {
   Future<Result<SongsTableData?>> getSongById(int id);
   Future<Result<SongsTableData?>> getSongByPath(String path);
   Future<Result<SongsTableData?>> getSongByUri(String uri);
+  Future<Result<SongsTableData?>> getSongByRemoteId(String remoteId);
+  Future<Result<SongsTableData?>> findMatchingLocalSong({String? remoteId, String? title, String? artist});
   Future<Result<List<SongsTableData>>> getSongsByIds(List<int> ids);
   Future<Result<int>> hardDeleteMissingSongs();
 

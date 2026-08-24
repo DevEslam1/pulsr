@@ -20,6 +20,7 @@ import org.schabi.newpipe.extractor.exceptions.ExtractionException
 import org.schabi.newpipe.extractor.exceptions.ReCaptchaException
 import org.schabi.newpipe.extractor.localization.ContentCountry
 import org.schabi.newpipe.extractor.localization.Localization
+import org.schabi.newpipe.extractor.playlist.PlaylistInfo
 import org.schabi.newpipe.extractor.search.SearchInfo
 import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeSearchQueryHandlerFactory
 import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeStreamLinkHandlerFactory
@@ -108,6 +109,36 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 val limit = call.argument<Int>("limit") ?: DEFAULT_SEARCH_LIMIT
                 runOffMainThread(result) { trending(limit) }
             }
+            "getPlaylist" -> {
+                val url = call.argument<String>("url")?.trim()
+                if (url.isNullOrEmpty()) {
+                    result.error("YTM_INVALID_ARGUMENT", "url is required", null)
+                    return
+                }
+                val limit = call.argument<Int>("limit") ?: 100
+                runOffMainThread(result) { getPlaylist(url, limit) }
+            }
+            "getCookies" -> {
+                val urls = listOf(
+                    "https://music.youtube.com",
+                    "https://www.youtube.com",
+                    "https://accounts.google.com",
+                    "https://youtube.com"
+                )
+                val cookieJar = mutableMapOf<String, String>()
+                val cm = android.webkit.CookieManager.getInstance()
+                for (u in urls) {
+                    val c = cm.getCookie(u) ?: continue
+                    for (pair in c.split(";")) {
+                        val parts = pair.trim().split("=", limit = 2)
+                        if (parts.size == 2 && parts[0].isNotBlank()) {
+                            cookieJar[parts[0].trim()] = parts[1].trim()
+                        }
+                    }
+                }
+                val merged = cookieJar.entries.joinToString("; ") { "${it.key}=${it.value}" }
+                result.success(merged)
+            }
             "resolveStream" -> {
                 val videoId = call.argument<String>("videoId")
                 if (videoId == null || !VIDEO_ID.matches(videoId)) {
@@ -193,6 +224,26 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         } catch (_: Throwable) {
             emptyList()
         }
+    }
+
+    private fun getPlaylist(urlOrId: String, limit: Int): Map<String, Any?> {
+        val rawUrl = if (urlOrId.startsWith("http://") || urlOrId.startsWith("https://")) {
+            urlOrId
+        } else {
+            "https://www.youtube.com/playlist?list=$urlOrId"
+        }
+        val url = rawUrl.replace("music.youtube.com", "www.youtube.com")
+        val extractor = ServiceList.YouTube.getPlaylistExtractor(url)
+        extractor.fetchPage()
+        val playlistInfo = PlaylistInfo.getInfo(extractor)
+        val items = playlistInfo.relatedItems.asSequence().filterIsInstance<StreamInfoItem>()
+        val tracks = streamItemsToMaps(items, limit)
+        return mapOf(
+            "title" to playlistInfo.name,
+            "uploader" to (playlistInfo.uploaderName ?: ""),
+            "thumbnailUrl" to bestArtwork(playlistInfo.thumbnails),
+            "tracks" to tracks,
+        )
     }
 
     /** Shared shape for search and trending results, keyed to match [YtmTrack.fromChannel]. */

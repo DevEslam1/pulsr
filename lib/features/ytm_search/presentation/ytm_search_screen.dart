@@ -133,18 +133,25 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
     }
 
     final songs = [for (final track in state.results) track.toSongData()];
-    return ListView.builder(
-      padding: const EdgeInsets.only(bottom: 160, top: 4),
-      itemCount: songs.length,
-      itemBuilder: (context, index) {
-        final song = songs[index];
-        return SongTile(
-          song: song,
-          subtitleOverride: state.results[index].artist,
-          onTap: () => playerCubit.playSong(song, queue: songs),
-          trailing: YtmDownloadButton(song: song),
-        );
+    return RefreshIndicator(
+      onRefresh: () async {
+        cubit.retry();
+        await Future.delayed(const Duration(milliseconds: 300));
       },
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.only(bottom: 160, top: 4),
+        itemCount: songs.length,
+        itemBuilder: (context, index) {
+          final song = songs[index];
+          return SongTile(
+            song: song,
+            subtitleOverride: state.results[index].artist,
+            onTap: () => playerCubit.playSong(song, queue: songs),
+            trailing: YtmDownloadButton(song: song),
+          );
+        },
+      ),
     );
   }
 }
