@@ -29,6 +29,10 @@ class SettingsCubit extends Cubit<SettingsState> {
   static const String _keyReplayGainMode = 'setting_replay_gain_mode';
   static const String _keyReplayGainPreampWithRg = 'setting_replay_gain_preamp_with_rg';
   static const String _keyReplayGainPreampWithoutRg = 'setting_replay_gain_preamp_without_rg';
+  static const String _keyStreamingQuality = 'setting_streaming_quality';
+  static const String _keyDownloadQuality = 'setting_download_quality';
+  static const String _keyWifiOnlyMode = 'setting_wifi_only_mode';
+  static const String _keyOfflineOnlyMode = 'setting_offline_only_mode';
 
   SettingsCubit({required MediaScannerService scannerService})
       : _scannerService = scannerService,
@@ -98,6 +102,21 @@ class SettingsCubit extends Cubit<SettingsState> {
       final replayGainPreampWithRg = prefs.getDouble(_keyReplayGainPreampWithRg) ?? 0.0;
       final replayGainPreampWithoutRg = prefs.getDouble(_keyReplayGainPreampWithoutRg) ?? -3.0;
 
+      final streamingQualityStr = prefs.getString(_keyStreamingQuality) ?? YtmAudioQuality.high.name;
+      final streamingQuality = YtmAudioQuality.values.firstWhere(
+        (e) => e.name == streamingQualityStr,
+        orElse: () => YtmAudioQuality.high,
+      );
+
+      final downloadQualityStr = prefs.getString(_keyDownloadQuality) ?? YtmAudioQuality.high.name;
+      final downloadQuality = YtmAudioQuality.values.firstWhere(
+        (e) => e.name == downloadQualityStr,
+        orElse: () => YtmAudioQuality.high,
+      );
+
+      final wifiOnlyMode = prefs.getBool(_keyWifiOnlyMode) ?? false;
+      final offlineOnlyMode = prefs.getBool(_keyOfflineOnlyMode) ?? false;
+
       emit(state.copyWith(
         gaplessPlayback: prefs.getBool(_keyGapless) ?? true,
         crossfadeSeconds: prefs.getDouble(_keyCrossfade) ?? 0.0,
@@ -117,6 +136,10 @@ class SettingsCubit extends Cubit<SettingsState> {
         replayGainMode: replayGainMode,
         replayGainPreampWithRg: replayGainPreampWithRg,
         replayGainPreampWithoutRg: replayGainPreampWithoutRg,
+        streamingQuality: streamingQuality,
+        downloadQuality: downloadQuality,
+        wifiOnlyMode: wifiOnlyMode,
+        offlineOnlyMode: offlineOnlyMode,
       ));
     } catch (e, st) {
       ErrorLogger.log('Failed to load settings preferences from SharedPreferences', error: e, stackTrace: st, category: 'SettingsCubit');
@@ -230,6 +253,30 @@ class SettingsCubit extends Cubit<SettingsState> {
     emit(state.copyWith(replayGainPreampWithoutRg: db));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(_keyReplayGainPreampWithoutRg, db);
+  }
+
+  Future<void> setStreamingQuality(YtmAudioQuality quality) async {
+    emit(state.copyWith(streamingQuality: quality));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyStreamingQuality, quality.name);
+  }
+
+  Future<void> setDownloadQuality(YtmAudioQuality quality) async {
+    emit(state.copyWith(downloadQuality: quality));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyDownloadQuality, quality.name);
+  }
+
+  Future<void> setWifiOnlyMode(bool enabled) async {
+    emit(state.copyWith(wifiOnlyMode: enabled));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyWifiOnlyMode, enabled);
+  }
+
+  Future<void> setOfflineOnlyMode(bool enabled) async {
+    emit(state.copyWith(offlineOnlyMode: enabled));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyOfflineOnlyMode, enabled);
   }
 
   Future<int> rescanLibrary() async {

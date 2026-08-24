@@ -17,6 +17,8 @@ enum NowPlayingArtworkSwipeAction { nextPrev, none }
 
 enum ReplayGainMode { off, track, album }
 
+enum YtmAudioQuality { low, medium, high }
+
 @freezed
 abstract class SettingsState with _$SettingsState {
   const SettingsState._();
@@ -40,6 +42,10 @@ abstract class SettingsState with _$SettingsState {
     @Default(ReplayGainMode.track) ReplayGainMode replayGainMode,
     @Default(0.0) double replayGainPreampWithRg,
     @Default(-3.0) double replayGainPreampWithoutRg,
+    @Default(YtmAudioQuality.high) YtmAudioQuality streamingQuality,
+    @Default(YtmAudioQuality.high) YtmAudioQuality downloadQuality,
+    @Default(false) bool wifiOnlyMode,
+    @Default(false) bool offlineOnlyMode,
     @Default(false) bool isScanning,
     int? scanResultCount,
     String? errorMessage,

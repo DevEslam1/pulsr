@@ -247,6 +247,17 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   Future<void> _loadLyricsForSong(SongsTableData song) async {
     if (isClosed) return;
+    // A YouTube row's path is a ytmusic:// sentinel, not a file on disk, so
+    // LrcParser (which reads sidecar/embedded lyrics off the path) has nothing
+    // to resolve. Clear lyrics and skip the lookup.
+    if (song.source != SongSource.local) {
+      emit(state.copyWith(
+        isLoadingLyrics: false,
+        lyrics: [],
+        lyricsSource: LyricsSource.none,
+      ));
+      return;
+    }
     emit(state.copyWith(
       isLoadingLyrics: true,
       lyrics: [],
@@ -363,6 +374,34 @@ class PlayerCubit extends Cubit<PlayerState> {
         await _audioHandler.pause();
       }
       _loadLyricsForSong(song);
+    }
+  }
+
+  /// After a YouTube row is downloaded and folded into a positive-id local row,
+  /// swap the stale negative-id row in the queues so favorite/tag/queue UI stay
+  /// coherent. Pure state update: the handler keeps streaming the current track
+  /// uninterrupted; the local file takes over on the next load.
+  Future<void> swapReconciledSong(int oldId, int newId) async {
+    if (oldId == newId) return;
+    final result = await _repository.getSongById(newId);
+    final newSong = result.fold((_) => null, (s) => s);
+    if (newSong == null || isClosed) return;
+
+    _queueSlots.updateAll((slot, data) {
+      if (!data.songs.any((s) => s.id == oldId)) return data;
+      return _QueueSlotData(
+        songs: data.songs.map((s) => s.id == oldId ? newSong : s).toList(),
+        currentIndex: data.currentIndex,
+        position: data.position,
+      );
+    });
+
+    if (state.queue.any((s) => s.id == oldId)) {
+      emit(state.copyWith(
+        queue: state.queue.map((s) => s.id == oldId ? newSong : s).toList(),
+        currentSong: state.currentSong?.id == oldId ? newSong : state.currentSong,
+      ));
+      _updateWidgetThrottled(force: true);
     }
   }
 

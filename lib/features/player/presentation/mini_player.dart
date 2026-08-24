@@ -82,6 +82,7 @@ class MiniPlayer extends StatelessWidget {
                               tag: 'now_playing_art',
                               child: CachedArtwork(
                                 id: song.id,
+                                remoteUrl: song.remoteArtworkUrl,
                                 type: ArtworkType.AUDIO,
                                 size: 48,
                                 borderRadius: 12,

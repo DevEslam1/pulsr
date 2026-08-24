@@ -352,7 +352,13 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                         final song = state.previewSongs[index];
                         return ListTile(
                           dense: true,
-                          leading: CachedArtwork(id: song.id, type: ArtworkType.AUDIO, size: 36, borderRadius: 8),
+                          leading: CachedArtwork(
+                            id: song.id,
+                            remoteUrl: song.remoteArtworkUrl,
+                            type: ArtworkType.AUDIO,
+                            size: 36,
+                            borderRadius: 8,
+                          ),
                           title: Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: p.textPrimary)),
                           subtitle: Text(
                             '${song.artist} • ${Formatters.formatDuration(Duration(milliseconds: song.durationMs))}',

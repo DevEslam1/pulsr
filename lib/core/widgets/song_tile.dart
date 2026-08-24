@@ -96,6 +96,7 @@ class SongTile extends StatelessWidget {
                                 children: [
                                   CachedArtwork(
                                     id: song.id,
+                                    remoteUrl: song.remoteArtworkUrl,
                                     type: ArtworkType.AUDIO,
                                     size: effectiveArtworkSize,
                                     borderRadius: 13,

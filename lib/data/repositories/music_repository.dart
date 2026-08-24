@@ -36,7 +36,7 @@ class MusicRepository implements IMusicRepository {
       if (excludedFolders.isNotEmpty) {
         for (final folder in excludedFolders) {
           final prefix = folder.endsWith(Platform.pathSeparator) ? folder : '$folder${Platform.pathSeparator}';
-          query.where((t) => t.path.like('$prefix%').not());
+          query.where((t) => t.source.equals(SongSource.local).not() | t.path.like('$prefix%').not());
         }
       }
 
@@ -692,8 +692,14 @@ class MusicRepository implements IMusicRepository {
 
       int markedMissingCount = 0;
       await _db.transaction(() async {
-        // Soft delete: mark missing songs instead of hard deleting to preserve playlist entries, play history & favorites
-        markedMissingCount = await (_db.update(_db.songsTable)..where((t) => t.id.isNotIn(scannedSongIds))).write(
+        // Soft delete: mark missing songs instead of hard deleting to preserve playlist entries, play history & favorites.
+        // Non-local rows or pending local downloads without MediaStore IDs must not be flagged missing.
+        markedMissingCount = await (_db.update(_db.songsTable)
+              ..where((t) =>
+                  t.id.isNotIn(scannedSongIds) &
+                  t.id.isBiggerThanValue(0) &
+                  t.source.equals(SongSource.local)))
+            .write(
           const SongsTableCompanion(isMissing: Value(true)),
         );
 
@@ -750,7 +756,9 @@ class MusicRepository implements IMusicRepository {
   @override
   Future<Result<int>> hardDeleteMissingSongs() async {
     try {
-      final deletedCount = await (_db.delete(_db.songsTable)..where((t) => t.isMissing.equals(true))).go();
+      final deletedCount = await (_db.delete(_db.songsTable)
+            ..where((t) => t.isMissing.equals(true) & t.source.equals(SongSource.local)))
+          .go();
 
       // Reconcile and cleanup orphaned albums and artists in single SQL queries
       await _db.customStatement(
@@ -767,6 +775,124 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
+  Future<Result<int?>> reconcileDownloadedSong({
+    required int oldId,
+    required String newPath,
+  }) async {
+    try {
+      int? survivingId;
+      await _db.transaction(() async {
+        final oldRow = await (_db.select(_db.songsTable)..where((t) => t.id.equals(oldId))).getSingleOrNull();
+
+        // Find the row the scanner minted for the downloaded file. getSongByPath
+        // is unusable here: getSingleOrNull() throws if MediaStore re-indexed
+        // the same path under more than one id (there is no unique index on path).
+        var newRow = await (_db.select(_db.songsTable)
+              ..where((t) => t.path.equals(newPath) & t.id.isBiggerThanValue(0))
+              ..orderBy([(t) => OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)])
+              ..limit(1))
+            .getSingleOrNull();
+
+        // Fallback: MediaStore may rename the file to dodge a collision, so the
+        // path won't match. Match on normalized metadata instead.
+        if (newRow == null && oldRow != null) {
+          newRow = await (_db.select(_db.songsTable)
+                ..where((t) =>
+                    t.id.isBiggerThanValue(0) &
+                    t.source.equals(SongSource.local) &
+                    t.title.lower().equals(oldRow.title.toLowerCase()) &
+                    t.artist.lower().equals(oldRow.artist.toLowerCase()) &
+                    t.durationMs.isBetweenValues(oldRow.durationMs - 2000, oldRow.durationMs + 2000))
+                ..orderBy([(t) => OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)])
+                ..limit(1))
+              .getSingleOrNull();
+        }
+
+        if (newRow == null) {
+          if (oldRow != null) {
+            final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+            await (_db.update(_db.songsTable)..where((t) => t.id.equals(oldId))).write(
+              SongsTableCompanion(
+                path: Value(newPath),
+                source: const Value(SongSource.local),
+                isMissing: const Value(false),
+                dateAdded: Value((oldRow.dateAdded ?? 0) > 0 ? oldRow.dateAdded! : nowSec),
+                pendingDownloadPath: const Value(null),
+              ),
+            );
+            survivingId = oldId;
+          }
+          return;
+        }
+        final targetId = newRow.id;
+        survivingId = targetId;
+
+        // Old row already gone (reconciled twice) or scanner reused the id: nothing to fold.
+        if (oldRow == null || oldRow.id == targetId) return;
+
+        // Re-point children off the negative id BEFORE deleting it so the FK
+        // cascade finds nothing to remove. playlist_entries has no unique
+        // (playlist_id, song_id) index, so dedupe first or membership doubles.
+        await _db.customStatement(
+          'DELETE FROM playlist_entries WHERE song_id = ? '
+          'AND playlist_id IN (SELECT playlist_id FROM playlist_entries WHERE song_id = ?);',
+          [oldId, targetId],
+        );
+        await _db.customStatement('UPDATE playlist_entries SET song_id = ? WHERE song_id = ?;', [targetId, oldId]);
+        await _db.customStatement('UPDATE queue_items SET song_id = ? WHERE song_id = ?;', [targetId, oldId]);
+        await _db.customStatement('UPDATE play_history SET song_id = ? WHERE song_id = ?;', [targetId, oldId]);
+
+        // Delete the YT row BEFORE writing remoteId onto the new row: the
+        // partial unique index on remote_id would otherwise see two rows.
+        await _db.customStatement('DELETE FROM songs WHERE id = ?;', [oldId]);
+
+        // Merge stats (don't clobber — the scanned row may predate the download).
+        final int? mergedLastPlayed;
+        if (oldRow.lastPlayed != null && newRow.lastPlayed != null) {
+          mergedLastPlayed = oldRow.lastPlayed! > newRow.lastPlayed! ? oldRow.lastPlayed : newRow.lastPlayed;
+        } else {
+          mergedLastPlayed = oldRow.lastPlayed ?? newRow.lastPlayed;
+        }
+        final keepOldPosition = (oldRow.lastPlayed ?? 0) > (newRow.lastPlayed ?? 0);
+
+        final String effectiveTitle = (oldRow.title.isNotEmpty && !oldRow.title.toLowerCase().startsWith('ytdl_'))
+            ? oldRow.title
+            : newRow.title;
+        final String effectiveArtist = (oldRow.artist.isNotEmpty && oldRow.artist != '<unknown>' && oldRow.artist != 'Unknown')
+            ? oldRow.artist
+            : newRow.artist;
+        final String effectiveAlbum = (oldRow.album.isNotEmpty && oldRow.album != '<unknown>' && oldRow.album != 'Unknown')
+            ? oldRow.album
+            : newRow.album;
+        final String? effectiveRemoteArt = (oldRow.remoteArtworkUrl != null && oldRow.remoteArtworkUrl!.isNotEmpty)
+            ? oldRow.remoteArtworkUrl
+            : newRow.remoteArtworkUrl;
+
+        await (_db.update(_db.songsTable)..where((t) => t.id.equals(targetId))).write(
+          SongsTableCompanion(
+            title: Value(effectiveTitle),
+            artist: Value(effectiveArtist),
+            album: Value(effectiveAlbum),
+            genre: Value(oldRow.genre ?? newRow.genre),
+            isFavorite: Value(oldRow.isFavorite || newRow.isFavorite),
+            playCount: Value(oldRow.playCount + newRow.playCount),
+            lastPlayed: Value(mergedLastPlayed),
+            lastPositionMs: Value(keepOldPosition ? oldRow.lastPositionMs : newRow.lastPositionMs),
+            // Carry the video id and online remoteArtworkUrl
+            remoteId: Value(oldRow.remoteId ?? newRow.remoteId),
+            remoteArtworkUrl: Value(effectiveRemoteArt),
+            source: const Value(SongSource.local),
+            pendingDownloadPath: const Value(null),
+          ),
+        );
+      });
+      return Right(survivingId);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to reconcile downloaded song', e));
+    }
+  }
+
+  @override
   Future<Result<void>> updateSongTags({
     required String path,
     required String title,
@@ -777,7 +903,9 @@ class MusicRepository implements IMusicRepository {
     int? trackNumber,
   }) async {
     try {
-      final existing = await (_db.select(_db.songsTable)..where((t) => t.path.equals(path))).getSingleOrNull();
+      final existing = await (_db.select(_db.songsTable)
+            ..where((t) => t.path.equals(path) & t.source.equals(SongSource.local)))
+          .getSingleOrNull();
       if (existing != null) {
         await (_db.update(_db.songsTable)..where((t) => t.id.equals(existing.id))).write(
           SongsTableCompanion(

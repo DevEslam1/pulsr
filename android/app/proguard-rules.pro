@@ -44,3 +44,20 @@
 # Kotlin Coroutines
 -keep class kotlinx.coroutines.** { *; }
 -dontwarn kotlinx.coroutines.**
+
+# NewPipeExtractor -- present only in the ytm/dev flavors, absent from prod.
+# Rhino compiles YouTube's player JS at runtime and resolves classes
+# reflectively, so it must not be minified. The extractor reflects into
+# nanojson/jsoup on its deserialization paths.
+-keep class org.mozilla.javascript.** { *; }
+-keep class org.mozilla.classfile.** { *; }
+-dontwarn org.mozilla.javascript.**
+-keep class org.schabi.newpipe.extractor.** { *; }
+-dontwarn org.schabi.newpipe.extractor.**
+-keep class com.grack.nanojson.** { *; }
+-keep class org.jsoup.** { *; }
+-dontwarn org.jsoup.**
+# Rhino optionally binds javax.script and java.beans; neither exists on Android.
+-dontwarn javax.script.**
+-dontwarn java.beans.**
+-dontwarn org.mozilla.javascript.tools.**

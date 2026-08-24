@@ -13,9 +13,12 @@ import 'dart:io' as _i497;
 
 import 'package:get_it/get_it.dart' as _i174;
 import 'package:injectable/injectable.dart' as _i526;
+import 'package:pulsr/core/di/injection.dart' as _i953;
 import 'package:pulsr/core/services/file_intent_handler.dart' as _i134;
 import 'package:pulsr/core/services/lrclib_service.dart' as _i621;
 import 'package:pulsr/core/services/scrobbler_service.dart' as _i629;
+import 'package:pulsr/core/services/yt_download_service.dart' as _i742;
+import 'package:pulsr/core/services/ytm_service.dart' as _i391;
 import 'package:pulsr/core/theme/dynamic_theme_cubit.dart' as _i401;
 import 'package:pulsr/data/audio/audio_handler.dart' as _i366;
 import 'package:pulsr/data/db/app_database.dart' as _i682;
@@ -44,6 +47,9 @@ import 'package:pulsr/features/settings/cubit/settings_cubit.dart' as _i41;
 import 'package:pulsr/features/smart_playlist_builder/smart_playlist_builder_cubit.dart'
     as _i790;
 import 'package:pulsr/features/widgets/widget_service.dart' as _i42;
+import 'package:pulsr/features/ytm_search/cubit/ytm_download_cubit.dart'
+    as _i873;
+import 'package:pulsr/features/ytm_search/cubit/ytm_search_cubit.dart' as _i171;
 
 extension GetItInjectableX on _i174.GetIt {
 // initializes the registration of main-scope dependencies inside of GetIt
@@ -56,7 +62,10 @@ extension GetItInjectableX on _i174.GetIt {
       environment,
       environmentFilter,
     );
+    final networkModule = _$NetworkModule();
+    gh.singleton<_i497.HttpClient>(() => networkModule.httpClient);
     gh.singleton<_i629.ScrobblerService>(() => _i629.ScrobblerService());
+    gh.singleton<_i391.YtmService>(() => _i391.YtmService());
     gh.singleton<_i401.DynamicThemeCubit>(() => _i401.DynamicThemeCubit());
     gh.singleton<_i682.AppDatabase>(() => _i682.AppDatabase());
     gh.singleton<_i265.PlaylistExportUseCase>(
@@ -66,6 +75,8 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i399.SmartPlaylistEngine(gh<_i682.AppDatabase>()));
     gh.singleton<_i320.IMusicRepository>(
         () => _i626.MusicRepository(gh<_i682.AppDatabase>()));
+    gh.factory<_i171.YtmSearchCubit>(
+        () => _i171.YtmSearchCubit(service: gh<_i391.YtmService>()));
     gh.singleton<_i792.PlaylistUseCases>(() => _i792.PlaylistUseCases(
           gh<_i320.IMusicRepository>(),
           gh<_i399.SmartPlaylistEngine>(),
@@ -103,12 +114,21 @@ extension GetItInjectableX on _i174.GetIt {
               gh<_i399.SmartPlaylistEngine>(),
               gh<_i792.PlaylistUseCases>(),
             ));
+    gh.lazySingleton<_i742.YtDownloadService>(() => _i742.YtDownloadService(
+          gh<_i497.HttpClient>(),
+          gh<_i391.YtmService>(),
+          gh<_i483.MediaScannerService>(),
+          gh<_i320.IMusicRepository>(),
+        ));
     gh.singleton<_i545.ImportBackupUseCase>(() => _i545.ImportBackupUseCase(
           gh<_i320.IMusicRepository>(),
           gh<_i682.AppDatabase>(),
         ));
     await gh.singletonAsync<_i366.PulsrAudioHandler>(
-      () => _i366.PulsrAudioHandler.create(gh<_i320.IMusicRepository>()),
+      () => _i366.PulsrAudioHandler.create(
+        gh<_i320.IMusicRepository>(),
+        gh<_i391.YtmService>(),
+      ),
       preResolve: true,
       dispose: (i) => i.dispose(),
     );
@@ -136,6 +156,10 @@ extension GetItInjectableX on _i174.GetIt {
           widgetService: gh<_i42.WidgetService>(),
           scrobblerService: gh<_i629.ScrobblerService>(),
         ));
+    gh.factory<_i873.YtmDownloadCubit>(() => _i873.YtmDownloadCubit(
+          gh<_i742.YtDownloadService>(),
+          gh<_i147.PlayerCubit>(),
+        ));
     gh.singleton<_i134.FileIntentHandler>(() => _i134.FileIntentHandler(
           gh<_i320.IMusicRepository>(),
           gh<_i147.PlayerCubit>(),
@@ -143,3 +167,5 @@ extension GetItInjectableX on _i174.GetIt {
     return this;
   }
 }
+
+class _$NetworkModule extends _i953.NetworkModule {}

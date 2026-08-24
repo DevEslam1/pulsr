@@ -149,6 +149,7 @@ void main() {
         album: 'Album',
         durationMs: 1000,
         path: '/path/s.mp3',
+        source: SongSource.local,
         isFavorite: false,
         isMissing: false,
         playCount: 0,

@@ -109,6 +109,7 @@ class FileIntentHandler {
         durationMs: 0,
         path: cleanPath,
         uri: uriOrPath,
+        source: SongSource.local,
         fileSize: fileSize,
         isFavorite: false,
         isMissing: false,

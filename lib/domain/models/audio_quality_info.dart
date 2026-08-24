@@ -1,6 +1,7 @@
 // lib/domain/models/audio_quality_info.dart
 import 'package:flutter/material.dart';
 import '../../data/db/app_database.dart';
+import '../../features/settings/cubit/settings_state.dart';
 
 enum AudioQualityTier {
   hiResLossless,
@@ -45,6 +46,7 @@ class AudioQualityInfo {
     int? explicitBitDepth,
     int? explicitBitrateKbps,
     String? explicitFormat,
+    YtmAudioQuality? streamingQuality,
   }) {
     if (song == null) {
       return const AudioQualityInfo(
@@ -64,6 +66,40 @@ class AudioQualityInfo {
     }
 
     final path = song.path.toLowerCase();
+
+    // YouTube Music online streaming track
+    if (song.source == SongSource.youtube || song.source == 'youtube' || path.startsWith('ytmusic://')) {
+      final defaultKbps = streamingQuality == YtmAudioQuality.low
+          ? 64
+          : streamingQuality == YtmAudioQuality.medium
+              ? 128
+              : 160;
+      final kbps = explicitBitrateKbps ?? defaultKbps;
+      final tier = kbps >= 160
+          ? AudioQualityTier.highQuality
+          : kbps >= 128
+              ? AudioQualityTier.standardQuality
+              : AudioQualityTier.compact;
+      return AudioQualityInfo(
+        format: 'AAC',
+        codecName: 'YouTube Music Stream (AAC / Opus)',
+        bitrateKbps: kbps,
+        sampleRate: '48.0 kHz',
+        bitDepth: '16-bit',
+        channels: 'Stereo (2.0)',
+        tier: tier,
+        tierLabel: kbps >= 160
+            ? 'High Quality Stream'
+            : kbps >= 128
+                ? 'Medium Quality Stream'
+                : 'Data Saver Stream',
+        shortBadgeLabel: 'AAC • ${kbps}k',
+        description: 'Online YouTube Music audio stream ($kbps kbps)',
+        badgeColor: const Color(0xFFE11D48),
+        icon: Icons.wifi_tethering_rounded,
+      );
+    }
+
     String ext = '';
     final dotIndex = path.lastIndexOf('.');
     if (dotIndex != -1 && dotIndex < path.length - 1) {

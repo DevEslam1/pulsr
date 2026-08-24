@@ -1,6 +1,16 @@
 // lib/data/db/tables.dart
 import 'package:drift/drift.dart';
 
+/// Allowed values for [SongsTable.source].
+abstract final class SongSource {
+  /// A file indexed by MediaStore. `path` points at the filesystem.
+  static const String local = 'local';
+
+  /// A YouTube track that has no local file yet. `path` holds a
+  /// `ytmusic://<videoId>` sentinel, so any path-based feature must skip it.
+  static const String youtube = 'youtube';
+}
+
 class SongsTable extends Table {
   @override
   String get tableName => 'songs';
@@ -28,6 +38,19 @@ class SongsTable extends Table {
   IntColumn get lastPositionMs => integer().withDefault(const Constant(0))();
   TextColumn get artworkUri => text().nullable()();
   IntColumn get fileSize => integer().nullable()();
+
+  /// See [SongSource]. Rows that are not [SongSource.local] have no file on
+  /// disk, so scanner cleanup and every path-derived query must exclude them.
+  TextColumn get source => text().withDefault(const Constant(SongSource.local))();
+
+  /// YouTube video id. Kept after a download completes so the same video is
+  /// not fetched twice.
+  TextColumn get remoteId => text().nullable()();
+  TextColumn get remoteArtworkUrl => text().nullable()();
+
+  /// Destination a download is writing to, used to match the row MediaStore
+  /// creates once the file lands.
+  TextColumn get pendingDownloadPath => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

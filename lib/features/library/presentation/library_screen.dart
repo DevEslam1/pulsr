@@ -33,7 +33,7 @@ class _LibraryScreenState extends State<LibraryScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 7, vsync: this);
+    _tabController = TabController(length: 8, vsync: this);
   }
 
   @override
@@ -142,6 +142,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     physics: const BouncingScrollPhysics(),
                     tabs: const [
                       Tab(text: 'Songs'),
+                      Tab(text: 'Downloaded'),
                       Tab(text: 'Albums'),
                       Tab(text: 'Artists'),
                       Tab(text: 'Favorites'),
@@ -158,6 +159,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                 controller: _tabController,
                 children: [
                   _buildSongsTab(context, state, cubit, playerCubit),
+                  _buildDownloadedTab(context, state, cubit, playerCubit),
                   _buildAlbumsTab(context, state),
                   _buildArtistsTab(context, state),
                   _buildFavoritesTab(context, state, playerCubit),
@@ -241,6 +243,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       Positioned.fill(
                         child: CachedArtwork(
                           id: song.id,
+                          remoteUrl: song.remoteArtworkUrl,
                           type: ArtworkType.AUDIO,
                           size: double.infinity,
                           borderRadius: 18,
@@ -416,6 +419,179 @@ class _LibraryScreenState extends State<LibraryScreen>
           ),
       ],
     );
+  }
+
+  // ================= DOWNLOADED =================
+  Widget _buildDownloadedTab(
+    BuildContext context,
+    LibraryState state,
+    LibraryCubit cubit,
+    PlayerCubit playerCubit,
+  ) {
+    final p = context.palette;
+    final downloaded = state.songs.where((s) => _isOnlineDownload(s)).toList();
+
+    if (downloaded.isEmpty) {
+      return EmptyStateWidget(
+        icon: Icons.cloud_download_rounded,
+        title: 'No Downloads Yet',
+        subtitle: 'Download your favorite songs from YouTube Music to listen offline anywhere.',
+        primaryActionLabel: 'Explore Online Music',
+        primaryActionIcon: Icons.travel_explore_rounded,
+        onPrimaryAction: () => context.go('/'),
+      );
+    }
+
+    return Column(
+      children: [
+        // ---------- Header Card with Play All & Shuffle ----------
+        Padding(
+          padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 12, Adaptive.pagePadding(context), 8),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  p.accent.withValues(alpha: 0.15),
+                  p.surfaceContainer,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: p.accent.withValues(alpha: 0.25)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: p.accent.withValues(alpha: 0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.download_done_rounded, color: p.accent, size: 24),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Offline Downloads',
+                        style: TextStyle(
+                          color: p.textPrimary,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${downloaded.length} tracks • Available offline',
+                        style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton.filled(
+                  style: IconButton.styleFrom(
+                    backgroundColor: p.accent,
+                    foregroundColor: p.onAccent,
+                  ),
+                  icon: const Icon(Icons.play_arrow_rounded, size: 24),
+                  tooltip: 'Play All',
+                  onPressed: () => playerCubit.playSong(downloaded.first, queue: downloaded),
+                ),
+                const SizedBox(width: 6),
+                IconButton.filledTonal(
+                  style: IconButton.styleFrom(
+                    backgroundColor: p.surfaceContainerHigh,
+                    foregroundColor: p.textPrimary,
+                  ),
+                  icon: const Icon(Icons.shuffle_rounded, size: 20),
+                  tooltip: 'Shuffle',
+                  onPressed: () {
+                    final shuffled = List<SongsTableData>.from(downloaded)..shuffle();
+                    playerCubit.playSong(shuffled.first, queue: shuffled);
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // ---------- List of Downloaded Songs ----------
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.only(bottom: 160, top: 4, left: 4, right: 4),
+            itemCount: downloaded.length,
+            itemBuilder: (context, index) {
+              final song = downloaded[index];
+              return Dismissible(
+                key: ValueKey('dl_${song.id}'),
+                background: Container(
+                  color: p.accentContainer,
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.only(left: 24),
+                  child: Row(children: [
+                    Icon(Icons.playlist_play_rounded, color: p.accent),
+                    const SizedBox(width: 8),
+                    Text('Play Next', style: TextStyle(color: p.accent, fontWeight: FontWeight.w700)),
+                  ]),
+                ),
+                secondaryBackground: Container(
+                  color: p.favorite.withValues(alpha: 0.2),
+                  alignment: Alignment.centerRight,
+                  padding: const EdgeInsets.only(right: 24),
+                  child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                    Text('Favorite', style: TextStyle(color: p.favorite, fontWeight: FontWeight.w700)),
+                    const SizedBox(width: 8),
+                    Icon(Icons.favorite_rounded, color: p.favorite),
+                  ]),
+                ),
+                confirmDismiss: (direction) async {
+                  if (direction == DismissDirection.startToEnd) {
+                    playerCubit.playNext(song);
+                  } else {
+                    cubit.toggleFavorite(song.id);
+                  }
+                  return false;
+                },
+                child: SongTile(
+                  song: song,
+                  index: index + 1,
+                  selected: state.selectedSongIds.contains(song.id),
+                  onTap: () {
+                    if (state.isMultiSelectMode) {
+                      cubit.toggleSongSelection(song.id);
+                    } else {
+                      playerCubit.playSong(song, queue: downloaded);
+                    }
+                  },
+                  onLongPress: () => cubit.toggleSongSelection(song.id),
+                  onMorePressed: () => showModalBottomSheet(
+                    context: context,
+                    useRootNavigator: true,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (_) => SongInfoSheet(song: song),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  bool _isOnlineDownload(SongsTableData s) {
+    return (s.remoteId != null && s.remoteId!.isNotEmpty) ||
+           (s.remoteArtworkUrl != null && s.remoteArtworkUrl!.isNotEmpty) ||
+           s.path.contains('ytdl_') ||
+           s.path.toLowerCase().contains('pulsr');
   }
 
   // ================= ALBUMS (adaptive grid / list) =================
@@ -725,6 +901,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       Positioned.fill(
                         child: CachedArtwork(
                           id: song.id,
+                          remoteUrl: song.remoteArtworkUrl,
                           type: ArtworkType.AUDIO,
                           size: double.infinity,
                           borderRadius: 18,

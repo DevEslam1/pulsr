@@ -207,7 +207,13 @@ class SongInfoSheet extends StatelessWidget {
                   const SizedBox(height: 20),
                   Row(
                     children: [
-                      CachedArtwork(id: song.id, type: ArtworkType.AUDIO, size: 64, borderRadius: 14),
+                      CachedArtwork(
+                        id: song.id,
+                        remoteUrl: song.remoteArtworkUrl,
+                        type: ArtworkType.AUDIO,
+                        size: 64,
+                        borderRadius: 14,
+                      ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(

@@ -62,6 +62,7 @@ class QueueScreen extends StatelessWidget {
                   child: ListTile(
                     leading: CachedArtwork(
                       id: song.id,
+                      remoteUrl: song.remoteArtworkUrl,
                       type: ArtworkType.AUDIO,
                       size: 44,
                       borderRadius: 10,

@@ -28,6 +28,15 @@ abstract class IMusicRepository {
   Future<Result<List<SongsTableData>>> getSongsByIds(List<int> ids);
   Future<Result<int>> hardDeleteMissingSongs();
 
+  /// Folds a downloaded YouTube row (negative [oldId]) into the positive-id
+  /// row the scanner created for [newPath]: merges play stats and re-points
+  /// playlist/queue/history children, then deletes the YouTube row. Returns
+  /// the surviving positive id, or null when no scanned row could be matched.
+  Future<Result<int?>> reconcileDownloadedSong({
+    required int oldId,
+    required String newPath,
+  });
+
   Stream<Result<List<SongsTableData>>> watchFavorites();
   Future<Result<List<SongsTableData>>> getFavorites();
 

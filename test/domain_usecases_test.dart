@@ -104,5 +104,52 @@ void main() {
       final items = result.getOrElse((_) => []);
       expect(items.isNotEmpty, isTrue);
     });
+
+    test('FolderUseCases excludes YouTube rows from the folder hierarchy', () async {
+      // A ytmusic:// sentinel path would otherwise collapse into one phantom
+      // folder the user could "exclude". Only the two local folders should show.
+      await db.into(db.songsTable).insert(
+        SongsTableCompanion.insert(
+          id: const Value(-42),
+          title: 'Streamed Track',
+          artist: const Value('Remote Artist'),
+          path: 'ytmusic://vid123',
+          source: const Value(SongSource.youtube),
+          remoteId: const Value('vid123'),
+        ),
+      );
+
+      final useCase = FolderUseCases(repo);
+      final result = await useCase.getFolderHierarchy();
+      final items = result.getOrElse((_) => []);
+
+      expect(items.length, equals(2));
+      expect(items.any((f) => f.path.contains('ytmusic')), isFalse);
+      expect(
+        items.map((f) => f.path).toSet(),
+        equals({'/storage/music/rock', '/storage/music/jazz'}),
+      );
+    });
+
+    test('FolderUseCases.watchFolderSongs never yields YouTube rows', () async {
+      await db.into(db.songsTable).insert(
+        SongsTableCompanion.insert(
+          id: const Value(-43),
+          title: 'Streamed Track',
+          artist: const Value('Remote Artist'),
+          path: 'ytmusic://vid456',
+          source: const Value(SongSource.youtube),
+          remoteId: const Value('vid456'),
+        ),
+      );
+
+      final useCase = FolderUseCases(repo);
+      final songs = await useCase.watchFolderSongs('/storage/music/rock').first
+          .then((r) => r.getOrElse((_) => []));
+
+      expect(songs.length, equals(1));
+      expect(songs.first.title, equals('Song Alpha'));
+      expect(songs.every((s) => s.source == SongSource.local), isTrue);
+    });
   });
 }

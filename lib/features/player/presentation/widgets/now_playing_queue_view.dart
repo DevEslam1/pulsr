@@ -104,6 +104,7 @@ class NowPlayingQueueView extends StatelessWidget {
                               children: [
                                 CachedArtwork(
                                   id: song.id,
+                                  remoteUrl: song.remoteArtworkUrl,
                                   type: ArtworkType.AUDIO,
                                   size: 42,
                                   borderRadius: 10,

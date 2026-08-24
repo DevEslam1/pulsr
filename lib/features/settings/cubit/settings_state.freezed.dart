@@ -32,6 +32,10 @@ mixin _$SettingsState {
   ReplayGainMode get replayGainMode;
   double get replayGainPreampWithRg;
   double get replayGainPreampWithoutRg;
+  YtmAudioQuality get streamingQuality;
+  YtmAudioQuality get downloadQuality;
+  bool get wifiOnlyMode;
+  bool get offlineOnlyMode;
   bool get isScanning;
   int? get scanResultCount;
   String? get errorMessage;
@@ -87,6 +91,14 @@ mixin _$SettingsState {
             (identical(other.replayGainPreampWithoutRg,
                     replayGainPreampWithoutRg) ||
                 other.replayGainPreampWithoutRg == replayGainPreampWithoutRg) &&
+            (identical(other.streamingQuality, streamingQuality) ||
+                other.streamingQuality == streamingQuality) &&
+            (identical(other.downloadQuality, downloadQuality) ||
+                other.downloadQuality == downloadQuality) &&
+            (identical(other.wifiOnlyMode, wifiOnlyMode) ||
+                other.wifiOnlyMode == wifiOnlyMode) &&
+            (identical(other.offlineOnlyMode, offlineOnlyMode) ||
+                other.offlineOnlyMode == offlineOnlyMode) &&
             (identical(other.isScanning, isScanning) ||
                 other.isScanning == isScanning) &&
             (identical(other.scanResultCount, scanResultCount) ||
@@ -116,6 +128,10 @@ mixin _$SettingsState {
         replayGainMode,
         replayGainPreampWithRg,
         replayGainPreampWithoutRg,
+        streamingQuality,
+        downloadQuality,
+        wifiOnlyMode,
+        offlineOnlyMode,
         isScanning,
         scanResultCount,
         errorMessage
@@ -123,7 +139,7 @@ mixin _$SettingsState {
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, dynamicThemingEnabled: $dynamicThemingEnabled, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, isScanning: $isScanning, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, dynamicThemingEnabled: $dynamicThemingEnabled, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
   }
 }
 
@@ -152,6 +168,10 @@ abstract mixin class $SettingsStateCopyWith<$Res> {
       ReplayGainMode replayGainMode,
       double replayGainPreampWithRg,
       double replayGainPreampWithoutRg,
+      YtmAudioQuality streamingQuality,
+      YtmAudioQuality downloadQuality,
+      bool wifiOnlyMode,
+      bool offlineOnlyMode,
       bool isScanning,
       int? scanResultCount,
       String? errorMessage});
@@ -188,6 +208,10 @@ class _$SettingsStateCopyWithImpl<$Res>
     Object? replayGainMode = null,
     Object? replayGainPreampWithRg = null,
     Object? replayGainPreampWithoutRg = null,
+    Object? streamingQuality = null,
+    Object? downloadQuality = null,
+    Object? wifiOnlyMode = null,
+    Object? offlineOnlyMode = null,
     Object? isScanning = null,
     Object? scanResultCount = freezed,
     Object? errorMessage = freezed,
@@ -265,6 +289,22 @@ class _$SettingsStateCopyWithImpl<$Res>
           ? _self.replayGainPreampWithoutRg
           : replayGainPreampWithoutRg // ignore: cast_nullable_to_non_nullable
               as double,
+      streamingQuality: null == streamingQuality
+          ? _self.streamingQuality
+          : streamingQuality // ignore: cast_nullable_to_non_nullable
+              as YtmAudioQuality,
+      downloadQuality: null == downloadQuality
+          ? _self.downloadQuality
+          : downloadQuality // ignore: cast_nullable_to_non_nullable
+              as YtmAudioQuality,
+      wifiOnlyMode: null == wifiOnlyMode
+          ? _self.wifiOnlyMode
+          : wifiOnlyMode // ignore: cast_nullable_to_non_nullable
+              as bool,
+      offlineOnlyMode: null == offlineOnlyMode
+          ? _self.offlineOnlyMode
+          : offlineOnlyMode // ignore: cast_nullable_to_non_nullable
+              as bool,
       isScanning: null == isScanning
           ? _self.isScanning
           : isScanning // ignore: cast_nullable_to_non_nullable
@@ -393,6 +433,10 @@ extension SettingsStatePatterns on SettingsState {
             ReplayGainMode replayGainMode,
             double replayGainPreampWithRg,
             double replayGainPreampWithoutRg,
+            YtmAudioQuality streamingQuality,
+            YtmAudioQuality downloadQuality,
+            bool wifiOnlyMode,
+            bool offlineOnlyMode,
             bool isScanning,
             int? scanResultCount,
             String? errorMessage)?
@@ -421,6 +465,10 @@ extension SettingsStatePatterns on SettingsState {
             _that.replayGainMode,
             _that.replayGainPreampWithRg,
             _that.replayGainPreampWithoutRg,
+            _that.streamingQuality,
+            _that.downloadQuality,
+            _that.wifiOnlyMode,
+            _that.offlineOnlyMode,
             _that.isScanning,
             _that.scanResultCount,
             _that.errorMessage);
@@ -463,6 +511,10 @@ extension SettingsStatePatterns on SettingsState {
             ReplayGainMode replayGainMode,
             double replayGainPreampWithRg,
             double replayGainPreampWithoutRg,
+            YtmAudioQuality streamingQuality,
+            YtmAudioQuality downloadQuality,
+            bool wifiOnlyMode,
+            bool offlineOnlyMode,
             bool isScanning,
             int? scanResultCount,
             String? errorMessage)
@@ -490,6 +542,10 @@ extension SettingsStatePatterns on SettingsState {
             _that.replayGainMode,
             _that.replayGainPreampWithRg,
             _that.replayGainPreampWithoutRg,
+            _that.streamingQuality,
+            _that.downloadQuality,
+            _that.wifiOnlyMode,
+            _that.offlineOnlyMode,
             _that.isScanning,
             _that.scanResultCount,
             _that.errorMessage);
@@ -531,6 +587,10 @@ extension SettingsStatePatterns on SettingsState {
             ReplayGainMode replayGainMode,
             double replayGainPreampWithRg,
             double replayGainPreampWithoutRg,
+            YtmAudioQuality streamingQuality,
+            YtmAudioQuality downloadQuality,
+            bool wifiOnlyMode,
+            bool offlineOnlyMode,
             bool isScanning,
             int? scanResultCount,
             String? errorMessage)?
@@ -558,6 +618,10 @@ extension SettingsStatePatterns on SettingsState {
             _that.replayGainMode,
             _that.replayGainPreampWithRg,
             _that.replayGainPreampWithoutRg,
+            _that.streamingQuality,
+            _that.downloadQuality,
+            _that.wifiOnlyMode,
+            _that.offlineOnlyMode,
             _that.isScanning,
             _that.scanResultCount,
             _that.errorMessage);
@@ -589,6 +653,10 @@ class _SettingsState extends SettingsState {
       this.replayGainMode = ReplayGainMode.track,
       this.replayGainPreampWithRg = 0.0,
       this.replayGainPreampWithoutRg = -3.0,
+      this.streamingQuality = YtmAudioQuality.high,
+      this.downloadQuality = YtmAudioQuality.high,
+      this.wifiOnlyMode = false,
+      this.offlineOnlyMode = false,
       this.isScanning = false,
       this.scanResultCount,
       this.errorMessage})
@@ -650,6 +718,18 @@ class _SettingsState extends SettingsState {
   final double replayGainPreampWithoutRg;
   @override
   @JsonKey()
+  final YtmAudioQuality streamingQuality;
+  @override
+  @JsonKey()
+  final YtmAudioQuality downloadQuality;
+  @override
+  @JsonKey()
+  final bool wifiOnlyMode;
+  @override
+  @JsonKey()
+  final bool offlineOnlyMode;
+  @override
+  @JsonKey()
   final bool isScanning;
   @override
   final int? scanResultCount;
@@ -707,6 +787,14 @@ class _SettingsState extends SettingsState {
             (identical(other.replayGainPreampWithoutRg,
                     replayGainPreampWithoutRg) ||
                 other.replayGainPreampWithoutRg == replayGainPreampWithoutRg) &&
+            (identical(other.streamingQuality, streamingQuality) ||
+                other.streamingQuality == streamingQuality) &&
+            (identical(other.downloadQuality, downloadQuality) ||
+                other.downloadQuality == downloadQuality) &&
+            (identical(other.wifiOnlyMode, wifiOnlyMode) ||
+                other.wifiOnlyMode == wifiOnlyMode) &&
+            (identical(other.offlineOnlyMode, offlineOnlyMode) ||
+                other.offlineOnlyMode == offlineOnlyMode) &&
             (identical(other.isScanning, isScanning) ||
                 other.isScanning == isScanning) &&
             (identical(other.scanResultCount, scanResultCount) ||
@@ -736,6 +824,10 @@ class _SettingsState extends SettingsState {
         replayGainMode,
         replayGainPreampWithRg,
         replayGainPreampWithoutRg,
+        streamingQuality,
+        downloadQuality,
+        wifiOnlyMode,
+        offlineOnlyMode,
         isScanning,
         scanResultCount,
         errorMessage
@@ -743,7 +835,7 @@ class _SettingsState extends SettingsState {
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, dynamicThemingEnabled: $dynamicThemingEnabled, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, isScanning: $isScanning, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, dynamicThemingEnabled: $dynamicThemingEnabled, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
   }
 }
 
@@ -774,6 +866,10 @@ abstract mixin class _$SettingsStateCopyWith<$Res>
       ReplayGainMode replayGainMode,
       double replayGainPreampWithRg,
       double replayGainPreampWithoutRg,
+      YtmAudioQuality streamingQuality,
+      YtmAudioQuality downloadQuality,
+      bool wifiOnlyMode,
+      bool offlineOnlyMode,
       bool isScanning,
       int? scanResultCount,
       String? errorMessage});
@@ -810,6 +906,10 @@ class __$SettingsStateCopyWithImpl<$Res>
     Object? replayGainMode = null,
     Object? replayGainPreampWithRg = null,
     Object? replayGainPreampWithoutRg = null,
+    Object? streamingQuality = null,
+    Object? downloadQuality = null,
+    Object? wifiOnlyMode = null,
+    Object? offlineOnlyMode = null,
     Object? isScanning = null,
     Object? scanResultCount = freezed,
     Object? errorMessage = freezed,
@@ -887,6 +987,22 @@ class __$SettingsStateCopyWithImpl<$Res>
           ? _self.replayGainPreampWithoutRg
           : replayGainPreampWithoutRg // ignore: cast_nullable_to_non_nullable
               as double,
+      streamingQuality: null == streamingQuality
+          ? _self.streamingQuality
+          : streamingQuality // ignore: cast_nullable_to_non_nullable
+              as YtmAudioQuality,
+      downloadQuality: null == downloadQuality
+          ? _self.downloadQuality
+          : downloadQuality // ignore: cast_nullable_to_non_nullable
+              as YtmAudioQuality,
+      wifiOnlyMode: null == wifiOnlyMode
+          ? _self.wifiOnlyMode
+          : wifiOnlyMode // ignore: cast_nullable_to_non_nullable
+              as bool,
+      offlineOnlyMode: null == offlineOnlyMode
+          ? _self.offlineOnlyMode
+          : offlineOnlyMode // ignore: cast_nullable_to_non_nullable
+              as bool,
       isScanning: null == isScanning
           ? _self.isScanning
           : isScanning // ignore: cast_nullable_to_non_nullable

@@ -1,7 +1,8 @@
-// lib/features/player/presentation/widgets/audio_quality_badge.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/audio_quality_info.dart';
+import '../../../settings/cubit/settings_cubit.dart';
 import 'audio_quality_sheet.dart';
 
 class AudioQualityBadge extends StatelessWidget {
@@ -20,7 +21,8 @@ class AudioQualityBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     if (song == null) return const SizedBox.shrink();
 
-    final info = AudioQualityInfo.fromSong(song);
+    final streamingQuality = context.watch<SettingsCubit?>()?.state.streamingQuality;
+    final info = AudioQualityInfo.fromSong(song, streamingQuality: streamingQuality);
 
     return Material(
       color: Colors.transparent,

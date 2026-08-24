@@ -14,7 +14,7 @@
     <a href="https://dart.dev"><img src="https://img.shields.io/badge/Dart-3.x-0175C2?style=for-the-badge&logo=dart&logoColor=white" alt="Dart"></a>
     <a href="#"><img src="https://img.shields.io/badge/Android-14%20%2F%2015%20Ready-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android 14/15"></a>
     <a href="https://github.com/DevEslam1/pulsr/releases"><img src="https://img.shields.io/github/downloads/DevEslam1/pulsr/total?style=for-the-badge&color=blueviolet&logo=github" alt="GitHub Total Downloads"></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge" alt="License MIT"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-GPLv3-blue.svg?style=for-the-badge" alt="License GPLv3"></a>
   </p>
 
   <p align="center">
@@ -298,21 +298,26 @@ Pulsr natively supports multiple languages with full RTL layout support:
 
 ## 📄 License
 
-This project is open source and available under the [MIT License](LICENSE).
+This project is free software licensed under the **[GNU General Public License v3.0](LICENSE)**.
 
 ```
-Copyright (c) 2026 Pulsr Music Contributors.
+Copyright (C) 2026 Pulsr Music Contributors.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
 ```
+
+> **Why GPLv3?** The YouTube Music integration is powered by [NewPipeExtractor](https://github.com/TeamNewPipe/NewPipeExtractor), which is licensed under GPLv3. Linking it obliges the combined work to be released under the same license, so Pulsr as a whole is GPLv3.
 
 ---
 

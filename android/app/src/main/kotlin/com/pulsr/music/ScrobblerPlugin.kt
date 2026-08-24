@@ -26,10 +26,10 @@ class ScrobblerPlugin(private val context: Context) : MethodChannel.MethodCallHa
             val artist = call.argument<String>("artist") ?: ""
             val track = call.argument<String>("track") ?: ""
             val album = call.argument<String>("album") ?: ""
-            val duration = call.argument<Long>("duration") ?: 0L
-            val position = call.argument<Long>("position") ?: 0L
+            val duration = (call.argument<Number>("duration"))?.toLong() ?: 0L
+            val position = (call.argument<Number>("position"))?.toLong() ?: 0L
             val isPlaying = call.argument<Boolean>("isPlaying") ?: false
-            val id = call.argument<Long>("id") ?: 0L
+            val id = (call.argument<Number>("id"))?.toLong() ?: 0L
 
             sendScrobbleBroadcasts(id, artist, track, album, duration, position, isPlaying)
             result.success(true)

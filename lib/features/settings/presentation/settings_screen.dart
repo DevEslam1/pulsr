@@ -1,6 +1,8 @@
 // lib/features/settings/presentation/settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
@@ -233,6 +235,30 @@ class SettingsScreen extends StatelessWidget {
                     _navTile(context, Icons.filter_list_rounded, 'Short Audio Filter', 'Ignore files under ${state.minDurationSec}s',
                         onTap: () => _showDurationFilterDialog(context, cubit, state.minDurationSec)),
                   ]),
+                  if (AppConfig.ytmEnabled)
+                    _section(context, 'YouTube Music & Online', [
+                      _switchTile(context, Icons.cloud_off_rounded, 'Offline Only Mode',
+                          'Disable online features, streaming & web queries',
+                          value: state.offlineOnlyMode, onChanged: cubit.setOfflineOnlyMode),
+                      if (!state.offlineOnlyMode) ...[
+                        _divider(p),
+                        _switchTile(context, Icons.wifi_rounded, 'Wi-Fi Only Mode',
+                            'Only stream and download when on Wi-Fi',
+                            value: state.wifiOnlyMode, onChanged: cubit.setWifiOnlyMode),
+                        _divider(p),
+                        _navTile(context, Icons.travel_explore_rounded, 'Search YouTube Music',
+                            'Search, stream & download songs',
+                            onTap: () => context.push('/ytm-search')),
+                        _divider(p),
+                        _navTile(context, Icons.wifi_tethering_rounded, 'Streaming Quality',
+                            _getQualityTitle(state.streamingQuality),
+                            onTap: () => _showQualityPickerSheet(context, cubit, isStreaming: true, currentQuality: state.streamingQuality)),
+                        _divider(p),
+                        _navTile(context, Icons.downloading_rounded, 'Download Quality',
+                            _getQualityTitle(state.downloadQuality),
+                            onTap: () => _showQualityPickerSheet(context, cubit, isStreaming: false, currentQuality: state.downloadQuality)),
+                      ],
+                    ]),
                   _section(context, 'Privacy & Data', [
                     const BackupSection(),
                     _divider(p),
@@ -882,6 +908,114 @@ class SettingsScreen extends StatelessWidget {
                     trailing: isSelected ? Icon(Icons.check_circle_rounded, color: primaryColor) : null,
                     onTap: () {
                       cubit.setNowPlayingArtworkSwipe(opt.action);
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getQualityTitle(YtmAudioQuality quality) {
+    switch (quality) {
+      case YtmAudioQuality.high:
+        return 'High (~160+ kbps • Best)';
+      case YtmAudioQuality.medium:
+        return 'Medium (~128 kbps)';
+      case YtmAudioQuality.low:
+        return 'Low (~64 kbps • Data Saver)';
+    }
+  }
+
+  void _showQualityPickerSheet(
+    BuildContext context,
+    SettingsCubit cubit, {
+    required bool isStreaming,
+    required YtmAudioQuality currentQuality,
+  }) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final surfaceColor = Theme.of(context).colorScheme.surface;
+    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
+    final outlineColor = Theme.of(context).colorScheme.outline;
+    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? context.palette.textPrimary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
+
+    final options = [
+      (
+        quality: YtmAudioQuality.high,
+        title: 'High Quality',
+        subtitle: isStreaming
+            ? 'Highest available bitrate (~160+ kbps) for crystal clear sound'
+            : 'Highest quality audio files (~160+ kbps M4A)',
+        icon: Icons.high_quality_rounded,
+      ),
+      (
+        quality: YtmAudioQuality.medium,
+        title: 'Medium Quality',
+        subtitle: isStreaming
+            ? 'Standard bitrate (~128 kbps) with balanced data usage'
+            : 'Standard file size and quality (~128 kbps M4A)',
+        icon: Icons.graphic_eq_rounded,
+      ),
+      (
+        quality: YtmAudioQuality.low,
+        title: 'Low / Data Saver',
+        subtitle: isStreaming
+            ? 'Reduced data usage (~64 kbps) for slow connections'
+            : 'Smallest file size (~64 kbps)',
+        icon: Icons.data_saver_on_rounded,
+      ),
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: surfaceColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Text(
+                isStreaming ? 'Streaming Audio Quality' : 'Download Audio Quality',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...options.map((opt) {
+              final isSelected = opt.quality == currentQuality;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color: isSelected ? primaryColor.withValues(alpha: 0.12) : cardColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: isSelected ? primaryColor : outlineColor,
+                      width: isSelected ? 1.5 : 1.0,
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: Icon(opt.icon, color: isSelected ? primaryColor : textSecondary),
+                    title: Text(opt.title, style: TextStyle(fontWeight: FontWeight.w700, color: isSelected ? primaryColor : textPrimary)),
+                    subtitle: Text(opt.subtitle, style: TextStyle(fontSize: 12, color: textSecondary)),
+                    trailing: isSelected ? Icon(Icons.check_circle_rounded, color: primaryColor) : null,
+                    onTap: () {
+                      if (isStreaming) {
+                        cubit.setStreamingQuality(opt.quality);
+                      } else {
+                        cubit.setDownloadQuality(opt.quality);
+                      }
                       Navigator.pop(ctx);
                     },
                   ),

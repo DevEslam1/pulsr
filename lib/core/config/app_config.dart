@@ -7,6 +7,14 @@ class AppConfig {
   static const String sentryDsn = String.fromEnvironment('SENTRY_DSN', defaultValue: '');
   static const String flavor = String.fromEnvironment('FLAVOR', defaultValue: 'dev');
 
+  /// YouTube Music search/stream/download. Off by default so Play Store builds
+  /// never expose it; enable with `--dart-define=ENABLE_YTM=true`.
+  ///
+  /// Being a `const false` lets Dart tree-shake the guarded branches, but the
+  /// generated DI config still imports every service, so this is not a
+  /// guarantee that no YouTube code reaches the binary.
+  static const bool ytmEnabled = bool.fromEnvironment('ENABLE_YTM', defaultValue: false);
+
   static AppEnvironment get environment {
     switch (envName.toLowerCase()) {
       case 'prod':

@@ -151,6 +151,31 @@ class $SongsTableTable extends SongsTable
   late final GeneratedColumn<int> fileSize = GeneratedColumn<int>(
       'file_size', aliasedName, true,
       type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _sourceMeta = const VerificationMeta('source');
+  @override
+  late final GeneratedColumn<String> source = GeneratedColumn<String>(
+      'source', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(SongSource.local));
+  static const VerificationMeta _remoteIdMeta =
+      const VerificationMeta('remoteId');
+  @override
+  late final GeneratedColumn<String> remoteId = GeneratedColumn<String>(
+      'remote_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _remoteArtworkUrlMeta =
+      const VerificationMeta('remoteArtworkUrl');
+  @override
+  late final GeneratedColumn<String> remoteArtworkUrl = GeneratedColumn<String>(
+      'remote_artwork_url', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _pendingDownloadPathMeta =
+      const VerificationMeta('pendingDownloadPath');
+  @override
+  late final GeneratedColumn<String> pendingDownloadPath =
+      GeneratedColumn<String>('pending_download_path', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -174,7 +199,11 @@ class $SongsTableTable extends SongsTable
         lastPlayed,
         lastPositionMs,
         artworkUri,
-        fileSize
+        fileSize,
+        source,
+        remoteId,
+        remoteArtworkUrl,
+        pendingDownloadPath
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -293,6 +322,26 @@ class $SongsTableTable extends SongsTable
       context.handle(_fileSizeMeta,
           fileSize.isAcceptableOrUnknown(data['file_size']!, _fileSizeMeta));
     }
+    if (data.containsKey('source')) {
+      context.handle(_sourceMeta,
+          source.isAcceptableOrUnknown(data['source']!, _sourceMeta));
+    }
+    if (data.containsKey('remote_id')) {
+      context.handle(_remoteIdMeta,
+          remoteId.isAcceptableOrUnknown(data['remote_id']!, _remoteIdMeta));
+    }
+    if (data.containsKey('remote_artwork_url')) {
+      context.handle(
+          _remoteArtworkUrlMeta,
+          remoteArtworkUrl.isAcceptableOrUnknown(
+              data['remote_artwork_url']!, _remoteArtworkUrlMeta));
+    }
+    if (data.containsKey('pending_download_path')) {
+      context.handle(
+          _pendingDownloadPathMeta,
+          pendingDownloadPath.isAcceptableOrUnknown(
+              data['pending_download_path']!, _pendingDownloadPathMeta));
+    }
     return context;
   }
 
@@ -346,6 +395,14 @@ class $SongsTableTable extends SongsTable
           .read(DriftSqlType.string, data['${effectivePrefix}artwork_uri']),
       fileSize: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}file_size']),
+      source: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}source'])!,
+      remoteId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}remote_id']),
+      remoteArtworkUrl: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}remote_artwork_url']),
+      pendingDownloadPath: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}pending_download_path']),
     );
   }
 
@@ -380,6 +437,19 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
   final int lastPositionMs;
   final String? artworkUri;
   final int? fileSize;
+
+  /// See [SongSource]. Rows that are not [SongSource.local] have no file on
+  /// disk, so scanner cleanup and every path-derived query must exclude them.
+  final String source;
+
+  /// YouTube video id. Kept after a download completes so the same video is
+  /// not fetched twice.
+  final String? remoteId;
+  final String? remoteArtworkUrl;
+
+  /// Destination a download is writing to, used to match the row MediaStore
+  /// creates once the file lands.
+  final String? pendingDownloadPath;
   const SongsTableData(
       {required this.id,
       required this.title,
@@ -402,7 +472,11 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       this.lastPlayed,
       required this.lastPositionMs,
       this.artworkUri,
-      this.fileSize});
+      this.fileSize,
+      required this.source,
+      this.remoteId,
+      this.remoteArtworkUrl,
+      this.pendingDownloadPath});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -452,6 +526,16 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
     if (!nullToAbsent || fileSize != null) {
       map['file_size'] = Variable<int>(fileSize);
     }
+    map['source'] = Variable<String>(source);
+    if (!nullToAbsent || remoteId != null) {
+      map['remote_id'] = Variable<String>(remoteId);
+    }
+    if (!nullToAbsent || remoteArtworkUrl != null) {
+      map['remote_artwork_url'] = Variable<String>(remoteArtworkUrl);
+    }
+    if (!nullToAbsent || pendingDownloadPath != null) {
+      map['pending_download_path'] = Variable<String>(pendingDownloadPath);
+    }
     return map;
   }
 
@@ -498,6 +582,16 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       fileSize: fileSize == null && nullToAbsent
           ? const Value.absent()
           : Value(fileSize),
+      source: Value(source),
+      remoteId: remoteId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remoteId),
+      remoteArtworkUrl: remoteArtworkUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remoteArtworkUrl),
+      pendingDownloadPath: pendingDownloadPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pendingDownloadPath),
     );
   }
 
@@ -527,6 +621,11 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       lastPositionMs: serializer.fromJson<int>(json['lastPositionMs']),
       artworkUri: serializer.fromJson<String?>(json['artworkUri']),
       fileSize: serializer.fromJson<int?>(json['fileSize']),
+      source: serializer.fromJson<String>(json['source']),
+      remoteId: serializer.fromJson<String?>(json['remoteId']),
+      remoteArtworkUrl: serializer.fromJson<String?>(json['remoteArtworkUrl']),
+      pendingDownloadPath:
+          serializer.fromJson<String?>(json['pendingDownloadPath']),
     );
   }
   @override
@@ -555,6 +654,10 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       'lastPositionMs': serializer.toJson<int>(lastPositionMs),
       'artworkUri': serializer.toJson<String?>(artworkUri),
       'fileSize': serializer.toJson<int?>(fileSize),
+      'source': serializer.toJson<String>(source),
+      'remoteId': serializer.toJson<String?>(remoteId),
+      'remoteArtworkUrl': serializer.toJson<String?>(remoteArtworkUrl),
+      'pendingDownloadPath': serializer.toJson<String?>(pendingDownloadPath),
     };
   }
 
@@ -580,7 +683,11 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           Value<int?> lastPlayed = const Value.absent(),
           int? lastPositionMs,
           Value<String?> artworkUri = const Value.absent(),
-          Value<int?> fileSize = const Value.absent()}) =>
+          Value<int?> fileSize = const Value.absent(),
+          String? source,
+          Value<String?> remoteId = const Value.absent(),
+          Value<String?> remoteArtworkUrl = const Value.absent(),
+          Value<String?> pendingDownloadPath = const Value.absent()}) =>
       SongsTableData(
         id: id ?? this.id,
         title: title ?? this.title,
@@ -604,6 +711,14 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
         lastPositionMs: lastPositionMs ?? this.lastPositionMs,
         artworkUri: artworkUri.present ? artworkUri.value : this.artworkUri,
         fileSize: fileSize.present ? fileSize.value : this.fileSize,
+        source: source ?? this.source,
+        remoteId: remoteId.present ? remoteId.value : this.remoteId,
+        remoteArtworkUrl: remoteArtworkUrl.present
+            ? remoteArtworkUrl.value
+            : this.remoteArtworkUrl,
+        pendingDownloadPath: pendingDownloadPath.present
+            ? pendingDownloadPath.value
+            : this.pendingDownloadPath,
       );
   SongsTableData copyWithCompanion(SongsTableCompanion data) {
     return SongsTableData(
@@ -638,6 +753,14 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       artworkUri:
           data.artworkUri.present ? data.artworkUri.value : this.artworkUri,
       fileSize: data.fileSize.present ? data.fileSize.value : this.fileSize,
+      source: data.source.present ? data.source.value : this.source,
+      remoteId: data.remoteId.present ? data.remoteId.value : this.remoteId,
+      remoteArtworkUrl: data.remoteArtworkUrl.present
+          ? data.remoteArtworkUrl.value
+          : this.remoteArtworkUrl,
+      pendingDownloadPath: data.pendingDownloadPath.present
+          ? data.pendingDownloadPath.value
+          : this.pendingDownloadPath,
     );
   }
 
@@ -665,7 +788,11 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           ..write('lastPlayed: $lastPlayed, ')
           ..write('lastPositionMs: $lastPositionMs, ')
           ..write('artworkUri: $artworkUri, ')
-          ..write('fileSize: $fileSize')
+          ..write('fileSize: $fileSize, ')
+          ..write('source: $source, ')
+          ..write('remoteId: $remoteId, ')
+          ..write('remoteArtworkUrl: $remoteArtworkUrl, ')
+          ..write('pendingDownloadPath: $pendingDownloadPath')
           ..write(')'))
         .toString();
   }
@@ -693,7 +820,11 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
         lastPlayed,
         lastPositionMs,
         artworkUri,
-        fileSize
+        fileSize,
+        source,
+        remoteId,
+        remoteArtworkUrl,
+        pendingDownloadPath
       ]);
   @override
   bool operator ==(Object other) =>
@@ -720,7 +851,11 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           other.lastPlayed == this.lastPlayed &&
           other.lastPositionMs == this.lastPositionMs &&
           other.artworkUri == this.artworkUri &&
-          other.fileSize == this.fileSize);
+          other.fileSize == this.fileSize &&
+          other.source == this.source &&
+          other.remoteId == this.remoteId &&
+          other.remoteArtworkUrl == this.remoteArtworkUrl &&
+          other.pendingDownloadPath == this.pendingDownloadPath);
 }
 
 class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
@@ -746,6 +881,10 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
   final Value<int> lastPositionMs;
   final Value<String?> artworkUri;
   final Value<int?> fileSize;
+  final Value<String> source;
+  final Value<String?> remoteId;
+  final Value<String?> remoteArtworkUrl;
+  final Value<String?> pendingDownloadPath;
   const SongsTableCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
@@ -769,6 +908,10 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     this.lastPositionMs = const Value.absent(),
     this.artworkUri = const Value.absent(),
     this.fileSize = const Value.absent(),
+    this.source = const Value.absent(),
+    this.remoteId = const Value.absent(),
+    this.remoteArtworkUrl = const Value.absent(),
+    this.pendingDownloadPath = const Value.absent(),
   });
   SongsTableCompanion.insert({
     this.id = const Value.absent(),
@@ -793,6 +936,10 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     this.lastPositionMs = const Value.absent(),
     this.artworkUri = const Value.absent(),
     this.fileSize = const Value.absent(),
+    this.source = const Value.absent(),
+    this.remoteId = const Value.absent(),
+    this.remoteArtworkUrl = const Value.absent(),
+    this.pendingDownloadPath = const Value.absent(),
   })  : title = Value(title),
         path = Value(path);
   static Insertable<SongsTableData> custom({
@@ -818,6 +965,10 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     Expression<int>? lastPositionMs,
     Expression<String>? artworkUri,
     Expression<int>? fileSize,
+    Expression<String>? source,
+    Expression<String>? remoteId,
+    Expression<String>? remoteArtworkUrl,
+    Expression<String>? pendingDownloadPath,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -842,6 +993,11 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       if (lastPositionMs != null) 'last_position_ms': lastPositionMs,
       if (artworkUri != null) 'artwork_uri': artworkUri,
       if (fileSize != null) 'file_size': fileSize,
+      if (source != null) 'source': source,
+      if (remoteId != null) 'remote_id': remoteId,
+      if (remoteArtworkUrl != null) 'remote_artwork_url': remoteArtworkUrl,
+      if (pendingDownloadPath != null)
+        'pending_download_path': pendingDownloadPath,
     });
   }
 
@@ -867,7 +1023,11 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       Value<int?>? lastPlayed,
       Value<int>? lastPositionMs,
       Value<String?>? artworkUri,
-      Value<int?>? fileSize}) {
+      Value<int?>? fileSize,
+      Value<String>? source,
+      Value<String?>? remoteId,
+      Value<String?>? remoteArtworkUrl,
+      Value<String?>? pendingDownloadPath}) {
     return SongsTableCompanion(
       id: id ?? this.id,
       title: title ?? this.title,
@@ -891,6 +1051,10 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       lastPositionMs: lastPositionMs ?? this.lastPositionMs,
       artworkUri: artworkUri ?? this.artworkUri,
       fileSize: fileSize ?? this.fileSize,
+      source: source ?? this.source,
+      remoteId: remoteId ?? this.remoteId,
+      remoteArtworkUrl: remoteArtworkUrl ?? this.remoteArtworkUrl,
+      pendingDownloadPath: pendingDownloadPath ?? this.pendingDownloadPath,
     );
   }
 
@@ -963,6 +1127,19 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     if (fileSize.present) {
       map['file_size'] = Variable<int>(fileSize.value);
     }
+    if (source.present) {
+      map['source'] = Variable<String>(source.value);
+    }
+    if (remoteId.present) {
+      map['remote_id'] = Variable<String>(remoteId.value);
+    }
+    if (remoteArtworkUrl.present) {
+      map['remote_artwork_url'] = Variable<String>(remoteArtworkUrl.value);
+    }
+    if (pendingDownloadPath.present) {
+      map['pending_download_path'] =
+          Variable<String>(pendingDownloadPath.value);
+    }
     return map;
   }
 
@@ -990,7 +1167,11 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
           ..write('lastPlayed: $lastPlayed, ')
           ..write('lastPositionMs: $lastPositionMs, ')
           ..write('artworkUri: $artworkUri, ')
-          ..write('fileSize: $fileSize')
+          ..write('fileSize: $fileSize, ')
+          ..write('source: $source, ')
+          ..write('remoteId: $remoteId, ')
+          ..write('remoteArtworkUrl: $remoteArtworkUrl, ')
+          ..write('pendingDownloadPath: $pendingDownloadPath')
           ..write(')'))
         .toString();
   }
@@ -3162,6 +3343,10 @@ typedef $$SongsTableTableCreateCompanionBuilder = SongsTableCompanion Function({
   Value<int> lastPositionMs,
   Value<String?> artworkUri,
   Value<int?> fileSize,
+  Value<String> source,
+  Value<String?> remoteId,
+  Value<String?> remoteArtworkUrl,
+  Value<String?> pendingDownloadPath,
 });
 typedef $$SongsTableTableUpdateCompanionBuilder = SongsTableCompanion Function({
   Value<int> id,
@@ -3186,6 +3371,10 @@ typedef $$SongsTableTableUpdateCompanionBuilder = SongsTableCompanion Function({
   Value<int> lastPositionMs,
   Value<String?> artworkUri,
   Value<int?> fileSize,
+  Value<String> source,
+  Value<String?> remoteId,
+  Value<String?> remoteArtworkUrl,
+  Value<String?> pendingDownloadPath,
 });
 
 class $$SongsTableTableFilterComposer
@@ -3263,6 +3452,20 @@ class $$SongsTableTableFilterComposer
 
   ColumnFilters<int> get fileSize => $composableBuilder(
       column: $table.fileSize, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get source => $composableBuilder(
+      column: $table.source, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get remoteId => $composableBuilder(
+      column: $table.remoteId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get remoteArtworkUrl => $composableBuilder(
+      column: $table.remoteArtworkUrl,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get pendingDownloadPath => $composableBuilder(
+      column: $table.pendingDownloadPath,
+      builder: (column) => ColumnFilters(column));
 }
 
 class $$SongsTableTableOrderingComposer
@@ -3340,6 +3543,20 @@ class $$SongsTableTableOrderingComposer
 
   ColumnOrderings<int> get fileSize => $composableBuilder(
       column: $table.fileSize, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get source => $composableBuilder(
+      column: $table.source, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get remoteId => $composableBuilder(
+      column: $table.remoteId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get remoteArtworkUrl => $composableBuilder(
+      column: $table.remoteArtworkUrl,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get pendingDownloadPath => $composableBuilder(
+      column: $table.pendingDownloadPath,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$SongsTableTableAnnotationComposer
@@ -3416,6 +3633,18 @@ class $$SongsTableTableAnnotationComposer
 
   GeneratedColumn<int> get fileSize =>
       $composableBuilder(column: $table.fileSize, builder: (column) => column);
+
+  GeneratedColumn<String> get source =>
+      $composableBuilder(column: $table.source, builder: (column) => column);
+
+  GeneratedColumn<String> get remoteId =>
+      $composableBuilder(column: $table.remoteId, builder: (column) => column);
+
+  GeneratedColumn<String> get remoteArtworkUrl => $composableBuilder(
+      column: $table.remoteArtworkUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get pendingDownloadPath => $composableBuilder(
+      column: $table.pendingDownloadPath, builder: (column) => column);
 }
 
 class $$SongsTableTableTableManager extends RootTableManager<
@@ -3466,6 +3695,10 @@ class $$SongsTableTableTableManager extends RootTableManager<
             Value<int> lastPositionMs = const Value.absent(),
             Value<String?> artworkUri = const Value.absent(),
             Value<int?> fileSize = const Value.absent(),
+            Value<String> source = const Value.absent(),
+            Value<String?> remoteId = const Value.absent(),
+            Value<String?> remoteArtworkUrl = const Value.absent(),
+            Value<String?> pendingDownloadPath = const Value.absent(),
           }) =>
               SongsTableCompanion(
             id: id,
@@ -3490,6 +3723,10 @@ class $$SongsTableTableTableManager extends RootTableManager<
             lastPositionMs: lastPositionMs,
             artworkUri: artworkUri,
             fileSize: fileSize,
+            source: source,
+            remoteId: remoteId,
+            remoteArtworkUrl: remoteArtworkUrl,
+            pendingDownloadPath: pendingDownloadPath,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -3514,6 +3751,10 @@ class $$SongsTableTableTableManager extends RootTableManager<
             Value<int> lastPositionMs = const Value.absent(),
             Value<String?> artworkUri = const Value.absent(),
             Value<int?> fileSize = const Value.absent(),
+            Value<String> source = const Value.absent(),
+            Value<String?> remoteId = const Value.absent(),
+            Value<String?> remoteArtworkUrl = const Value.absent(),
+            Value<String?> pendingDownloadPath = const Value.absent(),
           }) =>
               SongsTableCompanion.insert(
             id: id,
@@ -3538,6 +3779,10 @@ class $$SongsTableTableTableManager extends RootTableManager<
             lastPositionMs: lastPositionMs,
             artworkUri: artworkUri,
             fileSize: fileSize,
+            source: source,
+            remoteId: remoteId,
+            remoteArtworkUrl: remoteArtworkUrl,
+            pendingDownloadPath: pendingDownloadPath,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

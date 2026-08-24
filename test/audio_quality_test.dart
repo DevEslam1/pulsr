@@ -14,6 +14,7 @@ void main() {
         durationMs: 180000, // 3 minutes = 180s
         path: '/storage/emulated/0/Music/track_24bit_96k.flac',
         fileSize: 40 * 1024 * 1024, // 40MB
+        source: SongSource.local,
         isFavorite: false,
         isMissing: false,
         playCount: 0,
@@ -37,6 +38,7 @@ void main() {
         durationMs: 200000, // 200s
         path: '/storage/emulated/0/Music/track.flac',
         fileSize: 20 * 1024 * 1024, // 20MB -> ~838 kbps
+        source: SongSource.local,
         isFavorite: false,
         isMissing: false,
         playCount: 0,
@@ -60,6 +62,7 @@ void main() {
         durationMs: 240000, // 240s (4 mins)
         path: '/storage/emulated/0/Music/track.mp3',
         fileSize: 9600000, // 9.6MB -> 320 kbps
+        source: SongSource.local,
         isFavorite: false,
         isMissing: false,
         playCount: 0,
@@ -89,6 +92,7 @@ void main() {
         durationMs: 180000,
         path: '/storage/emulated/0/Music/track.flac',
         fileSize: 35000000,
+        source: SongSource.local,
         isFavorite: false,
         isMissing: false,
         playCount: 0,
@@ -119,6 +123,7 @@ void main() {
         durationMs: 200000,
         path: '/storage/emulated/0/Music/track.dsf',
         fileSize: 100000000,
+        source: SongSource.local,
         isFavorite: false,
         isMissing: false,
         playCount: 0,

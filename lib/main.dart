@@ -34,6 +34,7 @@ import 'features/search/cubit/search_cubit.dart';
 import 'features/settings/cubit/settings_cubit.dart';
 import 'features/settings/cubit/settings_state.dart';
 import 'features/widgets/widget_service.dart';
+import 'features/ytm_search/cubit/ytm_download_cubit.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -174,6 +175,10 @@ class _PulsrAppState extends State<PulsrApp> {
           BlocProvider<SettingsCubit>(
             create: (_) => getIt<SettingsCubit>(),
           ),
+          if (AppConfig.ytmEnabled)
+            BlocProvider<YtmDownloadCubit>(
+              create: (_) => getIt<YtmDownloadCubit>(),
+            ),
         ],
         child: MultiBlocListener(
           listeners: [

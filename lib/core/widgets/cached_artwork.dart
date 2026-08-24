@@ -1,7 +1,9 @@
 // lib/core/widgets/cached_artwork.dart
-import 'dart:typed_data';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:on_audio_query/on_audio_query.dart';
+import '../di/injection.dart';
 import 'artwork_placeholder.dart';
 
 /// LRU Memory Bitmap Cache for Artwork images.
@@ -60,6 +62,10 @@ class CachedArtwork extends StatefulWidget {
   final IconData? fallbackIcon;
   final ArtworkLruCache? customCache;
 
+  /// HTTPS cover art for a row that has no MediaStore id, i.e. a YouTube track
+  /// that has not been downloaded yet. Takes precedence over [id].
+  final String? remoteUrl;
+
   const CachedArtwork({
     super.key,
     required this.id,
@@ -68,6 +74,7 @@ class CachedArtwork extends StatefulWidget {
     this.borderRadius = 12.0,
     this.fallbackIcon,
     this.customCache,
+    this.remoteUrl,
   });
 
   @override
@@ -76,12 +83,13 @@ class CachedArtwork extends StatefulWidget {
 
 class _CachedArtworkState extends State<CachedArtwork> {
   static final OnAudioQuery _audioQuery = OnAudioQuery();
+  static const int _maxRemoteBytes = 4 * 1024 * 1024;
   Uint8List? _cachedBytes;
   int _loadToken = 0;
 
   ArtworkLruCache get _cache => widget.customCache ?? ArtworkLruCache();
 
-  String get _cacheKey => '${widget.type.name}_${widget.id}';
+  String get _cacheKey => widget.remoteUrl ?? '${widget.type.name}_${widget.id}';
 
   @override
   void initState() {
@@ -92,9 +100,24 @@ class _CachedArtworkState extends State<CachedArtwork> {
   @override
   void didUpdateWidget(CachedArtwork oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.id != widget.id || oldWidget.type != widget.type) {
+    if (oldWidget.id != widget.id ||
+        oldWidget.type != widget.type ||
+        oldWidget.remoteUrl != widget.remoteUrl) {
       _loadArtwork();
     }
+  }
+
+  static Future<Uint8List?> _fetchRemote(String url) async {
+    final uri = Uri.tryParse(url);
+    // Artwork URLs come from a third party, so refuse anything but HTTPS.
+    if (uri == null || !uri.isScheme('https')) return null;
+    final request = await getIt<HttpClient>().getUrl(uri);
+    final response = await request.close().timeout(const Duration(seconds: 8));
+    if (response.statusCode != 200 || response.contentLength > _maxRemoteBytes) {
+      await response.drain<void>();
+      return null;
+    }
+    return consolidateHttpClientResponseBytes(response);
   }
 
   void _loadArtwork() {
@@ -104,33 +127,52 @@ class _CachedArtworkState extends State<CachedArtwork> {
       setState(() {
         _cachedBytes = _cache.get(key);
       });
-    } else {
-      _audioQuery
-          .queryArtwork(
+      return;
+    }
+
+    final remoteUrl = widget.remoteUrl;
+    final Future<Uint8List?> pending;
+    if (remoteUrl != null && remoteUrl.isNotEmpty) {
+      pending = _fetchRemote(remoteUrl).then((remoteBytes) {
+        if (remoteBytes != null && remoteBytes.isNotEmpty) return remoteBytes;
+        if (widget.id > 0) {
+          return _audioQuery.queryArtwork(
             widget.id,
             widget.type,
             format: ArtworkFormat.JPEG,
             size: widget.size > 200 ? 300 : 150,
             quality: 80,
-          )
-          .then((bytes) {
-        if (mounted && token == _loadToken) {
-          if (bytes != null && bytes.isNotEmpty) {
-            _cache.put(key, bytes);
-          }
-          setState(() {
-            _cachedBytes = bytes;
-          });
+          );
         }
-      }).catchError((_) {
-        if (mounted && token == _loadToken) {
-          // Do not cache null on failure so future queries can retry
-          setState(() {
-            _cachedBytes = null;
-          });
-        }
+        return null;
       });
+    } else {
+      pending = _audioQuery.queryArtwork(
+        widget.id,
+        widget.type,
+        format: ArtworkFormat.JPEG,
+        size: widget.size > 200 ? 300 : 150,
+        quality: 80,
+      );
     }
+
+    pending.then((bytes) {
+      if (mounted && token == _loadToken) {
+        if (bytes != null && bytes.isNotEmpty) {
+          _cache.put(key, bytes);
+        }
+        setState(() {
+          _cachedBytes = bytes;
+        });
+      }
+    }).catchError((_) {
+      if (mounted && token == _loadToken) {
+        // Do not cache null on failure so future queries can retry
+        setState(() {
+          _cachedBytes = null;
+        });
+      }
+    });
   }
 
   @override

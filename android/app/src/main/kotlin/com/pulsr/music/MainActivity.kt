@@ -24,6 +24,8 @@ class MainActivity : AudioServiceActivity() {
     private var visualizerPlugin: VisualizerPlugin? = null
     private var ringtonePlugin: RingtonePlugin? = null
     private var scrobblerPlugin: ScrobblerPlugin? = null
+    private var ytmExtractorPlugin: YtmExtractorPlugin? = null
+    private var ytDownloadPlugin: YtDownloadPlugin? = null
     private val backgroundExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
  
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -99,6 +101,8 @@ class MainActivity : AudioServiceActivity() {
         ringtonePlugin = RingtonePlugin.registerWith(flutterEngine, applicationContext)
         audioEffectsPlugin = AudioEffectsPlugin.registerWith(flutterEngine, applicationContext)
         scrobblerPlugin = ScrobblerPlugin.registerWith(flutterEngine, applicationContext)
+        ytmExtractorPlugin = YtmExtractorPlugin.registerWith(flutterEngine, applicationContext)
+        ytDownloadPlugin = YtDownloadPlugin.registerWith(flutterEngine, applicationContext)
  
         val fileChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FILE_OPENER_CHANNEL)
         fileOpenerChannel = fileChannel
@@ -202,6 +206,10 @@ class MainActivity : AudioServiceActivity() {
         ringtonePlugin = null
         scrobblerPlugin?.cleanup()
         scrobblerPlugin = null
+        ytmExtractorPlugin?.cleanup()
+        ytmExtractorPlugin = null
+        ytDownloadPlugin?.cleanup()
+        ytDownloadPlugin = null
         fileOpenerChannel?.setMethodCallHandler(null)
         fileOpenerChannel = null
         lyricsChannel?.setMethodCallHandler(null)

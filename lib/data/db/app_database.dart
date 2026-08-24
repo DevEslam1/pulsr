@@ -4,6 +4,8 @@ import 'package:drift_flutter/drift_flutter.dart';
 import 'package:injectable/injectable.dart';
 import 'tables.dart';
 
+export 'tables.dart' show SongSource;
+
 part 'app_database.g.dart';
 
 @singleton
@@ -24,7 +26,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   static Future<void> _createIndexes(Future<void> Function(String) executeSql) async {
     await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_title ON songs (title);');
@@ -47,24 +49,39 @@ class AppDatabase extends _$AppDatabase {
     await executeSql('CREATE INDEX IF NOT EXISTS idx_queue_items_order_index ON queue_items (order_index);');
   }
 
+  static Future<void> _createRemoteSourceIndexes(Future<void> Function(String) executeSql) async {
+    await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_source ON songs (source);');
+    await executeSql(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_songs_remote_id ON songs (remote_id) WHERE remote_id IS NOT NULL;',
+    );
+  }
+
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onCreate: (Migrator m) async {
       await m.createAll();
       await _createIndexes(customStatement);
+      await _createRemoteSourceIndexes(customStatement);
     },
     onUpgrade: (Migrator m, int from, int to) async {
       if (from < 2) {
         await m.createTable(excludedFoldersTable);
       }
-      if (from < 3) {
-        await _createIndexes(customStatement);
-      }
       if (from < 4) {
         await m.addColumn(songsTable, songsTable.isMissing);
         await m.addColumn(songsTable, songsTable.replayGain);
-        await _createIndexes(customStatement);
       }
+      if (from < 5) {
+        await m.addColumn(songsTable, songsTable.source);
+        await m.addColumn(songsTable, songsTable.remoteId);
+        await m.addColumn(songsTable, songsTable.remoteArtworkUrl);
+        await m.addColumn(songsTable, songsTable.pendingDownloadPath);
+      }
+      // Must run after every addColumn above: several indexes cover columns a
+      // later branch introduces, so creating them mid-ladder fails on an older
+      // database. Every statement is IF NOT EXISTS, so re-running is free.
+      await _createIndexes(customStatement);
+      await _createRemoteSourceIndexes(customStatement);
     },
     beforeOpen: (details) async {
       await customStatement('PRAGMA foreign_keys = ON;');

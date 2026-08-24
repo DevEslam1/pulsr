@@ -8,6 +8,7 @@ import 'package:injectable/injectable.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/prefs_keys.dart';
+import '../../core/services/ytm_service.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/models/audio_effects_config.dart';
 import '../../domain/models/eq_preset.dart';
@@ -25,9 +26,10 @@ class PulsrAudioHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler {
   @factoryMethod
   @preResolve
-  static Future<PulsrAudioHandler> create(IMusicRepository repository) async {
+  static Future<PulsrAudioHandler> create(
+      IMusicRepository repository, YtmService ytmService) async {
     return await AudioService.init(
-      builder: () => PulsrAudioHandler(repository),
+      builder: () => PulsrAudioHandler(repository, ytmService),
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.pulsr.music.audio',
         androidNotificationChannelName: 'Pulsr Audio Playback',
@@ -48,6 +50,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   AudioPlayer get _inactivePlayer => _isPlayerAActive ? _playerB : _playerA;
 
   final IMusicRepository _repository;
+  final YtmService _ytmService;
   final CrossfadeManager _crossfadeManager = CrossfadeManager();
   final SleepTimerManager _sleepTimerManager = SleepTimerManager();
   late final EqualizerManager _equalizerManager;
@@ -58,6 +61,16 @@ class PulsrAudioHandler extends BaseAudioHandler
   double? _preDuckVolume;
   int _consecutiveFailures = 0;
   final List<int> _shuffleHistory = [];
+
+  // Bumped on every playSongAt/play entry so a slow async resolve from a
+  // superseded call cannot load its source into the player.
+  int _playGeneration = 0;
+  // Set when a restored YouTube session is left idle; play() resolves it lazily.
+  Duration? _pendingLazyPosition;
+  // Memoized stream URLs, keyed by video id. Never persisted — they expire.
+  final Map<String, ({String url, DateTime expires})> _streamCache = {};
+  // Video ids with an in-flight prefetch, so we resolve each at most once.
+  final Set<String> _prefetching = {};
 
   Timer? _savePositionDebounce;
   final StreamController<Duration> _positionSubject =
@@ -70,6 +83,7 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   PulsrAudioHandler._({
     required IMusicRepository repository,
+    required YtmService ytmService,
     required AudioPlayer playerA,
     required AudioPlayer playerB,
     AndroidEqualizer? equalizerA,
@@ -77,6 +91,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     AndroidEqualizer? equalizerB,
     AndroidLoudnessEnhancer? loudnessEnhancerB,
   })  : _repository = repository,
+        _ytmService = ytmService,
         _playerA = playerA,
         _playerB = playerB {
     _equalizerManager = EqualizerManager(
@@ -88,7 +103,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     _init();
   }
 
-  factory PulsrAudioHandler(IMusicRepository repository) {
+  factory PulsrAudioHandler(IMusicRepository repository, YtmService ytmService) {
     if (Platform.isAndroid) {
       final eqA = AndroidEqualizer();
       final leA = AndroidLoudnessEnhancer();
@@ -103,6 +118,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       );
       return PulsrAudioHandler._(
         repository: repository,
+        ytmService: ytmService,
         playerA: playerA,
         playerB: playerB,
         equalizerA: eqA,
@@ -113,6 +129,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     } else {
       return PulsrAudioHandler._(
         repository: repository,
+        ytmService: ytmService,
         playerA: AudioPlayer(),
         playerB: AudioPlayer(),
       );
@@ -250,6 +267,14 @@ class PulsrAudioHandler extends BaseAudioHandler
             _positionSubject.add(pos);
             _saveCurrentPosition();
             final duration = player.duration ?? Duration.zero;
+            // Warm the next YouTube stream URL before the crossfade window even
+            // opens, so resolve latency does not truncate the fade. Cheap no-op
+            // for local tracks and for an already-cached url.
+            if (duration > const Duration(seconds: 15) &&
+                pos >= duration - const Duration(seconds: 15)) {
+              final peekIdx = _peekNextIndex();
+              if (peekIdx != null) _prefetchStream(_songs[peekIdx]);
+            }
             if (_crossfadeManager.duration > Duration.zero &&
                 duration > _crossfadeManager.duration &&
                 pos >= duration - _crossfadeManager.duration &&
@@ -344,6 +369,80 @@ class PulsrAudioHandler extends BaseAudioHandler
     return AudioSource.file(song.path, tag: tag);
   }
 
+  /// A local song plays straight off disk; a YouTube row needs a freshly
+  /// resolved URL, because the last one expires within hours and is pinned to
+  /// this device's IP. `LockCachingAudioSource` keeps the fetched bytes so
+  /// seeking backwards does not re-hit an already-expired URL.
+  Future<AudioSource> _resolveAudioSource(
+      SongsTableData song, MediaItem tag) async {
+    if (song.source != SongSource.youtube) {
+      return _createAudioSource(song, tag);
+    }
+    final url = await _resolveStreamUrl(song);
+    // ignore: experimental_member_use
+    return LockCachingAudioSource(Uri.parse(url), tag: tag);
+  }
+
+  /// Returns a currently-valid stream URL for a YouTube row, reusing a memoized
+  /// one until it nears expiry. Throws [YtmException] when nothing usable comes
+  /// back, so the caller can tell "network down" from "skip this track".
+  Future<String> _resolveStreamUrl(SongsTableData song) async {
+    final prefs = await SharedPreferences.getInstance();
+    final offlineOnly = prefs.getBool('setting_offline_only_mode') ?? false;
+    if (offlineOnly) {
+      throw const YtmException('OFFLINE_ONLY', 'Offline Only Mode is enabled in Settings');
+    }
+    final wifiOnly = prefs.getBool('setting_wifi_only_mode') ?? false;
+    if (wifiOnly) {
+      final isWifi = await _ytmService.isWifiConnected();
+      if (!isWifi) {
+        throw const YtmException('WIFI_ONLY', 'Wi-Fi Only Mode is enabled. Connect to Wi-Fi to stream');
+      }
+    }
+    final videoId = song.remoteId;
+    if (videoId == null || videoId.isEmpty) {
+      throw const YtmException('YTM_UNAVAILABLE', 'Missing video id');
+    }
+    final quality = prefs.getString('setting_streaming_quality') ?? 'high';
+    final cacheKey = '$videoId-$quality';
+
+    final cached = _streamCache[cacheKey];
+    if (cached != null && cached.expires.isAfter(DateTime.now())) {
+      return cached.url;
+    }
+    final stream = await _ytmService.resolveStream(videoId, quality: quality);
+    // Google's URLs sit ~6h out; refresh well before that to stay safe.
+    _streamCache[cacheKey] =
+        (url: stream.url, expires: DateTime.now().add(const Duration(minutes: 30)));
+    return stream.url;
+  }
+
+  /// The index [_getNextIndex] *would* pick, without its shuffle-history side
+  /// effect, so a prefetch cannot corrupt the real shuffle order. Returns null
+  /// in shuffle mode, where the next track is not knowable in advance.
+  int? _peekNextIndex() {
+    if (_songs.isEmpty) return null;
+    if (_activePlayer.loopMode == LoopMode.one) return _currentIndex;
+    if (_activePlayer.shuffleModeEnabled && _songs.length > 1) return null;
+    if (_currentIndex + 1 < _songs.length) return _currentIndex + 1;
+    if (_activePlayer.loopMode == LoopMode.all) return 0;
+    return null;
+  }
+
+  /// Warms [_streamCache] for an upcoming YouTube track so the crossfade (which
+  /// *is* the prefetch window) is not truncated by resolve latency. Fire and
+  /// forget: a failure just means the crossfade resolves on demand instead.
+  void _prefetchStream(SongsTableData song) {
+    final videoId = song.remoteId;
+    if (song.source != SongSource.youtube || videoId == null) return;
+    final cached = _streamCache[videoId];
+    if (cached != null && cached.expires.isAfter(DateTime.now())) return;
+    if (!_prefetching.add(videoId)) return;
+    _resolveStreamUrl(song)
+        .whenComplete(() => _prefetching.remove(videoId))
+        .ignore();
+  }
+
   Future<void> restoreLastPlaybackSession() async {
     try {
       // Restore shuffle and repeat preferences from storage (Issue #12)
@@ -400,10 +499,17 @@ class PulsrAudioHandler extends BaseAudioHandler
         queue.add(_songs.map(_songToMediaItem).toList());
 
         final pos = Duration(milliseconds: savedPositionMs);
-        await _activePlayer.setAudioSource(
-          _createAudioSource(currentSong, item),
-          initialPosition: pos,
-        );
+        if (currentSong.source == SongSource.youtube) {
+          // Resolving a stream URL here runs unawaited at cold start and, if
+          // offline, would throw into the catch below and lose the whole
+          // restored session. Stay idle; play() resolves it on first tap.
+          _pendingLazyPosition = pos;
+        } else {
+          await _activePlayer.setAudioSource(
+            _createAudioSource(currentSong, item),
+            initialPosition: pos,
+          );
+        }
         _broadcastState(_activePlayer.playbackEvent);
         _positionSubject.add(pos);
       }
@@ -423,9 +529,13 @@ class PulsrAudioHandler extends BaseAudioHandler
       final artUri = await ArtworkUriResolver.resolveArtworkUri(nextSong);
       final item = _songToMediaItem(nextSong, artUri);
 
-      await _inactivePlayer.setAudioSource(
-        _createAudioSource(nextSong, item),
-      );
+      final source = await _resolveAudioSource(nextSong, item);
+      // Resolving a YouTube URL can take seconds. If a skip/stop cancelled this
+      // fade meanwhile, loading the source now would push phantom audio into a
+      // player that cancel() already stopped — bail on the stale fade.
+      if (_crossfadeManager.currentFadeId != currentFadeId) return;
+
+      await _inactivePlayer.setAudioSource(source);
 
       if (_crossfadeManager.currentFadeId != currentFadeId) return;
 
@@ -463,6 +573,15 @@ class PulsrAudioHandler extends BaseAudioHandler
     } catch (e, st) {
       ErrorLogger.log('Error during crossfade playback',
           error: e, stackTrace: st, category: 'AudioHandler');
+      // playerStateStream suppresses the natural completion-skip while a fade is
+      // in flight, so a failure here (e.g. a YouTube resolve that threw) would
+      // silently dead-end the queue. Recover by hard-playing the destination —
+      // playSongAt's own cancel() clears the crossfade and bumps the fade id, so
+      // the finally below then correctly skips finishCrossfade. Guarded so a
+      // superseded fade does not yank playback.
+      if (_crossfadeManager.currentFadeId == currentFadeId) {
+        await playSongAt(nextIndex);
+      }
     } finally {
       if (_crossfadeManager.currentFadeId == currentFadeId) {
         _crossfadeManager.finishCrossfade();
@@ -579,10 +698,16 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (index < 0 || index >= _songs.length) return;
     await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
         restoreVolume: _volume);
+    // A YouTube resolve below can await for seconds; a second skip during that
+    // window must win. Capture a generation token and bail from a stale call
+    // after every await, or we get double mediaItem/history and torn state.
+    final generation = ++_playGeneration;
+    _pendingLazyPosition = null;
     _currentIndex = index;
 
     final song = _songs[index];
     final artUri = await ArtworkUriResolver.resolveArtworkUri(song);
+    if (generation != _playGeneration) return;
 
     final item = _songToMediaItem(song, artUri);
     mediaItem.add(item);
@@ -603,26 +728,47 @@ class PulsrAudioHandler extends BaseAudioHandler
     );
 
     try {
-      await _activePlayer.setAudioSource(
-        _createAudioSource(song, item),
-        initialPosition: initialPosition,
-      );
+      final source = await _resolveAudioSource(song, item);
+      if (generation != _playGeneration) return;
+      await _activePlayer.setAudioSource(source, initialPosition: initialPosition);
+      if (generation != _playGeneration) return;
       await _activePlayer.setVolume(_calculateReplayGainVolume(song));
       await _activePlayer.play();
       _consecutiveFailures = 0;
       _repository.recordPlayHistory(song.id);
       _saveCurrentPosition();
+    } on YtmException catch (e, st) {
+      if (generation != _playGeneration) return;
+      ErrorLogger.log(
+          'Error resolving YouTube stream for ${song.title} (${e.code})',
+          error: e, stackTrace: st, category: 'AudioHandler');
+      // A dead network or an extractor-less build fails every remaining YouTube
+      // row, so skipping through them is pointless — halt immediately.
+      await _failCurrentPlayback(fatal: e.isNetwork || e.isDisabled);
     } catch (e, st) {
+      if (generation != _playGeneration) return;
       ErrorLogger.log('Error playing song ${song.title} (${song.path})',
           error: e, stackTrace: st, category: 'AudioHandler');
-      _consecutiveFailures++;
-      if (_consecutiveFailures >= 5 || _consecutiveFailures >= _songs.length) {
-        _consecutiveFailures = 0;
-        await _activePlayer.pause();
-        _broadcastState(_activePlayer.playbackEvent);
-      } else {
-        skipToNext();
-      }
+      await _failCurrentPlayback(fatal: false);
+    }
+  }
+
+  /// Shared failure handling for [playSongAt]: a fatal error pauses outright,
+  /// otherwise skip forward until [_consecutiveFailures] trips the circuit.
+  Future<void> _failCurrentPlayback({required bool fatal}) async {
+    if (fatal) {
+      _consecutiveFailures = 0;
+      await _activePlayer.pause();
+      _broadcastState(_activePlayer.playbackEvent);
+      return;
+    }
+    _consecutiveFailures++;
+    if (_consecutiveFailures >= 5 || _consecutiveFailures >= _songs.length) {
+      _consecutiveFailures = 0;
+      await _activePlayer.pause();
+      _broadcastState(_activePlayer.playbackEvent);
+    } else {
+      skipToNext();
     }
   }
 
@@ -630,6 +776,13 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> play() {
     ErrorLogger.addBreadcrumb('Playback started', category: 'player');
+    // A restored YouTube session was left with no source loaded (see
+    // restoreLastPlaybackSession); resolve and start it on the first play.
+    final pending = _pendingLazyPosition;
+    if (pending != null && currentSong != null) {
+      _pendingLazyPosition = null;
+      return playSongAt(_currentIndex, initialPosition: pending);
+    }
     return _activePlayer.play();
   }
 

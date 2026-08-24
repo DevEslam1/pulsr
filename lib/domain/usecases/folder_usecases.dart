@@ -54,6 +54,9 @@ class FolderUseCases {
     final Map<String, int> folderSongCounts = {};
 
     for (final song in songs) {
+      // `ytmusic://` sentinels would otherwise collapse into one phantom folder
+      // that the user could then "exclude".
+      if (song.source != SongSource.local) continue;
       final file = File(song.path);
       final parentDir = file.parent.path;
       folderSongCounts[parentDir] = (folderSongCounts[parentDir] ?? 0) + 1;
@@ -83,6 +86,7 @@ class FolderUseCases {
       return result.map((songs) {
         final normalizedTarget = folderPath.replaceAll('\\', '/').toLowerCase().trim();
         return songs.where((s) {
+          if (s.source != SongSource.local) return false;
           final parentDir = File(s.path).parent.path.replaceAll('\\', '/').toLowerCase().trim();
           return parentDir == normalizedTarget;
         }).toList();

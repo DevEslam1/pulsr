@@ -45,3 +45,7 @@ class BackupFailure extends AppFailure {
   const BackupFailure(super.message, [super.error]);
 }
 
+class DownloadFailure extends AppFailure {
+  const DownloadFailure(super.message, [super.error]);
+}
+

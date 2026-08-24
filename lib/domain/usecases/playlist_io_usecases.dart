@@ -16,6 +16,8 @@ class PlaylistExportUseCase {
     final buffer = StringBuffer();
     buffer.writeln('#EXTM3U');
     for (final song in songs) {
+      // A `ytmusic://` sentinel is meaningless to any other player.
+      if (song.source != SongSource.local) continue;
       final durationSec = (song.durationMs / 1000).round();
       final artist = song.artist.trim().isNotEmpty ? song.artist.trim() : 'Unknown Artist';
       final title = song.title.trim().isNotEmpty ? song.title.trim() : 'Unknown Track';
