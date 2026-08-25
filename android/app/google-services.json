@@ -84,6 +84,78 @@
           ]
         }
       }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:973193718497:android:742e8a240c53f1e5d925bb",
+        "android_client_info": {
+          "package_name": "com.pulsr.music.bb"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "973193718497-ffe3323bbunolfvu74quuoi2pbh9b0u9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDrGrDfNYj-17_eZ0rHPPo2tuwQA8A_O64"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "973193718497-ffe3323bbunolfvu74quuoi2pbh9b0u9.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "973193718497-bb716okvnhklii03mimq4pv5pdfjaveg.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.pulsr"
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:973193718497:android:277134fc7c2433fad925bb",
+        "android_client_info": {
+          "package_name": "com.pulsr.music.bb.plus"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "973193718497-ffe3323bbunolfvu74quuoi2pbh9b0u9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDrGrDfNYj-17_eZ0rHPPo2tuwQA8A_O64"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "973193718497-ffe3323bbunolfvu74quuoi2pbh9b0u9.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "973193718497-bb716okvnhklii03mimq4pv5pdfjaveg.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.pulsr"
+              }
+            }
+          ]
+        }
+      }
     }
   ],
   "configuration_version": "1"

@@ -14,9 +14,9 @@
     <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions"/>
 
     <!-- Custom signature permission to protect internal widget & playback broadcasts -->
-    <permission android:name="com.pulsr.music.permission.WIDGET_CONTROL"
+    <permission android:name="${applicationId}.permission.WIDGET_CONTROL"
         android:protectionLevel="signature" />
-    <uses-permission android:name="com.pulsr.music.permission.WIDGET_CONTROL" />
+    <uses-permission android:name="${applicationId}.permission.WIDGET_CONTROL" />
 
     <application
         android:label="${appName}"
