@@ -2,9 +2,12 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
 
+import '../di/injection.dart';
+import 'ytm_account_service.dart';
 import '../../domain/models/ytm_track.dart';
 import '../utils/error_logger.dart';
 
@@ -163,6 +166,22 @@ class YtmService {
   /// Resolves a currently-valid audio URL. The result expires, so callers must
   /// resolve at playback time and never store the URL.
   Future<YtmStream> resolveStream(String videoId, {String quality = 'high'}) async {
+    // 1. Try direct authenticated YouTube Music InnerTube Player API (bypasses VPN bot blocks)
+    try {
+      if (getIt.isRegistered<YtmAccountService>()) {
+        final account = getIt<YtmAccountService>();
+        if (account.isLoggedIn) {
+          final directStream = await account.resolvePlayerStream(videoId, quality: quality);
+          if (directStream != null) {
+            return directStream;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[YTM_SERVICE] Direct stream resolution fallback: $e');
+    }
+
+    // 2. Fallback to native extractor
     final raw = await _guard(
       () => _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
         'videoId': videoId,

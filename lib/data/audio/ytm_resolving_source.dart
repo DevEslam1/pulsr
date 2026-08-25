@@ -67,7 +67,16 @@ class YtmResolvingSource extends StreamAudioSource {
   Future<LockCachingAudioSource> _createInner() async {
     final url = await resolve();
     final cacheFile = await _cacheFileFor(videoId);
-    final inner = LockCachingAudioSource(Uri.parse(url), cacheFile: cacheFile);
+    final inner = LockCachingAudioSource(
+      Uri.parse(url),
+      headers: {
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'Referer': 'https://music.youtube.com/',
+        'Origin': 'https://music.youtube.com',
+      },
+      cacheFile: cacheFile,
+    );
     _inner = inner;
     return inner;
   }

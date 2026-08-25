@@ -515,7 +515,16 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
 
     final url = await _resolveStreamUrl(song);
-    return AudioSource.uri(Uri.parse(url), tag: tag);
+    return AudioSource.uri(
+      Uri.parse(url),
+      tag: tag,
+      headers: {
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'Referer': 'https://music.youtube.com/',
+        'Origin': 'https://music.youtube.com',
+      },
+    );
   }
 
   /// Returns a currently-valid stream URL for a YouTube row, reusing a memoized

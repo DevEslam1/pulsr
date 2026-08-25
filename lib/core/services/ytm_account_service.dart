@@ -55,6 +55,8 @@ class YtmAccountService {
   static const String _accountAvatarPrefKey = 'ytm_account_avatar';
   static const String _innertubeBrowseUrl =
       'https://music.youtube.com/youtubei/v1/browse?prettyPrint=false';
+  static const String _innertubePlayerUrl =
+      'https://music.youtube.com/youtubei/v1/player?prettyPrint=false';
 
   // InnerTube WEB_REMIX client identifiers, in one place so a refresh is a
   // single edit. YouTube bumps its client version periodically and eventually
@@ -828,5 +830,70 @@ class YtmAccountService {
 
     traverse(root);
     return results;
+  }
+
+  /// Resolves an audio stream directly via YouTube Music InnerTube Player API
+  /// with authenticated session cookies to bypass anonymous bot detection on VPNs.
+  Future<YtmStream?> resolvePlayerStream(String videoId, {String quality = 'high'}) async {
+    try {
+      final headers = _buildHeaders();
+      final body = jsonEncode({
+        'context': _clientContext(),
+        'videoId': videoId,
+        'playbackContext': {
+          'contentPlaybackContext': {
+            'html5Preference': 'HTML5_PREF_WANTS',
+          },
+        },
+      });
+
+      final response = await http
+          .post(Uri.parse('$_innertubePlayerUrl&key=$_apiKey'), headers: headers, body: body)
+          .timeout(const Duration(seconds: 12));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as Map<String, dynamic>;
+        final streamingData = data['streamingData'] as Map<String, dynamic>?;
+        final adaptive = (streamingData?['adaptiveFormats'] as List<dynamic>? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .toList();
+
+        final audioFormats = adaptive.where((f) {
+          final mime = f['mimeType'] as String? ?? '';
+          final url = f['url'] as String?;
+          return mime.startsWith('audio/') && url != null && url.isNotEmpty;
+        }).toList();
+
+        if (audioFormats.isNotEmpty) {
+          final m4a = audioFormats.where((f) => (f['mimeType'] as String).contains('mp4a')).toList();
+          final pool = m4a.isNotEmpty ? m4a : audioFormats;
+
+          final selected = switch (quality.toLowerCase()) {
+            'low' => pool.reduce((a, b) => ((a['bitrate'] as num?) ?? 0) < ((b['bitrate'] as num?) ?? 0) ? a : b),
+            _ => pool.reduce((a, b) => ((a['bitrate'] as num?) ?? 0) > ((b['bitrate'] as num?) ?? 0) ? a : b),
+          };
+
+          final mime = selected['mimeType'] as String? ?? 'audio/mp4';
+          final bitrate = (selected['bitrate'] as num?)?.toInt() ?? 128000;
+          final durationMs = int.tryParse(selected['approxDurationMs']?.toString() ?? '0') ?? 0;
+          final details = data['videoDetails'] as Map<String, dynamic>?;
+
+          return YtmStream(
+            videoId: videoId,
+            url: selected['url'] as String,
+            mimeType: mime.split(';').first.trim(),
+            container: mime.contains('mp4') ? 'm4a' : 'webm',
+            bitrateKbps: (bitrate / 1000).round(),
+            duration: Duration(milliseconds: durationMs),
+            title: details?['title'] as String? ?? '',
+            artist: details?['author'] as String? ?? '',
+            artworkUrl: null,
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('[YTM_ACCOUNT] resolvePlayerStream error: $e');
+    }
+    return null;
   }
 }
