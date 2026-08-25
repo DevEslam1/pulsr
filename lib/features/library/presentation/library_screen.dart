@@ -610,7 +610,9 @@ class _LibraryScreenState extends State<LibraryScreen>
   }
 
   bool _isOnlineDownload(SongsTableData s) {
-    return (s.remoteId != null && s.remoteId!.isNotEmpty) ||
+    return (s.isDownloaded ?? false) ||
+           s.source == SongSource.youtube ||
+           (s.remoteId != null && s.remoteId!.isNotEmpty) ||
            (s.remoteArtworkUrl != null && s.remoteArtworkUrl!.isNotEmpty) ||
            s.path.contains('ytdl_') ||
            s.path.toLowerCase().contains('pulsr');

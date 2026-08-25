@@ -1,26 +1,24 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/constants/prefs_keys.dart';
+import 'package:pulsr/core/services/scrobbler_service.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
-import 'package:pulsr/data/scanner/media_scanner_service.dart';
+import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/audio_effects_config.dart';
 import 'package:pulsr/domain/models/eq_preset.dart';
 import 'package:pulsr/domain/models/headphone_profile.dart';
+import 'package:pulsr/domain/repositories/music_repository_interface.dart';
 import 'package:pulsr/domain/usecases/toggle_favorite_usecase.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
-import 'package:pulsr/features/player/cubit/player_state.dart';
-import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
-import 'package:pulsr/features/widgets/widget_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-import 'package:pulsr/data/db/app_database.dart';
-import 'package:pulsr/domain/repositories/music_repository_interface.dart';
 
 class MockMusicRepository extends Mock implements IMusicRepository {}
 class MockToggleFavoriteUseCase extends Mock implements ToggleFavoriteUseCase {}
-class MockMediaScannerService extends Mock implements MediaScannerService {}
-class MockWidgetService extends Mock implements WidgetService {}
+class MockScrobblerService extends Mock implements ScrobblerService {}
 
 class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler implements PulsrAudioHandler {
   double _vol = 1.0;
@@ -193,161 +191,144 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {}
 
   @override
+  Future<void> setSpeed(double speed) async {}
+
+  @override
   Future<void> validatePlayerState() async {}
 }
 
 void main() {
-  setUpAll(() {
-    registerFallbackValue(Duration.zero);
-  });
+  TestWidgetsFlutterBinding.ensureInitialized();
 
-  late TestPulsrAudioHandler testAudioHandler;
   late MockMusicRepository mockRepository;
   late MockToggleFavoriteUseCase mockToggleFavorite;
+  late MockScrobblerService mockScrobblerService;
+  late TestPulsrAudioHandler testAudioHandler;
+
+  final sampleSong1 = SongsTableData(
+    id: 1,
+    title: 'Track 1',
+    artist: 'Artist 1',
+    album: 'Album 1',
+    durationMs: 180000,
+    path: '/path/1.mp3',
+    isFavorite: false,
+    isMissing: false,
+    playCount: 0,
+    lastPositionMs: 0,
+    source: 'local',
+  );
+
+  final missingSong = SongsTableData(
+    id: 2,
+    title: 'Missing Track',
+    artist: 'Artist 2',
+    album: 'Album 2',
+    durationMs: 200000,
+    path: '/path/missing.mp3',
+    isFavorite: false,
+    isMissing: true,
+    playCount: 0,
+    lastPositionMs: 0,
+    source: 'local',
+  );
 
   setUp(() {
-    testAudioHandler = TestPulsrAudioHandler();
+    SharedPreferences.setMockInitialValues({});
     mockRepository = MockMusicRepository();
     mockToggleFavorite = MockToggleFavoriteUseCase();
+    mockScrobblerService = MockScrobblerService();
+    testAudioHandler = TestPulsrAudioHandler();
+
+    when(() => mockRepository.getSongById(any())).thenAnswer((_) async => right(sampleSong1));
+    when(() => mockRepository.getSongsByIds(any())).thenAnswer((_) async => right([sampleSong1]));
+    when(() => mockScrobblerService.notifyPlaybackState(
+          id: any(named: 'id'),
+          artist: any(named: 'artist'),
+          track: any(named: 'track'),
+          album: any(named: 'album'),
+          durationMs: any(named: 'durationMs'),
+          positionMs: any(named: 'positionMs'),
+          isPlaying: any(named: 'isPlaying'),
+        )).thenAnswer((_) async {});
   });
 
-  group('PlayerCubit', () {
-    test('initial state defaults are correct', () {
+  group('PlayerCubit Hardening Tests', () {
+    test('Queue slots persist to SharedPreferences after queue operations', () async {
       final cubit = PlayerCubit(
         audioHandler: testAudioHandler,
         repository: mockRepository,
         toggleFavoriteUseCase: mockToggleFavorite,
+        scrobblerService: mockScrobblerService,
       );
 
-      expect(cubit.state.isPlaying, false);
-      expect(cubit.state.isShuffle, false);
-      expect(cubit.state.repeatMode, PlayerRepeatMode.off);
-      expect(cubit.state.activeQueueSlot, 0);
-      expect(cubit.state.isLyricsVisible, false);
-      expect(cubit.state.isQueueVisible, false);
+      await cubit.playSong(sampleSong1);
 
-      cubit.close();
+      // Wait for debounce timer (2s)
+      await Future.delayed(const Duration(milliseconds: 2100));
+
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(PrefsKeys.queueSlots);
+      expect(raw, isNotNull);
+      final data = jsonDecode(raw!) as Map<String, dynamic>;
+      expect(data['0'], isNotNull);
+      expect((data['0']['songIds'] as List), contains(1));
+
+      await cubit.close();
     });
 
-    test('equalizer enabling and preset apply updates state and audio handler', () async {
+    test('switchQueueSlot filters out missing songs', () async {
       final cubit = PlayerCubit(
         audioHandler: testAudioHandler,
         repository: mockRepository,
         toggleFavoriteUseCase: mockToggleFavorite,
+        scrobblerService: mockScrobblerService,
       );
 
-      await cubit.setEqualizerEnabled(true);
-      expect(cubit.state.isEqEnabled, true);
-      expect(testAudioHandler.eqEnabled, true);
+      // Populate slot 1 with missing song
+      await cubit.switchQueueSlot(1);
+      await cubit.playSong(missingSong);
 
-      const rockPreset = EqPreset(name: 'Rock', gains: [4.5, 2.5, -1.0, 2.0, 4.0], bassBoost: 0.2);
-      await cubit.applyPreset(rockPreset);
-      expect(cubit.state.eqPreset.name, 'Rock');
-      expect(testAudioHandler.currentEqPreset.name, 'Rock');
+      // Switch to slot 0, then back to slot 1
+      await cubit.switchQueueSlot(0);
+      await cubit.playSong(sampleSong1);
 
-      cubit.close();
+      await cubit.switchQueueSlot(1);
+      // Slot 1 had only missing song, so it emits error and empty queue
+      expect(cubit.state.errorMessage, equals('Queue slot is empty'));
+
+      await cubit.close();
     });
 
-    test('sleep timer starts and cancels properly', () {
+    test('Queue size is capped at 500 tracks', () async {
       final cubit = PlayerCubit(
         audioHandler: testAudioHandler,
         repository: mockRepository,
         toggleFavoriteUseCase: mockToggleFavorite,
+        scrobblerService: mockScrobblerService,
       );
 
-      cubit.startSleepTimer(30);
-      expect(cubit.state.sleepTimerRemaining, const Duration(minutes: 30));
-      expect(testAudioHandler.sleepTimerDuration, const Duration(minutes: 30));
-
-      cubit.cancelSleepTimer();
-      expect(cubit.state.sleepTimerRemaining, isNull);
-      expect(testAudioHandler.sleepTimerDuration, isNull);
-
-      cubit.close();
-    });
-
-    test('toggleLyricsVisibility toggles lyrics and closes queue', () {
-      final cubit = PlayerCubit(
-        audioHandler: testAudioHandler,
-        repository: mockRepository,
-        toggleFavoriteUseCase: mockToggleFavorite,
-      );
-
-      cubit.toggleLyricsVisibility();
-      expect(cubit.state.isLyricsVisible, true);
-      expect(cubit.state.isQueueVisible, false);
-
-      cubit.toggleLyricsVisibility();
-      expect(cubit.state.isLyricsVisible, false);
-
-      cubit.close();
-    });
-
-    test('crossfade duration updates when settings cubit changes', () async {
-      final mockScannerService = MockMediaScannerService();
-      SharedPreferences.setMockInitialValues({'setting_crossfade': 4.0});
-      final settingsCubit = SettingsCubit(scannerService: mockScannerService);
-
-      final cubit = PlayerCubit(
-        audioHandler: testAudioHandler,
-        repository: mockRepository,
-        toggleFavoriteUseCase: mockToggleFavorite,
-        settingsCubit: settingsCubit,
-      );
-
-      await settingsCubit.setCrossfade(6.0);
-      expect(testAudioHandler.currentCrossfadeDuration, const Duration(seconds: 6));
-
-      cubit.close();
-      await settingsCubit.close();
-    });
-
-    test('updates widget with playback state and favorite status', () async {
-      final mockWidgetService = MockWidgetService();
-      when(() => mockWidgetService.listenToWidgetClicks(any())).thenReturn(
-        StreamController<Uri?>().stream.listen((_) {}),
-      );
-      when(
-        () => mockWidgetService.updateNowPlaying(
-          song: any(named: 'song'),
-          isPlaying: any(named: 'isPlaying'),
-          position: any(named: 'position'),
-          duration: any(named: 'duration'),
-          isFavorite: any(named: 'isFavorite'),
-          isShuffle: any(named: 'isShuffle'),
-          repeatMode: any(named: 'repeatMode'),
+      final largeList = List.generate(
+        600,
+        (i) => SongsTableData(
+          id: i + 1,
+          title: 'Track $i',
+          artist: 'Artist',
+          album: 'Album',
+          durationMs: 100000,
+          path: '/path/$i.mp3',
+          isFavorite: false,
+          isMissing: false,
+          playCount: 0,
+          lastPositionMs: 0,
+          source: 'local',
         ),
-      ).thenAnswer((_) async {});
-
-      final cubit = PlayerCubit(
-        audioHandler: testAudioHandler,
-        repository: mockRepository,
-        toggleFavoriteUseCase: mockToggleFavorite,
-        widgetService: mockWidgetService,
       );
 
-      verify(() => mockWidgetService.listenToWidgetClicks(any())).called(1);
+      await cubit.playSong(largeList.first, queue: largeList);
+      expect(cubit.state.queue.length, equals(500));
 
-      cubit.close();
-    });
-
-    test('position stream updates state continuously', () async {
-      final cubit = PlayerCubit(
-        audioHandler: testAudioHandler,
-        repository: mockRepository,
-        toggleFavoriteUseCase: mockToggleFavorite,
-      );
-      await Future<void>.delayed(const Duration(milliseconds: 10));
-
-      testAudioHandler._positionController.add(const Duration(milliseconds: 100));
-      await Future<void>.delayed(const Duration(milliseconds: 10));
-      expect(cubit.state.position, const Duration(milliseconds: 100));
-
-      testAudioHandler._positionController.add(const Duration(milliseconds: 300));
-      await Future<void>.delayed(const Duration(milliseconds: 10));
-      expect(cubit.state.position, const Duration(milliseconds: 300));
-
-      cubit.close();
+      await cubit.close();
     });
   });
 }

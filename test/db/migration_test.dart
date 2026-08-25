@@ -17,8 +17,8 @@ void main() {
       await db.close();
     });
 
-    test('Fresh database opens at schemaVersion 6 and has all indexes', () async {
-      expect(db.schemaVersion, equals(6));
+    test('Fresh database opens at schemaVersion 7 and has all indexes', () async {
+      expect(db.schemaVersion, equals(7));
 
       // Test inserting a song with schema v4 fields
       final songId = await db.into(db.songsTable).insert(
@@ -27,7 +27,7 @@ void main() {
           title: 'Test Song',
           path: '/music/test.mp3',
           isMissing: const Value(false),
-          replayGain: const Value(-1.5),
+          replayGainTrack: const Value(-1.5),
         ),
       );
       expect(songId, equals(101));
@@ -35,7 +35,7 @@ void main() {
       final song = await (db.select(db.songsTable)..where((t) => t.id.equals(101))).getSingle();
       expect(song.title, equals('Test Song'));
       expect(song.isMissing, isFalse);
-      expect(song.replayGain, equals(-1.5));
+      expect(song.replayGainTrack, equals(-1.5));
       expect(song.source, equals(SongSource.local));
       expect(song.remoteId, equals(null));
       // v6 audio-quality columns default to null until enrichment runs.
@@ -113,7 +113,7 @@ void main() {
       return rows.map((row) => row.read<String>('name')).toSet();
     }
 
-    test('v4 -> v6 backfills source, keeps data, and adds the new indexes', () async {
+    test('v4 -> v7 backfills source, keeps data, and adds the new indexes', () async {
       upgraded = openLegacyDatabase(4);
 
       // Opening is lazy; the first query is what triggers the migration.
@@ -134,7 +134,7 @@ void main() {
       expect(await songIndexNames(), containsAll(['idx_songs_source', 'idx_songs_remote_id']));
 
       final version = await upgraded.customSelect('PRAGMA user_version;').getSingle();
-      expect(version.data['user_version'], equals(6));
+      expect(version.data['user_version'], equals(7));
 
       // The upgraded schema must accept remote rows, not just the fresh one.
       await upgraded.into(upgraded.songsTable).insert(
@@ -148,12 +148,12 @@ void main() {
       );
     });
 
-    test('v2 -> v6 runs the whole ladder without indexing a column that does not exist yet', () async {
+    test('v2 -> v7 runs the whole ladder without indexing a column that does not exist yet', () async {
       upgraded = openLegacyDatabase(2);
 
       final song = await (upgraded.select(upgraded.songsTable)..where((t) => t.id.equals(77))).getSingle();
       expect(song.isMissing, isFalse);
-      expect(song.replayGain, equals(null));
+      expect(song.replayGainTrack, equals(null));
       expect(song.source, equals(SongSource.local));
 
       // idx_songs_is_missing covers a column the `from < 4` branch adds, so it

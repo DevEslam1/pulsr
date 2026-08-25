@@ -864,6 +864,7 @@ class MusicRepository implements IMusicRepository {
                   path: Value(newPath),
                   source: const Value(SongSource.local),
                   isMissing: const Value(false),
+                  isDownloaded: const Value(true),
                   dateAdded: Value((oldRow.dateAdded ?? 0) > 0 ? oldRow.dateAdded! : nowSec),
                   pendingDownloadPath: const Value(null),
                 ),
@@ -880,6 +881,7 @@ class MusicRepository implements IMusicRepository {
                   path: Value(newPath),
                   source: const Value(SongSource.local),
                   isMissing: const Value(false),
+                  isDownloaded: const Value(true),
                   remoteId: Value(fallbackSong.remoteId),
                   remoteArtworkUrl: Value(fallbackSong.remoteArtworkUrl),
                   dateAdded: Value(nowSec),
@@ -949,6 +951,7 @@ class MusicRepository implements IMusicRepository {
             remoteId: Value(oldRow.remoteId ?? newRow.remoteId),
             remoteArtworkUrl: Value(effectiveRemoteArt),
             source: const Value(SongSource.local),
+            isDownloaded: const Value(true),
             pendingDownloadPath: const Value(null),
           ),
         );

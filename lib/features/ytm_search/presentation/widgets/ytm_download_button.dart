@@ -55,6 +55,7 @@ class YtmDownloadButton extends StatelessWidget {
         }
 
         switch (item.status) {
+          case YtDownloadStatus.queued:
           case YtDownloadStatus.running:
             return SizedBox(
               width: 40,
@@ -63,7 +64,11 @@ class YtmDownloadButton extends StatelessWidget {
                 child: SizedBox(
                   width: iconSize,
                   height: iconSize,
-                  child: CircularProgressIndicator(strokeWidth: 2.4, value: item.progress, color: tintColor),
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2.4,
+                    value: item.status == YtDownloadStatus.queued ? null : item.progress,
+                    color: tintColor,
+                  ),
                 ),
               ),
             );
@@ -80,6 +85,7 @@ class YtmDownloadButton extends StatelessWidget {
               onPressed: () => cubit.download(song),
               visualDensity: VisualDensity.compact,
             );
+          case YtDownloadStatus.canceled:
           case YtDownloadStatus.idle:
             return IconButton(
               tooltip: 'Download offline',

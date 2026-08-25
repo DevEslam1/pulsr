@@ -38,6 +38,22 @@ class ScrobblerPlugin(private val context: Context) : MethodChannel.MethodCallHa
         }
     }
 
+    private var isScrobblerChecked = false
+    private var isScrobblerPresent = false
+
+    private fun isScrobblerAvailable(): Boolean {
+        if (isScrobblerChecked) return isScrobblerPresent
+        try {
+            val intent = Intent("com.android.music.metachanged")
+            val receivers = context.packageManager.queryBroadcastReceivers(intent, 0)
+            isScrobblerPresent = receivers.isNotEmpty()
+        } catch (_: Throwable) {
+            isScrobblerPresent = false
+        }
+        isScrobblerChecked = true
+        return isScrobblerPresent
+    }
+
     private fun sendScrobbleBroadcasts(
         id: Long,
         artist: String,
@@ -47,6 +63,7 @@ class ScrobblerPlugin(private val context: Context) : MethodChannel.MethodCallHa
         position: Long,
         isPlaying: Boolean
     ) {
+        if (!isScrobblerAvailable()) return
         try {
             val actions = arrayOf(
                 "com.android.music.metachanged",

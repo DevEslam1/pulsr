@@ -29,32 +29,43 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
-        if (call.method == "isAvailable") {
-            result.success(false)
-        } else if (call.method == "getCookies") {
-            val urls = listOf(
-                "https://music.youtube.com",
-                "https://www.youtube.com",
-                "https://accounts.google.com",
-                "https://youtube.com"
+        when (call.method) {
+            "isAvailable" -> result.success(false)
+            "isWifiConnected" -> result.success(true)
+            "ensurePoTokenReady" -> result.success(false)
+            "invalidatePoToken" -> result.success(true)
+            "getPoTokenState" -> result.success(
+                mapOf(
+                    "isReady" to false,
+                    "isExpired" to true,
+                    "isExpiringSoon" to true,
+                    "visitorData" to "",
+                    "webViewBroken" to false,
+                )
             )
-            val cookieJar = mutableMapOf<String, String>()
-            val cm = android.webkit.CookieManager.getInstance()
-            for (u in urls) {
-                val c = cm.getCookie(u) ?: continue
-                for (pair in c.split(";")) {
-                    val parts = pair.trim().split("=", limit = 2)
-                    if (parts.size == 2 && parts[0].isNotBlank()) {
-                        cookieJar[parts[0].trim()] = parts[1].trim()
+            "getCookies" -> {
+                val urls = listOf(
+                    "https://music.youtube.com",
+                    "https://www.youtube.com",
+                    "https://accounts.google.com",
+                    "https://youtube.com"
+                )
+                val cookieJar = mutableMapOf<String, String>()
+                val cm = android.webkit.CookieManager.getInstance()
+                for (u in urls) {
+                    val c = cm.getCookie(u) ?: continue
+                    for (pair in c.split(";")) {
+                        val parts = pair.trim().split("=", limit = 2)
+                        if (parts.size == 2 && parts[0].isNotBlank()) {
+                            cookieJar[parts[0].trim()] = parts[1].trim()
+                        }
                     }
                 }
+                val merged = cookieJar.entries.joinToString("; ") { "${it.key}=${it.value}" }
+                result.success(merged)
             }
-            val merged = cookieJar.entries.joinToString("; ") { "${it.key}=${it.value}" }
-            result.success(merged)
-        } else if (call.method == "setCookies") {
-            result.success(true)
-        } else {
-            result.error("YTM_DISABLED", "YouTube Music is not available in this build", null)
+            "setCookies" -> result.success(true)
+            else -> result.error("YTM_DISABLED", "YouTube Music is not available in this build", null)
         }
     }
 

@@ -1,4 +1,5 @@
 // lib/features/auth/presentation/ytm_web_login_sheet.dart
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -30,6 +31,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   bool _isLoading = true;
   double _progress = 0.0;
   bool _isSuccessHandled = false;
+  bool _showHint = false;
+  Timer? _hintTimer;
 
   @override
   void initState() {
@@ -58,7 +61,19 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         ),
       );
 
+    _hintTimer = Timer(const Duration(seconds: 30), () {
+      if (mounted && !_isSuccessHandled) {
+        setState(() => _showHint = true);
+      }
+    });
+
     _initWebView();
+  }
+
+  @override
+  void dispose() {
+    _hintTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _initWebView() async {
@@ -74,39 +89,22 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   Future<void> _checkForAuthSuccess(String url) async {
     if (_isSuccessHandled) return;
 
-    // Only attempt cookie extraction once the user has actually landed on
-    // YouTube Music — NOT on any intermediate Google sign-in page.
     final isOnYtm = url.contains('music.youtube.com') &&
         !url.contains('ServiceLogin') &&
         !url.contains('accounts.google.com') &&
         !url.contains('signin');
     if (!isOnYtm) return;
 
-    // Give the page a moment so the browser flushes all Set-Cookie headers
-    // (especially HttpOnly ones like SID/__Secure-3PSID) into CookieManager.
     await Future<void>.delayed(const Duration(milliseconds: 800));
     if (!mounted || _isSuccessHandled) return;
 
     final accountService = getIt<YtmAccountService>();
-
-    // Collect cookies from all relevant Google/YTM domains via the native
-    // Android CookieManager, which has access to HttpOnly cookies that
-    // JS document.cookie cannot read.
     final cookies = await accountService.getNativeCookiesFromDomains();
 
     if (cookies != null && cookies.isNotEmpty) {
-      // Log which cookie keys are present (not values) for diagnosis.
-      final keys = cookies.split(';').map((p) => p.trim().split('=').first.trim()).toList();
-      debugPrint('[YTM_LOGIN] Cookie keys collected: $keys');
-
-      // A valid YTM session always has __Secure-3PSID (or __Secure-1PSID)
-      // alongside SAPISID. SID / HSID / SSID alone are NOT enough.
       final hasSecure3Psid = cookies.contains('__Secure-3PSID');
       final hasSecure1Psid = cookies.contains('__Secure-1PSID');
       final hasSapisid = cookies.contains('SAPISID');
-
-      debugPrint('[YTM_LOGIN] hasSecure3PSID=$hasSecure3Psid '
-          'hasSecure1PSID=$hasSecure1Psid hasSAPISID=$hasSapisid');
 
       if (hasSapisid && (hasSecure3Psid || hasSecure1Psid)) {
         _isSuccessHandled = true;
@@ -118,8 +116,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       }
     }
 
-    // Fallback: JS document.cookie (only gets non-HttpOnly cookies but
-    // is better than nothing if native CookieManager returns nothing).
+    // Fallback: JS document.cookie
     try {
       final rawCookie = await _controller.runJavaScriptReturningResult(
         'document.cookie',
@@ -129,7 +126,6 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         cookieStr = cookieStr.substring(1, cookieStr.length - 1);
       }
       if (cookieStr.contains('SAPISID')) {
-        debugPrint('[YTM_LOGIN] JS cookie fallback, len=${cookieStr.length}');
         _isSuccessHandled = true;
         await accountService.saveSession(cookieStr);
         if (mounted && Navigator.of(context).canPop()) {
@@ -246,6 +242,28 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                 ],
               ),
             ),
+            if (_showHint)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.info_outline_rounded, size: 18, color: Colors.amber),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Make sure you sign into the correct Google account. Tap "Done" once logged in.',
+                        style: TextStyle(fontSize: 12, color: p.textPrimary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             if (_isLoading || _progress < 1.0)
               LinearProgressIndicator(
                 value: _isLoading ? null : _progress,

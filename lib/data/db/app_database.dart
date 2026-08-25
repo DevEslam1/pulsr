@@ -26,7 +26,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   static Future<void> _createIndexes(Future<void> Function(String) executeSql) async {
     await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_title ON songs (title);');
@@ -38,6 +38,7 @@ class AppDatabase extends _$AppDatabase {
     await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_year ON songs (year);');
     await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_is_favorite ON songs (is_favorite);');
     await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_is_missing ON songs (is_missing);');
+    await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_is_downloaded ON songs (is_downloaded);');
     await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_last_played ON songs (last_played);');
     await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_date_added ON songs (date_added);');
     await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_play_count ON songs (play_count);');
@@ -69,7 +70,6 @@ class AppDatabase extends _$AppDatabase {
       }
       if (from < 4) {
         await m.addColumn(songsTable, songsTable.isMissing);
-        await m.addColumn(songsTable, songsTable.replayGain);
       }
       if (from < 5) {
         await m.addColumn(songsTable, songsTable.source);
@@ -82,6 +82,18 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(songsTable, songsTable.bitDepth);
         await m.addColumn(songsTable, songsTable.bitrateKbps);
         await m.addColumn(songsTable, songsTable.codec);
+      }
+      if (from < 7) {
+        await m.addColumn(songsTable, songsTable.replayGainTrack);
+        await m.addColumn(songsTable, songsTable.replayGainAlbum);
+        await m.addColumn(songsTable, songsTable.replayGainTrackPeak);
+        await m.addColumn(songsTable, songsTable.replayGainAlbumPeak);
+        try {
+          await m.addColumn(songsTable, songsTable.isDownloaded);
+        } catch (_) {}
+        try {
+          await customStatement('UPDATE songs SET replay_gain_track = replay_gain WHERE replay_gain IS NOT NULL;');
+        } catch (_) {}
       }
       // Must run after every addColumn above: several indexes cover columns a
       // later branch introduces, so creating them mid-ladder fails on an older

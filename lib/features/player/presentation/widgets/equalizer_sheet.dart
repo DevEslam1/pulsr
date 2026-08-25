@@ -9,6 +9,7 @@ import '../../../../domain/models/audio_effects_config.dart';
 import '../../../../domain/models/eq_preset.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
+import 'eq_curve_visualizer.dart';
 
 class EqualizerSheet extends StatefulWidget {
   const EqualizerSheet({super.key});
@@ -25,6 +26,7 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
   String _selectedCategory = 'All';
   String _searchQuery = '';
   bool _isLoadingProfiles = true;
+  bool _isAbComparing = false;
 
   static const List<String> _bandLabels = ['32', '64', '125', '250', '500', '1K', '2K', '4K', '8K', '16K'];
 
@@ -105,7 +107,7 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           clipBehavior: Clip.antiAlias,
           child: SizedBox(
-            height: MediaQuery.of(context).size.height * 0.78,
+            height: MediaQuery.of(context).size.height * 0.82,
             child: Column(
               children: [
                 // Top Handle
@@ -229,46 +231,100 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
     final preset = state.eqPreset;
     final isEnabled = state.isEqEnabled;
 
+    // Gain staging calculations for Volume Boost
+    final preampDb = state.selectedHeadphoneProfile?.preampGain ?? 0.0;
+    final safeMaxBoost = ((6.0 - preampDb) / 10.0).clamp(0.0, 1.0);
+    final isOverSafe = state.volumeBoost > safeMaxBoost;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Presets Carousel
-          SizedBox(
-            height: 36,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              itemCount: EqPreset.defaultPresets.length,
-              itemBuilder: (context, index) {
-                final presetItem = EqPreset.defaultPresets[index];
-                final isSelected =
-                    state.selectedHeadphoneProfile == null && preset.name == presetItem.name;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(presetItem.name),
-                    selected: isSelected,
-                    selectedColor: p.accent.withValues(alpha: 0.22),
-                    backgroundColor: p.surfaceContainer,
-                    side: BorderSide(
-                      color: isSelected ? p.accent.withValues(alpha: 0.5) : p.hairline,
-                    ),
-                    labelStyle: TextStyle(
-                      color: isSelected ? p.accent : p.textSecondary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                    onSelected: (_) {
-                      if (!state.isEqEnabled) cubit.setEqualizerEnabled(true);
-                      cubit.applyPreset(presetItem);
+          // Presets Carousel & Actions Header
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: 36,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: EqPreset.defaultPresets.length,
+                    itemBuilder: (context, index) {
+                      final presetItem = EqPreset.defaultPresets[index];
+                      final isSelected =
+                          state.selectedHeadphoneProfile == null && preset.name == presetItem.name;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(presetItem.name),
+                          selected: isSelected,
+                          selectedColor: p.accent.withValues(alpha: 0.22),
+                          backgroundColor: p.surfaceContainer,
+                          side: BorderSide(
+                            color: isSelected ? p.accent.withValues(alpha: 0.5) : p.hairline,
+                          ),
+                          labelStyle: TextStyle(
+                            color: isSelected ? p.accent : p.textSecondary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                          onSelected: (_) {
+                            if (!state.isEqEnabled) cubit.setEqualizerEnabled(true);
+                            cubit.applyPreset(presetItem);
+                          },
+                        ),
+                      );
                     },
                   ),
-                );
-              },
-            ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // A/B Comparison Toggle
+              GestureDetector(
+                onTapDown: (_) {
+                  setState(() => _isAbComparing = true);
+                  cubit.startAbComparison();
+                },
+                onTapUp: (_) {
+                  setState(() => _isAbComparing = false);
+                  cubit.endAbComparison();
+                },
+                onTapCancel: () {
+                  setState(() => _isAbComparing = false);
+                  cubit.endAbComparison();
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: _isAbComparing ? p.accent : p.surfaceContainer,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: _isAbComparing ? p.accent : p.hairline),
+                  ),
+                  child: Text(
+                    'A/B Flat',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: _isAbComparing ? p.onAccent : p.textSecondary,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              // Reset to Flat button
+              TextButton.icon(
+                onPressed: () => cubit.resetToFlat(),
+                icon: Icon(Icons.restore_rounded, size: 16, color: p.textSecondary),
+                label: Text('Reset', style: TextStyle(fontSize: 11, color: p.textSecondary, fontWeight: FontWeight.w600)),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
 
           // Active Profile Banner if AutoEq is selected
           if (state.selectedHeadphoneProfile != null) ...[
@@ -296,14 +352,15 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                           ),
                         ),
                         Text(
-                          '${state.selectedHeadphoneProfile!.brand} • ${state.selectedHeadphoneProfile!.category}',
+                          '${state.selectedHeadphoneProfile!.brand} • '
+                          'Preamp: ${state.selectedHeadphoneProfile!.preampGain.toStringAsFixed(1)} dB',
                           style: TextStyle(fontSize: 10, color: p.textTertiary),
                         ),
                       ],
                     ),
                   ),
                   TextButton(
-                    onPressed: () => cubit.applyPreset(EqPreset.defaultPresets.first),
+                    onPressed: () => cubit.resetToFlat(),
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       minimumSize: Size.zero,
@@ -313,8 +370,25 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
           ],
+
+          // Real-time Frequency Response Curve Visualizer
+          Container(
+            height: 64,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: p.surfaceContainer,
+              borderRadius: AppRadii.cardRadius,
+              border: Border.all(color: p.hairline),
+            ),
+            child: EqCurveVisualizer(
+              gains: preset.gains,
+              activeColor: isEnabled ? p.accent : p.textTertiary,
+              height: 52,
+            ),
+          ),
+          const SizedBox(height: 14),
 
           // 10-Band Equalizer Vertical Sliders
           Container(
@@ -431,12 +505,12 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: (state.volumeBoost > 0.6 ? p.error : p.accent).withValues(alpha: 0.15),
+                        color: (isOverSafe ? p.error : p.accent).withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Icon(
                         Icons.volume_up_rounded,
-                        color: state.volumeBoost > 0.6 ? p.error : p.accent,
+                        color: isOverSafe ? p.error : p.accent,
                         size: 20,
                       ),
                     ),
@@ -461,13 +535,13 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: (state.volumeBoost > 0.6
+                        color: (isOverSafe
                                 ? p.error
                                 : (state.volumeBoost > 0 ? p.accent : p.surface))
                             .withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
-                          color: state.volumeBoost > 0.6
+                          color: isOverSafe
                               ? p.error.withValues(alpha: 0.4)
                               : (state.volumeBoost > 0 ? p.accent.withValues(alpha: 0.3) : p.hairline),
                         ),
@@ -475,7 +549,7 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                       child: Text(
                         state.volumeBoost > 0 ? '+${(state.volumeBoost * 10).toStringAsFixed(1)} dB' : 'Off',
                         style: TextStyle(
-                          color: state.volumeBoost > 0.6
+                          color: isOverSafe
                               ? p.error
                               : (state.volumeBoost > 0 ? p.accent : p.textSecondary),
                           fontSize: 11,
@@ -490,9 +564,9 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                   data: SliderTheme.of(context).copyWith(
                     trackHeight: 4,
                     thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                    activeTrackColor: state.volumeBoost > 0.6 ? p.error : p.accent,
+                    activeTrackColor: isOverSafe ? p.error : p.accent,
                     inactiveTrackColor: p.surface,
-                    thumbColor: state.volumeBoost > 0.6 ? p.error : p.accent,
+                    thumbColor: isOverSafe ? p.error : p.accent,
                   ),
                   child: Slider(
                     value: state.volumeBoost.clamp(0.0, 1.0),
@@ -504,28 +578,44 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                     },
                   ),
                 ),
-                  if (state.volumeBoost > 0.6)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2, left: 4),
-                      child: Row(
-                        children: [
-                          Icon(Icons.warning_amber_rounded, color: p.error, size: 13),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              'High boost may cause audio distortion or hearing fatigue.',
-                              style: TextStyle(color: p.error, fontSize: 10, fontWeight: FontWeight.w600),
-                            ),
+                if (isOverSafe)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2, left: 4),
+                    child: Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded, color: p.error, size: 13),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'Combined with EQ preamp (+${preampDb.toStringAsFixed(1)} dB), total gain may clip. Consider reducing boost.',
+                            style: TextStyle(color: p.error, fontSize: 10, fontWeight: FontWeight.w600),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                ],
-              ),
+                  )
+                else if (state.volumeBoost > 0.6)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 2, left: 4),
+                    child: Row(
+                      children: [
+                        Icon(Icons.warning_amber_rounded, color: p.error, size: 13),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            'High boost may cause audio distortion or hearing fatigue.',
+                            style: TextStyle(color: p.error, fontSize: 10, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
+          ),
           const SizedBox(height: 12),
 
-          // Dolby Atmos / Spatial Audio Toggle
+          // Honest Spatializer / Soundstage Widening Section
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
@@ -551,7 +641,9 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                       Row(
                         children: [
                           Text(
-                            'Dolby Atmos / Spatial Audio',
+                            state.isSpatializerSupported
+                                ? 'Spatial Audio (Hardware)'
+                                : 'Soundstage Widening (Virtualizer)',
                             style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: p.textPrimary),
                           ),
                           const SizedBox(width: 6),
@@ -562,7 +654,7 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
-                              state.isSpatializerSupported ? 'Atmos' : 'Emulated',
+                              state.isSpatializerSupported ? 'Spatial API' : 'Emulated',
                               style: TextStyle(
                                 fontSize: 9,
                                 fontWeight: FontWeight.w700,
@@ -574,8 +666,8 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                       ),
                       Text(
                         state.isSpatializerSupported
-                            ? 'Hardware spatial audio decoder active'
-                            : 'Virtualizer 3D acoustic field expansion',
+                            ? 'Android Spatializer API with head tracking'
+                            : 'Stereo field expansion via hardware virtualizer',
                         style: TextStyle(fontSize: 11, color: p.textTertiary),
                       ),
                     ],
@@ -721,7 +813,7 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                     ),
                   ),
                   GestureDetector(
-                    onTap: () => cubit.applyHeadphoneProfile(null),
+                    onTap: () => cubit.resetToFlat(),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
@@ -763,7 +855,7 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                         child: InkWell(
                           onTap: () async {
                             if (isApplied) {
-                              await cubit.applyHeadphoneProfile(null);
+                              await cubit.resetToFlat();
                             } else {
                               if (!state.isEqEnabled) {
                                 await cubit.setEqualizerEnabled(true);
@@ -937,7 +1029,7 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                       ),
                       Text(
                         state.isSpatializerSupported
-                            ? 'Dolby Atmos & system spatial decoding available'
+                            ? 'Android Spatializer API with multi-channel soundstage'
                             : 'Stereo field widening active via hardware virtualizer',
                         style: TextStyle(fontSize: 10, color: p.textTertiary),
                       ),
@@ -949,7 +1041,7 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
           ),
           const SizedBox(height: 14),
 
-          // Dolby Atmos / Spatial Audio
+          // Dolby Atmos / Spatial Audio Card
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -975,7 +1067,9 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                       Row(
                         children: [
                           Text(
-                            'Dolby Atmos / Spatial Audio',
+                            state.isSpatializerSupported
+                                ? 'Spatial Audio (Hardware)'
+                                : 'Soundstage Widening (Virtualizer)',
                             style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: p.textPrimary),
                           ),
                           const SizedBox(width: 6),
@@ -986,7 +1080,7 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
-                              state.isSpatializerSupported ? 'Atmos' : 'Emulated',
+                              state.isSpatializerSupported ? 'Spatial API' : 'Emulated',
                               style: TextStyle(
                                 fontSize: 9,
                                 fontWeight: FontWeight.w700,
@@ -998,7 +1092,7 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                       ),
                       Text(
                         state.isSpatializerSupported
-                            ? 'Hardware spatial audio decoder'
+                            ? 'Android Spatializer API with head tracking'
                             : 'Virtualizer 3D acoustic field expansion',
                         style: TextStyle(fontSize: 11, color: p.textTertiary),
                       ),
@@ -1066,7 +1160,7 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                 ),
                 const SizedBox(height: 16),
 
-                // Soundstage visual animation / dispersion indicator
+                // Soundstage visual slider
                 Opacity(
                   opacity: state.isVirtualizerEnabled ? 1.0 : 0.35,
                   child: Column(
@@ -1377,16 +1471,31 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
         ),
         const SizedBox(height: 8),
 
-        // Frequency Label
+        // Frequency Label + Modification Indicator Dot
         FittedBox(
           fit: BoxFit.scaleDown,
-          child: Text(
-            widget.label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: widget.textColor,
-            ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                widget.label,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: widget.textColor,
+                ),
+              ),
+              if (gain.abs() > 0.1)
+                Container(
+                  width: 5,
+                  height: 5,
+                  margin: const EdgeInsets.only(top: 3),
+                  decoration: BoxDecoration(
+                    color: widget.accentColor,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+            ],
           ),
         ),
       ],

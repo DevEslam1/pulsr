@@ -32,7 +32,10 @@ class SongsTable extends Table {
   TextColumn get genre => text().nullable()();
   BoolColumn get isFavorite => boolean().withDefault(const Constant(false))();
   BoolColumn get isMissing => boolean().withDefault(const Constant(false))();
-  RealColumn get replayGain => real().nullable()();
+  RealColumn get replayGainTrack => real().nullable()();
+  RealColumn get replayGainAlbum => real().nullable()();
+  RealColumn get replayGainTrackPeak => real().nullable()();
+  RealColumn get replayGainAlbumPeak => real().nullable()();
   IntColumn get playCount => integer().withDefault(const Constant(0))();
   IntColumn get lastPlayed => integer().nullable()();
   IntColumn get lastPositionMs => integer().withDefault(const Constant(0))();
@@ -61,6 +64,9 @@ class SongsTable extends Table {
   /// Destination a download is writing to, used to match the row MediaStore
   /// creates once the file lands.
   TextColumn get pendingDownloadPath => text().nullable()();
+
+  /// Explicit flag indicating whether this song was downloaded from YouTube Music / Online.
+  BoolColumn get isDownloaded => boolean().withDefault(const Constant(false)).nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

@@ -22,6 +22,7 @@ import 'package:pulsr/core/services/lrclib_service.dart' as _i621;
 import 'package:pulsr/core/services/scrobbler_service.dart' as _i629;
 import 'package:pulsr/core/services/yt_download_service.dart' as _i742;
 import 'package:pulsr/core/services/ytm_account_service.dart' as _i631;
+import 'package:pulsr/core/services/ytm_client_version_resolver.dart' as _i169;
 import 'package:pulsr/core/services/ytm_service.dart' as _i391;
 import 'package:pulsr/core/theme/dynamic_theme_cubit.dart' as _i401;
 import 'package:pulsr/data/audio/audio_handler.dart' as _i366;
@@ -72,7 +73,8 @@ extension GetItInjectableX on _i174.GetIt {
     gh.singleton<_i305.ArtworkCacheManager>(() => _i305.ArtworkCacheManager());
     gh.singleton<_i535.AuthService>(() => _i535.AuthService());
     gh.singleton<_i629.ScrobblerService>(() => _i629.ScrobblerService());
-    gh.singleton<_i631.YtmAccountService>(() => _i631.YtmAccountService());
+    gh.singleton<_i169.YtmClientVersionResolver>(
+        () => _i169.YtmClientVersionResolver());
     gh.singleton<_i391.YtmService>(() => _i391.YtmService());
     gh.singleton<_i401.DynamicThemeCubit>(() => _i401.DynamicThemeCubit());
     gh.singleton<_i682.AppDatabase>(() => _i682.AppDatabase());
@@ -127,6 +129,8 @@ extension GetItInjectableX on _i174.GetIt {
               gh<_i399.SmartPlaylistEngine>(),
               gh<_i792.PlaylistUseCases>(),
             ));
+    gh.singleton<_i631.YtmAccountService>(
+        () => _i631.YtmAccountService(gh<_i169.YtmClientVersionResolver>()));
     gh.lazySingleton<_i742.YtDownloadService>(() => _i742.YtDownloadService(
           gh<_i497.HttpClient>(),
           gh<_i391.YtmService>(),

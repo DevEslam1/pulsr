@@ -1,11 +1,14 @@
 // lib/core/services/ytm_account_service.dart
+import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 import 'package:pulsr/core/di/injection.dart';
+import 'package:pulsr/core/services/ytm_client_version_resolver.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/models/lyrics_line.dart';
@@ -55,30 +58,10 @@ class YtmAccountService {
   static const String _accountAvatarPrefKey = 'ytm_account_avatar';
   static const String _innertubeBrowseUrl =
       'https://music.youtube.com/youtubei/v1/browse?prettyPrint=false';
-  static const String _innertubePlayerUrl =
-      'https://music.youtube.com/youtubei/v1/player?prettyPrint=false';
 
-  // InnerTube WEB_REMIX client identifiers, in one place so a refresh is a
-  // single edit. YouTube bumps its client version periodically and eventually
-  // rejects stale values, which surfaces as authenticated calls returning
-  // sign-in pages (HTTP 200, no contents). When that happens, recapture these
-  // from a live music.youtube.com session.
-  static const String _clientName = 'WEB_REMIX';
-  static const String _clientVersion = '1.20240417.01.00';
-  static const String _clientNameId = '67';
-  static const String _apiKey = 'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30';
-  static const String _userAgent =
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+  final YtmClientVersionResolver _versionResolver;
 
-  /// The `context.client` block every InnerTube request shares.
-  static Map<String, dynamic> _clientContext() => {
-        'client': {
-          'clientName': _clientName,
-          'clientVersion': _clientVersion,
-          'hl': 'en',
-          'gl': 'US',
-        }
-      };
+  YtmAccountService(this._versionResolver);
 
   String? _cookies;
   String? _accountName;
@@ -86,25 +69,27 @@ class YtmAccountService {
   bool _isInitialized = false;
 
   /// Notifies listeners whenever the YTM login state changes (login/logout).
-  /// UI widgets should listen to this to rebuild without a restart.
   final loginState = ValueNotifier<bool>(false);
 
   bool get isLoggedIn => _cookies != null && _cookies!.isNotEmpty;
   String? get accountName => _accountName;
   String? get accountAvatar => _accountAvatar;
 
+  String get _clientVersion => _versionResolver.clientVersion;
+  String get _apiKey => _versionResolver.apiKey;
+
   Future<void> init() async {
     if (_isInitialized) return;
     try {
+      await _versionResolver.init();
       final prefs = await SharedPreferences.getInstance();
       _cookies = prefs.getString(_cookiePrefKey);
       _accountName = prefs.getString(_accountNamePrefKey);
       _accountAvatar = prefs.getString(_accountAvatarPrefKey);
       _isInitialized = true;
-      loginState.value = isLoggedIn; // sync notifier with persisted state
+      loginState.value = isLoggedIn;
 
       if (_cookies != null && _cookies!.isNotEmpty) {
-        // Sync persisted session cookies to native CookieManager for extractor calls
         final ytmService = getIt<YtmService>();
         await ytmService.syncCookies(_cookies!);
       }
@@ -114,55 +99,38 @@ class YtmAccountService {
     }
   }
 
-  /// Returns cookies for a single URL from the native Android CookieManager.
-  Future<String?> getNativeCookies(
-      [String url = 'https://music.youtube.com']) async {
-    const channel = MethodChannel('com.pulsr.music/ytm');
-    try {
-      final cookies =
-          await channel.invokeMethod<String>('getCookies', {'url': url});
-      return cookies;
-    } catch (_) {
-      return null;
-    }
-  }
-
-  /// Collects cookies from ALL Google/YouTube Music domains via the native
-  /// Android CookieManager (which includes HttpOnly cookies that JS cannot
-  /// read). The Kotlin `getCookies` handler already merges multiple domains;
-  /// calling it without a URL argument returns the merged result.
+  /// Returns cookies from all YouTube Music / Google domains via native CookieManager.
   Future<String?> getNativeCookiesFromDomains() async {
     const channel = MethodChannel('com.pulsr.music/ytm');
     try {
-      // The Kotlin handler for 'getCookies' always reads from all 4 domains:
-      // music.youtube.com, www.youtube.com, accounts.google.com, youtube.com
-      // and merges them — so we can call it with any (or no) url arg.
-      final cookies = await channel.invokeMethod<String>(
-          'getCookies', {'url': 'https://music.youtube.com'});
+      final cookies = await channel.invokeMethod<String>('getCookies');
       return cookies;
     } catch (_) {
       return null;
     }
   }
 
-  /// Saves extracted web cookies and fetches profile info.
+  /// Saves extracted web cookies, warms the session, and triggers fresh attestation.
   Future<bool> saveSession(String rawCookies) async {
     _cookies = rawCookies;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_cookiePrefKey, rawCookies);
 
-    // Sync to native CookieManager
+    // Sync to native CookieManager and invalidate stale poTokens
     final ytmService = getIt<YtmService>();
     await ytmService.syncCookies(rawCookies);
+    await ytmService.invalidatePoToken();
 
-    // Attempt to extract SAPISID or account profile
     final name = _extractCookieValue(rawCookies, 'ACCOUNT_CHOOSER') ??
         _extractCookieValue(rawCookies, 'LOGIN_INFO') ??
         'YouTube Music User';
     _accountName = name;
     await prefs.setString(_accountNamePrefKey, name);
 
-    loginState.value = true; // notify UI: now logged in
+    loginState.value = true;
+
+    // Warm session in background & harvest any Set-Cookie headers
+    unawaited(_warmSession());
     return true;
   }
 
@@ -174,21 +142,82 @@ class YtmAccountService {
     await prefs.remove(_cookiePrefKey);
     await prefs.remove(_accountNamePrefKey);
     await prefs.remove(_accountAvatarPrefKey);
-    loginState.value = false; // notify UI: now logged out
+    loginState.value = false;
+
+    try {
+      final ytmService = getIt<YtmService>();
+      await ytmService.syncCookies('');
+      await ytmService.invalidatePoToken();
+    } catch (_) {}
   }
 
-  /// Builds authenticated Innertube request headers.
-  Map<String, String> _buildHeaders() {
+  Future<void> _warmSession() async {
+    try {
+      final headers = _buildHeaders();
+      final body = jsonEncode({
+        'context': _buildClientContext('WEB_REMIX'),
+        'browseId': 'FEmusic_home',
+      });
+
+      final res = await _postWithRetry(
+        Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
+        headers: headers,
+        body: body,
+      );
+
+      if (res.statusCode == 200) {
+        final setCookie = res.headers['set-cookie'];
+        if (setCookie != null && setCookie.isNotEmpty) {
+          _ingestSetCookies(setCookie);
+        }
+        debugPrint('[YTM_ACCOUNT] Session warmed successfully');
+      }
+    } catch (e) {
+      debugPrint('[YTM_ACCOUNT] Session warming error (non-fatal): $e');
+    }
+  }
+
+  void _ingestSetCookies(String setCookieHeader) {
+    final currentMap = <String, String>{};
+    if (_cookies != null && _cookies!.isNotEmpty) {
+      for (final pair in _cookies!.split(';')) {
+        final parts = pair.trim().split('=');
+        if (parts.length >= 2 && parts[0].isNotEmpty) {
+          currentMap[parts[0].trim()] = parts.sublist(1).join('=').trim();
+        }
+      }
+    }
+
+    final newPairs = setCookieHeader.split(',');
+    for (final p in newPairs) {
+      final cookiePart = p.split(';').first.trim();
+      final parts = cookiePart.split('=');
+      if (parts.length >= 2 && parts[0].isNotEmpty) {
+        currentMap[parts[0].trim()] = parts.sublist(1).join('=').trim();
+      }
+    }
+
+    final merged = currentMap.entries.map((e) => '${e.key}=${e.value}').join('; ');
+    _cookies = merged;
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setString(_cookiePrefKey, merged);
+    });
+  }
+
+  /// Builds authenticated Innertube request headers with timestamped SAPISIDHASH.
+  Map<String, String> _buildHeaders({String userAgent = ''}) {
+    final defaultUa =
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+
     final headers = <String, String>{
       'Content-Type': 'application/json',
-      'User-Agent': _userAgent,
+      'User-Agent': userAgent.isNotEmpty ? userAgent : defaultUa,
       'Origin': 'https://music.youtube.com',
       'Referer': 'https://music.youtube.com/',
       'x-origin': 'https://music.youtube.com',
-      'x-youtube-client-name': _clientNameId,
+      'x-youtube-client-name': '67',
       'x-youtube-client-version': _clientVersion,
       'x-goog-authuser': '0',
-      // Required when not using the ?key= query param
       'X-Goog-Api-Key': _apiKey,
     };
 
@@ -201,8 +230,6 @@ class YtmAccountService {
       if (sapisid != null && sapisid.isNotEmpty) {
         final timestamp =
             (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
-        // SAPISIDHASH input is space-separated: "{ts} {SAPISID} {origin}".
-        // Only the header value joins ts and hash with an underscore.
         final toHash = '$timestamp $sapisid https://music.youtube.com';
         final sha1Digest = sha1.convert(utf8.encode(toHash)).toString();
         headers['Authorization'] = 'SAPISIDHASH ${timestamp}_$sha1Digest';
@@ -222,10 +249,102 @@ class YtmAccountService {
     return null;
   }
 
-  /// Fetches the user's library playlists from YouTube Music.
+  Map<String, dynamic> _buildClientContext(String clientType) {
+    final clientMap = <String, dynamic>{
+      'clientName': clientType,
+      'clientVersion': clientType == 'WEB_REMIX' ? _clientVersion : '19.29.37',
+      'hl': 'en',
+      'gl': 'US',
+    };
+
+    if (clientType == 'ANDROID_MUSIC') {
+      clientMap['clientVersion'] = '6.42.52';
+      clientMap['androidSdkVersion'] = 33;
+      clientMap['osName'] = 'Android';
+      clientMap['osVersion'] = '13';
+      clientMap['platform'] = 'MOBILE';
+    } else if (clientType == 'IOS_MUSIC') {
+      clientMap['clientVersion'] = '6.42.1';
+      clientMap['deviceMake'] = 'Apple';
+      clientMap['deviceModel'] = 'iPhone14,3';
+      clientMap['osName'] = 'iOS';
+      clientMap['osVersion'] = '17.5.1';
+      clientMap['platform'] = 'MOBILE';
+    } else if (clientType == 'ANDROID_TESTSUITE') {
+      clientMap['clientVersion'] = '1.9';
+      clientMap['androidSdkVersion'] = 28;
+    } else if (clientType == 'MWEB') {
+      clientMap['clientVersion'] = '2.20240417.01.00';
+      clientMap['platform'] = 'MOBILE';
+    } else if (clientType == 'WEB_EMBEDDED_PLAYER') {
+      clientMap['clientVersion'] = '1.20240417.01.00';
+      clientMap['platform'] = 'DESKTOP';
+    } else if (clientType == 'ANDROID') {
+      clientMap['androidSdkVersion'] = 33;
+      clientMap['osName'] = 'Android';
+      clientMap['osVersion'] = '13';
+      clientMap['platform'] = 'MOBILE';
+    } else if (clientType == 'IOS') {
+      clientMap['clientVersion'] = '19.29.1';
+      clientMap['deviceMake'] = 'Apple';
+      clientMap['deviceModel'] = 'iPhone14,3';
+      clientMap['osName'] = 'iOS';
+      clientMap['osVersion'] = '17.5.1';
+      clientMap['platform'] = 'MOBILE';
+    } else if (clientType == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER') {
+      clientMap['clientVersion'] = '2.0';
+      clientMap['platform'] = 'TV';
+    } else {
+      clientMap['platform'] = 'DESKTOP';
+    }
+
+    final contextJson = <String, dynamic>{
+      'client': clientMap,
+      'user': {'lockedSafetyMode': false},
+    };
+
+    if (clientType == 'WEB_EMBEDDED_PLAYER' || clientType == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER') {
+      contextJson['thirdParty'] = {'embedUrl': 'https://www.youtube.com'};
+    }
+
+    return contextJson;
+  }
+
+  Future<http.Response> _postWithRetry(
+    Uri uri, {
+    Map<String, String>? headers,
+    Object? body,
+    int maxAttempts = 3,
+    int baseTimeoutSeconds = 15,
+  }) async {
+    for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        final timeout = Duration(seconds: baseTimeoutSeconds + attempt * 5);
+        final res = await http.post(uri, headers: headers, body: body).timeout(timeout);
+
+        if (res.statusCode == 429) {
+          final backoffSec = (1 << attempt) + Random().nextInt(2);
+          debugPrint('[YTM_ACCOUNT] HTTP 429 rate limited. Backing off for ${backoffSec}s');
+          await Future.delayed(Duration(seconds: backoffSec));
+          continue;
+        }
+
+        return res;
+      } on TimeoutException {
+        if (attempt == maxAttempts - 1) {
+          throw const YtmException('YTM_TIMEOUT', 'Request timed out');
+        }
+      } catch (e) {
+        if (attempt == maxAttempts - 1) rethrow;
+      }
+    }
+    throw const YtmException('YTM_TIMEOUT', 'Exceeded maximum retry attempts');
+  }
+
+  /// Fetches library playlists from YouTube Music.
   Future<List<YtmAccountPlaylist>> fetchAccountPlaylists() async {
     if (!isLoggedIn) {
-      throw Exception('Not signed in to YouTube Music');
+      throw const YtmException('YTM_AUTH', 'Not signed in to YouTube Music');
     }
 
     final headers = _buildHeaders();
@@ -238,49 +357,96 @@ class YtmAccountService {
     for (final bId in browseIds) {
       try {
         final body = jsonEncode({
-          'context': _clientContext(),
+          'context': _buildClientContext('WEB_REMIX'),
           'browseId': bId,
         });
 
-        final response = await http
-            .post(Uri.parse(_innertubeBrowseUrl), headers: headers, body: body)
-            .timeout(const Duration(seconds: 15));
+        final response = await _postWithRetry(
+          Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
+          headers: headers,
+          body: body,
+        );
 
         if (response.statusCode == 200) {
           final json = jsonDecode(response.body) as Map<String, dynamic>;
-          if (_isUnauthenticatedResponse(json)) continue;
+          if (_isUnauthenticatedResponse(json)) {
+            debugPrint('[YTM_ACCOUNT] Unauthenticated response detected on $bId');
+            await logout();
+            throw const YtmException('YTM_AUTH', 'Session expired');
+          }
 
           final playlists = _parseInnertubeAccountPlaylists(json);
           if (playlists.isNotEmpty) {
-            debugPrint(
-              '[YTM_ACCOUNT] Found ${playlists.length} account playlists from $bId',
-            );
             return playlists;
           }
         }
       } catch (e) {
-        debugPrint(
-            '[YTM_ACCOUNT] Failed fetching account playlists ($bId): $e');
+        if (e is YtmException && e.isAuth) rethrow;
+        debugPrint('[YTM_ACCOUNT] Failed fetching account playlists ($bId): $e');
+      }
+    }
+    return [];
+  }
+
+  /// Fetches private Liked Music playlist (`FEmusic_liked_videos`).
+  Future<List<YtmTrack>> fetchLikedSongs({int maxTracks = 200}) async {
+    if (!isLoggedIn) {
+      throw const YtmException('YTM_AUTH', 'Not signed in to YouTube Music');
+    }
+
+    final headers = _buildHeaders();
+    final browseIds = ['FEmusic_liked_videos', 'VLLM'];
+
+    for (final bId in browseIds) {
+      try {
+        final body = jsonEncode({
+          'context': _buildClientContext('WEB_REMIX'),
+          'browseId': bId,
+        });
+
+        final response = await _postWithRetry(
+          Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
+          headers: headers,
+          body: body,
+        );
+
+        if (response.statusCode == 200) {
+          final json = jsonDecode(response.body) as Map<String, dynamic>;
+          if (_isUnauthenticatedResponse(json)) {
+            debugPrint('[YTM_ACCOUNT] Liked songs returned unauthenticated, logging out');
+            await logout();
+            throw const YtmException('YTM_AUTH', 'Session expired');
+          }
+
+          final tracks = _parseInnertubePlaylistTracks(json);
+          if (tracks.isNotEmpty) {
+            return tracks.take(maxTracks).toList();
+          }
+        }
+      } catch (e) {
+        if (e is YtmException && e.isAuth) rethrow;
+        debugPrint('[YTM_ACCOUNT] Liked songs fetch failed for $bId: $e');
       }
     }
     return [];
   }
 
   /// Fetches personalized recommendations and home feed from YouTube Music (`FEmusic_home`).
-  /// Includes Quick Picks, Mixed for You, and personalized artist radios.
   Future<List<YtmTrack>> fetchHomeRecommendations({int maxTracks = 50}) async {
     if (!isLoggedIn) return [];
     final headers = _buildHeaders();
 
     try {
       final body = jsonEncode({
-        'context': _clientContext(),
+        'context': _buildClientContext('WEB_REMIX'),
         'browseId': 'FEmusic_home',
       });
 
-      final response = await http
-          .post(Uri.parse(_innertubeBrowseUrl), headers: headers, body: body)
-          .timeout(const Duration(seconds: 15));
+      final response = await _postWithRetry(
+        Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
+        headers: headers,
+        body: body,
+      );
 
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -294,8 +460,6 @@ class YtmAccountService {
                 unique.add(t);
               }
             }
-            debugPrint(
-                '[YTM_ACCOUNT] Parsed ${unique.length} personalized home recommendations');
             return unique.take(maxTracks).toList();
           }
         }
@@ -312,19 +476,17 @@ class YtmAccountService {
     final headers = _buildHeaders();
 
     try {
-      // 1. Query Next endpoint to find lyrics browse ID
       final nextBody = jsonEncode({
-        'context': _clientContext(),
+        'context': _buildClientContext('WEB_REMIX'),
         'videoId': videoId,
       });
 
-      final nextRes = await http
-          .post(
-              Uri.parse(
-                  'https://music.youtube.com/youtubei/v1/next?prettyPrint=false'),
-              headers: headers,
-              body: nextBody)
-          .timeout(const Duration(seconds: 8));
+      final nextRes = await _postWithRetry(
+        Uri.parse('https://music.youtube.com/youtubei/v1/next?prettyPrint=false&key=$_apiKey'),
+        headers: headers,
+        body: nextBody,
+        baseTimeoutSeconds: 8,
+      );
 
       if (nextRes.statusCode != 200) return null;
       final nextJson = jsonDecode(nextRes.body) as Map<String, dynamic>;
@@ -358,16 +520,17 @@ class YtmAccountService {
       findLyricsBrowseId(nextJson);
       if (lyricsBrowseId == null) return null;
 
-      // 2. Fetch the lyrics browse payload
       final browseBody = jsonEncode({
-        'context': _clientContext(),
+        'context': _buildClientContext('WEB_REMIX'),
         'browseId': lyricsBrowseId,
       });
 
-      final browseRes = await http
-          .post(Uri.parse(_innertubeBrowseUrl),
-              headers: headers, body: browseBody)
-          .timeout(const Duration(seconds: 8));
+      final browseRes = await _postWithRetry(
+        Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
+        headers: headers,
+        body: browseBody,
+        baseTimeoutSeconds: 8,
+      );
 
       if (browseRes.statusCode != 200) return null;
       final browseJson = jsonDecode(browseRes.body) as Map<String, dynamic>;
@@ -412,85 +575,190 @@ class YtmAccountService {
     return null;
   }
 
-  /// Fetches the user's private Liked Music playlist (`FEmusic_liked_videos`).
-  Future<List<YtmTrack>> fetchLikedSongs({int maxTracks = 200}) async {
-    if (!isLoggedIn) {
-      throw Exception('Not signed in to YouTube Music');
-    }
+  /// Resolves an audio stream using multi-client priority fallback:
+  /// 1. WEB_REMIX + cookies
+  /// 2. ANDROID client
+  /// 3. IOS client
+  /// 4. TVHTML5_SIMPLY_EMBEDDED_PLAYER
+  Future<YtmStream?> resolvePlayerStream(String videoId, {String quality = 'high'}) async {
+    final clientChain = [
+      'ANDROID_MUSIC',
+      'IOS_MUSIC',
+      'WEB_REMIX',
+      'WEB_EMBEDDED_PLAYER',
+      'MWEB',
+      'ANDROID_TESTSUITE',
+    ];
 
-    final headers = _buildHeaders();
-
-    // Diagnostics: confirm auth material actually made it into the request.
-    final hasSapisid = _extractCookieValue(_cookies!, 'SAPISID') != null ||
-        _extractCookieValue(_cookies!, '__Secure-3PAPISID') != null ||
-        _extractCookieValue(_cookies!, '__Secure-1PAPISID') != null;
-    debugPrint(
-      '[YTM_ACCOUNT] fetchLikedSongs: cookieLen=${_cookies!.length} '
-      'hasSAPISID=$hasSapisid hasAuthHeader=${headers.containsKey('Authorization')}',
-    );
-
-    // Try Innertube Web Remix browse IDs.
-    // NOTE: 'LM' and 'VLSE' are NOT valid browse IDs — 'LM' is a YouTube
-    // playlist ID (causes HTTP 400) and 'VLSE' is not a real endpoint.
-    // Only 'FEmusic_liked_videos' and 'VLLM' are valid YTM browse IDs.
-    final browseIds = ['FEmusic_liked_videos', 'VLLM'];
-    for (final bId in browseIds) {
+    for (final client in clientChain) {
       try {
+        final isWeb = client == 'WEB_REMIX' || client == 'WEB_EMBEDDED_PLAYER' || client == 'MWEB';
+        final endpointHost = (client == 'ANDROID_MUSIC' || client == 'IOS_MUSIC' || client == 'WEB_REMIX')
+            ? 'https://music.youtube.com'
+            : (client == 'MWEB' ? 'https://m.youtube.com' : 'https://www.youtube.com');
+
+        final headers = <String, String>{
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': _apiKey,
+          'x-youtube-client-name': client == 'ANDROID_MUSIC'
+              ? '21'
+              : (client == 'IOS_MUSIC'
+                  ? '26'
+                  : (client == 'WEB_REMIX'
+                      ? '67'
+                      : (client == 'WEB_EMBEDDED_PLAYER'
+                          ? '56'
+                          : (client == 'MWEB' ? '65' : '89')))),
+          'x-youtube-client-version': client == 'ANDROID_MUSIC'
+              ? '6.42.52'
+              : (client == 'IOS_MUSIC'
+                  ? '6.42.1'
+                  : (client == 'ANDROID_TESTSUITE' ? '1.9' : _clientVersion)),
+          'User-Agent': client == 'ANDROID_MUSIC'
+              ? 'com.google.android.apps.youtube.music/6.42.52 (Linux; U; Android 13; en_US) gzip'
+              : (client == 'IOS_MUSIC'
+                  ? 'com.google.ios.youtubemusic/6.42.1 (iPhone14,3; U; CPU iOS 17_5_1 like Mac OS X; en_US)'
+                  : (client == 'ANDROID_TESTSUITE'
+                      ? 'com.google.android.youtube/1.9 (Linux; U; Android 9; gzip)'
+                      : (client == 'MWEB'
+                          ? 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36'
+                          : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'))),
+        };
+
+        if (isWeb) {
+          final origin = endpointHost;
+          headers['Origin'] = origin;
+          headers['Referer'] = '$origin/';
+          headers['x-origin'] = origin;
+          headers['x-goog-authuser'] = '0';
+          if (_cookies != null && _cookies!.isNotEmpty) {
+            headers['Cookie'] = _cookies!;
+          }
+        }
+
+        Map<String, dynamic>? poState;
+        if (client == 'WEB_REMIX') {
+          try {
+            poState = await getIt<YtmService>().getPoTokenState();
+          } catch (_) {}
+        }
+        final poToken = poState?['streamingPoToken'] as String?;
+        final visitorData = poState?['visitorData'] as String?;
+
+        final clientContext = _buildClientContext(client);
+        if (visitorData != null && visitorData.isNotEmpty && clientContext['client'] is Map<String, dynamic>) {
+          (clientContext['client'] as Map<String, dynamic>)['visitorData'] = visitorData;
+        }
+
         final body = jsonEncode({
-          'context': _clientContext(),
-          'browseId': bId,
+          'context': clientContext,
+          'videoId': videoId,
+          'racyCheckOk': true,
+          'contentCheckOk': true,
+          'playbackContext': {
+            'contentPlaybackContext': {
+              'html5Preference': 'HTML5_PREF_WANTS',
+              if (poToken != null && poToken.isNotEmpty) ...{
+                'signatureTimestamp': DateTime.now().millisecondsSinceEpoch ~/ (1000 * 86400),
+                'poToken': poToken,
+              },
+            },
+          },
         });
 
-        final response = await http
-            .post(Uri.parse(_innertubeBrowseUrl), headers: headers, body: body)
-            .timeout(const Duration(seconds: 15));
+        final response = await _postWithRetry(
+          Uri.parse('$endpointHost/youtubei/v1/player?prettyPrint=false&key=$_apiKey'),
+          headers: headers,
+          body: body,
+          baseTimeoutSeconds: 10,
+        );
 
         if (response.statusCode == 200) {
-          final json = jsonDecode(response.body) as Map<String, dynamic>;
+          final data = jsonDecode(response.body) as Map<String, dynamic>;
+          final playability = data['playabilityStatus'] as Map<String, dynamic>?;
+          final status = playability?['status'] as String? ?? '';
 
-          // Detect silent auth failure: YouTube returns a sign-in prompt
-          // as HTTP 200 with no content items when cookies are expired.
-          if (_isUnauthenticatedResponse(json)) {
-            debugPrint(
-              '[YTM_ACCOUNT] Innertube browse $bId: session expired or cookies invalid',
-            );
+          if (status == 'LOGIN_REQUIRED' || status == 'UNPLAYABLE' || status.contains('BOT')) {
+            debugPrint('[YTM_ACCOUNT] Client $client returned playability $status, falling back to next');
             continue;
           }
 
-          final tracks = _parseInnertubePlaylistTracks(json);
-          debugPrint(
-            '[YTM_ACCOUNT] Innertube browse $bId: 200 OK, parsed ${tracks.length} tracks',
-          );
-          if (tracks.isNotEmpty) {
-            return tracks;
+          final streamingData = data['streamingData'] as Map<String, dynamic>?;
+          final adaptive = (streamingData?['adaptiveFormats'] as List<dynamic>? ?? [])
+              .whereType<Map<String, dynamic>>()
+              .toList();
+
+          final audioFormats = <({Map<String, dynamic> format, String url})>[];
+          for (final f in adaptive) {
+            final mime = f['mimeType'] as String? ?? '';
+            final streamUrl = _extractUrlFromFormat(f);
+            if (mime.startsWith('audio/') && streamUrl != null && streamUrl.isNotEmpty) {
+              audioFormats.add((format: f, url: streamUrl));
+            }
           }
-        } else {
-          final snippet = response.body.length > 300
-              ? response.body.substring(0, 300)
-              : response.body;
-          debugPrint(
-            '[YTM_ACCOUNT] Innertube browse $bId: HTTP ${response.statusCode} body=$snippet',
-          );
+
+          if (audioFormats.isNotEmpty) {
+            final m4a = audioFormats
+                .where((f) => ((f.format['mimeType'] as String?) ?? '').contains('mp4'))
+                .toList();
+            final pool = m4a.isNotEmpty ? m4a : audioFormats;
+
+            final selected = switch (quality.toLowerCase()) {
+              'low' => pool.reduce((a, b) =>
+                  ((a.format['bitrate'] as num?) ?? 0) < ((b.format['bitrate'] as num?) ?? 0) ? a : b),
+              'medium' => pool.reduce((a, b) =>
+                  (((a.format['bitrate'] as num?) ?? 128000) - 128000).abs() <
+                          (((b.format['bitrate'] as num?) ?? 128000) - 128000).abs()
+                      ? a
+                      : b),
+              _ => pool.reduce((a, b) =>
+                  ((a.format['bitrate'] as num?) ?? 0) > ((b.format['bitrate'] as num?) ?? 0) ? a : b),
+            };
+
+            final mime = selected.format['mimeType'] as String? ?? 'audio/mp4';
+            final bitrate = (selected.format['bitrate'] as num?)?.toInt() ?? 128000;
+            final durationMs =
+                int.tryParse(selected.format['approxDurationMs']?.toString() ?? '0') ?? 0;
+            final details = data['videoDetails'] as Map<String, dynamic>?;
+
+            return YtmStream(
+              videoId: videoId,
+              url: selected.url,
+              mimeType: mime.split(';').first.trim(),
+              container: mime.contains('mp4') ? 'm4a' : 'webm',
+              bitrateKbps: (bitrate / 1000).round(),
+              duration: Duration(milliseconds: durationMs),
+              title: details?['title'] as String? ?? '',
+              artist: details?['author'] as String? ?? '',
+              artworkUrl: null,
+            );
+          }
         }
       } catch (e) {
-        debugPrint('[YTM_ACCOUNT] Innertube browse failed for $bId: $e');
+        debugPrint('[YTM_ACCOUNT] Client $client resolution error for $videoId: $e');
       }
     }
-
-    // NOTE: The private playlist IDs 'LM' (Liked Music) and 'LL' (Liked Videos)
-    // are NOT supported via NewPipe extractor — they require authenticated
-    // cookies AND are rejected by NewPipe's URL validator. Do not attempt them.
-    debugPrint('[YTM_ACCOUNT] fetchLikedSongs: all browse attempts exhausted. '
-        'Cookies may be expired — please re-login to YouTube Music.');
-    return [];
+    return null;
   }
 
-  /// Returns true when YouTube returns an unauthenticated / sign-in-required
-  /// page as HTTP 200 (which happens when cookies are missing or expired).
+  String? _extractUrlFromFormat(Map<String, dynamic> format) {
+    final directUrl = format['url'] as String?;
+    if (directUrl != null && directUrl.isNotEmpty) return directUrl;
+
+    final cipher = (format['signatureCipher'] ?? format['cipher']) as String?;
+    if (cipher != null && cipher.isNotEmpty) {
+      try {
+        final uri = Uri.parse('?$cipher');
+        final extracted = uri.queryParameters['url'];
+        if (extracted != null && extracted.isNotEmpty) {
+          return extracted;
+        }
+      } catch (_) {}
+    }
+    return null;
+  }
+
   bool _isUnauthenticatedResponse(Map<String, dynamic> json) {
-    // A sign-in response has no 'contents' or 'header' at the root level,
-    // but does contain 'responseContext'. An authenticated liked-songs response
-    // always has either 'contents' or 'header'.
     final hasContents = json.containsKey('contents');
     final hasHeader = json.containsKey('header');
     final hasResponseContext = json.containsKey('responseContext');
@@ -574,7 +842,6 @@ class YtmAccountService {
               }
             }
 
-            // Extract high-res artwork
             String? artworkUrl;
             final thumbRenderer = renderer['thumbnailRenderer']
                     ?['musicThumbnailRenderer'] ??
@@ -617,7 +884,6 @@ class YtmAccountService {
 
   YtmTrack? _parseListItemRenderer(Map<String, dynamic> renderer) {
     try {
-      // 1. Video ID
       final playlistItemData =
           renderer['playlistItemData'] as Map<String, dynamic>?;
       String? videoId = playlistItemData?['videoId'] as String?;
@@ -644,7 +910,6 @@ class YtmAccountService {
 
       if (videoId == null || videoId.length != 11) return null;
 
-      // 2. Title & Artist & Duration
       String title = 'Unknown Title';
       String artist = 'Unknown Artist';
       int durationMs = 0;
@@ -665,7 +930,6 @@ class YtmAccountService {
         }
       }
 
-      // Fixed column: duration
       final fixedCols = renderer['fixedColumns'] as List<dynamic>? ?? const [];
       if (fixedCols.isNotEmpty) {
         final durText = fixedCols[0]
@@ -682,7 +946,6 @@ class YtmAccountService {
         }
       }
 
-      // Artwork
       String? artworkUrl;
       final thumbnails = renderer['thumbnail']?['musicThumbnailRenderer']
           ?['thumbnail']?['thumbnails'] as List<dynamic>?;
@@ -715,7 +978,6 @@ class YtmAccountService {
 
     void traverse(dynamic node) {
       if (node is Map<String, dynamic>) {
-        // 1. musicTwoRowItemRenderer
         if (node.containsKey('musicTwoRowItemRenderer')) {
           final renderer =
               node['musicTwoRowItemRenderer'] as Map<String, dynamic>;
@@ -763,7 +1025,6 @@ class YtmAccountService {
           }
         }
 
-        // 2. musicResponsiveListItemRenderer
         if (node.containsKey('musicResponsiveListItemRenderer')) {
           final renderer =
               node['musicResponsiveListItemRenderer'] as Map<String, dynamic>;
@@ -830,70 +1091,5 @@ class YtmAccountService {
 
     traverse(root);
     return results;
-  }
-
-  /// Resolves an audio stream directly via YouTube Music InnerTube Player API
-  /// with authenticated session cookies to bypass anonymous bot detection on VPNs.
-  Future<YtmStream?> resolvePlayerStream(String videoId, {String quality = 'high'}) async {
-    try {
-      final headers = _buildHeaders();
-      final body = jsonEncode({
-        'context': _clientContext(),
-        'videoId': videoId,
-        'playbackContext': {
-          'contentPlaybackContext': {
-            'html5Preference': 'HTML5_PREF_WANTS',
-          },
-        },
-      });
-
-      final response = await http
-          .post(Uri.parse('$_innertubePlayerUrl&key=$_apiKey'), headers: headers, body: body)
-          .timeout(const Duration(seconds: 12));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as Map<String, dynamic>;
-        final streamingData = data['streamingData'] as Map<String, dynamic>?;
-        final adaptive = (streamingData?['adaptiveFormats'] as List<dynamic>? ?? [])
-            .whereType<Map<String, dynamic>>()
-            .toList();
-
-        final audioFormats = adaptive.where((f) {
-          final mime = f['mimeType'] as String? ?? '';
-          final url = f['url'] as String?;
-          return mime.startsWith('audio/') && url != null && url.isNotEmpty;
-        }).toList();
-
-        if (audioFormats.isNotEmpty) {
-          final m4a = audioFormats.where((f) => (f['mimeType'] as String).contains('mp4a')).toList();
-          final pool = m4a.isNotEmpty ? m4a : audioFormats;
-
-          final selected = switch (quality.toLowerCase()) {
-            'low' => pool.reduce((a, b) => ((a['bitrate'] as num?) ?? 0) < ((b['bitrate'] as num?) ?? 0) ? a : b),
-            _ => pool.reduce((a, b) => ((a['bitrate'] as num?) ?? 0) > ((b['bitrate'] as num?) ?? 0) ? a : b),
-          };
-
-          final mime = selected['mimeType'] as String? ?? 'audio/mp4';
-          final bitrate = (selected['bitrate'] as num?)?.toInt() ?? 128000;
-          final durationMs = int.tryParse(selected['approxDurationMs']?.toString() ?? '0') ?? 0;
-          final details = data['videoDetails'] as Map<String, dynamic>?;
-
-          return YtmStream(
-            videoId: videoId,
-            url: selected['url'] as String,
-            mimeType: mime.split(';').first.trim(),
-            container: mime.contains('mp4') ? 'm4a' : 'webm',
-            bitrateKbps: (bitrate / 1000).round(),
-            duration: Duration(milliseconds: durationMs),
-            title: details?['title'] as String? ?? '',
-            artist: details?['author'] as String? ?? '',
-            artworkUrl: null,
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint('[YTM_ACCOUNT] resolvePlayerStream error: $e');
-    }
-    return null;
   }
 }

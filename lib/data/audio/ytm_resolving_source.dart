@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
@@ -16,15 +17,10 @@ import 'package:path_provider/path_provider.dart';
 /// A [StreamAudioSource] for a YouTube Music track whose stream URL is resolved
 /// lazily, on the first byte request rather than up front.
 ///
-/// YTM URLs expire within hours and are pinned to the device IP, so resolving
-/// an entire queue eagerly is both wasteful and fragile. Deferring resolution
-/// to the moment ExoPlayer actually asks for bytes keeps the URL fresh. Once
-/// resolved, byte streaming, HTTP range support and on-disk caching are handed
-/// off to just_audio's own [LockCachingAudioSource], so a backward seek after
-/// buffering is served from the cache instead of re-hitting a (possibly
-/// expired) URL. Because this presents as a plain [StreamAudioSource], a YTM
-/// track can live inside a [ConcatenatingAudioSource] and join gaplessly,
-/// exactly like a local file.
+/// Hardened with:
+/// - Parsing of `expire` query timestamp (proactive re-resolve when < 300s remaining)
+/// - Automatic transparent retry on 403 Forbidden / 416 Range Not Satisfiable
+/// - Resilient disk cache under application support
 class YtmResolvingSource extends StreamAudioSource {
   YtmResolvingSource({
     required this.videoId,
@@ -35,37 +31,68 @@ class YtmResolvingSource extends StreamAudioSource {
   /// The YouTube video id this source streams; also the disk-cache key.
   final String videoId;
 
-  /// Resolves this track to a currently-valid, direct stream URL. Injected by
-  /// the audio handler so this class stays free of YTM-service and settings
-  /// concerns — offline/Wi-Fi/quality gating and URL memoization all live in
-  /// the resolver, which may throw (e.g. `YtmException`) to fail the request.
+  /// Resolves this track to a currently-valid, direct stream URL.
   final Future<String> Function() resolve;
 
   LockCachingAudioSource? _inner;
   Future<LockCachingAudioSource>? _pending;
+  DateTime? _resolvedExpiresAt;
 
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
+    // 1. Proactive expiry check: if URL is within 5 minutes of expiring, discard & re-resolve
+    if (_isExpiringSoon()) {
+      debugPrint('[YtmResolvingSource] Stream URL for $videoId is expiring soon. Re-resolving...');
+      _inner = null;
+      _pending = null;
+    }
+
     try {
       final inner = await _ensureInner();
-      return await inner.request(start, end);
+      try {
+        return await inner.request(start, end);
+      } catch (byteErr) {
+        debugPrint('[YtmResolvingSource] Byte stream error ($byteErr) for $videoId. Re-resolving fresh stream...');
+        _inner = null;
+        _pending = null;
+        final freshInner = await _ensureInner();
+        return await freshInner.request(start, end);
+      }
     } catch (_) {
-      // Drop the resolved source so the next request re-resolves a fresh URL
-      // instead of retrying a dead/expired one forever.
       _inner = null;
       _pending = null;
       rethrow;
     }
   }
 
+  bool _isExpiringSoon() {
+    final expires = _resolvedExpiresAt;
+    if (expires == null) return false;
+    final now = DateTime.now();
+    return expires.difference(now).inSeconds < 300;
+  }
+
   Future<LockCachingAudioSource> _ensureInner() {
     final existing = _inner;
-    if (existing != null) return Future.value(existing);
+    if (existing != null && !_isExpiringSoon()) return Future.value(existing);
     return _pending ??= _createInner();
   }
 
   Future<LockCachingAudioSource> _createInner() async {
     final url = await resolve();
+
+    // Parse 'expire' Unix timestamp from query
+    try {
+      final uri = Uri.parse(url);
+      final expireParam = uri.queryParameters['expire'];
+      if (expireParam != null) {
+        final epochSeconds = int.tryParse(expireParam);
+        if (epochSeconds != null) {
+          _resolvedExpiresAt = DateTime.fromMillisecondsSinceEpoch(epochSeconds * 1000);
+        }
+      }
+    } catch (_) {}
+
     final cacheFile = await _cacheFileFor(videoId);
     final inner = LockCachingAudioSource(
       Uri.parse(url),
@@ -81,9 +108,6 @@ class YtmResolvingSource extends StreamAudioSource {
     return inner;
   }
 
-  /// A durable, per-track cache file. Lives under application support (not the
-  /// OS temp dir) so a fetched track survives storage pressure and remains
-  /// available for offline back-seek / replay.
   static Future<File> _cacheFileFor(String videoId) async {
     final base = await getApplicationSupportDirectory();
     final hash = sha256.convert(utf8.encode(videoId)).toString();

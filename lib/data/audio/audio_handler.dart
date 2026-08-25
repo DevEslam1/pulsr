@@ -4,6 +4,8 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:injectable/injectable.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -94,12 +96,16 @@ class PulsrAudioHandler extends BaseAudioHandler
   int? _currentAudioSessionId;
   final StreamController<int?> _audioSessionIdSubject =
       StreamController<int?>.broadcast();
+
   /// The Android audio session id of the active player, or null when the
   /// platform has not yet assigned one (or on non-Android). Consumers such as
   /// the visualizer attach to this real session instead of the global mix.
   int? get currentAudioSessionId => _currentAudioSessionId;
   Stream<int?> get audioSessionIdStream => _audioSessionIdSubject.stream;
-  SongsTableData? get currentSong => (_songs.isNotEmpty && _currentIndex >= 0 && _currentIndex < _songs.length) ? _songs[_currentIndex] : null;
+  SongsTableData? get currentSong =>
+      (_songs.isNotEmpty && _currentIndex >= 0 && _currentIndex < _songs.length)
+          ? _songs[_currentIndex]
+          : null;
   Stream<Duration?> get sleepTimerRemainingStream =>
       _sleepTimerManager.sleepTimerRemainingStream;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
@@ -122,7 +128,8 @@ class PulsrAudioHandler extends BaseAudioHandler
     _init();
   }
 
-  factory PulsrAudioHandler(IMusicRepository repository, YtmService ytmService) {
+  factory PulsrAudioHandler(
+      IMusicRepository repository, YtmService ytmService) {
     if (Platform.isAndroid) {
       // The 10-band EQ now runs natively (DynamicsProcessing postEq). Only the
       // loudness enhancers remain in the just_audio pipeline, as inert anchors
@@ -178,17 +185,62 @@ class PulsrAudioHandler extends BaseAudioHandler
     );
   }
 
+  SharedPreferences? _cachedPrefs;
+
+  Future<void> _initPrefs() async {
+    _cachedPrefs = await SharedPreferences.getInstance();
+  }
+
   double _volume = 1.0;
   double get volume => _volume;
 
   double _calculateReplayGainVolume(SongsTableData? song) {
     if (song == null) return _volume;
-    final rg = song.replayGain;
-    if (rg != null && rg != 0.0) {
-      final mult = math.pow(10.0, rg / 20.0);
-      return (_volume * mult).clamp(0.0, 1.0).toDouble();
+
+    final prefs = _cachedPrefs;
+    final modeStr = prefs?.getString(PrefsKeys.replayGainMode) ?? 'track';
+    final preampWithRg =
+        prefs?.getDouble(PrefsKeys.replayGainPreampWithRg) ?? 0.0;
+    final preampWithoutRg =
+        prefs?.getDouble(PrefsKeys.replayGainPreampWithoutRg) ?? -3.0;
+
+    double? gainDb;
+    double? peak;
+
+    switch (modeStr) {
+      case 'track':
+        gainDb = song.replayGainTrack;
+        peak = song.replayGainTrackPeak;
+        break;
+      case 'album':
+        gainDb = song.replayGainAlbum ?? song.replayGainTrack;
+        peak = song.replayGainAlbumPeak ?? song.replayGainTrackPeak;
+        break;
+      case 'off':
+      default:
+        return _volume;
     }
-    return _volume;
+
+    double preampDb;
+    if (gainDb != null && gainDb != 0.0) {
+      preampDb = preampWithRg;
+    } else {
+      preampDb = preampWithoutRg;
+      gainDb = 0.0;
+    }
+
+    final totalGainDb = (gainDb) + preampDb;
+    var multiplier = math.pow(10.0, totalGainDb / 20.0).toDouble();
+
+    // Clipping prevention: if peak is known, limit gain so output <= 1.0
+    if (peak != null && peak > 0.0) {
+      final maxGain = 1.0 / peak;
+      if (multiplier > maxGain) {
+        multiplier = maxGain;
+      }
+    }
+
+    return (_volume * multiplier).clamp(0.0, 1.0).toDouble();
   }
 
   Future<void> setVolume(double volume) async {
@@ -244,6 +296,10 @@ class PulsrAudioHandler extends BaseAudioHandler
       _equalizerManager.setEqualizerEnabled(enabled);
   Future<void> setBandGain(int bandIndex, double gain) =>
       _equalizerManager.setBandGain(bandIndex, gain);
+  Future<void> resetToFlat() => _equalizerManager.resetToFlat();
+  Future<void> startAbComparison() => _equalizerManager.startAbComparison();
+  Future<void> endAbComparison() => _equalizerManager.endAbComparison();
+  bool get isAbComparisonActive => _equalizerManager.isAbComparisonActive;
   Future<void> setBassBoost(double value) =>
       _equalizerManager.setBassBoost(value);
   Future<void> applyPreset(EqPreset preset) =>
@@ -256,13 +312,20 @@ class PulsrAudioHandler extends BaseAudioHandler
       _equalizerManager.setVirtualizerStrength(strength);
   Future<void> setDynamicsPreset(DynamicsPreset preset, {bool? enabled}) =>
       _equalizerManager.setDynamicsPreset(preset, enabled: enabled);
+  Future<void> toggleDynamicsBypass() =>
+      _equalizerManager.toggleDynamicsBypass();
+  bool get isDynamicsBypassed => _equalizerManager.isDynamicsBypassed;
   bool get isSpatializerEnabled => _equalizerManager.isSpatializerEnabled;
   bool get isSpatializerSupported => _equalizerManager.isSpatializerSupported;
+  bool get isHeadTrackerAvailable => _equalizerManager.isHeadTrackerAvailable;
   Future<void> setSpatializerEnabled(bool enabled) =>
       _equalizerManager.setSpatializerEnabled(enabled);
   double get volumeBoost => _equalizerManager.volumeBoost;
   Future<void> setVolumeBoost(double value) =>
       _equalizerManager.setVolumeBoost(value);
+  Future<void> setCustomFrequencies(List<double> frequencies) =>
+      _equalizerManager.setCustomFrequencies(frequencies);
+  void onAppPaused() => _equalizerManager.onAppPaused();
 
   void saveCurrentPositionImmediate() {
     _savePositionDebounce?.cancel();
@@ -288,6 +351,8 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   Future<void> _init() async {
+    await _initPrefs();
+
     void setupPlayerListeners(AudioPlayer player, bool isPlayerA) {
       _subscriptions.add(
         player.playbackEventStream.listen((event) {
@@ -299,7 +364,9 @@ class PulsrAudioHandler extends BaseAudioHandler
 
       _subscriptions.add(
         player.durationStream.listen((dur) {
-          if (isPlayerA == _isPlayerAActive && dur != null && dur > Duration.zero) {
+          if (isPlayerA == _isPlayerAActive &&
+              dur != null &&
+              dur > Duration.zero) {
             final current = mediaItem.value;
             if (current != null && current.duration != dur) {
               mediaItem.add(current.copyWith(duration: dur));
@@ -309,8 +376,16 @@ class PulsrAudioHandler extends BaseAudioHandler
       );
 
       _subscriptions.add(
-        player.playerStateStream.listen((state) {
+        player.playerStateStream.listen((state) async {
           if (isPlayerA == _isPlayerAActive) {
+            // Gapless loop-all support
+            if (_gaplessMode &&
+                state.processingState == ProcessingState.completed &&
+                _activePlayer.loopMode == LoopMode.all) {
+              await _activePlayer.seek(Duration.zero, index: 0);
+              await _activePlayer.play();
+              return;
+            }
             // In gapless mode the ConcatenatingAudioSource advances itself; only
             // the crossfade engine (one source per track) needs a manual skip on
             // completion. A completed event at the very end (loop off) just stops.
@@ -413,16 +488,19 @@ class PulsrAudioHandler extends BaseAudioHandler
               case AudioInterruptionType.pause:
                 if (_wasPlayingBeforeInterruption) {
                   _wasPlayingBeforeInterruption = false;
-                  final prefs = await SharedPreferences.getInstance();
+                  final prefs =
+                      _cachedPrefs ?? await SharedPreferences.getInstance();
                   final resume =
                       prefs.getBool(PrefsKeys.resumeAfterInterruption) ?? true;
                   if (resume && !_activePlayer.playing) {
                     await _activePlayer.play();
                   }
                 }
+                _preDuckVolume = null;
                 break;
               case AudioInterruptionType.unknown:
                 _wasPlayingBeforeInterruption = false;
+                _preDuckVolume = null;
                 break;
             }
           }
@@ -431,6 +509,10 @@ class PulsrAudioHandler extends BaseAudioHandler
 
       _subscriptions.add(
         session.becomingNoisyEventStream.listen((_) {
+          if (_crossfadeManager.isCrossfading) {
+            _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
+                restoreVolume: _volume);
+          }
           pause();
         }),
       );
@@ -495,7 +577,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
 
     // Direct fast path for downloaded songs with physical file on disk
-    if (!song.path.startsWith('ytmusic://') && song.path.isNotEmpty && File(song.path).existsSync()) {
+    if (!song.path.startsWith('ytmusic://') &&
+        song.path.isNotEmpty &&
+        File(song.path).existsSync()) {
       return _createAudioSource(song, tag);
     }
 
@@ -507,7 +591,10 @@ class PulsrAudioHandler extends BaseAudioHandler
       );
       final localSong = localMatch.fold((_) => null, (s) => s);
       if (localSong != null &&
-          (File(localSong.path).existsSync() || localSong.path.startsWith('content:') || (localSong.uri != null && localSong.uri!.startsWith('content:')))) {
+          (File(localSong.path).existsSync() ||
+              localSong.path.startsWith('content:') ||
+              (localSong.uri != null &&
+                  localSong.uri!.startsWith('content:')))) {
         return _createAudioSource(localSong, tag);
       }
     } catch (_) {
@@ -539,13 +626,15 @@ class PulsrAudioHandler extends BaseAudioHandler
     final prefs = await SharedPreferences.getInstance();
     final offlineOnly = prefs.getBool('setting_offline_only_mode') ?? false;
     if (offlineOnly) {
-      throw const YtmException('OFFLINE_ONLY', 'Offline Only Mode is enabled in Settings');
+      throw const YtmException(
+          'OFFLINE_ONLY', 'Offline Only Mode is enabled in Settings');
     }
     final wifiOnly = prefs.getBool('setting_wifi_only_mode') ?? false;
     if (wifiOnly) {
       final isWifi = await _ytmService.isWifiConnected();
       if (!isWifi) {
-        throw const YtmException('WIFI_ONLY', 'Wi-Fi Only Mode is enabled. Connect to Wi-Fi to stream');
+        throw const YtmException('WIFI_ONLY',
+            'Wi-Fi Only Mode is enabled. Connect to Wi-Fi to stream');
       }
     }
     final quality = prefs.getString('setting_streaming_quality') ?? 'high';
@@ -556,9 +645,13 @@ class PulsrAudioHandler extends BaseAudioHandler
       return cached.url;
     }
     final stream = await _ytmService.resolveStream(videoId, quality: quality);
-    // Cache stream URLs for 2 hours for instant repeated plays and track skips
-    _streamCache[cacheKey] =
-        (url: stream.url, expires: DateTime.now().add(const Duration(hours: 2)));
+    final expireParam = Uri.tryParse(stream.url)?.queryParameters['expire'];
+    final expireAt = expireParam != null
+        ? DateTime.fromMillisecondsSinceEpoch(
+            (int.tryParse(expireParam) ?? 0) * 1000)
+        : DateTime.now().add(const Duration(hours: 5));
+    final ttl = expireAt.subtract(const Duration(minutes: 5));
+    _streamCache[cacheKey] = (url: stream.url, expires: ttl);
     return stream.url;
   }
 
@@ -577,8 +670,14 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// Warms [_streamCache] for an upcoming YouTube track so track switching is instant.
   void _prefetchStream(SongsTableData song) {
     final videoId = song.remoteId;
-    if (song.source != SongSource.youtube || videoId == null || videoId.isEmpty) return;
-    if (!_prefetching.add(videoId)) return;
+    if (song.source != SongSource.youtube ||
+        videoId == null ||
+        videoId.isEmpty) {
+      return;
+    }
+    if (!_prefetching.add(videoId)) {
+      return;
+    }
     _resolveStreamUrl(song)
         .whenComplete(() => _prefetching.remove(videoId))
         .ignore();
@@ -670,74 +769,75 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   Future<void> _startCrossfade(int nextIndex) async {
     if (_crossfadeManager.isCrossfading) return;
-    _crossfadeManager.beginCrossfade(nextIndex);
-    final currentFadeId = _crossfadeManager.nextFadeId();
+    return _crossfadeManager.protect(() async {
+      if (_crossfadeManager.isCrossfading) return;
+      _crossfadeManager.beginCrossfade(nextIndex);
+      final currentFadeId = _crossfadeManager.nextFadeId();
 
-    try {
-      final nextSong = _songs[nextIndex];
-      final artUri = await ArtworkUriResolver.resolveArtworkUri(nextSong);
-      final item = _songToMediaItem(nextSong, artUri);
+      try {
+        final nextSong = _songs[nextIndex];
+        final artUri = await ArtworkUriResolver.resolveArtworkUri(nextSong);
+        final item = _songToMediaItem(nextSong, artUri);
 
-      final source = await _resolveAudioSource(nextSong, item);
-      // Resolving a YouTube URL can take seconds. If a skip/stop cancelled this
-      // fade meanwhile, loading the source now would push phantom audio into a
-      // player that cancel() already stopped — bail on the stale fade.
-      if (_crossfadeManager.currentFadeId != currentFadeId) return;
+        final source = await _resolveAudioSource(nextSong, item);
+        // Resolving a YouTube URL can take seconds. If a skip/stop cancelled this
+        // fade meanwhile, loading the source now would push phantom audio into a
+        // player that cancel() already stopped — bail on the stale fade.
+        if (_crossfadeManager.currentFadeId != currentFadeId) return;
 
-      await _inactivePlayer.setAudioSource(source);
+        // Synchronize speed on inactive player before loading & playback
+        await _inactivePlayer.setSpeed(_activePlayer.speed);
+        await _inactivePlayer.setAudioSource(source);
 
-      if (_crossfadeManager.currentFadeId != currentFadeId) return;
+        if (_crossfadeManager.currentFadeId != currentFadeId) return;
 
-      await _inactivePlayer.setVolume(0.0);
-      await _inactivePlayer.play();
+        await _inactivePlayer.setVolume(0.0);
+        await _inactivePlayer.play();
 
-      if (_crossfadeManager.currentFadeId != currentFadeId) return;
+        if (_crossfadeManager.currentFadeId != currentFadeId) return;
 
-      final active = _activePlayer;
-      final inactive = _inactivePlayer;
+        final active = _activePlayer;
+        final inactive = _inactivePlayer;
 
-      await Future.wait([
-        _crossfadeManager.fadeVolume(
-            active, _volume, 0.0, _crossfadeManager.duration, currentFadeId),
-        _crossfadeManager.fadeVolume(
-            inactive, 0.0, _volume, _crossfadeManager.duration, currentFadeId),
-      ]);
+        await Future.wait([
+          _crossfadeManager.fadeVolume(
+              active, _volume, 0.0, _crossfadeManager.duration, currentFadeId),
+          _crossfadeManager.fadeVolume(inactive, 0.0, _volume,
+              _crossfadeManager.duration, currentFadeId),
+        ]);
 
-      if (_crossfadeManager.currentFadeId != currentFadeId) return;
+        if (_crossfadeManager.currentFadeId != currentFadeId) return;
 
-      _isPlayerAActive = !_isPlayerAActive;
-      _currentIndex = nextIndex;
+        _isPlayerAActive = !_isPlayerAActive;
+        _currentIndex = nextIndex;
 
-      final currentSessionId = _activePlayer.androidAudioSessionId;
-      if (currentSessionId != null) {
-        AudioEffectsChannel().setAudioSessionId(currentSessionId);
-        _currentAudioSessionId = currentSessionId;
-        _audioSessionIdSubject.add(currentSessionId);
+        final currentSessionId = _activePlayer.androidAudioSessionId;
+        if (currentSessionId != null) {
+          AudioEffectsChannel().setAudioSessionId(currentSessionId);
+          _currentAudioSessionId = currentSessionId;
+          _audioSessionIdSubject.add(currentSessionId);
+        }
+
+        mediaItem.add(_songToMediaItem(nextSong, artUri));
+        _repository.recordPlayHistory(nextSong.id);
+        _broadcastState(_activePlayer.playbackEvent);
+
+        await active.stop();
+        await active.setVolume(_volume);
+      } catch (e, st) {
+        ErrorLogger.log('Error during crossfade playback',
+            error: e, stackTrace: st, category: 'AudioHandler');
+        if (_crossfadeManager.currentFadeId == currentFadeId) {
+          await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
+              restoreVolume: _volume);
+          await playSongAt(nextIndex);
+        }
+      } finally {
+        if (_crossfadeManager.currentFadeId == currentFadeId) {
+          _crossfadeManager.finishCrossfade();
+        }
       }
-
-      mediaItem.add(_songToMediaItem(nextSong, artUri));
-      _repository.recordPlayHistory(nextSong.id);
-      _broadcastState(_activePlayer.playbackEvent);
-
-      await active.stop();
-      await active.setVolume(_volume);
-    } catch (e, st) {
-      ErrorLogger.log('Error during crossfade playback',
-          error: e, stackTrace: st, category: 'AudioHandler');
-      // playerStateStream suppresses the natural completion-skip while a fade is
-      // in flight, so a failure here (e.g. a YouTube resolve that threw) would
-      // silently dead-end the queue. Recover by hard-playing the destination —
-      // playSongAt's own cancel() clears the crossfade and bumps the fade id, so
-      // the finally below then correctly skips finishCrossfade. Guarded so a
-      // superseded fade does not yank playback.
-      if (_crossfadeManager.currentFadeId == currentFadeId) {
-        await playSongAt(nextIndex);
-      }
-    } finally {
-      if (_crossfadeManager.currentFadeId == currentFadeId) {
-        _crossfadeManager.finishCrossfade();
-      }
-    }
+    });
   }
 
   int? _getNextIndex() {
@@ -901,8 +1001,25 @@ class PulsrAudioHandler extends BaseAudioHandler
       if (generation != _playGeneration) return;
       ErrorLogger.log(
           'Error loading gapless YouTube source for ${song.title} (${e.code})',
-          error: e, stackTrace: st, category: 'AudioHandler');
-      await _failCurrentPlayback(fatal: e.isNetwork || e.isDisabled);
+          error: e,
+          stackTrace: st,
+          category: 'AudioHandler');
+      if (e.isFatal) {
+        await _failCurrentPlayback(fatal: true);
+        return;
+      }
+      // Non-fatal: skip this track and try the next
+      _consecutiveFailures++;
+      if (_consecutiveFailures >= _songs.length) {
+        await _failCurrentPlayback(fatal: false);
+        return;
+      }
+      final nextIdx = _getNextIndex();
+      if (nextIdx != null && nextIdx != _currentIndex) {
+        await playSongAt(nextIdx, initialPosition: initialPosition);
+      } else {
+        await _failCurrentPlayback(fatal: false);
+      }
     } catch (e, st) {
       if (generation != _playGeneration) return;
       ErrorLogger.log('Error loading gapless queue for ${song.title}',
@@ -916,6 +1033,10 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// step with the item ExoPlayer moved to on its own.
   Future<void> _onGaplessIndexChanged(int index) async {
     if (index < 0 || index >= _songs.length) return;
+    if (_gaplessSource == null) return;
+    final childCount = _gaplessSource!.length;
+    if (index >= childCount) return;
+
     _lastGaplessIndex = index;
     _currentIndex = index;
     final song = _songs[index];
@@ -947,13 +1068,16 @@ class PulsrAudioHandler extends BaseAudioHandler
     _currentIndex = index;
 
     final song = _songs[index];
-    final fastArtUri = song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
+    final fastArtUri =
+        song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
     final item = _songToMediaItem(song, fastArtUri);
     mediaItem.add(item);
 
     // Resolve high-res artwork in background without blocking audio source loading
     ArtworkUriResolver.resolveArtworkUri(song).then((artUri) {
-      if (artUri != null && artUri != fastArtUri && generation == _playGeneration) {
+      if (artUri != null &&
+          artUri != fastArtUri &&
+          generation == _playGeneration) {
         mediaItem.add(_songToMediaItem(song, artUri));
       }
     }).catchError((_) {});
@@ -979,9 +1103,25 @@ class PulsrAudioHandler extends BaseAudioHandler
     );
 
     try {
-      final source = await _resolveAudioSource(song, item);
+      AudioSource source = await _resolveAudioSource(song, item);
       if (generation != _playGeneration) return;
-      await _activePlayer.setAudioSource(source, initialPosition: initialPosition, preload: true);
+      try {
+        await _activePlayer.setAudioSource(source,
+            initialPosition: initialPosition, preload: true);
+      } catch (playErr) {
+        // If a YouTube stream fails (e.g. 403 / expired URL), clear cache & retry once
+        if (song.source == SongSource.youtube && song.remoteId != null) {
+          debugPrint(
+              '[AudioHandler] Playback error on ${song.title}: $playErr. Retrying with fresh stream URL...');
+          _streamCache.removeWhere((key, _) => key.startsWith(song.remoteId!));
+          source = await _resolveAudioSource(song, item);
+          if (generation != _playGeneration) return;
+          await _activePlayer.setAudioSource(source,
+              initialPosition: initialPosition, preload: true);
+        } else {
+          rethrow;
+        }
+      }
       if (generation != _playGeneration) return;
       await _activePlayer.setVolume(_calculateReplayGainVolume(song));
       await _activePlayer.play();
@@ -998,7 +1138,9 @@ class PulsrAudioHandler extends BaseAudioHandler
       if (generation != _playGeneration) return;
       ErrorLogger.log(
           'Error resolving YouTube stream for ${song.title} (${e.code})',
-          error: e, stackTrace: st, category: 'AudioHandler');
+          error: e,
+          stackTrace: st,
+          category: 'AudioHandler');
       // A dead network, bot challenge, or extractor-less build fails every remaining YouTube
       // row, so skipping through them is pointless — halt immediately.
       await _failCurrentPlayback(fatal: e.isFatal);
@@ -1057,7 +1199,8 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> seek(Duration position) async {
-    ErrorLogger.addBreadcrumb('Playback seek to ${position.inSeconds}s', category: 'player');
+    ErrorLogger.addBreadcrumb('Playback seek to ${position.inSeconds}s',
+        category: 'player');
     await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
         restoreVolume: _volume);
     await _activePlayer.seek(position);
@@ -1163,11 +1306,23 @@ class PulsrAudioHandler extends BaseAudioHandler
     playbackState.add(playbackState.value.copyWith(repeatMode: repeatMode));
   }
 
+  static const int maxQueueSize = 500;
+
   @override
   Future<void> setSpeed(double speed) async {
-    await _playerA.setSpeed(speed);
-    await _playerB.setSpeed(speed);
-    playbackState.add(playbackState.value.copyWith(speed: speed));
+    final clamped = speed.clamp(0.25, 4.0);
+    await _playerA.setSpeed(clamped);
+    await _playerB.setSpeed(clamped);
+    playbackState.add(playbackState.value.copyWith(speed: clamped));
+  }
+
+  Future<void> validatePlayerState() async {
+    final player = _activePlayer;
+    if (player.processingState == ProcessingState.idle && _songs.isNotEmpty) {
+      ErrorLogger.log('Player in idle state with non-empty queue, recovering',
+          category: 'AudioHandler');
+      await playSongAt(_currentIndex);
+    }
   }
 
   @override
@@ -1190,6 +1345,11 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> addQueueItem(MediaItem mediaItem) async {
+    if (_songs.length >= maxQueueSize) {
+      ErrorLogger.log('Queue size limit reached ($maxQueueSize)',
+          category: 'AudioHandler');
+      return;
+    }
     final songId = int.tryParse(mediaItem.id);
     if (songId != null) {
       final songRes = await _repository.getSongById(songId);
@@ -1207,6 +1367,11 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   Future<void> insertNextInQueue(SongsTableData song) async {
+    if (_songs.length >= maxQueueSize) {
+      ErrorLogger.log('Queue size limit reached ($maxQueueSize)',
+          category: 'AudioHandler');
+      return;
+    }
     final insertIdx =
         _songs.isEmpty ? 0 : (_currentIndex + 1).clamp(0, _songs.length);
     _songs.insert(insertIdx, song);
@@ -1220,6 +1385,11 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   Future<void> addToQueueEnd(SongsTableData song) async {
+    if (_songs.length >= maxQueueSize) {
+      ErrorLogger.log('Queue size limit reached ($maxQueueSize)',
+          category: 'AudioHandler');
+      return;
+    }
     _songs.add(song);
     _queueDirty = true;
     if (_gaplessMode && _gaplessSource != null) {

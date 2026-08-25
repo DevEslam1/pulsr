@@ -1,9 +1,11 @@
 // lib/core/services/ytm_service.dart
 import 'dart:async';
+import 'dart:convert';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 
 import '../di/injection.dart';
@@ -12,11 +14,6 @@ import '../../domain/models/ytm_track.dart';
 import '../utils/error_logger.dart';
 
 /// A failed YTM call.
-///
-/// Unlike [LrclibService], which swallows failures because lyrics are optional,
-/// these have to surface: the user typed a query and needs to see the difference
-/// between "no results" and "offline", and the playback path has to stop
-/// immediately on a network error instead of skipping through the queue.
 class YtmException implements Exception {
   final String code;
   final String? details;
@@ -35,8 +32,14 @@ class YtmException implements Exception {
               details!.contains('LOGIN_REQUIRED') ||
               details!.contains('Sign in to confirm')));
 
+  /// Session has expired or authentication is invalid.
+  bool get isAuth =>
+      code == 'YTM_AUTH' ||
+      code == 'LOGIN_REQUIRED' ||
+      (details != null && details!.toLowerCase().contains('unauthenticated'));
+
   /// Fatal error where looping / skipping the queue will only worsen the block.
-  bool get isFatal => isNetwork || isDisabled || isBotBlocked;
+  bool get isFatal => isNetwork || isDisabled || isBotBlocked || isAuth;
 
   /// This one video cannot be played, but others still can.
   bool get isUnavailable => code == 'YTM_UNAVAILABLE';
@@ -51,12 +54,19 @@ class YtmException implements Exception {
 @singleton
 class YtmService {
   static const String channelName = 'com.pulsr.music/ytm';
-  static const Duration _searchTimeout = Duration(seconds: 20);
-  static const Duration _resolveTimeout = Duration(seconds: 25);
+  static const Duration _defaultSearchTimeout = Duration(seconds: 15);
+  static const Duration _defaultResolveTimeout = Duration(seconds: 20);
 
   final MethodChannel _channel = const MethodChannel(channelName);
+  final StreamController<void> _authExpiredController = StreamController<void>.broadcast();
 
   bool? _available;
+
+  Stream<void> get onAuthExpired => _authExpiredController.stream;
+
+  void notifyAuthExpired() {
+    _authExpiredController.add(null);
+  }
 
   /// Synchronizes cookies into the native CookieManager so the extractor
   /// makes authenticated requests on all YouTube endpoints.
@@ -66,9 +76,34 @@ class YtmService {
     } catch (_) {}
   }
 
-  /// The device locale, forwarded to the native extractor so trending and
-  /// search results follow the user's region/language instead of a hardcoded
-  /// one. Read from the platform each call so a locale change is picked up.
+  /// Calls native PoTokenManager to ensure attestation tokens are ready.
+  Future<bool> ensurePoTokenReady() async {
+    try {
+      final ready = await _channel.invokeMethod<bool>('ensurePoTokenReady');
+      return ready ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Invalidates BotGuard poToken state on bot-detection block or session logout.
+  Future<void> invalidatePoToken() async {
+    try {
+      await _channel.invokeMethod<bool>('invalidatePoToken');
+    } catch (_) {}
+  }
+
+  /// Retrieves state of PoTokenManager.
+  Future<Map<String, dynamic>?> getPoTokenState() async {
+    try {
+      final state = await _channel.invokeMethod<Map<Object?, Object?>>('getPoTokenState');
+      if (state == null) return null;
+      return state.map((k, v) => MapEntry(k.toString(), v));
+    } catch (_) {
+      return null;
+    }
+  }
+
   Map<String, String> _localeArgs() {
     final locale = ui.PlatformDispatcher.instance.locale;
     final country = locale.countryCode;
@@ -79,8 +114,6 @@ class YtmService {
     };
   }
 
-  /// False in the Play Store build, where the native extractor is replaced by a
-  /// stub. Cached because the answer is fixed at compile time.
   Future<bool> isAvailable() async {
     final cached = _available;
     if (cached != null) return cached;
@@ -117,27 +150,136 @@ class YtmService {
         'limit': limit,
         ..._localeArgs(),
       }),
-      timeout: _searchTimeout,
+      timeout: _defaultSearchTimeout,
     );
 
     return _parseTracks(raw);
   }
 
-  /// The YouTube "Trending" chart. Not query-driven and not music-filtered, so
-  /// it can include non-music videos; used to seed the Home discovery section.
+  /// Search with fallback: First tries native extractor, then falls back to
+  /// Innertube search if the extractor returns empty or throws.
+  Future<List<YtmTrack>> searchWithFallback(String query, {int limit = 30}) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return const [];
+
+    // 1. Try native extractor search
+    try {
+      final results = await search(trimmed, limit: limit);
+      if (results.isNotEmpty) return results;
+    } catch (e) {
+      debugPrint('[YTM_SERVICE] Native search failed, trying Innertube fallback: $e');
+    }
+
+    // 2. Fallback: Innertube search
+    try {
+      final innertubeResults = await _searchInnertube(trimmed, limit: limit);
+      if (innertubeResults.isNotEmpty) return innertubeResults;
+    } catch (e) {
+      debugPrint('[YTM_SERVICE] Innertube fallback search failed: $e');
+    }
+
+    return const [];
+  }
+
+  Future<List<YtmTrack>> _searchInnertube(String query, {int limit = 30}) async {
+    try {
+      const apiKey = 'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30';
+      final body = jsonEncode({
+        'context': {
+          'client': {
+            'clientName': 'WEB_REMIX',
+            'clientVersion': '1.20240417.01.00',
+            'hl': 'en',
+            'gl': 'US',
+          },
+        },
+        'query': query,
+      });
+
+      final response = await http
+          .post(
+            Uri.parse('https://music.youtube.com/youtubei/v1/search?prettyPrint=false&key=$apiKey'),
+            headers: {
+              'Content-Type': 'application/json',
+              'User-Agent':
+                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+              'Origin': 'https://music.youtube.com',
+              'Referer': 'https://music.youtube.com/',
+            },
+            body: body,
+          )
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        final tracks = <YtmTrack>[];
+
+        void traverse(dynamic node) {
+          if (node is Map<String, dynamic>) {
+            if (node.containsKey('musicResponsiveListItemRenderer')) {
+              final r = node['musicResponsiveListItemRenderer'] as Map<String, dynamic>;
+              final flexCols = r['flexColumns'] as List<dynamic>? ?? [];
+              String? videoId;
+              String title = 'Unknown Title';
+              String artist = 'Unknown Artist';
+
+              final pData = r['playlistItemData'] as Map<String, dynamic>?;
+              videoId = pData?['videoId'] as String?;
+
+              if (flexCols.isNotEmpty) {
+                final c0 = flexCols[0]['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'] as List<dynamic>?;
+                if (c0 != null && c0.isNotEmpty) {
+                  title = c0[0]['text'] as String? ?? title;
+                  final nav = c0[0]['navigationEndpoint'] as Map<String, dynamic>?;
+                  videoId ??= nav?['watchEndpoint']?['videoId'] as String?;
+                }
+              }
+              if (flexCols.length > 1) {
+                final c1 = flexCols[1]['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'] as List<dynamic>?;
+                if (c1 != null && c1.isNotEmpty) {
+                  artist = c1[0]['text'] as String? ?? artist;
+                }
+              }
+
+              if (videoId != null && videoId.length == 11) {
+                tracks.add(YtmTrack(
+                  videoId: videoId,
+                  title: title,
+                  artist: artist,
+                  duration: Duration.zero,
+                ));
+              }
+              return;
+            }
+            for (final val in node.values) {
+              traverse(val);
+            }
+          } else if (node is List) {
+            for (final item in node) {
+              traverse(item);
+            }
+          }
+        }
+
+        traverse(json);
+        return tracks.take(limit).toList();
+      }
+    } catch (_) {}
+    return const [];
+  }
+
   Future<List<YtmTrack>> trending({int limit = 30}) async {
     final raw = await _guard(
       () => _channel.invokeMethod<List<Object?>>('trending', {
         'limit': limit,
         ..._localeArgs(),
       }),
-      timeout: _searchTimeout,
+      timeout: _defaultSearchTimeout,
     );
 
     return _parseTracks(raw);
   }
 
-  /// Fetches all tracks from a YouTube or YouTube Music playlist link or ID.
   Future<List<YtmTrack>> getPlaylistTracks(String urlOrId, {int limit = 100}) async {
     final raw = await _guard(
       () => _channel.invokeMethod<Map<Object?, Object?>>('getPlaylist', {
@@ -163,10 +305,10 @@ class YtmService {
     return tracks;
   }
 
-  /// Resolves a currently-valid audio URL. The result expires, so callers must
-  /// resolve at playback time and never store the URL.
+  /// Resolves audio stream using multi-tier fallback:
+  /// (a) Direct authenticated account stream -> (b) Native multi-client extractor
   Future<YtmStream> resolveStream(String videoId, {String quality = 'high'}) async {
-    // 1. Try direct authenticated YouTube Music InnerTube Player API (bypasses VPN bot blocks)
+    // 1. Try direct authenticated YouTube Music InnerTube Player API if logged in
     try {
       if (getIt.isRegistered<YtmAccountService>()) {
         final account = getIt<YtmAccountService>();
@@ -178,16 +320,16 @@ class YtmService {
         }
       }
     } catch (e) {
-      debugPrint('[YTM_SERVICE] Direct stream resolution fallback: $e');
+      debugPrint('[YTM_SERVICE] Direct account stream resolution fallback: $e');
     }
 
-    // 2. Fallback to native extractor
+    // 2. Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
     final raw = await _guard(
       () => _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
         'videoId': videoId,
         'quality': quality,
       }),
-      timeout: _resolveTimeout,
+      timeout: _defaultResolveTimeout,
     );
 
     final stream = raw == null ? null : YtmStream.fromChannel(raw);
@@ -197,16 +339,36 @@ class YtmService {
     return stream;
   }
 
-  Future<T?> _guard<T>(Future<T?> Function() call, {required Duration timeout}) async {
-    try {
-      return await call().timeout(timeout);
-    } on TimeoutException {
-      throw const YtmException('YTM_TIMEOUT');
-    } on MissingPluginException {
-      throw const YtmException('YTM_UNSUPPORTED');
-    } on PlatformException catch (e) {
-      ErrorLogger.log('YTM call failed: ${e.code} ${e.message}', category: 'YTM');
-      throw YtmException(e.code, e.message);
+  Future<T?> _guard<T>(
+    Future<T?> Function() call, {
+    required Duration timeout,
+    int maxRetries = 2,
+  }) async {
+    for (var attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        final adaptiveTimeout = timeout + Duration(seconds: attempt * 5);
+        return await call().timeout(adaptiveTimeout);
+      } on TimeoutException {
+        if (attempt == maxRetries) {
+          throw const YtmException('YTM_TIMEOUT', 'Request timed out');
+        }
+      } on MissingPluginException {
+        throw const YtmException('YTM_UNSUPPORTED');
+      } on PlatformException catch (e) {
+        if (attempt == maxRetries || e.code == 'YTM_DISABLED' || e.code == 'YTM_UNSUPPORTED') {
+          ErrorLogger.log('YTM call failed: ${e.code} ${e.message}', category: 'YTM');
+          if (e.code == 'LOGIN_REQUIRED' || e.code == 'YTM_AUTH') {
+            notifyAuthExpired();
+          }
+          throw YtmException(e.code, e.message);
+        }
+        // If bot blocked, invalidate poToken before retrying
+        if (e.code == 'YTM_BOT_BLOCKED' || e.code == 'YTM_RECAPTCHA') {
+          await invalidatePoToken();
+          await Future.delayed(Duration(milliseconds: 500 * (1 << attempt)));
+        }
+      }
     }
+    throw const YtmException('YTM_FAILED', 'Max retries exhausted');
   }
 }

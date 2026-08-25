@@ -14,12 +14,14 @@ class AudioEffectsChannel {
   bool _isVirtualizerSupported = false;
   bool _isDynamicsSupported = false;
   bool _isSpatializerSupported = false;
+  bool _isHeadTrackerAvailable = false;
   bool _isVolumeBoostSupported = false;
   bool _isBassBoostSupported = false;
 
   bool get isVirtualizerSupported => _isVirtualizerSupported;
   bool get isDynamicsSupported => _isDynamicsSupported;
   bool get isSpatializerSupported => _isSpatializerSupported;
+  bool get isHeadTrackerAvailable => _isHeadTrackerAvailable;
   bool get isVolumeBoostSupported => _isVolumeBoostSupported;
   bool get isBassBoostSupported => _isBassBoostSupported;
 
@@ -41,6 +43,7 @@ class AudioEffectsChannel {
       final spatialMap = await _channel.invokeMapMethod<String, dynamic>('getSpatializerState');
       if (spatialMap != null) {
         _isSpatializerSupported = (spatialMap['isSupported'] as bool?) ?? false;
+        _isHeadTrackerAvailable = (spatialMap['isHeadTrackerAvailable'] as bool?) ?? false;
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to initialize platform audio effects channel', error: e, stackTrace: st, category: 'AudioEffectsChannel');

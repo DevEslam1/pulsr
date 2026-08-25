@@ -93,6 +93,22 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     final isLoggedIn = getIt<YtmAccountService>().isLoggedIn;
     _selectedOnlineCategory = isLoggedIn ? 'Recommended For You' : 'Trending Egypt';
+    getIt<YtmAccountService>().loginState.addListener(_onLoginStateChanged);
+  }
+
+  void _onLoginStateChanged() {
+    if (!mounted) return;
+    setState(() {
+      _categoryFutures.clear();
+      final isLoggedIn = getIt<YtmAccountService>().isLoggedIn;
+      _selectedOnlineCategory = isLoggedIn ? 'Recommended For You' : 'Trending Egypt';
+    });
+  }
+
+  @override
+  void dispose() {
+    getIt<YtmAccountService>().loginState.removeListener(_onLoginStateChanged);
+    super.dispose();
   }
 
   Future<List<YtmTrack>> _getCategoryFuture(String category) {

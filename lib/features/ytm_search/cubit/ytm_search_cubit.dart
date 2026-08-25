@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 
+import '../../../core/errors/ytm_error_classifier.dart';
 import '../../../core/services/file_intent_handler.dart';
 import '../../../core/services/ytm_service.dart';
 import '../../../domain/models/ytm_track.dart';
@@ -14,8 +15,6 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
   final YtmService _service;
   Timer? _debounceTimer;
 
-  /// A YouTube search is several network round trips, so a slow earlier request
-  /// can land after a later one. Only the newest generation may emit.
   int _generation = 0;
 
   YtmSearchCubit({required YtmService service})
@@ -42,7 +41,7 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
 
   Future<void> retry() => _executeSearch(state.query);
 
-  Future<void> _executeSearch(String query) async {
+  Future<void> _executeSearch(String query, {bool isRetryAfterBotBlock = false}) async {
     final generation = ++_generation;
     if (query.trim().isEmpty) {
       emit(state.copyWith(results: [], isLoading: false, errorMessage: null));
@@ -75,17 +74,22 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
       emit(state.copyWith(results: results, isLoading: false, errorMessage: null));
     } on YtmException catch (e) {
       if (generation != _generation || isClosed) return;
-      emit(state.copyWith(isLoading: false, results: [], errorMessage: _messageFor(e)));
-    }
-  }
 
-  String _messageFor(YtmException e) {
-    if (e.isNetwork) return 'No connection. Check your network and try again.';
-    if (e.isDisabled) return 'YouTube Music is not available in this build.';
-    if (e.code == 'YTM_RECAPTCHA') {
-      return 'YouTube is rate-limiting this device. Try again in a few minutes.';
+      // Auto-recovery: On bot block or recaptcha, invalidate poToken and retry once
+      if (e.isBotBlocked && !isRetryAfterBotBlock) {
+        await _service.invalidatePoToken();
+        await _service.ensurePoTokenReady();
+        if (generation != _generation || isClosed) return;
+        return _executeSearch(query, isRetryAfterBotBlock: true);
+      }
+
+      final errorInfo = YtmErrorClassifier.classify(e);
+      emit(state.copyWith(isLoading: false, results: [], errorMessage: errorInfo.message));
+    } catch (e) {
+      if (generation != _generation || isClosed) return;
+      final errorInfo = YtmErrorClassifier.classify(e);
+      emit(state.copyWith(isLoading: false, results: [], errorMessage: errorInfo.message));
     }
-    return 'Search failed. Try again.';
   }
 
   @override

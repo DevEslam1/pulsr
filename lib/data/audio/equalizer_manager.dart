@@ -28,10 +28,16 @@ class EqualizerManager {
 
   bool isDynamicsEnabled = false;
   DynamicsPreset dynamicsPreset = DynamicsPreset.off;
+  bool _isDynamicsBypassed = false;
+  bool get isDynamicsBypassed => _isDynamicsBypassed;
 
   bool isSpatializerEnabled = false;
 
   HeadphoneProfile? selectedHeadphoneProfile;
+
+  List<double> customFrequencies = List.from(EqPreset.centerFrequencies);
+  List<double> _abComparisonGains = [];
+  bool isAbComparisonActive = false;
 
   EqualizerManager({
     this.loudnessEnhancerA,
@@ -47,25 +53,38 @@ class EqualizerManager {
 
   Future<void> init() async {
     await _effectsChannel.init();
-    // Push the fixed 10-band ISO layout so native builds the postEq correctly.
-    await _effectsChannel.setEqBands(EqPreset.centerFrequencies);
     await _restorePreferences();
   }
 
   Future<void> _restorePreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      // 1. Read all stored configuration
       isEnabled = prefs.getBool(PrefsKeys.eqEnabled) ?? false;
       final presetName = prefs.getString(PrefsKeys.eqPresetName) ?? 'Flat';
       final gainsJson = prefs.getString(PrefsKeys.eqGains);
       final bass = prefs.getDouble(PrefsKeys.eqBassBoost) ?? 0.0;
       volumeBoost = prefs.getDouble(PrefsKeys.eqVolumeBoost) ?? 0.0;
 
-      List<double> gains = List<double>.filled(EqPreset.centerFrequencies.length, 0.0);
+      // Custom frequencies if persisted
+      final customFreqsJson = prefs.getString(PrefsKeys.eqCustomFrequencies);
+      if (customFreqsJson != null) {
+        try {
+          final decodedFreqs = (json.decode(customFreqsJson) as List<dynamic>)
+              .map((e) => (e as num).toDouble())
+              .toList();
+          if (decodedFreqs.length == 10) {
+            customFrequencies = decodedFreqs;
+          }
+        } catch (e, st) {
+          ErrorLogger.log('Failed to decode custom EQ frequencies', error: e, stackTrace: st, category: 'EqualizerManager');
+        }
+      }
+
+      List<double> gains = List<double>.filled(customFrequencies.length, 0.0);
       if (gainsJson != null) {
         try {
           final decoded = json.decode(gainsJson) as List<dynamic>;
-          // Migrate any legacy (5-band) persisted gains up to the 10 ISO centers.
           gains = EqPreset.interpolateGains(
             decoded.map((e) => (e as num).toDouble()).toList(),
           );
@@ -90,6 +109,7 @@ class EqualizerManager {
         orElse: () => DynamicsPreset.off,
       );
       isDynamicsEnabled = prefs.getBool(PrefsKeys.eqDynamicsEnabled) ?? false;
+      _isDynamicsBypassed = prefs.getBool(PrefsKeys.eqDynamicsBypassed) ?? false;
 
       isSpatializerEnabled = prefs.getBool(PrefsKeys.eqSpatializerEnabled) ?? false;
 
@@ -99,22 +119,37 @@ class EqualizerManager {
         selectedHeadphoneProfile = HeadphoneProfilesRepository().getProfileById(profileId);
       }
 
-      if (isEnabled) {
-        await setEqualizerEnabled(true);
-        await applyPreset(currentPreset);
-      }
-      if (volumeBoost > 0) {
-        await setVolumeBoost(volumeBoost);
-      }
-      if (isVirtualizerEnabled) {
-        await setVirtualizerEnabled(true);
-        await setVirtualizerStrength(virtualizerStrength);
-      }
-      if (isDynamicsEnabled && dynamicsPreset != DynamicsPreset.off) {
-        await setDynamicsPreset(dynamicsPreset, enabled: isDynamicsEnabled);
-      }
-      if (isSpatializerEnabled) {
-        await setSpatializerEnabled(true);
+      // 2. Apply to native audio engine in strict ordered sequence
+      if (Platform.isAndroid) {
+        // a. Configure band center frequencies first
+        await _effectsChannel.setEqBands(customFrequencies);
+
+        // b. Enable EQ engine if active
+        if (isEnabled) {
+          await _effectsChannel.setEqEnabled(true);
+        }
+
+        // c. Apply gains and preamp after enabling
+        await _effectsChannel.setEqBandGains(currentPreset.gains);
+        await _effectsChannel.setEqPreamp(selectedHeadphoneProfile?.preampGain ?? 0.0);
+
+        // d. Apply other effects
+        if (currentPreset.bassBoost > 0) {
+          await _effectsChannel.setBassBoost((currentPreset.bassBoost * 1000).round());
+        }
+        if (volumeBoost > 0) {
+          await setVolumeBoost(volumeBoost);
+        }
+        if (isVirtualizerEnabled) {
+          await setVirtualizerEnabled(true);
+          await setVirtualizerStrength(virtualizerStrength);
+        }
+        if (isDynamicsEnabled && dynamicsPreset != DynamicsPreset.off && !_isDynamicsBypassed) {
+          await setDynamicsPreset(dynamicsPreset, enabled: isDynamicsEnabled);
+        }
+        if (isSpatializerEnabled) {
+          await setSpatializerEnabled(true);
+        }
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to restore equalizer preferences', error: e, stackTrace: st, category: 'EqualizerManager');
@@ -133,6 +168,7 @@ class EqualizerManager {
       await prefs.setDouble(PrefsKeys.eqVirtualizerStrength, virtualizerStrength);
       await prefs.setString(PrefsKeys.eqDynamicsPreset, dynamicsPreset.name);
       await prefs.setBool(PrefsKeys.eqDynamicsEnabled, isDynamicsEnabled);
+      await prefs.setBool(PrefsKeys.eqDynamicsBypassed, _isDynamicsBypassed);
       await prefs.setBool(PrefsKeys.eqSpatializerEnabled, isSpatializerEnabled);
       if (selectedHeadphoneProfile != null) {
         await prefs.setString(PrefsKeys.eqHeadphoneProfileId, selectedHeadphoneProfile!.id);
@@ -144,58 +180,114 @@ class EqualizerManager {
     }
   }
 
+  void onAppPaused() {
+    _saveDebounce?.cancel();
+    _savePreferences();
+  }
+
   Future<void> setEqualizerEnabled(bool enabled) async {
+    final previousState = isEnabled;
     isEnabled = enabled;
-    if (Platform.isAndroid) {
-      // The just_audio loudness enhancers are kept only as inert session
-      // anchors; the real EQ runs through the native DynamicsProcessing postEq.
-      for (final le in [loudnessEnhancerA, loudnessEnhancerB]) {
-        if (le != null) {
-          try {
-            await le.setEnabled(enabled);
-          } catch (e, st) {
-            ErrorLogger.log('Failed to set loudness enhancer enabled state', error: e, stackTrace: st, category: 'EqualizerManager');
+    try {
+      if (Platform.isAndroid) {
+        for (final le in [loudnessEnhancerA, loudnessEnhancerB]) {
+          if (le != null) {
+            try {
+              await le.setEnabled(enabled);
+            } catch (e, st) {
+              ErrorLogger.log('Failed to set loudness enhancer enabled state', error: e, stackTrace: st, category: 'EqualizerManager');
+            }
           }
         }
+        await _effectsChannel.setEqEnabled(enabled);
+        if (!enabled) {
+          await _effectsChannel.setVolumeBoost(0);
+          await _effectsChannel.setBassBoost(0);
+        } else {
+          await _effectsChannel.setEqBandGains(currentPreset.gains);
+          await _effectsChannel.setEqPreamp(selectedHeadphoneProfile?.preampGain ?? 0.0);
+          await setVolumeBoost(volumeBoost);
+          await setBassBoost(currentPreset.bassBoost);
+        }
       }
-      await _effectsChannel.setEqEnabled(enabled);
-      if (!enabled) {
-        await _effectsChannel.setVolumeBoost(0);
-        await _effectsChannel.setBassBoost(0);
-      } else {
-        await _effectsChannel.setEqBandGains(currentPreset.gains);
-        await _effectsChannel.setEqPreamp(selectedHeadphoneProfile?.preampGain ?? 0.0);
-        await setVolumeBoost(volumeBoost);
-        await setBassBoost(currentPreset.bassBoost);
-      }
+      await _savePreferences();
+    } catch (e, st) {
+      isEnabled = previousState;
+      ErrorLogger.log('Failed to set EQ enabled state', error: e, stackTrace: st, category: 'EqualizerManager');
     }
-    await _savePreferences();
   }
 
   Future<void> setBandGain(int bandIndex, double gain) async {
+    final clamped = gain.clamp(-15.0, 15.0);
     final updatedGains = List<double>.from(currentPreset.gains);
     if (bandIndex >= 0 && bandIndex < updatedGains.length) {
       final hadProfile = selectedHeadphoneProfile != null;
-      updatedGains[bandIndex] = gain;
-      currentPreset = currentPreset.copyWith(name: 'Custom', gains: updatedGains);
-      selectedHeadphoneProfile = null;
-      await _effectsChannel.setEqBandGain(bandIndex, gain);
-      // A hand tweak abandons any profile preamp; drop back to unity headroom.
-      if (hadProfile) await _effectsChannel.setEqPreamp(0.0);
+      updatedGains[bandIndex] = clamped;
+      currentPreset = currentPreset.copyWith(
+        name: 'Custom',
+        gains: updatedGains,
+      );
+      if (hadProfile) {
+        selectedHeadphoneProfile = null;
+        await _effectsChannel.setEqPreamp(0.0);
+        await setBassBoost(0.0);
+      }
+      await _effectsChannel.setEqBandGain(bandIndex, clamped);
     }
     _debouncedSavePreferences();
   }
 
+  Future<void> resetToFlat() async {
+    currentPreset = EqPreset.defaultPresets.first; // Flat
+    selectedHeadphoneProfile = null;
+    await _effectsChannel.setEqBandGains(
+      List<double>.filled(customFrequencies.length, 0.0),
+    );
+    await _effectsChannel.setEqPreamp(0.0);
+    await setBassBoost(0.0);
+    await _savePreferences();
+  }
+
+  Future<void> startAbComparison() async {
+    if (isAbComparisonActive) return;
+    isAbComparisonActive = true;
+    _abComparisonGains = List.from(currentPreset.gains);
+    await _effectsChannel.setEqBandGains(
+      List<double>.filled(customFrequencies.length, 0.0),
+    );
+  }
+
+  Future<void> endAbComparison() async {
+    if (!isAbComparisonActive) return;
+    isAbComparisonActive = false;
+    if (_abComparisonGains.isNotEmpty) {
+      await _effectsChannel.setEqBandGains(_abComparisonGains);
+      _abComparisonGains = [];
+    }
+  }
+
   Future<void> setVolumeBoost(double value) async {
     volumeBoost = value.clamp(0.0, 1.0);
+
+    // Compute total gain: EQ preamp + volume boost
+    final preampDb = selectedHeadphoneProfile?.preampGain ?? 0.0;
+    final boostDb = volumeBoost * 10.0; // 0-10 dB
+    final totalDb = preampDb + boostDb;
+
+    // If total exceeds +6 dB headroom, cap the boost to prevent digital clipping
+    if (totalDb > 6.0) {
+      final cappedBoostDb = 6.0 - preampDb;
+      volumeBoost = (cappedBoostDb / 10.0).clamp(0.0, 1.0);
+    }
+
     final milliBels = (volumeBoost * 1000).round();
     await _effectsChannel.setVolumeBoost(milliBels);
     _debouncedSavePreferences();
   }
 
   Future<void> setBassBoost(double value) async {
-    currentPreset = currentPreset.copyWith(bassBoost: value);
-    final strength = (value.clamp(0.0, 1.0) * 1000).round();
+    currentPreset = currentPreset.copyWith(bassBoost: value.clamp(0.0, 1.0));
+    final strength = (currentPreset.bassBoost * 1000).round();
     await _effectsChannel.setBassBoost(strength);
     _debouncedSavePreferences();
   }
@@ -204,9 +296,8 @@ class EqualizerManager {
     currentPreset = preset;
     selectedHeadphoneProfile = null;
     await _effectsChannel.setEqBandGains(preset.gains);
-    // Built-in presets carry no preamp; keep headroom at unity.
     await _effectsChannel.setEqPreamp(0.0);
-    await setBassBoost(preset.bassBoost);
+    await setBassBoost(preset.bassBoost); // Bass boost travels with preset
     await _savePreferences();
   }
 
@@ -219,12 +310,23 @@ class EqualizerManager {
         bassBoost: profile.bassBoost,
       );
       await _effectsChannel.setEqBandGains(profile.gains);
-      // Apply the profile preamp as real headroom — negative attenuates
-      // (protects against EQ-boost clipping) instead of being discarded.
       await _effectsChannel.setEqPreamp(profile.preampGain);
       await setBassBoost(profile.bassBoost);
+    } else {
+      await resetToFlat();
     }
     await _savePreferences();
+  }
+
+  Future<void> setCustomFrequencies(List<double> frequencies) async {
+    if (frequencies.length != 10) return;
+    customFrequencies = List.from(frequencies);
+    await _effectsChannel.setEqBands(frequencies);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      PrefsKeys.eqCustomFrequencies,
+      json.encode(frequencies),
+    );
   }
 
   void dispose() {
@@ -233,9 +335,15 @@ class EqualizerManager {
   }
 
   Future<void> setVirtualizerEnabled(bool enabled) async {
+    final previous = isVirtualizerEnabled;
     isVirtualizerEnabled = enabled;
-    await _effectsChannel.setVirtualizerEnabled(enabled);
-    await _savePreferences();
+    try {
+      await _effectsChannel.setVirtualizerEnabled(enabled);
+      await _savePreferences();
+    } catch (e, st) {
+      isVirtualizerEnabled = previous;
+      ErrorLogger.log('Failed to set virtualizer enabled', error: e, stackTrace: st, category: 'EqualizerManager');
+    }
   }
 
   Future<void> setVirtualizerStrength(double strength) async {
@@ -253,23 +361,45 @@ class EqualizerManager {
     } else {
       isDynamicsEnabled = true;
     }
-    await _effectsChannel.setDynamicsPreset(dynamicsPreset, isDynamicsEnabled);
+    if (!_isDynamicsBypassed) {
+      await _effectsChannel.setDynamicsPreset(dynamicsPreset, isDynamicsEnabled);
+    }
+    await _savePreferences();
+  }
+
+  Future<void> toggleDynamicsBypass() async {
+    _isDynamicsBypassed = !_isDynamicsBypassed;
+    if (_isDynamicsBypassed) {
+      await _effectsChannel.setDynamicsPreset(DynamicsPreset.off, false);
+    } else {
+      await _effectsChannel.setDynamicsPreset(
+        dynamicsPreset,
+        isDynamicsEnabled,
+      );
+    }
     await _savePreferences();
   }
 
   bool get isSpatializerSupported => _effectsChannel.isSpatializerSupported;
+  bool get isHeadTrackerAvailable => _effectsChannel.isHeadTrackerAvailable;
 
   Future<void> setSpatializerEnabled(bool enabled) async {
+    final previous = isSpatializerEnabled;
     isSpatializerEnabled = enabled;
-    await _effectsChannel.setSpatializerEnabled(enabled);
-    if (enabled && !_effectsChannel.isSpatializerSupported) {
-      if (!isVirtualizerEnabled) {
-        await setVirtualizerEnabled(true);
-        if (virtualizerStrength < 0.3) {
-          await setVirtualizerStrength(0.7);
+    try {
+      await _effectsChannel.setSpatializerEnabled(enabled);
+      if (enabled && !_effectsChannel.isSpatializerSupported) {
+        if (!isVirtualizerEnabled) {
+          await setVirtualizerEnabled(true);
+          if (virtualizerStrength < 0.3) {
+            await setVirtualizerStrength(0.7);
+          }
         }
       }
+      await _savePreferences();
+    } catch (e, st) {
+      isSpatializerEnabled = previous;
+      ErrorLogger.log('Failed to set spatializer enabled', error: e, stackTrace: st, category: 'EqualizerManager');
     }
-    await _savePreferences();
   }
 }
