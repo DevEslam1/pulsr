@@ -128,10 +128,10 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
         val fileName = file.name
         val mimeType = getMimeType(file.absolutePath)
 
-        // 1. Try querying MediaStore by DISPLAY_NAME
+        // 1. Try querying MediaStore by DISPLAY_NAME and SIZE to prevent wrong file collision
         val projection = arrayOf(MediaStore.Audio.Media._ID)
-        val selection = "${MediaStore.Audio.Media.DISPLAY_NAME}=?"
-        val selectionArgs = arrayOf(fileName)
+        val selection = "${MediaStore.Audio.Media.DISPLAY_NAME}=? AND ${MediaStore.Audio.Media.SIZE}=?"
+        val selectionArgs = arrayOf(fileName, file.length().toString())
 
         val cursor = context.contentResolver.query(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
@@ -164,6 +164,7 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
         val values = ContentValues().apply {
             put(MediaStore.Audio.Media.DISPLAY_NAME, fileName)
             put(MediaStore.Audio.Media.TITLE, file.nameWithoutExtension)
+            put(MediaStore.Audio.Media.SIZE, file.length())
             put(MediaStore.Audio.Media.MIME_TYPE, mimeType)
             put(MediaStore.Audio.Media.IS_RINGTONE, ringtoneType == RingtoneManager.TYPE_RINGTONE)
             put(MediaStore.Audio.Media.IS_NOTIFICATION, ringtoneType == RingtoneManager.TYPE_NOTIFICATION)
@@ -191,8 +192,8 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
                     put(MediaStore.Audio.Media.IS_PENDING, 0)
                 }
                 context.contentResolver.update(insertedUri, updateValues, null, null)
-            } catch (_: Exception) {
-                // Ignore copy errors, uri might still be usable
+            } catch (e: Exception) {
+                android.util.Log.w("RingtonePlugin", "Failed to write ringtone content stream: ${e.message}")
             }
         }
 

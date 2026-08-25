@@ -6,7 +6,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:palette_generator/palette_generator.dart';
+import '../../data/db/app_database.dart';
 import '../constants/app_colors.dart';
+import '../utils/error_logger.dart';
 import '../widgets/cached_artwork.dart';
 
 class DynamicThemeState {
@@ -49,16 +51,34 @@ class DynamicThemeState {
 class DynamicThemeCubit extends Cubit<DynamicThemeState> {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   static const int _maxCacheSize = 50;
-  final LinkedHashMap<int, DynamicThemeState> _cachedPalettes = LinkedHashMap();
+  final LinkedHashMap<String, DynamicThemeState> _cachedPalettes = LinkedHashMap();
   Timer? _debounceTimer;
   int _currentRequestToken = 0;
 
   DynamicThemeCubit() : super(const DynamicThemeState());
 
-  Future<void> updateFromSongId(int songId) async {
-    if (_cachedPalettes.containsKey(songId)) {
-      final cached = _cachedPalettes.remove(songId)!;
-      _cachedPalettes[songId] = cached; // Refresh LRU position
+  /// Extracts dynamic color scheme from a [SongsTableData] object, supporting
+  /// both local MediaStore songs and online streaming tracks (YouTube Music).
+  Future<void> updateFromSong(SongsTableData? song) async {
+    if (song == null) {
+      resetToDefault();
+      return;
+    }
+    await updateFromDetails(songId: song.id, remoteArtworkUrl: song.remoteArtworkUrl);
+  }
+
+  Future<void> updateFromSongId(int songId, {String? remoteArtworkUrl}) async {
+    await updateFromDetails(songId: songId, remoteArtworkUrl: remoteArtworkUrl);
+  }
+
+  Future<void> updateFromDetails({required int songId, String? remoteArtworkUrl}) async {
+    final cacheKey = (remoteArtworkUrl != null && remoteArtworkUrl.isNotEmpty)
+        ? remoteArtworkUrl
+        : 'AUDIO_$songId';
+
+    if (_cachedPalettes.containsKey(cacheKey)) {
+      final cached = _cachedPalettes.remove(cacheKey)!;
+      _cachedPalettes[cacheKey] = cached; // Refresh LRU position
       emit(cached);
       return;
     }
@@ -66,24 +86,41 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
     final token = ++_currentRequestToken;
 
     try {
-      Uint8List? rawArt = ArtworkLruCache().get('AUDIO_$songId');
-      if (rawArt == null || rawArt.isEmpty) {
-        rawArt = await _audioQuery.queryArtwork(
-          songId,
-          ArtworkType.AUDIO,
-          format: ArtworkFormat.JPEG,
-          size: 150,
-          quality: 75,
-        );
+      ImageProvider? imageProvider;
+
+      // 1. If online remote artwork URL exists (YouTube Music streaming / online song)
+      if (remoteArtworkUrl != null && remoteArtworkUrl.isNotEmpty) {
+        final highResUrl = CachedArtwork.upgradeToHighResArtwork(remoteArtworkUrl);
+        final cachedBytes = ArtworkLruCache().get(highResUrl) ?? ArtworkLruCache().get(remoteArtworkUrl);
+        if (cachedBytes != null && cachedBytes.isNotEmpty) {
+          imageProvider = MemoryImage(cachedBytes);
+        } else {
+          imageProvider = NetworkImage(highResUrl);
+        }
+      } else {
+        // 2. Local audio file from MediaStore
+        Uint8List? rawArt = ArtworkLruCache().get('AUDIO_$songId');
+        if (rawArt == null || rawArt.isEmpty) {
+          rawArt = await _audioQuery.queryArtwork(
+            songId,
+            ArtworkType.AUDIO,
+            format: ArtworkFormat.JPEG,
+            size: 150,
+            quality: 75,
+          );
+        }
+        if (rawArt != null && rawArt.isNotEmpty) {
+          imageProvider = MemoryImage(rawArt);
+        }
       }
 
       if (token != _currentRequestToken || isClosed) return;
 
-      if (rawArt != null && rawArt.isNotEmpty) {
+      if (imageProvider != null) {
         final palette = await PaletteGenerator.fromImageProvider(
-          MemoryImage(rawArt),
-          size: const Size(48, 48),
-          maximumColorCount: 12,
+          imageProvider,
+          size: const Size(64, 64),
+          maximumColorCount: 16,
         );
 
         if (token != _currentRequestToken || isClosed) return;
@@ -123,11 +160,13 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
         if (_cachedPalettes.length >= _maxCacheSize) {
           _cachedPalettes.remove(_cachedPalettes.keys.first);
         }
-        _cachedPalettes[songId] = newState;
+        _cachedPalettes[cacheKey] = newState;
         emit(newState);
         return;
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to generate dynamic theme palette for $cacheKey', error: e, stackTrace: st, category: 'DynamicTheme');
+    }
 
     if (token == _currentRequestToken && !isClosed) {
       emit(const DynamicThemeState());

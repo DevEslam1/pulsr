@@ -5,6 +5,7 @@ plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -22,10 +23,51 @@ android {
         applicationId = "com.pulsr.music"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 24
+        // 28 (Android 9) is the floor for the true 10-band graphic EQ, which is
+        // built on DynamicsProcessing postEq — added in API 28.
+        minSdk = 28
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        manifestPlaceholders["appName"] = "Pulsr Music"
+    }
+
+    flavorDimensions += "default"
+    productFlavors {
+        create("dev") {
+            dimension = "default"
+            applicationIdSuffix = ".plus"
+            manifestPlaceholders["appName"] = "Pulsr Plus"
+        }
+        create("prod") {
+            dimension = "default"
+            manifestPlaceholders["appName"] = "Pulsr Music"
+        }
+        // Off-Play distribution build. Identical to prod but compiles the
+        // NewPipeExtractor bridge, so YouTube Music search/stream/download works.
+        create("ytm") {
+            dimension = "default"
+            manifestPlaceholders["appName"] = "Pulsr Music"
+        }
+    }
+
+    // The extractor bridge lives outside src/main so that `prod` -- the Play
+    // Store variant -- cannot compile it and does not link NewPipeExtractor at
+    // all. This is a hard exclusion, unlike the Dart-side ENABLE_YTM gate which
+    // only relies on tree-shaking. Both source sets must declare the same
+    // YtmExtractorPlugin class, because MainActivity in src/main references it.
+    // The assets dir carries the BotGuard page the poToken WebView runs, which is
+    // likewise GPL and so likewise kept out of prod.
+    sourceSets {
+        getByName("dev") {
+            kotlin.directories.add("src/ytmEnabled/kotlin")
+            assets.srcDir("src/ytmEnabled/assets")
+        }
+        getByName("ytm") {
+            kotlin.directories.add("src/ytmEnabled/kotlin")
+            assets.srcDir("src/ytmEnabled/assets")
+        }
+        getByName("prod") { kotlin.directories.add("src/ytmDisabled/kotlin") }
     }
 
     val keystoreProperties = Properties().apply {
@@ -59,6 +101,20 @@ android {
             )
         }
     }
+
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
+    }
+
+    packaging {
+        resources {
+            excludes += "google/protobuf/**"
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            excludes += "META-INF/INDEX.LIST"
+            excludes += "META-INF/io.netty.versions.properties"
+        }
+    }
 }
 
 kotlin {
@@ -71,9 +127,28 @@ flutter {
     source = "../.."
 }
 
+// Scoped to this module rather than the root allprojects block: JitPack serves
+// unreviewed builds straight from git tags, so only the app needs to trust it.
+repositories {
+    maven { url = uri("https://jitpack.io") }
+}
+
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.2")
     implementation("net.jthink:jaudiotagger:3.0.1")
     implementation("androidx.media:media:1.7.0")
+
+    // GPL-3.0. Its presence is why Pulsr as a whole is GPL-3.0, and why it is
+    // kept out of the prod (Play Store) variant. Pulls in Mozilla Rhino, which
+    // solves YouTube's JS signature challenges on-device.
+    val newPipeExtractor = "com.github.TeamNewPipe:NewPipeExtractor:v0.26.5"
+    "devImplementation"(newPipeExtractor)
+    "ytmImplementation"(newPipeExtractor)
+}
+
+configurations.all {
+    resolutionStrategy {
+        force("com.google.protobuf:protobuf-javalite:3.25.5")
+    }
 }
 

@@ -6,10 +6,12 @@ import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/love_feedback.dart';
 import '../../../../core/widgets/cached_artwork.dart';
+import '../../../../data/db/app_database.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../../sheets/add_to_playlist_sheet.dart';
 import '../../../sheets/song_info_sheet.dart';
+import '../../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../widgets/audio_quality_badge.dart';
 import '../widgets/audio_visualizer.dart';
 import '../widgets/equalizer_sheet.dart';
@@ -149,6 +151,7 @@ class MinimalPlayerTheme extends StatelessWidget {
                                           child: song != null
                                               ? CachedArtwork(
                                                   id: song.id,
+                                                  remoteUrl: song.remoteArtworkUrl,
                                                   type: ArtworkType.AUDIO,
                                                   size: double.infinity,
                                                   borderRadius: 20,
@@ -168,6 +171,7 @@ class MinimalPlayerTheme extends StatelessWidget {
                         color: activeColor,
                         height: visualizerStyle == VisualizerStyle.circular ? 100 : 48,
                         isPlaying: state.isPlaying,
+                        audioSessionId: state.audioSessionId,
                       ),
                   ],
                 ),
@@ -317,6 +321,13 @@ class MinimalPlayerTheme extends StatelessWidget {
                       }
                     },
                   ),
+                  if (song != null && (song.source == SongSource.youtube || (song.remoteId != null && song.remoteId!.isNotEmpty)))
+                    YtmDownloadButton(
+                      song: song,
+                      activeColor: activeColor,
+                      iconColor: p.textSecondary,
+                      iconSize: 22,
+                    ),
                   IconButton(
                     icon: Icon(Icons.playlist_add_rounded, color: p.textSecondary),
                     onPressed: () {

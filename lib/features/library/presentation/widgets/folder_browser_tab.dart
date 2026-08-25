@@ -53,6 +53,10 @@ class FolderBrowserTab extends StatelessWidget {
               itemCount: folders.length,
               itemBuilder: (context, index) {
                 final folder = folders[index];
+                final isDownloads = folder.name.toLowerCase().contains('pulsr') ||
+                    folder.path.toLowerCase().contains('ytdl') ||
+                    folder.name.toLowerCase() == 'download' ||
+                    folder.name.toLowerCase() == 'downloads';
 
                 return Container(
                   margin: const EdgeInsets.symmetric(vertical: 4),
@@ -61,7 +65,11 @@ class FolderBrowserTab extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                       side: BorderSide(
-                        color: folder.isExcluded ? p.error.withValues(alpha: 0.4) : p.hairline,
+                        color: folder.isExcluded
+                            ? p.error.withValues(alpha: 0.4)
+                            : isDownloads
+                                ? p.accent.withValues(alpha: 0.35)
+                                : p.hairline,
                       ),
                     ),
                     child: ListTile(
@@ -70,56 +78,87 @@ class FolderBrowserTab extends StatelessWidget {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       leading: Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: folder.isExcluded
-                            ? p.error.withValues(alpha: 0.15)
-                            : p.accentContainer,
-                        borderRadius: BorderRadius.circular(12),
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: folder.isExcluded
+                              ? p.error.withValues(alpha: 0.15)
+                              : isDownloads
+                                  ? p.accent.withValues(alpha: 0.22)
+                                  : p.accentContainer,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          folder.isExcluded
+                              ? Icons.folder_off_rounded
+                              : isDownloads
+                                  ? Icons.download_done_rounded
+                                  : Icons.folder_rounded,
+                          color: folder.isExcluded ? p.error : p.accent,
+                          size: 22,
+                        ),
                       ),
-                      child: Icon(
-                        folder.isExcluded ? Icons.folder_off_rounded : Icons.folder_rounded,
-                        color: folder.isExcluded ? p.error : p.accent,
-                        size: 22,
+                      title: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              folder.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                color: folder.isExcluded ? p.textTertiary : p.textPrimary,
+                                decoration: folder.isExcluded ? TextDecoration.lineThrough : null,
+                              ),
+                            ),
+                          ),
+                          if (isDownloads) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: p.accent.withValues(alpha: 0.18),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'DOWNLOADS',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w800,
+                                  color: p.accent,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                    ),
-                    title: Text(
-                      folder.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        color: folder.isExcluded ? p.textTertiary : p.textPrimary,
-                        decoration: folder.isExcluded ? TextDecoration.lineThrough : null,
+                      subtitle: Text(
+                        '${folder.songCount} audio tracks • ${folder.path}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: p.textSecondary, fontSize: 11.5),
                       ),
-                    ),
-                    subtitle: Text(
-                      '${folder.songCount} audio tracks • ${folder.path}',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: p.textSecondary, fontSize: 11.5),
-                    ),
-                    trailing: IconButton(
-                      icon: Icon(
-                        folder.isExcluded ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                        color: folder.isExcluded ? p.error : p.textSecondary,
-                        size: 22,
+                      trailing: IconButton(
+                        icon: Icon(
+                          folder.isExcluded ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                          color: folder.isExcluded ? p.error : p.textSecondary,
+                          size: 22,
+                        ),
+                        tooltip: folder.isExcluded ? 'Include in Scan' : 'Exclude from Scan',
+                        onPressed: () {
+                          cubit.toggleFolderExclusion(folder.path);
+                        },
                       ),
-                      tooltip: folder.isExcluded ? 'Include in Scan' : 'Exclude from Scan',
-                      onPressed: () {
-                        cubit.toggleFolderExclusion(folder.path);
-                      },
                     ),
                   ),
-                ),
-              );
-            },
+                );
+              },
+            ),
           ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
 }

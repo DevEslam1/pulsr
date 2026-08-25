@@ -37,6 +37,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     try {
       final granted = await widget.scannerService.requestPermission();
       if (granted) {
+        try {
+          await Permission.notification.request();
+        } catch (_) {}
         await widget.scannerService.scanDeviceLibrary();
       } else {
         if (mounted) {
@@ -375,7 +378,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1, end: 0),
           const SizedBox(height: 16),
           Text(
-            'Tailor your sound with a 5-band parametric equalizer, smooth crossfade transitions, gapless playback, and smart sleep timers.',
+            'Tailor your sound with a 10-band graphic equalizer, smooth crossfade transitions, gapless playback, and smart sleep timers.',
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                   color: p.textSecondary,

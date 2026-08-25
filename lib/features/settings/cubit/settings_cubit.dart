@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
 import 'settings_state.dart';
@@ -15,6 +16,7 @@ class SettingsCubit extends Cubit<SettingsState> {
   static const String _keyMinDuration = 'setting_min_duration';
   static const String _keyAutoHideSystemMedia = 'setting_auto_hide_system_media';
   static const String _keyDynamicTheme = 'setting_dynamic_theme';
+  static const String _keyThemeColorSource = 'setting_theme_color_source';
   static const String _keyResumeAfterInterruption = 'setting_resume_after_interruption';
   static const String _keyWaveformSeekBar = 'setting_waveform_seek_bar';
   static const String _keyThemeMode = 'setting_theme_mode';
@@ -25,6 +27,13 @@ class SettingsCubit extends Cubit<SettingsState> {
   static const String _keyMiniPlayerSwipeRight = 'setting_mini_player_swipe_right';
   static const String _keyNowPlayingDoubleTap = 'setting_now_playing_double_tap';
   static const String _keyNowPlayingArtworkSwipe = 'setting_now_playing_artwork_swipe';
+  static const String _keyReplayGainMode = 'setting_replay_gain_mode';
+  static const String _keyReplayGainPreampWithRg = 'setting_replay_gain_preamp_with_rg';
+  static const String _keyReplayGainPreampWithoutRg = 'setting_replay_gain_preamp_without_rg';
+  static const String _keyStreamingQuality = 'setting_streaming_quality';
+  static const String _keyDownloadQuality = 'setting_download_quality';
+  static const String _keyWifiOnlyMode = 'setting_wifi_only_mode';
+  static const String _keyOfflineOnlyMode = 'setting_offline_only_mode';
 
   SettingsCubit({required MediaScannerService scannerService})
       : _scannerService = scannerService,
@@ -86,12 +95,53 @@ class SettingsCubit extends Cubit<SettingsState> {
         orElse: () => NowPlayingArtworkSwipeAction.nextPrev,
       );
 
+      final replayGainModeStr = prefs.getString(_keyReplayGainMode) ?? ReplayGainMode.track.name;
+      final replayGainMode = ReplayGainMode.values.firstWhere(
+        (e) => e.name == replayGainModeStr,
+        orElse: () => ReplayGainMode.track,
+      );
+      final replayGainPreampWithRg = prefs.getDouble(_keyReplayGainPreampWithRg) ?? 0.0;
+      final replayGainPreampWithoutRg = prefs.getDouble(_keyReplayGainPreampWithoutRg) ?? -3.0;
+
+      final streamingQualityStr = prefs.getString(_keyStreamingQuality) ?? YtmAudioQuality.high.name;
+      final streamingQuality = YtmAudioQuality.values.firstWhere(
+        (e) => e.name == streamingQualityStr,
+        orElse: () => YtmAudioQuality.high,
+      );
+
+      final downloadQualityStr = prefs.getString(_keyDownloadQuality) ?? YtmAudioQuality.high.name;
+      final downloadQuality = YtmAudioQuality.values.firstWhere(
+        (e) => e.name == downloadQualityStr,
+        orElse: () => YtmAudioQuality.high,
+      );
+
+      final wifiOnlyMode = prefs.getBool(_keyWifiOnlyMode) ?? false;
+      final offlineOnlyMode = prefs.getBool(_keyOfflineOnlyMode) ?? false;
+
+      // Theme color source: prefer the new enum key; migrate from the legacy
+      // `dynamic_theme` bool for upgraders (true → artwork, false → custom) so
+      // an existing custom-accent user is not surprised by wallpaper colors.
+      final ThemeColorSource themeColorSource;
+      final sourceStr = prefs.getString(_keyThemeColorSource);
+      if (sourceStr != null) {
+        themeColorSource = ThemeColorSource.values.firstWhere(
+          (e) => e.name == sourceStr,
+          orElse: () => ThemeColorSource.artwork,
+        );
+      } else if (prefs.containsKey(_keyDynamicTheme)) {
+        themeColorSource = (prefs.getBool(_keyDynamicTheme) ?? true)
+            ? ThemeColorSource.artwork
+            : ThemeColorSource.custom;
+      } else {
+        themeColorSource = ThemeColorSource.artwork;
+      }
+
       emit(state.copyWith(
         gaplessPlayback: prefs.getBool(_keyGapless) ?? true,
         crossfadeSeconds: prefs.getDouble(_keyCrossfade) ?? 0.0,
         minDurationSec: prefs.getInt(_keyMinDuration) ?? 30,
         autoHideSystemMedia: prefs.getBool(_keyAutoHideSystemMedia) ?? true,
-        dynamicThemingEnabled: prefs.getBool(_keyDynamicTheme) ?? true,
+        themeColorSource: themeColorSource,
         resumeAfterInterruption: prefs.getBool(_keyResumeAfterInterruption) ?? true,
         waveformSeekBarEnabled: prefs.getBool(_keyWaveformSeekBar) ?? true,
         themeMode: themeMode,
@@ -102,8 +152,17 @@ class SettingsCubit extends Cubit<SettingsState> {
         miniPlayerSwipeRight: miniPlayerSwipeRight,
         nowPlayingDoubleTap: nowPlayingDoubleTap,
         nowPlayingArtworkSwipe: nowPlayingArtworkSwipe,
+        replayGainMode: replayGainMode,
+        replayGainPreampWithRg: replayGainPreampWithRg,
+        replayGainPreampWithoutRg: replayGainPreampWithoutRg,
+        streamingQuality: streamingQuality,
+        downloadQuality: downloadQuality,
+        wifiOnlyMode: wifiOnlyMode,
+        offlineOnlyMode: offlineOnlyMode,
       ));
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load settings preferences from SharedPreferences', error: e, stackTrace: st, category: 'SettingsCubit');
+    }
   }
 
   Future<void> setGapless(bool value) async {
@@ -130,11 +189,18 @@ class SettingsCubit extends Cubit<SettingsState> {
     await prefs.setBool(_keyAutoHideSystemMedia, value);
   }
 
-  Future<void> setDynamicTheming(bool value) async {
-    emit(state.copyWith(dynamicThemingEnabled: value));
+  Future<void> setThemeColorSource(ThemeColorSource source) async {
+    emit(state.copyWith(themeColorSource: source));
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyDynamicTheme, value);
+    await prefs.setString(_keyThemeColorSource, source.name);
+    // Keep the legacy bool in sync so a downgrade / backup restore still reads
+    // a sensible value (artwork ↔ true, anything else ↔ false).
+    await prefs.setBool(_keyDynamicTheme, source == ThemeColorSource.artwork);
   }
+
+  /// Back-compat shim: the old boolean toggle mapped on→artwork, off→custom.
+  Future<void> setDynamicTheming(bool value) =>
+      setThemeColorSource(value ? ThemeColorSource.artwork : ThemeColorSource.custom);
 
   Future<void> setResumeAfterInterruption(bool value) async {
     emit(state.copyWith(resumeAfterInterruption: value));
@@ -195,6 +261,48 @@ class SettingsCubit extends Cubit<SettingsState> {
     emit(state.copyWith(nowPlayingArtworkSwipe: action));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyNowPlayingArtworkSwipe, action.name);
+  }
+
+  Future<void> setReplayGainMode(ReplayGainMode mode) async {
+    emit(state.copyWith(replayGainMode: mode));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyReplayGainMode, mode.name);
+  }
+
+  Future<void> setReplayGainPreampWithRg(double db) async {
+    emit(state.copyWith(replayGainPreampWithRg: db));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_keyReplayGainPreampWithRg, db);
+  }
+
+  Future<void> setReplayGainPreampWithoutRg(double db) async {
+    emit(state.copyWith(replayGainPreampWithoutRg: db));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_keyReplayGainPreampWithoutRg, db);
+  }
+
+  Future<void> setStreamingQuality(YtmAudioQuality quality) async {
+    emit(state.copyWith(streamingQuality: quality));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyStreamingQuality, quality.name);
+  }
+
+  Future<void> setDownloadQuality(YtmAudioQuality quality) async {
+    emit(state.copyWith(downloadQuality: quality));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyDownloadQuality, quality.name);
+  }
+
+  Future<void> setWifiOnlyMode(bool enabled) async {
+    emit(state.copyWith(wifiOnlyMode: enabled));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyWifiOnlyMode, enabled);
+  }
+
+  Future<void> setOfflineOnlyMode(bool enabled) async {
+    emit(state.copyWith(offlineOnlyMode: enabled));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyOfflineOnlyMode, enabled);
   }
 
   Future<int> rescanLibrary() async {

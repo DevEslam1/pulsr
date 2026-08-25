@@ -7,11 +7,13 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/love_feedback.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/waveform_logo.dart';
+import '../../../../data/db/app_database.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 import '../../../sheets/add_to_playlist_sheet.dart';
 import '../../../sheets/sleep_timer_sheet.dart';
 import '../../../sheets/song_info_sheet.dart';
+import '../../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../widgets/audio_quality_badge.dart';
 import '../widgets/audio_visualizer.dart';
 import '../widgets/equalizer_sheet.dart';
@@ -175,6 +177,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                                     child: song != null
                                         ? CachedArtwork(
                                             id: song.id,
+                                            remoteUrl: song.remoteArtworkUrl,
                                             type: ArtworkType.AUDIO,
                                             size: double.infinity,
                                             borderRadius: 24,
@@ -195,14 +198,15 @@ class ClassicPlayerTheme extends StatelessWidget {
                 child: AudioVisualizer(
                   style: visualizerStyle,
                   color: activeColor,
-                  height: visualizerStyle == VisualizerStyle.circular ? 80 : 36,
+                  height: visualizerStyle == VisualizerStyle.circular ? 90 : 50,
                   isPlaying: state.isPlaying,
+                  audioSessionId: state.audioSessionId,
                 ),
               ),
 
             const SizedBox(height: 4),
 
-            // Title, Artist, Favorite
+            // Title, Artist, Favorite & Download
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 4),
               child: Row(
@@ -275,6 +279,15 @@ class ClassicPlayerTheme extends StatelessWidget {
                       ],
                     ),
                   ),
+                  if (song != null && (song.source == SongSource.youtube || (song.remoteId != null && song.remoteId!.isNotEmpty))) ...[
+                    YtmDownloadButton(
+                      song: song,
+                      activeColor: activeColor,
+                      iconColor: p.textSecondary,
+                      iconSize: 24,
+                    ),
+                    const SizedBox(width: 4),
+                  ],
                   IconButton(
                     icon: Icon(
                       song?.isFavorite == true

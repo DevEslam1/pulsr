@@ -39,6 +39,7 @@ class PlayerControls extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
         IconButton(
+          tooltip: isShuffle ? 'Disable shuffle' : 'Enable shuffle',
           onPressed: onToggleShuffle,
           icon: Icon(
             Icons.shuffle_rounded,
@@ -47,6 +48,7 @@ class PlayerControls extends StatelessWidget {
           ),
         ),
         IconButton(
+          tooltip: 'Previous track',
           onPressed: onPrevious,
           icon: Icon(
             Icons.skip_previous_rounded,
@@ -54,33 +56,38 @@ class PlayerControls extends StatelessWidget {
             size: 38,
           ),
         ),
-        GestureDetector(
-          onTap: onPlayPause,
-          child: Container(
-            width: mainButtonSize,
-            height: mainButtonSize,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: primaryColor,
-              boxShadow: [
-                BoxShadow(
-                  color: primaryColor.withValues(alpha: 0.4),
-                  blurRadius: 20,
-                  spreadRadius: 2,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Icon(
-              isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-              color: onPrimaryColor,
-              size: mainButtonSize * 0.55,
-            ),
-          )
-              .animate(target: isPlaying ? 1 : 0)
-              .scale(duration: 120.ms, begin: const Offset(0.92, 0.92), end: const Offset(1.0, 1.0)),
+        Semantics(
+          label: isPlaying ? 'Pause' : 'Play',
+          button: true,
+          child: GestureDetector(
+            onTap: onPlayPause,
+            child: Container(
+              width: mainButtonSize,
+              height: mainButtonSize,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: primaryColor,
+                boxShadow: [
+                  BoxShadow(
+                    color: primaryColor.withValues(alpha: 0.4),
+                    blurRadius: 20,
+                    spreadRadius: 2,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Icon(
+                isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                color: onPrimaryColor,
+                size: mainButtonSize * 0.55,
+              ),
+            )
+                .animate(target: isPlaying ? 1 : 0)
+                .scale(duration: 120.ms, begin: const Offset(0.92, 0.92), end: const Offset(1.0, 1.0)),
+          ),
         ),
         IconButton(
+          tooltip: 'Next track',
           onPressed: onNext,
           icon: Icon(
             Icons.skip_next_rounded,
@@ -89,6 +96,11 @@ class PlayerControls extends StatelessWidget {
           ),
         ),
         IconButton(
+          tooltip: repeatMode == PlayerRepeatMode.one
+              ? 'Repeat one'
+              : repeatMode == PlayerRepeatMode.all
+                  ? 'Repeat all'
+                  : 'Repeat off',
           onPressed: onToggleRepeat,
           icon: Icon(
             repeatMode == PlayerRepeatMode.one

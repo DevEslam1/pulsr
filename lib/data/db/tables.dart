@@ -1,6 +1,16 @@
 // lib/data/db/tables.dart
 import 'package:drift/drift.dart';
 
+/// Allowed values for [SongsTable.source].
+abstract final class SongSource {
+  /// A file indexed by MediaStore. `path` points at the filesystem.
+  static const String local = 'local';
+
+  /// A YouTube track that has no local file yet. `path` holds a
+  /// `ytmusic://<videoId>` sentinel, so any path-based feature must skip it.
+  static const String youtube = 'youtube';
+}
+
 class SongsTable extends Table {
   @override
   String get tableName => 'songs';
@@ -21,11 +31,42 @@ class SongsTable extends Table {
   IntColumn get dateAdded => integer().nullable()();
   TextColumn get genre => text().nullable()();
   BoolColumn get isFavorite => boolean().withDefault(const Constant(false))();
+  BoolColumn get isMissing => boolean().withDefault(const Constant(false))();
+  RealColumn get replayGainTrack => real().nullable()();
+  RealColumn get replayGainAlbum => real().nullable()();
+  RealColumn get replayGainTrackPeak => real().nullable()();
+  RealColumn get replayGainAlbumPeak => real().nullable()();
   IntColumn get playCount => integer().withDefault(const Constant(0))();
   IntColumn get lastPlayed => integer().nullable()();
   IntColumn get lastPositionMs => integer().withDefault(const Constant(0))();
   TextColumn get artworkUri => text().nullable()();
   IntColumn get fileSize => integer().nullable()();
+
+  /// Real audio-header fields, read from the file via the tag channel and
+  /// cached so the quality badge reflects actual metadata rather than a guess
+  /// from the filename/extension. Null until a file has been enriched.
+  IntColumn get sampleRate => integer().nullable()();
+  IntColumn get bitDepth => integer().nullable()();
+  IntColumn get bitrateKbps => integer().nullable()();
+  /// Real container/codec from the header (e.g. FLAC, MP3, AAC, ALAC), used to
+  /// gate lossless/Hi-Res so a renamed file cannot fake a higher tier.
+  TextColumn get codec => text().nullable()();
+
+  /// See [SongSource]. Rows that are not [SongSource.local] have no file on
+  /// disk, so scanner cleanup and every path-derived query must exclude them.
+  TextColumn get source => text().withDefault(const Constant(SongSource.local))();
+
+  /// YouTube video id. Kept after a download completes so the same video is
+  /// not fetched twice.
+  TextColumn get remoteId => text().nullable()();
+  TextColumn get remoteArtworkUrl => text().nullable()();
+
+  /// Destination a download is writing to, used to match the row MediaStore
+  /// creates once the file lands.
+  TextColumn get pendingDownloadPath => text().nullable()();
+
+  /// Explicit flag indicating whether this song was downloaded from YouTube Music / Online.
+  BoolColumn get isDownloaded => boolean().withDefault(const Constant(false)).nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

@@ -2,6 +2,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../core/utils/error_logger.dart';
 import '../../core/utils/lrc_parser.dart';
 import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
@@ -62,7 +63,8 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       } else {
         emit(state.copyWith(status: TagEditorStatus.loaded));
       }
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read native tags via MethodChannel for ${state.song.path}', error: e, stackTrace: st, category: 'TagEditorCubit');
       // Fallback to loaded with default DB tags if MethodChannel fails or on non-Android platform
       emit(state.copyWith(status: TagEditorStatus.loaded));
     }

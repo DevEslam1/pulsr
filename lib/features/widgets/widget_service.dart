@@ -8,6 +8,7 @@ import 'package:injectable/injectable.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../core/utils/error_logger.dart';
 import '../../data/db/app_database.dart';
 
 @lazySingleton
@@ -66,7 +67,9 @@ class WidgetService {
         androidName: androidWidgetName,
         qualifiedAndroidName: qualifiedAndroidName,
       );
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to update home screen widget state', error: e, stackTrace: st, category: 'WidgetService');
+    }
   }
 
   /// Exports a corner-rounded artwork PNG for the widget, cached per song.
@@ -101,7 +104,8 @@ class WidgetService {
       _lastArtworkSongId = songId;
       _lastArtworkPath = cachedFile.path;
       return cachedFile.path;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to resolve widget artwork for song $songId', error: e, stackTrace: st, category: 'WidgetService');
       return null;
     }
   }
@@ -140,7 +144,8 @@ class WidgetService {
       codec.dispose();
 
       return byteData?.buffer.asUint8List();
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to round corners for widget artwork', error: e, stackTrace: st, category: 'WidgetService');
       return null;
     }
   }

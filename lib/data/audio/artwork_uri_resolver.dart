@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'dart:io';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:path_provider/path_provider.dart';
+import '../../core/utils/error_logger.dart';
 import '../db/app_database.dart';
 
 class ArtworkUriResolver {
@@ -23,7 +24,9 @@ class ArtworkUriResolver {
         try {
           final f = File(oldestUri.toFilePath());
           if (f.existsSync()) f.deleteSync();
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('Failed to delete evicted artwork temp file', error: e, stackTrace: st, category: 'ArtworkUriResolver');
+        }
       }
     }
     map[key] = value;
@@ -41,11 +44,15 @@ class ArtworkUriResolver {
               name.startsWith('pulsr_artist_art_')) {
             try {
               entity.deleteSync();
-            } catch (_) {}
+            } catch (e, st) {
+              ErrorLogger.log('Failed to delete temp artwork file during cleanup: $name', error: e, stackTrace: st, category: 'ArtworkUriResolver');
+            }
           }
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to cleanup temp artwork directory', error: e, stackTrace: st, category: 'ArtworkUriResolver');
+    }
     _cachedArtworkUris.clear();
     _cachedAlbumArtUris.clear();
     _cachedArtistArtUris.clear();
@@ -69,8 +76,8 @@ class ArtworkUriResolver {
         songId,
         ArtworkType.AUDIO,
         format: ArtworkFormat.JPEG,
-        size: 300,
-        quality: 90,
+        size: 800,
+        quality: 95,
       );
       if (bytes != null && bytes.isNotEmpty) {
         await file.writeAsBytes(bytes);
@@ -78,7 +85,9 @@ class ArtworkUriResolver {
         _putLru(_cachedArtworkUris, songId, uri);
         return uri;
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to resolve artwork URI for song ID: $songId', error: e, stackTrace: st, category: 'ArtworkUriResolver');
+    }
     return null;
   }
 
@@ -100,8 +109,8 @@ class ArtworkUriResolver {
         albumId,
         ArtworkType.ALBUM,
         format: ArtworkFormat.JPEG,
-        size: 300,
-        quality: 90,
+        size: 800,
+        quality: 95,
       );
       if (bytes != null && bytes.isNotEmpty) {
         await file.writeAsBytes(bytes);
@@ -109,7 +118,9 @@ class ArtworkUriResolver {
         _putLru(_cachedAlbumArtUris, albumId, uri);
         return uri;
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to resolve album artwork URI for album ID: $albumId', error: e, stackTrace: st, category: 'ArtworkUriResolver');
+    }
     return null;
   }
 
@@ -131,8 +142,8 @@ class ArtworkUriResolver {
         artistId,
         ArtworkType.ARTIST,
         format: ArtworkFormat.JPEG,
-        size: 300,
-        quality: 90,
+        size: 800,
+        quality: 95,
       );
       if (bytes != null && bytes.isNotEmpty) {
         await file.writeAsBytes(bytes);
@@ -140,11 +151,18 @@ class ArtworkUriResolver {
         _putLru(_cachedArtistArtUris, artistId, uri);
         return uri;
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to resolve artist artwork URI for artist ID: $artistId', error: e, stackTrace: st, category: 'ArtworkUriResolver');
+    }
     return null;
   }
 
   static Future<Uri?> resolveArtworkUri(SongsTableData song) async {
+    // Remote tracks have no MediaStore id, so querying would be a wasted IPC.
+    final remoteUrl = song.remoteArtworkUrl;
+    if (remoteUrl != null && remoteUrl.isNotEmpty) {
+      return Uri.tryParse(remoteUrl);
+    }
     var uri = await getArtworkUri(song.id);
     if (uri == null && song.albumId != null) {
       uri = await getAlbumArtUri(song.albumId!);

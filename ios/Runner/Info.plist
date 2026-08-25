@@ -28,6 +28,12 @@
 	<true/>
 	<key>NSAppleMusicUsageDescription</key>
 	<string>Pulsr needs access to your local music library to play your songs.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Pulsr needs access to your photos to set custom album artwork.</string>
+	<key>UISupportsDocumentBrowser</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

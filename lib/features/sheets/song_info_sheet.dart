@@ -1,6 +1,5 @@
 // lib/features/sheets/song_info_sheet.dart
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -11,6 +10,7 @@ import '../../core/constants/app_radii.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/adaptive.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/platform_capabilities.dart';
 import '../../core/widgets/cached_artwork.dart';
 import '../../data/db/app_database.dart';
 import '../../domain/models/audio_quality_info.dart';
@@ -33,17 +33,49 @@ class SongInfoSheet extends StatelessWidget {
 
   Future<void> _setRingtone(BuildContext context, String type) async {
     const channel = MethodChannel('com.pulsr.music/ringtone');
+    final label = type == 'notification'
+        ? 'Notification sound'
+        : type == 'alarm'
+            ? 'Alarm sound'
+            : 'Ringtone';
+
     try {
+      if (Platform.isAndroid) {
+        final canWrite = await channel.invokeMethod<bool>('checkWriteSettingsPermission') ?? true;
+        if (!canWrite) {
+          if (!context.mounted) return;
+          final proceed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Permission Required'),
+              content: Text(
+                'To set $label directly, Android requires the "Modify system settings" permission.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    Navigator.of(ctx).pop(true);
+                    channel.invokeMethod('openWriteSettings');
+                  },
+                  child: const Text('Open Settings'),
+                ),
+              ],
+            ),
+          );
+          if (proceed != true) return;
+          return;
+        }
+      }
+
       final success = await channel.invokeMethod<bool>('setRingtone', {
         'filePath': song.path,
         'type': type,
       });
       if (context.mounted && (success ?? false)) {
-        final label = type == 'notification'
-            ? 'Notification sound'
-            : type == 'alarm'
-                ? 'Alarm sound'
-                : 'Ringtone';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('$label set successfully!')),
         );
@@ -175,7 +207,13 @@ class SongInfoSheet extends StatelessWidget {
                   const SizedBox(height: 20),
                   Row(
                     children: [
-                      CachedArtwork(id: song.id, type: ArtworkType.AUDIO, size: 64, borderRadius: 14),
+                      CachedArtwork(
+                        id: song.id,
+                        remoteUrl: song.remoteArtworkUrl,
+                        type: ArtworkType.AUDIO,
+                        size: 64,
+                        borderRadius: 14,
+                      ),
                       const SizedBox(width: 16),
                       Expanded(
                         child: Column(
@@ -265,7 +303,7 @@ class SongInfoSheet extends StatelessWidget {
                           ),
                         ),
                       ),
-                      if (defaultTargetPlatform == TargetPlatform.android) ...[
+                      if (PlatformCapabilities.hasRingtoneManager) ...[
                         const SizedBox(width: 12),
                         Expanded(
                           child: OutlinedButton.icon(
@@ -288,7 +326,7 @@ class SongInfoSheet extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  if (defaultTargetPlatform == TargetPlatform.android)
+                  if (PlatformCapabilities.hasTagEditor)
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton.icon(

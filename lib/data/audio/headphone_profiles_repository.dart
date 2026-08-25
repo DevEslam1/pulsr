@@ -1,6 +1,9 @@
 // lib/data/audio/headphone_profiles_repository.dart
 import 'dart:convert';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/constants/prefs_keys.dart';
+import '../../core/utils/error_logger.dart';
 import '../../domain/models/headphone_profile.dart';
 
 class HeadphoneProfilesRepository {
@@ -20,22 +23,68 @@ class HeadphoneProfilesRepository {
     try {
       final jsonString = await rootBundle.loadString('assets/eq_profiles/headphone_profiles.json');
       final List<dynamic> jsonList = json.decode(jsonString) as List<dynamic>;
-      _profiles = jsonList
+      final bundled = jsonList
           .map((item) => HeadphoneProfile.fromJson(item as Map<String, dynamic>))
           .toList();
+
+      // Load custom user profiles from SharedPreferences
+      final prefs = await SharedPreferences.getInstance();
+      final customJson = prefs.getString(PrefsKeys.customEqProfiles);
+      final List<HeadphoneProfile> customProfiles = [];
+      if (customJson != null) {
+        try {
+          final List<dynamic> customList = json.decode(customJson) as List<dynamic>;
+          for (final item in customList) {
+            customProfiles.add(HeadphoneProfile.fromJson(item as Map<String, dynamic>));
+          }
+        } catch (e, st) {
+          ErrorLogger.log('Failed to decode custom EQ profiles', error: e, stackTrace: st, category: 'HeadphoneProfilesRepository');
+        }
+      }
+
+      _profiles = [...customProfiles, ...bundled];
       _isLoaded = true;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load headphone profiles from assets', error: e, stackTrace: st, category: 'HeadphoneProfilesRepository');
       _profiles = [];
     }
     return _profiles;
   }
 
-  HeadphoneProfile? getProfileById(String id) {
-    try {
-      return _profiles.firstWhere((p) => p.id == id);
-    } catch (_) {
-      return null;
+  Future<void> addCustomProfile(HeadphoneProfile profile) async {
+    // Replace if existing ID matches, else prepend
+    final existingIndex = _profiles.indexWhere((p) => p.id == profile.id);
+    if (existingIndex >= 0) {
+      _profiles[existingIndex] = profile;
+    } else {
+      _profiles = [profile, ..._profiles];
     }
+    await _saveCustomProfiles();
+  }
+
+  Future<void> removeProfile(String id) async {
+    _profiles = _profiles.where((p) => p.id != id).toList();
+    await _saveCustomProfiles();
+  }
+
+  Future<void> _saveCustomProfiles() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonList = _profiles
+          .where((p) => p.id.startsWith('custom_'))
+          .map((p) => p.toJson())
+          .toList();
+      await prefs.setString(PrefsKeys.customEqProfiles, jsonEncode(jsonList));
+    } catch (e, st) {
+      ErrorLogger.log('Failed to save custom EQ profiles', error: e, stackTrace: st, category: 'HeadphoneProfilesRepository');
+    }
+  }
+
+  HeadphoneProfile? getProfileById(String id) {
+    for (final p in _profiles) {
+      if (p.id == id) return p;
+    }
+    return null;
   }
 
   List<String> getCategories() {
@@ -51,9 +100,9 @@ class HeadphoneProfilesRepository {
 
       if (query.trim().isEmpty) return true;
       final q = query.toLowerCase();
-      return profile.name.toLowerCase().contains(q) ||
-          profile.brand.toLowerCase().contains(q) ||
-          profile.model.toLowerCase().contains(q);
+      final tokens = q.split(RegExp(r'\s+'));
+      final searchable = '${profile.name} ${profile.brand} ${profile.model} ${profile.category}'.toLowerCase();
+      return tokens.every((token) => searchable.contains(token));
     }).toList();
   }
 }

@@ -1,6 +1,6 @@
-// lib/core/utils/error_logger.dart
 import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 
 class ErrorLogger {
   static void Function(dynamic error, StackTrace? stackTrace, String category)? onCrashReported;
@@ -18,11 +18,42 @@ class ErrorLogger {
         error: error,
         stackTrace: stackTrace,
       );
-    } else {
-      // In release mode, route to crash reporting hook if configured
-      if (error != null) {
-        onCrashReported?.call(error, stackTrace, category);
+    }
+    if (error != null) {
+      onCrashReported?.call(error, stackTrace, category);
+      if (Sentry.isEnabled) {
+        Sentry.captureException(
+          error,
+          stackTrace: stackTrace,
+          withScope: (scope) {
+            scope.setTag('category', category);
+            scope.setContexts('message', {'value': message});
+          },
+        );
       }
+    }
+  }
+
+  static void addBreadcrumb(
+    String message, {
+    String category = 'event',
+    Map<String, dynamic>? data,
+  }) {
+    if (kDebugMode) {
+      developer.log(
+        'Breadcrumb: $message ${data != null ? data.toString() : ""}',
+        name: 'Pulsr.$category',
+      );
+    }
+    if (Sentry.isEnabled) {
+      Sentry.addBreadcrumb(
+        Breadcrumb(
+          message: message,
+          category: category,
+          data: data,
+          timestamp: DateTime.now(),
+        ),
+      );
     }
   }
 

@@ -48,6 +48,12 @@ class MockPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   @override
   double get volume => 1.0;
   @override
+  SongsTableData? get currentSong => null;
+  @override
+  int? get currentAudioSessionId => null;
+  @override
+  Stream<int?> get audioSessionIdStream => Stream<int?>.empty();
+  @override
   Future<void> setVolume(double volume) async {}
   @override
   bool get isEqualizerEnabled => false;
@@ -61,6 +67,8 @@ class MockPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   void setCrossfadeDuration(Duration d) {}
   @override
   Future<void> restoreLastPlaybackSession() async {}
+  @override
+  void saveCurrentPositionImmediate() {}
   @override
   Future<void> setEqualizerEnabled(bool enabled) async {}
   @override
@@ -92,11 +100,29 @@ class MockPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   @override
   bool get isSpatializerSupported => false;
   @override
+  bool get isHeadTrackerAvailable => false;
+  @override
   Future<void> setSpatializerEnabled(bool enabled) async {}
   @override
   double get volumeBoost => 0.0;
   @override
   Future<void> setVolumeBoost(double value) async {}
+  @override
+  Future<void> resetToFlat() async {}
+  @override
+  Future<void> startAbComparison() async {}
+  @override
+  Future<void> endAbComparison() async {}
+  @override
+  bool get isAbComparisonActive => false;
+  @override
+  Future<void> toggleDynamicsBypass() async {}
+  @override
+  bool get isDynamicsBypassed => false;
+  @override
+  Future<void> setCustomFrequencies(List<double> frequencies) async {}
+  @override
+  void onAppPaused() {}
   @override
   void startSleepTimer(Duration duration, {bool fadeOut = true}) {}
   @override
@@ -119,6 +145,8 @@ class MockPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   void dispose() {}
   @override
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {}
+  @override
+  Future<void> validatePlayerState() async {}
 }
 
 void main() {

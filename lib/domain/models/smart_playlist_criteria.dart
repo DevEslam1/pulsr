@@ -1,5 +1,5 @@
-// lib/domain/models/smart_playlist_criteria.dart
 import 'dart:convert';
+import '../../core/utils/error_logger.dart';
 
 enum SmartRuleField {
   playCount('playCount', 'Play Count'),
@@ -125,7 +125,8 @@ class SmartCriteria {
     if (source.trim().isEmpty) return const SmartCriteria();
     try {
       return SmartCriteria.fromJson(jsonDecode(source) as Map<String, dynamic>);
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Failed to parse SmartCriteria from JSON string', error: e, stackTrace: st, category: 'SmartCriteria');
       return const SmartCriteria();
     }
   }

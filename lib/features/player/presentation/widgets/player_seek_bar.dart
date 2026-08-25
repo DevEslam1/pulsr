@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
-import '../../../../core/utils/waveform_generator.dart';
+import '../../../../core/services/waveform_service.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/player_cubit.dart';
 import 'waveform_seek_bar.dart';
@@ -48,7 +48,7 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
     if (waveformEnabled && effectiveSongId != null) {
       if (_lastSongId != effectiveSongId || _cachedWaveformFuture == null) {
         _lastSongId = effectiveSongId;
-        _cachedWaveformFuture = WaveformGenerator().generateWaveform(
+        _cachedWaveformFuture = WaveformService.instance.getWaveform(
           songId: effectiveSongId,
           filePath: effectiveFilePath,
         );

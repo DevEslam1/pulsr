@@ -27,6 +27,12 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   @override
   double get volume => _vol;
   @override
+  SongsTableData? get currentSong => null;
+  @override
+  int? get currentAudioSessionId => null;
+  @override
+  Stream<int?> get audioSessionIdStream => Stream<int?>.empty();
+  @override
   Future<void> setVolume(double volume) async {
     _vol = volume;
   }
@@ -56,6 +62,9 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
 
   @override
   Future<void> restoreLastPlaybackSession() async {}
+
+  @override
+  void saveCurrentPositionImmediate() {}
 
   @override
   Future<void> setEqualizerEnabled(bool enabled) async {
@@ -107,6 +116,9 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   bool get isSpatializerSupported => false;
 
   @override
+  bool get isHeadTrackerAvailable => false;
+
+  @override
   Future<void> setSpatializerEnabled(bool enabled) async {}
 
   @override
@@ -114,6 +126,30 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
 
   @override
   Future<void> setVolumeBoost(double value) async {}
+
+  @override
+  Future<void> resetToFlat() async {}
+
+  @override
+  Future<void> startAbComparison() async {}
+
+  @override
+  Future<void> endAbComparison() async {}
+
+  @override
+  bool get isAbComparisonActive => false;
+
+  @override
+  Future<void> toggleDynamicsBypass() async {}
+
+  @override
+  bool get isDynamicsBypassed => false;
+
+  @override
+  Future<void> setCustomFrequencies(List<double> frequencies) async {}
+
+  @override
+  void onAppPaused() {}
 
   @override
   void startSleepTimer(Duration duration, {bool fadeOut = true}) {
@@ -155,6 +191,9 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
 
   @override
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {}
+
+  @override
+  Future<void> validatePlayerState() async {}
 }
 
 void main() {
@@ -292,7 +331,7 @@ void main() {
       cubit.close();
     });
 
-    test('position stream only emits when delta exceeds 100ms', () async {
+    test('position stream updates state continuously', () async {
       final cubit = PlayerCubit(
         audioHandler: testAudioHandler,
         repository: mockRepository,
@@ -300,15 +339,13 @@ void main() {
       );
       await Future<void>.delayed(const Duration(milliseconds: 10));
 
-      // 50ms delta from zero - should not emit
-      testAudioHandler._positionController.add(const Duration(milliseconds: 50));
+      testAudioHandler._positionController.add(const Duration(milliseconds: 100));
       await Future<void>.delayed(const Duration(milliseconds: 10));
-      expect(cubit.state.position, Duration.zero);
+      expect(cubit.state.position, const Duration(milliseconds: 100));
 
-      // 200ms delta from 50ms - should emit
-      testAudioHandler._positionController.add(const Duration(milliseconds: 250));
+      testAudioHandler._positionController.add(const Duration(milliseconds: 300));
       await Future<void>.delayed(const Duration(milliseconds: 10));
-      expect(cubit.state.position, const Duration(milliseconds: 250));
+      expect(cubit.state.position, const Duration(milliseconds: 300));
 
       cubit.close();
     });

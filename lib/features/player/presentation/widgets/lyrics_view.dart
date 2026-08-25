@@ -78,8 +78,20 @@ class _LyricsViewState extends State<LyricsView> {
   Widget _buildSourceBadge(LyricsSource source) {
     if (source == LyricsSource.none) return const SizedBox.shrink();
 
-    final String label = source == LyricsSource.embedded ? 'Embedded' : 'LRC File';
-    final IconData icon = source == LyricsSource.embedded ? Icons.music_note : Icons.subtitles_outlined;
+    final String label = switch (source) {
+      LyricsSource.embedded => 'Embedded',
+      LyricsSource.externalLrc => 'LRC File',
+      LyricsSource.lrclib => 'LRCLIB Synced',
+      LyricsSource.ytmusic => 'YouTube Music',
+      LyricsSource.none => '',
+    };
+    final IconData icon = switch (source) {
+      LyricsSource.embedded => Icons.music_note,
+      LyricsSource.externalLrc => Icons.subtitles_outlined,
+      LyricsSource.lrclib => Icons.cloud_done_rounded,
+      LyricsSource.ytmusic => Icons.lyrics_rounded,
+      LyricsSource.none => Icons.music_note,
+    };
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

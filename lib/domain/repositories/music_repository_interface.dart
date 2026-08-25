@@ -23,6 +23,22 @@ abstract class IMusicRepository {
   });
 
   Future<Result<SongsTableData?>> getSongById(int id);
+  Future<Result<SongsTableData?>> getSongByPath(String path);
+  Future<Result<SongsTableData?>> getSongByUri(String uri);
+  Future<Result<SongsTableData?>> getSongByRemoteId(String remoteId);
+  Future<Result<SongsTableData?>> findMatchingLocalSong({String? remoteId, String? title, String? artist});
+  Future<Result<List<SongsTableData>>> getSongsByIds(List<int> ids);
+  Future<Result<int>> hardDeleteMissingSongs();
+
+  /// Folds a downloaded YouTube row (negative [oldId]) into the positive-id
+  /// row the scanner created for [newPath]: merges play stats and re-points
+  /// playlist/queue/history children, then deletes the YouTube row. Returns
+  /// the surviving positive id, or null when no scanned row could be matched.
+  Future<Result<int?>> reconcileDownloadedSong({
+    required int oldId,
+    required String newPath,
+    SongsTableData? fallbackSong,
+  });
 
   Stream<Result<List<SongsTableData>>> watchFavorites();
   Future<Result<List<SongsTableData>>> getFavorites();
@@ -90,6 +106,16 @@ abstract class IMusicRepository {
     String? genre,
     int? year,
     int? trackNumber,
+  });
+
+  /// Persists real audio-header fields (read from the file) so the quality
+  /// badge reflects actual metadata instead of a filename guess.
+  Future<Result<void>> updateAudioQuality({
+    required int songId,
+    int? sampleRate,
+    int? bitDepth,
+    int? bitrateKbps,
+    String? codec,
   });
 
   // --- GENRES ---

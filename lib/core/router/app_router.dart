@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
+import '../config/app_config.dart';
 import '../../domain/models/genre_item.dart';
 import '../../domain/models/year_item.dart';
 import '../../domain/usecases/folder_usecases.dart';
@@ -24,6 +25,7 @@ import '../../features/smart_playlist_builder/smart_playlist_builder_screen.dart
 import '../../features/splash/presentation/splash_screen.dart';
 import '../../features/tag_editor/tag_editor_screen.dart';
 import '../../features/year_detail/presentation/year_detail_screen.dart';
+import '../../features/ytm_search/presentation/ytm_search_screen.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
@@ -251,6 +253,15 @@ GoRouter createRouter(MediaScannerService scannerService) {
           return TagEditorScreen(song: song);
         },
       ),
+      // Gated: only reachable in an ENABLE_YTM build. In prod this collection-if
+      // is const-false, so the route and YtmSearchScreen tree-shake away.
+      if (AppConfig.ytmEnabled)
+        GoRoute(
+          path: '/ytm-search',
+          name: 'ytm-search',
+          parentNavigatorKey: rootNavigatorKey,
+          builder: (context, state) => const YtmSearchScreen(),
+        ),
     ],
   );
 }

@@ -1,9 +1,19 @@
 // lib/features/settings/presentation/settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/di/injection.dart';
+import '../../../core/services/artwork_cache_manager.dart';
+import '../../../core/services/ytm_account_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/platform_capabilities.dart';
+import '../../auth/cubit/auth_cubit.dart';
+import '../../auth/cubit/auth_state.dart';
+import '../../auth/presentation/auth_sheet.dart';
+import '../../auth/presentation/ytm_web_login_sheet.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
 import '../../player/presentation/widgets/equalizer_sheet.dart';
 import '../../sheets/sleep_timer_sheet.dart';
@@ -11,6 +21,7 @@ import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
 import 'hidden_folders_screen.dart';
 import 'widgets/backup_section.dart';
+import 'widgets/battery_optimization_card.dart';
 import 'widgets/love_dedication_card.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -33,9 +44,24 @@ class SettingsScreen extends StatelessWidget {
                 padding: EdgeInsets.only(bottom: 160, top: 8, left: Adaptive.pagePadding(context), right: Adaptive.pagePadding(context)),
                 children: [
                   const LoveDedicationCard(),
+                  _buildCloudSyncCard(context),
                   _section(context, 'Audio & Playback', [
-                    _navTile(context, Icons.equalizer_rounded, 'Equalizer & Sound Effects', '5-band EQ, bass boost, presets',
-                        onTap: () => showModalBottomSheet(context: context, useRootNavigator: true, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => const EqualizerSheet())),
+                    _navTile(
+                      context,
+                      Icons.equalizer_rounded,
+                      'Equalizer & Sound Effects',
+                      PlatformCapabilities.hasEqualizer
+                          ? '10-band EQ, bass boost, presets'
+                          : 'Not available on this platform',
+                      onTap: PlatformCapabilities.hasEqualizer
+                          ? () => showModalBottomSheet(
+                              context: context,
+                              useRootNavigator: true,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (_) => const EqualizerSheet())
+                          : null,
+                    ),
                     _divider(p),
                     _navTile(context, Icons.timer_outlined, 'Sleep Timer', 'Auto pause with gentle fade-out',
                         onTap: () => showModalBottomSheet(context: context, useRootNavigator: true, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => const SleepTimerSheet())),
@@ -70,6 +96,7 @@ class SettingsScreen extends StatelessWidget {
                         ],
                       ),
                     ),
+                    const BatteryOptimizationCard(),
                   ]),
                   _section(context, 'Theme & Appearance', [
                     Padding(
@@ -186,8 +213,8 @@ class SettingsScreen extends StatelessWidget {
                     _navTile(context, Icons.graphic_eq_rounded, 'Visualizer Style', _getVisualizerStyleTitle(state.visualizerStyle),
                         onTap: () => _showVisualizerStylePickerSheet(context, cubit, state.visualizerStyle)),
                     _divider(p),
-                    _switchTile(context, Icons.palette_outlined, 'Dynamic Artwork Theming', 'Adapt colors from album art',
-                        value: state.dynamicThemingEnabled, onChanged: cubit.setDynamicTheming),
+                    _navTile(context, Icons.palette_outlined, 'Color Source', _getColorSourceTitle(state.themeColorSource),
+                        onTap: () => _showColorSourcePickerSheet(context, cubit, state.themeColorSource)),
                   ]),
                   _section(context, 'Gestures', [
                     _navTile(context, Icons.swipe_left_rounded, 'Mini Player Swipe Left', _getMiniPlayerSwipeTitle(state.miniPlayerSwipeLeft),
@@ -217,6 +244,71 @@ class SettingsScreen extends StatelessWidget {
                     _divider(p),
                     _navTile(context, Icons.filter_list_rounded, 'Short Audio Filter', 'Ignore files under ${state.minDurationSec}s',
                         onTap: () => _showDurationFilterDialog(context, cubit, state.minDurationSec)),
+                  ]),
+                  if (AppConfig.ytmEnabled)
+                    _section(context, 'YouTube Music & Online', [
+                      () {
+                        final ytmAccount = getIt<YtmAccountService>();
+                        return ValueListenableBuilder<bool>(
+                          valueListenable: ytmAccount.loginState,
+                          builder: (context, isLoggedIn, _) {
+                            if (!isLoggedIn) {
+                              return _navTile(
+                                context,
+                                Icons.account_circle_outlined,
+                                'Connect YouTube Music Account',
+                                'Sign in to auto-sync your Liked Music library',
+                                onTap: () async {
+                                  final ok = await YtmWebLoginSheet.show(context);
+                                  // loginState notifier fires automatically in
+                                  // saveSession — no manual setState needed.
+                                  if (ok == true && context.mounted) {
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('YouTube Music connected!'),
+                                      ),
+                                    );
+                                  }
+                                },
+                              );
+                            } else {
+                              return _navTile(
+                                context,
+                                Icons.account_circle_rounded,
+                                'YouTube Music Connected',
+                                '${ytmAccount.accountName ?? "Connected"} • Tap to manage',
+                                onTap: () =>
+                                    _showYtmAccountDisconnectDialog(context),
+                              );
+                            }
+                          },
+                        );
+                      }(),
+                      _divider(p),
+                      _switchTile(context, Icons.cloud_off_rounded, 'Offline Only Mode',
+                          'Disable online features, streaming & web queries',
+                          value: state.offlineOnlyMode, onChanged: cubit.setOfflineOnlyMode),
+                      if (!state.offlineOnlyMode) ...[
+                        _divider(p),
+                        _switchTile(context, Icons.wifi_rounded, 'Wi-Fi Only Mode',
+                            'Only stream and download when on Wi-Fi',
+                            value: state.wifiOnlyMode, onChanged: cubit.setWifiOnlyMode),
+                        _divider(p),
+                        _navTile(context, Icons.travel_explore_rounded, 'Search YouTube Music',
+                            'Search, stream & download songs',
+                            onTap: () => context.push('/ytm-search')),
+                        _divider(p),
+                        _navTile(context, Icons.wifi_tethering_rounded, 'Streaming Quality',
+                            _getQualityTitle(state.streamingQuality),
+                            onTap: () => _showQualityPickerSheet(context, cubit, isStreaming: true, currentQuality: state.streamingQuality)),
+                        _divider(p),
+                        _navTile(context, Icons.downloading_rounded, 'Download Quality',
+                            _getQualityTitle(state.downloadQuality),
+                            onTap: () => _showQualityPickerSheet(context, cubit, isStreaming: false, currentQuality: state.downloadQuality)),
+                      ],
+                    ]),
+                  _section(context, 'Storage & Cache', [
+                    const _CacheSection(),
                   ]),
                   _section(context, 'Privacy & Data', [
                     const BackupSection(),
@@ -311,7 +403,7 @@ class SettingsScreen extends StatelessWidget {
   }
 
   Widget _navTile(BuildContext context, IconData icon, String title, String subtitle,
-      {Widget? trailing, required VoidCallback onTap}) {
+      {Widget? trailing, VoidCallback? onTap}) {
     final p = context.palette;
     return ListTile(
       leading: _iconBox(context, icon),
@@ -497,6 +589,120 @@ class SettingsScreen extends StatelessWidget {
                         : null,
                     onTap: () {
                       cubit.setPlayerThemeMode(t.mode);
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getColorSourceTitle(ThemeColorSource source) {
+    switch (source) {
+      case ThemeColorSource.system:
+        return 'Material You (Wallpaper)';
+      case ThemeColorSource.artwork:
+        return 'Album Artwork';
+      case ThemeColorSource.custom:
+        return 'Custom Accent';
+    }
+  }
+
+  void _showColorSourcePickerSheet(
+    BuildContext context,
+    SettingsCubit cubit,
+    ThemeColorSource currentSource,
+  ) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final surfaceColor = Theme.of(context).colorScheme.surface;
+    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
+    final outlineColor = Theme.of(context).colorScheme.outline;
+    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? context.palette.textPrimary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
+
+    final sources = [
+      (
+        source: ThemeColorSource.system,
+        title: 'Material You (Wallpaper)',
+        subtitle: 'Follow the system wallpaper palette on Android 12+ • falls back to album art on older devices',
+        icon: Icons.wallpaper_rounded,
+      ),
+      (
+        source: ThemeColorSource.artwork,
+        title: 'Album Artwork',
+        subtitle: 'Adapt colors from the current track\'s album art (changes per song)',
+        icon: Icons.album_rounded,
+      ),
+      (
+        source: ThemeColorSource.custom,
+        title: 'Custom Accent',
+        subtitle: 'Use the fixed accent color you pick above',
+        icon: Icons.color_lens_rounded,
+      ),
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: surfaceColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Text(
+                'App Color Source',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...sources.map((s) {
+              final isSelected = s.source == currentSource;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color: isSelected ? primaryColor.withValues(alpha: 0.12) : cardColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: isSelected ? primaryColor : outlineColor,
+                      width: isSelected ? 1.5 : 1.0,
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: Icon(
+                      s.icon,
+                      color: isSelected ? primaryColor : textSecondary,
+                    ),
+                    title: Text(
+                      s.title,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: isSelected ? primaryColor : textPrimary,
+                      ),
+                    ),
+                    subtitle: Text(
+                      s.subtitle,
+                      style: TextStyle(fontSize: 12, color: textSecondary),
+                    ),
+                    trailing: isSelected
+                        ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                        : null,
+                    onTap: () {
+                      cubit.setThemeColorSource(s.source);
                       Navigator.pop(ctx);
                     },
                   ),
@@ -909,6 +1115,419 @@ class SettingsScreen extends StatelessWidget {
               );
             }),
           ],
+        ),
+      ),
+    );
+  }
+
+  String _getQualityTitle(YtmAudioQuality quality) {
+    switch (quality) {
+      case YtmAudioQuality.high:
+        return 'High (~160+ kbps • Best)';
+      case YtmAudioQuality.medium:
+        return 'Medium (~128 kbps)';
+      case YtmAudioQuality.low:
+        return 'Low (~64 kbps • Data Saver)';
+    }
+  }
+
+  void _showQualityPickerSheet(
+    BuildContext context,
+    SettingsCubit cubit, {
+    required bool isStreaming,
+    required YtmAudioQuality currentQuality,
+  }) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final surfaceColor = Theme.of(context).colorScheme.surface;
+    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
+    final outlineColor = Theme.of(context).colorScheme.outline;
+    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? context.palette.textPrimary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
+
+    final options = [
+      (
+        quality: YtmAudioQuality.high,
+        title: 'High Quality',
+        subtitle: isStreaming
+            ? 'Highest available bitrate (~160+ kbps) for crystal clear sound'
+            : 'Highest quality audio files (~160+ kbps M4A)',
+        icon: Icons.high_quality_rounded,
+      ),
+      (
+        quality: YtmAudioQuality.medium,
+        title: 'Medium Quality',
+        subtitle: isStreaming
+            ? 'Standard bitrate (~128 kbps) with balanced data usage'
+            : 'Standard file size and quality (~128 kbps M4A)',
+        icon: Icons.graphic_eq_rounded,
+      ),
+      (
+        quality: YtmAudioQuality.low,
+        title: 'Low / Data Saver',
+        subtitle: isStreaming
+            ? 'Reduced data usage (~64 kbps) for slow connections'
+            : 'Smallest file size (~64 kbps)',
+        icon: Icons.data_saver_on_rounded,
+      ),
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: surfaceColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Text(
+                isStreaming ? 'Streaming Audio Quality' : 'Download Audio Quality',
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...options.map((opt) {
+              final isSelected = opt.quality == currentQuality;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color: isSelected ? primaryColor.withValues(alpha: 0.12) : cardColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: isSelected ? primaryColor : outlineColor,
+                      width: isSelected ? 1.5 : 1.0,
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: Icon(opt.icon, color: isSelected ? primaryColor : textSecondary),
+                    title: Text(opt.title, style: TextStyle(fontWeight: FontWeight.w700, color: isSelected ? primaryColor : textPrimary)),
+                    subtitle: Text(opt.subtitle, style: TextStyle(fontSize: 12, color: textSecondary)),
+                    trailing: isSelected ? Icon(Icons.check_circle_rounded, color: primaryColor) : null,
+                    onTap: () {
+                      if (isStreaming) {
+                        cubit.setStreamingQuality(opt.quality);
+                      } else {
+                        cubit.setDownloadQuality(opt.quality);
+                      }
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCloudSyncCard(BuildContext context) {
+    final p = context.palette;
+
+    return BlocBuilder<AuthCubit, AuthState>(
+      builder: (context, state) {
+        final authCubit = context.read<AuthCubit>();
+        final user = state.user;
+        final isSyncing = state.syncStatus == SyncStatus.syncing;
+
+        String syncSubtitle = 'Sign in to back up favorites & playlists';
+        if (user != null) {
+          if (state.lastSyncedAt != null) {
+            final diff = DateTime.now().difference(state.lastSyncedAt!);
+            if (diff.inMinutes < 1) {
+              syncSubtitle = 'Last synced: Just now';
+            } else if (diff.inHours < 1) {
+              syncSubtitle = 'Last synced: ${diff.inMinutes}m ago';
+            } else {
+              syncSubtitle = 'Last synced: ${diff.inHours}h ago';
+            }
+          } else {
+            syncSubtitle = 'Connected • Ready to sync';
+          }
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 20, top: 4),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: p.surfaceContainer,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: p.hairline),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                      color: user != null ? p.accent.withValues(alpha: 0.15) : p.surface,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: p.hairline),
+                    ),
+                    child: user?.photoURL != null
+                        ? ClipOval(
+                            child: Image.network(
+                              user!.photoURL!,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Icon(Icons.person_rounded, color: p.accent),
+                            ),
+                          )
+                        : Icon(user != null ? Icons.person_rounded : Icons.cloud_outlined, color: p.accent),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          user?.displayName ?? user?.email ?? 'Cloud Sync & Backup',
+                          style: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          syncSubtitle,
+                          style: TextStyle(
+                            color: p.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (user == null) ...[
+                    FilledButton(
+                      onPressed: () => AuthSheet.show(context),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: p.accent,
+                        foregroundColor: p.onAccent,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
+                      child: const Text('Sign In', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    ),
+                  ] else ...[
+                    IconButton(
+                      tooltip: 'Sync Now',
+                      icon: isSyncing
+                          ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: p.accent))
+                          : Icon(Icons.sync_rounded, color: p.accent),
+                      onPressed: isSyncing ? null : () => authCubit.syncNow(),
+                    ),
+                    IconButton(
+                      tooltip: 'Sign Out',
+                      icon: Icon(Icons.logout_rounded, color: p.textTertiary, size: 20),
+                      onPressed: () => authCubit.signOut(),
+                    ),
+                  ],
+                ],
+              ),
+              if (state.syncError != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  state.syncError!,
+                  style: TextStyle(color: p.error, fontSize: 11),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showYtmAccountDisconnectDialog(BuildContext context) {
+    final account = getIt<YtmAccountService>();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('YouTube Music Account'),
+        content: Text(
+          'Connected as: ${account.accountName ?? "User"}\n\nDo you want to disconnect your YouTube Music account?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              await account.logout();
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Disconnected from YouTube Music')),
+                );
+              }
+            },
+            child: const Text('Disconnect'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CacheSection extends StatefulWidget {
+  const _CacheSection();
+
+  @override
+  State<_CacheSection> createState() => _CacheSectionState();
+}
+
+class _CacheSectionState extends State<_CacheSection> {
+  int _cacheSizeBytes = 0;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshCacheSize();
+  }
+
+  Future<void> _refreshCacheSize() async {
+    final size = await ArtworkCacheManager().getDiskCacheSizeBytes();
+    if (mounted) {
+      setState(() {
+        _cacheSizeBytes = size;
+        _isLoading = false;
+      });
+    }
+  }
+
+  String _formatSize(int bytes) {
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    final manager = ArtworkCacheManager();
+    final maxMb = manager.maxCacheSizeMb;
+
+    return Column(
+      children: [
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: p.accent.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.photo_size_select_actual_rounded, color: p.accent, size: 22),
+          ),
+          title: Text(
+            'Artwork & Media Cache',
+            style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14.5),
+          ),
+          subtitle: Text(
+            _isLoading ? 'Calculating…' : '${_formatSize(_cacheSizeBytes)} used of $maxMb MB max',
+            style: TextStyle(color: p.textSecondary, fontSize: 12.5),
+          ),
+          trailing: TextButton.icon(
+            style: TextButton.styleFrom(
+              foregroundColor: p.error,
+              visualDensity: VisualDensity.compact,
+            ),
+            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+            label: const Text('Clear'),
+            onPressed: () async {
+              await manager.clearAllCache();
+              await _refreshCacheSize();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Artwork cache cleared successfully')),
+                );
+              }
+            },
+          ),
+        ),
+        Divider(height: 1, color: p.hairline),
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: p.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(Icons.disc_full_rounded, color: p.textSecondary, size: 22),
+          ),
+          title: Text(
+            'Maximum Cache Limit',
+            style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14.5),
+          ),
+          subtitle: Text(
+            '$maxMb MB • Auto-evicts oldest artworks when full',
+            style: TextStyle(color: p.textSecondary, fontSize: 12.5),
+          ),
+          trailing: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: p.textTertiary),
+          onTap: () => _showMaxCacheLimitPicker(context, manager),
+        ),
+      ],
+    );
+  }
+
+  void _showMaxCacheLimitPicker(BuildContext context, ArtworkCacheManager manager) {
+    final p = context.palette;
+    final options = [50, 100, 250, 500];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: p.surfaceContainer,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Maximum Cache Size',
+                style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w800, fontSize: 16),
+              ),
+              const SizedBox(height: 12),
+              for (final mb in options)
+                ListTile(
+                  leading: Icon(
+                    manager.maxCacheSizeMb == mb ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
+                    color: manager.maxCacheSizeMb == mb ? p.accent : p.textTertiary,
+                  ),
+                  title: Text(
+                    '$mb MB',
+                    style: TextStyle(
+                      color: manager.maxCacheSizeMb == mb ? p.accent : p.textPrimary,
+                      fontWeight: manager.maxCacheSizeMb == mb ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                  onTap: () async {
+                    await manager.setMaxCacheSizeMb(mb);
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (mounted) setState(() {});
+                  },
+                ),
+            ],
+          ),
         ),
       ),
     );

@@ -8,6 +8,9 @@ import android.media.audiofx.DynamicsProcessing
 import android.media.audiofx.LoudnessEnhancer
 import android.media.audiofx.Virtualizer
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
@@ -15,6 +18,32 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import java.util.UUID
+
+data class MbcBandConfig(
+    val cutoffFrequency: Float,
+    val attackTime: Float,
+    val releaseTime: Float,
+    val ratio: Float,
+    val threshold: Float,
+    val kneeWidth: Float,
+    val postGain: Float
+)
+
+data class LimiterConfig(
+    val attackTime: Float,
+    val releaseTime: Float,
+    val ratio: Float,
+    val threshold: Float,
+    val postGain: Float
+)
+
+data class DynamicsPresetConfig(
+    val name: String,
+    val label: String,
+    val description: String,
+    val bands: List<MbcBandConfig>,
+    val limiter: LimiterConfig
+)
 
 class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var methodChannel: MethodChannel
@@ -35,9 +64,83 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var currentDynamicsPreset = "off"
     private var currentAudioSessionId = 0
 
+    // Graphic EQ state. The EQ is a 10-band DynamicsProcessing postEq bound to the
+    // same session as the dynamics compressor, so a single engine owns both.
+    private var isEqEnabled = false
+    private var eqBandCount = DEFAULT_EQ_FREQS.size
+    private var eqCenterFreqs = DEFAULT_EQ_FREQS.copyOf()
+    private var eqBandGains = DoubleArray(DEFAULT_EQ_FREQS.size)
+    private var eqPreampDb = 0.0
+
     companion object {
+        const val TAG = "AudioEffectsPlugin"
         const val CHANNEL_NAME = "com.pulsr.music/audio_effects"
+        private const val CHANNEL_COUNT = 2 // Stereo
+        private const val MBC_BAND_COUNT = 3
+
+        // ISO standard octave centers for a 10-band graphic equalizer.
+        private val DEFAULT_EQ_FREQS = doubleArrayOf(
+            32.0, 64.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0
+        )
         private var cachedSupportedEffects: Array<AudioEffect.Descriptor>? = null
+
+        val DYNAMICS_PRESETS: Map<String, DynamicsPresetConfig> = mapOf(
+            "studioPunch" to DynamicsPresetConfig(
+                name = "studioPunch",
+                label = "Studio Punch",
+                description = "Modern punchy dynamics with transient snap & limiting",
+                bands = listOf(
+                    MbcBandConfig(cutoffFrequency = 200f, attackTime = 15f, releaseTime = 90f, ratio = 3.5f, threshold = -18f, kneeWidth = 4f, postGain = 2.0f),
+                    MbcBandConfig(cutoffFrequency = 3500f, attackTime = 20f, releaseTime = 120f, ratio = 2.5f, threshold = -16f, kneeWidth = 6f, postGain = 1.0f),
+                    MbcBandConfig(cutoffFrequency = 20000f, attackTime = 10f, releaseTime = 80f, ratio = 2.0f, threshold = -14f, kneeWidth = 6f, postGain = 1.5f)
+                ),
+                limiter = LimiterConfig(attackTime = 2f, releaseTime = 60f, ratio = 10f, threshold = -1.0f, postGain = 0.5f)
+            ),
+            "warmAnalog" to DynamicsPresetConfig(
+                name = "warmAnalog",
+                label = "Warm Analog",
+                description = "Gentle tube-style warmth with rich low-mid presence",
+                bands = listOf(
+                    MbcBandConfig(cutoffFrequency = 300f, attackTime = 40f, releaseTime = 200f, ratio = 2.0f, threshold = -20f, kneeWidth = 10f, postGain = 2.5f),
+                    MbcBandConfig(cutoffFrequency = 4000f, attackTime = 35f, releaseTime = 180f, ratio = 1.8f, threshold = -18f, kneeWidth = 8f, postGain = 1.0f),
+                    MbcBandConfig(cutoffFrequency = 20000f, attackTime = 25f, releaseTime = 150f, ratio = 1.5f, threshold = -16f, kneeWidth = 8f, postGain = 0.0f)
+                ),
+                limiter = LimiterConfig(attackTime = 5f, releaseTime = 100f, ratio = 6f, threshold = -1.5f, postGain = 0.0f)
+            ),
+            "vocalFocus" to DynamicsPresetConfig(
+                name = "vocalFocus",
+                label = "Vocal Focus",
+                description = "Crisp vocal presence with vocal intelligibility boost",
+                bands = listOf(
+                    MbcBandConfig(cutoffFrequency = 250f, attackTime = 30f, releaseTime = 120f, ratio = 2.0f, threshold = -15f, kneeWidth = 6f, postGain = 0.0f),
+                    MbcBandConfig(cutoffFrequency = 4500f, attackTime = 15f, releaseTime = 80f, ratio = 3.0f, threshold = -22f, kneeWidth = 4f, postGain = 3.0f),
+                    MbcBandConfig(cutoffFrequency = 20000f, attackTime = 8f, releaseTime = 60f, ratio = 3.5f, threshold = -18f, kneeWidth = 4f, postGain = 0.5f)
+                ),
+                limiter = LimiterConfig(attackTime = 2f, releaseTime = 50f, ratio = 8f, threshold = -1.0f, postGain = 0.0f)
+            ),
+            "nightLeveller" to DynamicsPresetConfig(
+                name = "nightLeveller",
+                label = "Night Leveller",
+                description = "Smooths volume peaks for comfortable quiet listening",
+                bands = listOf(
+                    MbcBandConfig(cutoffFrequency = 200f, attackTime = 20f, releaseTime = 150f, ratio = 4.0f, threshold = -24f, kneeWidth = 8f, postGain = 1.0f),
+                    MbcBandConfig(cutoffFrequency = 3500f, attackTime = 20f, releaseTime = 150f, ratio = 4.0f, threshold = -24f, kneeWidth = 8f, postGain = 1.0f),
+                    MbcBandConfig(cutoffFrequency = 20000f, attackTime = 15f, releaseTime = 120f, ratio = 4.0f, threshold = -22f, kneeWidth = 8f, postGain = 1.0f)
+                ),
+                limiter = LimiterConfig(attackTime = 1f, releaseTime = 150f, ratio = 12f, threshold = -3.0f, postGain = 0.0f)
+            ),
+            "bassTightener" to DynamicsPresetConfig(
+                name = "bassTightener",
+                label = "Bass Tightener",
+                description = "Controls sub-bass rumble for tight, punchy low-end",
+                bands = listOf(
+                    MbcBandConfig(cutoffFrequency = 160f, attackTime = 8f, releaseTime = 60f, ratio = 5.0f, threshold = -20f, kneeWidth = 4f, postGain = 2.5f),
+                    MbcBandConfig(cutoffFrequency = 3500f, attackTime = 25f, releaseTime = 100f, ratio = 1.5f, threshold = -15f, kneeWidth = 6f, postGain = 0.5f),
+                    MbcBandConfig(cutoffFrequency = 20000f, attackTime = 20f, releaseTime = 90f, ratio = 1.5f, threshold = -15f, kneeWidth = 6f, postGain = 0.5f)
+                ),
+                limiter = LimiterConfig(attackTime = 2f, releaseTime = 50f, ratio = 8f, threshold = -1.0f, postGain = 0.5f)
+            )
+        )
 
         fun registerWith(flutterEngine: FlutterEngine, context: Context): AudioEffectsPlugin {
             val plugin = AudioEffectsPlugin()
@@ -111,13 +214,37 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(true)
                 }
 
+                "setEqEnabled" -> {
+                    setEqEnabledState(call.argument<Boolean>("enabled") ?: false)
+                    result.success(true)
+                }
+
+                "setEqBands" -> {
+                    val freqs = call.argument<List<Double>>("frequencies")
+                    setEqBandsLayout(freqs)
+                    result.success(true)
+                }
+
+                "setEqBandGain" -> {
+                    val index = call.argument<Int>("index") ?: -1
+                    val gainDb = call.argument<Double>("gainDb") ?: 0.0
+                    setEqBandGainValue(index, gainDb)
+                    result.success(true)
+                }
+
+                "setEqBandGains" -> {
+                    val gains = call.argument<List<Double>>("gains")
+                    setEqGainsValue(gains)
+                    result.success(true)
+                }
+
+                "setEqPreamp" -> {
+                    setEqPreampValue(call.argument<Double>("preampDb") ?: 0.0)
+                    result.success(true)
+                }
+
                 "isDynamicsSupported" -> {
-                    val supported = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                        isEffectTypeSupported(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING)
-                    } else {
-                        false
-                    }
-                    result.success(supported)
+                    result.success(isEffectTypeSupported(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING))
                 }
 
                 "isVirtualizerSupported" -> {
@@ -136,9 +263,34 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(true)
                 }
 
+                "getCapabilities" -> {
+                    val dynamicsSupported = isEffectTypeSupported(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING)
+                    val caps = mapOf(
+                        "hasEqualizer" to dynamicsSupported,
+                        "eqBandCount" to if (dynamicsSupported) eqBandCount else 0,
+                        "eqCenterFrequencies" to eqCenterFreqs.toList(),
+                        "hasAudioEffects" to true,
+                        "hasTagEditor" to true,
+                        "hasRingtoneManager" to true,
+                        "hasVisualizer" to true,
+                        "hasAppWidget" to true,
+                        "isVolumeBoostSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_LOUDNESS_ENHANCER),
+                        "isBassBoostSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_BASS_BOOST),
+                        "isDynamicsSupported" to dynamicsSupported,
+                        "isVirtualizerSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_VIRTUALIZER)
+                    )
+                    result.success(caps)
+                }
+
+                "releaseEffects" -> {
+                    releaseEffects()
+                    result.success(true)
+                }
+
                 else -> result.notImplemented()
             }
         } catch (e: Exception) {
+            Log.e(TAG, "MethodChannel error handling ${call.method}: ${e.message}", e)
             result.error("AUDIO_EFFECT_ERROR", e.message, null)
         }
     }
@@ -152,7 +304,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 }
                 virtualizer?.enabled = isVirtualizerEnabled
             } catch (e: Exception) {
-                android.util.Log.w("AudioEffectsPlugin", "Virtualizer initialization failed: ${e.message}")
+                Log.w(TAG, "Virtualizer initialization failed: ${e.message}")
             }
         }
     }
@@ -163,7 +315,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         try {
             virtualizer?.enabled = enabled
         } catch (e: Exception) {
-            android.util.Log.w("AudioEffectsPlugin", "Failed to set virtualizer enabled: ${e.message}")
+            Log.w(TAG, "Failed to set virtualizer enabled: ${e.message}")
         }
     }
 
@@ -176,7 +328,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 virtualizer?.setStrength(clamped)
             }
         } catch (e: Exception) {
-            android.util.Log.w("AudioEffectsPlugin", "Failed to set virtualizer strength: ${e.message}")
+            Log.w(TAG, "Failed to set virtualizer strength: ${e.message}")
         }
     }
 
@@ -189,7 +341,20 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 }
                 loudnessEnhancer?.enabled = volumeBoostMilliBels > 0
             } catch (e: Exception) {
-                android.util.Log.w("AudioEffectsPlugin", "LoudnessEnhancer initialization failed: ${e.message}")
+                Log.w(TAG, "LoudnessEnhancer init failed, retrying in 500ms: ${e.message}")
+                Handler(Looper.getMainLooper()).postDelayed({
+                    try {
+                        if (loudnessEnhancer == null && currentAudioSessionId != 0) {
+                            loudnessEnhancer = LoudnessEnhancer(currentAudioSessionId)
+                            if (volumeBoostMilliBels > 0) {
+                                loudnessEnhancer?.setTargetGain(volumeBoostMilliBels)
+                            }
+                            loudnessEnhancer?.enabled = volumeBoostMilliBels > 0
+                        }
+                    } catch (e2: Exception) {
+                        Log.e(TAG, "LoudnessEnhancer retry failed: ${e2.message}")
+                    }
+                }, 500)
             }
         }
     }
@@ -201,7 +366,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             loudnessEnhancer?.setTargetGain(volumeBoostMilliBels)
             loudnessEnhancer?.enabled = volumeBoostMilliBels > 0
         } catch (e: Exception) {
-            android.util.Log.w("AudioEffectsPlugin", "Failed to set volume boost: ${e.message}")
+            Log.w(TAG, "Failed to set volume boost: ${e.message}")
         }
     }
 
@@ -214,7 +379,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 }
                 bassBoost?.enabled = bassBoostStrength > 0
             } catch (e: Exception) {
-                android.util.Log.w("AudioEffectsPlugin", "BassBoost initialization failed: ${e.message}")
+                Log.w(TAG, "BassBoost initialization failed: ${e.message}")
             }
         }
     }
@@ -229,274 +394,215 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             }
             bassBoost?.enabled = clamped > 0
         } catch (e: Exception) {
-            android.util.Log.w("AudioEffectsPlugin", "Failed to set bass boost: ${e.message}")
+            Log.w(TAG, "Failed to set bass boost: ${e.message}")
+        }
+    }
+
+    // ---- Graphic EQ + Dynamics Engine ------------------------------------
+
+    private fun updateEqInPlace() {
+        val dp = dynamicsProcessing ?: return buildDynamicsProcessing()
+        try {
+            for (ch in 0 until CHANNEL_COUNT) {
+                val eq = dp.getPostEqByChannelIndex(ch)
+                for (i in 0 until eqBandCount) {
+                    val band = eq.getBand(i)
+                    band.cutoffFrequency = eqCenterFreqs[i].toFloat()
+                    band.gain = if (isEqEnabled) eqBandGains[i].toFloat() else 0f
+                    band.isEnabled = true
+                }
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "In-place EQ update failed, falling back to rebuild: ${e.message}")
+            buildDynamicsProcessing()
+        }
+    }
+
+    private fun updatePreampInPlace() {
+        val dp = dynamicsProcessing ?: return
+        try {
+            val preampDb = if (isEqEnabled) eqPreampDb.toFloat() else 0f
+            // Apply preamp to the limiter's postGain instead of inputGain
+            // to avoid driving the MBC stage into unwanted compression
+            val baseLimiterGain = if (isDynamicsEnabled && currentDynamicsPreset != "off") {
+                DYNAMICS_PRESETS[currentDynamicsPreset]?.limiter?.postGain ?: 0f
+            } else {
+                0f
+            }
+            for (ch in 0 until CHANNEL_COUNT) {
+                val limiter = dp.getLimiterByChannelIndex(ch)
+                limiter.postGain = baseLimiterGain + preampDb
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Preamp update failed: ${e.message}")
         }
     }
 
     private fun setDynamicsPresetState(preset: String, enabled: Boolean) {
         currentDynamicsPreset = preset
         isDynamicsEnabled = enabled
-
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) {
-            return
-        }
-
-        if (!enabled || preset == "off") {
-            try {
-                dynamicsProcessing?.enabled = false
-            } catch (_: Exception) {}
-            return
-        }
-
-        try {
-            applyDynamicsPreset(preset)
-        } catch (e: Exception) {
-            android.util.Log.w("AudioEffectsPlugin", "DynamicsProcessing configuration failed: ${e.message}")
+        val dp = dynamicsProcessing
+        if (dp != null) {
+            configureDynamicsInPlace(dp, preset, enabled)
+        } else {
+            buildDynamicsProcessing()
         }
     }
 
-    private fun applyDynamicsPreset(preset: String) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return
-        if (currentAudioSessionId == 0) return
-
+    private fun configureDynamicsInPlace(
+        dp: DynamicsProcessing,
+        presetName: String,
+        enabled: Boolean
+    ) {
+        val config = DYNAMICS_PRESETS[presetName]
+        if (config == null || !enabled) {
+            neutralizeDynamics(dp)
+            return
+        }
         try {
-            dynamicsProcessing?.release()
-        } catch (_: Exception) {}
+            val preampDb = if (isEqEnabled) eqPreampDb.toFloat() else 0f
+            for (ch in 0 until CHANNEL_COUNT) {
+                val mbc = dp.getMbcByChannelIndex(ch)
+                for (i in 0 until minOf(MBC_BAND_COUNT, config.bands.size)) {
+                    val band = mbc.getBand(i)
+                    val cfg = config.bands[i]
+                    band.cutoffFrequency = cfg.cutoffFrequency
+                    band.attackTime = cfg.attackTime
+                    band.releaseTime = cfg.releaseTime
+                    band.ratio = cfg.ratio
+                    band.threshold = cfg.threshold
+                    band.kneeWidth = cfg.kneeWidth
+                    band.postGain = cfg.postGain
+                    band.isEnabled = true
+                }
+                val limiter = dp.getLimiterByChannelIndex(ch)
+                val limCfg = config.limiter
+                limiter.attackTime = limCfg.attackTime
+                limiter.releaseTime = limCfg.releaseTime
+                limiter.ratio = limCfg.ratio
+                limiter.threshold = limCfg.threshold
+                limiter.postGain = limCfg.postGain + preampDb
+                limiter.isEnabled = true
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "In-place dynamics configuration failed, falling back to rebuild: ${e.message}")
+            buildDynamicsProcessing()
+        }
+    }
+
+    private fun neutralizeDynamics(dp: DynamicsProcessing) {
+        try {
+            val preampDb = if (isEqEnabled) eqPreampDb.toFloat() else 0f
+            for (ch in 0 until CHANNEL_COUNT) {
+                val mbc = dp.getMbcByChannelIndex(ch)
+                for (i in 0 until MBC_BAND_COUNT) {
+                    mbc.getBand(i).isEnabled = false
+                }
+                val limiter = dp.getLimiterByChannelIndex(ch)
+                limiter.isEnabled = false
+                limiter.postGain = preampDb
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to neutralize dynamics: ${e.message}")
+        }
+    }
+
+    private fun setEqEnabledState(enabled: Boolean) {
+        isEqEnabled = enabled
+        val dp = dynamicsProcessing
+        if (dp != null) {
+            updateEqInPlace()
+            updatePreampInPlace()
+        } else {
+            buildDynamicsProcessing()
+        }
+    }
+
+    private fun setEqBandsLayout(freqs: List<Double>?) {
+        if (freqs != null && freqs.isNotEmpty()) {
+            eqCenterFreqs = DoubleArray(freqs.size) { freqs[it] }
+            eqBandCount = freqs.size
+            if (eqBandGains.size != eqBandCount) eqBandGains = DoubleArray(eqBandCount)
+        }
+        // Band count change requires engine rebuild
+        buildDynamicsProcessing()
+    }
+
+    private fun setEqGainsValue(gains: List<Double>?) {
+        if (gains == null) return
+        for (i in 0 until minOf(gains.size, eqBandCount)) eqBandGains[i] = gains[i]
+        updateEqInPlace()
+    }
+
+    private fun setEqBandGainValue(index: Int, gainDb: Double) {
+        if (index < 0 || index >= eqBandCount) return
+        eqBandGains[index] = gainDb
+        updateEqInPlace()
+    }
+
+    private fun setEqPreampValue(preampDb: Double) {
+        eqPreampDb = preampDb
+        updatePreampInPlace()
+    }
+
+    private fun buildPostEq(): DynamicsProcessing.Eq {
+        val eq = DynamicsProcessing.Eq(true, true, eqBandCount)
+        for (i in 0 until eqBandCount) {
+            val band = eq.getBand(i)
+            band.cutoffFrequency = eqCenterFreqs[i].toFloat()
+            band.gain = if (isEqEnabled) eqBandGains[i].toFloat() else 0f
+            band.isEnabled = true
+        }
+        return eq
+    }
+
+    private fun buildDynamicsProcessing() {
+        val oldDp = dynamicsProcessing
         dynamicsProcessing = null
 
-        // Setup 3-band Multiband Compressor (Low, Mid, High)
-        val channelCount = 2 // Stereo
-        val mbcBandCount = 3
-
-        val builder = DynamicsProcessing.Config.Builder(
-            DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION,
-            channelCount,
-            false, // preEq
-            0,
-            true,  // mbc
-            mbcBandCount,
-            false, // postEq
-            0,
-            true   // limiter
-        )
-        builder.setPreferredFrameDuration(10f)
-
-        val config = builder.build()
-
-        // Configure bands & limiter based on preset
-        for (ch in 0 until channelCount) {
-            val mbc = config.getMbcByChannelIndex(ch)
-            val limiter = config.getLimiterByChannelIndex(ch)
-
-            when (preset) {
-                "studioPunch" -> {
-                    // Low: Punchy kick & bass
-                    val band0 = mbc.getBand(0)
-                    band0.cutoffFrequency = 200f
-                    band0.attackTime = 15f
-                    band0.releaseTime = 90f
-                    band0.ratio = 3.5f
-                    band0.threshold = -18f
-                    band0.kneeWidth = 4f
-                    band0.postGain = 2.0f
-                    band0.isEnabled = true
-
-                    // Mid: Vocal & snare clarity
-                    val band1 = mbc.getBand(1)
-                    band1.cutoffFrequency = 3500f
-                    band1.attackTime = 20f
-                    band1.releaseTime = 120f
-                    band1.ratio = 2.5f
-                    band1.threshold = -16f
-                    band1.kneeWidth = 6f
-                    band1.postGain = 1.0f
-                    band1.isEnabled = true
-
-                    // High: Air & cymbals
-                    val band2 = mbc.getBand(2)
-                    band2.cutoffFrequency = 20000f
-                    band2.attackTime = 10f
-                    band2.releaseTime = 80f
-                    band2.ratio = 2.0f
-                    band2.threshold = -14f
-                    band2.kneeWidth = 6f
-                    band2.postGain = 1.5f
-                    band2.isEnabled = true
-
-                    limiter.isEnabled = true
-                    limiter.attackTime = 2f
-                    limiter.releaseTime = 60f
-                    limiter.ratio = 10f
-                    limiter.threshold = -1.0f
-                    limiter.postGain = 0.5f
-                }
-
-                "warmAnalog" -> {
-                    // Warm low-mids, smooth gentle compression
-                    val band0 = mbc.getBand(0)
-                    band0.cutoffFrequency = 300f
-                    band0.attackTime = 40f
-                    band0.releaseTime = 200f
-                    band0.ratio = 2.0f
-                    band0.threshold = -20f
-                    band0.kneeWidth = 10f
-                    band0.postGain = 2.5f
-                    band0.isEnabled = true
-
-                    val band1 = mbc.getBand(1)
-                    band1.cutoffFrequency = 4000f
-                    band1.attackTime = 35f
-                    band1.releaseTime = 180f
-                    band1.ratio = 1.8f
-                    band1.threshold = -18f
-                    band1.kneeWidth = 8f
-                    band1.postGain = 1.0f
-                    band1.isEnabled = true
-
-                    val band2 = mbc.getBand(2)
-                    band2.cutoffFrequency = 20000f
-                    band2.attackTime = 25f
-                    band2.releaseTime = 150f
-                    band2.ratio = 1.5f
-                    band2.threshold = -16f
-                    band2.kneeWidth = 8f
-                    band2.postGain = 0.0f
-                    band2.isEnabled = true
-
-                    limiter.isEnabled = true
-                    limiter.attackTime = 5f
-                    limiter.releaseTime = 100f
-                    limiter.ratio = 6f
-                    limiter.threshold = -1.5f
-                    limiter.postGain = 0.0f
-                }
-
-                "vocalFocus" -> {
-                    // Vocal presence & de-essing
-                    val band0 = mbc.getBand(0)
-                    band0.cutoffFrequency = 250f
-                    band0.attackTime = 30f
-                    band0.releaseTime = 120f
-                    band0.ratio = 2.0f
-                    band0.threshold = -15f
-                    band0.kneeWidth = 6f
-                    band0.postGain = 0.0f
-                    band0.isEnabled = true
-
-                    val band1 = mbc.getBand(1)
-                    band1.cutoffFrequency = 4500f
-                    band1.attackTime = 15f
-                    band1.releaseTime = 80f
-                    band1.ratio = 3.0f
-                    band1.threshold = -22f
-                    band1.kneeWidth = 4f
-                    band1.postGain = 3.0f
-                    band1.isEnabled = true
-
-                    val band2 = mbc.getBand(2)
-                    band2.cutoffFrequency = 20000f
-                    band2.attackTime = 8f
-                    band2.releaseTime = 60f
-                    band2.ratio = 3.5f
-                    band2.threshold = -18f
-                    band2.kneeWidth = 4f
-                    band2.postGain = 0.5f
-                    band2.isEnabled = true
-
-                    limiter.isEnabled = true
-                    limiter.attackTime = 2f
-                    limiter.releaseTime = 50f
-                    limiter.ratio = 8f
-                    limiter.threshold = -1.0f
-                    limiter.postGain = 0.0f
-                }
-
-                "nightLeveller" -> {
-                    // Smooth wide dynamics for quiet environments
-                    val band0 = mbc.getBand(0)
-                    band0.cutoffFrequency = 200f
-                    band0.attackTime = 20f
-                    band0.releaseTime = 150f
-                    band0.ratio = 4.0f
-                    band0.threshold = -24f
-                    band0.kneeWidth = 8f
-                    band0.postGain = 1.0f
-                    band0.isEnabled = true
-
-                    val band1 = mbc.getBand(1)
-                    band1.cutoffFrequency = 3500f
-                    band1.attackTime = 20f
-                    band1.releaseTime = 150f
-                    band1.ratio = 4.0f
-                    band1.threshold = -24f
-                    band1.kneeWidth = 8f
-                    band1.postGain = 1.0f
-                    band1.isEnabled = true
-
-                    val band2 = mbc.getBand(2)
-                    band2.cutoffFrequency = 20000f
-                    band2.attackTime = 15f
-                    band2.releaseTime = 120f
-                    band2.ratio = 4.0f
-                    band2.threshold = -22f
-                    band2.kneeWidth = 8f
-                    band2.postGain = 1.0f
-                    band2.isEnabled = true
-
-                    limiter.isEnabled = true
-                    limiter.attackTime = 1f
-                    limiter.releaseTime = 150f
-                    limiter.ratio = 12f
-                    limiter.threshold = -3.0f
-                    limiter.postGain = 0.0f
-                }
-
-                "bassTightener" -> {
-                    // Fast attack on sub frequencies, unmuddy low end
-                    val band0 = mbc.getBand(0)
-                    band0.cutoffFrequency = 160f
-                    band0.attackTime = 8f
-                    band0.releaseTime = 60f
-                    band0.ratio = 5.0f
-                    band0.threshold = -20f
-                    band0.kneeWidth = 4f
-                    band0.postGain = 2.5f
-                    band0.isEnabled = true
-
-                    val band1 = mbc.getBand(1)
-                    band1.cutoffFrequency = 3500f
-                    band1.attackTime = 25f
-                    band1.releaseTime = 100f
-                    band1.ratio = 1.5f
-                    band1.threshold = -15f
-                    band1.kneeWidth = 6f
-                    band1.postGain = 0.5f
-                    band1.isEnabled = true
-
-                    val band2 = mbc.getBand(2)
-                    band2.cutoffFrequency = 20000f
-                    band2.attackTime = 20f
-                    band2.releaseTime = 90f
-                    band2.ratio = 1.5f
-                    band2.threshold = -15f
-                    band2.kneeWidth = 6f
-                    band2.postGain = 0.5f
-                    band2.isEnabled = true
-
-                    limiter.isEnabled = true
-                    limiter.attackTime = 2f
-                    limiter.releaseTime = 50f
-                    limiter.ratio = 8f
-                    limiter.threshold = -1.0f
-                    limiter.postGain = 0.5f
-                }
-
-                else -> return
-            }
+        if (currentAudioSessionId == 0) {
+            try { oldDp?.release() } catch (_: Exception) {}
+            return
         }
 
-        dynamicsProcessing = DynamicsProcessing(0, currentAudioSessionId, config)
-        dynamicsProcessing?.enabled = true
+        val dynamicsActive = isDynamicsEnabled && currentDynamicsPreset != "off"
+        if (!isEqEnabled && !dynamicsActive) {
+            try { oldDp?.release() } catch (_: Exception) {}
+            return
+        }
+
+        try {
+            val builder = DynamicsProcessing.Config.Builder(
+                DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION,
+                CHANNEL_COUNT,
+                false, // preEq
+                0,
+                true,  // mbc
+                MBC_BAND_COUNT,
+                true,  // postEq — 10-band graphic EQ
+                eqBandCount,
+                true   // limiter
+            )
+            builder.setPreferredFrameDuration(10f)
+            builder.setPostEqAllChannelsTo(buildPostEq())
+
+            val config = builder.build()
+            val dp = DynamicsProcessing(0, currentAudioSessionId, config)
+
+            if (dynamicsActive) {
+                configureDynamicsInPlace(dp, currentDynamicsPreset, true)
+            } else {
+                neutralizeDynamics(dp)
+            }
+
+            dp.enabled = true
+            dynamicsProcessing = dp
+        } catch (e: Exception) {
+            Log.w(TAG, "DynamicsProcessing build failed: ${e.message}")
+            dynamicsProcessing = null
+        } finally {
+            try { oldDp?.release() } catch (_: Exception) {}
+        }
     }
 
     private fun getSpatializerInfo(): Map<String, Any> {
@@ -506,7 +612,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             "isHeadTrackerAvailable" to false
         )
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2) { // Android 12L / API 32+ (Spatializer class)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2) {
             try {
                 val audioManager = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
                 if (audioManager != null) {
@@ -516,7 +622,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     result["isHeadTrackerAvailable"] = spatializer.isHeadTrackerAvailable
                 }
             } catch (e: Exception) {
-                android.util.Log.w("AudioEffectsPlugin", "Spatializer query error: ${e.message}")
+                Log.w(TAG, "Spatializer query error: ${e.message}")
             }
         }
 
@@ -524,29 +630,41 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     private fun setSpatializerState(enabled: Boolean) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S_V2) return // API 32+
-        try {
-            val audioManager = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return
-            val sp = audioManager.spatializer
-            if (sp.isAvailable) {
-                try {
-                    val method = sp.javaClass.getMethod("setEnabled", Boolean::class.javaPrimitiveType)
-                    method.invoke(sp, enabled)
-                } catch (_: Exception) {}
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S_V2) {
+            try {
+                val audioManager = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+                val spatializer = audioManager?.spatializer
+                if (spatializer != null && spatializer.isAvailable) {
+                    // Hardware Spatializer detected; engage virtualizer supplement for wider staging
+                    setVirtualizerState(enabled)
+                    if (enabled && virtualizerStrength <= 0) {
+                        setVirtualizerStrengthValue(600)
+                    }
+                    return
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "Spatializer hardware check failed, falling back: ${e.message}")
             }
-        } catch (e: Exception) {
-            android.util.Log.w("AudioEffectsPlugin", "Failed to set spatializer state: ${e.message}")
+        }
+        // Fallback: virtualizer-only stereo field widening
+        setVirtualizerState(enabled)
+        if (enabled && virtualizerStrength <= 0) {
+            setVirtualizerStrengthValue(800)
         }
     }
 
     private fun recreateEffects() {
-        // Always release — stale instances are bound to the dead session
-        try { virtualizer?.release() } catch (_: Exception) {}
-        try { loudnessEnhancer?.release() } catch (_: Exception) {}
-        try { bassBoost?.release() } catch (_: Exception) {}
+        // Build new effects before releasing old ones for gapless transition
+        val oldVirtualizer = virtualizer
+        val oldLoudnessEnhancer = loudnessEnhancer
+        val oldBassBoost = bassBoost
+        val oldDynamics = dynamicsProcessing
+
         virtualizer = null
         loudnessEnhancer = null
         bassBoost = null
+        dynamicsProcessing = null
+        cachedSupportedEffects = null
 
         if (isVirtualizerEnabled || virtualizerStrength > 0) {
             setVirtualizerState(isVirtualizerEnabled)
@@ -561,35 +679,48 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             setBassBoostStrengthValue(bassBoostStrength.toInt())
         }
 
-        if (isDynamicsEnabled && currentDynamicsPreset != "off") {
-            setDynamicsPresetState(currentDynamicsPreset, isDynamicsEnabled)
-        }
+        buildDynamicsProcessing()
+
+        // Release old instances safely
+        try { oldVirtualizer?.release() } catch (_: Exception) {}
+        try { oldLoudnessEnhancer?.release() } catch (_: Exception) {}
+        try { oldBassBoost?.release() } catch (_: Exception) {}
+        try { oldDynamics?.release() } catch (_: Exception) {}
     }
 
     fun releaseEffects() {
         try {
             virtualizer?.enabled = false
             virtualizer?.release()
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w(TAG, "Virtualizer cleanup error: ${e.message}")
+        }
         virtualizer = null
 
         try {
             loudnessEnhancer?.enabled = false
             loudnessEnhancer?.release()
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w(TAG, "LoudnessEnhancer cleanup error: ${e.message}")
+        }
         loudnessEnhancer = null
 
         try {
             bassBoost?.enabled = false
             bassBoost?.release()
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w(TAG, "BassBoost cleanup error: ${e.message}")
+        }
         bassBoost = null
 
         try {
             dynamicsProcessing?.enabled = false
             dynamicsProcessing?.release()
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w(TAG, "DynamicsProcessing cleanup error: ${e.message}")
+        }
         dynamicsProcessing = null
+        cachedSupportedEffects = null
     }
 
     private fun isEffectTypeSupported(effectType: UUID): Boolean {
@@ -598,7 +729,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 cachedSupportedEffects = it
             } ?: return false
             effects.any { it.type == effectType }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.w(TAG, "Effect support query failed: ${e.message}")
             false
         }
     }

@@ -11,6 +11,18 @@ abstract class AppFailure {
 
   @override
   String toString() => '$runtimeType: $message';
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is AppFailure &&
+        other.runtimeType == runtimeType &&
+        other.message == message &&
+        other.error == error;
+  }
+
+  @override
+  int get hashCode => Object.hash(runtimeType, message, error);
 }
 
 class DatabaseFailure extends AppFailure {
@@ -43,5 +55,9 @@ class PlaylistImportFailure extends AppFailure {
 
 class BackupFailure extends AppFailure {
   const BackupFailure(super.message, [super.error]);
+}
+
+class DownloadFailure extends AppFailure {
+  const DownloadFailure(super.message, [super.error]);
 }
 

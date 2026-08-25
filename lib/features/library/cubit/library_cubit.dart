@@ -1,9 +1,14 @@
 // lib/features/library/cubit/library_cubit.dart
 import 'dart:async';
+import 'package:drift/drift.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/di/injection.dart';
+import '../../../core/services/ytm_account_service.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../data/db/app_database.dart';
+import '../../../domain/models/ytm_track.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../../domain/usecases/get_albums_usecase.dart';
 import '../../../domain/usecases/get_artists_usecase.dart';
@@ -69,7 +74,9 @@ class LibraryCubit extends Cubit<LibraryState> {
           viewMode: savedViewMode,
         ));
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to load library preferences from SharedPreferences', error: e, stackTrace: st, category: 'LibraryCubit');
+    }
 
     await _subscribeSongs();
     if (isClosed) return;
@@ -230,6 +237,55 @@ class LibraryCubit extends Cubit<LibraryState> {
 
   List<SongsTableData> getSelectedSongs() {
     return state.songs.where((s) => state.selectedSongIds.contains(s.id)).toList();
+  }
+
+  /// Batch imports YouTube Music playlist tracks as Favorites.
+  Future<int> importYtmTracksAsFavorites(List<YtmTrack> tracks) async {
+    final db = getIt<AppDatabase>();
+    int count = 0;
+    for (final track in tracks) {
+      final songData = track.toSongData();
+      final existing = await (db.select(db.songsTable)
+            ..where((t) => t.remoteId.equals(track.videoId))
+            ..limit(1))
+          .getSingleOrNull();
+
+      if (existing != null) {
+        await (db.update(db.songsTable)..where((t) => t.id.equals(existing.id)))
+            .write(const SongsTableCompanion(isFavorite: Value(true)));
+        count++;
+      } else {
+        await db.into(db.songsTable).insert(
+              SongsTableCompanion(
+                id: Value(songData.id),
+                title: Value(songData.title),
+                artist: Value(songData.artist),
+                album: Value(songData.album),
+                durationMs: Value(songData.durationMs),
+                path: Value(songData.path),
+                source: const Value(SongSource.youtube),
+                remoteId: Value(track.videoId),
+                remoteArtworkUrl: Value(track.artworkUrl),
+                isFavorite: const Value(true),
+                dateAdded: Value(DateTime.now().millisecondsSinceEpoch),
+              ),
+              mode: InsertMode.insertOrReplace,
+            );
+        count++;
+      }
+    }
+    return count;
+  }
+
+  /// Synchronizes private Liked Music from the authenticated YouTube Music web account.
+  Future<int> syncYtmAccountLikes() async {
+    final accountService = getIt<YtmAccountService>();
+    if (!accountService.isLoggedIn) {
+      throw Exception('Not signed in to YouTube Music');
+    }
+    final tracks = await accountService.fetchLikedSongs();
+    final count = await importYtmTracksAsFavorites(tracks);
+    return count;
   }
 
   @override

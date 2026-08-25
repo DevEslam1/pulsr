@@ -42,6 +42,7 @@ mixin _$PlayerState {
   double get volumeBoost;
   int get activeQueueSlot;
   double get playbackSpeed;
+  int? get audioSessionId;
   String? get errorMessage;
 
   /// Create a copy of PlayerState
@@ -111,6 +112,8 @@ mixin _$PlayerState {
                 other.activeQueueSlot == activeQueueSlot) &&
             (identical(other.playbackSpeed, playbackSpeed) ||
                 other.playbackSpeed == playbackSpeed) &&
+            (identical(other.audioSessionId, audioSessionId) ||
+                other.audioSessionId == audioSessionId) &&
             (identical(other.errorMessage, errorMessage) ||
                 other.errorMessage == errorMessage));
   }
@@ -146,12 +149,13 @@ mixin _$PlayerState {
         volumeBoost,
         activeQueueSlot,
         playbackSpeed,
+        audioSessionId,
         errorMessage
       ]);
 
   @override
   String toString() {
-    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isDynamicsEnabled: $isDynamicsEnabled, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, errorMessage: $errorMessage)';
+    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isDynamicsEnabled: $isDynamicsEnabled, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, audioSessionId: $audioSessionId, errorMessage: $errorMessage)';
   }
 }
 
@@ -190,6 +194,7 @@ abstract mixin class $PlayerStateCopyWith<$Res> {
       double volumeBoost,
       int activeQueueSlot,
       double playbackSpeed,
+      int? audioSessionId,
       String? errorMessage});
 }
 
@@ -233,6 +238,7 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
     Object? volumeBoost = null,
     Object? activeQueueSlot = null,
     Object? playbackSpeed = null,
+    Object? audioSessionId = freezed,
     Object? errorMessage = freezed,
   }) {
     return _then(_self.copyWith(
@@ -348,6 +354,10 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
           ? _self.playbackSpeed
           : playbackSpeed // ignore: cast_nullable_to_non_nullable
               as double,
+      audioSessionId: freezed == audioSessionId
+          ? _self.audioSessionId
+          : audioSessionId // ignore: cast_nullable_to_non_nullable
+              as int?,
       errorMessage: freezed == errorMessage
           ? _self.errorMessage
           : errorMessage // ignore: cast_nullable_to_non_nullable
@@ -478,6 +488,7 @@ extension PlayerStatePatterns on PlayerState {
             double volumeBoost,
             int activeQueueSlot,
             double playbackSpeed,
+            int? audioSessionId,
             String? errorMessage)?
         $default, {
     required TResult orElse(),
@@ -514,6 +525,7 @@ extension PlayerStatePatterns on PlayerState {
             _that.volumeBoost,
             _that.activeQueueSlot,
             _that.playbackSpeed,
+            _that.audioSessionId,
             _that.errorMessage);
       case _:
         return orElse();
@@ -564,6 +576,7 @@ extension PlayerStatePatterns on PlayerState {
             double volumeBoost,
             int activeQueueSlot,
             double playbackSpeed,
+            int? audioSessionId,
             String? errorMessage)
         $default,
   ) {
@@ -599,6 +612,7 @@ extension PlayerStatePatterns on PlayerState {
             _that.volumeBoost,
             _that.activeQueueSlot,
             _that.playbackSpeed,
+            _that.audioSessionId,
             _that.errorMessage);
       case _:
         throw StateError('Unexpected subclass');
@@ -648,6 +662,7 @@ extension PlayerStatePatterns on PlayerState {
             double volumeBoost,
             int activeQueueSlot,
             double playbackSpeed,
+            int? audioSessionId,
             String? errorMessage)?
         $default,
   ) {
@@ -683,6 +698,7 @@ extension PlayerStatePatterns on PlayerState {
             _that.volumeBoost,
             _that.activeQueueSlot,
             _that.playbackSpeed,
+            _that.audioSessionId,
             _that.errorMessage);
       case _:
         return null;
@@ -710,7 +726,8 @@ class _PlayerState extends PlayerState {
       this.isLoadingLyrics = false,
       this.isLyricsVisible = false,
       this.isQueueVisible = false,
-      this.eqPreset = const EqPreset(name: 'Flat', gains: [0, 0, 0, 0, 0]),
+      this.eqPreset =
+          const EqPreset(name: 'Flat', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
       this.isEqEnabled = false,
       this.isVirtualizerEnabled = false,
       this.virtualizerStrength = 0.0,
@@ -722,6 +739,7 @@ class _PlayerState extends PlayerState {
       this.volumeBoost = 0.0,
       this.activeQueueSlot = 0,
       this.playbackSpeed = 1.0,
+      this.audioSessionId,
       this.errorMessage})
       : _queue = queue,
         _lyrics = lyrics,
@@ -820,6 +838,8 @@ class _PlayerState extends PlayerState {
   @JsonKey()
   final double playbackSpeed;
   @override
+  final int? audioSessionId;
+  @override
   final String? errorMessage;
 
   /// Create a copy of PlayerState
@@ -890,6 +910,8 @@ class _PlayerState extends PlayerState {
                 other.activeQueueSlot == activeQueueSlot) &&
             (identical(other.playbackSpeed, playbackSpeed) ||
                 other.playbackSpeed == playbackSpeed) &&
+            (identical(other.audioSessionId, audioSessionId) ||
+                other.audioSessionId == audioSessionId) &&
             (identical(other.errorMessage, errorMessage) ||
                 other.errorMessage == errorMessage));
   }
@@ -925,12 +947,13 @@ class _PlayerState extends PlayerState {
         volumeBoost,
         activeQueueSlot,
         playbackSpeed,
+        audioSessionId,
         errorMessage
       ]);
 
   @override
   String toString() {
-    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isDynamicsEnabled: $isDynamicsEnabled, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, errorMessage: $errorMessage)';
+    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isDynamicsEnabled: $isDynamicsEnabled, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, audioSessionId: $audioSessionId, errorMessage: $errorMessage)';
   }
 }
 
@@ -971,6 +994,7 @@ abstract mixin class _$PlayerStateCopyWith<$Res>
       double volumeBoost,
       int activeQueueSlot,
       double playbackSpeed,
+      int? audioSessionId,
       String? errorMessage});
 }
 
@@ -1014,6 +1038,7 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
     Object? volumeBoost = null,
     Object? activeQueueSlot = null,
     Object? playbackSpeed = null,
+    Object? audioSessionId = freezed,
     Object? errorMessage = freezed,
   }) {
     return _then(_PlayerState(
@@ -1129,6 +1154,10 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
           ? _self.playbackSpeed
           : playbackSpeed // ignore: cast_nullable_to_non_nullable
               as double,
+      audioSessionId: freezed == audioSessionId
+          ? _self.audioSessionId
+          : audioSessionId // ignore: cast_nullable_to_non_nullable
+              as int?,
       errorMessage: freezed == errorMessage
           ? _self.errorMessage
           : errorMessage // ignore: cast_nullable_to_non_nullable

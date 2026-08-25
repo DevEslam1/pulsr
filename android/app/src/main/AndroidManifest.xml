@@ -1,25 +1,37 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
     <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions"/>
 
+    <!-- Custom signature permission to protect internal widget & playback broadcasts -->
+    <permission android:name="com.pulsr.music.permission.WIDGET_CONTROL"
+        android:protectionLevel="signature" />
+    <uses-permission android:name="com.pulsr.music.permission.WIDGET_CONTROL" />
+
     <application
-        android:label="Pulsr Music"
+        android:label="${appName}"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:allowBackup="false"
+        android:allowBackup="true"
         android:supportsRtl="true"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:enableOnBackInvokedCallback="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules">
+
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -36,15 +48,43 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+                <category android:name="android.intent.category.APP_MUSIC"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MUSIC_PLAYER" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.APP_MUSIC" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="pulsrWidget" />
             </intent-filter>
+            <!-- Intent filter to open YouTube Music & YouTube links -->
+            <intent-filter android:label="${appName}">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="http" />
+                <data android:scheme="https" />
+                <data android:host="music.youtube.com" />
+                <data android:host="www.youtube.com" />
+                <data android:host="youtube.com" />
+                <data android:host="m.youtube.com" />
+                <data android:host="youtu.be" />
+            </intent-filter>
+            <!-- Intent filter for shared YouTube / YouTube Music links (Share via Pulsr) -->
+            <intent-filter android:label="${appName}">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
             <!-- Intent filter to open audio files from File Explorers & Downloads -->
-            <intent-filter android:label="Pulsr Music">
+            <intent-filter android:label="${appName}">
                 <action android:name="android.intent.action.VIEW" />
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -58,7 +98,7 @@
                 <data android:mimeType="application/x-flac" />
                 <data android:mimeType="application/x-matroska" />
             </intent-filter>
-            <intent-filter android:label="Pulsr Music">
+            <intent-filter android:label="${appName}">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
@@ -87,20 +127,9 @@
                 <data android:pathPattern=".*\\.opus" />
                 <data android:pathPattern=".*\\..*\\.opus" />
                 <data android:pathPattern=".*\\..*\\..*\\.opus" />
-                <data android:pathPattern=".*\\.wma" />
-                <data android:pathPattern=".*\\..*\\.wma" />
-                <data android:pathPattern=".*\\.alac" />
-                <data android:pathPattern=".*\\..*\\.alac" />
-                <data android:pathPattern=".*\\..*\\..*\\.alac" />
-                <data android:pathPattern=".*\\.aiff" />
-                <data android:pathPattern=".*\\..*\\.aiff" />
-                <data android:pathPattern=".*\\..*\\..*\\.aiff" />
-                <data android:pathPattern=".*\\.dsf" />
-                <data android:pathPattern=".*\\..*\\.dsf" />
-                <data android:pathPattern=".*\\..*\\..*\\.dsf" />
-                <data android:pathPattern=".*\\.dff" />
-                <data android:pathPattern=".*\\..*\\.dff" />
-                <data android:pathPattern=".*\\..*\\..*\\.dff" />
+                <data android:pathPattern=".*\\.mka" />
+                <data android:pathPattern=".*\\..*\\.mka" />
+                <data android:pathPattern=".*\\..*\\..*\\.mka" />
             </intent-filter>
         </activity>
         
@@ -121,16 +150,10 @@
 
         <receiver
             android:name=".NowPlayingWidget"
+            android:label="${appName} Widget"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-                <action android:name="com.pulsr.music.widget.PLAY_PAUSE" />
-                <action android:name="com.pulsr.music.widget.NEXT" />
-                <action android:name="com.pulsr.music.widget.PREV" />
-                <action android:name="com.pulsr.music.widget.REWIND" />
-                <action android:name="com.pulsr.music.widget.FORWARD" />
-                <action android:name="com.pulsr.music.widget.SEEK_RATIO" />
-                <action android:name="com.pulsr.music.widget.FAVORITE" />
             </intent-filter>
             <meta-data
                 android:name="android.appwidget.provider"

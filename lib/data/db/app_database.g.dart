@@ -101,6 +101,40 @@ class $SongsTableTable extends SongsTable
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('CHECK ("is_favorite" IN (0, 1))'),
       defaultValue: const Constant(false));
+  static const VerificationMeta _isMissingMeta =
+      const VerificationMeta('isMissing');
+  @override
+  late final GeneratedColumn<bool> isMissing = GeneratedColumn<bool>(
+      'is_missing', aliasedName, false,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints:
+          GeneratedColumn.constraintIsAlways('CHECK ("is_missing" IN (0, 1))'),
+      defaultValue: const Constant(false));
+  static const VerificationMeta _replayGainTrackMeta =
+      const VerificationMeta('replayGainTrack');
+  @override
+  late final GeneratedColumn<double> replayGainTrack = GeneratedColumn<double>(
+      'replay_gain_track', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _replayGainAlbumMeta =
+      const VerificationMeta('replayGainAlbum');
+  @override
+  late final GeneratedColumn<double> replayGainAlbum = GeneratedColumn<double>(
+      'replay_gain_album', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _replayGainTrackPeakMeta =
+      const VerificationMeta('replayGainTrackPeak');
+  @override
+  late final GeneratedColumn<double> replayGainTrackPeak =
+      GeneratedColumn<double>('replay_gain_track_peak', aliasedName, true,
+          type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _replayGainAlbumPeakMeta =
+      const VerificationMeta('replayGainAlbumPeak');
+  @override
+  late final GeneratedColumn<double> replayGainAlbumPeak =
+      GeneratedColumn<double>('replay_gain_album_peak', aliasedName, true,
+          type: DriftSqlType.double, requiredDuringInsert: false);
   static const VerificationMeta _playCountMeta =
       const VerificationMeta('playCount');
   @override
@@ -135,6 +169,64 @@ class $SongsTableTable extends SongsTable
   late final GeneratedColumn<int> fileSize = GeneratedColumn<int>(
       'file_size', aliasedName, true,
       type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _sampleRateMeta =
+      const VerificationMeta('sampleRate');
+  @override
+  late final GeneratedColumn<int> sampleRate = GeneratedColumn<int>(
+      'sample_rate', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _bitDepthMeta =
+      const VerificationMeta('bitDepth');
+  @override
+  late final GeneratedColumn<int> bitDepth = GeneratedColumn<int>(
+      'bit_depth', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _bitrateKbpsMeta =
+      const VerificationMeta('bitrateKbps');
+  @override
+  late final GeneratedColumn<int> bitrateKbps = GeneratedColumn<int>(
+      'bitrate_kbps', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
+  static const VerificationMeta _codecMeta = const VerificationMeta('codec');
+  @override
+  late final GeneratedColumn<String> codec = GeneratedColumn<String>(
+      'codec', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _sourceMeta = const VerificationMeta('source');
+  @override
+  late final GeneratedColumn<String> source = GeneratedColumn<String>(
+      'source', aliasedName, false,
+      type: DriftSqlType.string,
+      requiredDuringInsert: false,
+      defaultValue: const Constant(SongSource.local));
+  static const VerificationMeta _remoteIdMeta =
+      const VerificationMeta('remoteId');
+  @override
+  late final GeneratedColumn<String> remoteId = GeneratedColumn<String>(
+      'remote_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _remoteArtworkUrlMeta =
+      const VerificationMeta('remoteArtworkUrl');
+  @override
+  late final GeneratedColumn<String> remoteArtworkUrl = GeneratedColumn<String>(
+      'remote_artwork_url', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _pendingDownloadPathMeta =
+      const VerificationMeta('pendingDownloadPath');
+  @override
+  late final GeneratedColumn<String> pendingDownloadPath =
+      GeneratedColumn<String>('pending_download_path', aliasedName, true,
+          type: DriftSqlType.string, requiredDuringInsert: false);
+  static const VerificationMeta _isDownloadedMeta =
+      const VerificationMeta('isDownloaded');
+  @override
+  late final GeneratedColumn<bool> isDownloaded = GeneratedColumn<bool>(
+      'is_downloaded', aliasedName, true,
+      type: DriftSqlType.bool,
+      requiredDuringInsert: false,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'CHECK ("is_downloaded" IN (0, 1))'),
+      defaultValue: const Constant(false));
   @override
   List<GeneratedColumn> get $columns => [
         id,
@@ -152,11 +244,25 @@ class $SongsTableTable extends SongsTable
         dateAdded,
         genre,
         isFavorite,
+        isMissing,
+        replayGainTrack,
+        replayGainAlbum,
+        replayGainTrackPeak,
+        replayGainAlbumPeak,
         playCount,
         lastPlayed,
         lastPositionMs,
         artworkUri,
-        fileSize
+        fileSize,
+        sampleRate,
+        bitDepth,
+        bitrateKbps,
+        codec,
+        source,
+        remoteId,
+        remoteArtworkUrl,
+        pendingDownloadPath,
+        isDownloaded
       ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -239,6 +345,34 @@ class $SongsTableTable extends SongsTable
           isFavorite.isAcceptableOrUnknown(
               data['is_favorite']!, _isFavoriteMeta));
     }
+    if (data.containsKey('is_missing')) {
+      context.handle(_isMissingMeta,
+          isMissing.isAcceptableOrUnknown(data['is_missing']!, _isMissingMeta));
+    }
+    if (data.containsKey('replay_gain_track')) {
+      context.handle(
+          _replayGainTrackMeta,
+          replayGainTrack.isAcceptableOrUnknown(
+              data['replay_gain_track']!, _replayGainTrackMeta));
+    }
+    if (data.containsKey('replay_gain_album')) {
+      context.handle(
+          _replayGainAlbumMeta,
+          replayGainAlbum.isAcceptableOrUnknown(
+              data['replay_gain_album']!, _replayGainAlbumMeta));
+    }
+    if (data.containsKey('replay_gain_track_peak')) {
+      context.handle(
+          _replayGainTrackPeakMeta,
+          replayGainTrackPeak.isAcceptableOrUnknown(
+              data['replay_gain_track_peak']!, _replayGainTrackPeakMeta));
+    }
+    if (data.containsKey('replay_gain_album_peak')) {
+      context.handle(
+          _replayGainAlbumPeakMeta,
+          replayGainAlbumPeak.isAcceptableOrUnknown(
+              data['replay_gain_album_peak']!, _replayGainAlbumPeakMeta));
+    }
     if (data.containsKey('play_count')) {
       context.handle(_playCountMeta,
           playCount.isAcceptableOrUnknown(data['play_count']!, _playCountMeta));
@@ -264,6 +398,52 @@ class $SongsTableTable extends SongsTable
     if (data.containsKey('file_size')) {
       context.handle(_fileSizeMeta,
           fileSize.isAcceptableOrUnknown(data['file_size']!, _fileSizeMeta));
+    }
+    if (data.containsKey('sample_rate')) {
+      context.handle(
+          _sampleRateMeta,
+          sampleRate.isAcceptableOrUnknown(
+              data['sample_rate']!, _sampleRateMeta));
+    }
+    if (data.containsKey('bit_depth')) {
+      context.handle(_bitDepthMeta,
+          bitDepth.isAcceptableOrUnknown(data['bit_depth']!, _bitDepthMeta));
+    }
+    if (data.containsKey('bitrate_kbps')) {
+      context.handle(
+          _bitrateKbpsMeta,
+          bitrateKbps.isAcceptableOrUnknown(
+              data['bitrate_kbps']!, _bitrateKbpsMeta));
+    }
+    if (data.containsKey('codec')) {
+      context.handle(
+          _codecMeta, codec.isAcceptableOrUnknown(data['codec']!, _codecMeta));
+    }
+    if (data.containsKey('source')) {
+      context.handle(_sourceMeta,
+          source.isAcceptableOrUnknown(data['source']!, _sourceMeta));
+    }
+    if (data.containsKey('remote_id')) {
+      context.handle(_remoteIdMeta,
+          remoteId.isAcceptableOrUnknown(data['remote_id']!, _remoteIdMeta));
+    }
+    if (data.containsKey('remote_artwork_url')) {
+      context.handle(
+          _remoteArtworkUrlMeta,
+          remoteArtworkUrl.isAcceptableOrUnknown(
+              data['remote_artwork_url']!, _remoteArtworkUrlMeta));
+    }
+    if (data.containsKey('pending_download_path')) {
+      context.handle(
+          _pendingDownloadPathMeta,
+          pendingDownloadPath.isAcceptableOrUnknown(
+              data['pending_download_path']!, _pendingDownloadPathMeta));
+    }
+    if (data.containsKey('is_downloaded')) {
+      context.handle(
+          _isDownloadedMeta,
+          isDownloaded.isAcceptableOrUnknown(
+              data['is_downloaded']!, _isDownloadedMeta));
     }
     return context;
   }
@@ -304,6 +484,18 @@ class $SongsTableTable extends SongsTable
           .read(DriftSqlType.string, data['${effectivePrefix}genre']),
       isFavorite: attachedDatabase.typeMapping
           .read(DriftSqlType.bool, data['${effectivePrefix}is_favorite'])!,
+      isMissing: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_missing'])!,
+      replayGainTrack: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}replay_gain_track']),
+      replayGainAlbum: attachedDatabase.typeMapping.read(
+          DriftSqlType.double, data['${effectivePrefix}replay_gain_album']),
+      replayGainTrackPeak: attachedDatabase.typeMapping.read(
+          DriftSqlType.double,
+          data['${effectivePrefix}replay_gain_track_peak']),
+      replayGainAlbumPeak: attachedDatabase.typeMapping.read(
+          DriftSqlType.double,
+          data['${effectivePrefix}replay_gain_album_peak']),
       playCount: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}play_count'])!,
       lastPlayed: attachedDatabase.typeMapping
@@ -314,6 +506,24 @@ class $SongsTableTable extends SongsTable
           .read(DriftSqlType.string, data['${effectivePrefix}artwork_uri']),
       fileSize: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}file_size']),
+      sampleRate: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}sample_rate']),
+      bitDepth: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}bit_depth']),
+      bitrateKbps: attachedDatabase.typeMapping
+          .read(DriftSqlType.int, data['${effectivePrefix}bitrate_kbps']),
+      codec: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}codec']),
+      source: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}source'])!,
+      remoteId: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}remote_id']),
+      remoteArtworkUrl: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}remote_artwork_url']),
+      pendingDownloadPath: attachedDatabase.typeMapping.read(
+          DriftSqlType.string, data['${effectivePrefix}pending_download_path']),
+      isDownloaded: attachedDatabase.typeMapping
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_downloaded']),
     );
   }
 
@@ -341,11 +551,43 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
   final int? dateAdded;
   final String? genre;
   final bool isFavorite;
+  final bool isMissing;
+  final double? replayGainTrack;
+  final double? replayGainAlbum;
+  final double? replayGainTrackPeak;
+  final double? replayGainAlbumPeak;
   final int playCount;
   final int? lastPlayed;
   final int lastPositionMs;
   final String? artworkUri;
   final int? fileSize;
+
+  /// Real audio-header fields, read from the file via the tag channel and
+  /// cached so the quality badge reflects actual metadata rather than a guess
+  /// from the filename/extension. Null until a file has been enriched.
+  final int? sampleRate;
+  final int? bitDepth;
+  final int? bitrateKbps;
+
+  /// Real container/codec from the header (e.g. FLAC, MP3, AAC, ALAC), used to
+  /// gate lossless/Hi-Res so a renamed file cannot fake a higher tier.
+  final String? codec;
+
+  /// See [SongSource]. Rows that are not [SongSource.local] have no file on
+  /// disk, so scanner cleanup and every path-derived query must exclude them.
+  final String source;
+
+  /// YouTube video id. Kept after a download completes so the same video is
+  /// not fetched twice.
+  final String? remoteId;
+  final String? remoteArtworkUrl;
+
+  /// Destination a download is writing to, used to match the row MediaStore
+  /// creates once the file lands.
+  final String? pendingDownloadPath;
+
+  /// Explicit flag indicating whether this song was downloaded from YouTube Music / Online.
+  final bool? isDownloaded;
   const SongsTableData(
       {required this.id,
       required this.title,
@@ -362,11 +604,25 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       this.dateAdded,
       this.genre,
       required this.isFavorite,
+      required this.isMissing,
+      this.replayGainTrack,
+      this.replayGainAlbum,
+      this.replayGainTrackPeak,
+      this.replayGainAlbumPeak,
       required this.playCount,
       this.lastPlayed,
       required this.lastPositionMs,
       this.artworkUri,
-      this.fileSize});
+      this.fileSize,
+      this.sampleRate,
+      this.bitDepth,
+      this.bitrateKbps,
+      this.codec,
+      required this.source,
+      this.remoteId,
+      this.remoteArtworkUrl,
+      this.pendingDownloadPath,
+      this.isDownloaded});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -401,6 +657,19 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       map['genre'] = Variable<String>(genre);
     }
     map['is_favorite'] = Variable<bool>(isFavorite);
+    map['is_missing'] = Variable<bool>(isMissing);
+    if (!nullToAbsent || replayGainTrack != null) {
+      map['replay_gain_track'] = Variable<double>(replayGainTrack);
+    }
+    if (!nullToAbsent || replayGainAlbum != null) {
+      map['replay_gain_album'] = Variable<double>(replayGainAlbum);
+    }
+    if (!nullToAbsent || replayGainTrackPeak != null) {
+      map['replay_gain_track_peak'] = Variable<double>(replayGainTrackPeak);
+    }
+    if (!nullToAbsent || replayGainAlbumPeak != null) {
+      map['replay_gain_album_peak'] = Variable<double>(replayGainAlbumPeak);
+    }
     map['play_count'] = Variable<int>(playCount);
     if (!nullToAbsent || lastPlayed != null) {
       map['last_played'] = Variable<int>(lastPlayed);
@@ -411,6 +680,31 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
     }
     if (!nullToAbsent || fileSize != null) {
       map['file_size'] = Variable<int>(fileSize);
+    }
+    if (!nullToAbsent || sampleRate != null) {
+      map['sample_rate'] = Variable<int>(sampleRate);
+    }
+    if (!nullToAbsent || bitDepth != null) {
+      map['bit_depth'] = Variable<int>(bitDepth);
+    }
+    if (!nullToAbsent || bitrateKbps != null) {
+      map['bitrate_kbps'] = Variable<int>(bitrateKbps);
+    }
+    if (!nullToAbsent || codec != null) {
+      map['codec'] = Variable<String>(codec);
+    }
+    map['source'] = Variable<String>(source);
+    if (!nullToAbsent || remoteId != null) {
+      map['remote_id'] = Variable<String>(remoteId);
+    }
+    if (!nullToAbsent || remoteArtworkUrl != null) {
+      map['remote_artwork_url'] = Variable<String>(remoteArtworkUrl);
+    }
+    if (!nullToAbsent || pendingDownloadPath != null) {
+      map['pending_download_path'] = Variable<String>(pendingDownloadPath);
+    }
+    if (!nullToAbsent || isDownloaded != null) {
+      map['is_downloaded'] = Variable<bool>(isDownloaded);
     }
     return map;
   }
@@ -443,6 +737,19 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       genre:
           genre == null && nullToAbsent ? const Value.absent() : Value(genre),
       isFavorite: Value(isFavorite),
+      isMissing: Value(isMissing),
+      replayGainTrack: replayGainTrack == null && nullToAbsent
+          ? const Value.absent()
+          : Value(replayGainTrack),
+      replayGainAlbum: replayGainAlbum == null && nullToAbsent
+          ? const Value.absent()
+          : Value(replayGainAlbum),
+      replayGainTrackPeak: replayGainTrackPeak == null && nullToAbsent
+          ? const Value.absent()
+          : Value(replayGainTrackPeak),
+      replayGainAlbumPeak: replayGainAlbumPeak == null && nullToAbsent
+          ? const Value.absent()
+          : Value(replayGainAlbumPeak),
       playCount: Value(playCount),
       lastPlayed: lastPlayed == null && nullToAbsent
           ? const Value.absent()
@@ -454,6 +761,30 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       fileSize: fileSize == null && nullToAbsent
           ? const Value.absent()
           : Value(fileSize),
+      sampleRate: sampleRate == null && nullToAbsent
+          ? const Value.absent()
+          : Value(sampleRate),
+      bitDepth: bitDepth == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bitDepth),
+      bitrateKbps: bitrateKbps == null && nullToAbsent
+          ? const Value.absent()
+          : Value(bitrateKbps),
+      codec:
+          codec == null && nullToAbsent ? const Value.absent() : Value(codec),
+      source: Value(source),
+      remoteId: remoteId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remoteId),
+      remoteArtworkUrl: remoteArtworkUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(remoteArtworkUrl),
+      pendingDownloadPath: pendingDownloadPath == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pendingDownloadPath),
+      isDownloaded: isDownloaded == null && nullToAbsent
+          ? const Value.absent()
+          : Value(isDownloaded),
     );
   }
 
@@ -476,11 +807,28 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       dateAdded: serializer.fromJson<int?>(json['dateAdded']),
       genre: serializer.fromJson<String?>(json['genre']),
       isFavorite: serializer.fromJson<bool>(json['isFavorite']),
+      isMissing: serializer.fromJson<bool>(json['isMissing']),
+      replayGainTrack: serializer.fromJson<double?>(json['replayGainTrack']),
+      replayGainAlbum: serializer.fromJson<double?>(json['replayGainAlbum']),
+      replayGainTrackPeak:
+          serializer.fromJson<double?>(json['replayGainTrackPeak']),
+      replayGainAlbumPeak:
+          serializer.fromJson<double?>(json['replayGainAlbumPeak']),
       playCount: serializer.fromJson<int>(json['playCount']),
       lastPlayed: serializer.fromJson<int?>(json['lastPlayed']),
       lastPositionMs: serializer.fromJson<int>(json['lastPositionMs']),
       artworkUri: serializer.fromJson<String?>(json['artworkUri']),
       fileSize: serializer.fromJson<int?>(json['fileSize']),
+      sampleRate: serializer.fromJson<int?>(json['sampleRate']),
+      bitDepth: serializer.fromJson<int?>(json['bitDepth']),
+      bitrateKbps: serializer.fromJson<int?>(json['bitrateKbps']),
+      codec: serializer.fromJson<String?>(json['codec']),
+      source: serializer.fromJson<String>(json['source']),
+      remoteId: serializer.fromJson<String?>(json['remoteId']),
+      remoteArtworkUrl: serializer.fromJson<String?>(json['remoteArtworkUrl']),
+      pendingDownloadPath:
+          serializer.fromJson<String?>(json['pendingDownloadPath']),
+      isDownloaded: serializer.fromJson<bool?>(json['isDownloaded']),
     );
   }
   @override
@@ -502,11 +850,25 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       'dateAdded': serializer.toJson<int?>(dateAdded),
       'genre': serializer.toJson<String?>(genre),
       'isFavorite': serializer.toJson<bool>(isFavorite),
+      'isMissing': serializer.toJson<bool>(isMissing),
+      'replayGainTrack': serializer.toJson<double?>(replayGainTrack),
+      'replayGainAlbum': serializer.toJson<double?>(replayGainAlbum),
+      'replayGainTrackPeak': serializer.toJson<double?>(replayGainTrackPeak),
+      'replayGainAlbumPeak': serializer.toJson<double?>(replayGainAlbumPeak),
       'playCount': serializer.toJson<int>(playCount),
       'lastPlayed': serializer.toJson<int?>(lastPlayed),
       'lastPositionMs': serializer.toJson<int>(lastPositionMs),
       'artworkUri': serializer.toJson<String?>(artworkUri),
       'fileSize': serializer.toJson<int?>(fileSize),
+      'sampleRate': serializer.toJson<int?>(sampleRate),
+      'bitDepth': serializer.toJson<int?>(bitDepth),
+      'bitrateKbps': serializer.toJson<int?>(bitrateKbps),
+      'codec': serializer.toJson<String?>(codec),
+      'source': serializer.toJson<String>(source),
+      'remoteId': serializer.toJson<String?>(remoteId),
+      'remoteArtworkUrl': serializer.toJson<String?>(remoteArtworkUrl),
+      'pendingDownloadPath': serializer.toJson<String?>(pendingDownloadPath),
+      'isDownloaded': serializer.toJson<bool?>(isDownloaded),
     };
   }
 
@@ -526,11 +888,25 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           Value<int?> dateAdded = const Value.absent(),
           Value<String?> genre = const Value.absent(),
           bool? isFavorite,
+          bool? isMissing,
+          Value<double?> replayGainTrack = const Value.absent(),
+          Value<double?> replayGainAlbum = const Value.absent(),
+          Value<double?> replayGainTrackPeak = const Value.absent(),
+          Value<double?> replayGainAlbumPeak = const Value.absent(),
           int? playCount,
           Value<int?> lastPlayed = const Value.absent(),
           int? lastPositionMs,
           Value<String?> artworkUri = const Value.absent(),
-          Value<int?> fileSize = const Value.absent()}) =>
+          Value<int?> fileSize = const Value.absent(),
+          Value<int?> sampleRate = const Value.absent(),
+          Value<int?> bitDepth = const Value.absent(),
+          Value<int?> bitrateKbps = const Value.absent(),
+          Value<String?> codec = const Value.absent(),
+          String? source,
+          Value<String?> remoteId = const Value.absent(),
+          Value<String?> remoteArtworkUrl = const Value.absent(),
+          Value<String?> pendingDownloadPath = const Value.absent(),
+          Value<bool?> isDownloaded = const Value.absent()}) =>
       SongsTableData(
         id: id ?? this.id,
         title: title ?? this.title,
@@ -547,11 +923,38 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
         dateAdded: dateAdded.present ? dateAdded.value : this.dateAdded,
         genre: genre.present ? genre.value : this.genre,
         isFavorite: isFavorite ?? this.isFavorite,
+        isMissing: isMissing ?? this.isMissing,
+        replayGainTrack: replayGainTrack.present
+            ? replayGainTrack.value
+            : this.replayGainTrack,
+        replayGainAlbum: replayGainAlbum.present
+            ? replayGainAlbum.value
+            : this.replayGainAlbum,
+        replayGainTrackPeak: replayGainTrackPeak.present
+            ? replayGainTrackPeak.value
+            : this.replayGainTrackPeak,
+        replayGainAlbumPeak: replayGainAlbumPeak.present
+            ? replayGainAlbumPeak.value
+            : this.replayGainAlbumPeak,
         playCount: playCount ?? this.playCount,
         lastPlayed: lastPlayed.present ? lastPlayed.value : this.lastPlayed,
         lastPositionMs: lastPositionMs ?? this.lastPositionMs,
         artworkUri: artworkUri.present ? artworkUri.value : this.artworkUri,
         fileSize: fileSize.present ? fileSize.value : this.fileSize,
+        sampleRate: sampleRate.present ? sampleRate.value : this.sampleRate,
+        bitDepth: bitDepth.present ? bitDepth.value : this.bitDepth,
+        bitrateKbps: bitrateKbps.present ? bitrateKbps.value : this.bitrateKbps,
+        codec: codec.present ? codec.value : this.codec,
+        source: source ?? this.source,
+        remoteId: remoteId.present ? remoteId.value : this.remoteId,
+        remoteArtworkUrl: remoteArtworkUrl.present
+            ? remoteArtworkUrl.value
+            : this.remoteArtworkUrl,
+        pendingDownloadPath: pendingDownloadPath.present
+            ? pendingDownloadPath.value
+            : this.pendingDownloadPath,
+        isDownloaded:
+            isDownloaded.present ? isDownloaded.value : this.isDownloaded,
       );
   SongsTableData copyWithCompanion(SongsTableCompanion data) {
     return SongsTableData(
@@ -574,6 +977,19 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       genre: data.genre.present ? data.genre.value : this.genre,
       isFavorite:
           data.isFavorite.present ? data.isFavorite.value : this.isFavorite,
+      isMissing: data.isMissing.present ? data.isMissing.value : this.isMissing,
+      replayGainTrack: data.replayGainTrack.present
+          ? data.replayGainTrack.value
+          : this.replayGainTrack,
+      replayGainAlbum: data.replayGainAlbum.present
+          ? data.replayGainAlbum.value
+          : this.replayGainAlbum,
+      replayGainTrackPeak: data.replayGainTrackPeak.present
+          ? data.replayGainTrackPeak.value
+          : this.replayGainTrackPeak,
+      replayGainAlbumPeak: data.replayGainAlbumPeak.present
+          ? data.replayGainAlbumPeak.value
+          : this.replayGainAlbumPeak,
       playCount: data.playCount.present ? data.playCount.value : this.playCount,
       lastPlayed:
           data.lastPlayed.present ? data.lastPlayed.value : this.lastPlayed,
@@ -583,6 +999,23 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       artworkUri:
           data.artworkUri.present ? data.artworkUri.value : this.artworkUri,
       fileSize: data.fileSize.present ? data.fileSize.value : this.fileSize,
+      sampleRate:
+          data.sampleRate.present ? data.sampleRate.value : this.sampleRate,
+      bitDepth: data.bitDepth.present ? data.bitDepth.value : this.bitDepth,
+      bitrateKbps:
+          data.bitrateKbps.present ? data.bitrateKbps.value : this.bitrateKbps,
+      codec: data.codec.present ? data.codec.value : this.codec,
+      source: data.source.present ? data.source.value : this.source,
+      remoteId: data.remoteId.present ? data.remoteId.value : this.remoteId,
+      remoteArtworkUrl: data.remoteArtworkUrl.present
+          ? data.remoteArtworkUrl.value
+          : this.remoteArtworkUrl,
+      pendingDownloadPath: data.pendingDownloadPath.present
+          ? data.pendingDownloadPath.value
+          : this.pendingDownloadPath,
+      isDownloaded: data.isDownloaded.present
+          ? data.isDownloaded.value
+          : this.isDownloaded,
     );
   }
 
@@ -604,37 +1037,66 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           ..write('dateAdded: $dateAdded, ')
           ..write('genre: $genre, ')
           ..write('isFavorite: $isFavorite, ')
+          ..write('isMissing: $isMissing, ')
+          ..write('replayGainTrack: $replayGainTrack, ')
+          ..write('replayGainAlbum: $replayGainAlbum, ')
+          ..write('replayGainTrackPeak: $replayGainTrackPeak, ')
+          ..write('replayGainAlbumPeak: $replayGainAlbumPeak, ')
           ..write('playCount: $playCount, ')
           ..write('lastPlayed: $lastPlayed, ')
           ..write('lastPositionMs: $lastPositionMs, ')
           ..write('artworkUri: $artworkUri, ')
-          ..write('fileSize: $fileSize')
+          ..write('fileSize: $fileSize, ')
+          ..write('sampleRate: $sampleRate, ')
+          ..write('bitDepth: $bitDepth, ')
+          ..write('bitrateKbps: $bitrateKbps, ')
+          ..write('codec: $codec, ')
+          ..write('source: $source, ')
+          ..write('remoteId: $remoteId, ')
+          ..write('remoteArtworkUrl: $remoteArtworkUrl, ')
+          ..write('pendingDownloadPath: $pendingDownloadPath, ')
+          ..write('isDownloaded: $isDownloaded')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
-      id,
-      title,
-      artist,
-      artistId,
-      album,
-      albumId,
-      durationMs,
-      path,
-      uri,
-      trackNumber,
-      discNumber,
-      year,
-      dateAdded,
-      genre,
-      isFavorite,
-      playCount,
-      lastPlayed,
-      lastPositionMs,
-      artworkUri,
-      fileSize);
+  int get hashCode => Object.hashAll([
+        id,
+        title,
+        artist,
+        artistId,
+        album,
+        albumId,
+        durationMs,
+        path,
+        uri,
+        trackNumber,
+        discNumber,
+        year,
+        dateAdded,
+        genre,
+        isFavorite,
+        isMissing,
+        replayGainTrack,
+        replayGainAlbum,
+        replayGainTrackPeak,
+        replayGainAlbumPeak,
+        playCount,
+        lastPlayed,
+        lastPositionMs,
+        artworkUri,
+        fileSize,
+        sampleRate,
+        bitDepth,
+        bitrateKbps,
+        codec,
+        source,
+        remoteId,
+        remoteArtworkUrl,
+        pendingDownloadPath,
+        isDownloaded
+      ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -654,11 +1116,25 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           other.dateAdded == this.dateAdded &&
           other.genre == this.genre &&
           other.isFavorite == this.isFavorite &&
+          other.isMissing == this.isMissing &&
+          other.replayGainTrack == this.replayGainTrack &&
+          other.replayGainAlbum == this.replayGainAlbum &&
+          other.replayGainTrackPeak == this.replayGainTrackPeak &&
+          other.replayGainAlbumPeak == this.replayGainAlbumPeak &&
           other.playCount == this.playCount &&
           other.lastPlayed == this.lastPlayed &&
           other.lastPositionMs == this.lastPositionMs &&
           other.artworkUri == this.artworkUri &&
-          other.fileSize == this.fileSize);
+          other.fileSize == this.fileSize &&
+          other.sampleRate == this.sampleRate &&
+          other.bitDepth == this.bitDepth &&
+          other.bitrateKbps == this.bitrateKbps &&
+          other.codec == this.codec &&
+          other.source == this.source &&
+          other.remoteId == this.remoteId &&
+          other.remoteArtworkUrl == this.remoteArtworkUrl &&
+          other.pendingDownloadPath == this.pendingDownloadPath &&
+          other.isDownloaded == this.isDownloaded);
 }
 
 class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
@@ -677,11 +1153,25 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
   final Value<int?> dateAdded;
   final Value<String?> genre;
   final Value<bool> isFavorite;
+  final Value<bool> isMissing;
+  final Value<double?> replayGainTrack;
+  final Value<double?> replayGainAlbum;
+  final Value<double?> replayGainTrackPeak;
+  final Value<double?> replayGainAlbumPeak;
   final Value<int> playCount;
   final Value<int?> lastPlayed;
   final Value<int> lastPositionMs;
   final Value<String?> artworkUri;
   final Value<int?> fileSize;
+  final Value<int?> sampleRate;
+  final Value<int?> bitDepth;
+  final Value<int?> bitrateKbps;
+  final Value<String?> codec;
+  final Value<String> source;
+  final Value<String?> remoteId;
+  final Value<String?> remoteArtworkUrl;
+  final Value<String?> pendingDownloadPath;
+  final Value<bool?> isDownloaded;
   const SongsTableCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
@@ -698,11 +1188,25 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     this.dateAdded = const Value.absent(),
     this.genre = const Value.absent(),
     this.isFavorite = const Value.absent(),
+    this.isMissing = const Value.absent(),
+    this.replayGainTrack = const Value.absent(),
+    this.replayGainAlbum = const Value.absent(),
+    this.replayGainTrackPeak = const Value.absent(),
+    this.replayGainAlbumPeak = const Value.absent(),
     this.playCount = const Value.absent(),
     this.lastPlayed = const Value.absent(),
     this.lastPositionMs = const Value.absent(),
     this.artworkUri = const Value.absent(),
     this.fileSize = const Value.absent(),
+    this.sampleRate = const Value.absent(),
+    this.bitDepth = const Value.absent(),
+    this.bitrateKbps = const Value.absent(),
+    this.codec = const Value.absent(),
+    this.source = const Value.absent(),
+    this.remoteId = const Value.absent(),
+    this.remoteArtworkUrl = const Value.absent(),
+    this.pendingDownloadPath = const Value.absent(),
+    this.isDownloaded = const Value.absent(),
   });
   SongsTableCompanion.insert({
     this.id = const Value.absent(),
@@ -720,11 +1224,25 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     this.dateAdded = const Value.absent(),
     this.genre = const Value.absent(),
     this.isFavorite = const Value.absent(),
+    this.isMissing = const Value.absent(),
+    this.replayGainTrack = const Value.absent(),
+    this.replayGainAlbum = const Value.absent(),
+    this.replayGainTrackPeak = const Value.absent(),
+    this.replayGainAlbumPeak = const Value.absent(),
     this.playCount = const Value.absent(),
     this.lastPlayed = const Value.absent(),
     this.lastPositionMs = const Value.absent(),
     this.artworkUri = const Value.absent(),
     this.fileSize = const Value.absent(),
+    this.sampleRate = const Value.absent(),
+    this.bitDepth = const Value.absent(),
+    this.bitrateKbps = const Value.absent(),
+    this.codec = const Value.absent(),
+    this.source = const Value.absent(),
+    this.remoteId = const Value.absent(),
+    this.remoteArtworkUrl = const Value.absent(),
+    this.pendingDownloadPath = const Value.absent(),
+    this.isDownloaded = const Value.absent(),
   })  : title = Value(title),
         path = Value(path);
   static Insertable<SongsTableData> custom({
@@ -743,11 +1261,25 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     Expression<int>? dateAdded,
     Expression<String>? genre,
     Expression<bool>? isFavorite,
+    Expression<bool>? isMissing,
+    Expression<double>? replayGainTrack,
+    Expression<double>? replayGainAlbum,
+    Expression<double>? replayGainTrackPeak,
+    Expression<double>? replayGainAlbumPeak,
     Expression<int>? playCount,
     Expression<int>? lastPlayed,
     Expression<int>? lastPositionMs,
     Expression<String>? artworkUri,
     Expression<int>? fileSize,
+    Expression<int>? sampleRate,
+    Expression<int>? bitDepth,
+    Expression<int>? bitrateKbps,
+    Expression<String>? codec,
+    Expression<String>? source,
+    Expression<String>? remoteId,
+    Expression<String>? remoteArtworkUrl,
+    Expression<String>? pendingDownloadPath,
+    Expression<bool>? isDownloaded,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -765,11 +1297,28 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       if (dateAdded != null) 'date_added': dateAdded,
       if (genre != null) 'genre': genre,
       if (isFavorite != null) 'is_favorite': isFavorite,
+      if (isMissing != null) 'is_missing': isMissing,
+      if (replayGainTrack != null) 'replay_gain_track': replayGainTrack,
+      if (replayGainAlbum != null) 'replay_gain_album': replayGainAlbum,
+      if (replayGainTrackPeak != null)
+        'replay_gain_track_peak': replayGainTrackPeak,
+      if (replayGainAlbumPeak != null)
+        'replay_gain_album_peak': replayGainAlbumPeak,
       if (playCount != null) 'play_count': playCount,
       if (lastPlayed != null) 'last_played': lastPlayed,
       if (lastPositionMs != null) 'last_position_ms': lastPositionMs,
       if (artworkUri != null) 'artwork_uri': artworkUri,
       if (fileSize != null) 'file_size': fileSize,
+      if (sampleRate != null) 'sample_rate': sampleRate,
+      if (bitDepth != null) 'bit_depth': bitDepth,
+      if (bitrateKbps != null) 'bitrate_kbps': bitrateKbps,
+      if (codec != null) 'codec': codec,
+      if (source != null) 'source': source,
+      if (remoteId != null) 'remote_id': remoteId,
+      if (remoteArtworkUrl != null) 'remote_artwork_url': remoteArtworkUrl,
+      if (pendingDownloadPath != null)
+        'pending_download_path': pendingDownloadPath,
+      if (isDownloaded != null) 'is_downloaded': isDownloaded,
     });
   }
 
@@ -789,11 +1338,25 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       Value<int?>? dateAdded,
       Value<String?>? genre,
       Value<bool>? isFavorite,
+      Value<bool>? isMissing,
+      Value<double?>? replayGainTrack,
+      Value<double?>? replayGainAlbum,
+      Value<double?>? replayGainTrackPeak,
+      Value<double?>? replayGainAlbumPeak,
       Value<int>? playCount,
       Value<int?>? lastPlayed,
       Value<int>? lastPositionMs,
       Value<String?>? artworkUri,
-      Value<int?>? fileSize}) {
+      Value<int?>? fileSize,
+      Value<int?>? sampleRate,
+      Value<int?>? bitDepth,
+      Value<int?>? bitrateKbps,
+      Value<String?>? codec,
+      Value<String>? source,
+      Value<String?>? remoteId,
+      Value<String?>? remoteArtworkUrl,
+      Value<String?>? pendingDownloadPath,
+      Value<bool?>? isDownloaded}) {
     return SongsTableCompanion(
       id: id ?? this.id,
       title: title ?? this.title,
@@ -810,11 +1373,25 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       dateAdded: dateAdded ?? this.dateAdded,
       genre: genre ?? this.genre,
       isFavorite: isFavorite ?? this.isFavorite,
+      isMissing: isMissing ?? this.isMissing,
+      replayGainTrack: replayGainTrack ?? this.replayGainTrack,
+      replayGainAlbum: replayGainAlbum ?? this.replayGainAlbum,
+      replayGainTrackPeak: replayGainTrackPeak ?? this.replayGainTrackPeak,
+      replayGainAlbumPeak: replayGainAlbumPeak ?? this.replayGainAlbumPeak,
       playCount: playCount ?? this.playCount,
       lastPlayed: lastPlayed ?? this.lastPlayed,
       lastPositionMs: lastPositionMs ?? this.lastPositionMs,
       artworkUri: artworkUri ?? this.artworkUri,
       fileSize: fileSize ?? this.fileSize,
+      sampleRate: sampleRate ?? this.sampleRate,
+      bitDepth: bitDepth ?? this.bitDepth,
+      bitrateKbps: bitrateKbps ?? this.bitrateKbps,
+      codec: codec ?? this.codec,
+      source: source ?? this.source,
+      remoteId: remoteId ?? this.remoteId,
+      remoteArtworkUrl: remoteArtworkUrl ?? this.remoteArtworkUrl,
+      pendingDownloadPath: pendingDownloadPath ?? this.pendingDownloadPath,
+      isDownloaded: isDownloaded ?? this.isDownloaded,
     );
   }
 
@@ -866,6 +1443,23 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     if (isFavorite.present) {
       map['is_favorite'] = Variable<bool>(isFavorite.value);
     }
+    if (isMissing.present) {
+      map['is_missing'] = Variable<bool>(isMissing.value);
+    }
+    if (replayGainTrack.present) {
+      map['replay_gain_track'] = Variable<double>(replayGainTrack.value);
+    }
+    if (replayGainAlbum.present) {
+      map['replay_gain_album'] = Variable<double>(replayGainAlbum.value);
+    }
+    if (replayGainTrackPeak.present) {
+      map['replay_gain_track_peak'] =
+          Variable<double>(replayGainTrackPeak.value);
+    }
+    if (replayGainAlbumPeak.present) {
+      map['replay_gain_album_peak'] =
+          Variable<double>(replayGainAlbumPeak.value);
+    }
     if (playCount.present) {
       map['play_count'] = Variable<int>(playCount.value);
     }
@@ -880,6 +1474,34 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     }
     if (fileSize.present) {
       map['file_size'] = Variable<int>(fileSize.value);
+    }
+    if (sampleRate.present) {
+      map['sample_rate'] = Variable<int>(sampleRate.value);
+    }
+    if (bitDepth.present) {
+      map['bit_depth'] = Variable<int>(bitDepth.value);
+    }
+    if (bitrateKbps.present) {
+      map['bitrate_kbps'] = Variable<int>(bitrateKbps.value);
+    }
+    if (codec.present) {
+      map['codec'] = Variable<String>(codec.value);
+    }
+    if (source.present) {
+      map['source'] = Variable<String>(source.value);
+    }
+    if (remoteId.present) {
+      map['remote_id'] = Variable<String>(remoteId.value);
+    }
+    if (remoteArtworkUrl.present) {
+      map['remote_artwork_url'] = Variable<String>(remoteArtworkUrl.value);
+    }
+    if (pendingDownloadPath.present) {
+      map['pending_download_path'] =
+          Variable<String>(pendingDownloadPath.value);
+    }
+    if (isDownloaded.present) {
+      map['is_downloaded'] = Variable<bool>(isDownloaded.value);
     }
     return map;
   }
@@ -902,11 +1524,25 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
           ..write('dateAdded: $dateAdded, ')
           ..write('genre: $genre, ')
           ..write('isFavorite: $isFavorite, ')
+          ..write('isMissing: $isMissing, ')
+          ..write('replayGainTrack: $replayGainTrack, ')
+          ..write('replayGainAlbum: $replayGainAlbum, ')
+          ..write('replayGainTrackPeak: $replayGainTrackPeak, ')
+          ..write('replayGainAlbumPeak: $replayGainAlbumPeak, ')
           ..write('playCount: $playCount, ')
           ..write('lastPlayed: $lastPlayed, ')
           ..write('lastPositionMs: $lastPositionMs, ')
           ..write('artworkUri: $artworkUri, ')
-          ..write('fileSize: $fileSize')
+          ..write('fileSize: $fileSize, ')
+          ..write('sampleRate: $sampleRate, ')
+          ..write('bitDepth: $bitDepth, ')
+          ..write('bitrateKbps: $bitrateKbps, ')
+          ..write('codec: $codec, ')
+          ..write('source: $source, ')
+          ..write('remoteId: $remoteId, ')
+          ..write('remoteArtworkUrl: $remoteArtworkUrl, ')
+          ..write('pendingDownloadPath: $pendingDownloadPath, ')
+          ..write('isDownloaded: $isDownloaded')
           ..write(')'))
         .toString();
   }
@@ -3071,11 +3707,25 @@ typedef $$SongsTableTableCreateCompanionBuilder = SongsTableCompanion Function({
   Value<int?> dateAdded,
   Value<String?> genre,
   Value<bool> isFavorite,
+  Value<bool> isMissing,
+  Value<double?> replayGainTrack,
+  Value<double?> replayGainAlbum,
+  Value<double?> replayGainTrackPeak,
+  Value<double?> replayGainAlbumPeak,
   Value<int> playCount,
   Value<int?> lastPlayed,
   Value<int> lastPositionMs,
   Value<String?> artworkUri,
   Value<int?> fileSize,
+  Value<int?> sampleRate,
+  Value<int?> bitDepth,
+  Value<int?> bitrateKbps,
+  Value<String?> codec,
+  Value<String> source,
+  Value<String?> remoteId,
+  Value<String?> remoteArtworkUrl,
+  Value<String?> pendingDownloadPath,
+  Value<bool?> isDownloaded,
 });
 typedef $$SongsTableTableUpdateCompanionBuilder = SongsTableCompanion Function({
   Value<int> id,
@@ -3093,11 +3743,25 @@ typedef $$SongsTableTableUpdateCompanionBuilder = SongsTableCompanion Function({
   Value<int?> dateAdded,
   Value<String?> genre,
   Value<bool> isFavorite,
+  Value<bool> isMissing,
+  Value<double?> replayGainTrack,
+  Value<double?> replayGainAlbum,
+  Value<double?> replayGainTrackPeak,
+  Value<double?> replayGainAlbumPeak,
   Value<int> playCount,
   Value<int?> lastPlayed,
   Value<int> lastPositionMs,
   Value<String?> artworkUri,
   Value<int?> fileSize,
+  Value<int?> sampleRate,
+  Value<int?> bitDepth,
+  Value<int?> bitrateKbps,
+  Value<String?> codec,
+  Value<String> source,
+  Value<String?> remoteId,
+  Value<String?> remoteArtworkUrl,
+  Value<String?> pendingDownloadPath,
+  Value<bool?> isDownloaded,
 });
 
 class $$SongsTableTableFilterComposer
@@ -3154,6 +3818,25 @@ class $$SongsTableTableFilterComposer
   ColumnFilters<bool> get isFavorite => $composableBuilder(
       column: $table.isFavorite, builder: (column) => ColumnFilters(column));
 
+  ColumnFilters<bool> get isMissing => $composableBuilder(
+      column: $table.isMissing, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get replayGainTrack => $composableBuilder(
+      column: $table.replayGainTrack,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get replayGainAlbum => $composableBuilder(
+      column: $table.replayGainAlbum,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get replayGainTrackPeak => $composableBuilder(
+      column: $table.replayGainTrackPeak,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get replayGainAlbumPeak => $composableBuilder(
+      column: $table.replayGainAlbumPeak,
+      builder: (column) => ColumnFilters(column));
+
   ColumnFilters<int> get playCount => $composableBuilder(
       column: $table.playCount, builder: (column) => ColumnFilters(column));
 
@@ -3169,6 +3852,35 @@ class $$SongsTableTableFilterComposer
 
   ColumnFilters<int> get fileSize => $composableBuilder(
       column: $table.fileSize, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get sampleRate => $composableBuilder(
+      column: $table.sampleRate, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get bitDepth => $composableBuilder(
+      column: $table.bitDepth, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<int> get bitrateKbps => $composableBuilder(
+      column: $table.bitrateKbps, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get codec => $composableBuilder(
+      column: $table.codec, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get source => $composableBuilder(
+      column: $table.source, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get remoteId => $composableBuilder(
+      column: $table.remoteId, builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get remoteArtworkUrl => $composableBuilder(
+      column: $table.remoteArtworkUrl,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<String> get pendingDownloadPath => $composableBuilder(
+      column: $table.pendingDownloadPath,
+      builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<bool> get isDownloaded => $composableBuilder(
+      column: $table.isDownloaded, builder: (column) => ColumnFilters(column));
 }
 
 class $$SongsTableTableOrderingComposer
@@ -3225,6 +3937,25 @@ class $$SongsTableTableOrderingComposer
   ColumnOrderings<bool> get isFavorite => $composableBuilder(
       column: $table.isFavorite, builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<bool> get isMissing => $composableBuilder(
+      column: $table.isMissing, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get replayGainTrack => $composableBuilder(
+      column: $table.replayGainTrack,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get replayGainAlbum => $composableBuilder(
+      column: $table.replayGainAlbum,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get replayGainTrackPeak => $composableBuilder(
+      column: $table.replayGainTrackPeak,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<double> get replayGainAlbumPeak => $composableBuilder(
+      column: $table.replayGainAlbumPeak,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<int> get playCount => $composableBuilder(
       column: $table.playCount, builder: (column) => ColumnOrderings(column));
 
@@ -3240,6 +3971,36 @@ class $$SongsTableTableOrderingComposer
 
   ColumnOrderings<int> get fileSize => $composableBuilder(
       column: $table.fileSize, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get sampleRate => $composableBuilder(
+      column: $table.sampleRate, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get bitDepth => $composableBuilder(
+      column: $table.bitDepth, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<int> get bitrateKbps => $composableBuilder(
+      column: $table.bitrateKbps, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get codec => $composableBuilder(
+      column: $table.codec, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get source => $composableBuilder(
+      column: $table.source, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get remoteId => $composableBuilder(
+      column: $table.remoteId, builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get remoteArtworkUrl => $composableBuilder(
+      column: $table.remoteArtworkUrl,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<String> get pendingDownloadPath => $composableBuilder(
+      column: $table.pendingDownloadPath,
+      builder: (column) => ColumnOrderings(column));
+
+  ColumnOrderings<bool> get isDownloaded => $composableBuilder(
+      column: $table.isDownloaded,
+      builder: (column) => ColumnOrderings(column));
 }
 
 class $$SongsTableTableAnnotationComposer
@@ -3296,6 +4057,21 @@ class $$SongsTableTableAnnotationComposer
   GeneratedColumn<bool> get isFavorite => $composableBuilder(
       column: $table.isFavorite, builder: (column) => column);
 
+  GeneratedColumn<bool> get isMissing =>
+      $composableBuilder(column: $table.isMissing, builder: (column) => column);
+
+  GeneratedColumn<double> get replayGainTrack => $composableBuilder(
+      column: $table.replayGainTrack, builder: (column) => column);
+
+  GeneratedColumn<double> get replayGainAlbum => $composableBuilder(
+      column: $table.replayGainAlbum, builder: (column) => column);
+
+  GeneratedColumn<double> get replayGainTrackPeak => $composableBuilder(
+      column: $table.replayGainTrackPeak, builder: (column) => column);
+
+  GeneratedColumn<double> get replayGainAlbumPeak => $composableBuilder(
+      column: $table.replayGainAlbumPeak, builder: (column) => column);
+
   GeneratedColumn<int> get playCount =>
       $composableBuilder(column: $table.playCount, builder: (column) => column);
 
@@ -3310,6 +4086,33 @@ class $$SongsTableTableAnnotationComposer
 
   GeneratedColumn<int> get fileSize =>
       $composableBuilder(column: $table.fileSize, builder: (column) => column);
+
+  GeneratedColumn<int> get sampleRate => $composableBuilder(
+      column: $table.sampleRate, builder: (column) => column);
+
+  GeneratedColumn<int> get bitDepth =>
+      $composableBuilder(column: $table.bitDepth, builder: (column) => column);
+
+  GeneratedColumn<int> get bitrateKbps => $composableBuilder(
+      column: $table.bitrateKbps, builder: (column) => column);
+
+  GeneratedColumn<String> get codec =>
+      $composableBuilder(column: $table.codec, builder: (column) => column);
+
+  GeneratedColumn<String> get source =>
+      $composableBuilder(column: $table.source, builder: (column) => column);
+
+  GeneratedColumn<String> get remoteId =>
+      $composableBuilder(column: $table.remoteId, builder: (column) => column);
+
+  GeneratedColumn<String> get remoteArtworkUrl => $composableBuilder(
+      column: $table.remoteArtworkUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get pendingDownloadPath => $composableBuilder(
+      column: $table.pendingDownloadPath, builder: (column) => column);
+
+  GeneratedColumn<bool> get isDownloaded => $composableBuilder(
+      column: $table.isDownloaded, builder: (column) => column);
 }
 
 class $$SongsTableTableTableManager extends RootTableManager<
@@ -3353,11 +4156,25 @@ class $$SongsTableTableTableManager extends RootTableManager<
             Value<int?> dateAdded = const Value.absent(),
             Value<String?> genre = const Value.absent(),
             Value<bool> isFavorite = const Value.absent(),
+            Value<bool> isMissing = const Value.absent(),
+            Value<double?> replayGainTrack = const Value.absent(),
+            Value<double?> replayGainAlbum = const Value.absent(),
+            Value<double?> replayGainTrackPeak = const Value.absent(),
+            Value<double?> replayGainAlbumPeak = const Value.absent(),
             Value<int> playCount = const Value.absent(),
             Value<int?> lastPlayed = const Value.absent(),
             Value<int> lastPositionMs = const Value.absent(),
             Value<String?> artworkUri = const Value.absent(),
             Value<int?> fileSize = const Value.absent(),
+            Value<int?> sampleRate = const Value.absent(),
+            Value<int?> bitDepth = const Value.absent(),
+            Value<int?> bitrateKbps = const Value.absent(),
+            Value<String?> codec = const Value.absent(),
+            Value<String> source = const Value.absent(),
+            Value<String?> remoteId = const Value.absent(),
+            Value<String?> remoteArtworkUrl = const Value.absent(),
+            Value<String?> pendingDownloadPath = const Value.absent(),
+            Value<bool?> isDownloaded = const Value.absent(),
           }) =>
               SongsTableCompanion(
             id: id,
@@ -3375,11 +4192,25 @@ class $$SongsTableTableTableManager extends RootTableManager<
             dateAdded: dateAdded,
             genre: genre,
             isFavorite: isFavorite,
+            isMissing: isMissing,
+            replayGainTrack: replayGainTrack,
+            replayGainAlbum: replayGainAlbum,
+            replayGainTrackPeak: replayGainTrackPeak,
+            replayGainAlbumPeak: replayGainAlbumPeak,
             playCount: playCount,
             lastPlayed: lastPlayed,
             lastPositionMs: lastPositionMs,
             artworkUri: artworkUri,
             fileSize: fileSize,
+            sampleRate: sampleRate,
+            bitDepth: bitDepth,
+            bitrateKbps: bitrateKbps,
+            codec: codec,
+            source: source,
+            remoteId: remoteId,
+            remoteArtworkUrl: remoteArtworkUrl,
+            pendingDownloadPath: pendingDownloadPath,
+            isDownloaded: isDownloaded,
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
@@ -3397,11 +4228,25 @@ class $$SongsTableTableTableManager extends RootTableManager<
             Value<int?> dateAdded = const Value.absent(),
             Value<String?> genre = const Value.absent(),
             Value<bool> isFavorite = const Value.absent(),
+            Value<bool> isMissing = const Value.absent(),
+            Value<double?> replayGainTrack = const Value.absent(),
+            Value<double?> replayGainAlbum = const Value.absent(),
+            Value<double?> replayGainTrackPeak = const Value.absent(),
+            Value<double?> replayGainAlbumPeak = const Value.absent(),
             Value<int> playCount = const Value.absent(),
             Value<int?> lastPlayed = const Value.absent(),
             Value<int> lastPositionMs = const Value.absent(),
             Value<String?> artworkUri = const Value.absent(),
             Value<int?> fileSize = const Value.absent(),
+            Value<int?> sampleRate = const Value.absent(),
+            Value<int?> bitDepth = const Value.absent(),
+            Value<int?> bitrateKbps = const Value.absent(),
+            Value<String?> codec = const Value.absent(),
+            Value<String> source = const Value.absent(),
+            Value<String?> remoteId = const Value.absent(),
+            Value<String?> remoteArtworkUrl = const Value.absent(),
+            Value<String?> pendingDownloadPath = const Value.absent(),
+            Value<bool?> isDownloaded = const Value.absent(),
           }) =>
               SongsTableCompanion.insert(
             id: id,
@@ -3419,11 +4264,25 @@ class $$SongsTableTableTableManager extends RootTableManager<
             dateAdded: dateAdded,
             genre: genre,
             isFavorite: isFavorite,
+            isMissing: isMissing,
+            replayGainTrack: replayGainTrack,
+            replayGainAlbum: replayGainAlbum,
+            replayGainTrackPeak: replayGainTrackPeak,
+            replayGainAlbumPeak: replayGainAlbumPeak,
             playCount: playCount,
             lastPlayed: lastPlayed,
             lastPositionMs: lastPositionMs,
             artworkUri: artworkUri,
             fileSize: fileSize,
+            sampleRate: sampleRate,
+            bitDepth: bitDepth,
+            bitrateKbps: bitrateKbps,
+            codec: codec,
+            source: source,
+            remoteId: remoteId,
+            remoteArtworkUrl: remoteArtworkUrl,
+            pendingDownloadPath: pendingDownloadPath,
+            isDownloaded: isDownloaded,
           ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

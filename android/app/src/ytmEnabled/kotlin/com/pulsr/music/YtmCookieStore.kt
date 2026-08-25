@@ -1,0 +1,190 @@
+package com.pulsr.music
+
+import android.content.Context
+import android.content.SharedPreferences
+import android.webkit.CookieManager
+import java.util.concurrent.ConcurrentHashMap
+
+/**
+ * Thread-safe Cookie Store for YouTube & Google session management.
+ *
+ * Acts as the single source of truth for cookies across:
+ * - https://music.youtube.com
+ * - https://www.youtube.com
+ * - https://accounts.google.com
+ * - https://youtube.com
+ *
+ * Handles persistence, CookieManager synchronization, Set-Cookie header extraction,
+ * and session health / expiry detection (SAPISID + __Secure-3PSID presence).
+ */
+internal class YtmCookieStore private constructor(context: Context) {
+    private val prefs: SharedPreferences =
+        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    // Keyed by cookie name -> cookie value
+    private val cookies = ConcurrentHashMap<String, String>()
+    private val lock = Any()
+
+    init {
+        loadFromPrefs()
+    }
+
+    private fun loadFromPrefs() {
+        synchronized(lock) {
+            val saved = prefs.getString(KEY_COOKIES, null)
+            if (!saved.isNullOrEmpty()) {
+                parseAndPut(saved)
+                syncToCookieManager()
+            } else {
+                // Read from native CookieManager if prefs are empty
+                readFromCookieManager()
+            }
+        }
+    }
+
+    /**
+     * Reads and aggregates cookies from all relevant YouTube and Google domains in CookieManager.
+     */
+    fun readFromCookieManager(): String? {
+        synchronized(lock) {
+            val cm = runCatching { CookieManager.getInstance() }.getOrNull() ?: return null
+            for (domain in DOMAINS) {
+                val c = cm.getCookie(domain) ?: continue
+                parseAndPut(c)
+            }
+            val merged = getMergedCookieHeader()
+            if (merged != null) {
+                saveToPrefs(merged)
+            }
+            return merged
+        }
+    }
+
+    /**
+     * Sets cookies from a raw header string (e.g. "name=val; name2=val2") and persists them.
+     */
+    fun setCookies(rawCookieHeader: String) {
+        synchronized(lock) {
+            parseAndPut(rawCookieHeader)
+            val merged = getMergedCookieHeader() ?: ""
+            saveToPrefs(merged)
+            syncToCookieManager()
+        }
+    }
+
+    /**
+     * Parses Set-Cookie response headers and updates the store.
+     */
+    fun ingestSetCookieHeaders(headerValues: List<String>?) {
+        if (headerValues.isNullOrEmpty()) return
+        synchronized(lock) {
+            var updated = false
+            for (header in headerValues) {
+                val firstPart = header.split(";").firstOrNull()?.trim() ?: continue
+                val parts = firstPart.split("=", limit = 2)
+                if (parts.size == 2 && parts[0].isNotBlank()) {
+                    cookies[parts[0].trim()] = parts[1].trim()
+                    updated = true
+                }
+            }
+            if (updated) {
+                val merged = getMergedCookieHeader() ?: ""
+                saveToPrefs(merged)
+                syncToCookieManager()
+            }
+        }
+    }
+
+    /**
+     * Returns the formatted `Cookie` header string for HTTP requests.
+     */
+    fun getMergedCookieHeader(): String? {
+        if (cookies.isEmpty()) return null
+        return cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
+    }
+
+    /**
+     * Returns a specific cookie value (e.g. "SAPISID", "__Secure-3PSID").
+     */
+    fun getCookie(name: String): String? = cookies[name]
+
+    /**
+     * Checks if the session has valid authentication credentials.
+     * Both SAPISID (or variant) and __Secure-3PSID (or __Secure-1PSID) are required for full access.
+     */
+    fun isSessionValid(): Boolean {
+        val hasSapisid = cookies.containsKey("SAPISID") ||
+                cookies.containsKey("__Secure-3PAPISID") ||
+                cookies.containsKey("__Secure-1PAPISID")
+
+        val hasPsid = cookies.containsKey("__Secure-3PSID") ||
+                cookies.containsKey("__Secure-1PSID") ||
+                cookies.containsKey("SID")
+
+        return hasSapisid && hasPsid
+    }
+
+    /**
+     * Clears all stored cookies.
+     */
+    fun clear() {
+        synchronized(lock) {
+            cookies.clear()
+            prefs.edit().remove(KEY_COOKIES).apply()
+            runCatching {
+                val cm = CookieManager.getInstance()
+                cm.removeAllCookies(null)
+                cm.flush()
+            }
+        }
+    }
+
+    private fun parseAndPut(cookieString: String) {
+        for (pair in cookieString.split(";")) {
+            val trimmed = pair.trim()
+            if (trimmed.isEmpty()) continue
+            val parts = trimmed.split("=", limit = 2)
+            if (parts.size == 2 && parts[0].isNotBlank()) {
+                cookies[parts[0].trim()] = parts[1].trim()
+            }
+        }
+    }
+
+    private fun syncToCookieManager() {
+        runCatching {
+            val cm = CookieManager.getInstance()
+            cm.setAcceptCookie(true)
+            for (domain in DOMAINS) {
+                for ((key, value) in cookies) {
+                    cm.setCookie(domain, "$key=$value; Domain=${domain.removePrefix("https://")}; Path=/; Secure; HttpOnly")
+                }
+            }
+            cm.flush()
+        }
+    }
+
+    private fun saveToPrefs(cookieString: String) {
+        prefs.edit().putString(KEY_COOKIES, cookieString).apply()
+    }
+
+    companion object {
+        private const val PREFS_NAME = "ytm_session_cookies"
+        private const val KEY_COOKIES = "cookies"
+
+        val DOMAINS = listOf(
+            "https://music.youtube.com",
+            "https://www.youtube.com",
+            "https://accounts.google.com",
+            "https://youtube.com",
+        )
+
+        @Volatile
+        private var instance: YtmCookieStore? = null
+
+        fun getInstance(context: Context): YtmCookieStore {
+            return instance ?: synchronized(this) {
+                instance ?: YtmCookieStore(context.applicationContext).also { instance = it }
+            }
+        }
+    }
+}

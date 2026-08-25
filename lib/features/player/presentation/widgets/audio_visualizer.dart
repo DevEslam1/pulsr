@@ -4,7 +4,9 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/error_logger.dart';
 
 enum VisualizerStyle {
   off,
@@ -19,6 +21,7 @@ class AudioVisualizer extends StatefulWidget {
   final double width;
   final double height;
   final bool isPlaying;
+  final int? audioSessionId;
 
   const AudioVisualizer({
     super.key,
@@ -27,6 +30,7 @@ class AudioVisualizer extends StatefulWidget {
     this.width = double.infinity,
     this.height = 120.0,
     this.isPlaying = true,
+    this.audioSessionId,
   });
 
   @override
@@ -40,7 +44,6 @@ class _AudioVisualizerState extends State<AudioVisualizer>
 
   StreamSubscription? _subscription;
   late AnimationController _animController;
-  int _frameSkip = 0;
 
   static const int _numBands = 32;
   final List<double> _currentData = List.filled(_numBands, 0.0);
@@ -105,6 +108,13 @@ class _AudioVisualizerState extends State<AudioVisualizer>
       } else {
         _stopNativeVisualizer();
       }
+    } else if (widget.audioSessionId != oldWidget.audioSessionId &&
+        widget.style != VisualizerStyle.off &&
+        widget.isPlaying &&
+        Platform.isAndroid) {
+      // Session changed (first assignment, or a crossfade swap to the other
+      // player) — rebind the native Visualizer to the new session id.
+      _startNativeVisualizer();
     }
   }
 
@@ -117,9 +127,56 @@ class _AudioVisualizerState extends State<AudioVisualizer>
     super.dispose();
   }
 
+  static bool _hasPromptedRationale = false;
+
   Future<void> _startNativeVisualizer() async {
     if (widget.style == VisualizerStyle.off) return;
     try {
+      if (Platform.isAndroid) {
+        final status = await Permission.microphone.status;
+        if (!status.isGranted) {
+          if (_hasPromptedRationale) {
+            // User already made a decision, seamlessly use simulation fallback
+            return;
+          }
+          _hasPromptedRationale = true;
+          if (mounted) {
+            final shouldAsk = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Audio Visualizer Permission'),
+                content: const Text(
+                  'The visualizer reads audio output, not your microphone. Android requires the Record Audio permission to process FFT visualizer frequency data.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(ctx).pop(false),
+                    child: const Text('Use Simulation'),
+                  ),
+                  FilledButton(
+                    onPressed: () => Navigator.of(ctx).pop(true),
+                    child: const Text('Continue'),
+                  ),
+                ],
+              ),
+            );
+            if (shouldAsk != true) return;
+          }
+          final res = await Permission.microphone.request();
+          if (!res.isGranted) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Visualizer permission denied — showing a simulated animation instead.',
+                  ),
+                ),
+              );
+            }
+            return;
+          }
+        }
+      }
       await _subscription?.cancel();
       _subscription = _eventChannel.receiveBroadcastStream().listen(
         (data) {
@@ -127,19 +184,46 @@ class _AudioVisualizerState extends State<AudioVisualizer>
             final raw = data.map((e) => (e as num).toDouble()).toList();
             if (raw.isNotEmpty) {
               _lastNativeDataTime = DateTime.now();
-              // Resample raw FFT to 32 bands
-              final step = (raw.length / _numBands).floor().clamp(1, raw.length);
+              // Logarithmic frequency band pooling across audible spectrum
+              final rawLen = raw.length;
               for (int i = 0; i < _numBands; i++) {
-                final idx = (i * step).clamp(0, raw.length - 1);
-                _targetData[i] = raw[idx].clamp(0.0, 1.0);
+                final pStart = math.pow(i / _numBands, 2.0);
+                final pEnd = math.pow((i + 1) / _numBands, 2.0);
+                final startIdx = (pStart * rawLen * 0.85).floor().clamp(0, rawLen - 1);
+                final endIdx = (pEnd * rawLen * 0.85).ceil().clamp(startIdx + 1, rawLen);
+
+                double bandMax = 0.0;
+                double bandSum = 0.0;
+                int count = 0;
+                for (int j = startIdx; j < endIdx; j++) {
+                  final val = raw[j];
+                  if (val > bandMax) bandMax = val;
+                  bandSum += val;
+                  count++;
+                }
+                final avg = count > 0 ? bandSum / count : 0.0;
+                final combined = (bandMax * 0.7 + avg * 0.3);
+
+                // High-frequency treble gain compensation & logarithmic dynamic expansion
+                final trebleGain = 1.0 + (i / _numBands) * 3.2;
+                final boosted = (combined * trebleGain).clamp(0.0, 2.5);
+                final scaled = (math.pow(boosted, 0.45).toDouble() * 1.1).clamp(0.18, 1.0);
+
+                _targetData[i] = scaled;
               }
             }
           }
         },
-        onError: (_) {},
+        onError: (e, st) {
+          ErrorLogger.log('Visualizer event stream error', error: e, stackTrace: st, category: 'AudioVisualizer');
+        },
       );
-      await _methodChannel.invokeMethod('start', {'audioSessionId': 0});
-    } catch (_) {}
+      await _methodChannel.invokeMethod('start', {
+        'audioSessionId': widget.audioSessionId ?? 0,
+      });
+    } catch (e, st) {
+      ErrorLogger.log('Failed to start native audio visualizer', error: e, stackTrace: st, category: 'AudioVisualizer');
+    }
   }
 
   Future<void> _stopNativeVisualizer() async {
@@ -147,13 +231,13 @@ class _AudioVisualizerState extends State<AudioVisualizer>
       await _subscription?.cancel();
       _subscription = null;
       await _methodChannel.invokeMethod('stop');
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Failed to stop native audio visualizer', error: e, stackTrace: st, category: 'AudioVisualizer');
+    }
   }
 
   void _updateFftFrame() {
     if (!mounted) return;
-    _frameSkip++;
-    if (_frameSkip % 2 != 0) return; // 30fps
     final now = DateTime.now();
     final isNativeActive = now.difference(_lastNativeDataTime).inMilliseconds < 300;
 
@@ -168,23 +252,25 @@ class _AudioVisualizerState extends State<AudioVisualizer>
         _animController.stop();
       }
     } else if (isNativeActive) {
-      // Interpolate target native FFT data
+      // Interpolate target native FFT data with snappy physics
       for (int i = 0; i < _numBands; i++) {
-        _currentData[i] += (_targetData[i] - _currentData[i]) * 0.25;
+        _currentData[i] += (_targetData[i] - _currentData[i]) * 0.45;
       }
     } else {
-      // Simulated organic FFT frequencies when native audio is silent/unavailable
-      final t = _animController.value * 2 * math.pi * 2;
+      // High-energy organic FFT frequencies across all bands
+      final t = _animController.value * 2 * math.pi * 3;
       for (int i = 0; i < _numBands; i++) {
-        final freq = (i + 1) * 0.4;
-        final val = (math.sin(t * freq + i * 0.3).abs() * 0.6 +
-                math.cos(t * 0.5 + i * 0.5).abs() * 0.4)
-            .clamp(0.15, 0.95);
+        final f1 = (i + 1) * 0.4;
+        final f2 = (i + 2) * 0.65;
+        final wave1 = math.sin(t * f1 + i * 0.45).abs();
+        final wave2 = math.cos(t * f2 + i * 0.3).abs();
+        final wave3 = math.sin(t * 1.8 + (i % 5) * 1.1).abs();
 
-        // Apply bass to treble magnitude falloff
-        final factor = (1.0 - (i / _numBands) * 0.4);
-        final simulated = val * factor;
-        _currentData[i] += (simulated - _currentData[i]) * 0.15;
+        final rawMag = (wave1 * 0.45 + wave2 * 0.35 + wave3 * 0.2).clamp(0.0, 1.0);
+        final heightMultiplier = 0.5 + 0.5 * math.sin((i / _numBands) * math.pi);
+        final simulated = (rawMag * (0.6 + heightMultiplier * 0.4) + 0.3).clamp(0.25, 1.0);
+
+        _currentData[i] += (simulated - _currentData[i]) * 0.38;
       }
     }
 
@@ -242,16 +328,16 @@ class _BarVisualizerPainter extends CustomPainter {
     if (data.isEmpty) return;
 
     final count = data.length;
-    final gap = 4.0;
+    final gap = 3.0;
     final totalGap = gap * (count - 1);
-    final barWidth = ((size.width - totalGap) / count).clamp(2.0, 16.0);
+    final barWidth = ((size.width - totalGap) / count).clamp(3.0, 14.0);
 
     final paint = Paint()
       ..style = PaintingStyle.fill
       ..shader = LinearGradient(
         colors: [
           color.withValues(alpha: 0.95),
-          color.withValues(alpha: 0.4),
+          color.withValues(alpha: 0.35),
         ],
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
@@ -259,8 +345,8 @@ class _BarVisualizerPainter extends CustomPainter {
 
     for (int i = 0; i < count; i++) {
       final x = i * (barWidth + gap);
-      final magnitude = data[i].clamp(0.03, 1.0);
-      final barHeight = magnitude * size.height;
+      final magnitude = data[i].clamp(0.12, 1.0);
+      final barHeight = (magnitude * size.height).clamp(6.0, size.height);
       final y = size.height - barHeight;
 
       final rrect = RRect.fromRectAndRadius(

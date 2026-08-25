@@ -1,10 +1,13 @@
 package com.pulsr.music
  
+import android.content.Context
 import android.content.Intent
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.PowerManager
+import android.provider.Settings
 import android.util.Log
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -20,6 +23,10 @@ class MainActivity : AudioServiceActivity() {
     private var tagEditorPlugin: TagEditorPlugin? = null
     private var visualizerPlugin: VisualizerPlugin? = null
     private var ringtonePlugin: RingtonePlugin? = null
+    private var scrobblerPlugin: ScrobblerPlugin? = null
+    private var ytmExtractorPlugin: YtmExtractorPlugin? = null
+    private var ytDownloadPlugin: YtDownloadPlugin? = null
+    private var waveformPlugin: WaveformPlugin? = null
     private val backgroundExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
  
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -34,14 +41,22 @@ class MainActivity : AudioServiceActivity() {
     }
 
     override fun onDestroy() {
-        backgroundExecutor.shutdown()
+        pendingAudioUri = null
+        try {
+            backgroundExecutor.shutdown()
+        } catch (e: Exception) {
+            Log.w("MainActivity", "Error shutting down background executor: ${e.message}")
+        }
         super.onDestroy()
     }
  
     private fun isAudioIntent(intent: Intent, uri: Uri): Boolean {
         val scheme = uri.scheme?.lowercase() ?: return false
         if (scheme == "pulsrwidget") return false
+        if (isYouTubeUri(uri)) return true
         if (intent.action == Intent.ACTION_SEND) {
+            val text = intent.getStringExtra(Intent.EXTRA_TEXT)
+            if (!text.isNullOrEmpty() && isYouTubeUrl(text)) return true
             return intent.type?.startsWith("audio/") == true ||
                 (scheme == "content" && intent.type == null)
         }
@@ -49,21 +64,43 @@ class MainActivity : AudioServiceActivity() {
         val path = uri.path?.lowercase() ?: ""
         val isAudioExt = path.endsWith(".mp3") || path.endsWith(".flac") || path.endsWith(".wav") ||
             path.endsWith(".aac") || path.endsWith(".m4a") || path.endsWith(".ogg") ||
-            path.endsWith(".opus") || path.endsWith(".wma") || path.endsWith(".alac") ||
-            path.endsWith(".aiff") || path.endsWith(".dsf") || path.endsWith(".dff")
+            path.endsWith(".opus") || path.endsWith(".mka")
         return isAudioExt || (scheme == "content" && intent.type == null)
+    }
+
+    private fun isYouTubeUri(uri: Uri): Boolean {
+        val host = uri.host?.lowercase() ?: ""
+        return host == "music.youtube.com" || host == "youtube.com" || host == "www.youtube.com" ||
+            host == "m.youtube.com" || host == "youtu.be"
+    }
+
+    private fun isYouTubeUrl(text: String): Boolean {
+        val lower = text.lowercase()
+        return lower.contains("music.youtube.com") || lower.contains("youtube.com") || lower.contains("youtu.be")
     }
 
     private fun handleAudioIntent(intent: Intent?, fromColdStart: Boolean) {
         if (intent?.action != Intent.ACTION_VIEW && intent?.action != Intent.ACTION_SEND) return
+        val textExtra = intent.getStringExtra(Intent.EXTRA_TEXT)
         val streamUri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
         } else {
             @Suppress("DEPRECATION")
             intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
         }
-        val uri = intent.data ?: streamUri ?: return
+        val uri = intent.data ?: streamUri ?: (if (!textExtra.isNullOrEmpty() && isYouTubeUrl(textExtra)) Uri.parse(textExtra) else null) ?: return
         if (!isAudioIntent(intent, uri)) return
+
+        if (uri.scheme?.equals("content", ignoreCase = true) == true) {
+            try {
+                val flags = intent.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                if (flags != 0) {
+                    contentResolver.takePersistableUriPermission(uri, flags and Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+            } catch (e: Exception) {
+                Log.d("MainActivity", "Persistable URI grant not supported or failed for $uri: ${e.message}")
+            }
+        }
 
         if (fromColdStart) {
             pendingAudioUri = uri.toString()
@@ -83,6 +120,10 @@ class MainActivity : AudioServiceActivity() {
         visualizerPlugin = VisualizerPlugin.registerWith(flutterEngine)
         ringtonePlugin = RingtonePlugin.registerWith(flutterEngine, applicationContext)
         audioEffectsPlugin = AudioEffectsPlugin.registerWith(flutterEngine, applicationContext)
+        scrobblerPlugin = ScrobblerPlugin.registerWith(flutterEngine, applicationContext)
+        ytmExtractorPlugin = YtmExtractorPlugin.registerWith(flutterEngine, applicationContext)
+        ytDownloadPlugin = YtDownloadPlugin.registerWith(flutterEngine, applicationContext)
+        waveformPlugin = WaveformPlugin.registerWith(flutterEngine, applicationContext)
  
         val fileChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FILE_OPENER_CHANNEL)
         fileOpenerChannel = fileChannel
@@ -130,6 +171,49 @@ class MainActivity : AudioServiceActivity() {
                 result.notImplemented()
             }
         }
+
+        val batteryChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.pulsr.music/battery_optimization")
+        batteryChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "isIgnoringBatteryOptimizations" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                        val isIgnoring = powerManager?.isIgnoringBatteryOptimizations(packageName) ?: false
+                        result.success(isIgnoring)
+                    } else {
+                        result.success(true)
+                    }
+                }
+                "requestIgnoreBatteryOptimizations" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                        try {
+                            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                                data = Uri.parse("package:$packageName")
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            startActivity(intent)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            try {
+                                val fallbackIntent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                startActivity(fallbackIntent)
+                                result.success(true)
+                            } catch (e2: Exception) {
+                                result.error("BATTERY_OPT_ERROR", e2.message, null)
+                            }
+                        }
+                    } else {
+                        result.success(true)
+                    }
+                }
+                "getDeviceManufacturer" -> {
+                    result.success(Build.MANUFACTURER ?: "")
+                }
+                else -> result.notImplemented()
+            }
+        }
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
@@ -141,6 +225,14 @@ class MainActivity : AudioServiceActivity() {
         visualizerPlugin = null
         ringtonePlugin?.cleanup()
         ringtonePlugin = null
+        scrobblerPlugin?.cleanup()
+        scrobblerPlugin = null
+        ytmExtractorPlugin?.cleanup()
+        ytmExtractorPlugin = null
+        ytDownloadPlugin?.cleanup()
+        ytDownloadPlugin = null
+        waveformPlugin?.cleanup()
+        waveformPlugin = null
         fileOpenerChannel?.setMethodCallHandler(null)
         fileOpenerChannel = null
         lyricsChannel?.setMethodCallHandler(null)

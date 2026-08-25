@@ -1,4 +1,5 @@
 // lib/data/scanner/media_scanner_service.dart
+import 'dart:async';
 import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../../core/constants/audio_formats.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../db/app_database.dart';
@@ -14,6 +16,9 @@ import '../db/app_database.dart';
 class MediaScannerService {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   final IMusicRepository _repository;
+  final StreamController<double> _progressController = StreamController<double>.broadcast();
+
+  Stream<double> get scanProgress => _progressController.stream;
 
   MediaScannerService(this._repository);
 
@@ -31,9 +36,6 @@ class MediaScannerService {
 
   Future<bool> requestPermission() async {
     if (Platform.isAndroid) {
-      // Request notification permission for foreground playback on Android 13+ (H2)
-      await Permission.notification.request();
-
       final audioStatus = await Permission.audio.request();
       if (audioStatus.isGranted) return true;
       if (!audioStatus.isPermanentlyDenied) {
@@ -102,52 +104,71 @@ class MediaScannerService {
     int minDurationSec = 30,
     bool autoHideSystemMedia = true,
   }) async {
-    final hasPermission = await checkPermission();
-    if (!hasPermission) {
-      final granted = await requestPermission();
-      if (!granted) return 0;
+    _progressController.add(0.0);
+    try {
+      final hasPermission = await checkPermission();
+      if (!hasPermission) {
+        final granted = await requestPermission();
+        if (!granted) return 0;
+      }
+
+      _progressController.add(0.1);
+      final excludedRes = await _repository.getExcludedFolderPaths();
+      final excludedFolders = excludedRes.fold((l) => <String>[], (r) => r);
+
+      // Query songs using on_audio_query
+      final List<SongModel> songs = await _audioQuery.querySongs(
+        sortType: SongSortType.DATE_ADDED,
+        orderType: OrderType.DESC_OR_GREATER,
+        uriType: UriType.EXTERNAL,
+        ignoreCase: true,
+      );
+
+      final minDurationMs = ignoreShortFiles ? minDurationSec * 1000 : 0;
+      ErrorLogger.addBreadcrumb('Scanner started with ${songs.length} raw MediaStore songs', category: 'scanner');
+
+      _progressController.add(0.3);
+
+      // Offload CPU-heavy metadata parsing and aggregation to background isolate
+      final parseInput = _ScanMediaInput(
+        rawSongs: songs.map((s) => s.getMap).toList(),
+        excludedFolders: excludedFolders,
+        minDurationMs: minDurationMs,
+        autoHideSystemMedia: autoHideSystemMedia,
+        pathSeparator: Platform.pathSeparator,
+      );
+
+      final parseResult = await compute(_parseScannedMediaInIsolate, parseInput);
+      _progressController.add(0.7);
+
+      await _repository.syncScannedMusic(
+        songs: parseResult.songs,
+        albums: parseResult.albums,
+        artists: parseResult.artists,
+      );
+
+      _progressController.add(0.9);
+
+      // Clean up orphaned entries
+      await _repository.cleanupOrphanedSongs(parseResult.validSongIds);
+      _progressController.add(1.0);
+
+      ErrorLogger.addBreadcrumb('Scanner completed: ${parseResult.songs.length} valid songs indexed', category: 'scanner');
+
+      return parseResult.songs.length;
+    } catch (e, st) {
+      ErrorLogger.log('Media scanner failed', error: e, stackTrace: st, category: 'scanner');
+      rethrow;
     }
-
-    final excludedRes = await _repository.getExcludedFolderPaths();
-    final excludedFolders = excludedRes.fold((l) => <String>[], (r) => r);
-
-    // Query songs using on_audio_query
-    final List<SongModel> songs = await _audioQuery.querySongs(
-      sortType: SongSortType.DATE_ADDED,
-      orderType: OrderType.DESC_OR_GREATER,
-      uriType: UriType.EXTERNAL,
-      ignoreCase: true,
-    );
-
-    final minDurationMs = ignoreShortFiles ? minDurationSec * 1000 : 0;
-
-    // Offload CPU-heavy metadata parsing and aggregation to background isolate
-    final parseInput = _ScanMediaInput(
-      rawSongs: songs.map((s) => s.getMap).toList(),
-      excludedFolders: excludedFolders,
-      minDurationMs: minDurationMs,
-      autoHideSystemMedia: autoHideSystemMedia,
-      pathSeparator: Platform.pathSeparator,
-    );
-
-    final parseResult = await compute(_parseScannedMediaInIsolate, parseInput);
-
-    await _repository.syncScannedMusic(
-      songs: parseResult.songs,
-      albums: parseResult.albums,
-      artists: parseResult.artists,
-    );
-
-    // Clean up orphaned entries
-    await _repository.cleanupOrphanedSongs(parseResult.validSongIds);
-
-    return parseResult.songs.length;
   }
 
   Future<void> rescanSingleFile(String path) async {
     const channel = MethodChannel('com.pulsr.music/tag_editor');
     try {
-      final Map<dynamic, dynamic>? tags = await channel.invokeMapMethod<dynamic, dynamic>('readTags', {'path': path});
+      final Map<dynamic, dynamic>? tags = await channel.invokeMapMethod<dynamic, dynamic>('readTags', {
+        'path': path,
+        'includeArtwork': false,
+      });
       if (tags != null) {
         final title = (tags['title'] as String?)?.trim();
         final artist = (tags['artist'] as String?)?.trim();
@@ -177,6 +198,55 @@ class MediaScannerService {
         category: 'MediaScanner',
       );
     }
+  }
+
+  /// Reads the real audio-header fields for a local song via the tag channel
+  /// and persists them, so the quality badge reflects actual metadata. Runs
+  /// once per song: callers should skip songs that already have [codec] set.
+  ///
+  /// Must run on the main isolate (uses a platform channel); the bulk scan runs
+  /// in a background isolate and therefore cannot do this inline.
+  Future<void> enrichAudioQuality(int songId, String path) async {
+    if (!Platform.isAndroid) return;
+    if (path.isEmpty || path.startsWith('http') || path.startsWith('ytmusic://')) {
+      return;
+    }
+    const channel = MethodChannel('com.pulsr.music/tag_editor');
+    try {
+      final Map<dynamic, dynamic>? tags = await channel.invokeMapMethod<dynamic, dynamic>('readTags', {
+        'path': path,
+        'includeArtwork': false,
+      });
+      if (tags == null) return;
+
+      final sampleRate = _asInt(tags['sampleRate']);
+      final bitDepth = _asInt(tags['bitsPerSample']);
+      // Header bitRate is in kbps for lossy, bps-ish for some lossless; jaudiotagger
+      // reports kbps here.
+      final bitrateKbps = _asInt(tags['bitRate']);
+      final codec = (tags['format'] as String?)?.trim();
+
+      await _repository.updateAudioQuality(
+        songId: songId,
+        sampleRate: sampleRate != null && sampleRate > 0 ? sampleRate : null,
+        bitDepth: bitDepth != null && bitDepth > 0 ? bitDepth : null,
+        bitrateKbps: bitrateKbps != null && bitrateKbps > 0 ? bitrateKbps : null,
+        codec: (codec != null && codec.isNotEmpty) ? codec : null,
+      );
+    } catch (e, stack) {
+      ErrorLogger.log(
+        'Failed to enrich audio quality: $path',
+        error: e,
+        stackTrace: stack,
+        category: 'MediaScanner',
+      );
+    }
+  }
+
+  static int? _asInt(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '');
   }
 }
 
@@ -222,6 +292,9 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
     if (duration < input.minDurationMs) continue;
 
     final path = (raw['_data'] as String?) ?? (raw['data'] as String?) ?? '';
+    if (path.isEmpty || !AudioFormats.isSupportedExtension(path)) {
+      continue;
+    }
 
     // Auto-hide system media / messenger voice notes
     if (input.autoHideSystemMedia && MediaScannerService.isSystemIgnoredPath(path)) {

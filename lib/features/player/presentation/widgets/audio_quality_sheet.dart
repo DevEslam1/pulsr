@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/audio_quality_info.dart';
+import '../../../settings/cubit/settings_cubit.dart';
 
 class AudioQualitySheet extends StatelessWidget {
   final SongsTableData song;
@@ -40,7 +42,8 @@ class AudioQualitySheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final info = AudioQualityInfo.fromSong(song);
+    final streamingQuality = context.watch<SettingsCubit?>()?.state.streamingQuality;
+    final info = AudioQualityInfo.fromSong(song, streamingQuality: streamingQuality);
 
     return Align(
       alignment: Alignment.bottomCenter,
