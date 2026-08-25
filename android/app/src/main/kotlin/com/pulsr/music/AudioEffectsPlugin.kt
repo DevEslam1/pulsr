@@ -635,15 +635,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 val audioManager = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
                 val spatializer = audioManager?.spatializer
                 if (spatializer != null && spatializer.isAvailable) {
-                    spatializer.isEnabled = enabled
-                    if (enabled && spatializer.isHeadTrackerAvailable) {
-                        try {
-                            spatializer.headTracker?.isEnabled = true
-                        } catch (e: Exception) {
-                            Log.w(TAG, "Head tracking enable failed: ${e.message}")
-                        }
-                    }
-                    // Supplement with virtualizer for wider soundstage
+                    // Hardware Spatializer detected; engage virtualizer supplement for wider staging
                     setVirtualizerState(enabled)
                     if (enabled && virtualizerStrength <= 0) {
                         setVirtualizerStrengthValue(600)
@@ -651,7 +643,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     return
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Spatializer API call failed, falling back: ${e.message}")
+                Log.w(TAG, "Spatializer hardware check failed, falling back: ${e.message}")
             }
         }
         // Fallback: virtualizer-only stereo field widening
