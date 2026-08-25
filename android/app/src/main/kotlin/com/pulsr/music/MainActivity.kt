@@ -57,16 +57,23 @@ class MainActivity : AudioServiceActivity() {
         if (isYouTubeUri(uri)) return true
         if (intent.action == Intent.ACTION_SEND) {
             val text = intent.getStringExtra(Intent.EXTRA_TEXT)
-            if (!text.isNullOrEmpty() && isYouTubeUrl(text)) return true
+            if (!text.isNullOrEmpty() && (isYouTubeUrl(text) || isProxyText(text))) return true
             return intent.type?.startsWith("audio/") == true ||
+                intent.type?.startsWith("text/") == true ||
                 (scheme == "content" && intent.type == null)
         }
-        if (intent.type?.startsWith("audio/") == true) return true
+        if (intent.type?.startsWith("audio/") == true || intent.type?.startsWith("text/") == true) return true
         val path = uri.path?.lowercase() ?: ""
         val isAudioExt = path.endsWith(".mp3") || path.endsWith(".flac") || path.endsWith(".wav") ||
             path.endsWith(".aac") || path.endsWith(".m4a") || path.endsWith(".ogg") ||
             path.endsWith(".opus") || path.endsWith(".mka")
-        return isAudioExt || (scheme == "content" && intent.type == null)
+        val isTextExt = path.endsWith(".txt") || path.endsWith(".list") || path.endsWith(".conf") || path.endsWith(".csv")
+        return isAudioExt || isTextExt || (scheme == "content" && intent.type == null)
+    }
+
+    private fun isProxyText(text: String): Boolean {
+        val pattern = Regex("""\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{2,5}\b""")
+        return pattern.containsMatchIn(text)
     }
 
     private fun isYouTubeUri(uri: Uri): Boolean {
@@ -89,7 +96,7 @@ class MainActivity : AudioServiceActivity() {
             @Suppress("DEPRECATION")
             intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
         }
-        val uri = intent.data ?: streamUri ?: (if (!textExtra.isNullOrEmpty() && isYouTubeUrl(textExtra)) Uri.parse(textExtra) else null) ?: return
+        val uri = intent.data ?: streamUri ?: (if (!textExtra.isNullOrEmpty() && (isYouTubeUrl(textExtra) || isProxyText(textExtra))) Uri.parse(textExtra) else null) ?: return
         if (!isAudioIntent(intent, uri)) return
 
         if (uri.scheme?.equals("content", ignoreCase = true) == true) {

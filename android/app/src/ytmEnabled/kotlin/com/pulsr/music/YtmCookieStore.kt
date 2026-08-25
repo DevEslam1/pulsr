@@ -160,7 +160,7 @@ internal class YtmCookieStore private constructor(context: Context) {
             cm.setAcceptCookie(true)
             for (domain in DOMAINS) {
                 for ((key, value) in cookies) {
-                    cm.setCookie(domain, "$key=$value; Path=/; Secure; HttpOnly")
+                    cm.setCookie(domain, "$key=$value; Path=/; Secure")
                 }
             }
             cm.flush()

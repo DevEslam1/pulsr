@@ -142,6 +142,8 @@ class MockPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   @override
   Stream<Duration?> get sleepTimerRemainingStream => const Stream.empty();
   @override
+  Stream<String> get errorStream => const Stream.empty();
+  @override
   void dispose() {}
   @override
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {}

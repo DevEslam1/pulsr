@@ -57,7 +57,7 @@ class _QueuedDownload {
 /// Hardened YouTube Download Service.
 ///
 /// Features:
-/// - Max 2 concurrent downloads with FIFO queue
+/// - Max 3 concurrent downloads with FIFO queue
 /// - Pre-download PoToken attestation verification
 /// - Transparent 403 re-resolution & Range header resume
 /// - Multi-threaded chunked parallel downloading
@@ -66,7 +66,7 @@ class _QueuedDownload {
 class YtDownloadService {
   static const _downloadChannel = MethodChannel('com.pulsr.music/yt_download');
   static const _tagChannel = MethodChannel('com.pulsr.music/tag_editor');
-  static const int _maxConcurrentDownloads = 2;
+  static const int _maxConcurrentDownloads = 3;
 
   final HttpClient _http;
   final YtmService _ytmService;
@@ -167,6 +167,7 @@ class YtDownloadService {
     }
 
     File? temp;
+    File? tempArt;
     try {
       if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
         return const Left(DownloadFailure('Download canceled'));
@@ -189,7 +190,6 @@ class YtDownloadService {
       }
 
       // Download high-res master artwork in parallel with the audio stream
-      File? tempArt;
       Future<String?>? artworkFuture;
       final rawArtUrl = song.remoteArtworkUrl;
       if (rawArtUrl != null && rawArtUrl.isNotEmpty) {
@@ -232,9 +232,6 @@ class YtDownloadService {
         onProgress?.call(const YtDownloadProgress(YtDownloadStage.tagging));
         final artPath = artworkFuture != null ? await artworkFuture : null;
         await _tag(temp.path, song, artworkPath: artPath);
-        if (tempArt != null && await tempArt!.exists()) {
-          await tempArt!.delete().catchError((_) => tempArt!);
-        }
       }
 
       if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
@@ -299,6 +296,9 @@ class YtDownloadService {
     } finally {
       if (temp != null && await temp.exists()) {
         await temp.delete().catchError((_) => temp!);
+      }
+      if (tempArt != null && await tempArt!.exists()) {
+        await tempArt!.delete().catchError((_) => tempArt!);
       }
     }
   }
@@ -468,6 +468,10 @@ class YtDownloadService {
       final outSink = dest.openWrite();
       try {
         for (final part in tempParts) {
+          if (task.isCanceled ||
+              _canceledVideoIds.contains(task.song.remoteId)) {
+            throw const DownloadFailure('Download canceled');
+          }
           if (await part.exists()) {
             await outSink.addStream(part.openRead());
           }

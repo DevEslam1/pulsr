@@ -60,7 +60,9 @@ class PlayerCubit extends Cubit<PlayerState> {
   StreamSubscription? _widgetClickSub;
   StreamSubscription? _sleepTimerSub;
   StreamSubscription? _audioSessionIdSub;
+  StreamSubscription? _errorSub;
   DateTime? _lastWidgetUpdateTime;
+  int _mediaItemResolutionGen = 0;
 
   Timer? _persistQueueDebounce;
   Timer? _scrobbleDebounce;
@@ -277,10 +279,12 @@ class PlayerCubit extends Cubit<PlayerState> {
   void _listenToAudioService() {
     _mediaItemSub = _audioHandler.mediaItem.listen((item) async {
       if (item != null) {
+        final gen = ++_mediaItemResolutionGen;
         final id = int.tryParse(item.id);
         if (id != null) {
           SongsTableData? resolvedSong;
           final songResult = await _repository.getSongById(id);
+          if (gen != _mediaItemResolutionGen || isClosed) return;
           songResult.fold((_) => null, (song) => resolvedSong = song);
 
           // Crucial fallback for in-memory online tracks (negative IDs) or newly queued songs
@@ -289,6 +293,7 @@ class PlayerCubit extends Cubit<PlayerState> {
               : state.queue.where((s) => s.id == id).firstOrNull;
 
           if (resolvedSong != null) {
+            if (gen != _mediaItemResolutionGen || isClosed) return;
             final duration = (item.duration != null && item.duration! > Duration.zero)
                 ? item.duration!
                 : (resolvedSong!.durationMs > 0
@@ -312,6 +317,12 @@ class PlayerCubit extends Cubit<PlayerState> {
             _debouncedScrobble(resolvedSong!, state.position, state.isPlaying);
           }
         }
+      }
+    });
+
+    _errorSub = _audioHandler.errorStream.listen((err) {
+      if (!isClosed) {
+        emit(state.copyWith(errorMessage: err));
       }
     });
 
@@ -396,6 +407,8 @@ class PlayerCubit extends Cubit<PlayerState> {
       lyricsResult = await LrcParser.resolveLyrics(song.path);
     }
 
+    if (isClosed || state.currentSong?.id != song.id) return;
+
     // 2. Query LRCLIB for synchronized karaoke lyrics (works for local and online tracks)
     if (lyricsResult == null || lyricsResult.lines.isEmpty) {
       try {
@@ -409,6 +422,8 @@ class PlayerCubit extends Cubit<PlayerState> {
       } catch (_) {}
     }
 
+    if (isClosed || state.currentSong?.id != song.id) return;
+
     // 3. For YouTube Music tracks without LRCLIB matches, fetch native YTM lyrics
     final videoId = song.remoteId;
     if ((lyricsResult == null || lyricsResult.lines.isEmpty) && videoId != null && videoId.isNotEmpty) {
@@ -418,7 +433,7 @@ class PlayerCubit extends Cubit<PlayerState> {
       } catch (_) {}
     }
 
-    if (isClosed) return;
+    if (isClosed || state.currentSong?.id != song.id) return;
     emit(state.copyWith(
       isLoadingLyrics: false,
       lyrics: lyricsResult?.lines ?? [],
@@ -427,6 +442,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   }
 
   Future<void> playSong(SongsTableData song, {List<SongsTableData>? queue, Duration? initialPosition}) async {
+    ++_mediaItemResolutionGen;
     // If playing an online song that has already been downloaded to the device, swap to local song
     SongsTableData targetSong = song;
     if (song.source == SongSource.youtube) {
@@ -862,6 +878,7 @@ class PlayerCubit extends Cubit<PlayerState> {
     _persistQueueDebounce?.cancel();
     _scrobbleDebounce?.cancel();
     _mediaItemSub?.cancel();
+    _errorSub?.cancel();
     _playbackStateSub?.cancel();
     _positionSub?.cancel();
     _settingsSub?.cancel();

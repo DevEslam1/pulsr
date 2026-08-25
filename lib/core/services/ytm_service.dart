@@ -3,6 +3,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -197,17 +198,41 @@ class YtmService {
         'query': query,
       });
 
+      final headers = <String, String>{
+        'Content-Type': 'application/json',
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+        'Origin': 'https://music.youtube.com',
+        'Referer': 'https://music.youtube.com/',
+        'x-origin': 'https://music.youtube.com',
+        'x-goog-authuser': '0',
+      };
+
+      if (getIt.isRegistered<YtmAccountService>()) {
+        final account = getIt<YtmAccountService>();
+        if (account.isLoggedIn) {
+          final cookies = account.cookies;
+          if (cookies != null && cookies.isNotEmpty) {
+            headers['Cookie'] = cookies;
+            final sapisid = _extractCookieValue(cookies, 'SAPISID') ??
+                _extractCookieValue(cookies, '__Secure-3PAPISID') ??
+                _extractCookieValue(cookies, '__Secure-1PAPISID');
+            if (sapisid != null && sapisid.isNotEmpty) {
+              final timestamp =
+                  (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
+              final toHash = '$timestamp $sapisid https://music.youtube.com';
+              final sha1Digest = sha1.convert(utf8.encode(toHash)).toString();
+              headers['Authorization'] = 'SAPISIDHASH ${timestamp}_$sha1Digest';
+            }
+          }
+        }
+      }
+
       await YtmRateLimiter.shared.acquirePermit();
       final response = await http
           .post(
             Uri.parse('https://music.youtube.com/youtubei/v1/search?prettyPrint=false&key=$apiKey'),
-            headers: {
-              'Content-Type': 'application/json',
-              'User-Agent':
-                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
-              'Origin': 'https://music.youtube.com',
-              'Referer': 'https://music.youtube.com/',
-            },
+            headers: headers,
             body: body,
           )
           .timeout(const Duration(seconds: 10));
@@ -372,5 +397,15 @@ class YtmService {
       }
     }
     throw const YtmException('YTM_FAILED', 'Max retries exhausted');
+  }
+
+  static String? _extractCookieValue(String cookieString, String key) {
+    for (final pair in cookieString.split(';')) {
+      final parts = pair.trim().split('=');
+      if (parts.length >= 2 && parts[0].trim() == key) {
+        return parts.sublist(1).join('=').trim();
+      }
+    }
+    return null;
   }
 }

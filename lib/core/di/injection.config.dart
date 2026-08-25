@@ -177,7 +177,7 @@ extension GetItInjectableX on _i174.GetIt {
           widgetService: gh<_i42.WidgetService>(),
           scrobblerService: gh<_i629.ScrobblerService>(),
         ));
-    gh.factory<_i873.YtmDownloadCubit>(() => _i873.YtmDownloadCubit(
+    gh.lazySingleton<_i873.YtmDownloadCubit>(() => _i873.YtmDownloadCubit(
           gh<_i742.YtDownloadService>(),
           gh<_i147.PlayerCubit>(),
         ));

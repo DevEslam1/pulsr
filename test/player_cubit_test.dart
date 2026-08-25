@@ -185,6 +185,9 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   Stream<Duration?> get sleepTimerRemainingStream => const Stream.empty();
 
   @override
+  Stream<String> get errorStream => const Stream.empty();
+
+  @override
   void dispose() {
     _positionController.close();
   }

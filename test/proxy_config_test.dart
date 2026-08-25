@@ -81,4 +81,81 @@ void main() {
       expect(reconstructed.hasAuth, true);
     });
   });
+
+  group('ProxyEntry', () {
+    test('parses IP:PORT:USER:PASS format properly', () {
+      final entry = ProxyEntry.parse('31.59.20.176:6754:qmyizdto:n5fui7pyec1q');
+      expect(entry, isNotNull);
+      expect(entry!.host, '31.59.20.176');
+      expect(entry.port, 6754);
+      expect(entry.username, 'qmyizdto');
+      expect(entry.password, 'n5fui7pyec1q');
+      expect(entry.hasAuth, true);
+      expect(entry.isValid, true);
+    });
+
+    test('parses IP:PORT format', () {
+      final entry = ProxyEntry.parse('45.38.107.97:6014');
+      expect(entry, isNotNull);
+      expect(entry!.host, '45.38.107.97');
+      expect(entry.port, 6014);
+      expect(entry.username, '');
+      expect(entry.password, '');
+      expect(entry.hasAuth, false);
+      expect(entry.isValid, true);
+    });
+
+    test('parses URL format with socks5 scheme', () {
+      final entry = ProxyEntry.parse('socks5://qmyizdto:secret123@198.105.121.200:6462');
+      expect(entry, isNotNull);
+      expect(entry!.host, '198.105.121.200');
+      expect(entry.port, 6462);
+      expect(entry.username, 'qmyizdto');
+      expect(entry.password, 'secret123');
+      expect(entry.type, AppProxyType.socks5);
+    });
+
+    test('parseList handles multi-line proxy text blocks with comments and duplicates', () {
+      const rawText = '''
+# Proxy list comment
+31.59.20.176:6754:qmyizdto:n5fui7pyec1q
+45.38.107.97:6014:qmyizdto:n5fui7pyec1q
+// duplicate test
+31.59.20.176:6754:qmyizdto:n5fui7pyec1q
+198.105.121.200:6462:qmyizdto:n5fui7pyec1q
+''';
+      final list = ProxyEntry.parseList(rawText);
+      expect(list.length, 3);
+      expect(list[0].host, '31.59.20.176');
+      expect(list[1].host, '45.38.107.97');
+      expect(list[2].host, '198.105.121.200');
+    });
+
+    test('serialization to and from Map preserves all fields', () {
+      const entry = ProxyEntry(
+        id: 'p1',
+        host: '64.137.96.74',
+        port: 6641,
+        username: 'user1',
+        password: 'pwd',
+        type: AppProxyType.socks5,
+        label: 'US Fast Proxy',
+        latencyMs: 120,
+        isWorking: true,
+      );
+
+      final map = entry.toMap();
+      final restored = ProxyEntry.fromMap(map);
+
+      expect(restored.id, 'p1');
+      expect(restored.host, '64.137.96.74');
+      expect(restored.port, 6641);
+      expect(restored.username, 'user1');
+      expect(restored.password, 'pwd');
+      expect(restored.type, AppProxyType.socks5);
+      expect(restored.label, 'US Fast Proxy');
+      expect(restored.latencyMs, 120);
+      expect(restored.isWorking, true);
+    });
+  });
 }

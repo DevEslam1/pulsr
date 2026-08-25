@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="bgBlood" cx="50%" cy="45%" r="72%">
+      <stop offset="0%" stop-color="#ff3347"/>
+      <stop offset="38%" stop-color="#b4001b"/>
+      <stop offset="78%" stop-color="#53000d"/>
+      <stop offset="100%" stop-color="#180006"/>
+    </radialGradient>
+    <linearGradient id="plusFill" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fff7f7"/>
+      <stop offset="100%" stop-color="#ffc5c9"/>
+    </linearGradient>
+    <filter id="redGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="b1"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="15" result="b2"/>
+      <feMerge><feMergeNode in="b2"/><feMergeNode in="b1"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <path id="notePath" d="M270 120C320 100 370 130 380 165C385 185 365 190 350 175C335 155 310 145 295 150V315C310 290 280 265 240 260C170 250 120 310 140 370C160 430 240 430 280 380C295 360 295 340 295 320V120Z"/>
+    <clipPath id="noteClip"><use href="#notePath"/></clipPath>
+  </defs>
+
+  <rect width="512" height="512" rx="115" fill="url(#bgBlood)"/>
+
+  <!-- Subtle concentric audio waves -->
+  <g fill="none" stroke="#ffb0b6" stroke-width="1.5" opacity=".12">
+    <circle cx="256" cy="256" r="140"/><circle cx="256" cy="256" r="180"/>
+    <circle cx="256" cy="256" r="220"/><circle cx="256" cy="256" r="260"/>
+    <circle cx="210" cy="370" r="85"/><circle cx="210" cy="370" r="125"/>
+    <circle cx="340" cy="165" r="75"/><circle cx="340" cy="165" r="115"/>
+  </g>
+
+  <!-- Original musical note, recolored as a hot red neon mark -->
+  <g filter="url(#redGlow)">
+    <use href="#notePath" fill="#ff2940" opacity=".22"/>
+    <g clip-path="url(#noteClip)" fill="none" stroke="#ffdce0" stroke-width="2.5" opacity=".8">
+      <circle cx="210" cy="370" r="18"/><circle cx="210" cy="370" r="38"/>
+      <circle cx="210" cy="370" r="58"/><circle cx="210" cy="370" r="78"/>
+      <circle cx="210" cy="370" r="98"/><circle cx="210" cy="370" r="118"/>
+      <circle cx="340" cy="165" r="18"/><circle cx="340" cy="165" r="42"/>
+      <circle cx="340" cy="165" r="66"/><circle cx="340" cy="165" r="90"/>
+    </g>
+    <use href="#notePath" fill="none" stroke="#fff3f4" stroke-width="4"/>
+  </g>
+
+  <!-- Plus badge -->
+  <g transform="translate(350 330)">
+    <circle r="68" fill="#280009" opacity=".65"/>
+    <circle r="61" fill="#b4001b" stroke="#ff8c96" stroke-width="3"/>
+    <path d="M-14-38H14V-14H38V14H14V38H-14V14H-38V-14H-14Z" fill="url(#plusFill)"/>
+  </g>
+
+  <!-- Small blood-like accent drips -->
+  <path d="M92 115c0-13 10-23 10-23s10 10 10 23a10 10 0 1 1-20 0Zm300 286c0-10 8-18 8-18s8 8 8 18a8 8 0 1 1-16 0Z" fill="#ff263e" opacity=".9"/>
+  <use href="#notePath" fill="none" stroke="#ffb7bd" stroke-width="1.5" opacity=".7"/>
+</svg>

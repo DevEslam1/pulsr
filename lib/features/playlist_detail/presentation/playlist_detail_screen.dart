@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../../core/config/app_config.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
@@ -15,6 +16,8 @@ import '../../../domain/usecases/playlist_io_usecases.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
+import '../../ytm_search/cubit/ytm_download_cubit.dart';
+import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 
 class PlaylistDetailScreen extends StatelessWidget {
   final PlaylistsTableData playlist;
@@ -23,6 +26,39 @@ class PlaylistDetailScreen extends StatelessWidget {
   const PlaylistDetailScreen({super.key, required this.playlist, this.playlistUseCases});
 
   PlaylistUseCases get _useCases => playlistUseCases ?? getIt<PlaylistUseCases>();
+
+  void _downloadPlaylist(BuildContext context, List<SongsTableData> songs) {
+    if (songs.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Cannot download an empty playlist.')),
+      );
+      return;
+    }
+
+    final downloadCubit = context.read<YtmDownloadCubit?>() ?? getIt<YtmDownloadCubit>();
+    final queuedCount = downloadCubit.downloadAll(songs);
+
+    if (queuedCount > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Queued $queuedCount tracks for download (3 active downloads)...'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      final hasOnlineTracks = songs.any((s) => s.remoteId != null && s.remoteId!.isNotEmpty);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            hasOnlineTracks
+                ? 'All online tracks are already downloaded or in progress.'
+                : 'All tracks in this playlist are already offline local files.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
 
   Future<void> _exportPlaylist(BuildContext context, List<SongsTableData> songs) async {
     if (songs.isEmpty) {
@@ -93,6 +129,9 @@ class PlaylistDetailScreen extends StatelessWidget {
                 icon: const Icon(Icons.more_vert_rounded),
                 onSelected: (value) async {
                   switch (value) {
+                    case 'download':
+                      _downloadPlaylist(context, songs);
+                      break;
                     case 'export':
                       await _exportPlaylist(context, songs);
                       break;
@@ -106,11 +145,22 @@ class PlaylistDetailScreen extends StatelessWidget {
                   }
                 },
                 itemBuilder: (context) => [
+                  if (AppConfig.ytmEnabled)
+                    PopupMenuItem(
+                      value: 'download',
+                      child: Row(
+                        children: [
+                          Icon(Icons.download_rounded, color: p.accent, size: 20),
+                          const SizedBox(width: 12),
+                          const Text('Download All Tracks'),
+                        ],
+                      ),
+                    ),
                   PopupMenuItem(
                     value: 'export',
                     child: Row(
                       children: [
-                        Icon(Icons.download_rounded, color: p.accent, size: 20),
+                        Icon(Icons.file_upload_outlined, color: p.accent, size: 20),
                         const SizedBox(width: 12),
                         const Text('Export as M3U'),
                       ],
@@ -181,6 +231,18 @@ class PlaylistDetailScreen extends StatelessWidget {
                                       label: const Text('Shuffle'),
                                     ),
                                   ),
+                                  if (AppConfig.ytmEnabled) ...[
+                                    const SizedBox(width: 8),
+                                    IconButton.filledTonal(
+                                      onPressed: () => _downloadPlaylist(context, songs),
+                                      icon: const Icon(Icons.download_rounded, size: 20),
+                                      style: IconButton.styleFrom(
+                                        backgroundColor: p.accent.withValues(alpha: 0.15),
+                                        foregroundColor: p.accent,
+                                      ),
+                                      tooltip: 'Download all offline (3 active downloads)',
+                                    ),
+                                  ],
                                 ],
                               ),
                             ),
@@ -199,14 +261,23 @@ class PlaylistDetailScreen extends StatelessWidget {
                                   backgroundColor: Colors.transparent,
                                   builder: (_) => SongInfoSheet(song: songs[i]),
                                 ),
-                                trailing: playlist.isSmart
-                                    ? null
-                                    : IconButton(
-                                        icon: Icon(Icons.remove_circle_outline_rounded, size: 20, color: p.textTertiary),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (AppConfig.ytmEnabled &&
+                                        songs[i].remoteId != null &&
+                                        songs[i].remoteId!.isNotEmpty)
+                                      YtmDownloadButton(song: songs[i]),
+                                    if (!playlist.isSmart)
+                                      IconButton(
+                                        icon: Icon(Icons.remove_circle_outline_rounded,
+                                            size: 20, color: p.textTertiary),
                                         onPressed: () {
                                           playlistUseCases.removeSongFromPlaylist(playlist.id, songs[i].id);
                                         },
                                       ),
+                                  ],
+                                ),
                               ),
                           ],
                         ),

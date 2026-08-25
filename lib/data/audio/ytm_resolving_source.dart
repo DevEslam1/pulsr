@@ -26,6 +26,7 @@ class YtmResolvingSource extends StreamAudioSource {
     required this.videoId,
     required Future<String> Function() resolve,
     this.userAgent,
+    this.onError,
     super.tag,
   }) : resolve = (({bool forceRefresh = false}) => resolve());
 
@@ -33,6 +34,7 @@ class YtmResolvingSource extends StreamAudioSource {
     required this.videoId,
     required this.resolve,
     this.userAgent,
+    this.onError,
     super.tag,
   });
 
@@ -41,6 +43,9 @@ class YtmResolvingSource extends StreamAudioSource {
 
   /// Resolves this track to a currently-valid, direct stream URL.
   final Future<String> Function({bool forceRefresh}) resolve;
+
+  /// Optional error callback invoked when resolution fails before rethrow.
+  final void Function(Object error)? onError;
 
   String? userAgent;
 
@@ -74,9 +79,10 @@ class YtmResolvingSource extends StreamAudioSource {
         final freshInner = await _createInner(forceRefresh: true);
         return await freshInner.request(start, end);
       }
-    } catch (_) {
+    } catch (err) {
       _inner = null;
       _pending = null;
+      onError?.call(err);
       rethrow;
     }
   }
@@ -110,12 +116,19 @@ class YtmResolvingSource extends StreamAudioSource {
     } catch (_) {}
 
     final cacheFile = await _cacheFileFor(videoId);
+    final headers = <String, String>{
+      'User-Agent': userAgent ??
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+    };
+
+    if (url.contains('googlevideo.com') || url.contains('youtube.com')) {
+      headers['Origin'] = 'https://music.youtube.com';
+      headers['Referer'] = 'https://music.youtube.com/';
+    }
+
     final inner = LockCachingAudioSource(
       Uri.parse(url),
-      headers: {
-        'User-Agent': userAgent ??
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
-      },
+      headers: headers,
       cacheFile: cacheFile,
     );
     _inner = inner;

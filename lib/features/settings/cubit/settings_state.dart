@@ -63,6 +63,8 @@ abstract class SettingsState with _$SettingsState {
     @Default('') String proxyUsername,
     @Default('') String proxyPassword,
     @Default('localhost, 127.0.0.1') String proxyBypassHosts,
+    @Default([]) List<ProxyEntry> proxyList,
+    @Default(false) bool isTestingAllProxies,
     int? scanResultCount,
     String? errorMessage,
   }) = _SettingsState;

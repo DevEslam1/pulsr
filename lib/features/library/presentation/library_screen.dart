@@ -24,6 +24,8 @@ import '../../sheets/song_info_sheet.dart';
 import '../../sheets/sort_filter_sheet.dart';
 import '../cubit/library_cubit.dart';
 import '../cubit/library_state.dart';
+import '../../ytm_search/cubit/ytm_download_cubit.dart';
+import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import 'widgets/folder_browser_tab.dart';
 
 class LibraryScreen extends StatefulWidget {
@@ -975,6 +977,19 @@ class _LibraryScreenState extends State<LibraryScreen>
                   ),
                   tooltip: 'Shuffle',
                 ),
+                if (AppConfig.ytmEnabled) ...[
+                  const SizedBox(width: 8),
+                  IconButton.filledTonal(
+                    onPressed: () => _downloadFavorites(context, currentFavorites),
+                    icon: const Icon(Icons.download_rounded, size: 19),
+                    style: IconButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      backgroundColor: p.accent.withValues(alpha: 0.15),
+                      foregroundColor: p.accent,
+                    ),
+                    tooltip: 'Download All Liked Songs (3 active downloads)',
+                  ),
+                ],
                 if (_favTabFilter == 1 && AppConfig.ytmEnabled) ...[
                   const SizedBox(width: 8),
                   IconButton.filledTonal(
@@ -1040,12 +1055,21 @@ class _LibraryScreenState extends State<LibraryScreen>
                           subtitleOverride: '${song.artist} • ${song.album}',
                           onTap: () => playerCubit.playSong(song,
                               queue: currentFavorites),
-                          trailing: IconButton(
-                            icon: Icon(Icons.favorite_rounded,
-                                color: p.favorite, size: 21),
-                            onPressed: () => context
-                                .read<LibraryCubit>()
-                                .toggleFavorite(song.id),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (AppConfig.ytmEnabled &&
+                                  song.remoteId != null &&
+                                  song.remoteId!.isNotEmpty)
+                                YtmDownloadButton(song: song),
+                              IconButton(
+                                icon: Icon(Icons.favorite_rounded,
+                                    color: p.favorite, size: 21),
+                                onPressed: () => context
+                                    .read<LibraryCubit>()
+                                    .toggleFavorite(song.id),
+                              ),
+                            ],
                           ),
                         );
                       },
@@ -1125,6 +1149,42 @@ class _LibraryScreenState extends State<LibraryScreen>
             ),
           ],
         ],
+      );
+    }
+  }
+
+  void _downloadFavorites(BuildContext context, List<SongsTableData> songs) {
+    if (songs.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No favorite songs to download.')),
+      );
+      return;
+    }
+
+    final downloadCubit =
+        context.read<YtmDownloadCubit?>() ?? getIt<YtmDownloadCubit>();
+    final queuedCount = downloadCubit.downloadAll(songs);
+
+    if (queuedCount > 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              'Queued $queuedCount liked songs for download (3 active downloads)...'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else {
+      final hasOnlineTracks =
+          songs.any((s) => s.remoteId != null && s.remoteId!.isNotEmpty);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            hasOnlineTracks
+                ? 'All online liked songs are already downloaded or in progress.'
+                : 'All songs in this list are already offline local tracks.',
+          ),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
     }
   }
@@ -1422,6 +1482,25 @@ class _LibraryScreenState extends State<LibraryScreen>
                     borderRadius: 18,
                   ),
                 ),
+                if (AppConfig.ytmEnabled &&
+                    song.remoteId != null &&
+                    song.remoteId!.isNotEmpty)
+                  Positioned(
+                    left: 6,
+                    top: 6,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: YtmDownloadButton(
+                        song: song,
+                        activeColor: Colors.white,
+                        iconColor: Colors.white,
+                        iconSize: 18,
+                      ),
+                    ),
+                  ),
                 Positioned(
                   right: 6,
                   top: 6,

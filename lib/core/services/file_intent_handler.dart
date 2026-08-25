@@ -13,6 +13,7 @@ import '../../data/db/app_database.dart';
 import '../../domain/models/ytm_track.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../../features/player/cubit/player_cubit.dart';
+import '../network/proxy_config.dart';
 import 'ytm_service.dart';
 
 @singleton
@@ -116,6 +117,32 @@ class FileIntentHandler {
       String cleanPath = Uri.decodeFull(uriOrPath);
       if (cleanPath.startsWith('file://')) {
         cleanPath = cleanPath.replaceFirst('file://', '');
+      }
+
+      // Check if this is a shared proxy list text or text file (.txt, .list, .conf, .csv)
+      final isTextExt = cleanPath.toLowerCase().endsWith('.txt') ||
+          cleanPath.toLowerCase().endsWith('.list') ||
+          cleanPath.toLowerCase().endsWith('.conf') ||
+          cleanPath.toLowerCase().endsWith('.csv');
+
+      if (isTextExt) {
+        try {
+          final file = File(cleanPath);
+          if (file.existsSync()) {
+            final content = await file.readAsString();
+            final proxies = ProxyEntry.parseList(content);
+            if (proxies.isNotEmpty) {
+              rootNavigatorKey.currentContext?.push('/proxy-settings', extra: content);
+              return;
+            }
+          }
+        } catch (_) {}
+      } else {
+        final parsedProxies = ProxyEntry.parseList(uriOrPath);
+        if (parsedProxies.isNotEmpty && !AudioFormats.isPlayableExtension(cleanPath)) {
+          rootNavigatorKey.currentContext?.push('/proxy-settings', extra: uriOrPath);
+          return;
+        }
       }
 
       if (!AudioFormats.isPlayableExtension(cleanPath)) {

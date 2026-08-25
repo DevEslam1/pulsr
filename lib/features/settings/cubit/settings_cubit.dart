@@ -1,4 +1,5 @@
 // lib/features/settings/cubit/settings_cubit.dart
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -48,6 +49,7 @@ class SettingsCubit extends Cubit<SettingsState> {
   static const String _keyProxyUsername = 'setting_proxy_username';
   static const String _keyProxyPassword = 'setting_proxy_password';
   static const String _keyProxyBypassHosts = 'setting_proxy_bypass_hosts';
+  static const String _keyProxyList = 'setting_proxy_list';
 
   SettingsCubit({required MediaScannerService scannerService})
       : _scannerService = scannerService,
@@ -157,6 +159,18 @@ class SettingsCubit extends Cubit<SettingsState> {
       final proxyPassword = prefs.getString(_keyProxyPassword) ?? '';
       final proxyBypassHosts = prefs.getString(_keyProxyBypassHosts) ?? 'localhost, 127.0.0.1';
 
+      List<ProxyEntry> proxyList = [];
+      final proxyListRaw = prefs.getString(_keyProxyList);
+      if (proxyListRaw != null && proxyListRaw.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(proxyListRaw) as List<dynamic>;
+          proxyList = decoded
+              .map((e) => ProxyEntry.fromMap(e as Map<String, dynamic>))
+              .where((e) => e.isValid)
+              .toList();
+        } catch (_) {}
+      }
+
       // Theme color source
       final ThemeColorSource themeColorSource;
       final sourceStr = prefs.getString(_keyThemeColorSource);
@@ -203,6 +217,7 @@ class SettingsCubit extends Cubit<SettingsState> {
         proxyUsername: proxyUsername,
         proxyPassword: proxyPassword,
         proxyBypassHosts: proxyBypassHosts,
+        proxyList: proxyList,
       );
 
       emit(newState);
@@ -410,6 +425,154 @@ class SettingsCubit extends Cubit<SettingsState> {
     return AppHttpOverrides.instance.testConnection(
       configToTest: configToTest,
     );
+  }
+
+  Future<void> _saveProxyList(List<ProxyEntry> list) async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonList = list.map((e) => e.toMap()).toList();
+    await prefs.setString(_keyProxyList, jsonEncode(jsonList));
+  }
+
+  /// Imports multiple proxies parsed from raw multi-line text or file content.
+  /// Returns the count of newly added proxies.
+  Future<int> importProxiesFromText(String rawText, {bool autoSelectFirst = false}) async {
+    final parsed = ProxyEntry.parseList(rawText);
+    if (parsed.isEmpty) return 0;
+
+    final existing = List<ProxyEntry>.from(state.proxyList);
+    final existingKeys = existing.map((e) => '${e.host}:${e.port}:${e.username}').toSet();
+
+    int addedCount = 0;
+    for (final p in parsed) {
+      final key = '${p.host}:${p.port}:${p.username}';
+      if (!existingKeys.contains(key)) {
+        existing.add(p);
+        existingKeys.add(key);
+        addedCount++;
+      }
+    }
+
+    if (addedCount > 0) {
+      emit(state.copyWith(proxyList: existing));
+      await _saveProxyList(existing);
+      if (autoSelectFirst && existing.isNotEmpty) {
+        await selectProxyEntry(parsed.first);
+      }
+    }
+    return addedCount;
+  }
+
+  /// Adds or updates a single proxy entry in the pool.
+  Future<void> addProxyEntry(ProxyEntry entry, {bool autoSelect = false}) async {
+    final existing = List<ProxyEntry>.from(state.proxyList);
+    final index = existing.indexWhere((e) => e.id == entry.id || (e.host == entry.host && e.port == entry.port));
+    if (index >= 0) {
+      existing[index] = entry;
+    } else {
+      existing.add(entry);
+    }
+    emit(state.copyWith(proxyList: existing));
+    await _saveProxyList(existing);
+    if (autoSelect) {
+      await selectProxyEntry(entry);
+    }
+  }
+
+  /// Removes a proxy from the pool by ID.
+  Future<void> removeProxyEntry(String id) async {
+    final updated = state.proxyList.where((e) => e.id != id).toList();
+    emit(state.copyWith(proxyList: updated));
+    await _saveProxyList(updated);
+  }
+
+  /// Clears the entire proxy pool.
+  Future<void> clearProxyList() async {
+    emit(state.copyWith(proxyList: []));
+    await _saveProxyList([]);
+  }
+
+  /// Selects a proxy from the pool and activates it as the current active proxy.
+  Future<void> selectProxyEntry(ProxyEntry entry) async {
+    await setProxySettings(
+      enabled: true,
+      type: entry.type,
+      host: entry.host,
+      port: entry.port,
+      username: entry.username,
+      password: entry.password,
+      bypassHosts: state.proxyBypassHosts,
+    );
+  }
+
+  /// Sequentially tests all proxies in the pool against the probe endpoint,
+  /// updating live latency and working status for each proxy.
+  Future<void> testAllProxies() async {
+    if (state.proxyList.isEmpty || state.isTestingAllProxies) return;
+
+    emit(state.copyWith(isTestingAllProxies: true));
+    final currentList = List<ProxyEntry>.from(state.proxyList);
+
+    for (int i = 0; i < currentList.length; i++) {
+      final entry = currentList[i];
+      currentList[i] = entry.copyWith(isTesting: true);
+      emit(state.copyWith(proxyList: List.from(currentList)));
+
+      final result = await AppHttpOverrides.instance.testConnection(
+        configToTest: entry.toProxyConfig(enabled: true),
+        timeout: const Duration(seconds: 10),
+      );
+
+      currentList[i] = currentList[i].copyWith(
+        isTesting: false,
+        isWorking: result.success,
+        latencyMs: result.latencyMs,
+        lastError: result.error,
+      );
+      emit(state.copyWith(proxyList: List.from(currentList)));
+    }
+
+    emit(state.copyWith(isTestingAllProxies: false));
+    await _saveProxyList(currentList);
+  }
+
+  /// Tests a single proxy entry in the pool by its ID.
+  Future<void> testSingleProxyEntry(String id) async {
+    final index = state.proxyList.indexWhere((e) => e.id == id);
+    if (index < 0) return;
+
+    final entry = state.proxyList[index];
+    final updatedList = List<ProxyEntry>.from(state.proxyList);
+    updatedList[index] = entry.copyWith(isTesting: true);
+    emit(state.copyWith(proxyList: updatedList));
+
+    final result = await AppHttpOverrides.instance.testConnection(
+      configToTest: entry.toProxyConfig(enabled: true),
+      timeout: const Duration(seconds: 10),
+    );
+
+    updatedList[index] = updatedList[index].copyWith(
+      isTesting: false,
+      isWorking: result.success,
+      latencyMs: result.latencyMs,
+      lastError: result.error,
+    );
+    emit(state.copyWith(proxyList: updatedList));
+    await _saveProxyList(updatedList);
+  }
+
+  /// Sorts proxy entries by lowest latency first, followed by unverified/failed ones.
+  Future<void> sortProxiesByLatency() async {
+    final list = List<ProxyEntry>.from(state.proxyList);
+    list.sort((a, b) {
+      if (a.isWorking == true && b.isWorking == true) {
+        return (a.latencyMs ?? 99999).compareTo(b.latencyMs ?? 99999);
+      }
+      if (a.isWorking == true && b.isWorking != true) return -1;
+      if (a.isWorking != true && b.isWorking == true) return 1;
+      return 0;
+    });
+    emit(state.copyWith(proxyList: list));
+    await _saveProxyList(list);
   }
 
   Future<int> rescanLibrary() async {

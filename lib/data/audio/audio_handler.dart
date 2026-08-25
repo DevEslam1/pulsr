@@ -10,6 +10,7 @@ import 'package:injectable/injectable.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/prefs_keys.dart';
+import '../../core/errors/ytm_error_classifier.dart';
 import '../../core/services/ytm_service.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/models/audio_effects_config.dart';
@@ -63,6 +64,8 @@ class PulsrAudioHandler extends BaseAudioHandler
   bool _queueDirty = false;
   double? _preDuckVolume;
   int _consecutiveFailures = 0;
+  DateTime? _lastGaplessChangeTime;
+  int _rapidGaplessChangeCount = 0;
   final List<int> _shuffleHistory = [];
   bool _wasPlayingBeforeInterruption = false;
 
@@ -93,6 +96,9 @@ class PulsrAudioHandler extends BaseAudioHandler
   final StreamController<Duration> _positionSubject =
       StreamController<Duration>.broadcast();
   Stream<Duration> get positionStream => _positionSubject.stream;
+  final StreamController<String> _errorSubject =
+      StreamController<String>.broadcast();
+  Stream<String> get errorStream => _errorSubject.stream;
   int? _currentAudioSessionId;
   final StreamController<int?> _audioSessionIdSubject =
       StreamController<int?>.broadcast();
@@ -162,14 +168,26 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   static MediaItem _songToMediaItem(SongsTableData song, [Uri? artUri]) {
+    Uri? finalArtUri = (artUri != null && artUri.hasScheme && (artUri.host.isNotEmpty || artUri.path.isNotEmpty))
+        ? artUri
+        : null;
+
+    if (finalArtUri == null && song.artworkUri != null && song.artworkUri!.isNotEmpty) {
+      final parsed = Uri.tryParse(song.artworkUri!);
+      if (parsed != null &&
+          parsed.hasScheme &&
+          (parsed.host.isNotEmpty || parsed.scheme == 'file' || parsed.scheme == 'content')) {
+        finalArtUri = parsed;
+      }
+    }
+
     return MediaItem(
       id: song.id.toString(),
       album: song.album,
       title: song.title,
       artist: song.artist,
       duration: Duration(milliseconds: song.durationMs),
-      artUri: artUri ??
-          (song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null),
+      artUri: finalArtUri,
       extras: {
         'path': song.path,
         'uri': song.uri,
@@ -355,98 +373,134 @@ class PulsrAudioHandler extends BaseAudioHandler
 
     void setupPlayerListeners(AudioPlayer player, bool isPlayerA) {
       _subscriptions.add(
-        player.playbackEventStream.listen((event) {
-          if (isPlayerA == _isPlayerAActive) {
-            _broadcastState(event);
-          }
-        }),
+        player.playbackEventStream.listen(
+          (event) {
+            if (isPlayerA == _isPlayerAActive) {
+              _broadcastState(event);
+            }
+          },
+          onError: (e, st) {
+            ErrorLogger.log('Player playbackEventStream error',
+                error: e, stackTrace: st, category: 'AudioHandler');
+          },
+        ),
       );
 
       _subscriptions.add(
-        player.durationStream.listen((dur) {
-          if (isPlayerA == _isPlayerAActive &&
-              dur != null &&
-              dur > Duration.zero) {
-            final current = mediaItem.value;
-            if (current != null && current.duration != dur) {
-              mediaItem.add(current.copyWith(duration: dur));
-            }
-          }
-        }),
-      );
-
-      _subscriptions.add(
-        player.playerStateStream.listen((state) async {
-          if (isPlayerA == _isPlayerAActive) {
-            // Gapless loop-all support
-            if (_gaplessMode &&
-                state.processingState == ProcessingState.completed &&
-                _activePlayer.loopMode == LoopMode.all) {
-              await _activePlayer.seek(Duration.zero, index: 0);
-              await _activePlayer.play();
-              return;
-            }
-            // In gapless mode the ConcatenatingAudioSource advances itself; only
-            // the crossfade engine (one source per track) needs a manual skip on
-            // completion. A completed event at the very end (loop off) just stops.
-            if (!_gaplessMode &&
-                state.processingState == ProcessingState.completed &&
-                !_crossfadeManager.isCrossfading) {
-              skipToNext();
-            }
-          }
-        }),
-      );
-
-      _subscriptions.add(
-        player.positionStream.listen((pos) {
-          if (isPlayerA == _isPlayerAActive) {
-            _positionSubject.add(pos);
-            _saveCurrentPosition();
-            final duration = player.duration ?? Duration.zero;
-            // Warm the next YouTube stream URL before the crossfade window even
-            // opens, so resolve latency does not truncate the fade. Cheap no-op
-            // for local tracks and for an already-cached url.
-            if (duration > const Duration(seconds: 15) &&
-                pos >= duration - const Duration(seconds: 15)) {
-              final peekIdx = _peekNextIndex();
-              if (peekIdx != null) _prefetchStream(_songs[peekIdx]);
-            }
-            if (_crossfadeManager.duration > Duration.zero &&
-                duration > _crossfadeManager.duration &&
-                pos >= duration - _crossfadeManager.duration &&
-                !_crossfadeManager.isCrossfading) {
-              final nextIdx = _getNextIndex();
-              if (nextIdx != null) {
-                _startCrossfade(nextIdx);
+        player.durationStream.listen(
+          (dur) {
+            if (isPlayerA == _isPlayerAActive &&
+                dur != null &&
+                dur > Duration.zero) {
+              final current = mediaItem.value;
+              if (current != null && current.duration != dur) {
+                mediaItem.add(current.copyWith(duration: dur));
               }
             }
-          }
-        }),
+          },
+          onError: (e, st) {
+            ErrorLogger.log('Player durationStream error',
+                error: e, stackTrace: st, category: 'AudioHandler');
+          },
+        ),
       );
 
       _subscriptions.add(
-        player.androidAudioSessionIdStream.listen((sessionId) {
-          if (sessionId != null && isPlayerA == _isPlayerAActive) {
-            AudioEffectsChannel().setAudioSessionId(sessionId);
-            _currentAudioSessionId = sessionId;
-            _audioSessionIdSubject.add(sessionId);
-          }
-        }),
+        player.playerStateStream.listen(
+          (state) async {
+            if (isPlayerA == _isPlayerAActive) {
+              // Gapless loop-all support
+              if (_gaplessMode &&
+                  state.processingState == ProcessingState.completed &&
+                  _activePlayer.loopMode == LoopMode.all) {
+                await _activePlayer.seek(Duration.zero, index: 0);
+                await _activePlayer.play();
+                return;
+              }
+              // In gapless mode the ConcatenatingAudioSource advances itself; only
+              // the crossfade engine (one source per track) needs a manual skip on
+              // completion. A completed event at the very end (loop off) just stops.
+              if (!_gaplessMode &&
+                  state.processingState == ProcessingState.completed &&
+                  !_crossfadeManager.isCrossfading) {
+                skipToNext();
+              }
+            }
+          },
+          onError: (e, st) {
+            ErrorLogger.log('Player playerStateStream error',
+                error: e, stackTrace: st, category: 'AudioHandler');
+          },
+        ),
       );
 
       _subscriptions.add(
-        player.currentIndexStream.listen((index) {
-          // Native gapless advance: the concat moved to a new item on its own.
-          // Reconcile our queue model, notification, history and position-save
-          // off this single source of truth instead of a manual skip.
-          if (_gaplessMode &&
-              isPlayerA == _isPlayerAActive &&
-              index != null &&
-              index != _lastGaplessIndex) {
-            _onGaplessIndexChanged(index);
-          }
-        }),
+        player.positionStream.listen(
+          (pos) {
+            if (isPlayerA == _isPlayerAActive) {
+              _positionSubject.add(pos);
+              _saveCurrentPosition();
+              final duration = player.duration ?? Duration.zero;
+              // Warm the next YouTube stream URL before the crossfade window even
+              // opens, so resolve latency does not truncate the fade. Cheap no-op
+              // for local tracks and for an already-cached url.
+              if (duration > const Duration(seconds: 15) &&
+                  pos >= duration - const Duration(seconds: 15)) {
+                final peekIdx = _peekNextIndex();
+                if (peekIdx != null) _prefetchStream(_songs[peekIdx]);
+              }
+              if (_crossfadeManager.duration > Duration.zero &&
+                  duration > _crossfadeManager.duration &&
+                  pos >= duration - _crossfadeManager.duration &&
+                  !_crossfadeManager.isCrossfading) {
+                final nextIdx = _getNextIndex();
+                if (nextIdx != null) {
+                  _startCrossfade(nextIdx);
+                }
+              }
+            }
+          },
+          onError: (e, st) {
+            ErrorLogger.log('Player positionStream error',
+                error: e, stackTrace: st, category: 'AudioHandler');
+          },
+        ),
+      );
+
+      _subscriptions.add(
+        player.androidAudioSessionIdStream.listen(
+          (sessionId) {
+            if (sessionId != null && isPlayerA == _isPlayerAActive) {
+              AudioEffectsChannel().setAudioSessionId(sessionId);
+              _currentAudioSessionId = sessionId;
+              _audioSessionIdSubject.add(sessionId);
+            }
+          },
+          onError: (e, st) {
+            ErrorLogger.log('Player androidAudioSessionIdStream error',
+                error: e, stackTrace: st, category: 'AudioHandler');
+          },
+        ),
+      );
+
+      _subscriptions.add(
+        player.currentIndexStream.listen(
+          (index) {
+            // Native gapless advance: the concat moved to a new item on its own.
+            // Reconcile our queue model, notification, history and position-save
+            // off this single source of truth instead of a manual skip.
+            if (_gaplessMode &&
+                isPlayerA == _isPlayerAActive &&
+                index != null &&
+                index != _lastGaplessIndex) {
+              _onGaplessIndexChanged(index);
+            }
+          },
+          onError: (e, st) {
+            ErrorLogger.log('Player currentIndexStream error',
+                error: e, stackTrace: st, category: 'AudioHandler');
+          },
+        ),
       );
     }
 
@@ -536,6 +590,35 @@ class PulsrAudioHandler extends BaseAudioHandler
     return AudioSource.file(song.path, tag: tag);
   }
 
+  void _handleStreamResolutionError(SongsTableData song, Object error) {
+    final info = YtmErrorClassifier.classify(error);
+    ErrorLogger.log(
+      'Gapless stream resolution error on "${song.title}": ${info.message} ($error)',
+      category: 'AudioHandler',
+    );
+    _errorSubject.add(info.message);
+
+    final isFatal = error is YtmException
+        ? error.isFatal
+        : (info.recoveryAction != YtmRecoveryAction.skipToNextTrack &&
+            info.recoveryAction != YtmRecoveryAction.retryWithBackoff);
+
+    if (isFatal) {
+      _consecutiveFailures = 0;
+      _rapidGaplessChangeCount = 0;
+      _activePlayer.pause().ignore();
+      _broadcastState(_activePlayer.playbackEvent);
+    } else {
+      _consecutiveFailures++;
+      if (_consecutiveFailures >= 3 || _consecutiveFailures >= _songs.length) {
+        _consecutiveFailures = 0;
+        _rapidGaplessChangeCount = 0;
+        _activePlayer.pause().ignore();
+        _broadcastState(_activePlayer.playbackEvent);
+      }
+    }
+  }
+
   /// Builds a gapless-queue child for [song] with no network I/O, so an entire
   /// queue can be assembled up front. Local tracks resolve to a file/content
   /// source; a YouTube row (not yet downloaded) becomes a [YtmResolvingSource]
@@ -556,6 +639,7 @@ class PulsrAudioHandler extends BaseAudioHandler
           source.userAgent = resolved.userAgent;
           return resolved.url;
         },
+        onError: (error) => _handleStreamResolutionError(song, error),
         tag: tag,
       );
       return source;
@@ -611,13 +695,20 @@ class PulsrAudioHandler extends BaseAudioHandler
     final url = resolved.url;
     final userAgent = resolved.userAgent;
 
+    final headers = <String, String>{
+      'User-Agent': userAgent ??
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+    };
+
+    if (url.contains('googlevideo.com') || url.contains('youtube.com')) {
+      headers['Origin'] = 'https://music.youtube.com';
+      headers['Referer'] = 'https://music.youtube.com/';
+    }
+
     return AudioSource.uri(
       Uri.parse(url),
       tag: tag,
-      headers: {
-        'User-Agent': userAgent ??
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
-      },
+      headers: headers,
     );
   }
 
@@ -945,6 +1036,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     _currentIndex =
         initialIndex.clamp(0, _songs.isEmpty ? 0 : _songs.length - 1);
     _queueDirty = true;
+    _consecutiveFailures = 0;
+    _rapidGaplessChangeCount = 0;
+    _lastGaplessChangeTime = null;
 
     final mediaItems = _songs.map(_songToMediaItem).toList();
     queue.add(mediaItems);
@@ -967,6 +1061,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (_songs.isEmpty) return;
     final generation = ++_playGeneration;
     _pendingLazyPosition = null;
+    _consecutiveFailures = 0;
+    _rapidGaplessChangeCount = 0;
+    _lastGaplessChangeTime = null;
     _lastGaplessIndex = _currentIndex;
 
     final song = _songs[_currentIndex];
@@ -986,11 +1083,6 @@ class PulsrAudioHandler extends BaseAudioHandler
       );
       if (generation != _playGeneration) return;
       await _activePlayer.setVolume(_calculateReplayGainVolume(song));
-      // If shuffle is already on, randomize the upcoming order (current first)
-      // so a freshly-loaded or restored shuffled queue actually plays shuffled.
-      if (_activePlayer.shuffleModeEnabled) {
-        await _activePlayer.shuffle();
-      }
       if (preload) {
         await _activePlayer.play();
         _consecutiveFailures = 0;
@@ -1002,12 +1094,15 @@ class PulsrAudioHandler extends BaseAudioHandler
       ArtworkUriResolver.resolveArtworkUri(song).then((artUri) {
         if (artUri != null &&
             artUri != fastArtUri &&
-            generation == _playGeneration) {
+            generation == _playGeneration &&
+            currentSong?.id == song.id) {
           mediaItem.add(_songToMediaItem(song, artUri));
         }
       }).catchError((_) {});
     } on YtmException catch (e, st) {
       if (generation != _playGeneration) return;
+      final info = YtmErrorClassifier.classify(e);
+      _errorSubject.add(info.message);
       ErrorLogger.log(
           'Error loading gapless YouTube source for ${song.title} (${e.code})',
           error: e,
@@ -1019,7 +1114,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       }
       // Non-fatal: skip this track and try the next
       _consecutiveFailures++;
-      if (_consecutiveFailures >= _songs.length) {
+      if (_consecutiveFailures >= 3 || _consecutiveFailures >= _songs.length) {
         await _failCurrentPlayback(fatal: false);
         return;
       }
@@ -1031,6 +1126,8 @@ class PulsrAudioHandler extends BaseAudioHandler
       }
     } catch (e, st) {
       if (generation != _playGeneration) return;
+      final info = YtmErrorClassifier.classify(e);
+      _errorSubject.add(info.message);
       ErrorLogger.log('Error loading gapless queue for ${song.title}',
           error: e, stackTrace: st, category: 'AudioHandler');
       await _failCurrentPlayback(fatal: false);
@@ -1046,9 +1143,34 @@ class PulsrAudioHandler extends BaseAudioHandler
     final childCount = _gaplessSource!.length;
     if (index >= childCount) return;
 
+    // Detect rapid successive transitions caused by ExoPlayer auto-advancing
+    // past failing tracks in a loop.
+    final now = DateTime.now();
+    if (_lastGaplessChangeTime != null &&
+        now.difference(_lastGaplessChangeTime!).inMilliseconds < 600) {
+      _rapidGaplessChangeCount++;
+      if (_rapidGaplessChangeCount >= 2) {
+        // Circuit breaker tripped: halt runaway skip loop
+        _rapidGaplessChangeCount = 0;
+        _consecutiveFailures = 0;
+        ErrorLogger.log(
+          'Circuit breaker tripped: rapid gapless track changes detected. Halting playback.',
+          category: 'AudioHandler',
+        );
+        _errorSubject.add('Playback stopped: multiple tracks failed to load.');
+        await _activePlayer.pause();
+        _broadcastState(_activePlayer.playbackEvent);
+        return;
+      }
+    } else {
+      _rapidGaplessChangeCount = 0;
+    }
+    _lastGaplessChangeTime = now;
+
     _lastGaplessIndex = index;
     _currentIndex = index;
     final song = _songs[index];
+    final generation = _playGeneration;
 
     final fastArtUri =
         song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
@@ -1059,7 +1181,11 @@ class PulsrAudioHandler extends BaseAudioHandler
     _saveCurrentPosition();
 
     ArtworkUriResolver.resolveArtworkUri(song).then((artUri) {
-      if (artUri != null && artUri != fastArtUri && _currentIndex == index) {
+      if (artUri != null &&
+          artUri != fastArtUri &&
+          _currentIndex == index &&
+          generation == _playGeneration &&
+          currentSong?.id == song.id) {
         mediaItem.add(_songToMediaItem(song, artUri));
       }
     }).catchError((_) {});
@@ -1086,7 +1212,8 @@ class PulsrAudioHandler extends BaseAudioHandler
     ArtworkUriResolver.resolveArtworkUri(song).then((artUri) {
       if (artUri != null &&
           artUri != fastArtUri &&
-          generation == _playGeneration) {
+          generation == _playGeneration &&
+          currentSong?.id == song.id) {
         mediaItem.add(_songToMediaItem(song, artUri));
       }
     }).catchError((_) {});
@@ -1145,6 +1272,8 @@ class PulsrAudioHandler extends BaseAudioHandler
       }
     } on YtmException catch (e, st) {
       if (generation != _playGeneration) return;
+      final info = YtmErrorClassifier.classify(e);
+      _errorSubject.add(info.message);
       ErrorLogger.log(
           'Error resolving YouTube stream for ${song.title} (${e.code})',
           error: e,
@@ -1155,6 +1284,8 @@ class PulsrAudioHandler extends BaseAudioHandler
       await _failCurrentPlayback(fatal: e.isFatal);
     } catch (e, st) {
       if (generation != _playGeneration) return;
+      final info = YtmErrorClassifier.classify(e);
+      _errorSubject.add(info.message);
       ErrorLogger.log('Error playing song ${song.title} (${song.path})',
           error: e, stackTrace: st, category: 'AudioHandler');
       await _failCurrentPlayback(fatal: false);
@@ -1166,17 +1297,19 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<void> _failCurrentPlayback({required bool fatal}) async {
     if (fatal) {
       _consecutiveFailures = 0;
+      _rapidGaplessChangeCount = 0;
       await _activePlayer.pause();
       _broadcastState(_activePlayer.playbackEvent);
       return;
     }
     _consecutiveFailures++;
-    if (_consecutiveFailures >= 5 || _consecutiveFailures >= _songs.length) {
+    if (_consecutiveFailures >= 3 || _consecutiveFailures >= _songs.length) {
       _consecutiveFailures = 0;
+      _rapidGaplessChangeCount = 0;
       await _activePlayer.pause();
       _broadcastState(_activePlayer.playbackEvent);
     } else {
-      skipToNext();
+      await skipToNext();
     }
   }
 

@@ -154,6 +154,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                         "isExpired" to PoTokenManager.isExpired(),
                         "isExpiringSoon" to PoTokenManager.isExpiringSoon(),
                         "visitorData" to PoTokenManager.visitorData,
+                        "streamingPoToken" to PoTokenManager.streamingPoToken,
                         "webViewBroken" to PoTokenManager.webViewBroken,
                     )
                 )

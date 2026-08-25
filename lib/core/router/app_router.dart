@@ -258,7 +258,9 @@ GoRouter createRouter(MediaScannerService scannerService) {
         path: '/proxy-settings',
         name: 'proxy-settings',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const ProxySettingsScreen(),
+        builder: (context, state) => ProxySettingsScreen(
+          initialImportText: state.extra is String ? state.extra as String : null,
+        ),
       ),
       // Gated: only reachable in an ENABLE_YTM build. In prod this collection-if
       // is const-false, so the route and YtmSearchScreen tree-shake away.

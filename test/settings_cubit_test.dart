@@ -196,5 +196,77 @@ void main() {
               '/storage/emulated/0/Download/Pink Floyd - Time.mp3'),
           false);
     });
+
+    test('importProxiesFromText, selectProxyEntry, removeProxyEntry and sortProxiesByLatency work correctly', () async {
+      final cubit = SettingsCubit(scannerService: mockScannerService);
+
+      const rawText = '''
+31.59.20.176:6754:qmyizdto:n5fui7pyec1q
+45.38.107.97:6014:qmyizdto:n5fui7pyec1q
+198.105.121.200:6462:qmyizdto:n5fui7pyec1q
+''';
+
+      final count = await cubit.importProxiesFromText(rawText, autoSelectFirst: true);
+      expect(count, 3);
+      expect(cubit.state.proxyList.length, 3);
+      expect(cubit.state.proxyEnabled, true);
+      expect(cubit.state.proxyHost, '31.59.20.176');
+      expect(cubit.state.proxyPort, 6754);
+      expect(cubit.state.proxyUsername, 'qmyizdto');
+
+      // Select another proxy
+      final second = cubit.state.proxyList[1];
+      await cubit.selectProxyEntry(second);
+      expect(cubit.state.proxyHost, '45.38.107.97');
+      expect(cubit.state.proxyPort, 6014);
+
+      // Remove third proxy
+      final thirdId = cubit.state.proxyList[2].id;
+      await cubit.removeProxyEntry(thirdId);
+      expect(cubit.state.proxyList.length, 2);
+
+      // Add with latency and sort
+      await cubit.addProxyEntry(
+        const ProxyEntry(
+          id: 'fast_proxy',
+          host: '1.1.1.1',
+          port: 8080,
+          isWorking: true,
+          latencyMs: 50,
+        ),
+      );
+
+      await cubit.sortProxiesByLatency();
+      expect(cubit.state.proxyList.first.host, '1.1.1.1');
+
+      cubit.close();
+    });
+
+    test('proxy list and active proxy settings persist across simulated app relaunch', () async {
+      // 1. First app session: import proxies and select one
+      final cubitSession1 = SettingsCubit(scannerService: mockScannerService);
+      const rawText = '''
+31.59.20.176:6754:qmyizdto:n5fui7pyec1q
+45.38.107.97:6014:qmyizdto:n5fui7pyec1q
+''';
+      await cubitSession1.importProxiesFromText(rawText);
+      await cubitSession1.selectProxyEntry(cubitSession1.state.proxyList[1]);
+      await cubitSession1.close();
+
+      // 2. Second app session (relaunch): creates a new cubit instance reading from SharedPreferences
+      final cubitSession2 = SettingsCubit(scannerService: mockScannerService);
+      // Wait for initial asynchronous _loadPreferences to complete
+      await Future.delayed(const Duration(milliseconds: 50));
+
+      expect(cubitSession2.state.proxyList.length, 2);
+      expect(cubitSession2.state.proxyList[0].host, '31.59.20.176');
+      expect(cubitSession2.state.proxyList[1].host, '45.38.107.97');
+      expect(cubitSession2.state.proxyEnabled, true);
+      expect(cubitSession2.state.proxyHost, '45.38.107.97');
+      expect(cubitSession2.state.proxyPort, 6014);
+      expect(cubitSession2.state.proxyUsername, 'qmyizdto');
+
+      await cubitSession2.close();
+    });
   });
 }

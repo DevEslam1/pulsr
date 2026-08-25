@@ -74,6 +74,7 @@ class YtmAccountService {
   final loginState = ValueNotifier<bool>(false);
 
   bool get isLoggedIn => _cookies != null && _cookies!.isNotEmpty;
+  String? get cookies => _cookies;
   String? get accountName => _accountName;
   String? get accountAvatar => _accountAvatar;
 
@@ -603,6 +604,13 @@ class YtmAccountService {
   /// 3. IOS client
   /// 4. TVHTML5_SIMPLY_EMBEDDED_PLAYER
   Future<YtmStream?> resolvePlayerStream(String videoId, {String quality = 'high'}) async {
+    Map<String, dynamic>? poState;
+    try {
+      poState = await getIt<YtmService>().getPoTokenState();
+    } catch (_) {}
+    final poToken = poState?['streamingPoToken'] as String?;
+    final visitorData = poState?['visitorData'] as String?;
+
     final clientChain = (isLoggedIn && _cookies != null && _cookies!.isNotEmpty)
         ? [
             'WEB_REMIX',
@@ -701,17 +709,8 @@ class YtmAccountService {
           }
         }
 
-        Map<String, dynamic>? poState;
-        if (client == 'WEB_REMIX') {
-          try {
-            poState = await getIt<YtmService>().getPoTokenState();
-          } catch (_) {}
-        }
-        final poToken = poState?['streamingPoToken'] as String?;
-        final visitorData = poState?['visitorData'] as String?;
-
         final clientContext = _buildClientContext(client);
-        if (visitorData != null && visitorData.isNotEmpty && clientContext['client'] is Map<String, dynamic>) {
+        if (isWeb && visitorData != null && visitorData.isNotEmpty && clientContext['client'] is Map<String, dynamic>) {
           (clientContext['client'] as Map<String, dynamic>)['visitorData'] = visitorData;
         }
 
@@ -723,7 +722,7 @@ class YtmAccountService {
           'playbackContext': {
             'contentPlaybackContext': {
               'html5Preference': 'HTML5_PREF_WANTS',
-              if (poToken != null && poToken.isNotEmpty) 'poToken': poToken,
+              if (isWeb && poToken != null && poToken.isNotEmpty) 'poToken': poToken,
             },
           },
         });
@@ -742,6 +741,18 @@ class YtmAccountService {
 
           if (status == 'LOGIN_REQUIRED' || status == 'UNPLAYABLE' || status.contains('BOT')) {
             debugPrint('[YTM_ACCOUNT] Client $client returned playability $status, falling back to next');
+
+            // If WEB_REMIX (the client using auth cookies) returns LOGIN_REQUIRED, the session is expired.
+            // Do NOT wipe cookies if guest clients (like ANDROID_VR) return LOGIN_REQUIRED.
+            if (client == 'WEB_REMIX' && status == 'LOGIN_REQUIRED' && _cookies != null && _cookies!.isNotEmpty) {
+              debugPrint('[YTM_ACCOUNT] Session expired detected on WEB_REMIX. Clearing cookies and notifying UI.');
+              unawaited(logout());
+              try {
+                getIt<YtmService>().notifyAuthExpired();
+              } catch (_) {}
+
+              throw const YtmException('YTM_AUTH', 'YouTube Music session expired. Please sign in again.');
+            }
             continue;
           }
 

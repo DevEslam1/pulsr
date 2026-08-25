@@ -198,8 +198,8 @@ void main() {
     test('a stale in-flight search cannot overwrite a newer one', () async {
       final slow = Completer<List<YtmTrack>>();
       final fast = Completer<List<YtmTrack>>();
-      when(() => service.search('slow')).thenAnswer((_) => slow.future);
-      when(() => service.search('fast')).thenAnswer((_) => fast.future);
+      when(() => service.searchWithFallback('slow')).thenAnswer((_) => slow.future);
+      when(() => service.searchWithFallback('fast')).thenAnswer((_) => fast.future);
 
       final cubit = YtmSearchCubit(service: service);
       cubit.onQueryChanged('slow');
@@ -217,7 +217,7 @@ void main() {
     });
 
     test('a network failure surfaces a message instead of looking like no results', () async {
-      when(() => service.search(any())).thenThrow(const YtmException('YTM_TIMEOUT'));
+      when(() => service.searchWithFallback(any())).thenThrow(const YtmException('YTM_TIMEOUT'));
 
       final cubit = YtmSearchCubit(service: service);
       cubit.onQueryChanged('anything');
@@ -230,14 +230,14 @@ void main() {
     });
 
     test('clearing the query cancels the pending debounce', () async {
-      when(() => service.search(any())).thenAnswer((_) async => const []);
+      when(() => service.searchWithFallback(any())).thenAnswer((_) async => const []);
 
       final cubit = YtmSearchCubit(service: service);
       cubit.onQueryChanged('abc');
       cubit.clearQuery();
       await Future<void>.delayed(const Duration(milliseconds: 300));
 
-      verifyNever(() => service.search(any()));
+      verifyNever(() => service.searchWithFallback(any()));
       expect(cubit.state.query, isEmpty);
       await cubit.close();
     });

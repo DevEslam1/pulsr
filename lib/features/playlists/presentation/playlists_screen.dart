@@ -8,11 +8,13 @@ import '../../../core/services/ytm_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/widgets/empty_state_widget.dart';
+import '../../../domain/models/ytm_track.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../../domain/usecases/playlist_io_usecases.dart';
 import '../../auth/presentation/ytm_web_login_sheet.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
+import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../cubit/playlist_cubit.dart';
 import '../cubit/playlist_state.dart';
 
@@ -423,6 +425,101 @@ class _OnlinePlaylistsContent extends StatelessWidget {
     }
   }
 
+  Future<void> _downloadAccountPlaylist(
+    BuildContext context,
+    YtmAccountPlaylist playlist,
+  ) async {
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    scaffoldMessenger.showSnackBar(
+      SnackBar(
+        content: Text('Fetching "${playlist.title}" for download…'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    try {
+      final ytmService = getIt<YtmService>();
+      final tracks =
+          await ytmService.getPlaylistTracks(playlist.playlistId, limit: 200);
+      if (tracks.isNotEmpty) {
+        final songs = tracks.map((t) => t.toSongData()).toList();
+        final downloadCubit = getIt<YtmDownloadCubit>();
+        final queuedCount = downloadCubit.downloadAll(songs);
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(
+              queuedCount > 0
+                  ? 'Queued $queuedCount tracks from "${playlist.title}" for download (3 active downloads)...'
+                  : 'All tracks from "${playlist.title}" are already downloaded offline.',
+            ),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } else {
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(content: Text('Could not load tracks for this playlist.')),
+        );
+      }
+    } catch (e) {
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text('Failed to load playlist: $e')),
+      );
+    }
+  }
+
+  void _downloadCustomPlaylist(
+    BuildContext context,
+    OnlinePlaylistEntry entry,
+  ) {
+    if (entry.tracks.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No tracks in this playlist.')),
+      );
+      return;
+    }
+    final songs = entry.tracks.map((t) => t.toSongData()).toList();
+    final downloadCubit =
+        context.read<YtmDownloadCubit?>() ?? getIt<YtmDownloadCubit>();
+    final queuedCount = downloadCubit.downloadAll(songs);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          queuedCount > 0
+              ? 'Queued $queuedCount tracks from "${entry.title}" for download (3 active downloads)...'
+              : 'All tracks from "${entry.title}" are already downloaded offline.',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _downloadLikedSongs(
+    BuildContext context,
+    List<YtmTrack> likedTracks,
+  ) {
+    if (likedTracks.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('No liked songs to download. Sync first.')),
+      );
+      return;
+    }
+    final songs = likedTracks.map((t) => t.toSongData()).toList();
+    final downloadCubit =
+        context.read<YtmDownloadCubit?>() ?? getIt<YtmDownloadCubit>();
+    final queuedCount = downloadCubit.downloadAll(songs);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          queuedCount > 0
+              ? 'Queued $queuedCount liked songs for download (3 active downloads)...'
+              : 'All liked songs are already downloaded offline.',
+        ),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
@@ -513,6 +610,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                     trackCount: online.likedTracks.length,
                     error: online.likedError,
                     onFetch: () => cubit.fetchLikedSongsPlaylist(),
+                    onDownload: () => _downloadLikedSongs(context, online.likedTracks),
                     onPlay: () {
                       if (online.likedTracks.isNotEmpty) {
                         final songs = online.likedTracks.map((t) => t.toSongData()).toList();
@@ -631,6 +729,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                         return _AccountPlaylistCard(
                           playlist: pl,
                           onTap: () => _playAccountPlaylist(context, pl),
+                          onDownload: () => _downloadAccountPlaylist(context, pl),
                         );
                       },
                     ),
@@ -667,6 +766,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                               playerCubit.playSong(songs.first, queue: songs);
                             }
                           },
+                          onDownload: () => _downloadCustomPlaylist(context, pl),
                           onRemove: () => cubit.removeCustomPlaylist(pl.id),
                         );
                       },
@@ -716,10 +816,12 @@ class _OnlinePlaylistsContent extends StatelessWidget {
 class _AccountPlaylistCard extends StatelessWidget {
   final YtmAccountPlaylist playlist;
   final VoidCallback onTap;
+  final VoidCallback? onDownload;
 
   const _AccountPlaylistCard({
     required this.playlist,
     required this.onTap,
+    this.onDownload,
   });
 
   @override
@@ -740,37 +842,58 @@ class _AccountPlaylistCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              child: ClipRRect(
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(19)),
-                child: playlist.artworkUrl != null
-                    ? Image.network(
-                        playlist.artworkUrl!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: gradientColors,
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  ClipRRect(
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(19)),
+                    child: playlist.artworkUrl != null
+                        ? Image.network(
+                            playlist.artworkUrl!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              decoration: const BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: gradientColors,
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                              ),
+                              child: const Center(
+                                child: Icon(Icons.queue_music_rounded, color: Colors.white, size: 36),
+                              ),
+                            ),
+                          )
+                        : Container(
+                            decoration: const BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: gradientColors,
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                            ),
+                            child: const Center(
+                              child: Icon(Icons.queue_music_rounded, color: Colors.white, size: 36),
                             ),
                           ),
-                          child: const Center(
-                            child: Icon(Icons.queue_music_rounded, color: Colors.white, size: 36),
+                  ),
+                  if (onDownload != null)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: GestureDetector(
+                        onTap: onDownload,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.55),
+                            shape: BoxShape.circle,
                           ),
-                        ),
-                      )
-                    : Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: gradientColors,
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
-                        child: const Center(
-                          child: Icon(Icons.queue_music_rounded, color: Colors.white, size: 36),
+                          child: const Icon(Icons.download_rounded, color: Colors.white, size: 16),
                         ),
                       ),
+                    ),
+                ],
               ),
             ),
             Padding(
@@ -815,6 +938,7 @@ class _LikedMusicOnlineCard extends StatelessWidget {
   final String? error;
   final VoidCallback onFetch;
   final VoidCallback onPlay;
+  final VoidCallback? onDownload;
 
   const _LikedMusicOnlineCard({
     required this.status,
@@ -822,6 +946,7 @@ class _LikedMusicOnlineCard extends StatelessWidget {
     required this.error,
     required this.onFetch,
     required this.onPlay,
+    this.onDownload,
   });
 
   @override
@@ -837,7 +962,7 @@ class _LikedMusicOnlineCard extends StatelessWidget {
         subtitle = 'Syncing liked songs…';
         break;
       case YtmFetchStatus.done:
-        subtitle = '$trackCount songs synced • Tap to play';
+        subtitle = '$trackCount songs synced • Tap to play or download';
         break;
       case YtmFetchStatus.error:
         subtitle = error ?? 'Failed to fetch';
@@ -907,11 +1032,31 @@ class _LikedMusicOnlineCard extends StatelessWidget {
                 child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
               )
             else if (status == YtmFetchStatus.done)
-              Container(
-                width: 40,
-                height: 40,
-                decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                child: Icon(Icons.play_arrow_rounded, color: gradientColors.first, size: 26),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (onDownload != null) ...[
+                    GestureDetector(
+                      onTap: onDownload,
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.download_rounded, color: Colors.white, size: 22),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                  ],
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                    child: Icon(Icons.play_arrow_rounded, color: gradientColors.first, size: 26),
+                  ),
+                ],
               )
             else
               Container(
@@ -939,11 +1084,13 @@ class _OnlinePlaylistCard extends StatelessWidget {
   final OnlinePlaylistEntry entry;
   final VoidCallback onTap;
   final VoidCallback onRemove;
+  final VoidCallback? onDownload;
 
   const _OnlinePlaylistCard({
     required this.entry,
     required this.onTap,
     required this.onRemove,
+    this.onDownload,
   });
 
   @override
@@ -976,6 +1123,22 @@ class _OnlinePlaylistCard extends StatelessWidget {
                 child: Stack(
                   children: [
                     const Center(child: Icon(Icons.queue_music_rounded, color: Colors.white, size: 40)),
+                    if (onDownload != null)
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: GestureDetector(
+                          onTap: onDownload,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.35),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.download_rounded, color: Colors.white, size: 14),
+                          ),
+                        ),
+                      ),
                     Positioned(
                       top: 8,
                       right: 8,

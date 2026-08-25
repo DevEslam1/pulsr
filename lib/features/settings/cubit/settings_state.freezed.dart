@@ -44,6 +44,8 @@ mixin _$SettingsState {
   String get proxyUsername;
   String get proxyPassword;
   String get proxyBypassHosts;
+  List<ProxyEntry> get proxyList;
+  bool get isTestingAllProxies;
   int? get scanResultCount;
   String? get errorMessage;
 
@@ -120,8 +122,10 @@ mixin _$SettingsState {
                 other.proxyPassword == proxyPassword) &&
             (identical(other.proxyBypassHosts, proxyBypassHosts) ||
                 other.proxyBypassHosts == proxyBypassHosts) &&
-            (identical(other.scanResultCount, scanResultCount) ||
-                other.scanResultCount == scanResultCount) &&
+            const DeepCollectionEquality().equals(other.proxyList, proxyList) &&
+            (identical(other.isTestingAllProxies, isTestingAllProxies) ||
+                other.isTestingAllProxies == isTestingAllProxies) &&
+            (identical(other.scanResultCount, scanResultCount) || other.scanResultCount == scanResultCount) &&
             (identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
   }
 
@@ -158,13 +162,15 @@ mixin _$SettingsState {
         proxyUsername,
         proxyPassword,
         proxyBypassHosts,
+        const DeepCollectionEquality().hash(proxyList),
+        isTestingAllProxies,
         scanResultCount,
         errorMessage
       ]);
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, proxyPassword: $proxyPassword, proxyBypassHosts: $proxyBypassHosts, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, proxyPassword: $proxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
   }
 }
 
@@ -205,6 +211,8 @@ abstract mixin class $SettingsStateCopyWith<$Res> {
       String proxyUsername,
       String proxyPassword,
       String proxyBypassHosts,
+      List<ProxyEntry> proxyList,
+      bool isTestingAllProxies,
       int? scanResultCount,
       String? errorMessage});
 }
@@ -252,6 +260,8 @@ class _$SettingsStateCopyWithImpl<$Res>
     Object? proxyUsername = null,
     Object? proxyPassword = null,
     Object? proxyBypassHosts = null,
+    Object? proxyList = null,
+    Object? isTestingAllProxies = null,
     Object? scanResultCount = freezed,
     Object? errorMessage = freezed,
   }) {
@@ -376,6 +386,14 @@ class _$SettingsStateCopyWithImpl<$Res>
           ? _self.proxyBypassHosts
           : proxyBypassHosts // ignore: cast_nullable_to_non_nullable
               as String,
+      proxyList: null == proxyList
+          ? _self.proxyList
+          : proxyList // ignore: cast_nullable_to_non_nullable
+              as List<ProxyEntry>,
+      isTestingAllProxies: null == isTestingAllProxies
+          ? _self.isTestingAllProxies
+          : isTestingAllProxies // ignore: cast_nullable_to_non_nullable
+              as bool,
       scanResultCount: freezed == scanResultCount
           ? _self.scanResultCount
           : scanResultCount // ignore: cast_nullable_to_non_nullable
@@ -512,6 +530,8 @@ extension SettingsStatePatterns on SettingsState {
             String proxyUsername,
             String proxyPassword,
             String proxyBypassHosts,
+            List<ProxyEntry> proxyList,
+            bool isTestingAllProxies,
             int? scanResultCount,
             String? errorMessage)?
         $default, {
@@ -551,6 +571,8 @@ extension SettingsStatePatterns on SettingsState {
             _that.proxyUsername,
             _that.proxyPassword,
             _that.proxyBypassHosts,
+            _that.proxyList,
+            _that.isTestingAllProxies,
             _that.scanResultCount,
             _that.errorMessage);
       case _:
@@ -604,6 +626,8 @@ extension SettingsStatePatterns on SettingsState {
             String proxyUsername,
             String proxyPassword,
             String proxyBypassHosts,
+            List<ProxyEntry> proxyList,
+            bool isTestingAllProxies,
             int? scanResultCount,
             String? errorMessage)
         $default,
@@ -642,6 +666,8 @@ extension SettingsStatePatterns on SettingsState {
             _that.proxyUsername,
             _that.proxyPassword,
             _that.proxyBypassHosts,
+            _that.proxyList,
+            _that.isTestingAllProxies,
             _that.scanResultCount,
             _that.errorMessage);
       case _:
@@ -694,6 +720,8 @@ extension SettingsStatePatterns on SettingsState {
             String proxyUsername,
             String proxyPassword,
             String proxyBypassHosts,
+            List<ProxyEntry> proxyList,
+            bool isTestingAllProxies,
             int? scanResultCount,
             String? errorMessage)?
         $default,
@@ -732,6 +760,8 @@ extension SettingsStatePatterns on SettingsState {
             _that.proxyUsername,
             _that.proxyPassword,
             _that.proxyBypassHosts,
+            _that.proxyList,
+            _that.isTestingAllProxies,
             _that.scanResultCount,
             _that.errorMessage);
       case _:
@@ -774,9 +804,12 @@ class _SettingsState extends SettingsState {
       this.proxyUsername = '',
       this.proxyPassword = '',
       this.proxyBypassHosts = 'localhost, 127.0.0.1',
+      final List<ProxyEntry> proxyList = const [],
+      this.isTestingAllProxies = false,
       this.scanResultCount,
       this.errorMessage})
-      : super._();
+      : _proxyList = proxyList,
+        super._();
 
   @override
   @JsonKey()
@@ -869,6 +902,18 @@ class _SettingsState extends SettingsState {
   @override
   @JsonKey()
   final String proxyBypassHosts;
+  final List<ProxyEntry> _proxyList;
+  @override
+  @JsonKey()
+  List<ProxyEntry> get proxyList {
+    if (_proxyList is EqualUnmodifiableListView) return _proxyList;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_proxyList);
+  }
+
+  @override
+  @JsonKey()
+  final bool isTestingAllProxies;
   @override
   final int? scanResultCount;
   @override
@@ -947,8 +992,10 @@ class _SettingsState extends SettingsState {
                 other.proxyPassword == proxyPassword) &&
             (identical(other.proxyBypassHosts, proxyBypassHosts) ||
                 other.proxyBypassHosts == proxyBypassHosts) &&
-            (identical(other.scanResultCount, scanResultCount) ||
-                other.scanResultCount == scanResultCount) &&
+            const DeepCollectionEquality()
+                .equals(other._proxyList, _proxyList) &&
+            (identical(other.isTestingAllProxies, isTestingAllProxies) || other.isTestingAllProxies == isTestingAllProxies) &&
+            (identical(other.scanResultCount, scanResultCount) || other.scanResultCount == scanResultCount) &&
             (identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
   }
 
@@ -985,13 +1032,15 @@ class _SettingsState extends SettingsState {
         proxyUsername,
         proxyPassword,
         proxyBypassHosts,
+        const DeepCollectionEquality().hash(_proxyList),
+        isTestingAllProxies,
         scanResultCount,
         errorMessage
       ]);
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, proxyPassword: $proxyPassword, proxyBypassHosts: $proxyBypassHosts, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, proxyPassword: $proxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
   }
 }
 
@@ -1034,6 +1083,8 @@ abstract mixin class _$SettingsStateCopyWith<$Res>
       String proxyUsername,
       String proxyPassword,
       String proxyBypassHosts,
+      List<ProxyEntry> proxyList,
+      bool isTestingAllProxies,
       int? scanResultCount,
       String? errorMessage});
 }
@@ -1081,6 +1132,8 @@ class __$SettingsStateCopyWithImpl<$Res>
     Object? proxyUsername = null,
     Object? proxyPassword = null,
     Object? proxyBypassHosts = null,
+    Object? proxyList = null,
+    Object? isTestingAllProxies = null,
     Object? scanResultCount = freezed,
     Object? errorMessage = freezed,
   }) {
@@ -1205,6 +1258,14 @@ class __$SettingsStateCopyWithImpl<$Res>
           ? _self.proxyBypassHosts
           : proxyBypassHosts // ignore: cast_nullable_to_non_nullable
               as String,
+      proxyList: null == proxyList
+          ? _self._proxyList
+          : proxyList // ignore: cast_nullable_to_non_nullable
+              as List<ProxyEntry>,
+      isTestingAllProxies: null == isTestingAllProxies
+          ? _self.isTestingAllProxies
+          : isTestingAllProxies // ignore: cast_nullable_to_non_nullable
+              as bool,
       scanResultCount: freezed == scanResultCount
           ? _self.scanResultCount
           : scanResultCount // ignore: cast_nullable_to_non_nullable
