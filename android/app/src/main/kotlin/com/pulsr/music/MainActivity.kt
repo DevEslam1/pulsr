@@ -27,6 +27,7 @@ class MainActivity : AudioServiceActivity() {
     private var ytmExtractorPlugin: YtmExtractorPlugin? = null
     private var ytDownloadPlugin: YtDownloadPlugin? = null
     private var waveformPlugin: WaveformPlugin? = null
+    private var proxyPlugin: ProxyPlugin? = null
     private val backgroundExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
  
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -124,6 +125,7 @@ class MainActivity : AudioServiceActivity() {
         ytmExtractorPlugin = YtmExtractorPlugin.registerWith(flutterEngine, applicationContext)
         ytDownloadPlugin = YtDownloadPlugin.registerWith(flutterEngine, applicationContext)
         waveformPlugin = WaveformPlugin.registerWith(flutterEngine, applicationContext)
+        proxyPlugin = ProxyPlugin.registerWith(flutterEngine, applicationContext)
  
         val fileChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FILE_OPENER_CHANNEL)
         fileOpenerChannel = fileChannel
@@ -233,6 +235,8 @@ class MainActivity : AudioServiceActivity() {
         ytDownloadPlugin = null
         waveformPlugin?.cleanup()
         waveformPlugin = null
+        proxyPlugin?.cleanup()
+        proxyPlugin = null
         fileOpenerChannel?.setMethodCallHandler(null)
         fileOpenerChannel = null
         lyricsChannel?.setMethodCallHandler(null)

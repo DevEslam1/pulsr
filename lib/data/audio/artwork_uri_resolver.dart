@@ -161,7 +161,15 @@ class ArtworkUriResolver {
     // Remote tracks have no MediaStore id, so querying would be a wasted IPC.
     final remoteUrl = song.remoteArtworkUrl;
     if (remoteUrl != null && remoteUrl.isNotEmpty) {
-      return Uri.tryParse(remoteUrl);
+      final parsed = Uri.tryParse(remoteUrl);
+      if (parsed != null &&
+          parsed.hasScheme &&
+          (parsed.scheme == 'http' ||
+              parsed.scheme == 'https' ||
+              parsed.scheme == 'content' ||
+              parsed.scheme == 'file')) {
+        return parsed;
+      }
     }
     var uri = await getArtworkUri(song.id);
     if (uri == null && song.albumId != null) {

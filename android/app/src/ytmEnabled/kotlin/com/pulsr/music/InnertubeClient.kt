@@ -40,43 +40,67 @@ internal class InnertubeClient(
         val isWeb: Boolean,
         val endpointHost: String,
     ) {
+        ANDROID_VR(
+            "ANDROID_VR",
+            "1.60.19",
+            "28",
+            "com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12; en_US; Quest 2) gzip",
+            false,
+            "https://www.youtube.com",
+        ),
+        ANDROID_CREATOR(
+            "ANDROID_CREATOR",
+            "24.45.100",
+            "62",
+            "com.google.android.apps.youtube.creator/24.45.100 (Linux; U; Android 13; en_US) gzip",
+            false,
+            "https://www.youtube.com",
+        ),
+        TVHTML5_SIMPLY_EMBEDDED_PLAYER(
+            "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
+            "2.0",
+            "85",
+            "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/4.0 Chrome/76.0.3809.146 TV Safari/537.36",
+            true,
+            "https://www.youtube.com",
+        ),
         ANDROID_MUSIC(
             "ANDROID_MUSIC",
-            "6.42.52",
+            "7.27.52",
             "21",
-            "com.google.android.apps.youtube.music/6.42.52 (Linux; U; Android 13; en_US) gzip",
+            "com.google.android.apps.youtube.music/7.27.52 (Linux; U; Android 13; en_US) gzip",
             false,
             "https://music.youtube.com",
         ),
         IOS_MUSIC(
             "IOS_MUSIC",
-            "6.42.1",
+            "7.27.1",
             "26",
-            "com.google.ios.youtubemusic/6.42.1 (iPhone14,3; U; CPU iOS 17_5_1 like Mac OS X; en_US)",
+            "com.google.ios.youtubemusic/7.27.1 (iPhone14,3; U; CPU iOS 17_5_1 like Mac OS X; en_US)",
             false,
             "https://music.youtube.com",
         ),
         WEB_REMIX(
             "WEB_REMIX",
-            "1.20240417.01.00",
+            "1.20250820.01.00",
             "67",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
             true,
             "https://music.youtube.com",
         ),
         WEB_EMBEDDED_PLAYER(
             "WEB_EMBEDDED_PLAYER",
-            "1.20240417.01.00",
+            "1.20250820.01.00",
             "56",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
             true,
             "https://www.youtube.com",
         ),
         MWEB(
             "MWEB",
-            "2.20240417.01.00",
+            "2.20250820.01.00",
             "65",
-            "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36",
+            "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
             true,
             "https://m.youtube.com",
         ),
@@ -105,22 +129,42 @@ internal class InnertubeClient(
 
     /**
      * Resolves audio formats for [videoId] using a multi-client priority fallback chain:
-     * 1. ANDROID_MUSIC (unthrottled direct audio URLs tailored for YouTube Music)
-     * 2. IOS_MUSIC
-     * 3. WEB_REMIX + poToken + session cookies
-     * 4. WEB_EMBEDDED_PLAYER (bypasses restrictions via embed context)
-     * 5. MWEB (Mobile web)
-     * 6. ANDROID_TESTSUITE
+     * 1. ANDROID_VR (unthrottled, no PoToken/bot-block challenge required)
+     * 2. ANDROID_CREATOR
+     * 3. TVHTML5_SIMPLY_EMBEDDED_PLAYER
+     * 4. WEB_EMBEDDED_PLAYER
+     * 5. ANDROID_MUSIC
+     * 6. IOS_MUSIC
+     * 7. WEB_REMIX + poToken + session cookies
+     * 8. MWEB
+     * 9. ANDROID_TESTSUITE
      */
     fun resolvePlayerStream(videoId: String, quality: String = "high"): Map<String, Any?> {
-        val clientChain = listOf(
-            ClientType.ANDROID_MUSIC,
-            ClientType.IOS_MUSIC,
-            ClientType.WEB_REMIX,
-            ClientType.WEB_EMBEDDED_PLAYER,
-            ClientType.MWEB,
-            ClientType.ANDROID_TESTSUITE,
-        )
+        val clientChain = if (cookieStore.isSessionValid()) {
+            listOf(
+                ClientType.WEB_REMIX,
+                ClientType.ANDROID_VR,
+                ClientType.ANDROID_CREATOR,
+                ClientType.TVHTML5_SIMPLY_EMBEDDED_PLAYER,
+                ClientType.WEB_EMBEDDED_PLAYER,
+                ClientType.ANDROID_MUSIC,
+                ClientType.IOS_MUSIC,
+                ClientType.MWEB,
+                ClientType.ANDROID_TESTSUITE,
+            )
+        } else {
+            listOf(
+                ClientType.ANDROID_VR,
+                ClientType.ANDROID_CREATOR,
+                ClientType.TVHTML5_SIMPLY_EMBEDDED_PLAYER,
+                ClientType.WEB_EMBEDDED_PLAYER,
+                ClientType.ANDROID_MUSIC,
+                ClientType.IOS_MUSIC,
+                ClientType.WEB_REMIX,
+                ClientType.MWEB,
+                ClientType.ANDROID_TESTSUITE,
+            )
+        }
 
         var lastException: Throwable? = null
 
@@ -189,6 +233,7 @@ internal class InnertubeClient(
                     "title" to title,
                     "artist" to author,
                     "artworkUrl" to null,
+                    "userAgent" to client.userAgent,
                 )
             } catch (t: Throwable) {
                 Log.w(TAG, "Failed resolving with ${client.name}: ${t.message}")
@@ -263,7 +308,10 @@ internal class InnertubeClient(
 
             var connection: HttpURLConnection? = null
             try {
-                connection = (URL(urlStr).openConnection() as HttpURLConnection).apply {
+                val proxy = ProxyManager.getProxy(urlStr)
+                val url = URL(urlStr)
+                val rawConn = if (proxy != null) url.openConnection(proxy) else url.openConnection()
+                connection = (rawConn as HttpURLConnection).apply {
                     requestMethod = "POST"
                     connectTimeout = 15_000 + (attempt * 5_000)
                     readTimeout = 20_000 + (attempt * 5_000)
@@ -382,7 +430,6 @@ internal class InnertubeClient(
             if (PoTokenManager.isReady && clientType.isWeb) {
                 val poToken = PoTokenManager.poTokenForSync(videoId)
                 if (poToken.isNotEmpty()) {
-                    put("signatureTimestamp", (Instant.now().epochSecond / 86400).toInt())
                     put("poToken", poToken)
                 }
             }
@@ -401,6 +448,23 @@ internal class InnertubeClient(
             put("gl", "US")
 
             when (clientType) {
+                ClientType.ANDROID_VR -> {
+                    put("androidSdkVersion", 32)
+                    put("osName", "Android")
+                    put("osVersion", "12")
+                    put("platform", "MOBILE")
+                    put("deviceMake", "Oculus")
+                    put("deviceModel", "Quest 2")
+                }
+                ClientType.ANDROID_CREATOR -> {
+                    put("androidSdkVersion", 33)
+                    put("osName", "Android")
+                    put("osVersion", "13")
+                    put("platform", "MOBILE")
+                }
+                ClientType.TVHTML5_SIMPLY_EMBEDDED_PLAYER -> {
+                    put("platform", "TV")
+                }
                 ClientType.ANDROID_MUSIC -> {
                     put("androidSdkVersion", 33)
                     put("osName", "Android")
@@ -435,7 +499,7 @@ internal class InnertubeClient(
         val contextJson = JSONObject()
         contextJson.put("client", client)
 
-        if (clientType == ClientType.WEB_EMBEDDED_PLAYER) {
+        if (clientType == ClientType.WEB_EMBEDDED_PLAYER || clientType == ClientType.TVHTML5_SIMPLY_EMBEDDED_PLAYER) {
             val thirdParty = JSONObject()
             thirdParty.put("embedUrl", "https://www.youtube.com")
             contextJson.put("thirdParty", thirdParty)

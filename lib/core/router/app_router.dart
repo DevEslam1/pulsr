@@ -19,6 +19,7 @@ import '../../features/playlist_detail/presentation/playlist_detail_screen.dart'
 import '../../features/playlists/presentation/playlists_screen.dart';
 import '../../features/queue/presentation/queue_screen.dart';
 import '../../features/search/presentation/search_screen.dart';
+import '../../features/settings/presentation/proxy_settings_screen.dart';
 import '../../features/settings/presentation/settings_screen.dart';
 import '../../features/shell/presentation/app_shell.dart';
 import '../../features/smart_playlist_builder/smart_playlist_builder_screen.dart';
@@ -252,6 +253,12 @@ GoRouter createRouter(MediaScannerService scannerService) {
           }
           return TagEditorScreen(song: song);
         },
+      ),
+      GoRoute(
+        path: '/proxy-settings',
+        name: 'proxy-settings',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const ProxySettingsScreen(),
       ),
       // Gated: only reachable in an ENABLE_YTM build. In prod this collection-if
       // is const-false, so the route and YtmSearchScreen tree-shake away.

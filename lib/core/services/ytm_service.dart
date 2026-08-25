@@ -12,6 +12,7 @@ import '../di/injection.dart';
 import 'ytm_account_service.dart';
 import '../../domain/models/ytm_track.dart';
 import '../utils/error_logger.dart';
+import '../utils/ytm_rate_limiter.dart';
 
 /// A failed YTM call.
 class YtmException implements Exception {
@@ -188,7 +189,7 @@ class YtmService {
         'context': {
           'client': {
             'clientName': 'WEB_REMIX',
-            'clientVersion': '1.20240417.01.00',
+            'clientVersion': '1.20250820.01.00',
             'hl': 'en',
             'gl': 'US',
           },
@@ -196,13 +197,14 @@ class YtmService {
         'query': query,
       });
 
+      await YtmRateLimiter.shared.acquirePermit();
       final response = await http
           .post(
             Uri.parse('https://music.youtube.com/youtubei/v1/search?prettyPrint=false&key=$apiKey'),
             headers: {
               'Content-Type': 'application/json',
               'User-Agent':
-                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
               'Origin': 'https://music.youtube.com',
               'Referer': 'https://music.youtube.com/',
             },

@@ -25,7 +25,10 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
 
         var connection: HttpURLConnection? = null
         try {
-            connection = (URL(request.url()).openConnection() as HttpURLConnection).apply {
+            val proxy = ProxyManager.getProxy(request.url())
+            val url = URL(request.url())
+            val rawConn = if (proxy != null) url.openConnection(proxy) else url.openConnection()
+            connection = (rawConn as HttpURLConnection).apply {
                 requestMethod = request.httpMethod()
                 connectTimeout = CONNECT_TIMEOUT_MS
                 readTimeout = READ_TIMEOUT_MS
@@ -143,7 +146,7 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
 
     companion object {
         private const val USER_AGENT =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
         private const val CONNECT_TIMEOUT_MS = 15_000
         private const val READ_TIMEOUT_MS = 30_000
         private const val HTTP_TOO_MANY_REQUESTS = 429

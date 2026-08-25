@@ -1,8 +1,11 @@
 // lib/features/settings/cubit/settings_cubit.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/network/app_http_overrides.dart';
+import '../../../core/network/proxy_config.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
@@ -11,6 +14,8 @@ import 'settings_state.dart';
 @singleton
 class SettingsCubit extends Cubit<SettingsState> {
   final MediaScannerService _scannerService;
+  static const MethodChannel _proxyChannel = MethodChannel('com.pulsr.music/proxy');
+
   static const String _keyGapless = 'setting_gapless';
   static const String _keyCrossfade = 'setting_crossfade';
   static const String _keyMinDuration = 'setting_min_duration';
@@ -35,6 +40,15 @@ class SettingsCubit extends Cubit<SettingsState> {
   static const String _keyWifiOnlyMode = 'setting_wifi_only_mode';
   static const String _keyOfflineOnlyMode = 'setting_offline_only_mode';
 
+  // Proxy Keys
+  static const String _keyProxyEnabled = 'setting_proxy_enabled';
+  static const String _keyProxyType = 'setting_proxy_type';
+  static const String _keyProxyHost = 'setting_proxy_host';
+  static const String _keyProxyPort = 'setting_proxy_port';
+  static const String _keyProxyUsername = 'setting_proxy_username';
+  static const String _keyProxyPassword = 'setting_proxy_password';
+  static const String _keyProxyBypassHosts = 'setting_proxy_bypass_hosts';
+
   SettingsCubit({required MediaScannerService scannerService})
       : _scannerService = scannerService,
         super(const SettingsState()) {
@@ -47,6 +61,18 @@ class SettingsCubit extends Cubit<SettingsState> {
 
   Future<void> reloadSettings() async {
     await _loadPreferences();
+  }
+
+  Future<void> _syncProxySettings(ProxyConfig config) async {
+    // 1. Synchronize Dart HttpOverrides
+    AppHttpOverrides.instance.update(config);
+
+    // 2. Synchronize Android Native / NewPipe / JVM Proxy
+    try {
+      await _proxyChannel.invokeMethod('setProxy', config.toMap());
+    } catch (e) {
+      debugPrint('[SettingsCubit] Failed to sync proxy to native channel: $e');
+    }
   }
 
   Future<void> _loadPreferences() async {
@@ -118,9 +144,20 @@ class SettingsCubit extends Cubit<SettingsState> {
       final wifiOnlyMode = prefs.getBool(_keyWifiOnlyMode) ?? false;
       final offlineOnlyMode = prefs.getBool(_keyOfflineOnlyMode) ?? false;
 
-      // Theme color source: prefer the new enum key; migrate from the legacy
-      // `dynamic_theme` bool for upgraders (true → artwork, false → custom) so
-      // an existing custom-accent user is not surprised by wallpaper colors.
+      // Proxy Settings
+      final proxyEnabled = prefs.getBool(_keyProxyEnabled) ?? false;
+      final proxyTypeStr = prefs.getString(_keyProxyType) ?? AppProxyType.http.name;
+      final proxyType = AppProxyType.values.firstWhere(
+        (e) => e.name == proxyTypeStr,
+        orElse: () => AppProxyType.http,
+      );
+      final proxyHost = prefs.getString(_keyProxyHost) ?? '';
+      final proxyPort = prefs.getInt(_keyProxyPort) ?? 8080;
+      final proxyUsername = prefs.getString(_keyProxyUsername) ?? '';
+      final proxyPassword = prefs.getString(_keyProxyPassword) ?? '';
+      final proxyBypassHosts = prefs.getString(_keyProxyBypassHosts) ?? 'localhost, 127.0.0.1';
+
+      // Theme color source
       final ThemeColorSource themeColorSource;
       final sourceStr = prefs.getString(_keyThemeColorSource);
       if (sourceStr != null) {
@@ -136,7 +173,7 @@ class SettingsCubit extends Cubit<SettingsState> {
         themeColorSource = ThemeColorSource.artwork;
       }
 
-      emit(state.copyWith(
+      final newState = state.copyWith(
         gaplessPlayback: prefs.getBool(_keyGapless) ?? true,
         crossfadeSeconds: prefs.getDouble(_keyCrossfade) ?? 0.0,
         minDurationSec: prefs.getInt(_keyMinDuration) ?? 30,
@@ -159,7 +196,17 @@ class SettingsCubit extends Cubit<SettingsState> {
         downloadQuality: downloadQuality,
         wifiOnlyMode: wifiOnlyMode,
         offlineOnlyMode: offlineOnlyMode,
-      ));
+        proxyEnabled: proxyEnabled,
+        proxyType: proxyType,
+        proxyHost: proxyHost,
+        proxyPort: proxyPort,
+        proxyUsername: proxyUsername,
+        proxyPassword: proxyPassword,
+        proxyBypassHosts: proxyBypassHosts,
+      );
+
+      emit(newState);
+      await _syncProxySettings(newState.proxyConfig);
     } catch (e, st) {
       ErrorLogger.log('Failed to load settings preferences from SharedPreferences', error: e, stackTrace: st, category: 'SettingsCubit');
     }
@@ -193,12 +240,9 @@ class SettingsCubit extends Cubit<SettingsState> {
     emit(state.copyWith(themeColorSource: source));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyThemeColorSource, source.name);
-    // Keep the legacy bool in sync so a downgrade / backup restore still reads
-    // a sensible value (artwork ↔ true, anything else ↔ false).
     await prefs.setBool(_keyDynamicTheme, source == ThemeColorSource.artwork);
   }
 
-  /// Back-compat shim: the old boolean toggle mapped on→artwork, off→custom.
   Future<void> setDynamicTheming(bool value) =>
       setThemeColorSource(value ? ThemeColorSource.artwork : ThemeColorSource.custom);
 
@@ -303,6 +347,69 @@ class SettingsCubit extends Cubit<SettingsState> {
     emit(state.copyWith(offlineOnlyMode: enabled));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyOfflineOnlyMode, enabled);
+  }
+
+  // --- Proxy Settings Actions ---
+
+  Future<void> setProxyEnabled(bool enabled) async {
+    final updated = state.copyWith(proxyEnabled: enabled);
+    emit(updated);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyProxyEnabled, enabled);
+    await _syncProxySettings(updated.proxyConfig);
+  }
+
+  Future<void> setProxySettings({
+    required bool enabled,
+    required AppProxyType type,
+    required String host,
+    required int port,
+    String? username,
+    String? password,
+    String? bypassHosts,
+  }) async {
+    final newConfig = ProxyConfig(
+      enabled: enabled,
+      type: type,
+      host: host.trim(),
+      port: port,
+      username: username?.trim() ?? '',
+      password: password ?? '',
+      bypassHosts: bypassHosts ?? 'localhost, 127.0.0.1',
+    );
+
+    final updated = state.copyWith(
+      proxyEnabled: newConfig.enabled,
+      proxyType: newConfig.type,
+      proxyHost: newConfig.host,
+      proxyPort: newConfig.port,
+      proxyUsername: newConfig.username,
+      proxyPassword: newConfig.password,
+      proxyBypassHosts: newConfig.bypassHosts,
+    );
+
+    emit(updated);
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_keyProxyEnabled, newConfig.enabled);
+    await prefs.setString(_keyProxyType, newConfig.type.name);
+    await prefs.setString(_keyProxyHost, newConfig.host);
+    await prefs.setInt(_keyProxyPort, newConfig.port);
+    await prefs.setString(_keyProxyUsername, newConfig.username);
+    await prefs.setString(_keyProxyPassword, newConfig.password);
+    await prefs.setString(_keyProxyBypassHosts, newConfig.bypassHosts);
+
+    await _syncProxySettings(newConfig);
+  }
+
+  /// Tests connectivity through the provided or current proxy config.
+  Future<({bool success, int latencyMs, String? error})> testProxyConnection([
+    ProxyConfig? config,
+  ]) async {
+    final configToTest = config ?? state.proxyConfig;
+    return AppHttpOverrides.instance.testConnection(
+      configToTest: configToTest,
+    );
   }
 
   Future<int> rescanLibrary() async {

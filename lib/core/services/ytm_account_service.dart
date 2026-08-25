@@ -15,6 +15,8 @@ import '../../domain/models/lyrics_line.dart';
 import '../../domain/models/ytm_track.dart';
 import '../utils/error_logger.dart';
 import '../utils/lrc_parser.dart';
+import '../utils/ytm_rate_limiter.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 class YtmAccountPlaylist {
   final String playlistId;
@@ -149,6 +151,9 @@ class YtmAccountService {
       await ytmService.syncCookies('');
       await ytmService.invalidatePoToken();
     } catch (_) {}
+    try {
+      await WebViewCookieManager().clearCookies();
+    } catch (_) {}
   }
 
   Future<void> _warmSession() async {
@@ -207,7 +212,7 @@ class YtmAccountService {
   /// Builds authenticated Innertube request headers with timestamped SAPISIDHASH.
   Map<String, String> _buildHeaders({String userAgent = ''}) {
     final defaultUa =
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36';
 
     final headers = <String, String>{
       'Content-Type': 'application/json',
@@ -258,26 +263,40 @@ class YtmAccountService {
     };
 
     if (clientType == 'ANDROID_MUSIC') {
-      clientMap['clientVersion'] = '6.42.52';
+      clientMap['clientVersion'] = '7.27.52';
       clientMap['androidSdkVersion'] = 33;
       clientMap['osName'] = 'Android';
       clientMap['osVersion'] = '13';
       clientMap['platform'] = 'MOBILE';
     } else if (clientType == 'IOS_MUSIC') {
-      clientMap['clientVersion'] = '6.42.1';
+      clientMap['clientVersion'] = '7.27.1';
       clientMap['deviceMake'] = 'Apple';
       clientMap['deviceModel'] = 'iPhone14,3';
       clientMap['osName'] = 'iOS';
       clientMap['osVersion'] = '17.5.1';
       clientMap['platform'] = 'MOBILE';
+    } else if (clientType == 'ANDROID_VR') {
+      clientMap['clientVersion'] = '1.60.19';
+      clientMap['androidSdkVersion'] = 32;
+      clientMap['deviceMake'] = 'Oculus';
+      clientMap['deviceModel'] = 'Quest 2';
+      clientMap['osName'] = 'Android';
+      clientMap['osVersion'] = '12';
+      clientMap['platform'] = 'MOBILE';
+    } else if (clientType == 'ANDROID_CREATOR') {
+      clientMap['clientVersion'] = '24.45.100';
+      clientMap['androidSdkVersion'] = 33;
+      clientMap['osName'] = 'Android';
+      clientMap['osVersion'] = '13';
+      clientMap['platform'] = 'MOBILE';
     } else if (clientType == 'ANDROID_TESTSUITE') {
       clientMap['clientVersion'] = '1.9';
       clientMap['androidSdkVersion'] = 28;
     } else if (clientType == 'MWEB') {
-      clientMap['clientVersion'] = '2.20240417.01.00';
+      clientMap['clientVersion'] = '2.20250820.01.00';
       clientMap['platform'] = 'MOBILE';
     } else if (clientType == 'WEB_EMBEDDED_PLAYER') {
-      clientMap['clientVersion'] = '1.20240417.01.00';
+      clientMap['clientVersion'] = '1.20250820.01.00';
       clientMap['platform'] = 'DESKTOP';
     } else if (clientType == 'ANDROID') {
       clientMap['androidSdkVersion'] = 33;
@@ -319,16 +338,19 @@ class YtmAccountService {
   }) async {
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
       try {
+        await YtmRateLimiter.shared.acquirePermit();
         final timeout = Duration(seconds: baseTimeoutSeconds + attempt * 5);
         final res = await http.post(uri, headers: headers, body: body).timeout(timeout);
 
         if (res.statusCode == 429) {
+          YtmRateLimiter.shared.onRateLimited();
           final backoffSec = (1 << attempt) + Random().nextInt(2);
           debugPrint('[YTM_ACCOUNT] HTTP 429 rate limited. Backing off for ${backoffSec}s');
           await Future.delayed(Duration(seconds: backoffSec));
           continue;
         }
 
+        YtmRateLimiter.shared.onSuccess();
         return res;
       } on TimeoutException {
         if (attempt == maxAttempts - 1) {
@@ -581,18 +603,33 @@ class YtmAccountService {
   /// 3. IOS client
   /// 4. TVHTML5_SIMPLY_EMBEDDED_PLAYER
   Future<YtmStream?> resolvePlayerStream(String videoId, {String quality = 'high'}) async {
-    final clientChain = [
-      'ANDROID_MUSIC',
-      'IOS_MUSIC',
-      'WEB_REMIX',
-      'WEB_EMBEDDED_PLAYER',
-      'MWEB',
-      'ANDROID_TESTSUITE',
-    ];
+    final clientChain = (isLoggedIn && _cookies != null && _cookies!.isNotEmpty)
+        ? [
+            'WEB_REMIX',
+            'ANDROID_VR',
+            'ANDROID_CREATOR',
+            'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
+            'WEB_EMBEDDED_PLAYER',
+            'ANDROID_MUSIC',
+            'IOS_MUSIC',
+            'MWEB',
+            'ANDROID_TESTSUITE',
+          ]
+        : [
+            'ANDROID_VR',
+            'ANDROID_CREATOR',
+            'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
+            'WEB_EMBEDDED_PLAYER',
+            'ANDROID_MUSIC',
+            'IOS_MUSIC',
+            'WEB_REMIX',
+            'MWEB',
+            'ANDROID_TESTSUITE',
+          ];
 
     for (final client in clientChain) {
       try {
-        final isWeb = client == 'WEB_REMIX' || client == 'WEB_EMBEDDED_PLAYER' || client == 'MWEB';
+        final isWeb = client == 'WEB_REMIX' || client == 'WEB_EMBEDDED_PLAYER' || client == 'MWEB' || client == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER';
         final endpointHost = (client == 'ANDROID_MUSIC' || client == 'IOS_MUSIC' || client == 'WEB_REMIX')
             ? 'https://music.youtube.com'
             : (client == 'MWEB' ? 'https://m.youtube.com' : 'https://www.youtube.com');
@@ -608,21 +645,39 @@ class YtmAccountService {
                       ? '67'
                       : (client == 'WEB_EMBEDDED_PLAYER'
                           ? '56'
-                          : (client == 'MWEB' ? '65' : '89')))),
+                          : (client == 'MWEB'
+                              ? '65'
+                              : (client == 'ANDROID_VR'
+                                  ? '28'
+                                  : (client == 'ANDROID_CREATOR'
+                                      ? '62'
+                                      : (client == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER' ? '85' : '89'))))))),
           'x-youtube-client-version': client == 'ANDROID_MUSIC'
-              ? '6.42.52'
+              ? '7.27.52'
               : (client == 'IOS_MUSIC'
-                  ? '6.42.1'
-                  : (client == 'ANDROID_TESTSUITE' ? '1.9' : _clientVersion)),
+                  ? '7.27.1'
+                  : (client == 'ANDROID_VR'
+                      ? '1.60.19'
+                      : (client == 'ANDROID_CREATOR'
+                          ? '24.45.100'
+                          : (client == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER'
+                              ? '2.0'
+                              : (client == 'ANDROID_TESTSUITE' ? '1.9' : _clientVersion))))),
           'User-Agent': client == 'ANDROID_MUSIC'
-              ? 'com.google.android.apps.youtube.music/6.42.52 (Linux; U; Android 13; en_US) gzip'
+              ? 'com.google.android.apps.youtube.music/7.27.52 (Linux; U; Android 13; en_US) gzip'
               : (client == 'IOS_MUSIC'
-                  ? 'com.google.ios.youtubemusic/6.42.1 (iPhone14,3; U; CPU iOS 17_5_1 like Mac OS X; en_US)'
-                  : (client == 'ANDROID_TESTSUITE'
-                      ? 'com.google.android.youtube/1.9 (Linux; U; Android 9; gzip)'
-                      : (client == 'MWEB'
-                          ? 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36'
-                          : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36'))),
+                  ? 'com.google.ios.youtubemusic/7.27.1 (iPhone14,3; U; CPU iOS 17_5_1 like Mac OS X; en_US)'
+                  : (client == 'ANDROID_VR'
+                      ? 'com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12; en_US; Quest 2) gzip'
+                      : (client == 'ANDROID_CREATOR'
+                          ? 'com.google.android.apps.youtube.creator/24.45.100 (Linux; U; Android 13; en_US) gzip'
+                          : (client == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER'
+                              ? 'Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/4.0 Chrome/76.0.3809.146 TV Safari/537.36'
+                              : (client == 'ANDROID_TESTSUITE'
+                                  ? 'com.google.android.youtube/1.9 (Linux; U; Android 9; gzip)'
+                                  : (client == 'MWEB'
+                                      ? 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36'
+                                      : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36')))))),
         };
 
         if (isWeb) {
@@ -633,6 +688,16 @@ class YtmAccountService {
           headers['x-goog-authuser'] = '0';
           if (_cookies != null && _cookies!.isNotEmpty) {
             headers['Cookie'] = _cookies!;
+            final sapisid = _extractCookieValue(_cookies!, 'SAPISID') ??
+                _extractCookieValue(_cookies!, '__Secure-3PAPISID') ??
+                _extractCookieValue(_cookies!, '__Secure-1PAPISID');
+
+            if (sapisid != null && sapisid.isNotEmpty) {
+              final timestamp = (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
+              final toHash = '$timestamp $sapisid $origin';
+              final sha1Digest = sha1.convert(utf8.encode(toHash)).toString();
+              headers['Authorization'] = 'SAPISIDHASH ${timestamp}_$sha1Digest';
+            }
           }
         }
 
@@ -658,10 +723,7 @@ class YtmAccountService {
           'playbackContext': {
             'contentPlaybackContext': {
               'html5Preference': 'HTML5_PREF_WANTS',
-              if (poToken != null && poToken.isNotEmpty) ...{
-                'signatureTimestamp': DateTime.now().millisecondsSinceEpoch ~/ (1000 * 86400),
-                'poToken': poToken,
-              },
+              if (poToken != null && poToken.isNotEmpty) 'poToken': poToken,
             },
           },
         });
@@ -731,6 +793,7 @@ class YtmAccountService {
               title: details?['title'] as String? ?? '',
               artist: details?['author'] as String? ?? '',
               artworkUrl: null,
+              userAgent: headers['User-Agent'],
             );
           }
         }

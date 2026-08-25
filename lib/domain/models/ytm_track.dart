@@ -119,6 +119,7 @@ class YtmStream {
   final String title;
   final String artist;
   final String? artworkUrl;
+  final String? userAgent;
 
   const YtmStream({
     required this.videoId,
@@ -130,6 +131,7 @@ class YtmStream {
     required this.title,
     required this.artist,
     this.artworkUrl,
+    this.userAgent,
   });
 
   bool get isTaggable => container == 'm4a';
@@ -150,6 +152,7 @@ class YtmStream {
       artworkUrl: (map['artworkUrl'] as String?)?.trim().isNotEmpty == true
           ? (map['artworkUrl'] as String).trim()
           : null,
+      userAgent: map['userAgent'] as String?,
     );
   }
 

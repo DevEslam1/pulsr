@@ -1,6 +1,7 @@
 // test/settings_cubit_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/network/proxy_config.dart';
 import 'package:pulsr/data/scanner/media_scanner_service.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -93,6 +94,43 @@ void main() {
       await cubit.setOfflineOnlyMode(true);
       expect(cubit.state.offlineOnlyMode, true);
       expect(prefs.getBool('setting_offline_only_mode'), true);
+
+      cubit.close();
+    });
+
+    test('proxy settings update state and SharedPreferences', () async {
+      final cubit = SettingsCubit(scannerService: mockScannerService);
+      await Future<void>.delayed(Duration.zero);
+
+      expect(cubit.state.proxyEnabled, false);
+
+      await cubit.setProxySettings(
+        enabled: true,
+        type: AppProxyType.socks5,
+        host: '127.0.0.1',
+        port: 9050,
+        username: 'admin',
+        password: '123',
+        bypassHosts: 'localhost',
+      );
+
+      expect(cubit.state.proxyEnabled, true);
+      expect(cubit.state.proxyType, AppProxyType.socks5);
+      expect(cubit.state.proxyHost, '127.0.0.1');
+      expect(cubit.state.proxyPort, 9050);
+      expect(cubit.state.proxyUsername, 'admin');
+      expect(cubit.state.proxyPassword, '123');
+      expect(cubit.state.proxyBypassHosts, 'localhost');
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('setting_proxy_enabled'), true);
+      expect(prefs.getString('setting_proxy_type'), 'socks5');
+      expect(prefs.getString('setting_proxy_host'), '127.0.0.1');
+      expect(prefs.getInt('setting_proxy_port'), 9050);
+
+      await cubit.setProxyEnabled(false);
+      expect(cubit.state.proxyEnabled, false);
+      expect(prefs.getBool('setting_proxy_enabled'), false);
 
       cubit.close();
     });

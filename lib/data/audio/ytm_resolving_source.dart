@@ -24,7 +24,15 @@ import 'package:path_provider/path_provider.dart';
 class YtmResolvingSource extends StreamAudioSource {
   YtmResolvingSource({
     required this.videoId,
+    required Future<String> Function() resolve,
+    this.userAgent,
+    super.tag,
+  }) : resolve = (({bool forceRefresh = false}) => resolve());
+
+  YtmResolvingSource.withRefresh({
+    required this.videoId,
     required this.resolve,
+    this.userAgent,
     super.tag,
   });
 
@@ -32,7 +40,9 @@ class YtmResolvingSource extends StreamAudioSource {
   final String videoId;
 
   /// Resolves this track to a currently-valid, direct stream URL.
-  final Future<String> Function() resolve;
+  final Future<String> Function({bool forceRefresh}) resolve;
+
+  String? userAgent;
 
   LockCachingAudioSource? _inner;
   Future<LockCachingAudioSource>? _pending;
@@ -55,7 +65,13 @@ class YtmResolvingSource extends StreamAudioSource {
         debugPrint('[YtmResolvingSource] Byte stream error ($byteErr) for $videoId. Re-resolving fresh stream...');
         _inner = null;
         _pending = null;
-        final freshInner = await _ensureInner();
+        try {
+          final cacheFile = await _cacheFileFor(videoId);
+          if (cacheFile.existsSync()) {
+            await cacheFile.delete();
+          }
+        } catch (_) {}
+        final freshInner = await _createInner(forceRefresh: true);
         return await freshInner.request(start, end);
       }
     } catch (_) {
@@ -78,8 +94,8 @@ class YtmResolvingSource extends StreamAudioSource {
     return _pending ??= _createInner();
   }
 
-  Future<LockCachingAudioSource> _createInner() async {
-    final url = await resolve();
+  Future<LockCachingAudioSource> _createInner({bool forceRefresh = false}) async {
+    final url = await resolve(forceRefresh: forceRefresh);
 
     // Parse 'expire' Unix timestamp from query
     try {
@@ -97,10 +113,8 @@ class YtmResolvingSource extends StreamAudioSource {
     final inner = LockCachingAudioSource(
       Uri.parse(url),
       headers: {
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        'Referer': 'https://music.youtube.com/',
-        'Origin': 'https://music.youtube.com',
+        'User-Agent': userAgent ??
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
       },
       cacheFile: cacheFile,
     );
@@ -110,7 +124,11 @@ class YtmResolvingSource extends StreamAudioSource {
 
   static Future<File> _cacheFileFor(String videoId) async {
     final base = await getApplicationSupportDirectory();
+    final dir = Directory(p.join(base.path, 'ytm_cache'));
+    if (!dir.existsSync()) {
+      await dir.create(recursive: true);
+    }
     final hash = sha256.convert(utf8.encode(videoId)).toString();
-    return File(p.join(base.path, 'ytm_cache', '$hash.m4a'));
+    return File(p.join(dir.path, '$hash.m4a'));
   }
 }

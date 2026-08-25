@@ -72,7 +72,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   // Set when a restored YouTube session is left idle; play() resolves it lazily.
   Duration? _pendingLazyPosition;
   // Memoized stream URLs, keyed by video id. Never persisted — they expire.
-  final Map<String, ({String url, DateTime expires})> _streamCache = {};
+  final Map<String, ({String url, DateTime expires, String? userAgent})> _streamCache = {};
   // Video ids with an in-flight prefetch, so we resolve each at most once.
   final Set<String> _prefetching = {};
 
@@ -548,11 +548,17 @@ class PulsrAudioHandler extends BaseAudioHandler
             song.path.isEmpty ||
             !File(song.path).existsSync());
     if (isRemote) {
-      return YtmResolvingSource(
+      late final YtmResolvingSource source;
+      source = YtmResolvingSource.withRefresh(
         videoId: song.remoteId ?? '',
-        resolve: () => _resolveStreamUrl(song),
+        resolve: ({bool forceRefresh = false}) async {
+          final resolved = await _resolveStreamUrl(song, forceRefresh: forceRefresh);
+          source.userAgent = resolved.userAgent;
+          return resolved.url;
+        },
         tag: tag,
       );
+      return source;
     }
     return _createAudioSource(song, tag);
   }
@@ -601,15 +607,16 @@ class PulsrAudioHandler extends BaseAudioHandler
       // If local check fails, fall through to stream resolution
     }
 
-    final url = await _resolveStreamUrl(song);
+    final resolved = await _resolveStreamUrl(song);
+    final url = resolved.url;
+    final userAgent = resolved.userAgent;
+
     return AudioSource.uri(
       Uri.parse(url),
       tag: tag,
       headers: {
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-        'Referer': 'https://music.youtube.com/',
-        'Origin': 'https://music.youtube.com',
+        'User-Agent': userAgent ??
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
       },
     );
   }
@@ -617,7 +624,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// Returns a currently-valid stream URL for a YouTube row, reusing a memoized
   /// one until it nears expiry. Throws [YtmException] when nothing usable comes
   /// back, so the caller can tell "network down" from "skip this track".
-  Future<String> _resolveStreamUrl(SongsTableData song) async {
+  Future<({String url, String? userAgent})> _resolveStreamUrl(SongsTableData song, {bool forceRefresh = false}) async {
     final videoId = song.remoteId;
     if (videoId == null || videoId.isEmpty) {
       throw const YtmException('YTM_UNAVAILABLE', 'Missing video id');
@@ -640,9 +647,11 @@ class PulsrAudioHandler extends BaseAudioHandler
     final quality = prefs.getString('setting_streaming_quality') ?? 'high';
     final cacheKey = '$videoId-$quality';
 
-    final cached = _streamCache[cacheKey];
-    if (cached != null && cached.expires.isAfter(DateTime.now())) {
-      return cached.url;
+    if (!forceRefresh) {
+      final cached = _streamCache[cacheKey];
+      if (cached != null && cached.expires.isAfter(DateTime.now())) {
+        return (url: cached.url, userAgent: cached.userAgent);
+      }
     }
     final stream = await _ytmService.resolveStream(videoId, quality: quality);
     final expireParam = Uri.tryParse(stream.url)?.queryParameters['expire'];
@@ -651,8 +660,8 @@ class PulsrAudioHandler extends BaseAudioHandler
             (int.tryParse(expireParam) ?? 0) * 1000)
         : DateTime.now().add(const Duration(hours: 5));
     final ttl = expireAt.subtract(const Duration(minutes: 5));
-    _streamCache[cacheKey] = (url: stream.url, expires: ttl);
-    return stream.url;
+    _streamCache[cacheKey] = (url: stream.url, expires: ttl, userAgent: stream.userAgent);
+    return (url: stream.url, userAgent: stream.userAgent);
   }
 
   /// The index [_getNextIndex] *would* pick, without its shuffle-history side

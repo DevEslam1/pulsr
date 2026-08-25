@@ -12,7 +12,7 @@ class YtmClientVersionResolver {
   static const String _prefKeyApiKey = 'ytm_cached_api_key';
   static const String _prefKeyLastFetchTime = 'ytm_client_version_fetch_ts';
 
-  static const String fallbackClientVersion = '1.20240417.01.00';
+  static const String fallbackClientVersion = '1.20250820.01.00';
   static const String fallbackApiKey = 'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30';
   static const Duration _cacheTtl = Duration(hours: 24);
 
@@ -58,7 +58,7 @@ class YtmClientVersionResolver {
             Uri.parse('https://music.youtube.com'),
             headers: {
               'User-Agent':
-                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
               'Accept-Language': 'en-US,en;q=0.9',
             },
           )

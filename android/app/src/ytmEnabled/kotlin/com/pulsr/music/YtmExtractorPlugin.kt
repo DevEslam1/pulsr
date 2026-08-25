@@ -186,7 +186,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 val ctx = context
                 if (ctx != null) {
                     val cookieStore = YtmCookieStore.getInstance(ctx)
-                    val merged = cookieStore.getMergedCookieHeader() ?: cookieStore.readFromCookieManager()
+                    val merged = cookieStore.readFromCookieManager() ?: cookieStore.getMergedCookieHeader()
                     result.success(merged)
                 } else {
                     result.success(null)
@@ -195,8 +195,8 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             "setCookies" -> {
                 val cookies = call.argument<String>("cookies")
                 val ctx = context
-                if (!cookies.isNullOrEmpty() && ctx != null) {
-                    YtmCookieStore.getInstance(ctx).setCookies(cookies)
+                if (ctx != null) {
+                    YtmCookieStore.getInstance(ctx).setCookies(cookies ?: "")
                 }
                 result.success(true)
             }
@@ -419,6 +419,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             "title" to info.name,
             "artist" to (info.uploaderName ?: ""),
             "artworkUrl" to bestArtwork(info.thumbnails),
+            "userAgent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
         )
     }
 

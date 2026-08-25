@@ -1,4 +1,5 @@
 // lib/main.dart
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:dynamic_color/dynamic_color.dart';
@@ -8,6 +9,7 @@ import 'l10n/generated/app_localizations.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'core/config/app_config.dart';
 import 'core/di/injection.dart';
+import 'core/network/app_http_overrides.dart';
 import 'core/theme/aura_theme.dart';
 import 'core/theme/dynamic_theme_cubit.dart';
 import 'core/router/app_router.dart';
@@ -42,6 +44,7 @@ import 'features/ytm_search/cubit/ytm_download_cubit.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  HttpOverrides.global = AppHttpOverrides.instance;
   AppConfig.validateConfiguration();
   ErrorLogger.initialize();
   ErrorLogger.onCrashReported = (error, stackTrace, category) {

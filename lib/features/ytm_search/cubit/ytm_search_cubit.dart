@@ -69,7 +69,7 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
         }
       }
 
-      final results = await _service.search(query);
+      final results = await _service.searchWithFallback(query);
       if (generation != _generation || isClosed) return;
       emit(state.copyWith(results: results, isLoading: false, errorMessage: null));
     } on YtmException catch (e) {

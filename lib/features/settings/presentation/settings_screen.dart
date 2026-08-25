@@ -303,7 +303,61 @@ class SettingsScreen extends StatelessWidget {
                         _navTile(context, Icons.downloading_rounded, 'Download Quality',
                             _getQualityTitle(state.downloadQuality),
                             onTap: () => _showQualityPickerSheet(context, cubit, isStreaming: false, currentQuality: state.downloadQuality)),
+                        _divider(p),
+                        _navTile(
+                          context,
+                          Icons.vpn_lock_rounded,
+                          'Proxy Settings',
+                          state.proxyEnabled
+                              ? '${state.proxyType.displayName} • ${state.proxyHost.isNotEmpty ? "${state.proxyHost}:${state.proxyPort}" : "Enabled"}'
+                              : 'Disabled • Tap to configure HTTP / SOCKS5',
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (state.proxyEnabled)
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  margin: const EdgeInsets.only(right: 8),
+                                  decoration: BoxDecoration(
+                                    color: p.success,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                              Icon(Icons.chevron_right_rounded, color: p.textTertiary, size: 20),
+                            ],
+                          ),
+                          onTap: () => context.push('/proxy-settings'),
+                        ),
                       ],
+                    ]),
+                  if (!AppConfig.ytmEnabled)
+                    _section(context, 'Network & Proxy', [
+                      _navTile(
+                        context,
+                        Icons.vpn_lock_rounded,
+                        'Proxy Settings',
+                        state.proxyEnabled
+                            ? '${state.proxyType.displayName} • ${state.proxyHost.isNotEmpty ? "${state.proxyHost}:${state.proxyPort}" : "Enabled"}'
+                            : 'Disabled • Tap to configure HTTP / SOCKS5',
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (state.proxyEnabled)
+                              Container(
+                                width: 8,
+                                height: 8,
+                                margin: const EdgeInsets.only(right: 8),
+                                decoration: BoxDecoration(
+                                  color: p.success,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                            Icon(Icons.chevron_right_rounded, color: p.textTertiary, size: 20),
+                          ],
+                        ),
+                        onTap: () => context.push('/proxy-settings'),
+                      ),
                     ]),
                   _section(context, 'Storage & Cache', [
                     const _CacheSection(),

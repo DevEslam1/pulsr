@@ -1,6 +1,7 @@
 // lib/features/settings/cubit/settings_state.dart
 import 'package:flutter/material.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import '../../../core/network/proxy_config.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
 
 part 'settings_state.freezed.dart';
@@ -54,6 +55,14 @@ abstract class SettingsState with _$SettingsState {
     @Default(false) bool wifiOnlyMode,
     @Default(false) bool offlineOnlyMode,
     @Default(false) bool isScanning,
+    // Proxy Settings
+    @Default(false) bool proxyEnabled,
+    @Default(AppProxyType.http) AppProxyType proxyType,
+    @Default('') String proxyHost,
+    @Default(8080) int proxyPort,
+    @Default('') String proxyUsername,
+    @Default('') String proxyPassword,
+    @Default('localhost, 127.0.0.1') String proxyBypassHosts,
     int? scanResultCount,
     String? errorMessage,
   }) = _SettingsState;
@@ -63,4 +72,14 @@ abstract class SettingsState with _$SettingsState {
   /// True when the accent should track album artwork. Kept for call sites that
   /// only care about the per-song artwork behavior (e.g. Now Playing).
   bool get dynamicThemingEnabled => themeColorSource == ThemeColorSource.artwork;
+
+  ProxyConfig get proxyConfig => ProxyConfig(
+        enabled: proxyEnabled,
+        type: proxyType,
+        host: proxyHost,
+        port: proxyPort,
+        username: proxyUsername,
+        password: proxyPassword,
+        bypassHosts: proxyBypassHosts,
+      );
 }

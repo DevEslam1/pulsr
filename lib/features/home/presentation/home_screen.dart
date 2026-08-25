@@ -127,7 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
           return getIt<YtmService>().trending(limit: 25);
         }
         final query = _categoryQueries[category] ?? '$category songs';
-        return getIt<YtmService>().search(query, limit: 25);
+        return getIt<YtmService>().searchWithFallback(query, limit: 25);
       },
     );
   }

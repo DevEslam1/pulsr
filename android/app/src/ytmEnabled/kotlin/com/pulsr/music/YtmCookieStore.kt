@@ -65,6 +65,10 @@ internal class YtmCookieStore private constructor(context: Context) {
      */
     fun setCookies(rawCookieHeader: String) {
         synchronized(lock) {
+            if (rawCookieHeader.isBlank()) {
+                clear()
+                return
+            }
             parseAndPut(rawCookieHeader)
             val merged = getMergedCookieHeader() ?: ""
             saveToPrefs(merged)
@@ -156,7 +160,7 @@ internal class YtmCookieStore private constructor(context: Context) {
             cm.setAcceptCookie(true)
             for (domain in DOMAINS) {
                 for ((key, value) in cookies) {
-                    cm.setCookie(domain, "$key=$value; Domain=${domain.removePrefix("https://")}; Path=/; Secure; HttpOnly")
+                    cm.setCookie(domain, "$key=$value; Path=/; Secure; HttpOnly")
                 }
             }
             cm.flush()
@@ -176,6 +180,9 @@ internal class YtmCookieStore private constructor(context: Context) {
             "https://www.youtube.com",
             "https://accounts.google.com",
             "https://youtube.com",
+            "https://google.com",
+            "https://myaccount.google.com",
+            "https://accounts.youtube.com",
         )
 
         @Volatile
