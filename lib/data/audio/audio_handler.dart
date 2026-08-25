@@ -990,9 +990,9 @@ class PulsrAudioHandler extends BaseAudioHandler
       ErrorLogger.log(
           'Error resolving YouTube stream for ${song.title} (${e.code})',
           error: e, stackTrace: st, category: 'AudioHandler');
-      // A dead network or an extractor-less build fails every remaining YouTube
+      // A dead network, bot challenge, or extractor-less build fails every remaining YouTube
       // row, so skipping through them is pointless — halt immediately.
-      await _failCurrentPlayback(fatal: e.isNetwork || e.isDisabled);
+      await _failCurrentPlayback(fatal: e.isFatal);
     } catch (e, st) {
       if (generation != _playGeneration) return;
       ErrorLogger.log('Error playing song ${song.title} (${song.path})',

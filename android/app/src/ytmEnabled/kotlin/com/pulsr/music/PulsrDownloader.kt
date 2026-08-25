@@ -1,5 +1,6 @@
 package com.pulsr.music
 
+import android.webkit.CookieManager
 import org.schabi.newpipe.extractor.downloader.Downloader
 import org.schabi.newpipe.extractor.downloader.Request
 import org.schabi.newpipe.extractor.downloader.Response
@@ -34,11 +35,15 @@ class PulsrDownloader : Downloader() {
             }
         }
 
-        val cookie = runCatching {
-            android.webkit.CookieManager.getInstance().getCookie(request.url())
-        }.getOrNull()
+        // Attach cookies: first check specific URL, otherwise aggregate from YouTube domains
+        val cookie = resolveCookies(request.url())
         if (!cookie.isNullOrEmpty()) {
-            connection.setRequestProperty("Cookie", cookie)
+            val existing = connection.getRequestProperty("Cookie")
+            if (existing.isNullOrEmpty()) {
+                connection.setRequestProperty("Cookie", cookie)
+            } else {
+                connection.setRequestProperty("Cookie", "$existing; $cookie")
+            }
         }
 
         try {
@@ -54,15 +59,18 @@ class PulsrDownloader : Downloader() {
 
             val stream = if (code >= 400) connection.errorStream else connection.inputStream
             val body = stream?.let { raw ->
-                // Android decompresses transparently only when it added Accept-Encoding
-                // itself. If a caller set that header the payload arrives still gzipped
-                // and Content-Encoding survives, so it has to be unwrapped here.
                 val decoded = if (connection.contentEncoding.equals("gzip", ignoreCase = true)) {
                     GZIPInputStream(raw)
                 } else {
                     raw
                 }
                 decoded.use { it.readBytes().toString(Charsets.UTF_8) }
+            }
+
+            if (body != null && (body.contains("Sign in to confirm that you're not a bot") ||
+                        body.contains("LOGIN_REQUIRED") ||
+                        body.contains("Sign in to confirm you're not a bot"))) {
+                throw ReCaptchaException("YouTube bot verification required: Sign in to confirm you're not a bot", request.url())
             }
 
             return Response(
@@ -83,9 +91,37 @@ class PulsrDownloader : Downloader() {
         }
     }
 
+    private fun resolveCookies(url: String): String? {
+        return runCatching {
+            val cm = CookieManager.getInstance()
+            val direct = cm.getCookie(url)
+            if (!direct.isNullOrEmpty()) {
+                return@runCatching direct
+            }
+            val urls = listOf(
+                "https://music.youtube.com",
+                "https://www.youtube.com",
+                "https://accounts.google.com",
+                "https://youtube.com"
+            )
+            val jar = mutableMapOf<String, String>()
+            for (u in urls) {
+                val c = cm.getCookie(u) ?: continue
+                for (pair in c.split(";")) {
+                    val parts = pair.trim().split("=", limit = 2)
+                    if (parts.size == 2 && parts[0].isNotBlank()) {
+                        jar[parts[0].trim()] = parts[1].trim()
+                    }
+                }
+            }
+            if (jar.isEmpty()) null else jar.entries.joinToString("; ") { "${it.key}=${it.value}" }
+        }.getOrNull()
+    }
+
     companion object {
+        // Desktop User-Agent matching the PoToken BotGuard VM so session tokens and fingerprints align
         private const val USER_AGENT =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0"
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
         private const val CONNECT_TIMEOUT_MS = 15_000
         private const val READ_TIMEOUT_MS = 30_000
         private const val HTTP_TOO_MANY_REQUESTS = 429

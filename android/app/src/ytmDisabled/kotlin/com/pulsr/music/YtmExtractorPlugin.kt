@@ -51,6 +51,8 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             }
             val merged = cookieJar.entries.joinToString("; ") { "${it.key}=${it.value}" }
             result.success(merged)
+        } else if (call.method == "setCookies") {
+            result.success(true)
         } else {
             result.error("YTM_DISABLED", "YouTube Music is not available in this build", null)
         }

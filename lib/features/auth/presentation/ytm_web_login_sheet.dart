@@ -1,4 +1,6 @@
 // lib/features/auth/presentation/ytm_web_login_sheet.dart
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import '../../../core/di/injection.dart';
@@ -13,6 +15,7 @@ class YtmWebLoginSheet extends StatefulWidget {
       context: context,
       isScrollControlled: true,
       useRootNavigator: true,
+      enableDrag: false,
       backgroundColor: Colors.transparent,
       builder: (_) => const YtmWebLoginSheet(),
     );
@@ -31,11 +34,15 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   @override
   void initState() {
     super.initState();
+    final isApple = defaultTargetPlatform == TargetPlatform.iOS ||
+        defaultTargetPlatform == TargetPlatform.macOS;
+    final userAgent = isApple
+        ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1'
+        : 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36';
+
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setUserAgent(
-        'Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-      )
+      ..setUserAgent(userAgent)
       ..setNavigationDelegate(
         NavigationDelegate(
           onProgress: (p) {
@@ -49,12 +56,19 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
             await _checkForAuthSuccess(url);
           },
         ),
-      )
-      ..loadRequest(
-        Uri.parse(
-          'https://accounts.google.com/ServiceLogin?continue=https%3A%2F%2Fmusic.youtube.com',
-        ),
       );
+
+    _initWebView();
+  }
+
+  Future<void> _initWebView() async {
+    try {
+      await WebViewCookieManager().clearCookies();
+      await _controller.clearCache();
+    } catch (_) {}
+    await _controller.loadRequest(
+      Uri.parse('https://music.youtube.com'),
+    );
   }
 
   Future<void> _checkForAuthSuccess(String url) async {
@@ -127,7 +141,22 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
   Future<void> _forceSaveAndFinish() async {
     final accountService = getIt<YtmAccountService>();
-    final nativeCookies = await accountService.getNativeCookiesFromDomains();
+    var nativeCookies = await accountService.getNativeCookiesFromDomains();
+    if (nativeCookies == null || nativeCookies.isEmpty) {
+      try {
+        final rawCookie = await _controller.runJavaScriptReturningResult(
+          'document.cookie',
+        );
+        String cookieStr = rawCookie.toString();
+        if (cookieStr.startsWith('"') && cookieStr.endsWith('"')) {
+          cookieStr = cookieStr.substring(1, cookieStr.length - 1);
+        }
+        if (cookieStr.isNotEmpty) {
+          nativeCookies = cookieStr;
+        }
+      } catch (_) {}
+    }
+
     if (nativeCookies != null && nativeCookies.isNotEmpty) {
       await accountService.saveSession(nativeCookies);
       if (mounted && Navigator.of(context).canPop()) {
@@ -144,90 +173,102 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final size = MediaQuery.of(context).size;
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
 
-    return Container(
-      height: size.height * 0.88,
-      decoration: BoxDecoration(
-        color: p.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        border: Border.all(color: p.hairline),
-      ),
-      child: Column(
-        children: [
-          // Drag handle & Header
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Column(
-              children: [
-                Center(
-                  child: Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: p.textTertiary.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(2),
+    return AnimatedPadding(
+      padding: EdgeInsets.only(bottom: bottomInset),
+      duration: const Duration(milliseconds: 150),
+      child: Container(
+        height: size.height * 0.88,
+        decoration: BoxDecoration(
+          color: p.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          border: Border.all(color: p.hairline),
+        ),
+        child: Column(
+          children: [
+            // Drag handle & Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Column(
+                children: [
+                  Center(
+                    child: Container(
+                      width: 36,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: p.textTertiary.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    const Icon(Icons.cloud_sync_rounded,
-                        color: Colors.redAccent, size: 22),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Sign in to YouTube Music',
-                            style: TextStyle(
-                              color: p.textPrimary,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      const Icon(Icons.cloud_sync_rounded,
+                          color: Colors.redAccent, size: 22),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Sign in to YouTube Music',
+                              style: TextStyle(
+                                color: p.textPrimary,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
-                          ),
-                          Text(
-                            'Connects your account to sync your Liked Music automatically',
-                            style: TextStyle(
-                                color: p.textSecondary, fontSize: 11.5),
-                          ),
-                        ],
+                            Text(
+                              'Connects your account to sync your Liked Music automatically',
+                              style: TextStyle(
+                                  color: p.textSecondary, fontSize: 11.5),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    FilledButton.tonal(
-                      onPressed: _forceSaveAndFinish,
-                      style: FilledButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                      FilledButton.tonal(
+                        onPressed: _forceSaveAndFinish,
+                        style: FilledButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                        ),
+                        child: const Text('Done', style: TextStyle(fontSize: 12)),
                       ),
-                      child: const Text('Done', style: TextStyle(fontSize: 12)),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                        onPressed: () => Navigator.of(context).pop(false),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            if (_isLoading || _progress < 1.0)
+              LinearProgressIndicator(
+                value: _isLoading ? null : _progress,
+                backgroundColor: p.surfaceContainer,
+                color: p.accent,
+                minHeight: 2.5,
+              ),
+            const Divider(height: 1),
+            // WebView Body
+            Expanded(
+              child: ClipRRect(
+                child: WebViewWidget(
+                  controller: _controller,
+                  gestureRecognizers: const <Factory<OneSequenceGestureRecognizer>>{
+                    Factory<OneSequenceGestureRecognizer>(
+                      EagerGestureRecognizer.new,
                     ),
-                    const SizedBox(width: 4),
-                    IconButton(
-                      icon: const Icon(Icons.close_rounded, size: 20),
-                      onPressed: () => Navigator.of(context).pop(false),
-                    ),
-                  ],
+                  },
                 ),
-              ],
+              ),
             ),
-          ),
-          if (_isLoading || _progress < 1.0)
-            LinearProgressIndicator(
-              value: _isLoading ? null : _progress,
-              backgroundColor: p.surfaceContainer,
-              color: p.accent,
-              minHeight: 2.5,
-            ),
-          const Divider(height: 1),
-          // WebView Body
-          Expanded(
-            child: ClipRRect(
-              child: WebViewWidget(controller: _controller),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

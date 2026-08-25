@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
+import 'package:pulsr/core/di/injection.dart';
+import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/models/lyrics_line.dart';
 import '../../domain/models/ytm_track.dart';
@@ -98,6 +100,12 @@ class YtmAccountService {
       _accountAvatar = prefs.getString(_accountAvatarPrefKey);
       _isInitialized = true;
       loginState.value = isLoggedIn; // sync notifier with persisted state
+
+      if (_cookies != null && _cookies!.isNotEmpty) {
+        // Sync persisted session cookies to native CookieManager for extractor calls
+        final ytmService = getIt<YtmService>();
+        await ytmService.syncCookies(_cookies!);
+      }
     } catch (e, st) {
       ErrorLogger.log('Failed to initialize YtmAccountService',
           error: e, stackTrace: st, category: 'YTM_ACCOUNT');
@@ -105,7 +113,8 @@ class YtmAccountService {
   }
 
   /// Returns cookies for a single URL from the native Android CookieManager.
-  Future<String?> getNativeCookies([String url = 'https://music.youtube.com']) async {
+  Future<String?> getNativeCookies(
+      [String url = 'https://music.youtube.com']) async {
     const channel = MethodChannel('com.pulsr.music/ytm');
     try {
       final cookies =
@@ -126,8 +135,8 @@ class YtmAccountService {
       // The Kotlin handler for 'getCookies' always reads from all 4 domains:
       // music.youtube.com, www.youtube.com, accounts.google.com, youtube.com
       // and merges them — so we can call it with any (or no) url arg.
-      final cookies =
-          await channel.invokeMethod<String>('getCookies', {'url': 'https://music.youtube.com'});
+      final cookies = await channel.invokeMethod<String>(
+          'getCookies', {'url': 'https://music.youtube.com'});
       return cookies;
     } catch (_) {
       return null;
@@ -139,6 +148,10 @@ class YtmAccountService {
     _cookies = rawCookies;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_cookiePrefKey, rawCookies);
+
+    // Sync to native CookieManager
+    final ytmService = getIt<YtmService>();
+    await ytmService.syncCookies(rawCookies);
 
     // Attempt to extract SAPISID or account profile
     final name = _extractCookieValue(rawCookies, 'ACCOUNT_CHOOSER') ??
@@ -184,7 +197,8 @@ class YtmAccountService {
           _extractCookieValue(_cookies!, '__Secure-1PAPISID');
 
       if (sapisid != null && sapisid.isNotEmpty) {
-        final timestamp = (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
+        final timestamp =
+            (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
         // SAPISIDHASH input is space-separated: "{ts} {SAPISID} {origin}".
         // Only the header value joins ts and hash with an underscore.
         final toHash = '$timestamp $sapisid https://music.youtube.com';
@@ -243,7 +257,8 @@ class YtmAccountService {
           }
         }
       } catch (e) {
-        debugPrint('[YTM_ACCOUNT] Failed fetching account playlists ($bId): $e');
+        debugPrint(
+            '[YTM_ACCOUNT] Failed fetching account playlists ($bId): $e');
       }
     }
     return [];
@@ -277,7 +292,8 @@ class YtmAccountService {
                 unique.add(t);
               }
             }
-            debugPrint('[YTM_ACCOUNT] Parsed ${unique.length} personalized home recommendations');
+            debugPrint(
+                '[YTM_ACCOUNT] Parsed ${unique.length} personalized home recommendations');
             return unique.take(maxTracks).toList();
           }
         }
@@ -301,8 +317,11 @@ class YtmAccountService {
       });
 
       final nextRes = await http
-          .post(Uri.parse('https://music.youtube.com/youtubei/v1/next?prettyPrint=false'),
-              headers: headers, body: nextBody)
+          .post(
+              Uri.parse(
+                  'https://music.youtube.com/youtubei/v1/next?prettyPrint=false'),
+              headers: headers,
+              body: nextBody)
           .timeout(const Duration(seconds: 8));
 
       if (nextRes.statusCode != 200) return null;
@@ -315,9 +334,11 @@ class YtmAccountService {
           if (node.containsKey('tabRenderer')) {
             final tab = node['tabRenderer'] as Map<String, dynamic>;
             final title = tab['title'] as String? ?? '';
-            final endpoint = tab['endpoint']?['browseEndpoint'] as Map<String, dynamic>?;
+            final endpoint =
+                tab['endpoint']?['browseEndpoint'] as Map<String, dynamic>?;
             final bId = endpoint?['browseId'] as String?;
-            if (title.toLowerCase().contains('lyric') || (bId != null && bId.startsWith('MPLYt'))) {
+            if (title.toLowerCase().contains('lyric') ||
+                (bId != null && bId.startsWith('MPLYt'))) {
               lyricsBrowseId = bId;
               return;
             }
@@ -342,7 +363,8 @@ class YtmAccountService {
       });
 
       final browseRes = await http
-          .post(Uri.parse(_innertubeBrowseUrl), headers: headers, body: browseBody)
+          .post(Uri.parse(_innertubeBrowseUrl),
+              headers: headers, body: browseBody)
           .timeout(const Duration(seconds: 8));
 
       if (browseRes.statusCode != 200) return null;
@@ -352,7 +374,8 @@ class YtmAccountService {
       void parseLyrics(dynamic node) {
         if (node is Map<String, dynamic>) {
           if (node.containsKey('musicDescriptionShelfRenderer')) {
-            final shelf = node['musicDescriptionShelfRenderer'] as Map<String, dynamic>;
+            final shelf =
+                node['musicDescriptionShelfRenderer'] as Map<String, dynamic>;
             final desc = shelf['description'];
             String plainText = '';
             if (desc is Map && desc.containsKey('runs')) {
@@ -362,7 +385,8 @@ class YtmAccountService {
               plainText = desc;
             }
             if (plainText.isNotEmpty) {
-              lines.addAll(LrcParser.parsePlainText(plainText, source: LyricsSource.ytmusic));
+              lines.addAll(LrcParser.parsePlainText(plainText,
+                  source: LyricsSource.ytmusic));
             }
             return;
           }
@@ -488,9 +512,9 @@ class YtmAccountService {
           final videoId = renderer['videoId'] as String?;
           final title = renderer['title']?['runs']?[0]?['text'] as String? ??
               'Unknown Title';
-          final artist = renderer['shortBylineText']?['runs']?[0]?['text']
-                  as String? ??
-              'Unknown Artist';
+          final artist =
+              renderer['shortBylineText']?['runs']?[0]?['text'] as String? ??
+                  'Unknown Artist';
           final lengthSeconds =
               int.tryParse(renderer['lengthSeconds']?.toString() ?? '0') ?? 0;
           final thumbnails =
@@ -534,9 +558,15 @@ class YtmAccountService {
                 final parts = t.split(':').map((e) => int.tryParse(e)).toList();
                 if (parts.length == 2 && parts[0] != null && parts[1] != null) {
                   durationMs = (parts[0]! * 60 + parts[1]!) * 1000;
-                } else if (parts.length == 3 && parts[0] != null && parts[1] != null && parts[2] != null) {
-                  durationMs = (parts[0]! * 3600 + parts[1]! * 60 + parts[2]!) * 1000;
-                } else if (t.toLowerCase() != 'song' && t.toLowerCase() != 'video' && artist == 'Unknown Artist') {
+                } else if (parts.length == 3 &&
+                    parts[0] != null &&
+                    parts[1] != null &&
+                    parts[2] != null) {
+                  durationMs =
+                      (parts[0]! * 3600 + parts[1]! * 60 + parts[2]!) * 1000;
+                } else if (t.toLowerCase() != 'song' &&
+                    t.toLowerCase() != 'video' &&
+                    artist == 'Unknown Artist') {
                   artist = t;
                 }
               }
@@ -544,15 +574,18 @@ class YtmAccountService {
 
             // Extract high-res artwork
             String? artworkUrl;
-            final thumbRenderer = renderer['thumbnailRenderer']?['musicThumbnailRenderer'] ??
+            final thumbRenderer = renderer['thumbnailRenderer']
+                    ?['musicThumbnailRenderer'] ??
                 renderer['thumbnail']?['musicThumbnailRenderer'];
             final thumbs = (thumbRenderer?['thumbnail']?['thumbnails'] ??
                 renderer['thumbnail']?['thumbnails']) as List<dynamic>?;
             if (thumbs != null && thumbs.isNotEmpty) {
               artworkUrl = thumbs.last['url'] as String?;
               if (artworkUrl != null) {
-                artworkUrl = artworkUrl.replaceAll(RegExp(r'=w\d+-h\d+[^?]*'), '=s1200');
-                artworkUrl = artworkUrl.replaceAll(RegExp(r'=s\d+[^?]*'), '=s1200');
+                artworkUrl =
+                    artworkUrl.replaceAll(RegExp(r'=w\d+-h\d+[^?]*'), '=s1200');
+                artworkUrl =
+                    artworkUrl.replaceAll(RegExp(r'=s\d+[^?]*'), '=s1200');
               }
             }
 
@@ -591,8 +624,8 @@ class YtmAccountService {
         final flexColumns =
             renderer['flexColumns'] as List<dynamic>? ?? const [];
         for (final col in flexColumns) {
-          final runs = col['musicResponsiveListItemFlexColumnRenderer']
-              ?['text']?['runs'] as List<dynamic>?;
+          final runs = col['musicResponsiveListItemFlexColumnRenderer']?['text']
+              ?['runs'] as List<dynamic>?;
           if (runs != null) {
             for (final r in runs) {
               final nav = r['navigationEndpoint'] as Map<String, dynamic>?;
@@ -614,31 +647,31 @@ class YtmAccountService {
       String artist = 'Unknown Artist';
       int durationMs = 0;
 
-      final flexColumns =
-          renderer['flexColumns'] as List<dynamic>? ?? const [];
+      final flexColumns = renderer['flexColumns'] as List<dynamic>? ?? const [];
       if (flexColumns.isNotEmpty) {
-        final col0 = flexColumns[0]
-            ['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'];
+        final col0 = flexColumns[0]['musicResponsiveListItemFlexColumnRenderer']
+            ?['text']?['runs'];
         if (col0 is List && col0.isNotEmpty) {
           title = col0[0]['text'] as String? ?? title;
         }
       }
       if (flexColumns.length > 1) {
-        final col1 = flexColumns[1]
-            ['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'];
+        final col1 = flexColumns[1]['musicResponsiveListItemFlexColumnRenderer']
+            ?['text']?['runs'];
         if (col1 is List && col1.isNotEmpty) {
           artist = col1[0]['text'] as String? ?? artist;
         }
       }
 
       // Fixed column: duration
-      final fixedCols =
-          renderer['fixedColumns'] as List<dynamic>? ?? const [];
+      final fixedCols = renderer['fixedColumns'] as List<dynamic>? ?? const [];
       if (fixedCols.isNotEmpty) {
         final durText = fixedCols[0]
-            ['musicResponsiveListItemFixedColumnRenderer']?['text']?['runs']?[0]?['text'] as String?;
+                ['musicResponsiveListItemFixedColumnRenderer']?['text']?['runs']
+            ?[0]?['text'] as String?;
         if (durText != null) {
-          final parts = durText.split(':').map((e) => int.tryParse(e) ?? 0).toList();
+          final parts =
+              durText.split(':').map((e) => int.tryParse(e) ?? 0).toList();
           if (parts.length == 2) {
             durationMs = (parts[0] * 60 + parts[1]) * 1000;
           } else if (parts.length == 3) {
@@ -654,7 +687,8 @@ class YtmAccountService {
       if (thumbnails != null && thumbnails.isNotEmpty) {
         artworkUrl = thumbnails.last['url'] as String?;
         if (artworkUrl != null) {
-          artworkUrl = artworkUrl.replaceAll(RegExp(r'=w\d+-h\d+[^?]*'), '=s1200');
+          artworkUrl =
+              artworkUrl.replaceAll(RegExp(r'=w\d+-h\d+[^?]*'), '=s1200');
           artworkUrl = artworkUrl.replaceAll(RegExp(r'=s\d+[^?]*'), '=s1200');
         }
       }
@@ -683,10 +717,8 @@ class YtmAccountService {
         if (node.containsKey('musicTwoRowItemRenderer')) {
           final renderer =
               node['musicTwoRowItemRenderer'] as Map<String, dynamic>;
-          final nav =
-              renderer['navigationEndpoint'] as Map<String, dynamic>?;
-          final browseId =
-              nav?['browseEndpoint']?['browseId'] as String?;
+          final nav = renderer['navigationEndpoint'] as Map<String, dynamic>?;
+          final browseId = nav?['browseEndpoint']?['browseId'] as String?;
 
           if (browseId != null &&
               (browseId.startsWith('VLPL') ||
@@ -700,25 +732,21 @@ class YtmAccountService {
                 !seenIds.contains(cleanId)) {
               seenIds.add(cleanId);
 
-              final titleRuns =
-                  renderer['title']?['runs'] as List<dynamic>?;
-              final title = titleRuns
-                      ?.map((r) => r['text']?.toString() ?? '')
-                      .join() ??
-                  'Playlist';
+              final titleRuns = renderer['title']?['runs'] as List<dynamic>?;
+              final title =
+                  titleRuns?.map((r) => r['text']?.toString() ?? '').join() ??
+                      'Playlist';
 
-              final subRuns =
-                  renderer['subtitle']?['runs'] as List<dynamic>?;
-              final subtitle = subRuns
-                      ?.map((r) => r['text']?.toString() ?? '')
-                      .join() ??
-                  'YouTube Music';
+              final subRuns = renderer['subtitle']?['runs'] as List<dynamic>?;
+              final subtitle =
+                  subRuns?.map((r) => r['text']?.toString() ?? '').join() ??
+                      'YouTube Music';
 
               String? artwork;
-              final thumbRenderer = renderer['thumbnailRenderer']
-                  ?['musicThumbnailRenderer'];
-              final thumbs = thumbRenderer?['thumbnail']?['thumbnails']
-                  as List<dynamic>?;
+              final thumbRenderer =
+                  renderer['thumbnailRenderer']?['musicThumbnailRenderer'];
+              final thumbs =
+                  thumbRenderer?['thumbnail']?['thumbnails'] as List<dynamic>?;
               if (thumbs != null && thumbs.isNotEmpty) {
                 artwork = thumbs.last['url'] as String?;
               }
@@ -737,10 +765,8 @@ class YtmAccountService {
         if (node.containsKey('musicResponsiveListItemRenderer')) {
           final renderer =
               node['musicResponsiveListItemRenderer'] as Map<String, dynamic>;
-          final nav =
-              renderer['navigationEndpoint'] as Map<String, dynamic>?;
-          final browseId =
-              nav?['browseEndpoint']?['browseId'] as String?;
+          final nav = renderer['navigationEndpoint'] as Map<String, dynamic>?;
+          final browseId = nav?['browseEndpoint']?['browseId'] as String?;
           if (browseId != null &&
               (browseId.startsWith('VLPL') ||
                   browseId.startsWith('VL') ||
@@ -753,8 +779,7 @@ class YtmAccountService {
               seenIds.add(cleanId);
 
               String title = 'Playlist';
-              final flexCols =
-                  renderer['flexColumns'] as List<dynamic>?;
+              final flexCols = renderer['flexColumns'] as List<dynamic>?;
               if (flexCols != null && flexCols.isNotEmpty) {
                 final r = flexCols[0]
                         ['musicResponsiveListItemFlexColumnRenderer']?['text']
@@ -805,4 +830,3 @@ class YtmAccountService {
     return results;
   }
 }
-

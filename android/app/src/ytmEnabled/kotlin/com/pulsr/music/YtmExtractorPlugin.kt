@@ -22,6 +22,7 @@ import org.schabi.newpipe.extractor.localization.ContentCountry
 import org.schabi.newpipe.extractor.localization.Localization
 import org.schabi.newpipe.extractor.playlist.PlaylistInfo
 import org.schabi.newpipe.extractor.search.SearchInfo
+import org.schabi.newpipe.extractor.services.youtube.extractors.YoutubeStreamExtractor
 import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeSearchQueryHandlerFactory
 import org.schabi.newpipe.extractor.services.youtube.linkHandler.YoutubeStreamLinkHandlerFactory
 import org.schabi.newpipe.extractor.stream.AudioStream
@@ -94,6 +95,15 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 Localization.fromLocale(locale),
                 ContentCountry(countryCode),
             )
+            // Without a poToken provider YouTube answers every player request with
+            // LOGIN_REQUIRED ("Sign in to confirm that you're not a bot"), so stream
+            // resolution depends on this being installed before the first extraction.
+            val appContext = context?.applicationContext
+            if (appContext == null) {
+                Log.w(TAG, "No context, cannot attest with BotGuard; streams will be blocked")
+            } else {
+                YoutubeStreamExtractor.setPoTokenProvider(PoTokenProviderImpl(appContext))
+            }
             extractorReady = true
         }
     }
@@ -181,6 +191,28 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 val merged = cookieJar.entries.joinToString("; ") { "${it.key}=${it.value}" }
                 result.success(merged)
             }
+            "setCookies" -> {
+                val cookies = call.argument<String>("cookies")
+                if (!cookies.isNullOrEmpty()) {
+                    val cm = android.webkit.CookieManager.getInstance()
+                    cm.setAcceptCookie(true)
+                    val urls = listOf(
+                        "https://music.youtube.com",
+                        "https://www.youtube.com",
+                        "https://youtube.com"
+                    )
+                    for (pair in cookies.split(";")) {
+                        val trimmed = pair.trim()
+                        if (trimmed.isNotEmpty()) {
+                            for (u in urls) {
+                                cm.setCookie(u, trimmed)
+                            }
+                        }
+                    }
+                    cm.flush()
+                }
+                result.success(true)
+            }
             "resolveStream" -> {
                 val videoId = call.argument<String>("videoId")
                 if (videoId == null || !VIDEO_ID.matches(videoId)) {
@@ -226,12 +258,18 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         }
     }
 
-    private fun errorCodeFor(e: Throwable): String = when (e) {
-        is ReCaptchaException -> "YTM_RECAPTCHA"
-        is ContentNotAvailableException -> "YTM_UNAVAILABLE"
-        is IOException -> "YTM_NETWORK"
-        is ExtractionException -> "YTM_EXTRACTION"
-        else -> "YTM_FAILED"
+    private fun errorCodeFor(e: Throwable): String {
+        val msg = e.message?.lowercase() ?: ""
+        if (msg.contains("not a bot") || msg.contains("login_required") || msg.contains("recaptcha")) {
+            return "YTM_BOT_BLOCKED"
+        }
+        return when (e) {
+            is ReCaptchaException -> "YTM_RECAPTCHA"
+            is ContentNotAvailableException -> "YTM_UNAVAILABLE"
+            is IOException -> "YTM_NETWORK"
+            is ExtractionException -> "YTM_EXTRACTION"
+            else -> "YTM_FAILED"
+        }
     }
 
     private fun search(query: String, limit: Int): List<Map<String, Any?>> {

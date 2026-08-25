@@ -56,9 +56,17 @@ android {
     // all. This is a hard exclusion, unlike the Dart-side ENABLE_YTM gate which
     // only relies on tree-shaking. Both source sets must declare the same
     // YtmExtractorPlugin class, because MainActivity in src/main references it.
+    // The assets dir carries the BotGuard page the poToken WebView runs, which is
+    // likewise GPL and so likewise kept out of prod.
     sourceSets {
-        getByName("dev") { kotlin.directories.add("src/ytmEnabled/kotlin") }
-        getByName("ytm") { kotlin.directories.add("src/ytmEnabled/kotlin") }
+        getByName("dev") {
+            kotlin.directories.add("src/ytmEnabled/kotlin")
+            assets.srcDir("src/ytmEnabled/assets")
+        }
+        getByName("ytm") {
+            kotlin.directories.add("src/ytmEnabled/kotlin")
+            assets.srcDir("src/ytmEnabled/assets")
+        }
         getByName("prod") { kotlin.directories.add("src/ytmDisabled/kotlin") }
     }
 

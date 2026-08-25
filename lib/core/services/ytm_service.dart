@@ -23,6 +23,18 @@ class YtmException implements Exception {
   /// Retrying later may work; retrying the rest of the queue now will not.
   bool get isNetwork => code == 'YTM_NETWORK' || code == 'YTM_TIMEOUT';
 
+  /// YouTube has flagged the IP / client as automated/bot and requires authentication.
+  bool get isBotBlocked =>
+      code == 'YTM_BOT_BLOCKED' ||
+      code == 'YTM_RECAPTCHA' ||
+      (details != null &&
+          (details!.contains('bot') ||
+              details!.contains('LOGIN_REQUIRED') ||
+              details!.contains('Sign in to confirm')));
+
+  /// Fatal error where looping / skipping the queue will only worsen the block.
+  bool get isFatal => isNetwork || isDisabled || isBotBlocked;
+
   /// This one video cannot be played, but others still can.
   bool get isUnavailable => code == 'YTM_UNAVAILABLE';
 
@@ -42,6 +54,14 @@ class YtmService {
   final MethodChannel _channel = const MethodChannel(channelName);
 
   bool? _available;
+
+  /// Synchronizes cookies into the native CookieManager so the extractor
+  /// makes authenticated requests on all YouTube endpoints.
+  Future<void> syncCookies(String cookies) async {
+    try {
+      await _channel.invokeMethod<bool>('setCookies', {'cookies': cookies});
+    } catch (_) {}
+  }
 
   /// The device locale, forwarded to the native extractor so trending and
   /// search results follow the user's region/language instead of a hardcoded
