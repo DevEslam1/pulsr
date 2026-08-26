@@ -169,23 +169,27 @@ class AuraTheme {
     final p = _palette(accent, brightness, isAmoled);
     final isDark = p.isDark;
     const fontFamily = 'Manrope';
+    const fontFallbacks = ['Noto Sans Arabic', 'Segoe UI', 'Roboto', 'Arial', 'sans-serif'];
     final baseTextTheme = (isDark
         ? ThemeData.dark().textTheme
-        : ThemeData.light().textTheme).apply(fontFamily: fontFamily);
+        : ThemeData.light().textTheme).apply(
+            fontFamily: fontFamily,
+            fontFamilyFallback: fontFallbacks,
+          );
 
     final textTheme = baseTextTheme.copyWith(
-      displayLarge: baseTextTheme.displayLarge?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800, letterSpacing: -1.2, fontFamily: fontFamily),
-      displayMedium: baseTextTheme.displayMedium?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800, letterSpacing: -0.8, fontFamily: fontFamily),
-      headlineMedium: baseTextTheme.headlineMedium?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800, letterSpacing: -0.6, fontFamily: fontFamily),
-      headlineSmall: baseTextTheme.headlineSmall?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800, letterSpacing: -0.4, fontFamily: fontFamily),
-      titleLarge: baseTextTheme.titleLarge?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w700, letterSpacing: -0.2, fontFamily: fontFamily),
-      titleMedium: baseTextTheme.titleMedium?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w700, fontFamily: fontFamily),
-      titleSmall: baseTextTheme.titleSmall?.copyWith(color: p.textSecondary, fontWeight: FontWeight.w600, fontFamily: fontFamily),
-      bodyLarge: baseTextTheme.bodyLarge?.copyWith(color: p.textPrimary, fontSize: 16, fontFamily: fontFamily),
-      bodyMedium: baseTextTheme.bodyMedium?.copyWith(color: p.textSecondary, fontSize: 14, fontFamily: fontFamily),
-      bodySmall: baseTextTheme.bodySmall?.copyWith(color: p.textTertiary, fontSize: 12, fontFamily: fontFamily),
-      labelLarge: baseTextTheme.labelLarge?.copyWith(color: p.onAccent, fontWeight: FontWeight.w700, fontSize: 14, fontFamily: fontFamily),
-      labelSmall: baseTextTheme.labelSmall?.copyWith(color: p.textTertiary, fontWeight: FontWeight.w800, letterSpacing: 1.4, fontSize: 10.5, fontFamily: fontFamily),
+      displayLarge: baseTextTheme.displayLarge?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800, letterSpacing: -1.2, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
+      displayMedium: baseTextTheme.displayMedium?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800, letterSpacing: -0.8, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
+      headlineMedium: baseTextTheme.headlineMedium?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800, letterSpacing: -0.6, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
+      headlineSmall: baseTextTheme.headlineSmall?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800, letterSpacing: -0.4, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
+      titleLarge: baseTextTheme.titleLarge?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w700, letterSpacing: -0.2, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
+      titleMedium: baseTextTheme.titleMedium?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w700, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
+      titleSmall: baseTextTheme.titleSmall?.copyWith(color: p.textSecondary, fontWeight: FontWeight.w600, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
+      bodyLarge: baseTextTheme.bodyLarge?.copyWith(color: p.textPrimary, fontSize: 16, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
+      bodyMedium: baseTextTheme.bodyMedium?.copyWith(color: p.textSecondary, fontSize: 14, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
+      bodySmall: baseTextTheme.bodySmall?.copyWith(color: p.textTertiary, fontSize: 12, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
+      labelLarge: baseTextTheme.labelLarge?.copyWith(color: p.onAccent, fontWeight: FontWeight.w700, fontSize: 14, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
+      labelSmall: baseTextTheme.labelSmall?.copyWith(color: p.textTertiary, fontWeight: FontWeight.w800, letterSpacing: 1.4, fontSize: 10.5, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
     );
 
     final outlineBorder = OutlineInputBorder(
@@ -196,6 +200,7 @@ class AuraTheme {
     return ThemeData(
       useMaterial3: true,
       fontFamily: fontFamily,
+      fontFamilyFallback: fontFallbacks,
       brightness: brightness,
       scaffoldBackgroundColor: p.bg,
       extensions: [p],

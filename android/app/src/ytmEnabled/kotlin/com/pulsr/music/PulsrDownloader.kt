@@ -44,14 +44,19 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
                 }
             }
 
-            // Attach cookies from YtmCookieStore or native CookieManager
-            val cookieHeader = resolveCookies(request.url())
-            if (!cookieHeader.isNullOrEmpty()) {
-                val existing = connection.getRequestProperty("Cookie")
-                if (existing.isNullOrEmpty()) {
-                    connection.setRequestProperty("Cookie", cookieHeader)
-                } else {
-                    connection.setRequestProperty("Cookie", "$existing; $cookieHeader")
+            // Attach cookies from YtmCookieStore or native CookieManager.
+            // Skip the /youtubei/v1/player endpoint: NewPipe resolves streams as a guest (guest
+            // poToken + guest visitorData), so attaching account cookies there produces a
+            // cookie/token mismatch YouTube rejects. Cookies still flow to browse/search/next.
+            if (!isPlayerRequest(request.url())) {
+                val cookieHeader = resolveCookies(request.url())
+                if (!cookieHeader.isNullOrEmpty()) {
+                    val existing = connection.getRequestProperty("Cookie")
+                    if (existing.isNullOrEmpty()) {
+                        connection.setRequestProperty("Cookie", cookieHeader)
+                    } else {
+                        connection.setRequestProperty("Cookie", "$existing; $cookieHeader")
+                    }
                 }
             }
 
@@ -113,6 +118,11 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
         } finally {
             connection?.disconnect()
         }
+    }
+
+    private fun isPlayerRequest(url: String): Boolean {
+        val path = runCatching { URL(url).path }.getOrNull() ?: url
+        return path.contains("/youtubei/v1/player")
     }
 
     private fun resolveCookies(url: String): String? {

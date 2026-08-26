@@ -42,6 +42,7 @@ abstract class SettingsState with _$SettingsState {
     @Default(true) bool resumeAfterInterruption,
     @Default(true) bool waveformSeekBarEnabled,
     @Default(AppThemeMode.dark) AppThemeMode themeMode,
+    @Default('system') String languageCode,
     @Default(0xFF9B9EF5) int customAccentColorValue,
     @Default(PlayerThemeMode.classic) PlayerThemeMode playerThemeMode,
     @Default(VisualizerStyle.bar) VisualizerStyle visualizerStyle,

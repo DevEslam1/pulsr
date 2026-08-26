@@ -159,6 +159,29 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                     )
                 )
             }
+            "getAccountPoToken" -> {
+                val dataSyncId = call.argument<String>("dataSyncId")?.trim()
+                if (dataSyncId.isNullOrEmpty()) {
+                    result.error("YTM_INVALID_ARGUMENT", "dataSyncId is required", null)
+                    return
+                }
+                runOffMainThread(result) {
+                    PoTokenManager.setDataSyncId(dataSyncId)
+                    mapOf(
+                        "poToken" to PoTokenManager.accountPoTokenForSync(dataSyncId),
+                        "visitorData" to PoTokenManager.sessionVisitorData.ifEmpty { PoTokenManager.visitorData },
+                    )
+                }
+            }
+            "setDataSyncId" -> {
+                val dataSyncId = call.argument<String>("dataSyncId")?.trim()
+                if (!dataSyncId.isNullOrEmpty()) {
+                    val appContext = context?.applicationContext
+                    if (appContext != null) PoTokenManager.init(appContext)
+                    PoTokenManager.setDataSyncId(dataSyncId)
+                }
+                result.success(true)
+            }
             "search" -> {
                 val query = call.argument<String>("query")?.trim()
                 if (query.isNullOrEmpty()) {

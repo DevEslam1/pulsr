@@ -29,6 +29,7 @@ object PoTokenManager {
     private const val KEY_INTEGRITY_TOKEN = "ytm_integrity_token"
     private const val KEY_EXPIRY_INSTANT = "ytm_expiry_instant"
     private const val KEY_LAST_STREAMING_TOKEN = "ytm_last_streaming_token"
+    private const val KEY_DATA_SYNC_ID = "ytm_data_sync_id"
 
     private const val LRU_CAPACITY = 64
     private const val TOKEN_TTL_SECONDS = 1800L // 30 minutes
@@ -48,6 +49,24 @@ object PoTokenManager {
 
     @Volatile
     var streamingPoToken: String = ""
+        private set
+
+    /**
+     * Raw `datasyncId` of the currently authenticated account (e.g. "userSessionId||" or
+     * "delegated||user"). Empty when logged out. Used as the poToken content-binding for
+     * authenticated `WEB_REMIX` player requests.
+     */
+    @Volatile
+    var dataSyncId: String = ""
+        private set
+
+    /**
+     * `visitorData` harvested from an authenticated Innertube response. Sent in the client context
+     * for authenticated `WEB_REMIX` requests (the account-bound poToken binds to [dataSyncId], not
+     * this). Non-persisted: re-harvested from the first authed response each session.
+     */
+    @Volatile
+    var sessionVisitorData: String = ""
         private set
 
     @Volatile
@@ -75,6 +94,7 @@ object PoTokenManager {
                 integrityToken = p.getString(KEY_INTEGRITY_TOKEN, "") ?: ""
                 expiryInstant = p.getLong(KEY_EXPIRY_INSTANT, 0L)
                 streamingPoToken = p.getString(KEY_LAST_STREAMING_TOKEN, "") ?: ""
+                dataSyncId = p.getString(KEY_DATA_SYNC_ID, "") ?: ""
             }
         }
     }
@@ -199,6 +219,46 @@ object PoTokenManager {
     }
 
     /**
+     * Records the raw [id] `datasyncId` of the authenticated account. Blank input is ignored so
+     * an empty harvest never wipes a good value (use [invalidate] to clear on logout). When the
+     * value changes, evicts the stale account-bound token(s) so the next request re-mints.
+     */
+    fun setDataSyncId(id: String) {
+        val normalized = id.trim()
+        if (normalized.isEmpty()) return
+        synchronized(syncLock) {
+            if (normalized == dataSyncId) return
+            val old = dataSyncId
+            dataSyncId = normalized
+            prefs?.edit()?.putString(KEY_DATA_SYNC_ID, normalized)?.apply()
+            synchronized(tokenLru) {
+                if (old.isNotEmpty()) tokenLru.remove(old)
+                tokenLru.remove(normalized)
+            }
+        }
+    }
+
+    /**
+     * Records the `visitorData` [v] harvested from an authenticated response. Blank input ignored.
+     */
+    fun setSessionVisitorData(v: String) {
+        val normalized = v.trim()
+        if (normalized.isEmpty()) return
+        sessionVisitorData = normalized
+    }
+
+    /**
+     * Returns a poToken bound to the account [dataSyncId] for authenticated `WEB_REMIX` player
+     * requests. Reuses the LRU-cached [poTokenForSync] minting keyed on the raw dataSyncId.
+     */
+    fun accountPoTokenForSync(dataSyncId: String): String {
+        val id = dataSyncId.trim()
+        if (id.isEmpty()) return ""
+        ensureReadySync()
+        return poTokenForSync(id)
+    }
+
+    /**
      * Forces full cache invalidation and triggers re-attestation on the next request.
      */
     fun invalidate() {
@@ -206,8 +266,10 @@ object PoTokenManager {
             val oldGen = generator
             generator = null
             expiryInstant = 0L
+            dataSyncId = ""
+            sessionVisitorData = ""
             oldGen?.let { Handler(Looper.getMainLooper()).post { it.close() } }
-            prefs?.edit()?.remove(KEY_EXPIRY_INSTANT)?.apply()
+            prefs?.edit()?.remove(KEY_EXPIRY_INSTANT)?.remove(KEY_DATA_SYNC_ID)?.apply()
             synchronized(tokenLru) {
                 tokenLru.evictAll()
             }

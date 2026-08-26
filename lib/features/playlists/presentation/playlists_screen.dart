@@ -7,6 +7,7 @@ import '../../../core/services/ytm_account_service.dart';
 import '../../../core/services/ytm_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../domain/models/ytm_track.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
@@ -35,14 +36,14 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Create Playlist', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: Text(context.l10n.createPlaylist, style: const TextStyle(fontWeight: FontWeight.w800)),
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(hintText: 'Playlist name'),
+          decoration: InputDecoration(hintText: context.l10n.enterPlaylistName),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(context.l10n.cancel)),
           ElevatedButton(
             onPressed: () async {
               final name = controller.text.trim();
@@ -51,7 +52,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                 if (context.mounted) Navigator.pop(ctx);
               }
             },
-            child: const Text('Create'),
+            child: Text(context.l10n.save),
           ),
         ],
       ),
@@ -326,9 +327,9 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                     if (userPlaylists.isEmpty)
                       EmptyStateWidget(
                         icon: Icons.playlist_add_rounded,
-                        title: 'No Custom Playlists',
-                        subtitle: 'Create a custom playlist or import an M3U file to organize your tracks.',
-                        primaryActionLabel: 'Create Playlist',
+                        title: context.l10n.emptyPlaylists,
+                        subtitle: context.l10n.emptyPlaylistsSubtitle,
+                        primaryActionLabel: context.l10n.createPlaylist,
                         primaryActionIcon: Icons.add_rounded,
                         onPrimaryAction: () => _showCreateDialog(context, cubit),
                         secondaryActionLabel: 'Import M3U',

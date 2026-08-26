@@ -10,6 +10,7 @@ import '../../core/constants/app_radii.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/adaptive.dart';
 import '../../core/utils/formatters.dart';
+import '../../core/utils/l10n_extensions.dart';
 import '../../core/utils/platform_capabilities.dart';
 import '../../core/widgets/cached_artwork.dart';
 import '../../data/db/app_database.dart';
@@ -47,21 +48,21 @@ class SongInfoSheet extends StatelessWidget {
           final proceed = await showDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
-              title: const Text('Permission Required'),
+              title: Text(context.l10n.permissionRequired),
               content: Text(
                 'To set $label directly, Android requires the "Modify system settings" permission.',
               ),
               actions: [
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(false),
-                  child: const Text('Cancel'),
+                  child: Text(context.l10n.cancel),
                 ),
                 FilledButton(
                   onPressed: () {
                     Navigator.of(ctx).pop(true);
                     channel.invokeMethod('openWriteSettings');
                   },
-                  child: const Text('Open Settings'),
+                  child: Text(context.l10n.openSettings),
                 ),
               ],
             ),

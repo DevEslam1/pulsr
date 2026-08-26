@@ -58,6 +58,7 @@ class YtmAccountService {
   static const String _cookiePrefKey = 'ytm_session_cookies';
   static const String _accountNamePrefKey = 'ytm_account_name';
   static const String _accountAvatarPrefKey = 'ytm_account_avatar';
+  static const String _dataSyncIdPrefKey = 'ytm_data_sync_id';
   static const String _innertubeBrowseUrl =
       'https://music.youtube.com/youtubei/v1/browse?prettyPrint=false';
 
@@ -69,6 +70,13 @@ class YtmAccountService {
   String? _accountName;
   String? _accountAvatar;
   bool _isInitialized = false;
+
+  /// Raw `datasyncId` of the authenticated account (e.g. "userSessionId||"), harvested from any
+  /// authenticated Innertube response. Used as the account-bound poToken content-binding.
+  String? _dataSyncId;
+
+  /// `visitorData` harvested from an authenticated response; sent in the WEB_REMIX player context.
+  String? _sessionVisitorData;
 
   /// Notifies listeners whenever the YTM login state changes (login/logout).
   final loginState = ValueNotifier<bool>(false);
@@ -89,12 +97,17 @@ class YtmAccountService {
       _cookies = prefs.getString(_cookiePrefKey);
       _accountName = prefs.getString(_accountNamePrefKey);
       _accountAvatar = prefs.getString(_accountAvatarPrefKey);
+      _dataSyncId = prefs.getString(_dataSyncIdPrefKey);
       _isInitialized = true;
       loginState.value = isLoggedIn;
 
       if (_cookies != null && _cookies!.isNotEmpty) {
         final ytmService = getIt<YtmService>();
         await ytmService.syncCookies(_cookies!);
+        final dsid = _dataSyncId;
+        if (dsid != null && dsid.isNotEmpty) {
+          await ytmService.setDataSyncId(dsid);
+        }
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to initialize YtmAccountService',
@@ -141,10 +154,13 @@ class YtmAccountService {
     _cookies = null;
     _accountName = null;
     _accountAvatar = null;
+    _dataSyncId = null;
+    _sessionVisitorData = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_cookiePrefKey);
     await prefs.remove(_accountNamePrefKey);
     await prefs.remove(_accountAvatarPrefKey);
+    await prefs.remove(_dataSyncIdPrefKey);
     loginState.value = false;
 
     try {
@@ -172,6 +188,9 @@ class YtmAccountService {
       );
 
       if (res.statusCode == 200) {
+        try {
+          _harvestSessionState(jsonDecode(res.body) as Map<String, dynamic>);
+        } catch (_) {}
         final setCookie = res.headers['set-cookie'];
         if (setCookie != null && setCookie.isNotEmpty) {
           _ingestSetCookies(setCookie);
@@ -398,6 +417,7 @@ class YtmAccountService {
             throw const YtmException('YTM_AUTH', 'Session expired');
           }
 
+          _harvestSessionState(json);
           final playlists = _parseInnertubeAccountPlaylists(json);
           if (playlists.isNotEmpty) {
             return playlists;
@@ -441,6 +461,7 @@ class YtmAccountService {
             throw const YtmException('YTM_AUTH', 'Session expired');
           }
 
+          _harvestSessionState(json);
           final tracks = _parseInnertubePlaylistTracks(json);
           if (tracks.isNotEmpty) {
             return tracks.take(maxTracks).toList();
@@ -474,6 +495,7 @@ class YtmAccountService {
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
         if (!_isUnauthenticatedResponse(json)) {
+          _harvestSessionState(json);
           final tracks = _parseInnertubePlaylistTracks(json);
           if (tracks.isNotEmpty) {
             final seen = <String>{};
@@ -604,19 +626,35 @@ class YtmAccountService {
   /// 3. IOS client
   /// 4. TVHTML5_SIMPLY_EMBEDDED_PLAYER
   Future<YtmStream?> resolvePlayerStream(String videoId, {String quality = 'high'}) async {
-    // When authenticated, skip guest PoToken/visitorData entirely.
-    // The guest poToken is minted with guest visitorData — they're a matched pair.
-    // Sending poToken without matching visitorData (or vice versa) makes YouTube reject.
-    // Clean cookie-only auth (SAPISIDHASH + cookies) is correct for authenticated sessions.
+    // BotGuard requires a poToken on WEB_REMIX player requests regardless of login.
+    // Authenticated → the token must be content-bound to the account's datasyncId, sent WITH
+    // the session cookies + SAPISIDHASH. Unauthenticated → a guest token bound to guest visitorData.
     final isAuthenticated = isLoggedIn && _cookies != null && _cookies!.isNotEmpty;
-    Map<String, dynamic>? poState;
-    if (!isAuthenticated) {
+    String? poToken;
+    String? visitorData;
+    if (isAuthenticated) {
+      if (_dataSyncId == null || _dataSyncId!.isEmpty) {
+        await _bootstrapDataSyncId();
+      }
+      final dsid = _dataSyncId;
+      if (dsid != null && dsid.isNotEmpty) {
+        try {
+          final account = await getIt<YtmService>().getAccountPoToken(dsid);
+          poToken = account?['poToken'] as String?;
+          final vd = account?['visitorData'] as String?;
+          visitorData =
+              _sessionVisitorData ?? (vd != null && vd.isNotEmpty ? vd : null);
+        } catch (e) {
+          debugPrint('[YTM_ACCOUNT] Account poToken minting failed: $e');
+        }
+      }
+    } else {
       try {
-        poState = await getIt<YtmService>().getPoTokenState();
+        final poState = await getIt<YtmService>().getPoTokenState();
+        poToken = poState?['streamingPoToken'] as String?;
+        visitorData = poState?['visitorData'] as String?;
       } catch (_) {}
     }
-    final poToken = poState?['streamingPoToken'] as String?;
-    final visitorData = poState?['visitorData'] as String?;
 
     final clientChain = (isLoggedIn && _cookies != null && _cookies!.isNotEmpty)
         ? [
@@ -857,6 +895,62 @@ class YtmAccountService {
     final hasHeader = json.containsKey('header');
     final hasResponseContext = json.containsKey('responseContext');
     return hasResponseContext && !hasContents && !hasHeader;
+  }
+
+  /// Reads the account `datasyncId` from `responseContext.mainAppWebResponseContext.datasyncId`.
+  /// This is the raw content-binding for the account poToken (kept verbatim, incl. trailing `||`).
+  String? _extractDataSyncId(Map<String, dynamic> json) {
+    final rc = json['responseContext'];
+    if (rc is! Map<String, dynamic>) return null;
+    final mainApp = rc['mainAppWebResponseContext'];
+    if (mainApp is! Map<String, dynamic>) return null;
+    final id = mainApp['datasyncId'];
+    if (id is String && id.isNotEmpty) return id;
+    return null;
+  }
+
+  /// Opportunistically harvests session state (datasyncId, visitorData) from an authenticated
+  /// Innertube response. Persists a new datasyncId and seeds it into the native PoTokenManager so
+  /// the account-bound token re-mints against the current account.
+  void _harvestSessionState(Map<String, dynamic> json) {
+    final dsid = _extractDataSyncId(json);
+    if (dsid != null && dsid != _dataSyncId) {
+      _dataSyncId = dsid;
+      SharedPreferences.getInstance()
+          .then((p) => p.setString(_dataSyncIdPrefKey, dsid));
+      getIt<YtmService>().setDataSyncId(dsid);
+    }
+    final rc = json['responseContext'];
+    if (rc is Map<String, dynamic>) {
+      final vd = rc['visitorData'];
+      if (vd is String && vd.isNotEmpty) {
+        _sessionVisitorData = vd;
+      }
+    }
+  }
+
+  /// Bootstraps [_dataSyncId] with one lightweight authenticated `browse` call when it is unknown
+  /// (e.g. right after login before any library fetch). The datasyncId is present on any
+  /// authenticated response, so a home browse is enough to harvest it.
+  Future<void> _bootstrapDataSyncId() async {
+    try {
+      final headers = _buildHeaders();
+      final body = jsonEncode({
+        'context': _buildClientContext('WEB_REMIX'),
+        'browseId': 'FEmusic_home',
+      });
+      final res = await _postWithRetry(
+        Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
+        headers: headers,
+        body: body,
+        baseTimeoutSeconds: 8,
+      );
+      if (res.statusCode == 200) {
+        _harvestSessionState(jsonDecode(res.body) as Map<String, dynamic>);
+      }
+    } catch (e) {
+      debugPrint('[YTM_ACCOUNT] datasyncId bootstrap failed: $e');
+    }
   }
 
   List<YtmTrack> _parseInnertubePlaylistTracks(Map<String, dynamic> root) {

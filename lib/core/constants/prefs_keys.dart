@@ -32,4 +32,5 @@ class PrefsKeys {
   static const String ytdlpBackendUrl = 'setting_ytdlp_backend_url';
   static const String ytdlpBackendToken = 'setting_ytdlp_backend_token';
   static const String extractorEngine = 'setting_extractor_engine';
+  static const String languageCode = 'setting_language_code';
 }

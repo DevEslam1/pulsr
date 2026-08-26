@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/di/injection.dart';
 import '../../core/theme/aura_theme.dart';
+import '../../core/utils/l10n_extensions.dart';
 import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
 import 'artwork_picker.dart';
@@ -38,7 +39,7 @@ class _TagEditorView extends StatelessWidget {
         if (state.status == TagEditorStatus.success) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Audio tags updated successfully'),
+              content: Text(context.l10n.tagsSavedSuccess),
               backgroundColor: context.palette.accent,
             ),
           );
@@ -46,7 +47,7 @@ class _TagEditorView extends StatelessWidget {
         } else if (state.status == TagEditorStatus.failure) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(state.errorMessage ?? 'Failed to update tags'),
+              content: Text(state.errorMessage ?? context.l10n.tagsSaveError),
               backgroundColor: Colors.redAccent,
             ),
           );
@@ -67,7 +68,7 @@ class _TagEditorView extends StatelessWidget {
               onPressed: () => Navigator.of(context).pop(),
             ),
             title: Text(
-              'Edit Tags',
+              context.l10n.tagEditor,
               style: TextStyle(
                 color: p.textPrimary,
                 fontWeight: FontWeight.w700,
@@ -84,7 +85,7 @@ class _TagEditorView extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2, color: p.accent),
                       )
                     : Text(
-                        'Save',
+                        context.l10n.save,
                         style: TextStyle(
                           color: p.accent,
                           fontWeight: FontWeight.w700,
@@ -117,25 +118,25 @@ class _TagEditorView extends StatelessWidget {
                           ),
                           const SizedBox(height: 24),
                           TagFieldWidget(
-                            label: 'Title',
+                            label: context.l10n.songTitle,
                             initialValue: state.title,
                             icon: Icons.title_rounded,
                             onChanged: cubit.updateTitle,
                           ),
                           TagFieldWidget(
-                            label: 'Artist',
+                            label: context.l10n.artist,
                             initialValue: state.artist,
                             icon: Icons.person_outline_rounded,
                             onChanged: cubit.updateArtist,
                           ),
                           TagFieldWidget(
-                            label: 'Album',
+                            label: context.l10n.album,
                             initialValue: state.album,
                             icon: Icons.album_outlined,
                             onChanged: cubit.updateAlbum,
                           ),
                           TagFieldWidget(
-                            label: 'Genre',
+                            label: context.l10n.genre,
                             initialValue: state.genre,
                             icon: Icons.category_outlined,
                             onChanged: cubit.updateGenre,
@@ -144,7 +145,7 @@ class _TagEditorView extends StatelessWidget {
                             children: [
                               Expanded(
                                 child: TagFieldWidget(
-                                  label: 'Year',
+                                  label: context.l10n.year,
                                   initialValue: state.year,
                                   icon: Icons.calendar_today_outlined,
                                   keyboardType: TextInputType.number,
@@ -154,7 +155,7 @@ class _TagEditorView extends StatelessWidget {
                               const SizedBox(width: 12),
                               Expanded(
                                 child: TagFieldWidget(
-                                  label: 'Track #',
+                                  label: context.l10n.trackNumber,
                                   initialValue: state.trackNumber,
                                   icon: Icons.format_list_numbered_rounded,
                                   keyboardType: TextInputType.number,
@@ -170,7 +171,7 @@ class _TagEditorView extends StatelessWidget {
                             onChanged: cubit.updateComment,
                           ),
                           TagFieldWidget(
-                            label: 'Lyrics',
+                            label: context.l10n.lyrics,
                             initialValue: state.lyrics,
                             icon: Icons.lyrics_outlined,
                             maxLines: 4,

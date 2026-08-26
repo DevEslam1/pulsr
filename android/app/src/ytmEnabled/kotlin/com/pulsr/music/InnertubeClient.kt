@@ -166,6 +166,18 @@ internal class InnertubeClient(
             )
         }
 
+        // Authenticated cold-start: the account datasyncId may be unknown (e.g. the Dart primary
+        // path was skipped). One WEB_REMIX /player call still returns responseContext.datasyncId
+        // even on LOGIN_REQUIRED — harvest it so the WEB_REMIX attempt below can present an
+        // account-bound poToken instead of a guest token YouTube rejects.
+        if (cookieStore.isSessionValid() && PoTokenManager.dataSyncId.isEmpty()) {
+            try {
+                requestPlayer(videoId, ClientType.WEB_REMIX)
+            } catch (t: Throwable) {
+                Log.w(TAG, "Datasync bootstrap call failed for $videoId: ${t.message}")
+            }
+        }
+
         var lastException: Throwable? = null
 
         for (client in clientChain) {
@@ -398,7 +410,9 @@ internal class InnertubeClient(
                 }
 
                 rateLimiter.onSuccess()
-                return JSONObject(responseStr)
+                val parsed = JSONObject(responseStr)
+                harvestSessionState(parsed, clientType)
+                return parsed
             } catch (e: InnertubeException) {
                 if (e.category == ErrorCategory.AUTH || e.category == ErrorCategory.PERMANENT) {
                     throw e
@@ -418,6 +432,26 @@ internal class InnertubeClient(
         throw InnertubeException(ErrorCategory.TRANSIENT, "Innertube request failed after $maxRetries attempts for ${clientType.name}", lastError)
     }
 
+    /**
+     * Opportunistically harvests the account [PoTokenManager.dataSyncId] and session
+     * [PoTokenManager.sessionVisitorData] from an authenticated web response's `responseContext`.
+     * Gated on an authenticated web request so guest visitorData never pollutes session state.
+     */
+    private fun harvestSessionState(json: JSONObject, clientType: ClientType) {
+        if (!clientType.isWeb || !cookieStore.isSessionValid()) return
+        val responseContext = json.optJSONObject("responseContext") ?: return
+        val dataSyncId = responseContext
+            .optJSONObject("mainAppWebResponseContext")
+            ?.optString("datasyncId")
+        if (!dataSyncId.isNullOrBlank()) {
+            PoTokenManager.setDataSyncId(dataSyncId)
+        }
+        val visitorData = responseContext.optString("visitorData")
+        if (visitorData.isNotBlank()) {
+            PoTokenManager.setSessionVisitorData(visitorData)
+        }
+    }
+
     private fun buildPlayerBody(videoId: String, clientType: ClientType): JSONObject {
         val root = JSONObject()
         root.put("context", buildClientContext(clientType))
@@ -428,8 +462,15 @@ internal class InnertubeClient(
         val playbackContext = JSONObject()
         val contentPlaybackContext = JSONObject().apply {
             put("html5Preference", "HTML5_PREF_WANTS")
-            if (PoTokenManager.isReady && !cookieStore.isSessionValid()) {
-                val poToken = PoTokenManager.poTokenForSync(videoId)
+            // Web player requests require a poToken regardless of login. When authenticated the
+            // token must bind to the account datasyncId; otherwise it binds to the guest videoId.
+            if (clientType.isWeb && PoTokenManager.isReady) {
+                val dataSyncId = PoTokenManager.dataSyncId
+                val poToken = if (cookieStore.isSessionValid() && dataSyncId.isNotEmpty()) {
+                    PoTokenManager.accountPoTokenForSync(dataSyncId)
+                } else {
+                    PoTokenManager.poTokenForSync(videoId)
+                }
                 if (poToken.isNotEmpty()) {
                     put("poToken", poToken)
                 }
@@ -447,8 +488,16 @@ internal class InnertubeClient(
             put("clientVersion", clientType.clientVersion)
             put("hl", "en")
             put("gl", "US")
-            if (PoTokenManager.visitorData.isNotEmpty() && !cookieStore.isSessionValid()) {
-                put("visitorData", PoTokenManager.visitorData)
+            // Only web clients send cookies, so only they are "authenticated": send the harvested
+            // session visitorData in that case, guest visitorData otherwise.
+            val authedWeb = clientType.isWeb && cookieStore.isSessionValid()
+            val visitorData = if (authedWeb) {
+                PoTokenManager.sessionVisitorData.ifEmpty { PoTokenManager.visitorData }
+            } else {
+                PoTokenManager.visitorData
+            }
+            if (visitorData.isNotEmpty()) {
+                put("visitorData", visitorData)
             }
 
             when (clientType) {

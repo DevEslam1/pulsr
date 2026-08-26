@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/adaptive.dart';
+import '../../core/utils/l10n_extensions.dart';
 import '../player/cubit/player_cubit.dart';
 import '../player/cubit/player_state.dart';
 
@@ -61,7 +62,7 @@ class SleepTimerSheet extends StatelessWidget {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  'Sleep Timer',
+                                  context.l10n.sleepTimer,
                                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                         fontWeight: FontWeight.w800,
                                         color: p.textPrimary,

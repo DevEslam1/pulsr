@@ -107,6 +107,30 @@ class YtmService {
     }
   }
 
+  /// Mints an account-bound poToken for authenticated WEB_REMIX playback. [dataSyncId] is the raw
+  /// account binding harvested from an authenticated Innertube response. Returns
+  /// `{poToken, visitorData}` or null on failure.
+  Future<Map<String, dynamic>?> getAccountPoToken(String dataSyncId) async {
+    try {
+      final state = await _channel.invokeMethod<Map<Object?, Object?>>(
+        'getAccountPoToken',
+        {'dataSyncId': dataSyncId},
+      );
+      if (state == null) return null;
+      return state.map((k, v) => MapEntry(k.toString(), v));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// Seeds the native PoTokenManager with the current account [dataSyncId] so account-bound tokens
+  /// mint against the correct account (e.g. restored from prefs at startup).
+  Future<void> setDataSyncId(String dataSyncId) async {
+    try {
+      await _channel.invokeMethod<bool>('setDataSyncId', {'dataSyncId': dataSyncId});
+    } catch (_) {}
+  }
+
   Map<String, String> _localeArgs() {
     final locale = ui.PlatformDispatcher.instance.locale;
     final country = locale.countryCode;

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
-import '../../../core/constants/app_strings.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/pulsr_logo.dart';
 import '../../../core/widgets/section_header.dart';
@@ -138,11 +138,11 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  String _getGreeting() {
+  String _getGreeting(BuildContext context) {
     final hour = DateTime.now().hour;
-    if (hour < 12) return AppStrings.goodMorning;
-    if (hour < 17) return AppStrings.goodAfternoon;
-    return AppStrings.goodEvening;
+    if (hour < 12) return context.l10n.goodMorning;
+    if (hour < 17) return context.l10n.goodAfternoon;
+    return context.l10n.goodEvening;
   }
 
   @override
@@ -170,7 +170,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Rescan complete ($count songs found)'),
+                        content: Text(context.l10n.scanResult(count)),
                         duration: const Duration(seconds: 2),
                       ),
                     );
@@ -179,14 +179,13 @@ class _HomeScreenState extends State<HomeScreen> {
                   setState(() {
                     _categoryFutures.clear();
                   });
-                  await Future.delayed(const Duration(milliseconds: 300));
                 }
               },
               child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.only(bottom: 160),
+                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                padding: const EdgeInsets.only(bottom: 120),
                 children: [
-                  // ---------- Hero header ----------
+                  // ---------- Header ----------
                   Padding(
                     padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 4),
                     child: Row(
@@ -202,7 +201,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                _getGreeting(),
+                                _getGreeting(context),
                                 style: Theme.of(context).textTheme.headlineMedium,
                               ),
                             ],
@@ -341,7 +340,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Row(
             children: [
               _QuickCard(
-                title: AppStrings.favorites,
+                title: context.l10n.favorites,
                 subtitle: 'Liked tracks',
                 icon: Icons.favorite_rounded,
                 color: p.favorite,
@@ -355,7 +354,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(width: 12),
               _QuickCard(
-                title: AppStrings.dailyDrive,
+                title: context.l10n.dailyDrive,
                 subtitle: 'Auto-mix',
                 icon: Icons.directions_car_rounded,
                 color: p.accent,
@@ -371,7 +370,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const SizedBox(width: 12),
               _QuickCard(
-                title: AppStrings.focusFlow,
+                title: context.l10n.focusFlow,
                 subtitle: 'Top played',
                 icon: Icons.headphones_rounded,
                 color: const Color(0xFF1DE9B6),
@@ -399,7 +398,7 @@ class _HomeScreenState extends State<HomeScreen> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SectionHeader(title: AppStrings.recentlyPlayed),
+                SectionHeader(title: context.l10n.recentlyPlayed),
                 SizedBox(
                   height: isTablet ? 214 : 196,
                   child: ListView.builder(
@@ -410,7 +409,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       final song = songs[index];
                       final size = isTablet ? 158.0 : 138.0;
                       return Padding(
-                        padding: const EdgeInsets.only(right: 14),
+                        padding: const EdgeInsetsDirectional.only(end: 14),
                         child: InkWell(
                           borderRadius: BorderRadius.circular(20),
                           onTap: () => playerCubit.playSong(song, queue: songs),
@@ -428,8 +427,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                       size: size,
                                       borderRadius: 18,
                                     ),
-                                    Positioned(
-                                      right: 8,
+                                    PositionedDirectional(
+                                      end: 8,
                                       bottom: 8,
                                       child: Container(
                                         width: 34,
@@ -480,7 +479,7 @@ class _HomeScreenState extends State<HomeScreen> {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const SectionHeader(title: AppStrings.recentlyAdded),
+                SectionHeader(title: context.l10n.recentlyAdded),
                 for (final song in songs.take(10))
                   SongTile(
                     song: song,

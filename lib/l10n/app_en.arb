@@ -1,38 +1,308 @@
 {
   "@@locale": "en",
   "appTitle": "Pulsr Music",
+  "appTagline": "Pure Offline Sound",
+
+  "navHome": "Home",
+  "navLibrary": "Library",
+  "navSearch": "Search",
+  "navPlaylists": "Playlists",
+  "navSettings": "Settings",
+  "navYtmSearch": "Online Search",
+
+  "goodMorning": "Good morning",
+  "goodAfternoon": "Good afternoon",
+  "goodEvening": "Good evening",
+  "recentlyPlayed": "Recently Played",
+  "recentlyAdded": "Recently Added",
+  "favorites": "Favorites",
+  "dailyDrive": "Daily Drive",
+  "focusFlow": "Focus Flow",
+  "mostPlayed": "Most Played",
+  "quickMix": "Quick Mix",
+  "history": "History",
+  "stats": "Stats",
+
   "songs": "Songs",
   "albums": "Albums",
   "artists": "Artists",
   "playlists": "Playlists",
   "genres": "Genres",
   "folders": "Folders",
-  "favorites": "Favorites",
-  "settings": "Settings",
+  "years": "Years",
+
   "search": "Search",
+  "searchPlaceholder": "Search songs, artists, albums...",
+  "searchOnline": "Search YouTube Music...",
+  "recentSearches": "Recent Searches",
+  "clearSearchHistory": "Clear History",
+  "noResultsFound": "No music found",
+  "noResultsSubtitle": "Try a different search term or check spelling",
+
   "nowPlaying": "Now Playing",
-  "queue": "Queue",
+  "queue": "Up Next",
+  "clearQueue": "Clear Queue",
+  "saveQueueAsPlaylist": "Save Queue as Playlist",
+  "playingFrom": "Playing from",
   "lyrics": "Lyrics",
+  "syncedLyrics": "Synced Lyrics",
+  "plainLyrics": "Plain Lyrics",
+  "fetchingLyrics": "Searching for lyrics...",
+  "noLyricsFound": "No lyrics found for this track",
   "equalizer": "Equalizer",
+  "equalizerSubtitle": "10-band EQ, bass boost, presets",
   "sleepTimer": "Sleep Timer",
-  "rescanLibrary": "Rescan Media Library",
+  "sleepTimerSubtitle": "Auto pause with gentle fade-out",
+  "audioQuality": "Audio Quality",
+  "speedAndPitch": "Speed & Pitch",
+
   "play": "Play",
   "pause": "Pause",
   "next": "Next",
   "previous": "Previous",
   "shuffle": "Shuffle",
   "repeat": "Repeat",
+  "repeatOff": "Repeat Off",
+  "repeatAll": "Repeat All",
+  "repeatOne": "Repeat One",
   "share": "Share",
   "tagEditor": "Edit Audio Tags",
   "setRingtone": "Set as Ringtone",
+  "ringtoneSetSuccess": "Ringtone set successfully",
   "delete": "Delete",
   "cancel": "Cancel",
   "save": "Save",
   "close": "Close",
+  "done": "Done",
+  "retry": "Retry",
+  "edit": "Edit",
+  "confirm": "Confirm",
+  "reset": "Reset",
+  "apply": "Apply",
+
   "noSongsFound": "No Songs Found",
   "noSongsSubtitle": "Scan your local storage to find all offline music files.",
+  "rescanLibrary": "Rescan Media Library",
+  "rescanSubtitle": "Scan local storage for music files",
+  "scanning": "Scanning audio files...",
+  "scanCompleted": "Scan completed",
+
   "permissionRequired": "Permission Required",
   "audioAccessRequired": "Audio access is required to display your music library.",
+  "grantAccess": "Grant Access",
   "openSettings": "Open Settings",
-  "privacyGuarantee": "100% Offline • Zero Telemetry • Local Storage"
+  "privacyGuarantee": "100% Offline • Zero Telemetry • Local Storage",
+
+  "onboardingTitle": "Private & Offline",
+  "onboardingSubtitle": "Your music never leaves your device. No ads, no tracking, no accounts.",
+
+  "createPlaylist": "New Playlist",
+  "createSmartPlaylist": "New Smart Playlist",
+  "smartPlaylists": "Smart Playlists",
+  "editPlaylist": "Edit Playlist",
+  "deletePlaylist": "Delete Playlist",
+  "deletePlaylistPrompt": "Are you sure you want to delete this playlist?",
+  "emptyPlaylists": "No playlists created yet",
+  "emptyPlaylistsSubtitle": "Create custom or smart playlists to organize your tracks",
+  "playlistName": "Playlist Name",
+  "enterPlaylistName": "Enter playlist name",
+  "addToPlaylist": "Add to Playlist",
+  "addedToPlaylist": "Added to playlist",
+  "removedFromPlaylist": "Removed from playlist",
+
+  "smartRules": "Rules",
+  "matchAllRules": "Match All Rules",
+  "matchAnyRule": "Match Any Rule",
+  "addRule": "Add Rule",
+  "ruleGenre": "Genre",
+  "ruleYear": "Year",
+  "rulePlayCount": "Play Count",
+  "ruleDuration": "Duration",
+  "ruleRating": "Rating",
+
+  "trackNumber": "Track",
+  "discNumber": "Disc",
+  "year": "Year",
+  "genre": "Genre",
+  "artist": "Artist",
+  "albumArtist": "Album Artist",
+  "album": "Album",
+  "songTitle": "Title",
+  "chooseArtwork": "Choose Artwork",
+  "removeArtwork": "Remove Artwork",
+  "tagsSavedSuccess": "Tags updated successfully",
+  "tagsSaveError": "Failed to update tags",
+
+  "fileInfo": "File Information",
+  "filePath": "File Path",
+  "format": "Format",
+  "bitrate": "Bitrate",
+  "sampleRate": "Sample Rate",
+  "fileSize": "Size",
+
+  "settings": "Settings",
+  "appearance": "Theme & Appearance",
+  "language": "Language",
+  "appLanguage": "App Language",
+  "systemDefault": "System Default",
+  "english": "English",
+  "arabic": "العربية",
+  "spanish": "Español",
+  "theme": "Theme",
+  "themeDark": "Dark",
+  "themeLight": "Light",
+  "themeAmoled": "Pure Black (AMOLED)",
+  "themeSystem": "System Default",
+  "colorPalette": "Accent Color Source",
+  "paletteMonet": "System Wallpaper (Material You)",
+  "paletteArtwork": "Album Artwork Accent",
+  "paletteCustom": "Custom Accent Color",
+  "customAccentColor": "Custom Accent Color",
+  "playerTheme": "Now Playing Style",
+  "playerThemeClassic": "Classic Deck",
+  "playerThemeCard": "Floating Card",
+  "playerThemeCircle": "Vinyl Circle",
+  "playerThemeMinimal": "Pure Minimal",
+  "visualizerStyle": "Audio Visualizer",
+  "visualizerBar": "Frequency Bars",
+  "visualizerWave": "Smooth Wave",
+  "visualizerCircle": "Radial Pulse",
+  "visualizerParticles": "Ambient Particles",
+
+  "audioSettings": "Audio & Playback",
+  "gaplessPlayback": "Gapless Playback",
+  "gaplessSubtitle": "Continuous audio without silence",
+  "crossfade": "Crossfade Duration",
+  "resumeAfterInterruption": "Resume After Interruption",
+  "resumeAfterInterruptionSubtitle": "Resume after phone calls & notifications",
+  "waveformSeekBar": "Waveform Seek Bar",
+  "waveformSeekBarSubtitle": "Waveform visualization in the player",
+  "replayGain": "ReplayGain Normalization",
+  "replayGainTrack": "Track Gain",
+  "replayGainAlbum": "Album Gain",
+  "replayGainOff": "Off",
+  "preampWithRg": "Preamp with ReplayGain",
+  "preampWithoutRg": "Preamp without ReplayGain",
+
+  "librarySettings": "Library & Storage",
+  "minDuration": "Minimum Track Duration",
+  "minDurationSubtitle": "Hide audio clips shorter than",
+  "autoHideSystemMedia": "Auto-hide System Ringtone & Notifications",
+  "autoHideSystemMediaSubtitle": "Filter out non-music audio files",
+  "hiddenFolders": "Excluded Folders",
+  "hiddenFoldersSubtitle": "Manage excluded and hidden music folders",
+
+  "networkAndProxy": "Network & Proxy",
+  "proxySettings": "Proxy Settings",
+  "enableProxy": "Enable Proxy",
+  "proxyType": "Proxy Type",
+  "proxyHost": "Proxy Host",
+  "proxyPort": "Proxy Port",
+  "proxyUsername": "Username (Optional)",
+  "proxyPassword": "Password (Optional)",
+  "proxyBypass": "Bypass Hosts",
+  "testProxy": "Test Proxy Connection",
+  "proxySuccess": "Proxy connection successful",
+  "proxyFailed": "Proxy connection failed",
+
+  "extractorBackend": "Extractor & Backend Engine",
+  "backendUrl": "Backend Server URL",
+  "backendToken": "Backend API Token",
+  "testBackend": "Test Backend Connection",
+  "backendSuccess": "Backend connected successfully",
+  "backendFailed": "Backend connection failed",
+  "engineAuto": "Automatic Selection",
+  "engineRemote": "Remote Yt-dlp Server",
+  "engineOnDevice": "On-Device Extractor",
+
+  "cloudSync": "Cloud Sync & Backup",
+  "cloudSyncSubtitle": "Sync favorites, playlists, and settings across devices",
+  "signInWithGoogle": "Sign In with Google",
+  "signOut": "Sign Out",
+  "signedInAs": "Signed in as",
+  "syncNow": "Sync Now",
+  "lastSynced": "Last synced",
+  "neverSynced": "Never synced",
+  "backupToCloud": "Backup to Cloud",
+  "restoreFromCloud": "Restore from Cloud",
+  "exportBackupJson": "Export Backup File (JSON)",
+  "importBackupJson": "Import Backup File (JSON)",
+  "backupCreated": "Backup created successfully",
+  "backupRestored": "Backup restored successfully",
+
+  "batteryOptimization": "Battery Optimization",
+  "batteryOptimizationSubtitle": "Allow unrestricted background playback",
+  "batteryOptimizationPrompt": "Disable battery restrictions for uninterrupted playback",
+  "requestWhitelist": "Disable Restrictions",
+
+  "about": "About Pulsr",
+  "aboutSubtitle": "Premium offline music player",
+  "version": "Version",
+  "sourceCode": "Open Source Licenses",
+
+  "sortBy": "Sort by",
+  "sortTitle": "Title",
+  "sortArtist": "Artist",
+  "sortAlbum": "Album",
+  "sortDuration": "Duration",
+  "sortDateAdded": "Date Added",
+  "sortYear": "Year",
+  "sortTrackCount": "Track Count",
+  "sortAscending": "Ascending",
+  "sortDescending": "Descending",
+
+  "playAll": "Play All",
+  "shuffleAll": "Shuffle All",
+  "tracksCount": "{count, plural, =0{0 tracks} =1{1 track} other{{count} tracks}}",
+  "@tracksCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "albumsCount": "{count, plural, =0{0 albums} =1{1 album} other{{count} albums}}",
+  "@albumsCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "durationFormat": "{minutes}m {seconds}s",
+  "@durationFormat": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      },
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "scanResult": "Found {count} songs",
+  "@scanResult": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+
+  "deleteSongConfirmation": "Are you sure you want to permanently delete this song from your device?",
+  "deleteMultipleConfirmation": "Are you sure you want to permanently delete {count} songs from your device?",
+  "@deleteMultipleConfirmation": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "songDeleted": "Song deleted",
+  "songsDeleted": "Songs deleted",
+
+  "unknownSong": "Unknown Track",
+  "unknownArtist": "Unknown Artist",
+  "unknownAlbum": "Unknown Album",
+  "unknownGenre": "Unknown Genre"
 }

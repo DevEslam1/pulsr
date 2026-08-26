@@ -22,6 +22,7 @@ mixin _$SettingsState {
   bool get resumeAfterInterruption;
   bool get waveformSeekBarEnabled;
   AppThemeMode get themeMode;
+  String get languageCode;
   int get customAccentColorValue;
   PlayerThemeMode get playerThemeMode;
   VisualizerStyle get visualizerStyle;
@@ -84,6 +85,8 @@ mixin _$SettingsState {
                 other.waveformSeekBarEnabled == waveformSeekBarEnabled) &&
             (identical(other.themeMode, themeMode) ||
                 other.themeMode == themeMode) &&
+            (identical(other.languageCode, languageCode) ||
+                other.languageCode == languageCode) &&
             (identical(other.customAccentColorValue, customAccentColorValue) ||
                 other.customAccentColorValue == customAccentColorValue) &&
             (identical(other.playerThemeMode, playerThemeMode) ||
@@ -152,6 +155,7 @@ mixin _$SettingsState {
         resumeAfterInterruption,
         waveformSeekBarEnabled,
         themeMode,
+        languageCode,
         customAccentColorValue,
         playerThemeMode,
         visualizerStyle,
@@ -188,7 +192,7 @@ mixin _$SettingsState {
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, proxyPassword: $proxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, proxyPassword: $proxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
   }
 }
 
@@ -207,6 +211,7 @@ abstract mixin class $SettingsStateCopyWith<$Res> {
       bool resumeAfterInterruption,
       bool waveformSeekBarEnabled,
       AppThemeMode themeMode,
+      String languageCode,
       int customAccentColorValue,
       PlayerThemeMode playerThemeMode,
       VisualizerStyle visualizerStyle,
@@ -262,6 +267,7 @@ class _$SettingsStateCopyWithImpl<$Res>
     Object? resumeAfterInterruption = null,
     Object? waveformSeekBarEnabled = null,
     Object? themeMode = null,
+    Object? languageCode = null,
     Object? customAccentColorValue = null,
     Object? playerThemeMode = null,
     Object? visualizerStyle = null,
@@ -328,6 +334,10 @@ class _$SettingsStateCopyWithImpl<$Res>
           ? _self.themeMode
           : themeMode // ignore: cast_nullable_to_non_nullable
               as AppThemeMode,
+      languageCode: null == languageCode
+          ? _self.languageCode
+          : languageCode // ignore: cast_nullable_to_non_nullable
+              as String,
       customAccentColorValue: null == customAccentColorValue
           ? _self.customAccentColorValue
           : customAccentColorValue // ignore: cast_nullable_to_non_nullable
@@ -562,6 +572,7 @@ extension SettingsStatePatterns on SettingsState {
             bool resumeAfterInterruption,
             bool waveformSeekBarEnabled,
             AppThemeMode themeMode,
+            String languageCode,
             int customAccentColorValue,
             PlayerThemeMode playerThemeMode,
             VisualizerStyle visualizerStyle,
@@ -609,6 +620,7 @@ extension SettingsStatePatterns on SettingsState {
             _that.resumeAfterInterruption,
             _that.waveformSeekBarEnabled,
             _that.themeMode,
+            _that.languageCode,
             _that.customAccentColorValue,
             _that.playerThemeMode,
             _that.visualizerStyle,
@@ -670,6 +682,7 @@ extension SettingsStatePatterns on SettingsState {
             bool resumeAfterInterruption,
             bool waveformSeekBarEnabled,
             AppThemeMode themeMode,
+            String languageCode,
             int customAccentColorValue,
             PlayerThemeMode playerThemeMode,
             VisualizerStyle visualizerStyle,
@@ -716,6 +729,7 @@ extension SettingsStatePatterns on SettingsState {
             _that.resumeAfterInterruption,
             _that.waveformSeekBarEnabled,
             _that.themeMode,
+            _that.languageCode,
             _that.customAccentColorValue,
             _that.playerThemeMode,
             _that.visualizerStyle,
@@ -776,6 +790,7 @@ extension SettingsStatePatterns on SettingsState {
             bool resumeAfterInterruption,
             bool waveformSeekBarEnabled,
             AppThemeMode themeMode,
+            String languageCode,
             int customAccentColorValue,
             PlayerThemeMode playerThemeMode,
             VisualizerStyle visualizerStyle,
@@ -822,6 +837,7 @@ extension SettingsStatePatterns on SettingsState {
             _that.resumeAfterInterruption,
             _that.waveformSeekBarEnabled,
             _that.themeMode,
+            _that.languageCode,
             _that.customAccentColorValue,
             _that.playerThemeMode,
             _that.visualizerStyle,
@@ -872,6 +888,7 @@ class _SettingsState extends SettingsState {
       this.resumeAfterInterruption = true,
       this.waveformSeekBarEnabled = true,
       this.themeMode = AppThemeMode.dark,
+      this.languageCode = 'system',
       this.customAccentColorValue = 0xFF9B9EF5,
       this.playerThemeMode = PlayerThemeMode.classic,
       this.visualizerStyle = VisualizerStyle.bar,
@@ -932,6 +949,9 @@ class _SettingsState extends SettingsState {
   @override
   @JsonKey()
   final AppThemeMode themeMode;
+  @override
+  @JsonKey()
+  final String languageCode;
   @override
   @JsonKey()
   final int customAccentColorValue;
@@ -1063,6 +1083,8 @@ class _SettingsState extends SettingsState {
                 other.waveformSeekBarEnabled == waveformSeekBarEnabled) &&
             (identical(other.themeMode, themeMode) ||
                 other.themeMode == themeMode) &&
+            (identical(other.languageCode, languageCode) ||
+                other.languageCode == languageCode) &&
             (identical(other.customAccentColorValue, customAccentColorValue) ||
                 other.customAccentColorValue == customAccentColorValue) &&
             (identical(other.playerThemeMode, playerThemeMode) ||
@@ -1131,6 +1153,7 @@ class _SettingsState extends SettingsState {
         resumeAfterInterruption,
         waveformSeekBarEnabled,
         themeMode,
+        languageCode,
         customAccentColorValue,
         playerThemeMode,
         visualizerStyle,
@@ -1167,7 +1190,7 @@ class _SettingsState extends SettingsState {
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, proxyPassword: $proxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, proxyPassword: $proxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
   }
 }
 
@@ -1188,6 +1211,7 @@ abstract mixin class _$SettingsStateCopyWith<$Res>
       bool resumeAfterInterruption,
       bool waveformSeekBarEnabled,
       AppThemeMode themeMode,
+      String languageCode,
       int customAccentColorValue,
       PlayerThemeMode playerThemeMode,
       VisualizerStyle visualizerStyle,
@@ -1243,6 +1267,7 @@ class __$SettingsStateCopyWithImpl<$Res>
     Object? resumeAfterInterruption = null,
     Object? waveformSeekBarEnabled = null,
     Object? themeMode = null,
+    Object? languageCode = null,
     Object? customAccentColorValue = null,
     Object? playerThemeMode = null,
     Object? visualizerStyle = null,
@@ -1309,6 +1334,10 @@ class __$SettingsStateCopyWithImpl<$Res>
           ? _self.themeMode
           : themeMode // ignore: cast_nullable_to_non_nullable
               as AppThemeMode,
+      languageCode: null == languageCode
+          ? _self.languageCode
+          : languageCode // ignore: cast_nullable_to_non_nullable
+              as String,
       customAccentColorValue: null == customAccentColorValue
           ? _self.customAccentColorValue
           : customAccentColorValue // ignore: cast_nullable_to_non_nullable

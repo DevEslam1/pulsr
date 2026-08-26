@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/l10n_extensions.dart';
 
 class PulsrBottomNavBar extends StatelessWidget {
   final int currentIndex;
@@ -13,12 +14,12 @@ class PulsrBottomNavBar extends StatelessWidget {
     required this.onTap,
   });
 
-  static const _items = [
-    (icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: 'Home'),
-    (icon: Icons.library_music_outlined, activeIcon: Icons.library_music_rounded, label: 'Library'),
-    (icon: Icons.search_rounded, activeIcon: Icons.search_rounded, label: 'Search'),
-    (icon: Icons.queue_music_outlined, activeIcon: Icons.queue_music_rounded, label: 'Playlists'),
-    (icon: Icons.settings_outlined, activeIcon: Icons.settings_rounded, label: 'Settings'),
+  List<({IconData activeIcon, IconData icon, String label})> _getItems(BuildContext context) => [
+    (icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: context.l10n.navHome),
+    (icon: Icons.library_music_outlined, activeIcon: Icons.library_music_rounded, label: context.l10n.navLibrary),
+    (icon: Icons.search_rounded, activeIcon: Icons.search_rounded, label: context.l10n.navSearch),
+    (icon: Icons.queue_music_outlined, activeIcon: Icons.queue_music_rounded, label: context.l10n.navPlaylists),
+    (icon: Icons.settings_outlined, activeIcon: Icons.settings_rounded, label: context.l10n.navSettings),
   ];
 
   @override
@@ -54,10 +55,10 @@ class PulsrBottomNavBar extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 child: Row(
                   children: [
-                    for (int i = 0; i < _items.length; i++)
+                    for (int i = 0; i < _getItems(context).length; i++)
                       Expanded(
                         child: _NavTabItem(
-                          item: _items[i],
+                          item: _getItems(context)[i],
                           isSelected: currentIndex == i,
                           p: p,
                           onTap: () {

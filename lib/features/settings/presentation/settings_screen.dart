@@ -10,6 +10,7 @@ import '../../../core/services/artwork_cache_manager.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/utils/platform_capabilities.dart';
 import '../../auth/cubit/auth_cubit.dart';
 import '../../auth/cubit/auth_state.dart';
@@ -214,6 +215,9 @@ class SettingsScreen extends StatelessWidget {
                     _divider(p),
                     _navTile(context, Icons.palette_outlined, 'Color Source', _getColorSourceTitle(state.themeColorSource),
                         onTap: () => _showColorSourcePickerSheet(context, cubit, state.themeColorSource)),
+                    _divider(p),
+                    _navTile(context, Icons.language_rounded, context.l10n.language, _getLanguageTitle(state.languageCode, context.l10n),
+                        onTap: () => _showLanguagePickerSheet(context, cubit, state.languageCode)),
                   ]),
                   _section(context, 'Gestures', [
                     _navTile(context, Icons.swipe_left_rounded, 'Mini Player Swipe Left', _getMiniPlayerSwipeTitle(state.miniPlayerSwipeLeft),
@@ -633,6 +637,108 @@ class SettingsScreen extends StatelessWidget {
                         : null,
                     onTap: () {
                       cubit.setPlayerThemeMode(t.mode);
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getLanguageTitle(String code, dynamic l10n) {
+    switch (code) {
+      case 'ar':
+        return 'العربية (Arabic)';
+      case 'es':
+        return 'Español (Spanish)';
+      case 'en':
+        return 'English';
+      default:
+        return 'System Default';
+    }
+  }
+
+  void _showLanguagePickerSheet(
+    BuildContext context,
+    SettingsCubit cubit,
+    String currentCode,
+  ) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final surfaceColor = Theme.of(context).colorScheme.surface;
+    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
+    final outlineColor = Theme.of(context).colorScheme.outline;
+    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? context.palette.textPrimary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
+
+    final languages = [
+      (code: 'system', name: 'System Default', nativeName: 'الافتراضي للنظام / Predeterminado', flag: Icons.settings_suggest_rounded),
+      (code: 'en', name: 'English', nativeName: 'English (US/UK)', flag: Icons.language_rounded),
+      (code: 'ar', name: 'العربية', nativeName: 'Arabic (RTL)', flag: Icons.translate_rounded),
+      (code: 'es', name: 'Español', nativeName: 'Spanish', flag: Icons.public_rounded),
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: surfaceColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Text(
+                context.l10n.appLanguage,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...languages.map((lang) {
+              final isSelected = lang.code == currentCode;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color: isSelected ? primaryColor.withValues(alpha: 0.12) : cardColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: isSelected ? primaryColor : outlineColor,
+                      width: isSelected ? 1.5 : 1.0,
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: Icon(
+                      lang.flag,
+                      color: isSelected ? primaryColor : textSecondary,
+                    ),
+                    title: Text(
+                      lang.name,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        color: isSelected ? primaryColor : textPrimary,
+                      ),
+                    ),
+                    subtitle: Text(
+                      lang.nativeName,
+                      style: TextStyle(fontSize: 12, color: textSecondary),
+                    ),
+                    trailing: isSelected
+                        ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                        : null,
+                    onTap: () {
+                      cubit.setLanguage(lang.code);
                       Navigator.pop(ctx);
                     },
                   ),

@@ -293,6 +293,9 @@ class _PulsrAppState extends State<PulsrApp> {
                           themeMode: flutterThemeMode,
                           theme: lightTheme,
                           darkTheme: darkTheme,
+                          locale: settingsState.languageCode == 'system'
+                              ? null
+                              : Locale(settingsState.languageCode),
                           localizationsDelegates: const [
                             AppLocalizations.delegate,
                             GlobalMaterialLocalizations.delegate,

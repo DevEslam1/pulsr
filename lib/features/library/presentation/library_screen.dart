@@ -11,6 +11,7 @@ import '../../../core/theme/aura_theme.dart';
 import '../../auth/cubit/auth_cubit.dart';
 import '../../auth/presentation/ytm_web_login_sheet.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/song_tile.dart';
@@ -151,15 +152,15 @@ class _LibraryScreenState extends State<LibraryScreen>
                     isScrollable: true,
                     tabAlignment: TabAlignment.start,
                     physics: const BouncingScrollPhysics(),
-                    tabs: const [
-                      Tab(text: 'Songs'),
-                      Tab(text: 'Downloaded'),
-                      Tab(text: 'Albums'),
-                      Tab(text: 'Artists'),
-                      Tab(text: 'Favorites'),
-                      Tab(text: 'Folders'),
-                      Tab(text: 'Genres'),
-                      Tab(text: 'Years'),
+                    tabs: [
+                      Tab(text: context.l10n.songs),
+                      const Tab(text: 'Downloaded'),
+                      Tab(text: context.l10n.albums),
+                      Tab(text: context.l10n.artists),
+                      Tab(text: context.l10n.favorites),
+                      Tab(text: context.l10n.folders),
+                      Tab(text: context.l10n.genres),
+                      Tab(text: context.l10n.years),
                     ],
                   ),
                 ),
@@ -172,7 +173,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Rescan complete ($count songs found)'),
+                        content: Text(context.l10n.scanResult(count)),
                         duration: const Duration(seconds: 2),
                       ),
                     );

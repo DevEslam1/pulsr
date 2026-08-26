@@ -4,6 +4,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../player/cubit/player_cubit.dart';
@@ -130,8 +131,8 @@ class _SearchScreenState extends State<SearchScreen> {
                         onChanged: (value) => _onQueryChanged(context, value),
                         decoration: InputDecoration(
                           hintText: (AppConfig.ytmEnabled && _onlineMode)
-                              ? 'Songs on YouTube Music…'
-                              : 'Songs, artists, albums…',
+                              ? context.l10n.searchOnline
+                              : context.l10n.searchPlaceholder,
                           prefixIcon: Icon(Icons.search_rounded, color: p.textTertiary),
                           suffixIcon: _searchController.text.isNotEmpty
                               ? IconButton(
@@ -151,7 +152,7 @@ class _SearchScreenState extends State<SearchScreen> {
                           children: [
                             for (final filter in _filters(context))
                               Padding(
-                                padding: const EdgeInsets.only(right: 8),
+                                padding: const EdgeInsetsDirectional.only(end: 8),
                                 child: _buildChip(context, state, filter, p),
                               ),
                           ],
@@ -193,16 +194,16 @@ class _SearchScreenState extends State<SearchScreen> {
     }
     if (state.results.isEmpty) {
       return state.query.isEmpty
-          ? const EmptyStateWidget(
+          ? EmptyStateWidget(
               icon: Icons.search_rounded,
-              title: 'Search Your Music',
-              subtitle: 'Find songs, artists, or albums in your local library.',
+              title: context.l10n.search,
+              subtitle: context.l10n.searchPlaceholder,
             )
           : EmptyStateWidget(
               icon: Icons.search_off_rounded,
-              title: 'No Results Found',
-              subtitle: 'No matches found for "${state.query}". Try a different search term.',
-              primaryActionLabel: 'Clear Search',
+              title: context.l10n.noResultsFound,
+              subtitle: context.l10n.noResultsSubtitle,
+              primaryActionLabel: context.l10n.clearSearchHistory,
               primaryActionIcon: Icons.backspace_rounded,
               onPrimaryAction: () => _clear(context),
             );

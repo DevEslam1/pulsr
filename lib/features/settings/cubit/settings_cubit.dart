@@ -29,6 +29,7 @@ class SettingsCubit extends Cubit<SettingsState> {
   static const String _keyResumeAfterInterruption = 'setting_resume_after_interruption';
   static const String _keyWaveformSeekBar = 'setting_waveform_seek_bar';
   static const String _keyThemeMode = 'setting_theme_mode';
+  static const String _keyLanguageCode = PrefsKeys.languageCode;
   static const String _keyCustomAccent = 'setting_custom_accent';
   static const String _keyPlayerThemeMode = 'setting_player_theme_mode';
   static const String _keyVisualizerStyle = 'setting_visualizer_style';
@@ -201,6 +202,7 @@ class SettingsCubit extends Cubit<SettingsState> {
         resumeAfterInterruption: prefs.getBool(_keyResumeAfterInterruption) ?? true,
         waveformSeekBarEnabled: prefs.getBool(_keyWaveformSeekBar) ?? true,
         themeMode: themeMode,
+        languageCode: prefs.getString(_keyLanguageCode) ?? 'system',
         customAccentColorValue: customAccentValue,
         playerThemeMode: playerThemeMode,
         visualizerStyle: visualizerStyle,
@@ -289,6 +291,12 @@ class SettingsCubit extends Cubit<SettingsState> {
     emit(state.copyWith(themeMode: mode));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyThemeMode, mode.name);
+  }
+
+  Future<void> setLanguage(String languageCode) async {
+    emit(state.copyWith(languageCode: languageCode));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyLanguageCode, languageCode);
   }
 
   Future<void> setCustomAccentColor(Color color) async {
