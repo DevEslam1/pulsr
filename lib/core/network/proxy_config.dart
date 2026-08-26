@@ -43,6 +43,9 @@ class ProxyConfig {
       .where((s) => s.isNotEmpty)
       .toList();
 
+  static bool _isLocalhost(String host) =>
+      host == 'localhost' || host == '127.0.0.1' || host == '::1';
+
   bool isBypassed(Uri uri) {
     final host = uri.host.toLowerCase();
     for (final pattern in bypassList) {
@@ -51,7 +54,7 @@ class ProxyConfig {
         final domain = pattern.substring(2);
         if (host.endsWith(domain)) return true;
       }
-      if (pattern == 'localhost' && (host == 'localhost' || host == '127.0.0.1')) {
+      if (_isLocalhost(pattern) && _isLocalhost(host)) {
         return true;
       }
     }

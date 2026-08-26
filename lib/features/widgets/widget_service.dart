@@ -78,6 +78,8 @@ class WidgetService {
   Future<String?> _resolveArtworkPath(int songId) async {
     if (_lastArtworkSongId == songId && _lastArtworkPath != null) {
       if (await File(_lastArtworkPath!).exists()) return _lastArtworkPath;
+      _lastArtworkSongId = null;
+      _lastArtworkPath = null;
     }
     try {
       final dir = await getTemporaryDirectory();

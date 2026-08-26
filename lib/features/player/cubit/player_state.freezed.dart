@@ -40,6 +40,20 @@ mixin _$PlayerState {
   bool get isSpatializerSupported;
   bool get isSpatializerEnabled;
   double get volumeBoost;
+  bool get isCrossfeedEnabled;
+  double get crossfeedDelayUs;
+  double get crossfeedFeedDb;
+  bool get isLimiterEnabled;
+  double get limiterThresholdDb;
+  double get limiterReleaseMs;
+  bool get isReverbEnabled;
+  int get reverbPreset;
+  double get reverbWetDry;
+  double get stereoBalance;
+  bool get monoMix;
+  bool get isSincResamplerEnabled;
+  bool get hasOemAudio;
+  List<String> get detectedOemEngines;
   int get activeQueueSlot;
   double get playbackSpeed;
   int? get audioSessionId;
@@ -99,8 +113,7 @@ mixin _$PlayerState {
                 other.isDynamicsEnabled == isDynamicsEnabled) &&
             (identical(other.dynamicsPreset, dynamicsPreset) ||
                 other.dynamicsPreset == dynamicsPreset) &&
-            (identical(
-                    other.selectedHeadphoneProfile, selectedHeadphoneProfile) ||
+            (identical(other.selectedHeadphoneProfile, selectedHeadphoneProfile) ||
                 other.selectedHeadphoneProfile == selectedHeadphoneProfile) &&
             (identical(other.isSpatializerSupported, isSpatializerSupported) ||
                 other.isSpatializerSupported == isSpatializerSupported) &&
@@ -108,14 +121,39 @@ mixin _$PlayerState {
                 other.isSpatializerEnabled == isSpatializerEnabled) &&
             (identical(other.volumeBoost, volumeBoost) ||
                 other.volumeBoost == volumeBoost) &&
+            (identical(other.isCrossfeedEnabled, isCrossfeedEnabled) ||
+                other.isCrossfeedEnabled == isCrossfeedEnabled) &&
+            (identical(other.crossfeedDelayUs, crossfeedDelayUs) ||
+                other.crossfeedDelayUs == crossfeedDelayUs) &&
+            (identical(other.crossfeedFeedDb, crossfeedFeedDb) ||
+                other.crossfeedFeedDb == crossfeedFeedDb) &&
+            (identical(other.isLimiterEnabled, isLimiterEnabled) ||
+                other.isLimiterEnabled == isLimiterEnabled) &&
+            (identical(other.limiterThresholdDb, limiterThresholdDb) ||
+                other.limiterThresholdDb == limiterThresholdDb) &&
+            (identical(other.limiterReleaseMs, limiterReleaseMs) ||
+                other.limiterReleaseMs == limiterReleaseMs) &&
+            (identical(other.isReverbEnabled, isReverbEnabled) ||
+                other.isReverbEnabled == isReverbEnabled) &&
+            (identical(other.reverbPreset, reverbPreset) ||
+                other.reverbPreset == reverbPreset) &&
+            (identical(other.reverbWetDry, reverbWetDry) ||
+                other.reverbWetDry == reverbWetDry) &&
+            (identical(other.stereoBalance, stereoBalance) ||
+                other.stereoBalance == stereoBalance) &&
+            (identical(other.monoMix, monoMix) || other.monoMix == monoMix) &&
+            (identical(other.isSincResamplerEnabled, isSincResamplerEnabled) ||
+                other.isSincResamplerEnabled == isSincResamplerEnabled) &&
+            (identical(other.hasOemAudio, hasOemAudio) ||
+                other.hasOemAudio == hasOemAudio) &&
+            const DeepCollectionEquality()
+                .equals(other.detectedOemEngines, detectedOemEngines) &&
             (identical(other.activeQueueSlot, activeQueueSlot) ||
                 other.activeQueueSlot == activeQueueSlot) &&
             (identical(other.playbackSpeed, playbackSpeed) ||
                 other.playbackSpeed == playbackSpeed) &&
-            (identical(other.audioSessionId, audioSessionId) ||
-                other.audioSessionId == audioSessionId) &&
-            (identical(other.errorMessage, errorMessage) ||
-                other.errorMessage == errorMessage));
+            (identical(other.audioSessionId, audioSessionId) || other.audioSessionId == audioSessionId) &&
+            (identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
   }
 
   @override
@@ -147,6 +185,20 @@ mixin _$PlayerState {
         isSpatializerSupported,
         isSpatializerEnabled,
         volumeBoost,
+        isCrossfeedEnabled,
+        crossfeedDelayUs,
+        crossfeedFeedDb,
+        isLimiterEnabled,
+        limiterThresholdDb,
+        limiterReleaseMs,
+        isReverbEnabled,
+        reverbPreset,
+        reverbWetDry,
+        stereoBalance,
+        monoMix,
+        isSincResamplerEnabled,
+        hasOemAudio,
+        const DeepCollectionEquality().hash(detectedOemEngines),
         activeQueueSlot,
         playbackSpeed,
         audioSessionId,
@@ -155,7 +207,7 @@ mixin _$PlayerState {
 
   @override
   String toString() {
-    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isDynamicsEnabled: $isDynamicsEnabled, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, audioSessionId: $audioSessionId, errorMessage: $errorMessage)';
+    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isDynamicsEnabled: $isDynamicsEnabled, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, isCrossfeedEnabled: $isCrossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, isLimiterEnabled: $isLimiterEnabled, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, isReverbEnabled: $isReverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, isSincResamplerEnabled: $isSincResamplerEnabled, hasOemAudio: $hasOemAudio, detectedOemEngines: $detectedOemEngines, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, audioSessionId: $audioSessionId, errorMessage: $errorMessage)';
   }
 }
 
@@ -192,6 +244,20 @@ abstract mixin class $PlayerStateCopyWith<$Res> {
       bool isSpatializerSupported,
       bool isSpatializerEnabled,
       double volumeBoost,
+      bool isCrossfeedEnabled,
+      double crossfeedDelayUs,
+      double crossfeedFeedDb,
+      bool isLimiterEnabled,
+      double limiterThresholdDb,
+      double limiterReleaseMs,
+      bool isReverbEnabled,
+      int reverbPreset,
+      double reverbWetDry,
+      double stereoBalance,
+      bool monoMix,
+      bool isSincResamplerEnabled,
+      bool hasOemAudio,
+      List<String> detectedOemEngines,
       int activeQueueSlot,
       double playbackSpeed,
       int? audioSessionId,
@@ -236,6 +302,20 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
     Object? isSpatializerSupported = null,
     Object? isSpatializerEnabled = null,
     Object? volumeBoost = null,
+    Object? isCrossfeedEnabled = null,
+    Object? crossfeedDelayUs = null,
+    Object? crossfeedFeedDb = null,
+    Object? isLimiterEnabled = null,
+    Object? limiterThresholdDb = null,
+    Object? limiterReleaseMs = null,
+    Object? isReverbEnabled = null,
+    Object? reverbPreset = null,
+    Object? reverbWetDry = null,
+    Object? stereoBalance = null,
+    Object? monoMix = null,
+    Object? isSincResamplerEnabled = null,
+    Object? hasOemAudio = null,
+    Object? detectedOemEngines = null,
     Object? activeQueueSlot = null,
     Object? playbackSpeed = null,
     Object? audioSessionId = freezed,
@@ -346,6 +426,62 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
           ? _self.volumeBoost
           : volumeBoost // ignore: cast_nullable_to_non_nullable
               as double,
+      isCrossfeedEnabled: null == isCrossfeedEnabled
+          ? _self.isCrossfeedEnabled
+          : isCrossfeedEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      crossfeedDelayUs: null == crossfeedDelayUs
+          ? _self.crossfeedDelayUs
+          : crossfeedDelayUs // ignore: cast_nullable_to_non_nullable
+              as double,
+      crossfeedFeedDb: null == crossfeedFeedDb
+          ? _self.crossfeedFeedDb
+          : crossfeedFeedDb // ignore: cast_nullable_to_non_nullable
+              as double,
+      isLimiterEnabled: null == isLimiterEnabled
+          ? _self.isLimiterEnabled
+          : isLimiterEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      limiterThresholdDb: null == limiterThresholdDb
+          ? _self.limiterThresholdDb
+          : limiterThresholdDb // ignore: cast_nullable_to_non_nullable
+              as double,
+      limiterReleaseMs: null == limiterReleaseMs
+          ? _self.limiterReleaseMs
+          : limiterReleaseMs // ignore: cast_nullable_to_non_nullable
+              as double,
+      isReverbEnabled: null == isReverbEnabled
+          ? _self.isReverbEnabled
+          : isReverbEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      reverbPreset: null == reverbPreset
+          ? _self.reverbPreset
+          : reverbPreset // ignore: cast_nullable_to_non_nullable
+              as int,
+      reverbWetDry: null == reverbWetDry
+          ? _self.reverbWetDry
+          : reverbWetDry // ignore: cast_nullable_to_non_nullable
+              as double,
+      stereoBalance: null == stereoBalance
+          ? _self.stereoBalance
+          : stereoBalance // ignore: cast_nullable_to_non_nullable
+              as double,
+      monoMix: null == monoMix
+          ? _self.monoMix
+          : monoMix // ignore: cast_nullable_to_non_nullable
+              as bool,
+      isSincResamplerEnabled: null == isSincResamplerEnabled
+          ? _self.isSincResamplerEnabled
+          : isSincResamplerEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      hasOemAudio: null == hasOemAudio
+          ? _self.hasOemAudio
+          : hasOemAudio // ignore: cast_nullable_to_non_nullable
+              as bool,
+      detectedOemEngines: null == detectedOemEngines
+          ? _self.detectedOemEngines
+          : detectedOemEngines // ignore: cast_nullable_to_non_nullable
+              as List<String>,
       activeQueueSlot: null == activeQueueSlot
           ? _self.activeQueueSlot
           : activeQueueSlot // ignore: cast_nullable_to_non_nullable
@@ -486,6 +622,20 @@ extension PlayerStatePatterns on PlayerState {
             bool isSpatializerSupported,
             bool isSpatializerEnabled,
             double volumeBoost,
+            bool isCrossfeedEnabled,
+            double crossfeedDelayUs,
+            double crossfeedFeedDb,
+            bool isLimiterEnabled,
+            double limiterThresholdDb,
+            double limiterReleaseMs,
+            bool isReverbEnabled,
+            int reverbPreset,
+            double reverbWetDry,
+            double stereoBalance,
+            bool monoMix,
+            bool isSincResamplerEnabled,
+            bool hasOemAudio,
+            List<String> detectedOemEngines,
             int activeQueueSlot,
             double playbackSpeed,
             int? audioSessionId,
@@ -523,6 +673,20 @@ extension PlayerStatePatterns on PlayerState {
             _that.isSpatializerSupported,
             _that.isSpatializerEnabled,
             _that.volumeBoost,
+            _that.isCrossfeedEnabled,
+            _that.crossfeedDelayUs,
+            _that.crossfeedFeedDb,
+            _that.isLimiterEnabled,
+            _that.limiterThresholdDb,
+            _that.limiterReleaseMs,
+            _that.isReverbEnabled,
+            _that.reverbPreset,
+            _that.reverbWetDry,
+            _that.stereoBalance,
+            _that.monoMix,
+            _that.isSincResamplerEnabled,
+            _that.hasOemAudio,
+            _that.detectedOemEngines,
             _that.activeQueueSlot,
             _that.playbackSpeed,
             _that.audioSessionId,
@@ -574,6 +738,20 @@ extension PlayerStatePatterns on PlayerState {
             bool isSpatializerSupported,
             bool isSpatializerEnabled,
             double volumeBoost,
+            bool isCrossfeedEnabled,
+            double crossfeedDelayUs,
+            double crossfeedFeedDb,
+            bool isLimiterEnabled,
+            double limiterThresholdDb,
+            double limiterReleaseMs,
+            bool isReverbEnabled,
+            int reverbPreset,
+            double reverbWetDry,
+            double stereoBalance,
+            bool monoMix,
+            bool isSincResamplerEnabled,
+            bool hasOemAudio,
+            List<String> detectedOemEngines,
             int activeQueueSlot,
             double playbackSpeed,
             int? audioSessionId,
@@ -610,6 +788,20 @@ extension PlayerStatePatterns on PlayerState {
             _that.isSpatializerSupported,
             _that.isSpatializerEnabled,
             _that.volumeBoost,
+            _that.isCrossfeedEnabled,
+            _that.crossfeedDelayUs,
+            _that.crossfeedFeedDb,
+            _that.isLimiterEnabled,
+            _that.limiterThresholdDb,
+            _that.limiterReleaseMs,
+            _that.isReverbEnabled,
+            _that.reverbPreset,
+            _that.reverbWetDry,
+            _that.stereoBalance,
+            _that.monoMix,
+            _that.isSincResamplerEnabled,
+            _that.hasOemAudio,
+            _that.detectedOemEngines,
             _that.activeQueueSlot,
             _that.playbackSpeed,
             _that.audioSessionId,
@@ -660,6 +852,20 @@ extension PlayerStatePatterns on PlayerState {
             bool isSpatializerSupported,
             bool isSpatializerEnabled,
             double volumeBoost,
+            bool isCrossfeedEnabled,
+            double crossfeedDelayUs,
+            double crossfeedFeedDb,
+            bool isLimiterEnabled,
+            double limiterThresholdDb,
+            double limiterReleaseMs,
+            bool isReverbEnabled,
+            int reverbPreset,
+            double reverbWetDry,
+            double stereoBalance,
+            bool monoMix,
+            bool isSincResamplerEnabled,
+            bool hasOemAudio,
+            List<String> detectedOemEngines,
             int activeQueueSlot,
             double playbackSpeed,
             int? audioSessionId,
@@ -696,6 +902,20 @@ extension PlayerStatePatterns on PlayerState {
             _that.isSpatializerSupported,
             _that.isSpatializerEnabled,
             _that.volumeBoost,
+            _that.isCrossfeedEnabled,
+            _that.crossfeedDelayUs,
+            _that.crossfeedFeedDb,
+            _that.isLimiterEnabled,
+            _that.limiterThresholdDb,
+            _that.limiterReleaseMs,
+            _that.isReverbEnabled,
+            _that.reverbPreset,
+            _that.reverbWetDry,
+            _that.stereoBalance,
+            _that.monoMix,
+            _that.isSincResamplerEnabled,
+            _that.hasOemAudio,
+            _that.detectedOemEngines,
             _that.activeQueueSlot,
             _that.playbackSpeed,
             _that.audioSessionId,
@@ -737,12 +957,27 @@ class _PlayerState extends PlayerState {
       this.isSpatializerSupported = false,
       this.isSpatializerEnabled = false,
       this.volumeBoost = 0.0,
+      this.isCrossfeedEnabled = false,
+      this.crossfeedDelayUs = 350.0,
+      this.crossfeedFeedDb = -9.0,
+      this.isLimiterEnabled = false,
+      this.limiterThresholdDb = -0.2,
+      this.limiterReleaseMs = 50.0,
+      this.isReverbEnabled = false,
+      this.reverbPreset = 0,
+      this.reverbWetDry = 0.20,
+      this.stereoBalance = 0.0,
+      this.monoMix = false,
+      this.isSincResamplerEnabled = true,
+      this.hasOemAudio = false,
+      final List<String> detectedOemEngines = const [],
       this.activeQueueSlot = 0,
       this.playbackSpeed = 1.0,
       this.audioSessionId,
       this.errorMessage})
       : _queue = queue,
         _lyrics = lyrics,
+        _detectedOemEngines = detectedOemEngines,
         super._();
 
   @override
@@ -833,6 +1068,55 @@ class _PlayerState extends PlayerState {
   final double volumeBoost;
   @override
   @JsonKey()
+  final bool isCrossfeedEnabled;
+  @override
+  @JsonKey()
+  final double crossfeedDelayUs;
+  @override
+  @JsonKey()
+  final double crossfeedFeedDb;
+  @override
+  @JsonKey()
+  final bool isLimiterEnabled;
+  @override
+  @JsonKey()
+  final double limiterThresholdDb;
+  @override
+  @JsonKey()
+  final double limiterReleaseMs;
+  @override
+  @JsonKey()
+  final bool isReverbEnabled;
+  @override
+  @JsonKey()
+  final int reverbPreset;
+  @override
+  @JsonKey()
+  final double reverbWetDry;
+  @override
+  @JsonKey()
+  final double stereoBalance;
+  @override
+  @JsonKey()
+  final bool monoMix;
+  @override
+  @JsonKey()
+  final bool isSincResamplerEnabled;
+  @override
+  @JsonKey()
+  final bool hasOemAudio;
+  final List<String> _detectedOemEngines;
+  @override
+  @JsonKey()
+  List<String> get detectedOemEngines {
+    if (_detectedOemEngines is EqualUnmodifiableListView)
+      return _detectedOemEngines;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_detectedOemEngines);
+  }
+
+  @override
+  @JsonKey()
   final int activeQueueSlot;
   @override
   @JsonKey()
@@ -897,8 +1181,7 @@ class _PlayerState extends PlayerState {
                 other.isDynamicsEnabled == isDynamicsEnabled) &&
             (identical(other.dynamicsPreset, dynamicsPreset) ||
                 other.dynamicsPreset == dynamicsPreset) &&
-            (identical(
-                    other.selectedHeadphoneProfile, selectedHeadphoneProfile) ||
+            (identical(other.selectedHeadphoneProfile, selectedHeadphoneProfile) ||
                 other.selectedHeadphoneProfile == selectedHeadphoneProfile) &&
             (identical(other.isSpatializerSupported, isSpatializerSupported) ||
                 other.isSpatializerSupported == isSpatializerSupported) &&
@@ -906,14 +1189,39 @@ class _PlayerState extends PlayerState {
                 other.isSpatializerEnabled == isSpatializerEnabled) &&
             (identical(other.volumeBoost, volumeBoost) ||
                 other.volumeBoost == volumeBoost) &&
+            (identical(other.isCrossfeedEnabled, isCrossfeedEnabled) ||
+                other.isCrossfeedEnabled == isCrossfeedEnabled) &&
+            (identical(other.crossfeedDelayUs, crossfeedDelayUs) ||
+                other.crossfeedDelayUs == crossfeedDelayUs) &&
+            (identical(other.crossfeedFeedDb, crossfeedFeedDb) ||
+                other.crossfeedFeedDb == crossfeedFeedDb) &&
+            (identical(other.isLimiterEnabled, isLimiterEnabled) ||
+                other.isLimiterEnabled == isLimiterEnabled) &&
+            (identical(other.limiterThresholdDb, limiterThresholdDb) ||
+                other.limiterThresholdDb == limiterThresholdDb) &&
+            (identical(other.limiterReleaseMs, limiterReleaseMs) ||
+                other.limiterReleaseMs == limiterReleaseMs) &&
+            (identical(other.isReverbEnabled, isReverbEnabled) ||
+                other.isReverbEnabled == isReverbEnabled) &&
+            (identical(other.reverbPreset, reverbPreset) ||
+                other.reverbPreset == reverbPreset) &&
+            (identical(other.reverbWetDry, reverbWetDry) ||
+                other.reverbWetDry == reverbWetDry) &&
+            (identical(other.stereoBalance, stereoBalance) ||
+                other.stereoBalance == stereoBalance) &&
+            (identical(other.monoMix, monoMix) || other.monoMix == monoMix) &&
+            (identical(other.isSincResamplerEnabled, isSincResamplerEnabled) ||
+                other.isSincResamplerEnabled == isSincResamplerEnabled) &&
+            (identical(other.hasOemAudio, hasOemAudio) ||
+                other.hasOemAudio == hasOemAudio) &&
+            const DeepCollectionEquality()
+                .equals(other._detectedOemEngines, _detectedOemEngines) &&
             (identical(other.activeQueueSlot, activeQueueSlot) ||
                 other.activeQueueSlot == activeQueueSlot) &&
             (identical(other.playbackSpeed, playbackSpeed) ||
                 other.playbackSpeed == playbackSpeed) &&
-            (identical(other.audioSessionId, audioSessionId) ||
-                other.audioSessionId == audioSessionId) &&
-            (identical(other.errorMessage, errorMessage) ||
-                other.errorMessage == errorMessage));
+            (identical(other.audioSessionId, audioSessionId) || other.audioSessionId == audioSessionId) &&
+            (identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
   }
 
   @override
@@ -945,6 +1253,20 @@ class _PlayerState extends PlayerState {
         isSpatializerSupported,
         isSpatializerEnabled,
         volumeBoost,
+        isCrossfeedEnabled,
+        crossfeedDelayUs,
+        crossfeedFeedDb,
+        isLimiterEnabled,
+        limiterThresholdDb,
+        limiterReleaseMs,
+        isReverbEnabled,
+        reverbPreset,
+        reverbWetDry,
+        stereoBalance,
+        monoMix,
+        isSincResamplerEnabled,
+        hasOemAudio,
+        const DeepCollectionEquality().hash(_detectedOemEngines),
         activeQueueSlot,
         playbackSpeed,
         audioSessionId,
@@ -953,7 +1275,7 @@ class _PlayerState extends PlayerState {
 
   @override
   String toString() {
-    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isDynamicsEnabled: $isDynamicsEnabled, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, audioSessionId: $audioSessionId, errorMessage: $errorMessage)';
+    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isDynamicsEnabled: $isDynamicsEnabled, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, isCrossfeedEnabled: $isCrossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, isLimiterEnabled: $isLimiterEnabled, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, isReverbEnabled: $isReverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, isSincResamplerEnabled: $isSincResamplerEnabled, hasOemAudio: $hasOemAudio, detectedOemEngines: $detectedOemEngines, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, audioSessionId: $audioSessionId, errorMessage: $errorMessage)';
   }
 }
 
@@ -992,6 +1314,20 @@ abstract mixin class _$PlayerStateCopyWith<$Res>
       bool isSpatializerSupported,
       bool isSpatializerEnabled,
       double volumeBoost,
+      bool isCrossfeedEnabled,
+      double crossfeedDelayUs,
+      double crossfeedFeedDb,
+      bool isLimiterEnabled,
+      double limiterThresholdDb,
+      double limiterReleaseMs,
+      bool isReverbEnabled,
+      int reverbPreset,
+      double reverbWetDry,
+      double stereoBalance,
+      bool monoMix,
+      bool isSincResamplerEnabled,
+      bool hasOemAudio,
+      List<String> detectedOemEngines,
       int activeQueueSlot,
       double playbackSpeed,
       int? audioSessionId,
@@ -1036,6 +1372,20 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
     Object? isSpatializerSupported = null,
     Object? isSpatializerEnabled = null,
     Object? volumeBoost = null,
+    Object? isCrossfeedEnabled = null,
+    Object? crossfeedDelayUs = null,
+    Object? crossfeedFeedDb = null,
+    Object? isLimiterEnabled = null,
+    Object? limiterThresholdDb = null,
+    Object? limiterReleaseMs = null,
+    Object? isReverbEnabled = null,
+    Object? reverbPreset = null,
+    Object? reverbWetDry = null,
+    Object? stereoBalance = null,
+    Object? monoMix = null,
+    Object? isSincResamplerEnabled = null,
+    Object? hasOemAudio = null,
+    Object? detectedOemEngines = null,
     Object? activeQueueSlot = null,
     Object? playbackSpeed = null,
     Object? audioSessionId = freezed,
@@ -1146,6 +1496,62 @@ class __$PlayerStateCopyWithImpl<$Res> implements _$PlayerStateCopyWith<$Res> {
           ? _self.volumeBoost
           : volumeBoost // ignore: cast_nullable_to_non_nullable
               as double,
+      isCrossfeedEnabled: null == isCrossfeedEnabled
+          ? _self.isCrossfeedEnabled
+          : isCrossfeedEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      crossfeedDelayUs: null == crossfeedDelayUs
+          ? _self.crossfeedDelayUs
+          : crossfeedDelayUs // ignore: cast_nullable_to_non_nullable
+              as double,
+      crossfeedFeedDb: null == crossfeedFeedDb
+          ? _self.crossfeedFeedDb
+          : crossfeedFeedDb // ignore: cast_nullable_to_non_nullable
+              as double,
+      isLimiterEnabled: null == isLimiterEnabled
+          ? _self.isLimiterEnabled
+          : isLimiterEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      limiterThresholdDb: null == limiterThresholdDb
+          ? _self.limiterThresholdDb
+          : limiterThresholdDb // ignore: cast_nullable_to_non_nullable
+              as double,
+      limiterReleaseMs: null == limiterReleaseMs
+          ? _self.limiterReleaseMs
+          : limiterReleaseMs // ignore: cast_nullable_to_non_nullable
+              as double,
+      isReverbEnabled: null == isReverbEnabled
+          ? _self.isReverbEnabled
+          : isReverbEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      reverbPreset: null == reverbPreset
+          ? _self.reverbPreset
+          : reverbPreset // ignore: cast_nullable_to_non_nullable
+              as int,
+      reverbWetDry: null == reverbWetDry
+          ? _self.reverbWetDry
+          : reverbWetDry // ignore: cast_nullable_to_non_nullable
+              as double,
+      stereoBalance: null == stereoBalance
+          ? _self.stereoBalance
+          : stereoBalance // ignore: cast_nullable_to_non_nullable
+              as double,
+      monoMix: null == monoMix
+          ? _self.monoMix
+          : monoMix // ignore: cast_nullable_to_non_nullable
+              as bool,
+      isSincResamplerEnabled: null == isSincResamplerEnabled
+          ? _self.isSincResamplerEnabled
+          : isSincResamplerEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      hasOemAudio: null == hasOemAudio
+          ? _self.hasOemAudio
+          : hasOemAudio // ignore: cast_nullable_to_non_nullable
+              as bool,
+      detectedOemEngines: null == detectedOemEngines
+          ? _self._detectedOemEngines
+          : detectedOemEngines // ignore: cast_nullable_to_non_nullable
+              as List<String>,
       activeQueueSlot: null == activeQueueSlot
           ? _self.activeQueueSlot
           : activeQueueSlot // ignore: cast_nullable_to_non_nullable

@@ -73,7 +73,10 @@ class LrcParser {
     return result;
   }
 
-  /// Searches for a local `.lrc` file matching the audio file path
+  /// Searches for a local `.lrc` file matching the audio file path across standard locations:
+  /// 1. Exact path with .lrc extension (e.g. /Music/Song.lrc)
+  /// 2. /Music/Lyrics/Song.lrc
+  /// 3. /Music/lyrics.lrc
   static Future<List<LyricsLine>?> findAndParseLrc(
     String audioFilePath, {
     LyricsSource source = LyricsSource.externalLrc,
@@ -81,10 +84,28 @@ class LrcParser {
     try {
       final lastDot = audioFilePath.lastIndexOf('.');
       if (lastDot == -1) return null;
-      final lrcPath = '${audioFilePath.substring(0, lastDot)}.lrc';
-      final file = File(lrcPath);
+      final directLrcPath = '${audioFilePath.substring(0, lastDot)}.lrc';
+      final file = File(directLrcPath);
       if (await file.exists()) {
         final content = await file.readAsString();
+        final lines = parse(content, source: source);
+        if (lines.isNotEmpty) return lines;
+      }
+
+      // Check sibling "Lyrics" subdirectory
+      final parentDir = File(audioFilePath).parent;
+      final fileName = audioFilePath.split(Platform.pathSeparator).last;
+      final fileNameWithoutExt = fileName.substring(0, fileName.lastIndexOf('.'));
+      final lyricsSubdirLrc = File('${parentDir.path}${Platform.pathSeparator}Lyrics${Platform.pathSeparator}$fileNameWithoutExt.lrc');
+      if (await lyricsSubdirLrc.exists()) {
+        final content = await lyricsSubdirLrc.readAsString();
+        final lines = parse(content, source: source);
+        if (lines.isNotEmpty) return lines;
+      }
+
+      final genericLrc = File('${parentDir.path}${Platform.pathSeparator}lyrics.lrc');
+      if (await genericLrc.exists()) {
+        final content = await genericLrc.readAsString();
         final lines = parse(content, source: source);
         if (lines.isNotEmpty) return lines;
       }

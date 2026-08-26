@@ -28,6 +28,7 @@ class MainActivity : AudioServiceActivity() {
     private var ytDownloadPlugin: YtDownloadPlugin? = null
     private var waveformPlugin: WaveformPlugin? = null
     private var proxyPlugin: ProxyPlugin? = null
+    private var hiResDacPlugin: HiResDacPlugin? = null
     private val backgroundExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
  
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -110,7 +111,7 @@ class MainActivity : AudioServiceActivity() {
             }
         }
 
-        if (fromColdStart) {
+        if (fromColdStart || fileOpenerChannel == null) {
             pendingAudioUri = uri.toString()
         } else {
             fileOpenerChannel?.invokeMethod("onAudioFileOpened", uri.toString())
@@ -133,6 +134,7 @@ class MainActivity : AudioServiceActivity() {
         ytDownloadPlugin = YtDownloadPlugin.registerWith(flutterEngine, applicationContext)
         waveformPlugin = WaveformPlugin.registerWith(flutterEngine, applicationContext)
         proxyPlugin = ProxyPlugin.registerWith(flutterEngine, applicationContext)
+        hiResDacPlugin = HiResDacPlugin(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
  
         val fileChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FILE_OPENER_CHANNEL)
         fileOpenerChannel = fileChannel
@@ -244,6 +246,8 @@ class MainActivity : AudioServiceActivity() {
         waveformPlugin = null
         proxyPlugin?.cleanup()
         proxyPlugin = null
+        hiResDacPlugin?.dispose()
+        hiResDacPlugin = null
         fileOpenerChannel?.setMethodCallHandler(null)
         fileOpenerChannel = null
         lyricsChannel?.setMethodCallHandler(null)

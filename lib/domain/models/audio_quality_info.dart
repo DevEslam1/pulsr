@@ -40,6 +40,19 @@ class AudioQualityInfo {
     required this.icon,
   });
 
+  /// The audio rendering pipeline configuration based on source format and bit-depth.
+  String get renderEngineDescription {
+    if (tier == AudioQualityTier.hiResLossless || tier == AudioQualityTier.lossless) {
+      return 'ExoPlayer Media3 • 32-bit Float PCM';
+    } else if (format == 'AAC' || codecName.contains('AAC')) {
+      return 'ExoPlayer Media3 • Hardware Offload (AAC / DSP)';
+    } else if (format == 'MP3' || format == 'OPUS' || format == 'OGG') {
+      return 'ExoPlayer Media3 • Hardware Offload ($format / DSP)';
+    } else {
+      return 'ExoPlayer Media3 • Direct AudioSink';
+    }
+  }
+
   factory AudioQualityInfo.fromSong(
     SongsTableData? song, {
     int? explicitSampleRate,
@@ -73,7 +86,7 @@ class AudioQualityInfo {
           ? 64
           : streamingQuality == YtmAudioQuality.medium
               ? 128
-              : 160;
+              : 256;
       final kbps = explicitBitrateKbps ?? defaultKbps;
       final tier = kbps >= 160
           ? AudioQualityTier.highQuality
@@ -150,11 +163,11 @@ class AudioQualityInfo {
             (!hasRealHeader &&
                 ((calculatedBitrate != null && calculatedBitrate >= 1411) ||
                     path.contains('24bit') ||
-                    path.contains('96k') ||
-                    path.contains('192k') ||
                     path.contains('hi-res') ||
                     path.contains('hires') ||
-                    path.contains('master'))));
+                    path.contains('master') ||
+                    RegExp(r'[\s_\-\.\/]96k(?:hz)?[\s_\-\.\/]', caseSensitive: false).hasMatch(path) ||
+                    RegExp(r'[\s_\-\.\/]192k(?:hz)?[\s_\-\.\/]', caseSensitive: false).hasMatch(path))));
 
     final AudioQualityTier tier;
     final String tierLabel;

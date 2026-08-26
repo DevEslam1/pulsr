@@ -12,6 +12,14 @@ class YtmRateLimiter {
   YtmRateLimiter._();
   static final YtmRateLimiter shared = YtmRateLimiter._();
 
+  /// Test-only: restores pristine bucket/backoff state (the limiter is a
+  /// process-wide singleton, so tests need a way to isolate runs).
+  static void debugReset() {
+    shared._tokens = _maxTokens.toDouble();
+    shared._lastRefill = DateTime.now();
+    shared._backoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
   static const int _maxTokens = 8;
   static const double _refillRate = 4.0; // tokens per second
 
@@ -19,16 +27,17 @@ class YtmRateLimiter {
   DateTime _lastRefill = DateTime.now();
   final _random = Random();
 
-  /// How long to back off after a 429 response.
-  Duration _backoffDuration = Duration.zero;
+  /// Wall-clock deadline every caller must respect before sending; using an
+  /// absolute instant (instead of a one-shot duration) means every concurrent
+  /// caller waits out the full backoff, not just the first one.
+  DateTime _backoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
 
   /// Acquires a permit before making a request. If the bucket is empty,
   /// waits until a token is available.
   Future<void> acquirePermit() async {
-    // If we're in a backoff period, wait it out
-    if (_backoffDuration > Duration.zero) {
-      await Future<void>.delayed(_backoffDuration);
-      _backoffDuration = Duration.zero;
+    final now = DateTime.now();
+    if (now.isBefore(_backoffUntil)) {
+      await Future<void>.delayed(_backoffUntil.difference(now));
     }
 
     _refill();
@@ -47,20 +56,21 @@ class YtmRateLimiter {
   /// Called when a 429 rate-limit response is received. Triggers exponential
   /// backoff with jitter for subsequent requests.
   void onRateLimited() {
-    final base = _backoffDuration == Duration.zero
+    final now = DateTime.now();
+    final remaining = _backoffUntil.isAfter(now)
+        ? _backoffUntil.difference(now)
+        : Duration.zero;
+    var base = remaining == Duration.zero
         ? const Duration(seconds: 2)
-        : _backoffDuration * 2;
+        : remaining * 2;
     final jitter = Duration(milliseconds: _random.nextInt(1000));
-    _backoffDuration = base + jitter;
-    // Cap at 30 seconds
-    if (_backoffDuration.inSeconds > 30) {
-      _backoffDuration = Duration(seconds: 30) + jitter;
-    }
+    if (base.inSeconds > 30) base = const Duration(seconds: 30);
+    _backoffUntil = now.add(base + jitter);
   }
 
   /// Called on a successful request to reset backoff state.
   void onSuccess() {
-    _backoffDuration = Duration.zero;
+    _backoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
   }
 
   void _refill() {

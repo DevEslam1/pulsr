@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 
@@ -58,7 +59,7 @@ class SpeedPickerSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 Text(
-                  'Playback Speed',
+                  context.l10n.playbackSpeed,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w800,
                         color: p.textPrimary,
@@ -66,7 +67,7 @@ class SpeedPickerSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Current speed: ${formatSpeed(currentSpeed)}',
+                  context.l10n.currentSpeed(formatSpeed(currentSpeed)),
                   style: TextStyle(color: p.textSecondary, fontSize: 13),
                 ),
                 const SizedBox(height: 20),

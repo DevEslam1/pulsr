@@ -66,59 +66,10 @@ object ProxyManager {
             .map { it.trim().lowercase() }
             .filter { it.isNotEmpty() }
 
-        applySystemProperties()
+        // Global JVM system properties intentionally omitted to prevent accidental proxying
+        // of third-party SDK traffic (Firebase, Sentry, crash analytics). Proxies are injected
+        // explicitly via getProxy() into InnertubeClient and PulsrDownloader.
         Log.i(TAG, "Proxy configured: enabled=$enabled, type=$proxyType, host=${this.host}:${this.port}, hasAuth=${this.username.isNotEmpty()}")
-    }
-
-    private fun applySystemProperties() {
-        if (enabled && host.isNotEmpty() && port > 0) {
-            val nonProxyHosts = bypassList.joinToString("|")
-
-            if (proxyType == "socks5" || proxyType == "socks") {
-                System.setProperty("socksProxyHost", host)
-                System.setProperty("socksProxyPort", port.toString())
-                System.clearProperty("http.proxyHost")
-                System.clearProperty("http.proxyPort")
-                System.clearProperty("https.proxyHost")
-                System.clearProperty("https.proxyPort")
-            } else {
-                System.setProperty("http.proxyHost", host)
-                System.setProperty("http.proxyPort", port.toString())
-                System.setProperty("https.proxyHost", host)
-                System.setProperty("https.proxyPort", port.toString())
-                System.setProperty("http.nonProxyHosts", nonProxyHosts)
-                System.setProperty("https.nonProxyHosts", nonProxyHosts)
-                System.clearProperty("socksProxyHost")
-                System.clearProperty("socksProxyPort")
-            }
-
-            if (username.isNotEmpty()) {
-                val currentHost = host
-                val currentPort = port
-                val user = username
-                val pass = password
-                Authenticator.setDefault(object : Authenticator() {
-                    override fun getPasswordAuthentication(): PasswordAuthentication? {
-                        if (requestingHost.equals(currentHost, ignoreCase = true) || requestingPort == currentPort) {
-                            return PasswordAuthentication(user, pass.toCharArray())
-                        }
-                        return null
-                    }
-                })
-            } else {
-                Authenticator.setDefault(null)
-            }
-        } else {
-            System.clearProperty("http.proxyHost")
-            System.clearProperty("http.proxyPort")
-            System.clearProperty("https.proxyHost")
-            System.clearProperty("https.proxyPort")
-            System.clearProperty("http.nonProxyHosts")
-            System.clearProperty("https.nonProxyHosts")
-            System.clearProperty("socksProxyHost")
-            System.clearProperty("socksProxyPort")
-            Authenticator.setDefault(null)
-        }
     }
 
     /**

@@ -5,6 +5,7 @@ import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
@@ -131,7 +132,7 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
                                 ? () => context.read<PlayerCubit>().playSong(songs.first, queue: songs)
                                 : null,
                             icon: const Icon(Icons.play_arrow_rounded),
-                            label: const Text('Play All'),
+                            label: Text(context.l10n.playAll),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -144,7 +145,7 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
                                   }
                                 : null,
                             icon: Icon(Icons.shuffle_rounded, color: p.accent),
-                            label: const Text('Shuffle'),
+                            label: Text(context.l10n.shuffle),
                           ),
                         ),
                       ],

@@ -1,8 +1,8 @@
-// lib/domain/repositories/music_repository_interface.dart
 import '../../core/errors/failures.dart';
 import '../../data/db/app_database.dart';
 import '../models/genre_item.dart';
 import '../models/year_item.dart';
+import '../models/ytm_track.dart';
 
 abstract class IMusicRepository {
   // --- SONGS ---
@@ -42,6 +42,7 @@ abstract class IMusicRepository {
 
   Stream<Result<List<SongsTableData>>> watchFavorites();
   Future<Result<List<SongsTableData>>> getFavorites();
+  Future<Result<int>> importOnlineTracksAsFavorites(List<YtmTrack> tracks);
 
   Stream<Result<List<SongsTableData>>> watchRecentlyPlayed({int limit = 20});
   Future<Result<List<SongsTableData>>> getRecentlyPlayed({int limit = 20});
@@ -116,11 +117,14 @@ abstract class IMusicRepository {
     int? bitDepth,
     int? bitrateKbps,
     String? codec,
+    double? loudnessRange,
   });
 
   // --- GENRES ---
   Stream<Result<List<GenreItem>>> watchGenres();
+  Future<Result<List<GenreItem>>> getGenres();
   Stream<Result<List<SongsTableData>>> watchGenreSongs(String genre);
+  Future<Result<List<SongsTableData>>> getGenreSongs(String genre);
 
   // --- YEARS ---
   Stream<Result<List<YearItem>>> watchYears();

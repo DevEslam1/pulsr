@@ -6,6 +6,7 @@ import '../../../core/constants/app_radii.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/smart_playlist_criteria.dart';
@@ -82,7 +83,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                 Icon(Icons.auto_awesome_rounded, color: p.accent, size: 22),
                 const SizedBox(width: 8),
                 Text(
-                  state.isEditing ? 'Edit Smart Playlist' : 'Smart Playlist Builder',
+                  state.isEditing ? context.l10n.editPlaylist : context.l10n.createSmartPlaylist,
                   style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
                 ),
               ],
@@ -105,7 +106,7 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                       )
                     : Icon(Icons.check_rounded, color: p.accent),
                 label: Text(
-                  state.isEditing ? 'Update' : 'Save',
+                  context.l10n.save,
                   style: TextStyle(color: p.accent, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -497,7 +498,7 @@ class _RuleCardState extends State<_RuleCard> {
           const SizedBox(height: 8),
 
           // Value Input
-          if (widget.rule.field == SmartRuleField.isFavorite)
+          if (widget.rule.field == SmartRuleField.isFavorite || widget.rule.field == SmartRuleField.isLossless)
             DropdownButtonFormField<String>(
               initialValue: widget.rule.value.toLowerCase() == 'true' || widget.rule.value == '1' ? 'true' : 'false',
               decoration: InputDecoration(
@@ -524,6 +525,7 @@ class _RuleCardState extends State<_RuleCard> {
               },
               keyboardType: (widget.rule.field == SmartRuleField.playCount ||
                       widget.rule.field == SmartRuleField.year ||
+                      widget.rule.field == SmartRuleField.decade ||
                       widget.rule.field == SmartRuleField.durationMs ||
                       widget.rule.operator == SmartOperator.withinDays)
                   ? TextInputType.number
@@ -546,10 +548,20 @@ class _RuleCardState extends State<_RuleCard> {
     switch (field) {
       case SmartRuleField.playCount:
         return 'e.g. 5';
+      case SmartRuleField.artist:
+        return 'e.g. Queen, Daft Punk...';
+      case SmartRuleField.album:
+        return 'e.g. Discovery, Rumours...';
+      case SmartRuleField.title:
+        return 'e.g. Bohemian, Love...';
       case SmartRuleField.genre:
         return 'e.g. Rock, Pop, Jazz...';
       case SmartRuleField.year:
         return 'e.g. 2024';
+      case SmartRuleField.decade:
+        return 'e.g. 1980, 1990, 2000, 2020...';
+      case SmartRuleField.isLossless:
+        return 'FLAC, WAV, ALAC';
       case SmartRuleField.dateAdded:
         return 'e.g. 30';
       case SmartRuleField.durationMs:

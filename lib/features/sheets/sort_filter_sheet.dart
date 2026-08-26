@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/adaptive.dart';
+import '../../core/utils/l10n_extensions.dart';
 
 class SortFilterSheet extends StatelessWidget {
   final String currentSort;
@@ -20,10 +21,10 @@ class SortFilterSheet extends StatelessWidget {
     final p = context.palette;
     final screenHeight = MediaQuery.sizeOf(context).height;
     final sortOptions = [
-      {'key': 'title', 'label': 'Title'},
-      {'key': 'artist', 'label': 'Artist'},
-      {'key': 'dateAdded', 'label': 'Recently Added'},
-      {'key': 'duration', 'label': 'Duration'},
+      {'key': 'title', 'label': context.l10n.title},
+      {'key': 'artist', 'label': context.l10n.artist},
+      {'key': 'dateAdded', 'label': context.l10n.recentlyAdded},
+      {'key': 'duration', 'label': context.l10n.duration},
     ];
 
     return GestureDetector(
@@ -62,7 +63,7 @@ class SortFilterSheet extends StatelessWidget {
                       ),
                       const SizedBox(height: 20),
                       Text(
-                        'Sort & Filter',
+                        context.l10n.sortAndFilter,
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.w800,
                               color: p.textPrimary,

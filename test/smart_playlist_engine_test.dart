@@ -41,10 +41,10 @@ void main() {
   }
 
   group('SmartPlaylistEngine edge cases', () {
-    test('withinDays on dateAdded matches millisecond-granularity timestamps', () async {
-      final nowMs = DateTime.now().millisecondsSinceEpoch;
-      await insertSong(id: 10, title: 'FreshMs', dateAdded: nowMs - (3600 * 1000)); // 1 hour ago in ms
-      await insertSong(id: 20, title: 'OldMs', dateAdded: nowMs - (30 * 86400 * 1000)); // 30 days ago in ms
+    test('withinDays on dateAdded matches second-granularity Unix timestamps', () async {
+      final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      await insertSong(id: 10, title: 'FreshSec', dateAdded: nowSec - 3600); // 1 hour ago in sec
+      await insertSong(id: 20, title: 'OldSec', dateAdded: nowSec - (30 * 86400)); // 30 days ago in sec
 
       final criteria = SmartCriteria(
         rules: const [
@@ -57,14 +57,68 @@ void main() {
       );
 
       final result = await engine.evaluateCriteria(criteria);
-      expect(result.map((s) => s.title), contains('FreshMs'));
-      expect(result.map((s) => s.title), isNot(contains('OldMs')));
+      expect(result.map((s) => s.title), contains('FreshSec'));
+      expect(result.map((s) => s.title), isNot(contains('OldSec')));
+    });
+
+    test('withinDays on lastPlayed matches second-granularity Unix timestamps', () async {
+      final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      await insertSong(id: 101, title: 'PlayedRecently', lastPlayed: nowSec - 3600);
+      await insertSong(id: 102, title: 'PlayedLongAgo', lastPlayed: nowSec - (60 * 86400));
+
+      final criteria = SmartCriteria(
+        rules: const [
+          SmartRule(
+            field: SmartRuleField.lastPlayed,
+            operator: SmartOperator.withinDays,
+            value: '14',
+          ),
+        ],
+      );
+
+      final result = await engine.evaluateCriteria(criteria);
+      expect(result.map((s) => s.title), contains('PlayedRecently'));
+      expect(result.map((s) => s.title), isNot(contains('PlayedLongAgo')));
+    });
+
+    test('isLossless rule matches FLAC, WAV, ALAC, AIFF, DSF, and DFF', () async {
+      await db.into(db.songsTable).insert(SongsTableCompanion.insert(
+            id: const Value(201),
+            title: 'DsdDsf',
+            path: '/music/track.dsf',
+          ));
+      await db.into(db.songsTable).insert(SongsTableCompanion.insert(
+            id: const Value(202),
+            title: 'DsdDff',
+            path: '/music/track.dff',
+          ));
+      await db.into(db.songsTable).insert(SongsTableCompanion.insert(
+            id: const Value(203),
+            title: 'Mp3Lossy',
+            path: '/music/track.mp3',
+          ));
+
+      final criteria = const SmartCriteria(
+        rules: [
+          SmartRule(
+            field: SmartRuleField.isLossless,
+            operator: SmartOperator.equals,
+            value: '',
+          ),
+        ],
+      );
+
+      final result = await engine.evaluateCriteria(criteria);
+      final titles = result.map((s) => s.title).toList();
+      expect(titles, contains('DsdDsf'));
+      expect(titles, contains('DsdDff'));
+      expect(titles, isNot(contains('Mp3Lossy')));
     });
 
     test('withinDays with default 30 days when value missing', () async {
-      final nowMs = DateTime.now().millisecondsSinceEpoch;
-      await insertSong(id: 1, title: 'WithinDefault', dateAdded: nowMs - (20 * 86400 * 1000)); // 20 days
-      await insertSong(id: 2, title: 'TooOld', dateAdded: nowMs - (45 * 86400 * 1000)); // 45 days
+      final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      await insertSong(id: 1, title: 'WithinDefault', dateAdded: nowSec - (20 * 86400)); // 20 days
+      await insertSong(id: 2, title: 'TooOld', dateAdded: nowSec - (45 * 86400)); // 45 days
 
       final criteria = const SmartCriteria(
         rules: [
@@ -103,10 +157,10 @@ void main() {
     });
 
     test('matchAll combines rules with AND', () async {
-      final nowMs = DateTime.now().millisecondsSinceEpoch;
-      await insertSong(id: 1, title: 'Matches Both', playCount: 10, dateAdded: nowMs - (3600 * 1000));
-      await insertSong(id: 2, title: 'Only Plays', playCount: 10, dateAdded: nowMs - (60 * 86400 * 1000));
-      await insertSong(id: 3, title: 'Only Fresh', playCount: 0, dateAdded: nowMs - (3600 * 1000));
+      final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+      await insertSong(id: 1, title: 'Matches Both', playCount: 10, dateAdded: nowSec - 3600);
+      await insertSong(id: 2, title: 'Only Plays', playCount: 10, dateAdded: nowSec - (60 * 86400));
+      await insertSong(id: 3, title: 'Only Fresh', playCount: 0, dateAdded: nowSec - 3600);
 
       final criteria = SmartCriteria(
         rules: const [

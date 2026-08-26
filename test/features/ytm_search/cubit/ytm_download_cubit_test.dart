@@ -148,5 +148,19 @@ void main() {
       final countAgain = cubit.downloadAll([song1, song2]);
       expect(countAgain, 0);
     });
+
+    test('persisted running and queued download states reset to idle on init', () async {
+      SharedPreferences.setMockInitialValues({
+        'ytm_download_states': '{"v1":{"status":"running"},"v2":{"status":"queued"},"v3":{"status":"done"}}',
+      });
+      final newCubit = YtmDownloadCubit(mockService, mockPlayerCubit);
+      // Wait for _loadPersistedState async execution
+      await Future.delayed(const Duration(milliseconds: 50));
+
+      expect(newCubit.state.itemFor('v1').status, YtDownloadStatus.idle);
+      expect(newCubit.state.itemFor('v2').status, YtDownloadStatus.idle);
+      expect(newCubit.state.itemFor('v3').status, YtDownloadStatus.done);
+      await newCubit.close();
+    });
   });
 }

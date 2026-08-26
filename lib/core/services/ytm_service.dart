@@ -3,7 +3,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:ui' as ui;
 
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -250,15 +249,9 @@ class YtmService {
           final cookies = account.cookies;
           if (cookies != null && cookies.isNotEmpty) {
             headers['Cookie'] = cookies;
-            final sapisid = _extractCookieValue(cookies, 'SAPISID') ??
-                _extractCookieValue(cookies, '__Secure-3PAPISID') ??
-                _extractCookieValue(cookies, '__Secure-1PAPISID');
-            if (sapisid != null && sapisid.isNotEmpty) {
-              final timestamp =
-                  (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
-              final toHash = '$timestamp $sapisid https://music.youtube.com';
-              final sha1Digest = sha1.convert(utf8.encode(toHash)).toString();
-              headers['Authorization'] = 'SAPISIDHASH ${timestamp}_$sha1Digest';
+            final authHeader = YtmAccountService.buildAuthorizationHeader(cookies);
+            if (authHeader != null) {
+              headers['Authorization'] = authHeader;
             }
           }
         }
@@ -344,11 +337,30 @@ class YtmService {
   }
 
   Future<List<YtmTrack>> getPlaylistTracks(String urlOrId, {int limit = 100}) async {
+    final cleanUrlOrId = switch (urlOrId.trim()) {
+      'LM' ||
+      'VLLM' ||
+      'FEmusic_liked_videos' ||
+      'FEmusic_liked_tracks' ||
+      'VLSE' =>
+        'LL',
+      _ => urlOrId.trim(),
+    };
+
+    final resolvedUrl = cleanUrlOrId.startsWith('http')
+        ? cleanUrlOrId
+        : 'https://www.youtube.com/playlist?list=$cleanUrlOrId';
+
     // 1. Try remote yt-dlp backend if enabled
     try {
       if (getIt.isRegistered<XdmBackendService>()) {
         final xdm = getIt<XdmBackendService>();
-        final playlistTracks = await xdm.getPlaylist(urlOrId, limit: limit);
+        final account = getIt.isRegistered<YtmAccountService>() ? getIt<YtmAccountService>() : null;
+        final playlistTracks = await xdm.getPlaylist(
+          resolvedUrl,
+          limit: limit,
+          cookies: account?.cookies,
+        );
         if (playlistTracks.isNotEmpty) {
           return playlistTracks;
         }
@@ -359,7 +371,7 @@ class YtmService {
 
     final raw = await _guard(
       () => _channel.invokeMethod<Map<Object?, Object?>>('getPlaylist', {
-        'url': urlOrId.trim(),
+        'url': cleanUrlOrId,
         'limit': limit,
       }),
       timeout: const Duration(seconds: 40),
@@ -409,6 +421,9 @@ class YtmService {
         }
       }
     } catch (e) {
+      // A definitive session-expired verdict must surface to callers/UI,
+      // never silently downgrade to guest playback.
+      if (e is YtmException && e.isAuth) rethrow;
       debugPrint('[YTM_SERVICE] Direct account stream resolution fallback: $e');
     }
 
@@ -444,30 +459,23 @@ class YtmService {
       } on MissingPluginException {
         throw const YtmException('YTM_UNSUPPORTED');
       } on PlatformException catch (e) {
-        if (attempt == maxRetries || e.code == 'YTM_DISABLED' || e.code == 'YTM_UNSUPPORTED') {
+        final isFatalCode = e.code == 'YTM_DISABLED' ||
+            e.code == 'YTM_UNSUPPORTED' ||
+            e.code == 'YTM_BOT_BLOCKED' ||
+            e.code == 'YTM_RECAPTCHA' ||
+            e.code == 'LOGIN_REQUIRED' ||
+            e.code == 'YTM_AUTH';
+
+        if (attempt == maxRetries || isFatalCode) {
           ErrorLogger.log('YTM call failed: ${e.code} ${e.message}', category: 'YTM');
           if (e.code == 'LOGIN_REQUIRED' || e.code == 'YTM_AUTH') {
             notifyAuthExpired();
           }
           throw YtmException(e.code, e.message);
         }
-        // If bot blocked, invalidate poToken before retrying
-        if (e.code == 'YTM_BOT_BLOCKED' || e.code == 'YTM_RECAPTCHA') {
-          await invalidatePoToken();
-          await Future.delayed(Duration(milliseconds: 500 * (1 << attempt)));
-        }
+        await Future.delayed(Duration(milliseconds: 500 * (1 << attempt)));
       }
     }
     throw const YtmException('YTM_FAILED', 'Max retries exhausted');
-  }
-
-  static String? _extractCookieValue(String cookieString, String key) {
-    for (final pair in cookieString.split(';')) {
-      final parts = pair.trim().split('=');
-      if (parts.length >= 2 && parts[0].trim() == key) {
-        return parts.sublist(1).join('=').trim();
-      }
-    }
-    return null;
   }
 }

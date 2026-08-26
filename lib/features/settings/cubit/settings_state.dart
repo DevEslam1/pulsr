@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../../core/network/proxy_config.dart';
+import '../../../domain/models/audio_output_info.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
 
 part 'settings_state.freezed.dart';
@@ -64,7 +65,7 @@ abstract class SettingsState with _$SettingsState {
     @Default('') String proxyHost,
     @Default(8080) int proxyPort,
     @Default('') String proxyUsername,
-    @Default('') String proxyPassword,
+    @Default(false) bool hasProxyPassword,
     @Default('localhost, 127.0.0.1') String proxyBypassHosts,
     @Default([]) List<ProxyEntry> proxyList,
     @Default(false) bool isTestingAllProxies,
@@ -72,11 +73,29 @@ abstract class SettingsState with _$SettingsState {
     @Default(ExtractorEngine.auto) ExtractorEngine extractorEngine,
     @Default(true) bool ytdlpBackendEnabled,
     @Default('https://xdm-backend-10763667121.europe-west1.run.app') String ytdlpBackendUrl,
-    @Default('KxPgwFT0VvqoJUgVfcWuvE3-QSrc7qM-1YDS1dzNJv0') String ytdlpBackendToken,
+    @Default('') String ytdlpBackendToken,
     @Default(false) bool isTestingYtdlpBackend,
     String? ytdlpBackendStatusMessage,
+    // Audiophile & Hi-Res Output
+    @Default(false) bool bitPerfectOutput,
+    @Default(true) bool bypassDspOnBitPerfect,
+    AudioOutputInfo? currentOutputDevice,
     int? scanResultCount,
     String? errorMessage,
+    // DSP & Sound Quality
+    @Default(false) bool crossfeedEnabled,
+    @Default(350.0) double crossfeedDelayUs,
+    @Default(-9.0) double crossfeedFeedDb,
+    @Default(false) bool limiterEnabled,
+    @Default(3.0) double limiterLookaheadMs,
+    @Default(-0.2) double limiterThresholdDb,
+    @Default(50.0) double limiterReleaseMs,
+    @Default(false) bool reverbEnabled,
+    @Default(0) int reverbPreset,
+    @Default(0.20) double reverbWetDry,
+    @Default(0.0) double stereoBalance,
+    @Default(false) bool monoMix,
+    @Default(true) bool sincResamplerEnabled,
   }) = _SettingsState;
 
   Color get customAccentColor => Color(customAccentColorValue);
@@ -91,7 +110,7 @@ abstract class SettingsState with _$SettingsState {
         host: proxyHost,
         port: proxyPort,
         username: proxyUsername,
-        password: proxyPassword,
+        password: '',
         bypassHosts: proxyBypassHosts,
       );
 }

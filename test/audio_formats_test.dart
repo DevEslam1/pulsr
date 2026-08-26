@@ -3,8 +3,8 @@ import 'package:pulsr/core/constants/audio_formats.dart';
 
 void main() {
   group('AudioFormats Tests', () {
-    test('Standard audio extensions are supported and playable', () {
-      final validFormats = ['mp3', 'm4a', 'aac', 'flac', 'wav', 'ogg', 'opus', 'mka'];
+    test('Standard and DSD audio extensions are supported and playable', () {
+      final validFormats = ['mp3', 'm4a', 'aac', 'flac', 'wav', 'ogg', 'opus', 'mka', 'dsf', 'dff'];
       for (final ext in validFormats) {
         expect(AudioFormats.isSupportedExtension(ext), isTrue, reason: '$ext should be supported');
         expect(AudioFormats.isPlayableExtension('music/track.$ext'), isTrue, reason: 'track.$ext should be playable');
@@ -12,7 +12,7 @@ void main() {
     });
 
     test('Unsupported or proprietary formats are flagged as unsupported', () {
-      final unsupportedFormats = ['wma', 'dsf', 'dff'];
+      final unsupportedFormats = ['wma'];
       for (final ext in unsupportedFormats) {
         expect(AudioFormats.isSupportedExtension(ext), isFalse, reason: '$ext should not be scanned');
         expect(AudioFormats.unsupportedExtensions.contains(ext), isTrue);

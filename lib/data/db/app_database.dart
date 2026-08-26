@@ -26,7 +26,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   static Future<void> _createIndexes(Future<void> Function(String) executeSql) async {
     await executeSql('CREATE INDEX IF NOT EXISTS idx_songs_title ON songs (title);');
@@ -93,6 +93,11 @@ class AppDatabase extends _$AppDatabase {
         } catch (_) {}
         try {
           await customStatement('UPDATE songs SET replay_gain_track = replay_gain WHERE replay_gain IS NOT NULL;');
+        } catch (_) {}
+      }
+      if (from < 8) {
+        try {
+          await m.addColumn(songsTable, songsTable.loudnessRange);
         } catch (_) {}
       }
       // Must run after every addColumn above: several indexes cover columns a

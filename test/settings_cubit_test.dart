@@ -1,9 +1,10 @@
-// test/settings_cubit_test.dart
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/network/proxy_config.dart';
 import 'package:pulsr/data/scanner/media_scanner_service.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
+import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockMediaScannerService extends Mock implements MediaScannerService {}
@@ -15,6 +16,7 @@ void main() {
   setUp(() {
     mockScannerService = MockMediaScannerService();
     SharedPreferences.setMockInitialValues({});
+    FlutterSecureStorage.setMockInitialValues({});
   });
 
   group('SettingsCubit', () {
@@ -118,8 +120,8 @@ void main() {
       expect(cubit.state.proxyType, AppProxyType.socks5);
       expect(cubit.state.proxyHost, '127.0.0.1');
       expect(cubit.state.proxyPort, 9050);
-      expect(cubit.state.proxyUsername, 'admin');
-      expect(cubit.state.proxyPassword, '123');
+      expect(cubit.state.hasProxyPassword, true);
+      expect(await cubit.getProxyPassword(), '123');
       expect(cubit.state.proxyBypassHosts, 'localhost');
 
       final prefs = await SharedPreferences.getInstance();
@@ -255,8 +257,11 @@ void main() {
 
       // 2. Second app session (relaunch): creates a new cubit instance reading from SharedPreferences
       final cubitSession2 = SettingsCubit(scannerService: mockScannerService);
-      // Wait for initial asynchronous _loadPreferences to complete
-      await Future.delayed(const Duration(milliseconds: 50));
+      // Wait for initial asynchronous _loadPreferences to complete and emit
+      await expectLater(
+        cubitSession2.stream,
+        emits(predicate<SettingsState>((s) => s.proxyList.length == 2)),
+      );
 
       expect(cubitSession2.state.proxyList.length, 2);
       expect(cubitSession2.state.proxyList[0].host, '31.59.20.176');

@@ -289,6 +289,8 @@ internal class PoTokenWebView private constructor(
     @MainThread
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
+        val exception = PoTokenException("PoTokenGenerator closed")
+        popAllPoTokenFutures().forEach { (_, f) -> f.completeExceptionally(exception) }
         executor.shutdownNow()
 
         webView.clearHistory()

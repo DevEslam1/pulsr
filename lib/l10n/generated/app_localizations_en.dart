@@ -391,7 +391,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sampleRate => 'Sample Rate';
 
   @override
-  String get fileSize => 'Size';
+  String get fileSize => 'File Size';
 
   @override
   String get settings => 'Settings';
@@ -770,4 +770,386 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get unknownGenre => 'Unknown Genre';
+
+  @override
+  String get localMusic => 'Local Music';
+
+  @override
+  String get onlineStream => 'Online Stream';
+
+  @override
+  String get likedTracks => 'Liked tracks';
+
+  @override
+  String get autoMix => 'Auto-mix';
+
+  @override
+  String get topPlayedTracks => 'Top played';
+
+  @override
+  String get audioAndPlayback => 'Audio & Playback';
+
+  @override
+  String get equalizerAndSoundEffects => 'Equalizer & Sound Effects';
+
+  @override
+  String get themeAndAppearance => 'Theme & Appearance';
+
+  @override
+  String get accentColor => 'Accent Color';
+
+  @override
+  String get nowPlayingTheme => 'Now Playing Style';
+
+  @override
+  String get colorSource => 'Color Source';
+
+  @override
+  String get gestures => 'Gestures';
+
+  @override
+  String get miniPlayerSwipeLeft => 'Mini Player Swipe Left';
+
+  @override
+  String get miniPlayerSwipeRight => 'Mini Player Swipe Right';
+
+  @override
+  String get nowPlayingDoubleTap => 'Now Playing Double-Tap';
+
+  @override
+  String get artworkSwipe => 'Artwork Swipe';
+
+  @override
+  String get libraryAndScanning => 'Library & Scanning';
+
+  @override
+  String get hiddenAndExcludedFolders => 'Hidden & Excluded Folders';
+
+  @override
+  String get shortAudioFilter => 'Short Audio Filter';
+
+  @override
+  String get filterShortAudio => 'Filter Short Audio';
+
+  @override
+  String excludeTracksUnder(int seconds) {
+    return 'Exclude tracks under $seconds seconds (filters voice notes):';
+  }
+
+  @override
+  String ignoreFilesUnder(int seconds) {
+    return 'Ignore files under ${seconds}s';
+  }
+
+  @override
+  String get youtubeMusicAndOnline => 'YouTube Music & Online';
+
+  @override
+  String get connectYtmAccount => 'Connect YouTube Music Account';
+
+  @override
+  String get connectYtmSubtitle =>
+      'Sign in to auto-sync your Liked Music library';
+
+  @override
+  String get ytmConnected => 'YouTube Music Connected';
+
+  @override
+  String get openYtmWeb => 'Open YouTube Music Web';
+
+  @override
+  String get openYtmWebSubtitle =>
+      'Browse web player, explore charts, library & playlists';
+
+  @override
+  String get offlineOnlyMode => 'Offline Only Mode';
+
+  @override
+  String get offlineOnlySubtitle =>
+      'Disable online features, streaming & web queries';
+
+  @override
+  String get wifiOnlyMode => 'Wi-Fi Only Mode';
+
+  @override
+  String get wifiOnlySubtitle => 'Only stream and download when on Wi-Fi';
+
+  @override
+  String get searchYtm => 'Search YouTube Music';
+
+  @override
+  String get searchYtmSubtitle => 'Search, stream & download songs';
+
+  @override
+  String get streamingQuality => 'Streaming Quality';
+
+  @override
+  String get downloadQuality => 'Download Quality';
+
+  @override
+  String get extractionEngine => 'Extraction Engine';
+
+  @override
+  String get ytdlpConfig => 'yt-dlp Server Config';
+
+  @override
+  String get storageAndCache => 'Storage & Cache';
+
+  @override
+  String get privacyAndData => 'Privacy & Data';
+
+  @override
+  String get privacyGuaranteeSubtitle =>
+      '100% offline. Zero telemetry, zero tracking.';
+
+  @override
+  String get aboutAppSubtitle => 'Version 1.0.0 • Pure Offline Sound';
+
+  @override
+  String get signIn => 'Sign In';
+
+  @override
+  String get lastSyncedJustNow => 'Last synced: Just now';
+
+  @override
+  String lastSyncedMinutesAgo(int minutes) {
+    return 'Last synced: ${minutes}m ago';
+  }
+
+  @override
+  String lastSyncedHoursAgo(int hours) {
+    return 'Last synced: ${hours}h ago';
+  }
+
+  @override
+  String get connectedReadyToSync => 'Connected • Ready to sync';
+
+  @override
+  String get downloaded => 'Downloaded';
+
+  @override
+  String get exploreOnlineMusic => 'Explore Online Music';
+
+  @override
+  String get noDownloadsYet => 'No Downloads Yet';
+
+  @override
+  String get noDownloadsSubtitle =>
+      'Download your favorite songs from YouTube Music to listen offline anywhere.';
+
+  @override
+  String get offlineDownloads => 'Offline Downloads';
+
+  @override
+  String get local => 'Local';
+
+  @override
+  String get online => 'Online';
+
+  @override
+  String get syncYouTubeMusic => 'Sync YouTube Music';
+
+  @override
+  String get importByPlaylistLink => 'Import by Playlist Link';
+
+  @override
+  String get noLocalFavorites => 'No Local Favorites';
+
+  @override
+  String get noLocalFavoritesSubtitle =>
+      'Tap the heart icon on any of your local tracks to add them here.';
+
+  @override
+  String get noOnlineFavorites => 'No Online Favorites';
+
+  @override
+  String get scanStorage => 'Scan Storage';
+
+  @override
+  String get noFoldersFound => 'No Folders Found';
+
+  @override
+  String get noFoldersSubtitle =>
+      'Scan device storage to discover music directories and organize by path.';
+
+  @override
+  String get playNext => 'Play Next';
+
+  @override
+  String get favorite => 'Favorite';
+
+  @override
+  String get all => 'All';
+
+  @override
+  String get importM3u => 'Import M3U';
+
+  @override
+  String get syncOnlineLibrary => 'Sync Online Library';
+
+  @override
+  String get addPlaylistUrl => 'Add Playlist URL';
+
+  @override
+  String get addYouTubePlaylist => 'Add YouTube Playlist';
+
+  @override
+  String get playlistImported => 'Playlist Imported';
+
+  @override
+  String tracksMatched(int matched, int total) {
+    return '$matched of $total tracks matched.';
+  }
+
+  @override
+  String get fetch => 'Fetch';
+
+  @override
+  String get ok => 'OK';
+
+  @override
+  String tracksCountPlural(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'tracks',
+      one: 'track',
+    );
+    return '$count $_temp0';
+  }
+
+  @override
+  String get noTrackSelected => 'No Track Selected';
+
+  @override
+  String get playbackSpeed => 'Playback Speed';
+
+  @override
+  String get vinylCircle => 'Vinyl Circle';
+
+  @override
+  String get sortAndFilter => 'Sort & Filter';
+
+  @override
+  String get title => 'Title';
+
+  @override
+  String get duration => 'Duration';
+
+  @override
+  String get qualityAndCodec => 'QUALITY & CODEC';
+
+  @override
+  String get audioFormat => 'Audio Format';
+
+  @override
+  String get channels => 'Channels';
+
+  @override
+  String get playCount => 'Play Count';
+
+  @override
+  String get ringtone => 'Ringtone';
+
+  @override
+  String get editTags => 'Edit Tags';
+
+  @override
+  String get setAudioAs => 'Set Audio As';
+
+  @override
+  String get phoneRingtone => 'Phone Ringtone';
+
+  @override
+  String get notificationSound => 'Notification Sound';
+
+  @override
+  String get alarmSound => 'Alarm Sound';
+
+  @override
+  String get turnOff => 'Turn Off';
+
+  @override
+  String get presets => 'Presets';
+
+  @override
+  String get customTime => 'Custom Time';
+
+  @override
+  String get stopAtSpecificTime => 'Stop at specific time';
+
+  @override
+  String currentSpeed(String speed) {
+    return 'Current speed: $speed';
+  }
+
+  @override
+  String addedTo(String name) {
+    return 'Added to $name';
+  }
+
+  @override
+  String playCountTimes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'times',
+      one: 'time',
+    );
+    return '$count $_temp0';
+  }
+
+  @override
+  String get pastePlaylistUrl => 'Paste YouTube Playlist URL or ID';
+
+  @override
+  String get hideCustomFolder => 'Hide Custom Folder';
+
+  @override
+  String get hideFolderDesc =>
+      'Enter the full directory path you want to hide from your music library:';
+
+  @override
+  String get hideFolder => 'Hide Folder';
+
+  @override
+  String get confirmRestore => 'Confirm Restore';
+
+  @override
+  String get confirmRestoreDesc =>
+      'Are you sure you want to restore backup data from this file?';
+
+  @override
+  String get existingLibraryUpdateNotice =>
+      'Existing library matching tracks will be updated.';
+
+  @override
+  String get audioVisualizerPermission => 'Audio Visualizer Permission';
+
+  @override
+  String get audioVisualizerPermissionDesc =>
+      'The visualizer reads audio output, not your microphone. Android requires the Record Audio permission to process frequency data.';
+
+  @override
+  String get useSimulation => 'Use Simulation';
+
+  @override
+  String get visualizerSimulationNotice =>
+      'Visualizer permission denied — showing a simulated animation instead.';
+
+  @override
+  String get ytmAccount => 'YouTube Music Account';
+
+  @override
+  String get disconnect => 'Disconnect';
+
+  @override
+  String get openWebPlayer => 'Open Web Player';
+
+  @override
+  String get ytdlpServerConfig => 'yt-dlp Server Config';
+
+  @override
+  String get ytdlpServerDesc =>
+      'Connects Pulsr to a remote yt-dlp backend with rotating proxies to bypass YouTube bot detection and IP bans.';
 }

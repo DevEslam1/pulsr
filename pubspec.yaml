@@ -45,6 +45,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   intl: ^0.20.2
+  flutter_secure_storage: ^10.3.1
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -56,6 +57,7 @@ dev_dependencies:
   injectable_generator: ^2.6.2
   freezed: ^3.2.5
   flutter_launcher_icons: ^0.14.4
+  fake_async: ^1.3.3
 
 flutter:
   uses-material-design: true
@@ -73,15 +75,15 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/app_icon/app_icon.png"
+  image_path: "assets/app_icon/app_icon_plus.png"
   min_sdk_android: 21
-  adaptive_icon_background: "#030A2E"
-  adaptive_icon_foreground: "assets/app_icon/app_icon.png"
+  adaptive_icon_background: "#0A0C12"
+  adaptive_icon_foreground: "assets/app_icon/app_icon_plus.png"
   web:
     generate: true
-    image_path: "assets/app_icon/app_icon.png"
+    image_path: "assets/app_icon/app_icon_plus.png"
   windows:
     generate: true
-    image_path: "assets/app_icon/app_icon.png"
+    image_path: "assets/app_icon/app_icon_plus.png"
 
 

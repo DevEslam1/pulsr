@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/error_logger.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 
 enum VisualizerStyle {
   off,
@@ -144,18 +145,18 @@ class _AudioVisualizerState extends State<AudioVisualizer>
             final shouldAsk = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
-                title: const Text('Audio Visualizer Permission'),
-                content: const Text(
-                  'The visualizer reads audio output, not your microphone. Android requires the Record Audio permission to process FFT visualizer frequency data.',
+                title: Text(context.l10n.audioVisualizerPermission),
+                content: Text(
+                  context.l10n.audioVisualizerPermissionDesc,
                 ),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.of(ctx).pop(false),
-                    child: const Text('Use Simulation'),
+                    child: Text(context.l10n.useSimulation),
                   ),
                   FilledButton(
                     onPressed: () => Navigator.of(ctx).pop(true),
-                    child: const Text('Continue'),
+                    child: Text(context.l10n.confirm),
                   ),
                 ],
               ),
@@ -166,9 +167,9 @@ class _AudioVisualizerState extends State<AudioVisualizer>
           if (!res.isGranted) {
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
+                SnackBar(
                   content: Text(
-                    'Visualizer permission denied — showing a simulated animation instead.',
+                    context.l10n.visualizerSimulationNotice,
                   ),
                 ),
               );
@@ -331,6 +332,8 @@ class _BarVisualizerPainter extends CustomPainter {
     final gap = 3.0;
     final totalGap = gap * (count - 1);
     final barWidth = ((size.width - totalGap) / count).clamp(3.0, 14.0);
+    final totalWidth = count * barWidth + totalGap;
+    final startX = (size.width - totalWidth) / 2;
 
     final paint = Paint()
       ..style = PaintingStyle.fill
@@ -344,7 +347,7 @@ class _BarVisualizerPainter extends CustomPainter {
       ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
 
     for (int i = 0; i < count; i++) {
-      final x = i * (barWidth + gap);
+      final x = startX + i * (barWidth + gap);
       final magnitude = data[i].clamp(0.12, 1.0);
       final barHeight = (magnitude * size.height).clamp(6.0, size.height);
       final y = size.height - barHeight;

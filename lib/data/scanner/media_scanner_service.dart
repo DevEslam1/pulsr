@@ -117,12 +117,18 @@ class MediaScannerService {
       final excludedFolders = excludedRes.fold((l) => <String>[], (r) => r);
 
       // Query songs using on_audio_query
-      final List<SongModel> songs = await _audioQuery.querySongs(
-        sortType: SongSortType.DATE_ADDED,
-        orderType: OrderType.DESC_OR_GREATER,
-        uriType: UriType.EXTERNAL,
-        ignoreCase: true,
-      );
+      List<SongModel> songs = [];
+      try {
+        songs = await _audioQuery.querySongs(
+          sortType: SongSortType.DATE_ADDED,
+          orderType: OrderType.DESC_OR_GREATER,
+          uriType: UriType.EXTERNAL,
+          ignoreCase: true,
+        );
+      } catch (e, stack) {
+        ErrorLogger.log('on_audio_query querySongs failed', error: e, stackTrace: stack, category: 'scanner');
+        return 0;
+      }
 
       final minDurationMs = ignoreShortFiles ? minDurationSec * 1000 : 0;
       ErrorLogger.addBreadcrumb('Scanner started with ${songs.length} raw MediaStore songs', category: 'scanner');
@@ -221,10 +227,10 @@ class MediaScannerService {
 
       final sampleRate = _asInt(tags['sampleRate']);
       final bitDepth = _asInt(tags['bitsPerSample']);
-      // Header bitRate is in kbps for lossy, bps-ish for some lossless; jaudiotagger
-      // reports kbps here.
+      // Header bitRate is in kbps for lossy, bps-ish for some lossless; jaudiotagger reports kbps here.
       final bitrateKbps = _asInt(tags['bitRate']);
       final codec = (tags['format'] as String?)?.trim();
+      final lraVal = (tags['loudnessRange'] as num?)?.toDouble();
 
       await _repository.updateAudioQuality(
         songId: songId,
@@ -232,6 +238,7 @@ class MediaScannerService {
         bitDepth: bitDepth != null && bitDepth > 0 ? bitDepth : null,
         bitrateKbps: bitrateKbps != null && bitrateKbps > 0 ? bitrateKbps : null,
         codec: (codec != null && codec.isNotEmpty) ? codec : null,
+        loudnessRange: lraVal,
       );
     } catch (e, stack) {
       ErrorLogger.log(
@@ -241,6 +248,55 @@ class MediaScannerService {
         category: 'MediaScanner',
       );
     }
+  }
+
+  /// Computes inter-sample peak using 4x oversampling interpolation.
+  /// Standard PCM sample peak misses peaks occurring between samples during DAC reconstruction.
+  static double computeTruePeak(List<int> samples, {int bitDepth = 16}) {
+    if (samples.isEmpty) return 0.0;
+    final maxInt = (1 << (bitDepth - 1)).toDouble();
+    double maxTruePeak = 0.0;
+
+    for (int i = 0; i < samples.length - 1; i++) {
+      final s0 = (i > 0 ? samples[i - 1] : samples[i]) / maxInt;
+      final s1 = samples[i] / maxInt;
+      final s2 = samples[i + 1] / maxInt;
+      final s3 = (i + 2 < samples.length ? samples[i + 2] : samples[i + 1]) / maxInt;
+
+      // 4-point cubic Hermite interpolation for 4x oversampling
+      for (double t = 0.0; t < 1.0; t += 0.25) {
+        final t2 = t * t;
+        final t3 = t2 * t;
+        final val = 0.5 * (
+          (2.0 * s1) +
+          (-s0 + s2) * t +
+          (2.0 * s0 - 5.0 * s1 + 4.0 * s2 - s3) * t2 +
+          (-s0 + 3.0 * s1 - 3.0 * s2 + s3) * t3
+        );
+        final absVal = val.abs();
+        if (absVal > maxTruePeak) {
+          maxTruePeak = absVal;
+        }
+      }
+    }
+    return maxTruePeak;
+  }
+
+  /// Computes EBU R128 Loudness Range (LRA in LU) from short-term loudness blocks.
+  /// LRA measures the variation of loudness over time (10th to 95th percentile difference).
+  static double computeLoudnessRange(List<double> shortTermLufs) {
+    if (shortTermLufs.length < 5) return 0.0;
+
+    // Filter out silence/gating below -70 LUFS
+    final validLufs = shortTermLufs.where((l) => l > -70.0).toList();
+    if (validLufs.isEmpty) return 0.0;
+
+    validLufs.sort();
+    final p10Idx = (validLufs.length * 0.10).floor().clamp(0, validLufs.length - 1);
+    final p95Idx = (validLufs.length * 0.95).floor().clamp(0, validLufs.length - 1);
+
+    final lra = validLufs[p95Idx] - validLufs[p10Idx];
+    return lra.clamp(0.0, 30.0);
   }
 
   static int? _asInt(Object? value) {

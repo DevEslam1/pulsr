@@ -117,7 +117,7 @@ class ArtworkCacheManager {
       if (_cacheDir == null) await init();
       if (_cacheDir == null || !await _cacheDir!.exists()) return 0;
       int total = 0;
-      final entities = _cacheDir!.listSync(followLinks: false);
+      final entities = await _cacheDir!.list(followLinks: false).toList();
       for (final entity in entities) {
         if (entity is File) {
           total += await entity.length();
@@ -135,7 +135,7 @@ class ArtworkCacheManager {
     try {
       if (_cacheDir == null) await init();
       if (_cacheDir != null && await _cacheDir!.exists()) {
-        final entities = _cacheDir!.listSync(followLinks: false);
+        final entities = await _cacheDir!.list(followLinks: false).toList();
         for (final entity in entities) {
           if (entity is File) {
             await entity.delete().catchError((_) => entity);
@@ -156,8 +156,9 @@ class ArtworkCacheManager {
     try {
       if (_cacheDir == null || !await _cacheDir!.exists()) return;
       final maxBytes = _maxCacheSizeMb * 1024 * 1024;
-      final entities =
-          _cacheDir!.listSync(followLinks: false).whereType<File>().toList();
+      final entities = (await _cacheDir!.list(followLinks: false).toList())
+          .whereType<File>()
+          .toList();
 
       int currentSize = 0;
       final fileList = <({File file, int size, DateTime modified})>[];
@@ -171,7 +172,7 @@ class ArtworkCacheManager {
       if (currentSize > maxBytes) {
         // Sort oldest first
         fileList.sort((a, b) => a.modified.compareTo(b.modified));
-        final targetBytes = (maxBytes * 0.75).toInt(); // trim down to 75%
+        final targetBytes = (maxBytes * 0.90).toInt(); // trim down to 90%
 
         for (final item in fileList) {
           if (currentSize <= targetBytes) break;

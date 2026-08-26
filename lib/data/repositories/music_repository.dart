@@ -6,6 +6,7 @@ import 'package:injectable/injectable.dart';
 import '../../core/errors/failures.dart';
 import '../../domain/models/genre_item.dart';
 import '../../domain/models/year_item.dart';
+import '../../domain/models/ytm_track.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../db/app_database.dart';
 
@@ -26,7 +27,11 @@ class MusicRepository implements IMusicRepository {
     List<String> excludedFolders = const [],
   }) {
     try {
-      final query = _db.select(_db.songsTable)..where((t) => t.isMissing.equals(false));
+      final query = _db.select(_db.songsTable)
+        ..where((t) =>
+            t.isMissing.equals(false) &
+            t.source.equals(SongSource.local) &
+            t.path.like('ytmusic://%').not());
 
       if (searchQuery != null && searchQuery.trim().isNotEmpty) {
         final pattern = '%${searchQuery.trim().toLowerCase()}%';
@@ -36,7 +41,7 @@ class MusicRepository implements IMusicRepository {
       if (excludedFolders.isNotEmpty) {
         for (final folder in excludedFolders) {
           final prefix = folder.endsWith(Platform.pathSeparator) ? folder : '$folder${Platform.pathSeparator}';
-          query.where((t) => t.source.equals(SongSource.local).not() | t.path.like('$prefix%').not());
+          query.where((t) => t.path.like('$prefix%').not());
         }
       }
 
@@ -70,7 +75,11 @@ class MusicRepository implements IMusicRepository {
     int? offset,
   }) async {
     try {
-      final query = _db.select(_db.songsTable)..where((t) => t.isMissing.equals(false));
+      final query = _db.select(_db.songsTable)
+        ..where((t) =>
+            t.isMissing.equals(false) &
+            t.source.equals(SongSource.local) &
+            t.path.like('ytmusic://%').not());
       if (sortBy == 'title') {
         query.orderBy([(t) => OrderingTerm(expression: t.title, mode: ascending ? OrderingMode.asc : OrderingMode.desc)]);
       } else if (sortBy == 'artist') {
@@ -176,7 +185,11 @@ class MusicRepository implements IMusicRepository {
   Stream<Result<List<SongsTableData>>> watchFavorites() {
     try {
       return (_db.select(_db.songsTable)
-            ..where((t) => t.isFavorite.equals(true) & t.isMissing.equals(false))
+            ..where((t) =>
+                t.isFavorite.equals(true) &
+                t.isMissing.equals(false) &
+                t.source.equals(SongSource.local) &
+                t.path.like('ytmusic://%').not())
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
@@ -190,7 +203,11 @@ class MusicRepository implements IMusicRepository {
   Future<Result<List<SongsTableData>>> getFavorites() async {
     try {
       final songs = await (_db.select(_db.songsTable)
-            ..where((t) => t.isFavorite.equals(true) & t.isMissing.equals(false))
+            ..where((t) =>
+                t.isFavorite.equals(true) &
+                t.isMissing.equals(false) &
+                t.source.equals(SongSource.local) &
+                t.path.like('ytmusic://%').not())
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .get();
       return Right(songs);
@@ -200,10 +217,55 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
+  Future<Result<int>> importOnlineTracksAsFavorites(List<YtmTrack> tracks) async {
+    try {
+      int count = 0;
+      for (final track in tracks) {
+        final songData = track.toSongData();
+        final existing = await (_db.select(_db.songsTable)
+              ..where((t) => t.remoteId.equals(track.videoId))
+              ..limit(1))
+            .getSingleOrNull();
+
+        if (existing != null) {
+          await (_db.update(_db.songsTable)..where((t) => t.id.equals(existing.id)))
+              .write(const SongsTableCompanion(isFavorite: Value(true)));
+          count++;
+        } else {
+          await _db.into(_db.songsTable).insert(
+                SongsTableCompanion(
+                  id: Value(songData.id),
+                  title: Value(songData.title),
+                  artist: Value(songData.artist),
+                  album: Value(songData.album),
+                  durationMs: Value(songData.durationMs),
+                  path: Value(songData.path),
+                  source: const Value(SongSource.youtube),
+                  remoteId: Value(track.videoId),
+                  remoteArtworkUrl: Value(track.artworkUrl),
+                  isFavorite: const Value(true),
+                  dateAdded: Value(DateTime.now().millisecondsSinceEpoch),
+                ),
+                mode: InsertMode.insertOrReplace,
+              );
+          count++;
+        }
+      }
+      return Right(count);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to import online tracks as favorites', e));
+    }
+  }
+
+  @override
   Stream<Result<List<SongsTableData>>> watchRecentlyPlayed({int limit = 20}) {
     try {
       return (_db.select(_db.songsTable)
-            ..where((t) => t.lastPlayed.isNotNull() & t.isMissing.equals(false))
+            ..where((t) =>
+                t.lastPlayed.isNotNull() &
+                t.isMissing.equals(false) &
+                t.source.equals(SongSource.local) &
+                t.path.like('ytmusic://%').not())
             ..orderBy([(t) => OrderingTerm(expression: t.lastPlayed, mode: OrderingMode.desc)])
             ..limit(limit))
           .watch()
@@ -218,7 +280,11 @@ class MusicRepository implements IMusicRepository {
   Future<Result<List<SongsTableData>>> getRecentlyPlayed({int limit = 20}) async {
     try {
       final songs = await (_db.select(_db.songsTable)
-            ..where((t) => t.lastPlayed.isNotNull())
+            ..where((t) =>
+                t.lastPlayed.isNotNull() &
+                t.isMissing.equals(false) &
+                t.source.equals(SongSource.local) &
+                t.path.like('ytmusic://%').not())
             ..orderBy([(t) => OrderingTerm(expression: t.lastPlayed, mode: OrderingMode.desc)])
             ..limit(limit))
           .get();
@@ -232,6 +298,10 @@ class MusicRepository implements IMusicRepository {
   Stream<Result<List<SongsTableData>>> watchRecentlyAdded({int limit = 20}) {
     try {
       return (_db.select(_db.songsTable)
+            ..where((t) =>
+                t.isMissing.equals(false) &
+                t.source.equals(SongSource.local) &
+                t.path.like('ytmusic://%').not())
             ..orderBy([(t) => OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)])
             ..limit(limit))
           .watch()
@@ -246,7 +316,11 @@ class MusicRepository implements IMusicRepository {
   Stream<Result<List<SongsTableData>>> watchTopPlayed({int limit = 30}) {
     try {
       return (_db.select(_db.songsTable)
-            ..where((t) => t.playCount.isBiggerThanValue(0))
+            ..where((t) =>
+                t.playCount.isBiggerThanValue(0) &
+                t.isMissing.equals(false) &
+                t.source.equals(SongSource.local) &
+                t.path.like('ytmusic://%').not())
             ..orderBy([(t) => OrderingTerm(expression: t.playCount, mode: OrderingMode.desc)])
             ..limit(limit))
           .watch()
@@ -342,7 +416,11 @@ class MusicRepository implements IMusicRepository {
   Stream<Result<List<SongsTableData>>> watchAlbumSongs(int albumId) {
     try {
       return (_db.select(_db.songsTable)
-            ..where((t) => t.albumId.equals(albumId) & t.isMissing.equals(false))
+            ..where((t) =>
+                t.albumId.equals(albumId) &
+                t.isMissing.equals(false) &
+                t.source.equals(SongSource.local) &
+                t.path.like('ytmusic://%').not())
             ..orderBy([(t) => OrderingTerm(expression: t.trackNumber)]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
@@ -369,7 +447,11 @@ class MusicRepository implements IMusicRepository {
   Future<Result<List<SongsTableData>>> getAlbumSongs(int albumId) async {
     try {
       final songs = await (_db.select(_db.songsTable)
-            ..where((t) => t.albumId.equals(albumId) & t.isMissing.equals(false))
+            ..where((t) =>
+                t.albumId.equals(albumId) &
+                t.isMissing.equals(false) &
+                t.source.equals(SongSource.local) &
+                t.path.like('ytmusic://%').not())
             ..orderBy([(t) => OrderingTerm(expression: t.trackNumber)]))
           .get();
       return Right(songs);
@@ -396,7 +478,12 @@ class MusicRepository implements IMusicRepository {
   @override
   Stream<Result<List<SongsTableData>>> watchArtistSongs(int artistId) {
     try {
-      return (_db.select(_db.songsTable)..where((t) => t.artistId.equals(artistId) & t.isMissing.equals(false)))
+      return (_db.select(_db.songsTable)
+            ..where((t) =>
+                t.artistId.equals(artistId) &
+                t.isMissing.equals(false) &
+                t.source.equals(SongSource.local) &
+                t.path.like('ytmusic://%').not()))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
           .handleError((e) => Left<AppFailure, List<SongsTableData>>(DatabaseFailure('Failed to watch artist songs', e)));
@@ -421,7 +508,12 @@ class MusicRepository implements IMusicRepository {
   @override
   Future<Result<List<SongsTableData>>> getArtistSongs(int artistId) async {
     try {
-      final songs = await (_db.select(_db.songsTable)..where((t) => t.artistId.equals(artistId) & t.isMissing.equals(false)))
+      final songs = await (_db.select(_db.songsTable)
+            ..where((t) =>
+                t.artistId.equals(artistId) &
+                t.isMissing.equals(false) &
+                t.source.equals(SongSource.local) &
+                t.path.like('ytmusic://%').not()))
           .get();
       return Right(songs);
     } catch (e) {
@@ -753,16 +845,22 @@ class MusicRepository implements IMusicRepository {
           const SongsTableCompanion(isMissing: Value(false)),
         );
 
-        // Recalculate song counts using active (non-missing) songs
+        // Recalculate song counts using active (non-missing) local songs
         final albumCounts = await (_db.selectOnly(_db.songsTable)
               ..addColumns([_db.songsTable.albumId, _db.songsTable.id.count()])
-              ..where(_db.songsTable.albumId.isNotNull() & _db.songsTable.isMissing.equals(false))
+              ..where(_db.songsTable.albumId.isNotNull() &
+                  _db.songsTable.isMissing.equals(false) &
+                  _db.songsTable.source.equals(SongSource.local) &
+                  _db.songsTable.path.like('ytmusic://%').not())
               ..groupBy([_db.songsTable.albumId]))
             .get();
 
         final artistCounts = await (_db.selectOnly(_db.songsTable)
               ..addColumns([_db.songsTable.artistId, _db.songsTable.id.count()])
-              ..where(_db.songsTable.artistId.isNotNull() & _db.songsTable.isMissing.equals(false))
+              ..where(_db.songsTable.artistId.isNotNull() &
+                  _db.songsTable.isMissing.equals(false) &
+                  _db.songsTable.source.equals(SongSource.local) &
+                  _db.songsTable.path.like('ytmusic://%').not())
               ..groupBy([_db.songsTable.artistId]))
             .get();
 
@@ -1001,6 +1099,7 @@ class MusicRepository implements IMusicRepository {
     int? bitDepth,
     int? bitrateKbps,
     String? codec,
+    double? loudnessRange,
   }) async {
     try {
       await (_db.update(_db.songsTable)..where((t) => t.id.equals(songId))).write(
@@ -1009,6 +1108,7 @@ class MusicRepository implements IMusicRepository {
           bitDepth: Value(bitDepth),
           bitrateKbps: Value(bitrateKbps),
           codec: Value(codec),
+          loudnessRange: Value(loudnessRange),
         ),
       );
       return const Right(null);
@@ -1024,7 +1124,11 @@ class MusicRepository implements IMusicRepository {
       final countExp = _db.songsTable.id.count();
       final query = _db.selectOnly(_db.songsTable)
         ..addColumns([_db.songsTable.genre, countExp])
-        ..where(_db.songsTable.genre.isNotNull() & _db.songsTable.genre.equals('').not())
+        ..where(_db.songsTable.genre.isNotNull() &
+            _db.songsTable.genre.equals('').not() &
+            _db.songsTable.isMissing.equals(false) &
+            _db.songsTable.source.equals(SongSource.local) &
+            _db.songsTable.path.like('ytmusic://%').not())
         ..groupBy([_db.songsTable.genre])
         ..orderBy([OrderingTerm(expression: _db.songsTable.genre)]);
 
@@ -1042,16 +1146,63 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
+  Future<Result<List<GenreItem>>> getGenres() async {
+    try {
+      final countExp = _db.songsTable.id.count();
+      final query = _db.selectOnly(_db.songsTable)
+        ..addColumns([_db.songsTable.genre, countExp])
+        ..where(_db.songsTable.genre.isNotNull() &
+            _db.songsTable.genre.equals('').not() &
+            _db.songsTable.isMissing.equals(false) &
+            _db.songsTable.source.equals(SongSource.local) &
+            _db.songsTable.path.like('ytmusic://%').not())
+        ..groupBy([_db.songsTable.genre])
+        ..orderBy([OrderingTerm(expression: _db.songsTable.genre)]);
+
+      final rows = await query.get();
+      final list = rows.map((row) {
+        final genreName = row.read(_db.songsTable.genre) ?? '';
+        final count = row.read(countExp) ?? 0;
+        return GenreItem(name: genreName, songCount: count);
+      }).where((g) => g.name.isNotEmpty).toList();
+      return Right(list);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to get genres', e));
+    }
+  }
+
+  @override
   Stream<Result<List<SongsTableData>>> watchGenreSongs(String genre) {
     try {
       return (_db.select(_db.songsTable)
-            ..where((t) => t.genre.equals(genre))
+            ..where((t) =>
+                t.genre.equals(genre) &
+                t.isMissing.equals(false) &
+                t.source.equals(SongSource.local) &
+                t.path.like('ytmusic://%').not())
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
           .handleError((e) => Left<AppFailure, List<SongsTableData>>(DatabaseFailure('Failed to watch genre songs', e)));
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch genre songs', e)));
+    }
+  }
+
+  @override
+  Future<Result<List<SongsTableData>>> getGenreSongs(String genre) async {
+    try {
+      final songs = await (_db.select(_db.songsTable)
+            ..where((t) =>
+                t.genre.equals(genre) &
+                t.isMissing.equals(false) &
+                t.source.equals(SongSource.local) &
+                t.path.like('ytmusic://%').not())
+            ..orderBy([(t) => OrderingTerm(expression: t.title)]))
+          .get();
+      return Right(songs);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to get genre songs', e));
     }
   }
 
@@ -1062,7 +1213,11 @@ class MusicRepository implements IMusicRepository {
       final countExp = _db.songsTable.id.count();
       final query = _db.selectOnly(_db.songsTable)
         ..addColumns([_db.songsTable.year, countExp])
-        ..where(_db.songsTable.year.isNotNull() & _db.songsTable.year.isBiggerThanValue(0))
+        ..where(_db.songsTable.year.isNotNull() &
+            _db.songsTable.year.isBiggerThanValue(0) &
+            _db.songsTable.isMissing.equals(false) &
+            _db.songsTable.source.equals(SongSource.local) &
+            _db.songsTable.path.like('ytmusic://%').not())
         ..groupBy([_db.songsTable.year])
         ..orderBy([OrderingTerm(expression: _db.songsTable.year, mode: OrderingMode.desc)]);
 
@@ -1083,7 +1238,11 @@ class MusicRepository implements IMusicRepository {
   Stream<Result<List<SongsTableData>>> watchYearSongs(int year) {
     try {
       return (_db.select(_db.songsTable)
-            ..where((t) => t.year.equals(year))
+            ..where((t) =>
+                t.year.equals(year) &
+                t.isMissing.equals(false) &
+                t.source.equals(SongSource.local) &
+                t.path.like('ytmusic://%').not())
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))

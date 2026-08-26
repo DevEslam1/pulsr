@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/config/app_config.dart';
@@ -30,6 +31,7 @@ class _SearchScreenState extends State<SearchScreen> {
   /// Whether the "Online" chip is active. Can only ever be true in an
   /// ENABLE_YTM build, since that is the only build where the chip is shown.
   bool _onlineMode = false;
+  StreamSubscription? _settingsSub;
 
   bool _isOnlineAvailable(BuildContext context) {
     final offlineOnly = context.watch<SettingsCubit?>()?.state.offlineOnlyMode ?? false;
@@ -47,6 +49,13 @@ class _SearchScreenState extends State<SearchScreen> {
     // mode too, where keystrokes are routed to YtmSearchCubit and never touch
     // SearchState.query.
     _searchController.addListener(_onControllerChanged);
+
+    // Reset online search if offline-only mode gets enabled
+    _settingsSub = context.read<SettingsCubit?>()?.stream.listen((settings) {
+      if (settings.offlineOnlyMode && _onlineMode && mounted) {
+        setState(() => _onlineMode = false);
+      }
+    });
   }
 
   void _onControllerChanged() {
@@ -55,6 +64,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   void dispose() {
+    _settingsSub?.cancel();
     _searchController.removeListener(_onControllerChanged);
     _searchController.dispose();
     super.dispose();
@@ -175,10 +185,27 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
+  String _getFilterLabel(BuildContext context, String filter) {
+    switch (filter) {
+      case 'All':
+        return context.l10n.all;
+      case 'Songs':
+        return context.l10n.songs;
+      case 'Artists':
+        return context.l10n.artists;
+      case 'Albums':
+        return context.l10n.albums;
+      case 'Online':
+        return context.l10n.online;
+      default:
+        return filter;
+    }
+  }
+
   Widget _buildChip(BuildContext context, SearchState state, String filter, PulsrPalette p) {
     final selected = filter == 'Online' ? _onlineMode : (!_onlineMode && state.selectedFilter == filter);
     return ChoiceChip(
-      label: Text(filter),
+      label: Text(_getFilterLabel(context, filter)),
       selected: selected,
       labelStyle: TextStyle(
         color: selected ? p.accent : p.textSecondary,
@@ -193,14 +220,56 @@ class _SearchScreenState extends State<SearchScreen> {
       return Center(child: CircularProgressIndicator(color: p.accent));
     }
     if (state.results.isEmpty) {
-      return state.query.isEmpty
-          ? EmptyStateWidget(
-              icon: Icons.search_rounded,
-              title: context.l10n.search,
-              subtitle: context.l10n.searchPlaceholder,
-            )
-          : EmptyStateWidget(
-              icon: Icons.search_off_rounded,
+      if (state.query.isEmpty) {
+        return Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.search_rounded, size: 48, color: p.textTertiary),
+                const SizedBox(height: 12),
+                Text(
+                  context.l10n.search,
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.textPrimary),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  context.l10n.searchPlaceholder,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: p.textSecondary, fontSize: 13),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'QUICK DISCOVERY',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: p.textTertiary, letterSpacing: 1.2),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  alignment: WrapAlignment.center,
+                  children: [
+                    for (final tag in ['Rock', 'Pop', 'Hip-Hop', 'Acoustic', 'FLAC', 'Lossless', 'Jazz', 'Electronic'])
+                      ActionChip(
+                        label: Text(tag),
+                        backgroundColor: p.surfaceContainer,
+                        side: BorderSide(color: p.hairline),
+                        labelStyle: TextStyle(color: p.accent, fontSize: 12, fontWeight: FontWeight.w700),
+                        onPressed: () {
+                          _searchController.text = tag;
+                          _onQueryChanged(context, tag);
+                        },
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+      return EmptyStateWidget(
+        icon: Icons.search_off_rounded,
               title: context.l10n.noResultsFound,
               subtitle: context.l10n.noResultsSubtitle,
               primaryActionLabel: context.l10n.clearSearchHistory,

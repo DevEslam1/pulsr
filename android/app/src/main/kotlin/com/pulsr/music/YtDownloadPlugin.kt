@@ -90,6 +90,22 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                     result.error("SAVE_FAILED", e.localizedMessage ?: "Unknown error", e.stackTraceToString())
                 }
             }
+            "getFreeDiskSpace" -> {
+                try {
+                    val musicDir = currentContext.getExternalFilesDir(Environment.DIRECTORY_MUSIC)
+                        ?: currentContext.filesDir
+                    val stat = android.os.StatFs(musicDir.path)
+                    val availableBytes = stat.availableBlocksLong * stat.blockSizeLong
+                    result.success(availableBytes)
+                } catch (e: Exception) {
+                    try {
+                        val availableBytes = currentContext.filesDir.usableSpace
+                        result.success(availableBytes)
+                    } catch (e2: Exception) {
+                        result.success(-1L)
+                    }
+                }
+            }
             else -> result.notImplemented()
         }
     }
@@ -131,6 +147,10 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                     val idx = c.getColumnIndex(MediaStore.Audio.Media.DATA)
                     if (idx >= 0) path = c.getString(idx)
                 }
+            }
+            if (path.isNullOrEmpty()) {
+                val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
+                path = File(musicDir, displayName).absolutePath
             }
             if (path != null) {
                 MediaScannerConnection.scanFile(context, arrayOf(path), arrayOf(mimeType), null)

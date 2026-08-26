@@ -135,6 +135,12 @@ class $SongsTableTable extends SongsTable
   late final GeneratedColumn<double> replayGainAlbumPeak =
       GeneratedColumn<double>('replay_gain_album_peak', aliasedName, true,
           type: DriftSqlType.double, requiredDuringInsert: false);
+  static const VerificationMeta _loudnessRangeMeta =
+      const VerificationMeta('loudnessRange');
+  @override
+  late final GeneratedColumn<double> loudnessRange = GeneratedColumn<double>(
+      'loudness_range', aliasedName, true,
+      type: DriftSqlType.double, requiredDuringInsert: false);
   static const VerificationMeta _playCountMeta =
       const VerificationMeta('playCount');
   @override
@@ -249,6 +255,7 @@ class $SongsTableTable extends SongsTable
         replayGainAlbum,
         replayGainTrackPeak,
         replayGainAlbumPeak,
+        loudnessRange,
         playCount,
         lastPlayed,
         lastPositionMs,
@@ -373,6 +380,12 @@ class $SongsTableTable extends SongsTable
           replayGainAlbumPeak.isAcceptableOrUnknown(
               data['replay_gain_album_peak']!, _replayGainAlbumPeakMeta));
     }
+    if (data.containsKey('loudness_range')) {
+      context.handle(
+          _loudnessRangeMeta,
+          loudnessRange.isAcceptableOrUnknown(
+              data['loudness_range']!, _loudnessRangeMeta));
+    }
     if (data.containsKey('play_count')) {
       context.handle(_playCountMeta,
           playCount.isAcceptableOrUnknown(data['play_count']!, _playCountMeta));
@@ -496,6 +509,8 @@ class $SongsTableTable extends SongsTable
       replayGainAlbumPeak: attachedDatabase.typeMapping.read(
           DriftSqlType.double,
           data['${effectivePrefix}replay_gain_album_peak']),
+      loudnessRange: attachedDatabase.typeMapping
+          .read(DriftSqlType.double, data['${effectivePrefix}loudness_range']),
       playCount: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}play_count'])!,
       lastPlayed: attachedDatabase.typeMapping
@@ -556,6 +571,9 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
   final double? replayGainAlbum;
   final double? replayGainTrackPeak;
   final double? replayGainAlbumPeak;
+
+  /// EBU R128 Loudness Range (LRA in LU) for dynamics awareness
+  final double? loudnessRange;
   final int playCount;
   final int? lastPlayed;
   final int lastPositionMs;
@@ -609,6 +627,7 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       this.replayGainAlbum,
       this.replayGainTrackPeak,
       this.replayGainAlbumPeak,
+      this.loudnessRange,
       required this.playCount,
       this.lastPlayed,
       required this.lastPositionMs,
@@ -669,6 +688,9 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
     }
     if (!nullToAbsent || replayGainAlbumPeak != null) {
       map['replay_gain_album_peak'] = Variable<double>(replayGainAlbumPeak);
+    }
+    if (!nullToAbsent || loudnessRange != null) {
+      map['loudness_range'] = Variable<double>(loudnessRange);
     }
     map['play_count'] = Variable<int>(playCount);
     if (!nullToAbsent || lastPlayed != null) {
@@ -750,6 +772,9 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       replayGainAlbumPeak: replayGainAlbumPeak == null && nullToAbsent
           ? const Value.absent()
           : Value(replayGainAlbumPeak),
+      loudnessRange: loudnessRange == null && nullToAbsent
+          ? const Value.absent()
+          : Value(loudnessRange),
       playCount: Value(playCount),
       lastPlayed: lastPlayed == null && nullToAbsent
           ? const Value.absent()
@@ -814,6 +839,7 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           serializer.fromJson<double?>(json['replayGainTrackPeak']),
       replayGainAlbumPeak:
           serializer.fromJson<double?>(json['replayGainAlbumPeak']),
+      loudnessRange: serializer.fromJson<double?>(json['loudnessRange']),
       playCount: serializer.fromJson<int>(json['playCount']),
       lastPlayed: serializer.fromJson<int?>(json['lastPlayed']),
       lastPositionMs: serializer.fromJson<int>(json['lastPositionMs']),
@@ -855,6 +881,7 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       'replayGainAlbum': serializer.toJson<double?>(replayGainAlbum),
       'replayGainTrackPeak': serializer.toJson<double?>(replayGainTrackPeak),
       'replayGainAlbumPeak': serializer.toJson<double?>(replayGainAlbumPeak),
+      'loudnessRange': serializer.toJson<double?>(loudnessRange),
       'playCount': serializer.toJson<int>(playCount),
       'lastPlayed': serializer.toJson<int?>(lastPlayed),
       'lastPositionMs': serializer.toJson<int>(lastPositionMs),
@@ -893,6 +920,7 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           Value<double?> replayGainAlbum = const Value.absent(),
           Value<double?> replayGainTrackPeak = const Value.absent(),
           Value<double?> replayGainAlbumPeak = const Value.absent(),
+          Value<double?> loudnessRange = const Value.absent(),
           int? playCount,
           Value<int?> lastPlayed = const Value.absent(),
           int? lastPositionMs,
@@ -936,6 +964,8 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
         replayGainAlbumPeak: replayGainAlbumPeak.present
             ? replayGainAlbumPeak.value
             : this.replayGainAlbumPeak,
+        loudnessRange:
+            loudnessRange.present ? loudnessRange.value : this.loudnessRange,
         playCount: playCount ?? this.playCount,
         lastPlayed: lastPlayed.present ? lastPlayed.value : this.lastPlayed,
         lastPositionMs: lastPositionMs ?? this.lastPositionMs,
@@ -990,6 +1020,9 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       replayGainAlbumPeak: data.replayGainAlbumPeak.present
           ? data.replayGainAlbumPeak.value
           : this.replayGainAlbumPeak,
+      loudnessRange: data.loudnessRange.present
+          ? data.loudnessRange.value
+          : this.loudnessRange,
       playCount: data.playCount.present ? data.playCount.value : this.playCount,
       lastPlayed:
           data.lastPlayed.present ? data.lastPlayed.value : this.lastPlayed,
@@ -1042,6 +1075,7 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           ..write('replayGainAlbum: $replayGainAlbum, ')
           ..write('replayGainTrackPeak: $replayGainTrackPeak, ')
           ..write('replayGainAlbumPeak: $replayGainAlbumPeak, ')
+          ..write('loudnessRange: $loudnessRange, ')
           ..write('playCount: $playCount, ')
           ..write('lastPlayed: $lastPlayed, ')
           ..write('lastPositionMs: $lastPositionMs, ')
@@ -1082,6 +1116,7 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
         replayGainAlbum,
         replayGainTrackPeak,
         replayGainAlbumPeak,
+        loudnessRange,
         playCount,
         lastPlayed,
         lastPositionMs,
@@ -1121,6 +1156,7 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           other.replayGainAlbum == this.replayGainAlbum &&
           other.replayGainTrackPeak == this.replayGainTrackPeak &&
           other.replayGainAlbumPeak == this.replayGainAlbumPeak &&
+          other.loudnessRange == this.loudnessRange &&
           other.playCount == this.playCount &&
           other.lastPlayed == this.lastPlayed &&
           other.lastPositionMs == this.lastPositionMs &&
@@ -1158,6 +1194,7 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
   final Value<double?> replayGainAlbum;
   final Value<double?> replayGainTrackPeak;
   final Value<double?> replayGainAlbumPeak;
+  final Value<double?> loudnessRange;
   final Value<int> playCount;
   final Value<int?> lastPlayed;
   final Value<int> lastPositionMs;
@@ -1193,6 +1230,7 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     this.replayGainAlbum = const Value.absent(),
     this.replayGainTrackPeak = const Value.absent(),
     this.replayGainAlbumPeak = const Value.absent(),
+    this.loudnessRange = const Value.absent(),
     this.playCount = const Value.absent(),
     this.lastPlayed = const Value.absent(),
     this.lastPositionMs = const Value.absent(),
@@ -1229,6 +1267,7 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     this.replayGainAlbum = const Value.absent(),
     this.replayGainTrackPeak = const Value.absent(),
     this.replayGainAlbumPeak = const Value.absent(),
+    this.loudnessRange = const Value.absent(),
     this.playCount = const Value.absent(),
     this.lastPlayed = const Value.absent(),
     this.lastPositionMs = const Value.absent(),
@@ -1266,6 +1305,7 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
     Expression<double>? replayGainAlbum,
     Expression<double>? replayGainTrackPeak,
     Expression<double>? replayGainAlbumPeak,
+    Expression<double>? loudnessRange,
     Expression<int>? playCount,
     Expression<int>? lastPlayed,
     Expression<int>? lastPositionMs,
@@ -1304,6 +1344,7 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
         'replay_gain_track_peak': replayGainTrackPeak,
       if (replayGainAlbumPeak != null)
         'replay_gain_album_peak': replayGainAlbumPeak,
+      if (loudnessRange != null) 'loudness_range': loudnessRange,
       if (playCount != null) 'play_count': playCount,
       if (lastPlayed != null) 'last_played': lastPlayed,
       if (lastPositionMs != null) 'last_position_ms': lastPositionMs,
@@ -1343,6 +1384,7 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       Value<double?>? replayGainAlbum,
       Value<double?>? replayGainTrackPeak,
       Value<double?>? replayGainAlbumPeak,
+      Value<double?>? loudnessRange,
       Value<int>? playCount,
       Value<int?>? lastPlayed,
       Value<int>? lastPositionMs,
@@ -1378,6 +1420,7 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       replayGainAlbum: replayGainAlbum ?? this.replayGainAlbum,
       replayGainTrackPeak: replayGainTrackPeak ?? this.replayGainTrackPeak,
       replayGainAlbumPeak: replayGainAlbumPeak ?? this.replayGainAlbumPeak,
+      loudnessRange: loudnessRange ?? this.loudnessRange,
       playCount: playCount ?? this.playCount,
       lastPlayed: lastPlayed ?? this.lastPlayed,
       lastPositionMs: lastPositionMs ?? this.lastPositionMs,
@@ -1460,6 +1503,9 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       map['replay_gain_album_peak'] =
           Variable<double>(replayGainAlbumPeak.value);
     }
+    if (loudnessRange.present) {
+      map['loudness_range'] = Variable<double>(loudnessRange.value);
+    }
     if (playCount.present) {
       map['play_count'] = Variable<int>(playCount.value);
     }
@@ -1529,6 +1575,7 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
           ..write('replayGainAlbum: $replayGainAlbum, ')
           ..write('replayGainTrackPeak: $replayGainTrackPeak, ')
           ..write('replayGainAlbumPeak: $replayGainAlbumPeak, ')
+          ..write('loudnessRange: $loudnessRange, ')
           ..write('playCount: $playCount, ')
           ..write('lastPlayed: $lastPlayed, ')
           ..write('lastPositionMs: $lastPositionMs, ')
@@ -3712,6 +3759,7 @@ typedef $$SongsTableTableCreateCompanionBuilder = SongsTableCompanion Function({
   Value<double?> replayGainAlbum,
   Value<double?> replayGainTrackPeak,
   Value<double?> replayGainAlbumPeak,
+  Value<double?> loudnessRange,
   Value<int> playCount,
   Value<int?> lastPlayed,
   Value<int> lastPositionMs,
@@ -3748,6 +3796,7 @@ typedef $$SongsTableTableUpdateCompanionBuilder = SongsTableCompanion Function({
   Value<double?> replayGainAlbum,
   Value<double?> replayGainTrackPeak,
   Value<double?> replayGainAlbumPeak,
+  Value<double?> loudnessRange,
   Value<int> playCount,
   Value<int?> lastPlayed,
   Value<int> lastPositionMs,
@@ -3836,6 +3885,9 @@ class $$SongsTableTableFilterComposer
   ColumnFilters<double> get replayGainAlbumPeak => $composableBuilder(
       column: $table.replayGainAlbumPeak,
       builder: (column) => ColumnFilters(column));
+
+  ColumnFilters<double> get loudnessRange => $composableBuilder(
+      column: $table.loudnessRange, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<int> get playCount => $composableBuilder(
       column: $table.playCount, builder: (column) => ColumnFilters(column));
@@ -3956,6 +4008,10 @@ class $$SongsTableTableOrderingComposer
       column: $table.replayGainAlbumPeak,
       builder: (column) => ColumnOrderings(column));
 
+  ColumnOrderings<double> get loudnessRange => $composableBuilder(
+      column: $table.loudnessRange,
+      builder: (column) => ColumnOrderings(column));
+
   ColumnOrderings<int> get playCount => $composableBuilder(
       column: $table.playCount, builder: (column) => ColumnOrderings(column));
 
@@ -4072,6 +4128,9 @@ class $$SongsTableTableAnnotationComposer
   GeneratedColumn<double> get replayGainAlbumPeak => $composableBuilder(
       column: $table.replayGainAlbumPeak, builder: (column) => column);
 
+  GeneratedColumn<double> get loudnessRange => $composableBuilder(
+      column: $table.loudnessRange, builder: (column) => column);
+
   GeneratedColumn<int> get playCount =>
       $composableBuilder(column: $table.playCount, builder: (column) => column);
 
@@ -4161,6 +4220,7 @@ class $$SongsTableTableTableManager extends RootTableManager<
             Value<double?> replayGainAlbum = const Value.absent(),
             Value<double?> replayGainTrackPeak = const Value.absent(),
             Value<double?> replayGainAlbumPeak = const Value.absent(),
+            Value<double?> loudnessRange = const Value.absent(),
             Value<int> playCount = const Value.absent(),
             Value<int?> lastPlayed = const Value.absent(),
             Value<int> lastPositionMs = const Value.absent(),
@@ -4197,6 +4257,7 @@ class $$SongsTableTableTableManager extends RootTableManager<
             replayGainAlbum: replayGainAlbum,
             replayGainTrackPeak: replayGainTrackPeak,
             replayGainAlbumPeak: replayGainAlbumPeak,
+            loudnessRange: loudnessRange,
             playCount: playCount,
             lastPlayed: lastPlayed,
             lastPositionMs: lastPositionMs,
@@ -4233,6 +4294,7 @@ class $$SongsTableTableTableManager extends RootTableManager<
             Value<double?> replayGainAlbum = const Value.absent(),
             Value<double?> replayGainTrackPeak = const Value.absent(),
             Value<double?> replayGainAlbumPeak = const Value.absent(),
+            Value<double?> loudnessRange = const Value.absent(),
             Value<int> playCount = const Value.absent(),
             Value<int?> lastPlayed = const Value.absent(),
             Value<int> lastPositionMs = const Value.absent(),
@@ -4269,6 +4331,7 @@ class $$SongsTableTableTableManager extends RootTableManager<
             replayGainAlbum: replayGainAlbum,
             replayGainTrackPeak: replayGainTrackPeak,
             replayGainAlbumPeak: replayGainAlbumPeak,
+            loudnessRange: loudnessRange,
             playCount: playCount,
             lastPlayed: lastPlayed,
             lastPositionMs: lastPositionMs,

@@ -129,5 +129,41 @@ void main() {
         )),
       );
     });
+
+    test('Import matches by parent folder + filename and avoids cross-matching duplicates', () async {
+      // Two songs with the same filename in different album directories
+      await db.into(db.songsTable).insert(
+            SongsTableCompanion.insert(
+              id: const Value(101),
+              title: 'Track 01 (Album A)',
+              path: '/storage/music/AlbumA/track01.mp3',
+              isFavorite: const Value(false),
+            ),
+          );
+      await db.into(db.songsTable).insert(
+            SongsTableCompanion.insert(
+              id: const Value(102),
+              title: 'Track 01 (Album B)',
+              path: '/storage/music/AlbumB/track01.mp3',
+              isFavorite: const Value(false),
+            ),
+          );
+
+      // Restore targeting AlbumB with changed base mount point
+      final backupData = {
+        'version': 1,
+        'exportedAt': DateTime.now().toIso8601String(),
+        'favorites': ['/old_phone/sdcard/AlbumB/track01.mp3'],
+      };
+
+      final result = await importUseCase.execute(jsonEncode(backupData));
+      expect(result.restoredFavoritesCount, equals(1));
+
+      final songA = await (db.select(db.songsTable)..where((t) => t.id.equals(101))).getSingle();
+      final songB = await (db.select(db.songsTable)..where((t) => t.id.equals(102))).getSingle();
+
+      expect(songA.isFavorite, isFalse);
+      expect(songB.isFavorite, isTrue); // Correctly matched AlbumB!
+    });
   });
 }

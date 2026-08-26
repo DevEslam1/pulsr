@@ -81,7 +81,10 @@ class NowPlayingScreen extends StatelessWidget {
                   constraints: BoxConstraints(
                     maxWidth: MediaQuery.orientationOf(context) == Orientation.landscape ? 960 : 560,
                   ),
-                  child: themeWidget,
+                  child: Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: themeWidget,
+                  ),
                 ),
               ),
             ),

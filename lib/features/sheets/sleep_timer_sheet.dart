@@ -68,14 +68,14 @@ class SleepTimerSheet extends StatelessWidget {
                                         color: p.textPrimary,
                                       ),
                                 ),
-                                if (isActive)
+                                 if (isActive)
                                   TextButton.icon(
                                     onPressed: () {
                                       cubit.cancelSleepTimer();
                                       Navigator.pop(context);
                                     },
                                     icon: const Icon(Icons.cancel_rounded, color: Colors.redAccent, size: 18),
-                                    label: const Text('Turn Off', style: TextStyle(color: Colors.redAccent)),
+                                    label: Text(context.l10n.turnOff, style: const TextStyle(color: Colors.redAccent)),
                                   ),
                               ],
                             ),
@@ -93,7 +93,7 @@ class SleepTimerSheet extends StatelessWidget {
                               ),
                             const SizedBox(height: 16),
                             Text(
-                              'Presets',
+                              context.l10n.presets,
                               style: TextStyle(
                                 color: p.textSecondary,
                                 fontWeight: FontWeight.w600,
@@ -117,7 +117,7 @@ class SleepTimerSheet extends StatelessWidget {
                             ),
                             const SizedBox(height: 24),
                             Text(
-                              'Custom Time',
+                              context.l10n.customTime,
                               style: TextStyle(
                                 color: p.textSecondary,
                                 fontWeight: FontWeight.w600,
@@ -135,7 +135,7 @@ class SleepTimerSheet extends StatelessWidget {
                                 ),
                                 child: Icon(Icons.access_time_rounded, color: p.accent),
                               ),
-                              title: Text('Stop at specific time', style: TextStyle(color: p.textPrimary)),
+                              title: Text(context.l10n.stopAtSpecificTime, style: TextStyle(color: p.textPrimary)),
                               trailing: Icon(Icons.chevron_right_rounded, color: p.textSecondary),
                               onTap: () async {
                                 final now = TimeOfDay.now();

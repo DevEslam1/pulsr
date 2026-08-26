@@ -28,6 +28,23 @@ class YtmErrorClassifier {
     }
 
     final errStr = error.toString().toLowerCase();
+
+    if (errStr.contains('403') ||
+        errStr.contains('forbidden') ||
+        errStr.contains('http status error: 403')) {
+      return const YtmErrorInfo(
+        message: 'YouTube blocked this stream. Skipping...',
+        recoveryAction: YtmRecoveryAction.skipToNextTrack,
+      );
+    }
+
+    if (errStr.contains('407') || errStr.contains('proxy authentication')) {
+      return const YtmErrorInfo(
+        message: 'Backend proxy authentication failed.',
+        recoveryAction: YtmRecoveryAction.skipToNextTrack,
+      );
+    }
+
     if (errStr.contains('socketexception') ||
         errStr.contains('timeoutexception') ||
         errStr.contains('connection refused') ||
@@ -115,6 +132,13 @@ class YtmErrorClassifier {
     if (code == 'YTM_UNAVAILABLE' || detailLower.contains('404')) {
       return const YtmErrorInfo(
         message: 'This track is unavailable.',
+        recoveryAction: YtmRecoveryAction.skipToNextTrack,
+      );
+    }
+
+    if (code == 'YTM_PROXY_AUTH' || detailLower.contains('407')) {
+      return const YtmErrorInfo(
+        message: 'Backend proxy authentication failed.',
         recoveryAction: YtmRecoveryAction.skipToNextTrack,
       );
     }

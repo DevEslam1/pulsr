@@ -49,7 +49,7 @@ class _SplashScreenState extends State<SplashScreen> {
                 borderRadius: BorderRadius.circular(24),
                 boxShadow: [
                   BoxShadow(
-                    color: p.accent.withValues(alpha: 0.4),
+                    color: const Color(0xFFFF2940).withValues(alpha: 0.45),
                     blurRadius: 36,
                     spreadRadius: 4,
                     offset: const Offset(0, 8),
@@ -59,7 +59,7 @@ class _SplashScreenState extends State<SplashScreen> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(24),
                 child: Image.asset(
-                  'assets/app_icon/app_icon.png',
+                  'assets/app_icon/app_icon_plus.png',
                   width: 96,
                   height: 96,
                   fit: BoxFit.cover,

@@ -122,7 +122,7 @@ class _PulsrLogoPainter extends CustomPainter {
             color.withValues(alpha: 0.95),
             Color.lerp(color, const Color(0xFF002288), 0.5) ?? const Color(0xFF0077FF),
             const Color(0xFF001550),
-            const Color(0xFF030A2E),
+            const Color(0xFF0A0C12),
           ],
           stops: const [0.0, 0.4, 0.75, 1.0],
         ).createShader(const Rect.fromLTWH(0, 0, 512, 512));

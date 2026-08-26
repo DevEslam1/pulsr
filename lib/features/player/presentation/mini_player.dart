@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/glass_container.dart';
 import '../../settings/cubit/settings_cubit.dart';
@@ -73,132 +74,138 @@ class MiniPlayer extends StatelessWidget {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.center,
-                          children: [
-                            Hero(
-                              tag: 'now_playing_art',
-                              child: CachedArtwork(
-                                id: song.id,
-                                remoteUrl: song.remoteArtworkUrl,
-                                type: ArtworkType.AUDIO,
-                                size: 48,
-                                borderRadius: 12,
+                      Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Hero(
+                                tag: 'now_playing_art',
+                                child: CachedArtwork(
+                                  id: song.id,
+                                  remoteUrl: song.remoteArtworkUrl,
+                                  type: ArtworkType.AUDIO,
+                                  size: 48,
+                                  borderRadius: 12,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    song.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: p.textPrimary,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 14.5,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      song.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: p.textPrimary,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14.5,
+                                      ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    song.artist,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      color: p.textSecondary,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      song.artist,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: p.textSecondary,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 4),
-                            IconButton(
-                              tooltip: state.isPlaying ? 'Pause' : 'Play',
-                              icon: Icon(
-                                state.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                                color: activeAccent,
-                                size: 32,
+                              const SizedBox(width: 4),
+                              IconButton(
+                                tooltip: state.isPlaying ? context.l10n.pause : context.l10n.play,
+                                icon: Icon(
+                                  state.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                                  color: activeAccent,
+                                  size: 32,
+                                ),
+                                onPressed: cubit.togglePlayPause,
                               ),
-                              onPressed: cubit.togglePlayPause,
-                            ),
-                            IconButton(
-                              tooltip: 'Next track',
-                              icon: Icon(
-                                Icons.skip_next_rounded,
-                                color: p.textPrimary,
-                                size: 28,
+                              IconButton(
+                                tooltip: context.l10n.next,
+                                icon: Icon(
+                                  Icons.skip_next_rounded,
+                                  color: p.textPrimary,
+                                  size: 28,
+                                ),
+                                onPressed: cubit.next,
                               ),
-                              onPressed: cubit.next,
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                       // Edge-to-edge full width timeline with direct tap & scrub seeking
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final trackWidth = constraints.maxWidth;
-                          return GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTapDown: (details) {
-                              if (trackWidth > 0 && state.duration.inMilliseconds > 0) {
-                                final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
-                                final seekMs = (state.duration.inMilliseconds * ratio).round();
-                                cubit.seek(Duration(milliseconds: seekMs));
-                              }
-                            },
-                            onHorizontalDragUpdate: (details) {
-                              if (trackWidth > 0 && state.duration.inMilliseconds > 0) {
-                                final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
-                                final seekMs = (state.duration.inMilliseconds * ratio).round();
-                                cubit.seek(Duration(milliseconds: seekMs));
-                              }
-                            },
-                            child: SizedBox(
-                              height: 6.0,
-                              width: double.infinity,
-                              child: Stack(
-                                alignment: Alignment.centerLeft,
-                                children: [
-                                  Positioned.fill(
-                                    child: ColoredBox(color: p.hairline.withValues(alpha: 0.35)),
-                                  ),
-                                  Align(
-                                    alignment: Alignment.centerLeft,
-                                    child: FractionallySizedBox(
-                                      widthFactor: progress,
+                      Directionality(
+                        textDirection: TextDirection.ltr,
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final trackWidth = constraints.maxWidth;
+                            return GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTapDown: (details) {
+                                if (trackWidth > 0 && state.duration.inMilliseconds > 0) {
+                                  final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                                  final seekMs = (state.duration.inMilliseconds * ratio).round();
+                                  cubit.seek(Duration(milliseconds: seekMs));
+                                }
+                              },
+                              onHorizontalDragUpdate: (details) {
+                                if (trackWidth > 0 && state.duration.inMilliseconds > 0) {
+                                  final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                                  final seekMs = (state.duration.inMilliseconds * ratio).round();
+                                  cubit.seek(Duration(milliseconds: seekMs));
+                                }
+                              },
+                              child: SizedBox(
+                                height: 6.0,
+                                width: double.infinity,
+                                child: Stack(
+                                  alignment: Alignment.centerLeft,
+                                  children: [
+                                    Positioned.fill(
+                                      child: ColoredBox(color: p.hairline.withValues(alpha: 0.35)),
+                                    ),
+                                    Align(
                                       alignment: Alignment.centerLeft,
-                                      child: Container(
-                                        height: 6.0,
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            colors: [
-                                              activeAccent.withValues(alpha: 0.7),
-                                              activeAccent,
+                                      child: FractionallySizedBox(
+                                        widthFactor: progress,
+                                        alignment: Alignment.centerLeft,
+                                        child: Container(
+                                          height: 6.0,
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: [
+                                                activeAccent.withValues(alpha: 0.7),
+                                                activeAccent,
+                                              ],
+                                            ),
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: activeAccent.withValues(alpha: 0.45),
+                                                blurRadius: 4,
+                                              ),
                                             ],
                                           ),
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: activeAccent.withValues(alpha: 0.45),
-                                              blurRadius: 4,
-                                            ),
-                                          ],
                                         ),
                                       ),
                                     ),
-                                  ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
                     ],
                   ),

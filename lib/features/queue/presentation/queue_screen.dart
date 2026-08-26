@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/utils/formatters.dart';
@@ -18,7 +19,7 @@ class QueueScreen extends StatelessWidget {
     final p = context.palette;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Playing Queue'),
+        title: Text(context.l10n.queue),
       ),
       body: BlocBuilder<PlayerCubit, PlayerState>(
         builder: (context, state) {
@@ -28,9 +29,9 @@ class QueueScreen extends StatelessWidget {
           if (queue.isEmpty) {
             return EmptyStateWidget(
               icon: Icons.queue_music_rounded,
-              title: 'Playback Queue is Empty',
-              subtitle: 'Select a song, album, or playlist from your library to start playing music.',
-              primaryActionLabel: 'Explore Library',
+              title: context.l10n.queue,
+              subtitle: context.l10n.noSongsSubtitle,
+              primaryActionLabel: context.l10n.navLibrary,
               primaryActionIcon: Icons.library_music_rounded,
               onPrimaryAction: () {
                 if (Navigator.of(context).canPop()) {

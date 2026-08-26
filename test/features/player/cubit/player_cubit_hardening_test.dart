@@ -21,6 +21,9 @@ class MockToggleFavoriteUseCase extends Mock implements ToggleFavoriteUseCase {}
 class MockScrobblerService extends Mock implements ScrobblerService {}
 
 class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler implements PulsrAudioHandler {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
   double _vol = 1.0;
   @override
   double get volume => _vol;
@@ -136,6 +139,50 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
 
   @override
   bool get isAbComparisonActive => false;
+
+  @override
+  bool get isCrossfeedEnabled => false;
+  @override
+  double get crossfeedDelayUs => 350.0;
+  @override
+  double get crossfeedFeedDb => -9.0;
+  @override
+  bool get isLimiterEnabled => false;
+  @override
+  double get limiterThresholdDb => -0.2;
+  @override
+  double get limiterReleaseMs => 50.0;
+  @override
+  bool get isReverbEnabled => false;
+  @override
+  int get reverbPreset => 0;
+  @override
+  double get reverbWetDry => 0.20;
+  @override
+  double get stereoBalance => 0.0;
+  @override
+  bool get monoMix => false;
+  @override
+  bool get isSincResamplerEnabled => true;
+  @override
+  bool get hasOemAudio => false;
+  @override
+  List<String> get detectedOemEngines => const [];
+
+  @override
+  Future<void> setCrossfeed(bool enabled, {double? delayUs, double? feedDb}) async {}
+  @override
+  Future<void> setLookaheadLimiter(bool enabled, {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {}
+  @override
+  Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {}
+  @override
+  Future<void> loadCustomImpulseResponse(List<double> irSamples) async {}
+  @override
+  Future<void> setStereoBalance(double balance) async {}
+  @override
+  Future<void> setMonoMix(bool mono) async {}
+  @override
+  Future<void> setSincResampler(bool enabled) async {}
 
   @override
   Future<void> toggleDynamicsBypass() async {}

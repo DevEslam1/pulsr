@@ -99,31 +99,37 @@ class CrossfadeManager {
     AudioPlayer activePlayer, {
     double restoreVolume = 1.0,
   }) async {
-    if (isCrossfading || _fadeTimer != null) {
-      // Invalidate in-flight fade loops immediately before making async player calls
-      _fadeId++;
-      _fadeTimer?.cancel();
-      _fadeTimer = null;
-      isCrossfading = false;
-      pendingIndex = null;
+    final hadActiveFade = isCrossfading || _fadeTimer != null;
+    if (!hadActiveFade) return;
 
+    _fadeId++; // Invalidate any in-progress fade timers
+    _fadeTimer?.cancel();
+    _fadeTimer = null;
+    isCrossfading = false; // Set BEFORE stopping players
+    pendingIndex = null;
+
+    try {
+      await inactivePlayer.stop();
       try {
-        await inactivePlayer.stop();
-        await inactivePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));
-        await activePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));
-      } catch (e, st) {
-        ErrorLogger.log(
-          'Error canceling crossfade players',
-          error: e,
-          stackTrace: st,
-          category: 'CrossfadeManager',
-        );
-      }
+        await inactivePlayer
+            .setAudioSource(AudioSource.uri(Uri.parse('about:blank')));
+      } catch (_) {}
+      await inactivePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));
+      await activePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Error canceling crossfade players',
+        error: e,
+        stackTrace: st,
+        category: 'CrossfadeManager',
+      );
+    }
 
-      if (_crossfadeCompleter != null && !_crossfadeCompleter!.isCompleted) {
-        _crossfadeCompleter!.complete();
-      }
-      _crossfadeCompleter = null;
+    // Complete the completer exactly once
+    final completer = _crossfadeCompleter;
+    _crossfadeCompleter = null;
+    if (completer != null && !completer.isCompleted) {
+      completer.complete();
     }
   }
 

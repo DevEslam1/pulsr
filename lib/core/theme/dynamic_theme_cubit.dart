@@ -101,13 +101,17 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
         // 2. Local audio file from MediaStore
         Uint8List? rawArt = ArtworkLruCache().get('AUDIO_$songId');
         if (rawArt == null || rawArt.isEmpty) {
-          rawArt = await _audioQuery.queryArtwork(
-            songId,
-            ArtworkType.AUDIO,
-            format: ArtworkFormat.JPEG,
-            size: 150,
-            quality: 75,
-          );
+          try {
+            rawArt = await _audioQuery.queryArtwork(
+              songId,
+              ArtworkType.AUDIO,
+              format: ArtworkFormat.JPEG,
+              size: 150,
+              quality: 75,
+            );
+          } catch (_) {
+            rawArt = null;
+          }
         }
         if (rawArt != null && rawArt.isNotEmpty) {
           imageProvider = MemoryImage(rawArt);

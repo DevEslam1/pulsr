@@ -11,7 +11,11 @@ class SmartPlaylistEngine {
   SmartPlaylistEngine(this._db);
 
   SimpleSelectStatement<$SongsTableTable, SongsTableData> _buildQuery(SmartCriteria criteria) {
-    final query = _db.select(_db.songsTable);
+    final query = _db.select(_db.songsTable)
+      ..where((t) =>
+          t.isMissing.equals(false) &
+          t.source.equals(SongSource.local) &
+          t.path.like('ytmusic://%').not());
 
     if (criteria.rules.isNotEmpty) {
       query.where((t) {
@@ -83,6 +87,53 @@ class SmartPlaylistEngine {
             return t.playCount.equals(valInt);
         }
 
+      case SmartRuleField.artist:
+        if (valStr.isEmpty) return null;
+        final escapedArtist = valStr.replaceAll('\\', r'\\').replaceAll('%', r'\%').replaceAll('_', r'\_').toLowerCase();
+        switch (rule.operator) {
+          case SmartOperator.equals:
+            return t.artist.lower().equals(valStr.toLowerCase());
+          case SmartOperator.contains:
+          default:
+            return t.artist.lower().like('%$escapedArtist%');
+        }
+
+      case SmartRuleField.album:
+        if (valStr.isEmpty) return null;
+        final escapedAlbum = valStr.replaceAll('\\', r'\\').replaceAll('%', r'\%').replaceAll('_', r'\_').toLowerCase();
+        switch (rule.operator) {
+          case SmartOperator.equals:
+            return t.album.lower().equals(valStr.toLowerCase());
+          case SmartOperator.contains:
+          default:
+            return t.album.lower().like('%$escapedAlbum%');
+        }
+
+      case SmartRuleField.title:
+        if (valStr.isEmpty) return null;
+        final escapedTitle = valStr.replaceAll('\\', r'\\').replaceAll('%', r'\%').replaceAll('_', r'\_').toLowerCase();
+        switch (rule.operator) {
+          case SmartOperator.equals:
+            return t.title.lower().equals(valStr.toLowerCase());
+          case SmartOperator.contains:
+          default:
+            return t.title.lower().like('%$escapedTitle%');
+        }
+
+      case SmartRuleField.isLossless:
+        return t.path.lower().like('%.flac') |
+            t.path.lower().like('%.wav') |
+            t.path.lower().like('%.alac') |
+            t.path.lower().like('%.aiff') |
+            t.path.lower().like('%.dsf') |
+            t.path.lower().like('%.dff');
+
+      case SmartRuleField.decade:
+        if (valInt == null) return null;
+        final startYear = (valInt ~/ 10) * 10;
+        final endYear = startYear + 9;
+        return t.year.isBiggerOrEqualValue(startYear) & t.year.isSmallerOrEqualValue(endYear);
+
       case SmartRuleField.genre:
         if (valStr.isEmpty) return null;
         final escaped = valStr.replaceAll('\\', r'\\').replaceAll('%', r'\%').replaceAll('_', r'\_').toLowerCase();
@@ -114,8 +165,8 @@ class SmartPlaylistEngine {
       case SmartRuleField.dateAdded:
         if (rule.operator == SmartOperator.withinDays) {
           final days = valInt ?? 30;
-          final cutoffMs = DateTime.now().millisecondsSinceEpoch - (days * 86400 * 1000);
-          return t.dateAdded.isBiggerOrEqualValue(cutoffMs);
+          final cutoffSec = DateTime.now().millisecondsSinceEpoch ~/ 1000 - (days * 86400);
+          return t.dateAdded.isBiggerOrEqualValue(cutoffSec);
         }
         if (valInt == null) return null;
         switch (rule.operator) {
@@ -157,8 +208,8 @@ class SmartPlaylistEngine {
       case SmartRuleField.lastPlayed:
         if (rule.operator == SmartOperator.withinDays) {
           final days = valInt ?? 30;
-          final cutoffMs = DateTime.now().millisecondsSinceEpoch - (days * 86400 * 1000);
-          return t.lastPlayed.isBiggerOrEqualValue(cutoffMs);
+          final cutoffSec = DateTime.now().millisecondsSinceEpoch ~/ 1000 - (days * 86400);
+          return t.lastPlayed.isBiggerOrEqualValue(cutoffSec);
         }
         if (valInt == null) return null;
         switch (rule.operator) {

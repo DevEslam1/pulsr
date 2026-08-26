@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../settings/cubit/settings_cubit.dart';
@@ -55,7 +56,7 @@ class MinimalPlayerTheme extends StatelessWidget {
                     onPressed: () => context.canPop() ? context.pop() : context.go('/'),
                   ),
                   Text(
-                    'NOW PLAYING',
+                    context.l10n.nowPlaying.toUpperCase(),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           fontSize: 11,
                           letterSpacing: 2.0,
@@ -185,7 +186,7 @@ class MinimalPlayerTheme extends StatelessWidget {
               child: Column(
                 children: [
                   Text(
-                    song?.title ?? 'No Track Selected',
+                    song?.title ?? context.l10n.noTrackSelected,
                     textAlign: TextAlign.center,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -196,7 +197,7 @@ class MinimalPlayerTheme extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    song?.artist ?? 'Unknown Artist',
+                    song?.artist ?? context.l10n.unknownArtist,
                     textAlign: TextAlign.center,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

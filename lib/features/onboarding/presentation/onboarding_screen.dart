@@ -4,8 +4,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../../../core/theme/aura_theme.dart';
 import '../../../core/constants/app_radii.dart';
+import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_logo.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 
@@ -45,9 +46,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: const Text('Audio access is required to display your music library.'),
+              content: Text(context.l10n.audioAccessRequired),
               action: SnackBarAction(
-                label: 'Settings',
+                label: context.l10n.openSettings,
                 onPressed: () => openAppSettings(),
               ),
             ),
@@ -194,14 +195,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                       color: p.onAccent,
                                     ),
                                   )
-                                : const Row(
+                                : Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      Icon(Icons.shield_rounded, size: 20),
-                                      SizedBox(width: 8),
+                                      const Icon(Icons.shield_rounded, size: 20),
+                                      const SizedBox(width: 8),
                                       Text(
-                                        'Grant Access & Start Listening',
-                                        style: TextStyle(
+                                        context.l10n.grantAccess,
+                                        style: const TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w800,
                                         ),
@@ -223,13 +224,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Text(
-                                  'Next',
-                                  style: TextStyle(
+                                  context.l10n.next,
+                                  style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w700),
                                 ),
-                                SizedBox(width: 8),
-                                Icon(Icons.arrow_forward_rounded,
+                                const SizedBox(width: 8),
+                                Icon(Icons.adaptive.arrow_forward_rounded,
                                     size: 20, color: p.accent),
                               ],
                             ),

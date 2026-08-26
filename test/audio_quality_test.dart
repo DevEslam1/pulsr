@@ -136,5 +136,57 @@ void main() {
       expect(info.bitDepth, '1-bit DSD');
       expect(info.shortBadgeLabel, 'DSD • HI-RES');
     });
+
+    test('Provides accurate renderEngineDescription for lossless vs compressed streams', () {
+      const flacSong = SongsTableData(
+        id: 10,
+        title: 'Lossless Track',
+        artist: 'Artist',
+        album: 'Album',
+        durationMs: 180000,
+        path: '/storage/emulated/0/Music/track.flac',
+        fileSize: 30000000,
+        source: SongSource.local,
+        isFavorite: false,
+        isMissing: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+      final flacInfo = AudioQualityInfo.fromSong(flacSong);
+      expect(flacInfo.renderEngineDescription, 'ExoPlayer Media3 • 32-bit Float PCM');
+
+      const ytmSong = SongsTableData(
+        id: 11,
+        title: 'YTM Track',
+        artist: 'Artist',
+        album: 'Album',
+        durationMs: 210000,
+        path: 'ytmusic://abc12345',
+        source: SongSource.youtube,
+        isFavorite: false,
+        isMissing: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+      final ytmInfo = AudioQualityInfo.fromSong(ytmSong);
+      expect(ytmInfo.renderEngineDescription, contains('Hardware Offload (AAC / DSP)'));
+
+      const mp3Song = SongsTableData(
+        id: 12,
+        title: 'MP3 Track',
+        artist: 'Artist',
+        album: 'Album',
+        durationMs: 200000,
+        path: '/storage/emulated/0/Music/track.mp3',
+        fileSize: 8000000,
+        source: SongSource.local,
+        isFavorite: false,
+        isMissing: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+      final mp3Info = AudioQualityInfo.fromSong(mp3Song);
+      expect(mp3Info.renderEngineDescription, contains('Hardware Offload (MP3 / DSP)'));
+    });
   });
 }

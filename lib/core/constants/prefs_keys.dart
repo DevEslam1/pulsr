@@ -33,4 +33,18 @@ class PrefsKeys {
   static const String ytdlpBackendToken = 'setting_ytdlp_backend_token';
   static const String extractorEngine = 'setting_extractor_engine';
   static const String languageCode = 'setting_language_code';
+  static const String bitPerfectOutput = 'setting_bit_perfect_output';
+  static const String bypassDspOnBitPerfect = 'setting_bypass_dsp_on_bit_perfect';
+  static const String crossfeedEnabled = 'setting_crossfeed_enabled';
+  static const String crossfeedDelayUs = 'setting_crossfeed_delay_us';
+  static const String crossfeedFeedDb = 'setting_crossfeed_feed_db';
+  static const String lookaheadLimiterEnabled = 'setting_lookahead_limiter_enabled';
+  static const String lookaheadLimiterThresholdDb = 'setting_lookahead_limiter_threshold_db';
+  static const String lookaheadLimiterReleaseMs = 'setting_lookahead_limiter_release_ms';
+  static const String convolutionReverbEnabled = 'setting_convolution_reverb_enabled';
+  static const String convolutionReverbPreset = 'setting_convolution_reverb_preset';
+  static const String convolutionReverbWetDry = 'setting_convolution_reverb_wet_dry';
+  static const String stereoBalance = 'setting_stereo_balance';
+  static const String monoMix = 'setting_mono_mix';
+  static const String sincResamplerEnabled = 'setting_sinc_resampler_enabled';
 }

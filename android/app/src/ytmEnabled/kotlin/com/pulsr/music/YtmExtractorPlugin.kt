@@ -273,6 +273,17 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         if (msg.contains("not a bot") || msg.contains("login_required") || msg.contains("recaptcha") || msg.contains("bot_block")) {
             return "YTM_BOT_BLOCKED"
         }
+        // Structured category mapping: without this, InnertubeClient's
+        // BOT_BLOCK verdict is lost and Dart never runs its bot-block
+        // backoff / poToken-invalidation recovery path.
+        if (e is InnertubeClient.InnertubeException) {
+            return when (e.category) {
+                InnertubeClient.ErrorCategory.BOT_BLOCK -> "YTM_BOT_BLOCKED"
+                InnertubeClient.ErrorCategory.AUTH -> "LOGIN_REQUIRED"
+                InnertubeClient.ErrorCategory.PERMANENT -> "YTM_UNAVAILABLE"
+                InnertubeClient.ErrorCategory.TRANSIENT -> "YTM_NETWORK"
+            }
+        }
         return when (e) {
             is ReCaptchaException -> "YTM_RECAPTCHA"
             is ContentNotAvailableException -> "YTM_UNAVAILABLE"
@@ -346,14 +357,37 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
 
     /**
      * Playlist extraction with continuation pagination up to [limit].
+     *
+     * Liked-songs variants (LM, VLLM, LL, FEmusic_liked_*) are routed through
+     * [InnertubeClient.requestBrowse] because NewPipe's PlaylistExtractor cannot
+     * authenticate against YouTube's private `LL` playlist and always throws
+     * "URL not accepted". All other playlists continue to use NewPipe.
      */
     private fun getPlaylist(urlOrId: String, limit: Int): Map<String, Any?> {
-        val rawUrl = if (urlOrId.startsWith("http://") || urlOrId.startsWith("https://")) {
-            urlOrId
-        } else {
-            "https://www.youtube.com/playlist?list=$urlOrId"
+        val trimmed = urlOrId.trim()
+
+        // Detect liked-songs IDs (private playlist — NewPipe cannot handle them)
+        val isLikedSongs = trimmed == "LM" || trimmed == "VLLM" || trimmed == "LL" ||
+            trimmed == "FEmusic_liked_videos" || trimmed == "FEmusic_liked_tracks" ||
+            trimmed == "VLSE" ||
+            trimmed.contains("playlist?list=LM") ||
+            trimmed.contains("playlist?list=VLLM") ||
+            trimmed.contains("playlist?list=LL")
+
+        if (isLikedSongs) {
+            return getPlaylistViaInnertube(limit)
         }
+
+        // ── Public playlists via NewPipe ──────────────────────────────────────
+        val cleanId = trimmed
+        val rawUrl = if (cleanId.startsWith("http://") || cleanId.startsWith("https://")) {
+            cleanId
+        } else {
+            "https://www.youtube.com/playlist?list=$cleanId"
+        }
+        // Normalise music.youtube.com → www.youtube.com for NewPipe compatibility
         val url = rawUrl.replace("music.youtube.com", "www.youtube.com")
+
         val extractor = ServiceList.YouTube.getPlaylistExtractor(url)
         extractor.fetchPage()
         val playlistInfo = PlaylistInfo.getInfo(extractor)
@@ -385,6 +419,249 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             "thumbnailUrl" to bestArtwork(playlistInfo.thumbnails),
             "tracks" to tracks,
         )
+    }
+
+    /**
+     * Fetches the liked-songs playlist via [InnertubeClient] browse (VLLM → LM fallback).
+     *
+     * Uses the authenticated cookie store so the request is account-scoped. Parses
+     * `musicResponsiveListItemRenderer` and `musicPlaylistShelfRenderer` containers
+     * from the JSON response and converts them to the same map format as [streamItemsToMaps].
+     */
+    private fun getPlaylistViaInnertube(limit: Int): Map<String, Any?> {
+        val ctx = context?.applicationContext
+            ?: throw ExtractionException("No context for InnertubeClient")
+
+        // Ensure latest cookies from webview are in the store
+        YtmCookieStore.getInstance(ctx).readFromCookieManager()
+
+        val client = InnertubeClient(ctx)
+
+        // Try browse IDs in priority order — VLLM is the canonical "browse as playlist" form
+        val browseIds = listOf("VLLM", "FEmusic_liked_videos", "FEmusic_liked_tracks", "LM")
+        var lastError: Throwable? = null
+
+        for (bId in browseIds) {
+            try {
+                Log.d(TAG, "Liked songs: trying InnertubeClient browse with browseId=$bId")
+                val json = client.requestBrowse(bId)
+                val tracks = parseInnertubeTracksFromJson(json, limit)
+                if (tracks.isNotEmpty()) {
+                    Log.i(TAG, "Liked songs: parsed ${tracks.size} tracks via browseId=$bId")
+
+                    // Follow continuation pages
+                    val allTracks = tracks.toMutableList()
+                    var currentJson = json
+                    var pageCount = 0
+                    while (allTracks.size < limit && pageCount < 10) {
+                        val token = extractContinuationToken(currentJson) ?: break
+                        try {
+                            val contJson = client.requestContinuation(token)
+                            val contTracks = parseInnertubeTracksFromJson(contJson, limit - allTracks.size)
+                            if (contTracks.isEmpty()) break
+                            allTracks.addAll(contTracks)
+                            currentJson = contJson
+                            pageCount++
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Liked songs continuation failed: ${e.message}")
+                            break
+                        }
+                    }
+
+                    return mapOf(
+                        "title" to "Liked Music",
+                        "uploader" to "",
+                        "thumbnailUrl" to null,
+                        "tracks" to allTracks.take(limit),
+                    )
+                }
+            } catch (e: Throwable) {
+                Log.w(TAG, "Liked songs InnertubeClient browse $bId failed: ${e.message}")
+                lastError = e
+            }
+        }
+
+        throw ExtractionException(
+            "Unable to fetch liked songs via InnertubeClient",
+            lastError,
+        )
+    }
+
+    /**
+     * Parses track maps from an InnerTube browse JSON response.
+     * Handles `musicPlaylistShelfRenderer`, `musicShelfRenderer`, and
+     * `musicResponsiveListItemRenderer` containers.
+     */
+    private fun parseInnertubeTracksFromJson(
+        json: org.json.JSONObject,
+        limit: Int,
+    ): List<Map<String, Any?>> {
+        val results = mutableListOf<Map<String, Any?>>()
+
+        fun parseRenderer(renderer: org.json.JSONObject) {
+            val videoId = renderer.optString("videoId").takeIf { it.length == 11 } ?: run {
+                // Try nested watchEndpoint paths
+                renderer.optJSONObject("navigationEndpoint")
+                    ?.optJSONObject("watchEndpoint")
+                    ?.optString("videoId")
+                    ?.takeIf { it.length == 11 }
+            } ?: return
+
+            // Title from flexColumns[0]
+            var title = "Unknown Title"
+            val flexCols = renderer.optJSONArray("flexColumns")
+            if (flexCols != null && flexCols.length() > 0) {
+                val runs = flexCols.optJSONObject(0)
+                    ?.optJSONObject("musicResponsiveListItemFlexColumnRenderer")
+                    ?.optJSONObject("text")
+                    ?.optJSONArray("runs")
+                if (runs != null && runs.length() > 0) {
+                    title = runs.optJSONObject(0)?.optString("text") ?: title
+                }
+            }
+
+            // Artist from flexColumns[1] subtitle runs
+            var artist = "Unknown Artist"
+            if (flexCols != null && flexCols.length() > 1) {
+                val runs = flexCols.optJSONObject(1)
+                    ?.optJSONObject("musicResponsiveListItemFlexColumnRenderer")
+                    ?.optJSONObject("text")
+                    ?.optJSONArray("runs")
+                if (runs != null) {
+                    for (i in 0 until runs.length()) {
+                        val text = runs.optJSONObject(i)?.optString("text")?.trim() ?: continue
+                        if (text.isNotEmpty() && text != "•" && text != "·" &&
+                            text.lowercase() != "song" && text.lowercase() != "video"
+                        ) {
+                            artist = text
+                            break
+                        }
+                    }
+                }
+            }
+
+            // Duration from fixedColumns[0]
+            var durationSec = 0
+            val fixedCols = renderer.optJSONArray("fixedColumns")
+            if (fixedCols != null && fixedCols.length() > 0) {
+                val durText = fixedCols.optJSONObject(0)
+                    ?.optJSONObject("musicResponsiveListItemFixedColumnRenderer")
+                    ?.optJSONObject("text")
+                    ?.optJSONArray("runs")
+                    ?.optJSONObject(0)
+                    ?.optString("text")
+                if (durText != null) {
+                    val parts = durText.split(":").mapNotNull { it.toIntOrNull() }
+                    durationSec = when (parts.size) {
+                        2 -> parts[0] * 60 + parts[1]
+                        3 -> parts[0] * 3600 + parts[1] * 60 + parts[2]
+                        else -> 0
+                    }
+                }
+            }
+
+            // Thumbnail
+            val thumbUrl: String? = renderer
+                .optJSONObject("thumbnail")
+                ?.optJSONObject("musicThumbnailRenderer")
+                ?.optJSONObject("thumbnail")
+                ?.optJSONArray("thumbnails")
+                ?.let { arr ->
+                    if (arr.length() > 0) arr.optJSONObject(arr.length() - 1)?.optString("url")
+                    else null
+                }
+
+            results.add(
+                mapOf(
+                    "videoId" to videoId,
+                    "title" to title,
+                    "uploader" to artist,
+                    "thumbnailUrl" to thumbUrl,
+                    "duration" to durationSec.toLong(),
+                    "viewCount" to -1L,
+                    "isLive" to false,
+                    "shortDescription" to null,
+                    "url" to "https://music.youtube.com/watch?v=$videoId",
+                )
+            )
+        }
+
+        fun traverseJson(node: Any?) {
+            when (node) {
+                is org.json.JSONObject -> {
+                    // Container renderers — recurse into contents
+                    val shelfKeys = listOf("musicPlaylistShelfRenderer", "musicShelfRenderer")
+                    for (key in shelfKeys) {
+                        if (node.has(key)) {
+                            val contents = node.optJSONObject(key)?.optJSONArray("contents")
+                            if (contents != null) {
+                                for (i in 0 until contents.length()) {
+                                    if (results.size >= limit) return
+                                    traverseJson(contents.opt(i))
+                                }
+                            }
+                            return
+                        }
+                    }
+                    // Leaf renderer
+                    if (node.has("musicResponsiveListItemRenderer")) {
+                        parseRenderer(node.getJSONObject("musicResponsiveListItemRenderer"))
+                        return
+                    }
+                    // Generic recursion
+                    val keys = node.keys()
+                    while (keys.hasNext()) {
+                        if (results.size >= limit) return
+                        traverseJson(node.opt(keys.next()))
+                    }
+                }
+                is org.json.JSONArray -> {
+                    for (i in 0 until node.length()) {
+                        if (results.size >= limit) return
+                        traverseJson(node.opt(i))
+                    }
+                }
+            }
+        }
+
+        traverseJson(json)
+        return results
+    }
+
+    /** Extracts a continuation token from an InnerTube JSON response object. */
+    private fun extractContinuationToken(json: org.json.JSONObject): String? {
+        fun find(node: Any?): String? {
+            return when (node) {
+                is org.json.JSONObject -> {
+                    // nextContinuationData.continuation
+                    node.optJSONObject("nextContinuationData")
+                        ?.optString("continuation")?.takeIf { it.isNotEmpty() }
+                        // continuationEndpoint.continuationCommand.token
+                        ?: node.optJSONObject("continuationEndpoint")
+                            ?.optJSONObject("continuationCommand")
+                            ?.optString("token")?.takeIf { it.isNotEmpty() }
+                        ?: node.optJSONObject("continuationCommand")
+                            ?.optString("token")?.takeIf { it.isNotEmpty() }
+                        ?: run {
+                            val keys = node.keys()
+                            while (keys.hasNext()) {
+                                val r = find(node.opt(keys.next()))
+                                if (r != null) return@run r
+                            }
+                            null
+                        }
+                }
+                is org.json.JSONArray -> {
+                    for (i in 0 until node.length()) {
+                        val r = find(node.opt(i))
+                        if (r != null) return r
+                    }
+                    null
+                }
+                else -> null
+            }
+        }
+        return find(json)
     }
 
     /**

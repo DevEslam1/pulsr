@@ -119,6 +119,7 @@ class SleepTimerManager {
   }
 
   void cancelSleepTimer() {
+    // Incrementing _sleepFadeToken invalidates any pending Future.delayed in the fade-out loop
     _sleepFadeToken++;
     _sleepTimer?.cancel();
     _sleepTimer = null;
@@ -131,6 +132,7 @@ class SleepTimerManager {
       prefs.remove(PrefsKeys.sleepTimerTarget);
     }).catchError((_) {});
 
+    // Restore pre-fade volume if timer was canceled during fade-out
     if (_preFadeVolume != null && _lastPlayerGetter != null) {
       try {
         _lastPlayerGetter!().setVolume(_preFadeVolume!);

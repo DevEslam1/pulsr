@@ -1,4 +1,3 @@
-// lib/features/ytm_search/cubit/ytm_search_cubit.dart
 import 'dart:async';
 
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -43,6 +42,7 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
 
   Future<void> _executeSearch(String query, {bool isRetryAfterBotBlock = false}) async {
     final generation = ++_generation;
+
     if (query.trim().isEmpty) {
       emit(state.copyWith(results: [], isLoading: false, errorMessage: null));
       return;

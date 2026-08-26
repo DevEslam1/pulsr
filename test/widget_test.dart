@@ -2,6 +2,7 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/theme/dynamic_theme_cubit.dart';
@@ -35,6 +36,9 @@ import 'package:pulsr/main.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler implements PulsrAudioHandler {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
   MockPulsrAudioHandler() {
     playbackState.add(PlaybackState(
       controls: [],
@@ -116,6 +120,50 @@ class MockPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   @override
   bool get isAbComparisonActive => false;
   @override
+  bool get isCrossfeedEnabled => false;
+  @override
+  double get crossfeedDelayUs => 350.0;
+  @override
+  double get crossfeedFeedDb => -9.0;
+  @override
+  bool get isLimiterEnabled => false;
+  @override
+  double get limiterThresholdDb => -0.2;
+  @override
+  double get limiterReleaseMs => 50.0;
+  @override
+  bool get isReverbEnabled => false;
+  @override
+  int get reverbPreset => 0;
+  @override
+  double get reverbWetDry => 0.20;
+  @override
+  double get stereoBalance => 0.0;
+  @override
+  bool get monoMix => false;
+  @override
+  bool get isSincResamplerEnabled => true;
+  @override
+  bool get hasOemAudio => false;
+  @override
+  List<String> get detectedOemEngines => const [];
+
+  @override
+  Future<void> setCrossfeed(bool enabled, {double? delayUs, double? feedDb}) async {}
+  @override
+  Future<void> setLookaheadLimiter(bool enabled, {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {}
+  @override
+  Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {}
+  @override
+  Future<void> loadCustomImpulseResponse(List<double> irSamples) async {}
+  @override
+  Future<void> setStereoBalance(double balance) async {}
+  @override
+  Future<void> setMonoMix(bool mono) async {}
+  @override
+  Future<void> setSincResampler(bool enabled) async {}
+
+  @override
   Future<void> toggleDynamicsBypass() async {}
   @override
   bool get isDynamicsBypassed => false;
@@ -157,6 +205,13 @@ void main() {
   });
 
   testWidgets('App smoke test', (WidgetTester tester) async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('com.pulsr.music/hires_dac'), (call) async => null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('com.pulsr.music/hires_dac_events'), (call) async => null);
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('com.pulsr.music/proxy'), (call) async => null);
+
     SharedPreferences.setMockInitialValues({});
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     final repo = MusicRepository(db);

@@ -12,7 +12,11 @@ import java.net.URL
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import java.text.SimpleDateFormat
 import java.time.Instant
+import java.util.Date
+import java.util.Locale
+import java.util.TimeZone
 import java.util.zip.GZIPInputStream
 
 /**
@@ -107,11 +111,28 @@ internal class InnertubeClient(
         ANDROID_TESTSUITE(
             "ANDROID_TESTSUITE",
             "1.9",
-            "89",
+            "30",
             "com.google.android.youtube/1.9 (Linux; U; Android 9; gzip)",
             false,
             "https://www.youtube.com",
-        ),
+        );
+
+        val effectiveClientVersion: String
+            get() = when (this) {
+                WEB_REMIX, WEB_EMBEDDED_PLAYER -> {
+                    val dateStr = SimpleDateFormat("yyyyMMdd", Locale.US).apply {
+                        timeZone = TimeZone.getTimeZone("UTC")
+                    }.format(Date())
+                    "1.$dateStr.01.00"
+                }
+                MWEB -> {
+                    val dateStr = SimpleDateFormat("yyyyMMdd", Locale.US).apply {
+                        timeZone = TimeZone.getTimeZone("UTC")
+                    }.format(Date())
+                    "2.$dateStr.01.00"
+                }
+                else -> clientVersion
+            }
     }
 
     enum class ErrorCategory {
@@ -140,31 +161,17 @@ internal class InnertubeClient(
      * 9. ANDROID_TESTSUITE
      */
     fun resolvePlayerStream(videoId: String, quality: String = "high"): Map<String, Any?> {
-        val clientChain = if (cookieStore.isSessionValid()) {
-            listOf(
-                ClientType.WEB_REMIX,
-                ClientType.ANDROID_VR,
-                ClientType.ANDROID_CREATOR,
-                ClientType.TVHTML5_SIMPLY_EMBEDDED_PLAYER,
-                ClientType.WEB_EMBEDDED_PLAYER,
-                ClientType.ANDROID_MUSIC,
-                ClientType.IOS_MUSIC,
-                ClientType.MWEB,
-                ClientType.ANDROID_TESTSUITE,
-            )
-        } else {
-            listOf(
-                ClientType.ANDROID_VR,
-                ClientType.ANDROID_CREATOR,
-                ClientType.TVHTML5_SIMPLY_EMBEDDED_PLAYER,
-                ClientType.WEB_EMBEDDED_PLAYER,
-                ClientType.ANDROID_MUSIC,
-                ClientType.IOS_MUSIC,
-                ClientType.WEB_REMIX,
-                ClientType.MWEB,
-                ClientType.ANDROID_TESTSUITE,
-            )
-        }
+        val clientChain = listOf(
+            ClientType.ANDROID_VR,
+            ClientType.ANDROID_CREATOR,
+            ClientType.ANDROID_MUSIC,
+            ClientType.IOS_MUSIC,
+            ClientType.TVHTML5_SIMPLY_EMBEDDED_PLAYER,
+            ClientType.WEB_REMIX,
+            ClientType.WEB_EMBEDDED_PLAYER,
+            ClientType.MWEB,
+            ClientType.ANDROID_TESTSUITE,
+        )
 
         // Authenticated cold-start: the account datasyncId may be unknown (e.g. the Dart primary
         // path was skipped). One WEB_REMIX /player call still returns responseContext.datasyncId
@@ -179,6 +186,7 @@ internal class InnertubeClient(
         }
 
         var lastException: Throwable? = null
+        var sawBotGate = false
 
         for (client in clientChain) {
             try {
@@ -193,6 +201,9 @@ internal class InnertubeClient(
                     status.contains("BOT", ignoreCase = true)) {
                     val reason = playability?.optString("reason") ?: status
                     Log.w(TAG, "Client ${client.name} returned status $status ($reason), trying next client")
+                    // UNPLAYABLE means this video is restricted/unavailable, not that
+                    // we are bot-gated — only LOGIN_REQUIRED/BOT prove an attestation gate.
+                    if (!status.equals("UNPLAYABLE", ignoreCase = true)) sawBotGate = true
                     continue
                 }
 
@@ -253,9 +264,20 @@ internal class InnertubeClient(
             }
         }
 
-        PoTokenManager.invalidate()
+        // Only a real bot/auth gate justifies touching attestation state.
+        // Evict just the minted tokens so they re-mint; a full invalidation
+        // here would force a slow BotGuard WebView re-run every failing cycle
+        // and hammer YouTube with retries while already flagged.
+        if (sawBotGate) {
+            PoTokenManager.evictMintedTokens()
+            throw InnertubeException(
+                ErrorCategory.BOT_BLOCK,
+                "All Innertube client fallback resolutions failed for video $videoId",
+                lastException,
+            )
+        }
         throw InnertubeException(
-            ErrorCategory.BOT_BLOCK,
+            ErrorCategory.TRANSIENT,
             "All Innertube client fallback resolutions failed for video $videoId",
             lastException,
         )
@@ -292,6 +314,15 @@ internal class InnertubeClient(
         val payload = JSONObject().apply {
             put("context", buildClientContext(clientType))
             put("browseId", browseId)
+        }
+        return postWithRetry(endpoint, payload, clientType)
+    }
+
+    fun requestContinuation(token: String, clientType: ClientType = ClientType.WEB_REMIX): JSONObject {
+        val endpoint = "${clientType.endpointHost}/youtubei/v1/browse?prettyPrint=false&key=$API_KEY"
+        val payload = JSONObject().apply {
+            put("context", buildClientContext(clientType))
+            put("continuation", token)
         }
         return postWithRetry(endpoint, payload, clientType)
     }
@@ -354,14 +385,21 @@ internal class InnertubeClient(
                         connection.setRequestProperty("Cookie", cookieHeader)
 
                         val sapisid = cookieStore.getCookie("SAPISID")
-                            ?: cookieStore.getCookie("__Secure-3PAPISID")
-                            ?: cookieStore.getCookie("__Secure-1PAPISID")
+                        val sapisid3p = cookieStore.getCookie("__Secure-3PAPISID")
+                        val sapisid1p = cookieStore.getCookie("__Secure-1PAPISID")
 
-                        if (!sapisid.isNullOrEmpty()) {
-                            val timestamp = Instant.now().epochSecond
-                            val toHash = "$timestamp $sapisid ${clientType.endpointHost}"
+                        val timestamp = Instant.now().epochSecond
+                        val (authType, token) = when {
+                            !sapisid.isNullOrEmpty() -> "SAPISIDHASH" to sapisid
+                            !sapisid3p.isNullOrEmpty() -> "SAPISID3PHASH" to sapisid3p
+                            !sapisid1p.isNullOrEmpty() -> "SAPISID1PHASH" to sapisid1p
+                            else -> null to null
+                        }
+
+                        if (authType != null && token != null) {
+                            val toHash = "$timestamp $token ${clientType.endpointHost}"
                             val hash = sha1Hex(toHash)
-                            connection.setRequestProperty("Authorization", "SAPISIDHASH ${timestamp}_$hash")
+                            connection.setRequestProperty("Authorization", "$authType ${timestamp}_$hash")
                         }
                     }
                 }
@@ -372,8 +410,10 @@ internal class InnertubeClient(
                 val code = connection.responseCode
 
                 if (clientType.isWeb) {
-                    val setCookies = connection.headerFields["Set-Cookie"]
-                    if (!setCookies.isNullOrEmpty()) {
+                    val setCookies = connection.headerFields.entries
+                        .filter { it.key.equals("Set-Cookie", ignoreCase = true) }
+                        .flatMap { it.value }
+                    if (setCookies.isNotEmpty()) {
                         cookieStore.ingestSetCookieHeaders(setCookies)
                     }
                 }
@@ -454,19 +494,21 @@ internal class InnertubeClient(
 
     private fun buildPlayerBody(videoId: String, clientType: ClientType): JSONObject {
         val root = JSONObject()
-        root.put("context", buildClientContext(clientType))
+        root.put("context", buildClientContext(clientType, videoId))
         root.put("videoId", videoId)
         root.put("racyCheckOk", true)
         root.put("contentCheckOk", true)
 
+        if (clientType == ClientType.WEB_EMBEDDED_PLAYER || clientType == ClientType.TVHTML5_SIMPLY_EMBEDDED_PLAYER) {
+            root.put("thirdParty", JSONObject().put("embedUrl", "https://www.youtube.com/watch?v=$videoId"))
+        }
+
         val playbackContext = JSONObject()
         val contentPlaybackContext = JSONObject().apply {
             put("html5Preference", "HTML5_PREF_WANTS")
-            // Web player requests require a poToken regardless of login. When authenticated the
-            // token must bind to the account datasyncId; otherwise it binds to the guest videoId.
-            if (clientType.isWeb && PoTokenManager.isReady) {
+            if (PoTokenManager.isReady) {
                 val dataSyncId = PoTokenManager.dataSyncId
-                val poToken = if (cookieStore.isSessionValid() && dataSyncId.isNotEmpty()) {
+                val poToken = if (clientType.isWeb && cookieStore.isSessionValid() && dataSyncId.isNotEmpty()) {
                     PoTokenManager.accountPoTokenForSync(dataSyncId)
                 } else {
                     PoTokenManager.poTokenForSync(videoId)
@@ -479,20 +521,30 @@ internal class InnertubeClient(
         playbackContext.put("contentPlaybackContext", contentPlaybackContext)
         root.put("playbackContext", playbackContext)
 
+        // Web clients attest via root-level serviceIntegrityDimensions as well;
+        // mobile clients only read contentPlaybackContext.poToken. Sending both
+        // keeps every client in the chain covered.
+        if (clientType.isWeb && contentPlaybackContext.has("poToken")) {
+            root.put(
+                "serviceIntegrityDimensions",
+                JSONObject().put("poToken", contentPlaybackContext.getString("poToken")),
+            )
+        }
+
         return root
     }
 
-    private fun buildClientContext(clientType: ClientType): JSONObject {
+    private fun buildClientContext(clientType: ClientType, videoId: String? = null): JSONObject {
         val client = JSONObject().apply {
             put("clientName", clientType.clientName)
-            put("clientVersion", clientType.clientVersion)
+            put("clientVersion", clientType.effectiveClientVersion)
             put("hl", "en")
             put("gl", "US")
             // Only web clients send cookies, so only they are "authenticated": send the harvested
             // session visitorData in that case, guest visitorData otherwise.
             val authedWeb = clientType.isWeb && cookieStore.isSessionValid()
             val visitorData = if (authedWeb) {
-                PoTokenManager.sessionVisitorData.ifEmpty { PoTokenManager.visitorData }
+                PoTokenManager.sessionVisitorData
             } else {
                 PoTokenManager.visitorData
             }

@@ -6,6 +6,7 @@ enum TagEditorStatus { initial, loading, loaded, saving, success, failure }
 
 class TagEditorState {
   final SongsTableData song;
+  final List<SongsTableData> batchSongs;
   final TagEditorStatus status;
   final String title;
   final String artist;
@@ -18,10 +19,14 @@ class TagEditorState {
   final Uint8List? artworkBytes;
   final String? newArtworkPath;
   final bool removeArtwork;
+  final bool isAutoFetching;
   final String? errorMessage;
+
+  bool get isBatchMode => batchSongs.length > 1;
 
   const TagEditorState({
     required this.song,
+    this.batchSongs = const [],
     this.status = TagEditorStatus.initial,
     this.title = '',
     this.artist = '',
@@ -34,11 +39,13 @@ class TagEditorState {
     this.artworkBytes,
     this.newArtworkPath,
     this.removeArtwork = false,
+    this.isAutoFetching = false,
     this.errorMessage,
   });
 
   TagEditorState copyWith({
     SongsTableData? song,
+    List<SongsTableData>? batchSongs,
     TagEditorStatus? status,
     String? title,
     String? artist,
@@ -53,11 +60,13 @@ class TagEditorState {
     String? newArtworkPath,
     bool clearNewArtworkPath = false,
     bool? removeArtwork,
+    bool? isAutoFetching,
     String? errorMessage,
     bool clearErrorMessage = false,
   }) {
     return TagEditorState(
       song: song ?? this.song,
+      batchSongs: batchSongs ?? this.batchSongs,
       status: status ?? this.status,
       title: title ?? this.title,
       artist: artist ?? this.artist,
@@ -70,6 +79,7 @@ class TagEditorState {
       artworkBytes: clearArtworkBytes ? null : (artworkBytes ?? this.artworkBytes),
       newArtworkPath: clearNewArtworkPath ? null : (newArtworkPath ?? this.newArtworkPath),
       removeArtwork: removeArtwork ?? this.removeArtwork,
+      isAutoFetching: isAutoFetching ?? this.isAutoFetching,
       errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
     );
   }

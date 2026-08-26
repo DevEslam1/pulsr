@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import '../../../core/constants/app_radii.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/theme/aura_theme.dart';
@@ -56,10 +55,33 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   bool _showHint = false;
   Timer? _hintTimer;
   Timer? _authPollTimer;
+  bool _hadSuccessfulYtLoad = false;
+
+  static bool _isCookieMismatchUrl(String u) => RegExp(
+        r'CookieMismatch|/sorry|speedbump',
+        caseSensitive: false,
+      ).hasMatch(u);
+
+  static bool _isAuthInProgressUrl(String u) => RegExp(
+        r'accounts\.google\.com|ServiceLogin|signin|/checkpoint/|consent\.',
+        caseSensitive: false,
+      ).hasMatch(u);
 
   bool _canGoBack = false;
   bool _canGoForward = false;
   late String _currentUrl;
+  // Debounce timer: prevents rapid CookieMismatch events from triggering
+  // multiple navigations to music.youtube.com.
+  Timer? _cookieMismatchDebounce;
+
+  /// Collapses overlapping login checks (2s poll + onLoadStop +
+  /// onUpdateVisitedHistory) so cookies are harvested exactly once.
+  Future<bool>? _loginCheckInFlight;
+
+  /// Auto-navigation attempts past Google's CookieMismatch interstitial.
+  /// Capped: when third-party cookie state is broken, Google bounces the
+  /// reload straight back to CookieMismatch forever.
+  int _mismatchAutoNavCount = 0;
 
   @override
   void initState() {
@@ -68,25 +90,38 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
     final accountService = getIt<YtmAccountService>();
     if (accountService.isLoggedIn) {
-      _isLoggedIn = true;
+      accountService.validateSession().then((ok) {
+        if (!mounted) return;
+        setState(() => _isLoggedIn = ok);
+        if (!ok) {
+          _clearCookiesAndReset(); // start the re-login with a CLEAN jar (fixes B6)
+        }
+      });
     }
 
-    // Use Desktop Chrome User-Agent for both Android and desktop platforms.
-    // Google Accounts on mobile User-Agents attempts to invoke Android Play Services /
-    // OS Account Manager intents, which fail inside WebViews with "CookieMismatch".
-    // A desktop User-Agent ensures pure web cookie authentication.
+    // Use a Chrome Mobile User-Agent that matches the platform.
+    // Google's sign-in flow blocks embedded WebViews detected via:
+    //  1. X-Requested-With header containing the app package name (suppressed below via requestedWithHeaderOriginAllowList: {})
+    //  2. Chromium Client Hints (sec-ch-ua) that expose the embedded context
+    //  3. useHybridComposition=true which exposes a different rendering pipeline fingerprint
+    //
+    // Chrome Mobile UA + useHybridComposition=false + empty requestedWithHeaderOriginAllowList
+    // is the combination that avoids all three detection vectors.
     const userAgent =
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+        'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36';
 
     _settings = InAppWebViewSettings(
       userAgent: userAgent,
-      applicationNameForUserAgent: '',
+      // useHybridComposition=false forces the WebView to use the full Chromium
+      // rendering pipeline. Hybrid mode exposes a different rendering fingerprint
+      // that Google detects and flags as "not secure". This is the primary fix.
+      useHybridComposition: false,
       javaScriptEnabled: true,
       javaScriptCanOpenWindowsAutomatically: true,
-      supportMultipleWindows: false,
+      supportMultipleWindows: true,
       mediaPlaybackRequiresUserGesture: false,
       isInspectable: kDebugMode,
-      transparentBackground: true,
+      transparentBackground: false,
       mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
       cacheEnabled: true,
       databaseEnabled: true,
@@ -97,6 +132,14 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       allowContentAccess: true,
       useWideViewPort: true,
       loadWithOverviewMode: true,
+      allowsInlineMediaPlayback: true,
+      useShouldOverrideUrlLoading: true,
+      // Empty set suppresses the X-Requested-With header that Android WebView
+      // normally injects with the app's package name (com.pulsr.music).
+      // Google uses this header to detect embedded WebViews and block sign-in.
+      requestedWithHeaderOriginAllowList: <String>{},
+      // Disable hardware acceleration override to avoid rendering fingerprint differences
+      disableDefaultErrorPage: false,
     );
 
     _hintTimer = Timer(const Duration(seconds: 30), () {
@@ -117,6 +160,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   void dispose() {
     _hintTimer?.cancel();
     _authPollTimer?.cancel();
+    _cookieMismatchDebounce?.cancel();
     super.dispose();
   }
 
@@ -138,13 +182,52 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     } catch (_) {}
   }
 
+  /// Called by the CookieMismatch page detection. Google's cross-domain OAuth cookie
+  /// sync redirect or mismatched state. Debounce navigation to music.youtube.com.
+  void _handleCookieMismatch() {
+    // Hard cap on automatic bounces: when Google's third-party cookie state
+    // is broken it redirects every reload straight back to CookieMismatch.
+    if (_mismatchAutoNavCount >= 3) {
+      debugPrint('[YtmWebLogin] CookieMismatch auto-navigation cap reached; '
+          'stopping and resetting cookies.');
+      _clearCookiesAndReset();
+      if (mounted) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Google cookie mismatch detected. Resetting cookies — please sign in again.'),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+      return;
+    }
+
+    _cookieMismatchDebounce?.cancel();
+    _cookieMismatchDebounce = Timer(const Duration(milliseconds: 700), () {
+      if (!mounted) return;
+      _mismatchAutoNavCount++;
+      debugPrint('[YtmWebLogin] Navigating past CookieMismatch '
+          '(attempt $_mismatchAutoNavCount/3) → music.youtube.com');
+      _navigateTo('https://music.youtube.com');
+    });
+  }
+
+  /// Manual action triggered ONLY by the clear-cache button in the toolbar.
+  /// Wipes all WebView cookies and cache, resets the YTM session, and reloads.
   Future<void> _clearCookiesAndReset() async {
     try {
-      final cookieManager = CookieManager.instance();
-      await cookieManager.deleteAllCookies();
-      await InAppWebViewController.clearAllCache();
       final accountService = getIt<YtmAccountService>();
+      // Scoped wipe: only YouTube/Google sign-in cookies, never the whole
+      // device WebView cookie jar.
+      await accountService.clearSessionWebViewCookies();
       await accountService.logout();
+      await InAppWebViewController.clearAllCache();
+      _isLoggedIn = false;
+      _detectedCookies = null;
+      _hadSuccessfulYtLoad = false;
+      _mismatchAutoNavCount = 0;
       _navigateTo('https://music.youtube.com');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -165,7 +248,13 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     );
   }
 
-  Future<bool> _checkIfLoggedIn([String? url]) async {
+  Future<bool> _checkIfLoggedIn([String? url]) {
+    if (_isLoggedIn) return Future<bool>.value(true);
+    return _loginCheckInFlight ??=
+        _detectLoginState(url).whenComplete(() => _loginCheckInFlight = null);
+  }
+
+  Future<bool> _detectLoginState([String? url]) async {
     if (_isLoggedIn) return true;
 
     String? currentUrl = url;
@@ -177,77 +266,77 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     if (currentUrl != null) {
       if (currentUrl.startsWith('chrome-error://') ||
           currentUrl.startsWith('about:') ||
-          currentUrl.contains('accounts.google.com') ||
-          currentUrl.contains('ServiceLogin') ||
-          currentUrl.contains('signin/v2')) {
+          _isCookieMismatchUrl(currentUrl) ||
+          _isAuthInProgressUrl(currentUrl)) {
         return false;
       }
     }
 
+    if (!_hadSuccessfulYtLoad) return false; // never trust a jar we injected ourselves
+
     final accountService = getIt<YtmAccountService>();
 
-    // 1. Try InAppWebView CookieManager
+    // 1. Try InAppWebView CookieManager (deduplicated by name; rotated values win)
     try {
       final cookieManager = CookieManager.instance();
       final domains = [
-        'https://music.youtube.com',
-        'https://youtube.com',
+        'https://google.com',
         'https://accounts.google.com',
+        'https://myaccount.google.com',
+        'https://accounts.youtube.com',
+        'https://youtube.com',
+        'https://www.youtube.com',
+        'https://music.youtube.com',
       ];
-      final List<String> cookieParts = [];
+      final Map<String, String> jar = {};
       for (final domain in domains) {
         final cookies = await cookieManager.getCookies(url: WebUri(domain));
         for (final c in cookies) {
-          final pair = '${c.name}=${c.value}';
-          if (!cookieParts.contains(pair)) {
-            cookieParts.add(pair);
-          }
+          jar[c.name] = c.value;
         }
       }
-      if (cookieParts.isNotEmpty) {
-        final combinedCookies = cookieParts.join('; ');
-        final hasSecure3Psid = combinedCookies.contains('__Secure-3PSID');
-        final hasSecure1Psid = combinedCookies.contains('__Secure-1PSID');
-        final hasSapisid = combinedCookies.contains('SAPISID');
-
-        if (hasSapisid && (hasSecure3Psid || hasSecure1Psid)) {
-          if (!_isLoggedIn) {
-            _isLoggedIn = true;
-            _detectedCookies = combinedCookies;
-            await accountService.saveSession(combinedCookies);
-            if (mounted) {
-              setState(() {});
-            }
+      final combinedCookies =
+          jar.entries.map((e) => '${e.key}=${e.value}').join('; ');
+      if (combinedCookies.isNotEmpty &&
+          YtmAccountService.looksLikeSignedInCookies(combinedCookies)) {
+        if (!_isLoggedIn) {
+          _isLoggedIn = true;
+          _detectedCookies = combinedCookies;
+          await accountService.saveSession(combinedCookies);
+          if (mounted) {
+            setState(() {});
+            // Navigate to music.youtube.com to complete the OAuth redirect
+            // and ensure music.youtube.com domain cookies are also set.
+            _navigateTo('https://music.youtube.com');
           }
-          return true;
         }
+        return true;
       }
     } catch (_) {}
 
     // 2. Try native platform cookie manager
     final cookies = await accountService.getNativeCookiesFromDomains();
-    if (cookies != null && cookies.isNotEmpty) {
-      final hasSecure3Psid = cookies.contains('__Secure-3PSID');
-      final hasSecure1Psid = cookies.contains('__Secure-1PSID');
-      final hasSapisid = cookies.contains('SAPISID');
-
-      if (hasSapisid && (hasSecure3Psid || hasSecure1Psid)) {
-        if (!_isLoggedIn) {
-          _isLoggedIn = true;
-          _detectedCookies = cookies;
-          await accountService.saveSession(cookies);
-          if (mounted) {
-            setState(() {});
-          }
+    if (cookies != null &&
+        cookies.isNotEmpty &&
+        YtmAccountService.looksLikeSignedInCookies(cookies)) {
+      if (!_isLoggedIn) {
+        _isLoggedIn = true;
+        _detectedCookies = cookies;
+        await accountService.saveSession(cookies);
+        if (mounted) {
+          setState(() {});
+          _navigateTo('https://music.youtube.com');
         }
-        return true;
       }
+      return true;
     }
 
     // 3. Fallback: JS document.cookie
     if (currentUrl != null &&
         !currentUrl.startsWith('chrome-error://') &&
-        !currentUrl.startsWith('about:')) {
+        !currentUrl.startsWith('about:') &&
+        !_isCookieMismatchUrl(currentUrl) &&
+        !_isAuthInProgressUrl(currentUrl)) {
       try {
         final rawCookie = await _webViewController?.evaluateJavascript(
           source: '(() => { try { return document.cookie || ""; } catch (e) { return ""; } })()',
@@ -256,16 +345,15 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         if (cookieStr.startsWith('"') && cookieStr.endsWith('"')) {
           cookieStr = cookieStr.substring(1, cookieStr.length - 1);
         }
-        if (cookieStr.contains('SAPISID') &&
-            (cookieStr.contains('__Secure-3PSID') ||
-                cookieStr.contains('__Secure-1PSID') ||
-                cookieStr.contains('SSID'))) {
+        if (cookieStr.isNotEmpty &&
+            YtmAccountService.looksLikeSignedInCookies(cookieStr)) {
           if (!_isLoggedIn) {
             _isLoggedIn = true;
             _detectedCookies = cookieStr;
             await accountService.saveSession(cookieStr);
             if (mounted) {
               setState(() {});
+              _navigateTo('https://music.youtube.com');
             }
           }
           return true;
@@ -280,27 +368,28 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     final accountService = getIt<YtmAccountService>();
     var cookies = _detectedCookies;
 
-    // 1. Try InAppWebView CookieManager
+    // 1. Try InAppWebView CookieManager (deduplicated by name)
     if (cookies == null || cookies.isEmpty) {
       try {
         final cookieManager = CookieManager.instance();
         final domains = [
-          'https://music.youtube.com',
-          'https://youtube.com',
+          'https://google.com',
           'https://accounts.google.com',
+          'https://myaccount.google.com',
+          'https://accounts.youtube.com',
+          'https://youtube.com',
+          'https://www.youtube.com',
+          'https://music.youtube.com',
         ];
-        final List<String> cookieParts = [];
+        final Map<String, String> jar = {};
         for (final domain in domains) {
           final domainCookies = await cookieManager.getCookies(url: WebUri(domain));
           for (final c in domainCookies) {
-            final pair = '${c.name}=${c.value}';
-            if (!cookieParts.contains(pair)) {
-              cookieParts.add(pair);
-            }
+            jar[c.name] = c.value;
           }
         }
-        if (cookieParts.isNotEmpty) {
-          cookies = cookieParts.join('; ');
+        if (jar.isNotEmpty) {
+          cookies = jar.entries.map((e) => '${e.key}=${e.value}').join('; ');
         }
       } catch (_) {}
     }
@@ -326,7 +415,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       } catch (_) {}
     }
 
-    if (cookies != null && cookies.isNotEmpty) {
+    if (cookies != null &&
+        cookies.isNotEmpty &&
+        YtmAccountService.looksLikeSignedInCookies(cookies)) {
       await accountService.saveSession(cookies);
       if (mounted && Navigator.of(context).canPop()) {
         Navigator.of(context).pop(true);
@@ -334,11 +425,14 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       return;
     }
 
-    if (_isLoggedIn || accountService.isLoggedIn) {
-      if (mounted && Navigator.of(context).canPop()) {
-        Navigator.of(context).pop(true);
+    if (_isLoggedIn && accountService.isLoggedIn) {
+      final valid = await accountService.validateSession();
+      if (valid) {
+        if (mounted && Navigator.of(context).canPop()) {
+          Navigator.of(context).pop(true);
+        }
+        return;
       }
-      return;
     }
 
     if (mounted) {
@@ -355,25 +449,44 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final size = MediaQuery.of(context).size;
-    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final media = MediaQuery.of(context);
+    final topPadding = media.padding.top;
+    final bottomInset = media.viewInsets.bottom;
+    final totalHeight = media.size.height;
     final isBrowse = widget.isBrowseMode;
 
-    return Center(
+    // Expand height cleanly down to the bottom of the screen
+    final targetHeight = (totalHeight - topPadding - (isBrowse ? 8 : 16)).clamp(300.0, totalHeight);
+
+    return Align(
+      alignment: Alignment.bottomCenter,
       child: ConstrainedBox(
-        constraints: Adaptive.sheetConstraints(context),
+        constraints: BoxConstraints(
+          maxWidth: Adaptive.isTablet(context) ? 680 : double.infinity,
+          maxHeight: targetHeight,
+        ),
         child: AnimatedPadding(
           padding: EdgeInsets.only(bottom: bottomInset),
           duration: const Duration(milliseconds: 150),
           child: Container(
-            height: size.height * (isBrowse ? 0.92 : 0.88),
+            height: targetHeight,
             decoration: BoxDecoration(
               color: p.surface,
-              borderRadius: AppRadii.bottomSheetRadius,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               border: Border.all(color: p.hairline),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 20,
+                  offset: const Offset(0, -4),
+                ),
+              ],
             ),
-            child: Column(
-              children: [
+            child: SafeArea(
+              top: false,
+              bottom: true,
+              child: Column(
+                children: [
                 // Top Drag Handle & Bar
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
@@ -695,6 +808,24 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                       onWebViewCreated: (controller) {
                         _webViewController = controller;
                       },
+                      onCreateWindow: (controller, createWindowAction) async {
+                        final url = createWindowAction.request.url;
+                        if (url != null) {
+                          await controller.loadUrl(urlRequest: URLRequest(url: url));
+                        }
+                        return true;
+                      },
+                      shouldOverrideUrlLoading: (controller, navigationAction) async {
+                        final uri = navigationAction.request.url;
+                        if (uri == null) return NavigationActionPolicy.ALLOW;
+                        final urlStr = uri.toString();
+                        if (!urlStr.startsWith('http://') &&
+                            !urlStr.startsWith('https://') &&
+                            !urlStr.startsWith('about:')) {
+                          return NavigationActionPolicy.CANCEL;
+                        }
+                        return NavigationActionPolicy.ALLOW;
+                      },
                       onLoadStart: (controller, url) {
                         if (mounted) setState(() => _isLoading = true);
                       },
@@ -705,14 +836,34 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                         if (mounted) setState(() => _isLoading = false);
                         await _updateNavState();
                         final urlStr = url?.toString() ?? '';
-                        if (urlStr.contains('CookieMismatch')) {
-                          debugPrint(
-                              '[YtmWebLogin] Detected CookieMismatch page from Google, resetting cookies and cache...');
-                          await _clearCookiesAndReset();
+
+                        // Only bounce if Google navigated to an actual CookieMismatch or block error page.
+                        if (_isCookieMismatchUrl(urlStr)) {
+                          if (_isLoggedIn) {
+                            _isLoggedIn = false;
+                            _detectedCookies = null;
+                            if (mounted) setState(() {});
+                          }
+                          _handleCookieMismatch();
                           return;
                         }
-                        await _checkIfLoggedIn(url?.toString());
+
+                        final host = Uri.tryParse(urlStr)?.host ?? '';
+                        // Do not capture on Google Sign-In or EU consent screens before the user finishes
+                        if (_isAuthInProgressUrl(urlStr) ||
+                            host == 'consent.youtube.com' ||
+                            host == 'consent.google.com' ||
+                            host.startsWith('consent.')) {
+                          return;
+                        }
+
+                        if (host.endsWith('youtube.com') || host == 'youtu.be') {
+                          _hadSuccessfulYtLoad = true;
+                        }
+                        _mismatchAutoNavCount = 0;
+                        await _checkIfLoggedIn(urlStr);
                       },
+
                       onReceivedError: (controller, request, error) {
                         debugPrint(
                             '[YtmWebLogin] Web resource error: ${error.type} - ${error.description}');
@@ -720,14 +871,18 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                       },
                       onUpdateVisitedHistory: (controller, url, isReload) async {
                         await _updateNavState();
-                        if (url != null) {
-                          await _checkIfLoggedIn(url.toString());
+                        final urlStr = url?.toString() ?? '';
+                        if (urlStr.isNotEmpty &&
+                            !_isCookieMismatchUrl(urlStr) &&
+                            !_isAuthInProgressUrl(urlStr)) {
+                          await _checkIfLoggedIn(urlStr);
                         }
                       },
                     ),
                   ),
                 ),
               ],
+            ),
             ),
           ),
         ),

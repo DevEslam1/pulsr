@@ -7,6 +7,7 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../data/audio/headphone_profiles_repository.dart';
 import '../../../../domain/models/audio_effects_config.dart';
 import '../../../../domain/models/eq_preset.dart';
+import '../../../../domain/models/headphone_profile.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 import 'eq_curve_visualizer.dart';
@@ -51,6 +52,54 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _showSaveCustomPresetDialog(PlayerCubit cubit, PlayerState state) async {
+    final textController = TextEditingController(text: 'My Custom EQ');
+    final name = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Save Custom EQ Preset'),
+        content: TextField(
+          controller: textController,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'Preset Name',
+            hintText: 'e.g. Warm Bass, Vocal Punch',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, textController.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (name != null && name.isNotEmpty) {
+      final id = 'custom_${DateTime.now().millisecondsSinceEpoch}';
+      final profile = HeadphoneProfile(
+        id: id,
+        name: name,
+        brand: 'User Custom',
+        model: name,
+        category: 'Custom',
+        gains: List<double>.from(state.eqPreset.gains),
+        bassBoost: state.eqPreset.bassBoost,
+      );
+      await _headphoneRepo.addCustomProfile(profile);
+      await cubit.applyHeadphoneProfile(profile);
+      if (mounted) {
+        setState(() {});
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text('Preset "$name" saved!')),
+        );
+      }
+    }
   }
 
   @override
@@ -194,8 +243,8 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                       dividerColor: Colors.transparent,
                       tabs: const [
                         Tab(text: 'Equalizer'),
-                        Tab(text: 'AutoEq Presets'),
-                        Tab(text: 'Spatial & Dynamics'),
+                        Tab(text: 'AutoEq'),
+                        Tab(text: 'Spatial & DSP'),
                       ],
                     ),
                   ),
@@ -322,11 +371,64 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                   visualDensity: VisualDensity.compact,
                 ),
               ),
+              const SizedBox(width: 4),
+              // Save Custom Preset button
+              TextButton.icon(
+                onPressed: () => _showSaveCustomPresetDialog(cubit, state),
+                icon: Icon(Icons.bookmark_add_rounded, size: 16, color: p.accent),
+                label: Text('Save', style: TextStyle(fontSize: 11, color: p.accent, fontWeight: FontWeight.w700)),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 14),
 
           // Active Profile Banner if AutoEq is selected
+          // OEM Audio Double-Processing Warning Banner
+          if (state.hasOemAudio && (state.isEqEnabled || state.isCrossfeedEnabled || state.isLimiterEnabled || state.isVirtualizerEnabled || state.isDynamicsEnabled)) ...[
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.12),
+                borderRadius: AppRadii.cardRadius,
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '${state.detectedOemEngines.join(", ")} Active',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.amber[300] ?? Colors.amber,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'System-level audio enhancement is active on your device. '
+                          'Running Pulsr DSP on top may cause double-processing (over-compression or clipping). '
+                          'Consider disabling system Dolby/OEM sound effects or using Bit-Perfect output for cleanest sound.',
+                          style: TextStyle(fontSize: 11, color: p.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+
           if (state.selectedHeadphoneProfile != null) ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -463,24 +565,27 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                     ],
                   ),
                 ),
-                SizedBox(
-                  width: 140,
-                  child: SliderTheme(
-                    data: SliderTheme.of(context).copyWith(
-                      trackHeight: 4,
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                      activeTrackColor: p.accent,
-                      inactiveTrackColor: p.surface,
-                      thumbColor: p.accent,
-                    ),
-                    child: Slider(
-                      value: preset.bassBoost.clamp(0.0, 1.0),
-                      min: 0.0,
-                      max: 1.0,
-                      onChanged: (val) {
-                        if (!state.isEqEnabled) cubit.setEqualizerEnabled(true);
-                        cubit.setBassBoost(val);
-                      },
+                Flexible(
+                  flex: 2,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 140),
+                    child: SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 4,
+                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                        activeTrackColor: p.accent,
+                        inactiveTrackColor: p.surface,
+                        thumbColor: p.accent,
+                      ),
+                      child: Slider(
+                        value: preset.bassBoost.clamp(0.0, 1.0),
+                        min: 0.0,
+                        max: 1.0,
+                        onChanged: (val) {
+                          if (!state.isEqEnabled) cubit.setEqualizerEnabled(true);
+                          cubit.setBassBoost(val);
+                        },
+                      ),
                     ),
                   ),
                 ),
@@ -640,11 +745,15 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                     children: [
                       Row(
                         children: [
-                          Text(
-                            state.isSpatializerSupported
-                                ? 'Spatial Audio (Hardware)'
-                                : 'Soundstage Widening (Virtualizer)',
-                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: p.textPrimary),
+                          Flexible(
+                            child: Text(
+                              state.isSpatializerSupported
+                                  ? 'Spatial Audio'
+                                  : 'Soundstage Widening',
+                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: p.textPrimary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
                           const SizedBox(width: 6),
                           Container(
@@ -669,6 +778,8 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                             ? 'Android Spatializer API with head tracking'
                             : 'Stereo field expansion via hardware virtualizer',
                         style: TextStyle(fontSize: 11, color: p.textTertiary),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -908,15 +1019,32 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                                           fontWeight: FontWeight.w700,
                                           color: isApplied ? p.accent : p.textPrimary,
                                         ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
                                         '${profile.brand} • ${profile.category}',
                                         style: TextStyle(fontSize: 11, color: p.textTertiary),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ],
                                   ),
                                 ),
+                                if (profile.id.startsWith('custom_')) ...[
+                                  IconButton(
+                                    icon: Icon(Icons.delete_outline_rounded, size: 18, color: p.error),
+                                    visualDensity: VisualDensity.compact,
+                                    tooltip: 'Delete custom preset',
+                                    onPressed: () async {
+                                      await _headphoneRepo.removeProfile(profile.id);
+                                      if (isApplied) await cubit.resetToFlat();
+                                      if (mounted) setState(() {});
+                                    },
+                                  ),
+                                  const SizedBox(width: 4),
+                                ],
                                 if (isApplied)
                                   Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -1041,74 +1169,79 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
           ),
           const SizedBox(height: 14),
 
-          // Dolby Atmos / Spatial Audio Card
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: p.surfaceContainer,
-              borderRadius: AppRadii.cardRadius,
-              border: Border.all(color: p.hairline),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: p.accent.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
+          // Dolby Atmos / Hardware Spatial Audio Card (when supported by device)
+          if (state.isSpatializerSupported) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: p.surfaceContainer,
+                borderRadius: AppRadii.cardRadius,
+                border: Border.all(color: p.hairline),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: p.accent.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Icon(Icons.spatial_tracking_rounded, color: p.accent, size: 20),
                   ),
-                  child: Icon(Icons.spatial_tracking_rounded, color: p.accent, size: 20),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Text(
-                            state.isSpatializerSupported
-                                ? 'Spatial Audio (Hardware)'
-                                : 'Soundstage Widening (Virtualizer)',
-                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: p.textPrimary),
-                          ),
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: (state.isSpatializerSupported ? p.accent : p.textTertiary).withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: Text(
-                              state.isSpatializerSupported ? 'Spatial API' : 'Emulated',
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
-                                color: state.isSpatializerSupported ? p.accent : p.textSecondary,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                'Spatial Audio',
+                                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: p.textPrimary),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        state.isSpatializerSupported
-                            ? 'Android Spatializer API with head tracking'
-                            : 'Virtualizer 3D acoustic field expansion',
-                        style: TextStyle(fontSize: 11, color: p.textTertiary),
-                      ),
-                    ],
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: p.accent.withValues(alpha: 0.15),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'Spatial API',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: p.accent,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Text(
+                          'Android Spatializer API with head tracking',
+                          style: TextStyle(fontSize: 11, color: p.textTertiary),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                Switch.adaptive(
-                  value: state.isSpatializerEnabled,
-                  activeTrackColor: p.accent,
-                  activeThumbColor: p.onAccent,
-                  onChanged: (val) => cubit.setSpatializerEnabled(val),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  Switch.adaptive(
+                    value: state.isSpatializerEnabled,
+                    activeTrackColor: p.accent,
+                    activeThumbColor: p.onAccent,
+                    onChanged: (val) => cubit.setSpatializerEnabled(val),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
+          ],
 
           // Stereo Soundstage Expansion (Virtualizer)
           Container(
@@ -1124,32 +1257,41 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: p.accent.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: p.accent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(Icons.surround_sound_rounded, color: p.accent, size: 20),
                           ),
-                          child: Icon(Icons.surround_sound_rounded, color: p.accent, size: 20),
-                        ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Soundstage Widening',
-                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: p.textPrimary),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Soundstage Widening',
+                                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: p.textPrimary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  'Virtualizer stereo field expansion',
+                                  style: TextStyle(fontSize: 11, color: p.textTertiary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                             ),
-                            Text(
-                              'Virtualizer stereo field expansion',
-                              style: TextStyle(fontSize: 11, color: p.textTertiary),
-                            ),
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Switch.adaptive(
                       value: state.isVirtualizerEnabled,
                       activeTrackColor: p.accent,
@@ -1214,32 +1356,41 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: p.accent.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(8),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: p.accent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(Icons.compress_rounded, color: p.accent, size: 20),
                           ),
-                          child: Icon(Icons.compress_rounded, color: p.accent, size: 20),
-                        ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Studio Dynamics & Limiter',
-                              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: p.textPrimary),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Studio Dynamics & Limiter',
+                                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: p.textPrimary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  'Multiband compression engine',
+                                  style: TextStyle(fontSize: 11, color: p.textTertiary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                             ),
-                            Text(
-                              'Multiband compression engine',
-                              style: TextStyle(fontSize: 11, color: p.textTertiary),
-                            ),
-                          ],
-                        ),
-                      ],
+                          ),
+                        ],
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Switch.adaptive(
                       value: state.isDynamicsEnabled,
                       activeTrackColor: p.accent,
@@ -1327,8 +1478,465 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
               ],
             ),
           ),
+          const SizedBox(height: 16),
+
+          // 1. Headphone Crossfeed (Chu Moy / Linkwitz-Riley)
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: p.surfaceContainer,
+              borderRadius: AppRadii.cardRadius,
+              border: Border.all(color: p.hairline),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: p.accent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(Icons.headphones_rounded, color: p.accent, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Crossfeed (Headphones)',
+                                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: p.textPrimary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  'Natural acoustic room speaker simulation',
+                                  style: TextStyle(fontSize: 11, color: p.textTertiary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Switch.adaptive(
+                      value: state.isCrossfeedEnabled,
+                      activeTrackColor: p.accent,
+                      activeThumbColor: p.onAccent,
+                      onChanged: (val) => cubit.setCrossfeed(val),
+                    ),
+                  ],
+                ),
+                if (state.isCrossfeedEnabled) ...[
+                  const SizedBox(height: 14),
+                  // Delay slider
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Delay Time', style: TextStyle(fontSize: 12, color: p.textSecondary, fontWeight: FontWeight.w600)),
+                      Text(
+                        '${state.crossfeedDelayUs.round()} µs',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.accent),
+                      ),
+                    ],
+                  ),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 4,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                      activeTrackColor: p.accent,
+                      inactiveTrackColor: p.surface,
+                      thumbColor: p.accent,
+                    ),
+                    child: Slider(
+                      value: state.crossfeedDelayUs.clamp(200.0, 700.0),
+                      min: 200.0,
+                      max: 700.0,
+                      divisions: 50,
+                      onChanged: (val) => cubit.setCrossfeed(true, delayUs: val),
+                    ),
+                  ),
+                  // Feed Level slider
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Opposite Ear Bleed', style: TextStyle(fontSize: 12, color: p.textSecondary, fontWeight: FontWeight.w600)),
+                      Text(
+                        '${state.crossfeedFeedDb.toStringAsFixed(1)} dB',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.accent),
+                      ),
+                    ],
+                  ),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 4,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                      activeTrackColor: p.accent,
+                      inactiveTrackColor: p.surface,
+                      thumbColor: p.accent,
+                    ),
+                    child: Slider(
+                      value: state.crossfeedFeedDb.clamp(-15.0, -6.0),
+                      min: -15.0,
+                      max: -6.0,
+                      divisions: 18,
+                      onChanged: (val) => cubit.setCrossfeed(true, feedDb: val),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 2. Lookahead Brickwall Limiter
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: p.surfaceContainer,
+              borderRadius: AppRadii.cardRadius,
+              border: Border.all(color: p.hairline),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: p.accent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(Icons.security_rounded, color: p.accent, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Lookahead Brickwall Limiter',
+                                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: p.textPrimary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  'Zero-overshoot anti-clipping protection',
+                                  style: TextStyle(fontSize: 11, color: p.textTertiary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Switch.adaptive(
+                      value: state.isLimiterEnabled,
+                      activeTrackColor: p.accent,
+                      activeThumbColor: p.onAccent,
+                      onChanged: (val) => cubit.setLookaheadLimiter(val),
+                    ),
+                  ],
+                ),
+                if (state.isLimiterEnabled) ...[
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Ceiling Threshold', style: TextStyle(fontSize: 12, color: p.textSecondary, fontWeight: FontWeight.w600)),
+                      Text(
+                        '${state.limiterThresholdDb.toStringAsFixed(1)} dBFS',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.accent),
+                      ),
+                    ],
+                  ),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 4,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                      activeTrackColor: p.accent,
+                      inactiveTrackColor: p.surface,
+                      thumbColor: p.accent,
+                    ),
+                    child: Slider(
+                      value: state.limiterThresholdDb.clamp(-6.0, 0.0),
+                      min: -6.0,
+                      max: 0.0,
+                      divisions: 60,
+                      onChanged: (val) => cubit.setLookaheadLimiter(true, thresholdDb: val),
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Release Time', style: TextStyle(fontSize: 12, color: p.textSecondary, fontWeight: FontWeight.w600)),
+                      Text(
+                        '${state.limiterReleaseMs.round()} ms',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.accent),
+                      ),
+                    ],
+                  ),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 4,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                      activeTrackColor: p.accent,
+                      inactiveTrackColor: p.surface,
+                      thumbColor: p.accent,
+                    ),
+                    child: Slider(
+                      value: state.limiterReleaseMs.clamp(10.0, 200.0),
+                      min: 10.0,
+                      max: 200.0,
+                      divisions: 38,
+                      onChanged: (val) => cubit.setLookaheadLimiter(true, releaseMs: val),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 3. Stereo Balance & Mono Mix
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: p.surfaceContainer,
+              borderRadius: AppRadii.cardRadius,
+              border: Border.all(color: p.hairline),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: p.accent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(Icons.compare_arrows_rounded, color: p.accent, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Stereo Balance & Mono Mix',
+                                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: p.textPrimary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  'Left / Right acoustic panning balance',
+                                  style: TextStyle(fontSize: 11, color: p.textTertiary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Row(
+                      children: [
+                        Text('Mono', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: state.monoMix ? p.accent : p.textSecondary)),
+                        const SizedBox(width: 4),
+                        Switch.adaptive(
+                          value: state.monoMix,
+                          activeTrackColor: p.accent,
+                          activeThumbColor: p.onAccent,
+                          onChanged: (val) => cubit.setMonoMix(val),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('L', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: state.stereoBalance < -0.05 ? p.accent : p.textSecondary)),
+                    Text(
+                      state.stereoBalance.abs() < 0.05
+                          ? 'Center'
+                          : (state.stereoBalance < 0
+                              ? 'Left ${(-state.stereoBalance * 100).round()}%'
+                              : 'Right ${(state.stereoBalance * 100).round()}%'),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.accent),
+                    ),
+                    Text('R', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: state.stereoBalance > 0.05 ? p.accent : p.textSecondary)),
+                  ],
+                ),
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 4,
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                    activeTrackColor: p.accent,
+                    inactiveTrackColor: p.surface,
+                    thumbColor: p.accent,
+                  ),
+                  child: Slider(
+                    value: state.stereoBalance.clamp(-1.0, 1.0),
+                    min: -1.0,
+                    max: 1.0,
+                    divisions: 40,
+                    onChanged: (val) => cubit.setStereoBalance(val),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 4. Convolution Reverb & Room Acoustics
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: p.surfaceContainer,
+              borderRadius: AppRadii.cardRadius,
+              border: Border.all(color: p.hairline),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: p.accent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(Icons.meeting_room_rounded, color: p.accent, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Acoustic Room Convolution',
+                                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: p.textPrimary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                Text(
+                                  'Impulse Response spatial acoustic simulation',
+                                  style: TextStyle(fontSize: 11, color: p.textTertiary),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Switch.adaptive(
+                      value: state.isReverbEnabled,
+                      activeTrackColor: p.accent,
+                      activeThumbColor: p.onAccent,
+                      onChanged: (val) => cubit.setReverb(val),
+                    ),
+                  ],
+                ),
+                if (state.isReverbEnabled) ...[
+                  const SizedBox(height: 14),
+                  // Room presets chips
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      _buildReverbChip('Studio Room', 0, state.reverbPreset, cubit, p),
+                      _buildReverbChip('Concert Hall', 1, state.reverbPreset, cubit, p),
+                      _buildReverbChip('Warm Tube', 2, state.reverbPreset, cubit, p),
+                      _buildReverbChip('Plate Reverb', 3, state.reverbPreset, cubit, p),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Wet / Dry Mix', style: TextStyle(fontSize: 12, color: p.textSecondary, fontWeight: FontWeight.w600)),
+                      Text(
+                        '${(state.reverbWetDry * 100).round()}% Wet',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: p.accent),
+                      ),
+                    ],
+                  ),
+                  SliderTheme(
+                    data: SliderTheme.of(context).copyWith(
+                      trackHeight: 4,
+                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+                      activeTrackColor: p.accent,
+                      inactiveTrackColor: p.surface,
+                      thumbColor: p.accent,
+                    ),
+                    child: Slider(
+                      value: state.reverbWetDry.clamp(0.0, 1.0),
+                      min: 0.0,
+                      max: 1.0,
+                      onChanged: (val) => cubit.setReverb(true, wetDry: val),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _buildReverbChip(String label, int presetIdx, int currentPreset, PlayerCubit cubit, PulsrPalette p) {
+    final isSelected = presetIdx == currentPreset;
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      selectedColor: p.accent.withValues(alpha: 0.22),
+      backgroundColor: p.surface,
+      side: BorderSide(
+        color: isSelected ? p.accent : p.hairline,
+      ),
+      labelStyle: TextStyle(
+        color: isSelected ? p.accent : p.textSecondary,
+        fontWeight: FontWeight.w700,
+        fontSize: 11,
+      ),
+      onSelected: (_) => cubit.setReverb(true, preset: presetIdx),
     );
   }
 }

@@ -21,6 +21,9 @@ class MockMusicRepository extends Mock implements IMusicRepository {}
 class MockToggleFavoriteUseCase extends Mock implements ToggleFavoriteUseCase {}
 
 class StubPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler implements PulsrAudioHandler {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
   double _vol = 1.0;
   @override
   double get volume => _vol;
@@ -38,6 +41,52 @@ class StubPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   bool get isEqualizerEnabled => false;
   @override
   EqPreset get currentPreset => EqPreset.defaultPresets.first;
+  @override
+  bool get isVirtualizerEnabled => false;
+  @override
+  double get virtualizerStrength => 0.0;
+  @override
+  bool get isDynamicsEnabled => false;
+  @override
+  DynamicsPreset get dynamicsPreset => DynamicsPreset.off;
+  @override
+  HeadphoneProfile? get selectedHeadphoneProfile => null;
+  @override
+  bool get isSpatializerEnabled => false;
+  @override
+  bool get isSpatializerSupported => false;
+  @override
+  bool get isHeadTrackerAvailable => false;
+  @override
+  double get volumeBoost => 0.0;
+  @override
+  bool get isCrossfeedEnabled => false;
+  @override
+  double get crossfeedDelayUs => 350.0;
+  @override
+  double get crossfeedFeedDb => -9.0;
+  @override
+  bool get isLimiterEnabled => false;
+  @override
+  double get limiterThresholdDb => -0.2;
+  @override
+  double get limiterReleaseMs => 50.0;
+  @override
+  bool get isReverbEnabled => false;
+  @override
+  int get reverbPreset => 0;
+  @override
+  double get reverbWetDry => 0.20;
+  @override
+  double get stereoBalance => 0.0;
+  @override
+  bool get monoMix => false;
+  @override
+  bool get isSincResamplerEnabled => true;
+  @override
+  bool get hasOemAudio => false;
+  @override
+  List<String> get detectedOemEngines => const [];
   @override
   Duration get crossfadeDuration => Duration.zero;
   @override
@@ -62,16 +111,6 @@ class StubPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   @override
   Future<void> setBassBoost(double amount) async {}
   @override
-  bool get isVirtualizerEnabled => false;
-  @override
-  double get virtualizerStrength => 0.0;
-  @override
-  bool get isDynamicsEnabled => false;
-  @override
-  DynamicsPreset get dynamicsPreset => DynamicsPreset.off;
-  @override
-  HeadphoneProfile? get selectedHeadphoneProfile => null;
-  @override
   Future<void> setVirtualizerEnabled(bool enabled) async {}
   @override
   Future<void> setVirtualizerStrength(double strength) async {}
@@ -80,25 +119,29 @@ class StubPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   @override
   Future<void> applyHeadphoneProfile(HeadphoneProfile? profile) async {}
   @override
-  bool get isSpatializerEnabled => false;
-  @override
-  bool get isSpatializerSupported => false;
-  @override
-  bool get isHeadTrackerAvailable => false;
-  @override
   Future<void> setSpatializerEnabled(bool enabled) async {}
   @override
-  double get volumeBoost => 0.0;
-  @override
   Future<void> setVolumeBoost(double value) async {}
+  @override
+  Future<void> setCrossfeed(bool enabled, {double? delayUs, double? feedDb}) async {}
+  @override
+  Future<void> setLookaheadLimiter(bool enabled, {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {}
+  @override
+  Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {}
+  @override
+  Future<void> loadCustomImpulseResponse(List<double> irSamples) async {}
+  @override
+  Future<void> setStereoBalance(double balance) async {}
+  @override
+  Future<void> setMonoMix(bool mono) async {}
+  @override
+  Future<void> setSincResampler(bool enabled) async {}
   @override
   Future<void> resetToFlat() async {}
   @override
   Future<void> startAbComparison() async {}
   @override
   Future<void> endAbComparison() async {}
-  @override
-  bool get isAbComparisonActive => false;
   @override
   Future<void> toggleDynamicsBypass() async {}
   @override

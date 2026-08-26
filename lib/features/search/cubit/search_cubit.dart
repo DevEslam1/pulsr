@@ -36,7 +36,10 @@ class SearchCubit extends Cubit<SearchState> {
     });
   }
 
+  int _generation = 0;
+
   Future<void> _executeSearch(String query, {String? filterOverride}) async {
+    final generation = ++_generation;
     _searchSub?.cancel();
     if (query.trim().isEmpty) {
       emit(state.copyWith(results: [], isLoading: false, errorMessage: null));
@@ -45,9 +48,11 @@ class SearchCubit extends Cubit<SearchState> {
 
     emit(state.copyWith(isLoading: true));
     final excludedRes = await _folderUseCases.getExcludedFolders();
+    if (generation != _generation || isClosed) return;
     final excluded = excludedRes.fold((l) => <String>[], (r) => r);
 
     _searchSub = _searchUseCase.searchSongs(query, excludedFolders: excluded).listen((result) {
+      if (generation != _generation || isClosed) return;
       result.fold(
         (failure) => emit(state.copyWith(isLoading: false, errorMessage: failure.message)),
         (allResults) {

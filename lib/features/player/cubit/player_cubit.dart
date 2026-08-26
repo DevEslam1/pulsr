@@ -66,7 +66,6 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   Timer? _persistQueueDebounce;
   Timer? _scrobbleDebounce;
-  DateTime? _lastScrobbleTime;
   int? _lastScrobbleSongId;
   bool? _lastScrobbleIsPlaying;
   int? _lastScrobblePosSec;
@@ -112,6 +111,20 @@ class PlayerCubit extends Cubit<PlayerState> {
       isSpatializerEnabled: _audioHandler.isSpatializerEnabled,
       isSpatializerSupported: _audioHandler.isSpatializerSupported,
       volumeBoost: _audioHandler.volumeBoost,
+      isCrossfeedEnabled: _audioHandler.isCrossfeedEnabled,
+      crossfeedDelayUs: _audioHandler.crossfeedDelayUs,
+      crossfeedFeedDb: _audioHandler.crossfeedFeedDb,
+      isLimiterEnabled: _audioHandler.isLimiterEnabled,
+      limiterThresholdDb: _audioHandler.limiterThresholdDb,
+      limiterReleaseMs: _audioHandler.limiterReleaseMs,
+      isReverbEnabled: _audioHandler.isReverbEnabled,
+      reverbPreset: _audioHandler.reverbPreset,
+      reverbWetDry: _audioHandler.reverbWetDry,
+      stereoBalance: _audioHandler.stereoBalance,
+      monoMix: _audioHandler.monoMix,
+      isSincResamplerEnabled: _audioHandler.isSincResamplerEnabled,
+      hasOemAudio: _audioHandler.hasOemAudio,
+      detectedOemEngines: _audioHandler.detectedOemEngines,
     ));
   }
 
@@ -200,21 +213,18 @@ class PlayerCubit extends Cubit<PlayerState> {
     final isMajorSeek = _lastScrobblePosSec != null &&
         (posSec - _lastScrobblePosSec!).abs() >= 5;
 
-    if (!isSongChange && !isPlayStateChange && !isMajorSeek) {
-      return;
-    }
-
+    // Always update tracking state
     _lastScrobbleSongId = song.id;
     _lastScrobbleIsPlaying = isPlaying;
     _lastScrobblePosSec = posSec;
 
-    final now = DateTime.now();
-    if (_lastScrobbleTime != null &&
-        now.difference(_lastScrobbleTime!) < _scrobbleInterval) {
-      _scrobbleDebounce?.cancel();
+    // Only debounce if this is a minor update (not song change/play state/major seek)
+    if (!isSongChange && !isPlayStateChange && !isMajorSeek) {
+      return; // Skip minor position updates
     }
+
+    _scrobbleDebounce?.cancel();
     _scrobbleDebounce = Timer(_scrobbleInterval, () {
-      _lastScrobbleTime = DateTime.now();
       _scrobblerService?.notifyPlaybackState(
         id: song.id,
         artist: song.artist,
@@ -483,6 +493,7 @@ class PlayerCubit extends Cubit<PlayerState> {
       currentSong: targetSong,
       position: startPos,
       duration: Duration(milliseconds: targetSong.durationMs),
+      errorMessage: null,
     ));
     await _audioHandler.loadQueue(
       effectiveQueue,
@@ -801,6 +812,59 @@ class PlayerCubit extends Cubit<PlayerState> {
   Future<void> setSpatializerEnabled(bool enabled) async {
     await _audioHandler.setSpatializerEnabled(enabled);
     emit(state.copyWith(isSpatializerEnabled: enabled));
+  }
+
+  // --- NATIVE DSP METHODS ---
+
+  Future<void> setCrossfeed(bool enabled, {double? delayUs, double? feedDb}) async {
+    emit(state.copyWith(
+      isCrossfeedEnabled: enabled,
+      crossfeedDelayUs: delayUs ?? state.crossfeedDelayUs,
+      crossfeedFeedDb: feedDb ?? state.crossfeedFeedDb,
+    ));
+    await _audioHandler.setCrossfeed(enabled, delayUs: delayUs, feedDb: feedDb);
+  }
+
+  Future<void> setLookaheadLimiter(bool enabled, {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {
+    emit(state.copyWith(
+      isLimiterEnabled: enabled,
+      limiterThresholdDb: thresholdDb ?? state.limiterThresholdDb,
+      limiterReleaseMs: releaseMs ?? state.limiterReleaseMs,
+    ));
+    await _audioHandler.setLookaheadLimiter(enabled, thresholdDb: thresholdDb, releaseMs: releaseMs, lookaheadMs: lookaheadMs);
+  }
+
+  Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {
+    emit(state.copyWith(
+      isReverbEnabled: enabled,
+      reverbPreset: preset ?? state.reverbPreset,
+      reverbWetDry: wetDry ?? state.reverbWetDry,
+    ));
+    await _audioHandler.setReverb(enabled, preset: preset, wetDry: wetDry);
+  }
+
+  Future<void> loadCustomImpulseResponse(List<double> irSamples) async {
+    emit(state.copyWith(
+      isReverbEnabled: true,
+      reverbPreset: 4, // Custom
+    ));
+    await _audioHandler.loadCustomImpulseResponse(irSamples);
+  }
+
+  Future<void> setStereoBalance(double balance) async {
+    final clamped = balance.clamp(-1.0, 1.0);
+    emit(state.copyWith(stereoBalance: clamped));
+    await _audioHandler.setStereoBalance(clamped);
+  }
+
+  Future<void> setMonoMix(bool mono) async {
+    emit(state.copyWith(monoMix: mono));
+    await _audioHandler.setMonoMix(mono);
+  }
+
+  Future<void> setSincResampler(bool enabled) async {
+    emit(state.copyWith(isSincResamplerEnabled: enabled));
+    await _audioHandler.setSincResampler(enabled);
   }
 
   // Sleep Timer

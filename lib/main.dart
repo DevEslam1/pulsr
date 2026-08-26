@@ -1,4 +1,5 @@
 // lib/main.dart
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -17,6 +18,7 @@ import 'core/services/auth_service.dart';
 import 'core/services/file_intent_handler.dart';
 import 'core/services/restore_detection_service.dart';
 import 'core/services/ytm_account_service.dart';
+import 'core/services/ytm_service.dart';
 import 'core/utils/error_logger.dart';
 import 'data/audio/audio_handler.dart';
 import 'data/db/app_database.dart';
@@ -32,6 +34,7 @@ import 'domain/usecases/search_music_usecase.dart';
 import 'domain/usecases/playlist_usecases.dart';
 import 'domain/usecases/folder_usecases.dart';
 import 'features/auth/cubit/auth_cubit.dart';
+import 'features/auth/presentation/ytm_web_login_sheet.dart';
 import 'features/library/cubit/library_cubit.dart';
 import 'features/player/cubit/player_cubit.dart';
 import 'features/player/cubit/player_state.dart';
@@ -96,12 +99,52 @@ class PulsrApp extends StatefulWidget {
 
 class _PulsrAppState extends State<PulsrApp> {
   late final _router = createRouter(getIt<MediaScannerService>());
+  StreamSubscription<void>? _authExpiredSub;
+  DateTime? _lastAuthExpiredPrompt;
 
   @override
   void initState() {
     super.initState();
     _autoScanOnStartup();
     _checkInitialAudioIntent();
+    _listenForYtmSessionExpiry();
+  }
+
+  /// Surfaces a re-login prompt when the YouTube Music session dies mid-use
+  /// (detected during stream resolution), instead of failing silently.
+  void _listenForYtmSessionExpiry() {
+    try {
+      _authExpiredSub = getIt<YtmService>().onAuthExpired.listen((_) {
+        if (!mounted) return;
+        final now = DateTime.now();
+        final last = _lastAuthExpiredPrompt;
+        if (last != null && now.difference(last).inSeconds < 15) return;
+        _lastAuthExpiredPrompt = now;
+
+        final ctx = rootNavigatorKey.currentContext;
+        if (ctx == null || !ctx.mounted) return;
+        ScaffoldMessenger.of(ctx)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: const Text(
+                  'YouTube Music session expired. Sign in again to keep streaming.'),
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 6),
+              action: SnackBarAction(
+                label: 'Sign In',
+                onPressed: () => YtmWebLoginSheet.show(ctx),
+              ),
+            ),
+          );
+      });
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    unawaited(_authExpiredSub?.cancel());
+    super.dispose();
   }
 
   void _checkInitialAudioIntent() {

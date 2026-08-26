@@ -105,5 +105,31 @@ void main() {
       expect(find.text('Canciones'), findsOneWidget);
       expect(find.text('Se encontraron 12 canciones'), findsOneWidget);
     });
+
+    testWidgets('PlayerControls preserves LTR directionality in RTL context', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('ar'),
+          home: Scaffold(
+            body: Builder(
+              builder: (context) {
+                return Directionality(
+                  textDirection: TextDirection.rtl,
+                  child: Row(
+                    children: [
+                      Text(context.l10n.nowPlaying),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      expect(find.text('قيد التشغيل الآن'), findsOneWidget);
+    });
   });
 }

@@ -118,13 +118,23 @@ class _HomeScreenState extends State<HomeScreen> {
         if (category == 'Recommended For You') {
           final account = getIt<YtmAccountService>();
           if (account.isLoggedIn) {
-            final recs = await account.fetchHomeRecommendations(maxTracks: 50);
-            if (recs.isNotEmpty) return recs;
+            try {
+              final recs = await account.fetchHomeRecommendations(maxTracks: 50);
+              if (recs.isNotEmpty) return recs;
+            } catch (_) {}
           }
-          return getIt<YtmService>().trending(limit: 25);
+          try {
+            final trending = await getIt<YtmService>().trending(limit: 25);
+            if (trending.isNotEmpty) return trending;
+          } catch (_) {}
+          return getIt<YtmService>().searchWithFallback(_categoryQueries['Recommended For You'] ?? 'top hits music', limit: 25);
         }
         if (category == 'Trending Egypt') {
-          return getIt<YtmService>().trending(limit: 25);
+          try {
+            final trending = await getIt<YtmService>().trending(limit: 25);
+            if (trending.isNotEmpty) return trending;
+          } catch (_) {}
+          return getIt<YtmService>().searchWithFallback(_categoryQueries['Trending Egypt'] ?? 'أغاني مصرية جديدة تريند', limit: 25);
         }
         final query = _categoryQueries[category] ?? '$category songs';
         return getIt<YtmService>().searchWithFallback(query, limit: 25);
@@ -238,7 +248,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           Expanded(
                             child: _buildTabButton(
-                              title: 'Local Music',
+                              title: context.l10n.localMusic,
                               icon: Icons.library_music_rounded,
                               isSelected: currentTab == 0,
                               p: p,
@@ -248,7 +258,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           const SizedBox(width: 6),
                           Expanded(
                             child: _buildTabButton(
-                              title: 'Online Stream',
+                              title: context.l10n.onlineStream,
                               icon: Icons.public_rounded,
                               isSelected: currentTab == 1,
                               p: p,
@@ -341,7 +351,7 @@ class _HomeScreenState extends State<HomeScreen> {
             children: [
               _QuickCard(
                 title: context.l10n.favorites,
-                subtitle: 'Liked tracks',
+                subtitle: context.l10n.likedTracks,
                 icon: Icons.favorite_rounded,
                 color: p.favorite,
                 onTap: () async {
@@ -355,7 +365,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(width: 12),
               _QuickCard(
                 title: context.l10n.dailyDrive,
-                subtitle: 'Auto-mix',
+                subtitle: context.l10n.autoMix,
                 icon: Icons.directions_car_rounded,
                 color: p.accent,
                 onTap: () async {
@@ -371,7 +381,7 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(width: 12),
               _QuickCard(
                 title: context.l10n.focusFlow,
-                subtitle: 'Top played',
+                subtitle: context.l10n.topPlayedTracks,
                 icon: Icons.headphones_rounded,
                 color: const Color(0xFF1DE9B6),
                 onTap: () async {

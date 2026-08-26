@@ -34,7 +34,6 @@ internal class YtmCookieStore private constructor(context: Context) {
             val saved = prefs.getString(KEY_COOKIES, null)
             if (!saved.isNullOrEmpty()) {
                 parseAndPut(saved)
-                syncToCookieManager()
             } else {
                 // Read from native CookieManager if prefs are empty
                 readFromCookieManager()
@@ -72,7 +71,6 @@ internal class YtmCookieStore private constructor(context: Context) {
             parseAndPut(rawCookieHeader)
             val merged = getMergedCookieHeader() ?: ""
             saveToPrefs(merged)
-            syncToCookieManager()
         }
     }
 
@@ -94,7 +92,6 @@ internal class YtmCookieStore private constructor(context: Context) {
             if (updated) {
                 val merged = getMergedCookieHeader() ?: ""
                 saveToPrefs(merged)
-                syncToCookieManager()
             }
         }
     }
@@ -154,19 +151,6 @@ internal class YtmCookieStore private constructor(context: Context) {
         }
     }
 
-    private fun syncToCookieManager() {
-        runCatching {
-            val cm = CookieManager.getInstance()
-            cm.setAcceptCookie(true)
-            for (domain in DOMAINS) {
-                for ((key, value) in cookies) {
-                    cm.setCookie(domain, "$key=$value; Path=/; Secure")
-                }
-            }
-            cm.flush()
-        }
-    }
-
     private fun saveToPrefs(cookieString: String) {
         prefs.edit().putString(KEY_COOKIES, cookieString).apply()
     }
@@ -176,13 +160,13 @@ internal class YtmCookieStore private constructor(context: Context) {
         private const val KEY_COOKIES = "cookies"
 
         val DOMAINS = listOf(
-            "https://music.youtube.com",
-            "https://www.youtube.com",
-            "https://accounts.google.com",
-            "https://youtube.com",
             "https://google.com",
+            "https://accounts.google.com",
             "https://myaccount.google.com",
             "https://accounts.youtube.com",
+            "https://youtube.com",
+            "https://www.youtube.com",
+            "https://music.youtube.com",
         )
 
         @Volatile

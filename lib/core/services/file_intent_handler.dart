@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -18,7 +17,9 @@ import 'ytm_service.dart';
 
 @singleton
 class FileIntentHandler {
-  static const MethodChannel _channel = MethodChannel('com.pulsr.music/file_opener');
+  static const MethodChannel _channel =
+      MethodChannel('com.pulsr.music/file_opener');
+  static int _nextTempId = -100000;
   final IMusicRepository _repository;
   final PlayerCubit _playerCubit;
 
@@ -39,24 +40,34 @@ class FileIntentHandler {
 
   Future<void> checkInitialUri() async {
     try {
-      final initialUri = await _channel.invokeMethod<String>('getInitialAudioUri');
+      final initialUri =
+          await _channel.invokeMethod<String>('getInitialAudioUri');
       if (initialUri != null) {
         await handleAudioUri(initialUri);
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to check initial audio URI', error: e, stackTrace: st, category: 'FileIntentHandler');
+      ErrorLogger.log('Failed to check initial audio URI',
+          error: e, stackTrace: st, category: 'FileIntentHandler');
     }
   }
 
   static String? extractYouTubeVideoId(String input) {
     final trimmed = input.trim();
-    if (RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(trimmed)) {
+    // Reject anything that looks like a file path when checking raw 11-char ID
+    if (!trimmed.contains('/') &&
+        !trimmed.contains('\\') &&
+        !trimmed.contains('.') &&
+        RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(trimmed)) {
       return trimmed;
     }
-    final youTubeShort = RegExp(r'youtu\.be\/([a-zA-Z0-9_-]{11})').firstMatch(trimmed);
+
+    final youTubeShort =
+        RegExp(r'youtu\.be\/([a-zA-Z0-9_-]{11})').firstMatch(trimmed);
     if (youTubeShort != null) return youTubeShort.group(1);
 
-    final youTubeLong = RegExp(r'(?:v=|\/shorts\/|\/embed\/|\/watch\/|\/v\/)([a-zA-Z0-9_-]{11})').firstMatch(trimmed);
+    final youTubeLong = RegExp(
+            r'(?:v=|\/shorts\/|\/embed\/|\/watch\/|\/v\/)([a-zA-Z0-9_-]{11})')
+        .firstMatch(trimmed);
     if (youTubeLong != null) return youTubeLong.group(1);
 
     final fallback = RegExp(r'[?&]v=([a-zA-Z0-9_-]{11})').firstMatch(trimmed);
@@ -93,7 +104,8 @@ class FileIntentHandler {
       await _playerCubit.playSong(song);
       rootNavigatorKey.currentContext?.push('/now-playing');
     } catch (e, st) {
-      ErrorLogger.log('Failed to resolve YouTube link: $videoId', error: e, stackTrace: st, category: 'FileIntentHandler');
+      ErrorLogger.log('Failed to resolve YouTube link: $videoId',
+          error: e, stackTrace: st, category: 'FileIntentHandler');
       final ctx = rootNavigatorKey.currentContext;
       if (ctx != null && ctx.mounted) {
         ScaffoldMessenger.of(ctx).showSnackBar(
@@ -132,15 +144,18 @@ class FileIntentHandler {
             final content = await file.readAsString();
             final proxies = ProxyEntry.parseList(content);
             if (proxies.isNotEmpty) {
-              rootNavigatorKey.currentContext?.push('/proxy-settings', extra: content);
+              rootNavigatorKey.currentContext
+                  ?.push('/proxy-settings', extra: content);
               return;
             }
           }
         } catch (_) {}
       } else {
         final parsedProxies = ProxyEntry.parseList(uriOrPath);
-        if (parsedProxies.isNotEmpty && !AudioFormats.isPlayableExtension(cleanPath)) {
-          rootNavigatorKey.currentContext?.push('/proxy-settings', extra: uriOrPath);
+        if (parsedProxies.isNotEmpty &&
+            !AudioFormats.isPlayableExtension(cleanPath)) {
+          rootNavigatorKey.currentContext
+              ?.push('/proxy-settings', extra: uriOrPath);
           return;
         }
       }
@@ -181,13 +196,18 @@ class FileIntentHandler {
 
       if (isContentScheme) {
         final parsedUri = Uri.tryParse(uriOrPath);
-        final segment = parsedUri?.pathSegments.isNotEmpty == true ? parsedUri!.pathSegments.last : null;
+        final segment = parsedUri?.pathSegments.isNotEmpty == true
+            ? parsedUri!.pathSegments.last
+            : null;
         if (segment != null && segment.isNotEmpty) {
-          title = Uri.decodeComponent(segment).replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '');
+          title = Uri.decodeComponent(segment)
+              .replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '');
         }
       } else {
         final file = File(cleanPath);
-        final filename = file.uri.pathSegments.isNotEmpty ? file.uri.pathSegments.last : 'Audio File';
+        final filename = file.uri.pathSegments.isNotEmpty
+            ? file.uri.pathSegments.last
+            : 'Audio File';
         title = filename.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '');
         try {
           if (file.existsSync()) {
@@ -197,7 +217,7 @@ class FileIntentHandler {
       }
 
       final tempSong = SongsTableData(
-        id: -1 * (math.Random().nextInt(900000) + 100000),
+        id: _nextTempId--,
         title: title.isNotEmpty ? title : 'External Audio',
         artist: 'External Audio',
         album: 'Files',
@@ -224,7 +244,8 @@ class FileIntentHandler {
           ),
         );
       }
-      ErrorLogger.log('Failed to handle external audio URI: $uriOrPath', error: e, stackTrace: st, category: 'FileIntentHandler');
+      ErrorLogger.log('Failed to handle external audio URI: $uriOrPath',
+          error: e, stackTrace: st, category: 'FileIntentHandler');
     }
   }
 }

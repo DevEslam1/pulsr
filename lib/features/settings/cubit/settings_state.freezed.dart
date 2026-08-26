@@ -43,7 +43,7 @@ mixin _$SettingsState {
   String get proxyHost;
   int get proxyPort;
   String get proxyUsername;
-  String get proxyPassword;
+  bool get hasProxyPassword;
   String get proxyBypassHosts;
   List<ProxyEntry> get proxyList;
   bool get isTestingAllProxies; // Extractor & Backend Settings
@@ -52,9 +52,25 @@ mixin _$SettingsState {
   String get ytdlpBackendUrl;
   String get ytdlpBackendToken;
   bool get isTestingYtdlpBackend;
-  String? get ytdlpBackendStatusMessage;
+  String? get ytdlpBackendStatusMessage; // Audiophile & Hi-Res Output
+  bool get bitPerfectOutput;
+  bool get bypassDspOnBitPerfect;
+  AudioOutputInfo? get currentOutputDevice;
   int? get scanResultCount;
-  String? get errorMessage;
+  String? get errorMessage; // DSP & Sound Quality
+  bool get crossfeedEnabled;
+  double get crossfeedDelayUs;
+  double get crossfeedFeedDb;
+  bool get limiterEnabled;
+  double get limiterLookaheadMs;
+  double get limiterThresholdDb;
+  double get limiterReleaseMs;
+  bool get reverbEnabled;
+  int get reverbPreset;
+  double get reverbWetDry;
+  double get stereoBalance;
+  bool get monoMix;
+  bool get sincResamplerEnabled;
 
   /// Create a copy of SettingsState
   /// with the given fields replaced by the non-null parameter values.
@@ -127,8 +143,8 @@ mixin _$SettingsState {
                 other.proxyPort == proxyPort) &&
             (identical(other.proxyUsername, proxyUsername) ||
                 other.proxyUsername == proxyUsername) &&
-            (identical(other.proxyPassword, proxyPassword) ||
-                other.proxyPassword == proxyPassword) &&
+            (identical(other.hasProxyPassword, hasProxyPassword) ||
+                other.hasProxyPassword == hasProxyPassword) &&
             (identical(other.proxyBypassHosts, proxyBypassHosts) ||
                 other.proxyBypassHosts == proxyBypassHosts) &&
             const DeepCollectionEquality().equals(other.proxyList, proxyList) &&
@@ -140,8 +156,24 @@ mixin _$SettingsState {
             (identical(other.ytdlpBackendToken, ytdlpBackendToken) || other.ytdlpBackendToken == ytdlpBackendToken) &&
             (identical(other.isTestingYtdlpBackend, isTestingYtdlpBackend) || other.isTestingYtdlpBackend == isTestingYtdlpBackend) &&
             (identical(other.ytdlpBackendStatusMessage, ytdlpBackendStatusMessage) || other.ytdlpBackendStatusMessage == ytdlpBackendStatusMessage) &&
+            (identical(other.bitPerfectOutput, bitPerfectOutput) || other.bitPerfectOutput == bitPerfectOutput) &&
+            (identical(other.bypassDspOnBitPerfect, bypassDspOnBitPerfect) || other.bypassDspOnBitPerfect == bypassDspOnBitPerfect) &&
+            (identical(other.currentOutputDevice, currentOutputDevice) || other.currentOutputDevice == currentOutputDevice) &&
             (identical(other.scanResultCount, scanResultCount) || other.scanResultCount == scanResultCount) &&
-            (identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
+            (identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage) &&
+            (identical(other.crossfeedEnabled, crossfeedEnabled) || other.crossfeedEnabled == crossfeedEnabled) &&
+            (identical(other.crossfeedDelayUs, crossfeedDelayUs) || other.crossfeedDelayUs == crossfeedDelayUs) &&
+            (identical(other.crossfeedFeedDb, crossfeedFeedDb) || other.crossfeedFeedDb == crossfeedFeedDb) &&
+            (identical(other.limiterEnabled, limiterEnabled) || other.limiterEnabled == limiterEnabled) &&
+            (identical(other.limiterLookaheadMs, limiterLookaheadMs) || other.limiterLookaheadMs == limiterLookaheadMs) &&
+            (identical(other.limiterThresholdDb, limiterThresholdDb) || other.limiterThresholdDb == limiterThresholdDb) &&
+            (identical(other.limiterReleaseMs, limiterReleaseMs) || other.limiterReleaseMs == limiterReleaseMs) &&
+            (identical(other.reverbEnabled, reverbEnabled) || other.reverbEnabled == reverbEnabled) &&
+            (identical(other.reverbPreset, reverbPreset) || other.reverbPreset == reverbPreset) &&
+            (identical(other.reverbWetDry, reverbWetDry) || other.reverbWetDry == reverbWetDry) &&
+            (identical(other.stereoBalance, stereoBalance) || other.stereoBalance == stereoBalance) &&
+            (identical(other.monoMix, monoMix) || other.monoMix == monoMix) &&
+            (identical(other.sincResamplerEnabled, sincResamplerEnabled) || other.sincResamplerEnabled == sincResamplerEnabled));
   }
 
   @override
@@ -176,7 +208,7 @@ mixin _$SettingsState {
         proxyHost,
         proxyPort,
         proxyUsername,
-        proxyPassword,
+        hasProxyPassword,
         proxyBypassHosts,
         const DeepCollectionEquality().hash(proxyList),
         isTestingAllProxies,
@@ -186,13 +218,29 @@ mixin _$SettingsState {
         ytdlpBackendToken,
         isTestingYtdlpBackend,
         ytdlpBackendStatusMessage,
+        bitPerfectOutput,
+        bypassDspOnBitPerfect,
+        currentOutputDevice,
         scanResultCount,
-        errorMessage
+        errorMessage,
+        crossfeedEnabled,
+        crossfeedDelayUs,
+        crossfeedFeedDb,
+        limiterEnabled,
+        limiterLookaheadMs,
+        limiterThresholdDb,
+        limiterReleaseMs,
+        reverbEnabled,
+        reverbPreset,
+        reverbWetDry,
+        stereoBalance,
+        monoMix,
+        sincResamplerEnabled
       ]);
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, proxyPassword: $proxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled)';
   }
 }
 
@@ -232,7 +280,7 @@ abstract mixin class $SettingsStateCopyWith<$Res> {
       String proxyHost,
       int proxyPort,
       String proxyUsername,
-      String proxyPassword,
+      bool hasProxyPassword,
       String proxyBypassHosts,
       List<ProxyEntry> proxyList,
       bool isTestingAllProxies,
@@ -242,8 +290,24 @@ abstract mixin class $SettingsStateCopyWith<$Res> {
       String ytdlpBackendToken,
       bool isTestingYtdlpBackend,
       String? ytdlpBackendStatusMessage,
+      bool bitPerfectOutput,
+      bool bypassDspOnBitPerfect,
+      AudioOutputInfo? currentOutputDevice,
       int? scanResultCount,
-      String? errorMessage});
+      String? errorMessage,
+      bool crossfeedEnabled,
+      double crossfeedDelayUs,
+      double crossfeedFeedDb,
+      bool limiterEnabled,
+      double limiterLookaheadMs,
+      double limiterThresholdDb,
+      double limiterReleaseMs,
+      bool reverbEnabled,
+      int reverbPreset,
+      double reverbWetDry,
+      double stereoBalance,
+      bool monoMix,
+      bool sincResamplerEnabled});
 }
 
 /// @nodoc
@@ -288,7 +352,7 @@ class _$SettingsStateCopyWithImpl<$Res>
     Object? proxyHost = null,
     Object? proxyPort = null,
     Object? proxyUsername = null,
-    Object? proxyPassword = null,
+    Object? hasProxyPassword = null,
     Object? proxyBypassHosts = null,
     Object? proxyList = null,
     Object? isTestingAllProxies = null,
@@ -298,8 +362,24 @@ class _$SettingsStateCopyWithImpl<$Res>
     Object? ytdlpBackendToken = null,
     Object? isTestingYtdlpBackend = null,
     Object? ytdlpBackendStatusMessage = freezed,
+    Object? bitPerfectOutput = null,
+    Object? bypassDspOnBitPerfect = null,
+    Object? currentOutputDevice = freezed,
     Object? scanResultCount = freezed,
     Object? errorMessage = freezed,
+    Object? crossfeedEnabled = null,
+    Object? crossfeedDelayUs = null,
+    Object? crossfeedFeedDb = null,
+    Object? limiterEnabled = null,
+    Object? limiterLookaheadMs = null,
+    Object? limiterThresholdDb = null,
+    Object? limiterReleaseMs = null,
+    Object? reverbEnabled = null,
+    Object? reverbPreset = null,
+    Object? reverbWetDry = null,
+    Object? stereoBalance = null,
+    Object? monoMix = null,
+    Object? sincResamplerEnabled = null,
   }) {
     return _then(_self.copyWith(
       gaplessPlayback: null == gaplessPlayback
@@ -418,10 +498,10 @@ class _$SettingsStateCopyWithImpl<$Res>
           ? _self.proxyUsername
           : proxyUsername // ignore: cast_nullable_to_non_nullable
               as String,
-      proxyPassword: null == proxyPassword
-          ? _self.proxyPassword
-          : proxyPassword // ignore: cast_nullable_to_non_nullable
-              as String,
+      hasProxyPassword: null == hasProxyPassword
+          ? _self.hasProxyPassword
+          : hasProxyPassword // ignore: cast_nullable_to_non_nullable
+              as bool,
       proxyBypassHosts: null == proxyBypassHosts
           ? _self.proxyBypassHosts
           : proxyBypassHosts // ignore: cast_nullable_to_non_nullable
@@ -458,6 +538,18 @@ class _$SettingsStateCopyWithImpl<$Res>
           ? _self.ytdlpBackendStatusMessage
           : ytdlpBackendStatusMessage // ignore: cast_nullable_to_non_nullable
               as String?,
+      bitPerfectOutput: null == bitPerfectOutput
+          ? _self.bitPerfectOutput
+          : bitPerfectOutput // ignore: cast_nullable_to_non_nullable
+              as bool,
+      bypassDspOnBitPerfect: null == bypassDspOnBitPerfect
+          ? _self.bypassDspOnBitPerfect
+          : bypassDspOnBitPerfect // ignore: cast_nullable_to_non_nullable
+              as bool,
+      currentOutputDevice: freezed == currentOutputDevice
+          ? _self.currentOutputDevice
+          : currentOutputDevice // ignore: cast_nullable_to_non_nullable
+              as AudioOutputInfo?,
       scanResultCount: freezed == scanResultCount
           ? _self.scanResultCount
           : scanResultCount // ignore: cast_nullable_to_non_nullable
@@ -466,6 +558,58 @@ class _$SettingsStateCopyWithImpl<$Res>
           ? _self.errorMessage
           : errorMessage // ignore: cast_nullable_to_non_nullable
               as String?,
+      crossfeedEnabled: null == crossfeedEnabled
+          ? _self.crossfeedEnabled
+          : crossfeedEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      crossfeedDelayUs: null == crossfeedDelayUs
+          ? _self.crossfeedDelayUs
+          : crossfeedDelayUs // ignore: cast_nullable_to_non_nullable
+              as double,
+      crossfeedFeedDb: null == crossfeedFeedDb
+          ? _self.crossfeedFeedDb
+          : crossfeedFeedDb // ignore: cast_nullable_to_non_nullable
+              as double,
+      limiterEnabled: null == limiterEnabled
+          ? _self.limiterEnabled
+          : limiterEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      limiterLookaheadMs: null == limiterLookaheadMs
+          ? _self.limiterLookaheadMs
+          : limiterLookaheadMs // ignore: cast_nullable_to_non_nullable
+              as double,
+      limiterThresholdDb: null == limiterThresholdDb
+          ? _self.limiterThresholdDb
+          : limiterThresholdDb // ignore: cast_nullable_to_non_nullable
+              as double,
+      limiterReleaseMs: null == limiterReleaseMs
+          ? _self.limiterReleaseMs
+          : limiterReleaseMs // ignore: cast_nullable_to_non_nullable
+              as double,
+      reverbEnabled: null == reverbEnabled
+          ? _self.reverbEnabled
+          : reverbEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      reverbPreset: null == reverbPreset
+          ? _self.reverbPreset
+          : reverbPreset // ignore: cast_nullable_to_non_nullable
+              as int,
+      reverbWetDry: null == reverbWetDry
+          ? _self.reverbWetDry
+          : reverbWetDry // ignore: cast_nullable_to_non_nullable
+              as double,
+      stereoBalance: null == stereoBalance
+          ? _self.stereoBalance
+          : stereoBalance // ignore: cast_nullable_to_non_nullable
+              as double,
+      monoMix: null == monoMix
+          ? _self.monoMix
+          : monoMix // ignore: cast_nullable_to_non_nullable
+              as bool,
+      sincResamplerEnabled: null == sincResamplerEnabled
+          ? _self.sincResamplerEnabled
+          : sincResamplerEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
     ));
   }
 }
@@ -593,7 +737,7 @@ extension SettingsStatePatterns on SettingsState {
             String proxyHost,
             int proxyPort,
             String proxyUsername,
-            String proxyPassword,
+            bool hasProxyPassword,
             String proxyBypassHosts,
             List<ProxyEntry> proxyList,
             bool isTestingAllProxies,
@@ -603,8 +747,24 @@ extension SettingsStatePatterns on SettingsState {
             String ytdlpBackendToken,
             bool isTestingYtdlpBackend,
             String? ytdlpBackendStatusMessage,
+            bool bitPerfectOutput,
+            bool bypassDspOnBitPerfect,
+            AudioOutputInfo? currentOutputDevice,
             int? scanResultCount,
-            String? errorMessage)?
+            String? errorMessage,
+            bool crossfeedEnabled,
+            double crossfeedDelayUs,
+            double crossfeedFeedDb,
+            bool limiterEnabled,
+            double limiterLookaheadMs,
+            double limiterThresholdDb,
+            double limiterReleaseMs,
+            bool reverbEnabled,
+            int reverbPreset,
+            double reverbWetDry,
+            double stereoBalance,
+            bool monoMix,
+            bool sincResamplerEnabled)?
         $default, {
     required TResult orElse(),
   }) {
@@ -641,7 +801,7 @@ extension SettingsStatePatterns on SettingsState {
             _that.proxyHost,
             _that.proxyPort,
             _that.proxyUsername,
-            _that.proxyPassword,
+            _that.hasProxyPassword,
             _that.proxyBypassHosts,
             _that.proxyList,
             _that.isTestingAllProxies,
@@ -651,8 +811,24 @@ extension SettingsStatePatterns on SettingsState {
             _that.ytdlpBackendToken,
             _that.isTestingYtdlpBackend,
             _that.ytdlpBackendStatusMessage,
+            _that.bitPerfectOutput,
+            _that.bypassDspOnBitPerfect,
+            _that.currentOutputDevice,
             _that.scanResultCount,
-            _that.errorMessage);
+            _that.errorMessage,
+            _that.crossfeedEnabled,
+            _that.crossfeedDelayUs,
+            _that.crossfeedFeedDb,
+            _that.limiterEnabled,
+            _that.limiterLookaheadMs,
+            _that.limiterThresholdDb,
+            _that.limiterReleaseMs,
+            _that.reverbEnabled,
+            _that.reverbPreset,
+            _that.reverbWetDry,
+            _that.stereoBalance,
+            _that.monoMix,
+            _that.sincResamplerEnabled);
       case _:
         return orElse();
     }
@@ -703,7 +879,7 @@ extension SettingsStatePatterns on SettingsState {
             String proxyHost,
             int proxyPort,
             String proxyUsername,
-            String proxyPassword,
+            bool hasProxyPassword,
             String proxyBypassHosts,
             List<ProxyEntry> proxyList,
             bool isTestingAllProxies,
@@ -713,8 +889,24 @@ extension SettingsStatePatterns on SettingsState {
             String ytdlpBackendToken,
             bool isTestingYtdlpBackend,
             String? ytdlpBackendStatusMessage,
+            bool bitPerfectOutput,
+            bool bypassDspOnBitPerfect,
+            AudioOutputInfo? currentOutputDevice,
             int? scanResultCount,
-            String? errorMessage)
+            String? errorMessage,
+            bool crossfeedEnabled,
+            double crossfeedDelayUs,
+            double crossfeedFeedDb,
+            bool limiterEnabled,
+            double limiterLookaheadMs,
+            double limiterThresholdDb,
+            double limiterReleaseMs,
+            bool reverbEnabled,
+            int reverbPreset,
+            double reverbWetDry,
+            double stereoBalance,
+            bool monoMix,
+            bool sincResamplerEnabled)
         $default,
   ) {
     final _that = this;
@@ -750,7 +942,7 @@ extension SettingsStatePatterns on SettingsState {
             _that.proxyHost,
             _that.proxyPort,
             _that.proxyUsername,
-            _that.proxyPassword,
+            _that.hasProxyPassword,
             _that.proxyBypassHosts,
             _that.proxyList,
             _that.isTestingAllProxies,
@@ -760,8 +952,24 @@ extension SettingsStatePatterns on SettingsState {
             _that.ytdlpBackendToken,
             _that.isTestingYtdlpBackend,
             _that.ytdlpBackendStatusMessage,
+            _that.bitPerfectOutput,
+            _that.bypassDspOnBitPerfect,
+            _that.currentOutputDevice,
             _that.scanResultCount,
-            _that.errorMessage);
+            _that.errorMessage,
+            _that.crossfeedEnabled,
+            _that.crossfeedDelayUs,
+            _that.crossfeedFeedDb,
+            _that.limiterEnabled,
+            _that.limiterLookaheadMs,
+            _that.limiterThresholdDb,
+            _that.limiterReleaseMs,
+            _that.reverbEnabled,
+            _that.reverbPreset,
+            _that.reverbWetDry,
+            _that.stereoBalance,
+            _that.monoMix,
+            _that.sincResamplerEnabled);
       case _:
         throw StateError('Unexpected subclass');
     }
@@ -811,7 +1019,7 @@ extension SettingsStatePatterns on SettingsState {
             String proxyHost,
             int proxyPort,
             String proxyUsername,
-            String proxyPassword,
+            bool hasProxyPassword,
             String proxyBypassHosts,
             List<ProxyEntry> proxyList,
             bool isTestingAllProxies,
@@ -821,8 +1029,24 @@ extension SettingsStatePatterns on SettingsState {
             String ytdlpBackendToken,
             bool isTestingYtdlpBackend,
             String? ytdlpBackendStatusMessage,
+            bool bitPerfectOutput,
+            bool bypassDspOnBitPerfect,
+            AudioOutputInfo? currentOutputDevice,
             int? scanResultCount,
-            String? errorMessage)?
+            String? errorMessage,
+            bool crossfeedEnabled,
+            double crossfeedDelayUs,
+            double crossfeedFeedDb,
+            bool limiterEnabled,
+            double limiterLookaheadMs,
+            double limiterThresholdDb,
+            double limiterReleaseMs,
+            bool reverbEnabled,
+            int reverbPreset,
+            double reverbWetDry,
+            double stereoBalance,
+            bool monoMix,
+            bool sincResamplerEnabled)?
         $default,
   ) {
     final _that = this;
@@ -858,7 +1082,7 @@ extension SettingsStatePatterns on SettingsState {
             _that.proxyHost,
             _that.proxyPort,
             _that.proxyUsername,
-            _that.proxyPassword,
+            _that.hasProxyPassword,
             _that.proxyBypassHosts,
             _that.proxyList,
             _that.isTestingAllProxies,
@@ -868,8 +1092,24 @@ extension SettingsStatePatterns on SettingsState {
             _that.ytdlpBackendToken,
             _that.isTestingYtdlpBackend,
             _that.ytdlpBackendStatusMessage,
+            _that.bitPerfectOutput,
+            _that.bypassDspOnBitPerfect,
+            _that.currentOutputDevice,
             _that.scanResultCount,
-            _that.errorMessage);
+            _that.errorMessage,
+            _that.crossfeedEnabled,
+            _that.crossfeedDelayUs,
+            _that.crossfeedFeedDb,
+            _that.limiterEnabled,
+            _that.limiterLookaheadMs,
+            _that.limiterThresholdDb,
+            _that.limiterReleaseMs,
+            _that.reverbEnabled,
+            _that.reverbPreset,
+            _that.reverbWetDry,
+            _that.stereoBalance,
+            _that.monoMix,
+            _that.sincResamplerEnabled);
       case _:
         return null;
     }
@@ -909,7 +1149,7 @@ class _SettingsState extends SettingsState {
       this.proxyHost = '',
       this.proxyPort = 8080,
       this.proxyUsername = '',
-      this.proxyPassword = '',
+      this.hasProxyPassword = false,
       this.proxyBypassHosts = 'localhost, 127.0.0.1',
       final List<ProxyEntry> proxyList = const [],
       this.isTestingAllProxies = false,
@@ -917,11 +1157,27 @@ class _SettingsState extends SettingsState {
       this.ytdlpBackendEnabled = true,
       this.ytdlpBackendUrl =
           'https://xdm-backend-10763667121.europe-west1.run.app',
-      this.ytdlpBackendToken = 'KxPgwFT0VvqoJUgVfcWuvE3-QSrc7qM-1YDS1dzNJv0',
+      this.ytdlpBackendToken = '',
       this.isTestingYtdlpBackend = false,
       this.ytdlpBackendStatusMessage,
+      this.bitPerfectOutput = false,
+      this.bypassDspOnBitPerfect = true,
+      this.currentOutputDevice,
       this.scanResultCount,
-      this.errorMessage})
+      this.errorMessage,
+      this.crossfeedEnabled = false,
+      this.crossfeedDelayUs = 350.0,
+      this.crossfeedFeedDb = -9.0,
+      this.limiterEnabled = false,
+      this.limiterLookaheadMs = 3.0,
+      this.limiterThresholdDb = -0.2,
+      this.limiterReleaseMs = 50.0,
+      this.reverbEnabled = false,
+      this.reverbPreset = 0,
+      this.reverbWetDry = 0.20,
+      this.stereoBalance = 0.0,
+      this.monoMix = false,
+      this.sincResamplerEnabled = true})
       : _proxyList = proxyList,
         super._();
 
@@ -1015,7 +1271,7 @@ class _SettingsState extends SettingsState {
   final String proxyUsername;
   @override
   @JsonKey()
-  final String proxyPassword;
+  final bool hasProxyPassword;
   @override
   @JsonKey()
   final String proxyBypassHosts;
@@ -1049,10 +1305,59 @@ class _SettingsState extends SettingsState {
   final bool isTestingYtdlpBackend;
   @override
   final String? ytdlpBackendStatusMessage;
+// Audiophile & Hi-Res Output
+  @override
+  @JsonKey()
+  final bool bitPerfectOutput;
+  @override
+  @JsonKey()
+  final bool bypassDspOnBitPerfect;
+  @override
+  final AudioOutputInfo? currentOutputDevice;
   @override
   final int? scanResultCount;
   @override
   final String? errorMessage;
+// DSP & Sound Quality
+  @override
+  @JsonKey()
+  final bool crossfeedEnabled;
+  @override
+  @JsonKey()
+  final double crossfeedDelayUs;
+  @override
+  @JsonKey()
+  final double crossfeedFeedDb;
+  @override
+  @JsonKey()
+  final bool limiterEnabled;
+  @override
+  @JsonKey()
+  final double limiterLookaheadMs;
+  @override
+  @JsonKey()
+  final double limiterThresholdDb;
+  @override
+  @JsonKey()
+  final double limiterReleaseMs;
+  @override
+  @JsonKey()
+  final bool reverbEnabled;
+  @override
+  @JsonKey()
+  final int reverbPreset;
+  @override
+  @JsonKey()
+  final double reverbWetDry;
+  @override
+  @JsonKey()
+  final double stereoBalance;
+  @override
+  @JsonKey()
+  final bool monoMix;
+  @override
+  @JsonKey()
+  final bool sincResamplerEnabled;
 
   /// Create a copy of SettingsState
   /// with the given fields replaced by the non-null parameter values.
@@ -1125,8 +1430,8 @@ class _SettingsState extends SettingsState {
                 other.proxyPort == proxyPort) &&
             (identical(other.proxyUsername, proxyUsername) ||
                 other.proxyUsername == proxyUsername) &&
-            (identical(other.proxyPassword, proxyPassword) ||
-                other.proxyPassword == proxyPassword) &&
+            (identical(other.hasProxyPassword, hasProxyPassword) ||
+                other.hasProxyPassword == hasProxyPassword) &&
             (identical(other.proxyBypassHosts, proxyBypassHosts) ||
                 other.proxyBypassHosts == proxyBypassHosts) &&
             const DeepCollectionEquality()
@@ -1138,8 +1443,24 @@ class _SettingsState extends SettingsState {
             (identical(other.ytdlpBackendToken, ytdlpBackendToken) || other.ytdlpBackendToken == ytdlpBackendToken) &&
             (identical(other.isTestingYtdlpBackend, isTestingYtdlpBackend) || other.isTestingYtdlpBackend == isTestingYtdlpBackend) &&
             (identical(other.ytdlpBackendStatusMessage, ytdlpBackendStatusMessage) || other.ytdlpBackendStatusMessage == ytdlpBackendStatusMessage) &&
+            (identical(other.bitPerfectOutput, bitPerfectOutput) || other.bitPerfectOutput == bitPerfectOutput) &&
+            (identical(other.bypassDspOnBitPerfect, bypassDspOnBitPerfect) || other.bypassDspOnBitPerfect == bypassDspOnBitPerfect) &&
+            (identical(other.currentOutputDevice, currentOutputDevice) || other.currentOutputDevice == currentOutputDevice) &&
             (identical(other.scanResultCount, scanResultCount) || other.scanResultCount == scanResultCount) &&
-            (identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
+            (identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage) &&
+            (identical(other.crossfeedEnabled, crossfeedEnabled) || other.crossfeedEnabled == crossfeedEnabled) &&
+            (identical(other.crossfeedDelayUs, crossfeedDelayUs) || other.crossfeedDelayUs == crossfeedDelayUs) &&
+            (identical(other.crossfeedFeedDb, crossfeedFeedDb) || other.crossfeedFeedDb == crossfeedFeedDb) &&
+            (identical(other.limiterEnabled, limiterEnabled) || other.limiterEnabled == limiterEnabled) &&
+            (identical(other.limiterLookaheadMs, limiterLookaheadMs) || other.limiterLookaheadMs == limiterLookaheadMs) &&
+            (identical(other.limiterThresholdDb, limiterThresholdDb) || other.limiterThresholdDb == limiterThresholdDb) &&
+            (identical(other.limiterReleaseMs, limiterReleaseMs) || other.limiterReleaseMs == limiterReleaseMs) &&
+            (identical(other.reverbEnabled, reverbEnabled) || other.reverbEnabled == reverbEnabled) &&
+            (identical(other.reverbPreset, reverbPreset) || other.reverbPreset == reverbPreset) &&
+            (identical(other.reverbWetDry, reverbWetDry) || other.reverbWetDry == reverbWetDry) &&
+            (identical(other.stereoBalance, stereoBalance) || other.stereoBalance == stereoBalance) &&
+            (identical(other.monoMix, monoMix) || other.monoMix == monoMix) &&
+            (identical(other.sincResamplerEnabled, sincResamplerEnabled) || other.sincResamplerEnabled == sincResamplerEnabled));
   }
 
   @override
@@ -1174,7 +1495,7 @@ class _SettingsState extends SettingsState {
         proxyHost,
         proxyPort,
         proxyUsername,
-        proxyPassword,
+        hasProxyPassword,
         proxyBypassHosts,
         const DeepCollectionEquality().hash(_proxyList),
         isTestingAllProxies,
@@ -1184,13 +1505,29 @@ class _SettingsState extends SettingsState {
         ytdlpBackendToken,
         isTestingYtdlpBackend,
         ytdlpBackendStatusMessage,
+        bitPerfectOutput,
+        bypassDspOnBitPerfect,
+        currentOutputDevice,
         scanResultCount,
-        errorMessage
+        errorMessage,
+        crossfeedEnabled,
+        crossfeedDelayUs,
+        crossfeedFeedDb,
+        limiterEnabled,
+        limiterLookaheadMs,
+        limiterThresholdDb,
+        limiterReleaseMs,
+        reverbEnabled,
+        reverbPreset,
+        reverbWetDry,
+        stereoBalance,
+        monoMix,
+        sincResamplerEnabled
       ]);
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, proxyPassword: $proxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled)';
   }
 }
 
@@ -1232,7 +1569,7 @@ abstract mixin class _$SettingsStateCopyWith<$Res>
       String proxyHost,
       int proxyPort,
       String proxyUsername,
-      String proxyPassword,
+      bool hasProxyPassword,
       String proxyBypassHosts,
       List<ProxyEntry> proxyList,
       bool isTestingAllProxies,
@@ -1242,8 +1579,24 @@ abstract mixin class _$SettingsStateCopyWith<$Res>
       String ytdlpBackendToken,
       bool isTestingYtdlpBackend,
       String? ytdlpBackendStatusMessage,
+      bool bitPerfectOutput,
+      bool bypassDspOnBitPerfect,
+      AudioOutputInfo? currentOutputDevice,
       int? scanResultCount,
-      String? errorMessage});
+      String? errorMessage,
+      bool crossfeedEnabled,
+      double crossfeedDelayUs,
+      double crossfeedFeedDb,
+      bool limiterEnabled,
+      double limiterLookaheadMs,
+      double limiterThresholdDb,
+      double limiterReleaseMs,
+      bool reverbEnabled,
+      int reverbPreset,
+      double reverbWetDry,
+      double stereoBalance,
+      bool monoMix,
+      bool sincResamplerEnabled});
 }
 
 /// @nodoc
@@ -1288,7 +1641,7 @@ class __$SettingsStateCopyWithImpl<$Res>
     Object? proxyHost = null,
     Object? proxyPort = null,
     Object? proxyUsername = null,
-    Object? proxyPassword = null,
+    Object? hasProxyPassword = null,
     Object? proxyBypassHosts = null,
     Object? proxyList = null,
     Object? isTestingAllProxies = null,
@@ -1298,8 +1651,24 @@ class __$SettingsStateCopyWithImpl<$Res>
     Object? ytdlpBackendToken = null,
     Object? isTestingYtdlpBackend = null,
     Object? ytdlpBackendStatusMessage = freezed,
+    Object? bitPerfectOutput = null,
+    Object? bypassDspOnBitPerfect = null,
+    Object? currentOutputDevice = freezed,
     Object? scanResultCount = freezed,
     Object? errorMessage = freezed,
+    Object? crossfeedEnabled = null,
+    Object? crossfeedDelayUs = null,
+    Object? crossfeedFeedDb = null,
+    Object? limiterEnabled = null,
+    Object? limiterLookaheadMs = null,
+    Object? limiterThresholdDb = null,
+    Object? limiterReleaseMs = null,
+    Object? reverbEnabled = null,
+    Object? reverbPreset = null,
+    Object? reverbWetDry = null,
+    Object? stereoBalance = null,
+    Object? monoMix = null,
+    Object? sincResamplerEnabled = null,
   }) {
     return _then(_SettingsState(
       gaplessPlayback: null == gaplessPlayback
@@ -1418,10 +1787,10 @@ class __$SettingsStateCopyWithImpl<$Res>
           ? _self.proxyUsername
           : proxyUsername // ignore: cast_nullable_to_non_nullable
               as String,
-      proxyPassword: null == proxyPassword
-          ? _self.proxyPassword
-          : proxyPassword // ignore: cast_nullable_to_non_nullable
-              as String,
+      hasProxyPassword: null == hasProxyPassword
+          ? _self.hasProxyPassword
+          : hasProxyPassword // ignore: cast_nullable_to_non_nullable
+              as bool,
       proxyBypassHosts: null == proxyBypassHosts
           ? _self.proxyBypassHosts
           : proxyBypassHosts // ignore: cast_nullable_to_non_nullable
@@ -1458,6 +1827,18 @@ class __$SettingsStateCopyWithImpl<$Res>
           ? _self.ytdlpBackendStatusMessage
           : ytdlpBackendStatusMessage // ignore: cast_nullable_to_non_nullable
               as String?,
+      bitPerfectOutput: null == bitPerfectOutput
+          ? _self.bitPerfectOutput
+          : bitPerfectOutput // ignore: cast_nullable_to_non_nullable
+              as bool,
+      bypassDspOnBitPerfect: null == bypassDspOnBitPerfect
+          ? _self.bypassDspOnBitPerfect
+          : bypassDspOnBitPerfect // ignore: cast_nullable_to_non_nullable
+              as bool,
+      currentOutputDevice: freezed == currentOutputDevice
+          ? _self.currentOutputDevice
+          : currentOutputDevice // ignore: cast_nullable_to_non_nullable
+              as AudioOutputInfo?,
       scanResultCount: freezed == scanResultCount
           ? _self.scanResultCount
           : scanResultCount // ignore: cast_nullable_to_non_nullable
@@ -1466,6 +1847,58 @@ class __$SettingsStateCopyWithImpl<$Res>
           ? _self.errorMessage
           : errorMessage // ignore: cast_nullable_to_non_nullable
               as String?,
+      crossfeedEnabled: null == crossfeedEnabled
+          ? _self.crossfeedEnabled
+          : crossfeedEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      crossfeedDelayUs: null == crossfeedDelayUs
+          ? _self.crossfeedDelayUs
+          : crossfeedDelayUs // ignore: cast_nullable_to_non_nullable
+              as double,
+      crossfeedFeedDb: null == crossfeedFeedDb
+          ? _self.crossfeedFeedDb
+          : crossfeedFeedDb // ignore: cast_nullable_to_non_nullable
+              as double,
+      limiterEnabled: null == limiterEnabled
+          ? _self.limiterEnabled
+          : limiterEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      limiterLookaheadMs: null == limiterLookaheadMs
+          ? _self.limiterLookaheadMs
+          : limiterLookaheadMs // ignore: cast_nullable_to_non_nullable
+              as double,
+      limiterThresholdDb: null == limiterThresholdDb
+          ? _self.limiterThresholdDb
+          : limiterThresholdDb // ignore: cast_nullable_to_non_nullable
+              as double,
+      limiterReleaseMs: null == limiterReleaseMs
+          ? _self.limiterReleaseMs
+          : limiterReleaseMs // ignore: cast_nullable_to_non_nullable
+              as double,
+      reverbEnabled: null == reverbEnabled
+          ? _self.reverbEnabled
+          : reverbEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      reverbPreset: null == reverbPreset
+          ? _self.reverbPreset
+          : reverbPreset // ignore: cast_nullable_to_non_nullable
+              as int,
+      reverbWetDry: null == reverbWetDry
+          ? _self.reverbWetDry
+          : reverbWetDry // ignore: cast_nullable_to_non_nullable
+              as double,
+      stereoBalance: null == stereoBalance
+          ? _self.stereoBalance
+          : stereoBalance // ignore: cast_nullable_to_non_nullable
+              as double,
+      monoMix: null == monoMix
+          ? _self.monoMix
+          : monoMix // ignore: cast_nullable_to_non_nullable
+              as bool,
+      sincResamplerEnabled: null == sincResamplerEnabled
+          ? _self.sincResamplerEnabled
+          : sincResamplerEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
     ));
   }
 }

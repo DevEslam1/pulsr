@@ -2,6 +2,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../core/services/metadata_search_service.dart';
 import '../../core/utils/error_logger.dart';
 import '../../core/utils/lrc_parser.dart';
 import '../../data/db/app_database.dart';
@@ -11,22 +12,31 @@ import 'tag_editor_state.dart';
 class TagEditorCubit extends Cubit<TagEditorState> {
   static const MethodChannel _channel = MethodChannel('com.pulsr.music/tag_editor');
   final MediaScannerService _scannerService;
+  final MetadataSearchService _metadataSearchService;
   final ImagePicker _imagePicker = ImagePicker();
 
   TagEditorCubit({
     required SongsTableData song,
+    List<SongsTableData>? batchSongs,
     required MediaScannerService scannerService,
+    MetadataSearchService? metadataSearchService,
   })  : _scannerService = scannerService,
+        _metadataSearchService = metadataSearchService ?? MetadataSearchService(),
         super(TagEditorState(
           song: song,
-          title: song.title,
+          batchSongs: batchSongs ?? const [],
+          title: (batchSongs != null && batchSongs.length > 1) ? '' : song.title,
           artist: song.artist,
           album: song.album,
           genre: song.genre ?? '',
           year: song.year != null ? song.year.toString() : '',
-          trackNumber: song.trackNumber != null ? song.trackNumber.toString() : '',
+          trackNumber: (batchSongs != null && batchSongs.length > 1) ? '' : (song.trackNumber != null ? song.trackNumber.toString() : ''),
         )) {
-    loadTags();
+    if (!state.isBatchMode) {
+      loadTags();
+    } else {
+      emit(state.copyWith(status: TagEditorStatus.loaded));
+    }
   }
 
   Future<void> loadTags() async {
@@ -65,7 +75,6 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to read native tags via MethodChannel for ${state.song.path}', error: e, stackTrace: st, category: 'TagEditorCubit');
-      // Fallback to loaded with default DB tags if MethodChannel fails or on non-Android platform
       emit(state.copyWith(status: TagEditorStatus.loaded));
     }
   }
@@ -106,9 +115,80 @@ class TagEditorCubit extends Cubit<TagEditorState> {
     ));
   }
 
+  /// Automatically searches online (iTunes & MusicBrainz) and updates tags + cover art in 1 tap.
+  Future<bool> autoFetchOnlineTags() async {
+    emit(state.copyWith(isAutoFetching: true, clearErrorMessage: true));
+    try {
+      final searchTitle = state.title.isNotEmpty ? state.title : state.song.title;
+      final searchArtist = state.artist.isNotEmpty ? state.artist : state.song.artist;
+
+      final results = await _metadataSearchService.searchMetadata(
+        title: searchTitle,
+        artist: searchArtist,
+        album: state.album,
+      );
+
+      if (results.isEmpty) {
+        emit(state.copyWith(
+          isAutoFetching: false,
+          errorMessage: 'No matching online metadata found for this track.',
+        ));
+        return false;
+      }
+
+      final bestMatch = results.first;
+      String? downloadedArtPath;
+      if (bestMatch.artworkUrl != null) {
+        downloadedArtPath = await _metadataSearchService.downloadArtworkToTemp(bestMatch.artworkUrl!);
+      }
+
+      emit(state.copyWith(
+        isAutoFetching: false,
+        title: bestMatch.title.isNotEmpty ? bestMatch.title : state.title,
+        artist: bestMatch.artist.isNotEmpty ? bestMatch.artist : state.artist,
+        album: bestMatch.album.isNotEmpty ? bestMatch.album : state.album,
+        genre: (bestMatch.genre != null && bestMatch.genre!.isNotEmpty) ? bestMatch.genre : state.genre,
+        year: (bestMatch.releaseYear != null && bestMatch.releaseYear!.isNotEmpty) ? bestMatch.releaseYear : state.year,
+        trackNumber: (bestMatch.trackNumber != null && bestMatch.trackNumber!.isNotEmpty) ? bestMatch.trackNumber : state.trackNumber,
+        newArtworkPath: downloadedArtPath ?? state.newArtworkPath,
+        removeArtwork: false,
+      ));
+      return true;
+    } catch (e, st) {
+      ErrorLogger.log('Auto-fetch online tags failed', error: e, stackTrace: st, category: 'TagEditorCubit');
+      emit(state.copyWith(
+        isAutoFetching: false,
+        errorMessage: 'Failed to auto-fetch online tags: $e',
+      ));
+      return false;
+    }
+  }
+
   Future<void> saveTags() async {
     emit(state.copyWith(status: TagEditorStatus.saving, clearErrorMessage: true));
     try {
+      if (state.isBatchMode) {
+        for (final s in state.batchSongs) {
+          await _channel.invokeMethod('writeTags', {
+            'path': s.path,
+            'title': s.title, // keep individual title
+            'artist': state.artist.isNotEmpty ? state.artist : s.artist,
+            'album': state.album.isNotEmpty ? state.album : s.album,
+            'genre': state.genre.isNotEmpty ? state.genre : (s.genre ?? ''),
+            'year': state.year.isNotEmpty ? state.year : (s.year?.toString() ?? ''),
+            'trackNumber': s.trackNumber?.toString() ?? '',
+            'comment': state.comment.isNotEmpty ? state.comment : '',
+            'lyrics': '',
+            'artworkPath': state.newArtworkPath,
+            'removeArtwork': state.removeArtwork,
+          });
+          await _scannerService.rescanSingleFile(s.path);
+        }
+        LrcParser.clearCache();
+        emit(state.copyWith(status: TagEditorStatus.success));
+        return;
+      }
+
       await _channel.invokeMethod('writeTags', {
         'path': state.song.path,
         'title': state.title,

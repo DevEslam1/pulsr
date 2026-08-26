@@ -155,11 +155,19 @@ class PlaylistCubit extends Cubit<PlaylistState> {
 
     // Auto-update online playlists & liked songs in background on every restart
     if (AppConfig.ytmEnabled) {
+      getIt<YtmAccountService>().loginState.removeListener(_onYtmLoginStateChanged);
+      getIt<YtmAccountService>().loginState.addListener(_onYtmLoginStateChanged);
       Future.delayed(const Duration(milliseconds: 600), () {
         if (!isClosed) {
           autoFetchOnlineLibrary(force: true);
         }
       });
+    }
+  }
+
+  void _onYtmLoginStateChanged() {
+    if (!getIt<YtmAccountService>().isLoggedIn) {
+      clearOnlinePlaylists();
     }
   }
 
@@ -364,6 +372,13 @@ class PlaylistCubit extends Cubit<PlaylistState> {
       if (tracks.isNotEmpty) {
         _saveOnlineCache();
       }
+    } on YtmException catch (e) {
+      ytmOnline.value = ytmOnline.value.copyWith(
+        likedStatus: YtmFetchStatus.error,
+        likedError: e.isAuth
+            ? 'Session expired — please sign in again.'
+            : (e.details ?? e.code),
+      );
     } catch (e) {
       ytmOnline.value = ytmOnline.value.copyWith(
         likedStatus: YtmFetchStatus.error,
@@ -399,6 +414,13 @@ class PlaylistCubit extends Cubit<PlaylistState> {
       if (playlists.isNotEmpty) {
         _saveOnlineCache();
       }
+    } on YtmException catch (e) {
+      ytmOnline.value = ytmOnline.value.copyWith(
+        accountStatus: YtmFetchStatus.error,
+        accountError: e.isAuth
+            ? 'Session expired — please sign in again.'
+            : (e.details ?? e.code),
+      );
     } catch (e) {
       ytmOnline.value = ytmOnline.value.copyWith(
         accountStatus: YtmFetchStatus.error,
@@ -484,6 +506,11 @@ class PlaylistCubit extends Cubit<PlaylistState> {
 
   @override
   Future<void> close() {
+    if (AppConfig.ytmEnabled) {
+      try {
+        getIt<YtmAccountService>().loginState.removeListener(_onYtmLoginStateChanged);
+      } catch (_) {}
+    }
     ytmOnline.dispose();
     _playlistsSub?.cancel();
     _playlistSongsSub?.cancel();

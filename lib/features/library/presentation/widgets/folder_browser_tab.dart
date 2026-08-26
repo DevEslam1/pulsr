@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/widgets/empty_state_widget.dart';
-import '../../../../data/scanner/media_scanner_service.dart';
+import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/library_cubit.dart';
 import '../../cubit/library_state.dart';
 
@@ -21,35 +21,53 @@ class FolderBrowserTab extends StatelessWidget {
         final folders = state.folders;
         final cubit = context.read<LibraryCubit>();
 
+        Future<void> onRefresh() async {
+          final settingsCubit = context.read<SettingsCubit>();
+          final count = await settingsCubit.rescanLibrary();
+          if (context.mounted) {
+            await cubit.init();
+            if (!context.mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Scan complete! $count tracks loaded.')),
+            );
+          }
+        }
+
         if (folders.isEmpty) {
-          return EmptyStateWidget(
-            icon: Icons.folder_off_rounded,
-            title: 'No Folders Found',
-            subtitle: 'Scan device storage to discover music directories and organize by path.',
-            primaryActionLabel: 'Scan Storage',
-            primaryActionIcon: Icons.center_focus_strong_rounded,
-            onPrimaryAction: () async {
-              final scanner = context.read<MediaScannerService>();
-              final count = await scanner.scanDeviceLibrary();
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Scan complete! $count tracks loaded.')),
-                );
-              }
-            },
+          return RefreshIndicator(
+            onRefresh: onRefresh,
+            child: CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: EmptyStateWidget(
+                    icon: Icons.folder_off_rounded,
+                    title: 'No Folders Found',
+                    subtitle: 'Scan device storage to discover music directories and organize by path.',
+                    primaryActionLabel: 'Scan Storage',
+                    primaryActionIcon: Icons.center_focus_strong_rounded,
+                    onPrimaryAction: onRefresh,
+                  ),
+                ),
+              ],
+            ),
           );
         }
 
         return Center(
           child: ConstrainedBox(
             constraints: Adaptive.contentConstraints(context),
-            child: ListView.builder(
-              padding: EdgeInsets.only(
-                bottom: 160,
-                top: 8,
-                left: Adaptive.pagePadding(context),
-                right: Adaptive.pagePadding(context),
-              ),
+            child: RefreshIndicator(
+              onRefresh: onRefresh,
+              child: ListView.builder(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.only(
+                  bottom: 160,
+                  top: 8,
+                  left: Adaptive.pagePadding(context),
+                  right: Adaptive.pagePadding(context),
+                ),
               itemCount: folders.length,
               itemBuilder: (context, index) {
                 final folder = folders[index];
@@ -155,6 +173,7 @@ class FolderBrowserTab extends StatelessWidget {
                   ),
                 );
               },
+              ),
             ),
           ),
         );

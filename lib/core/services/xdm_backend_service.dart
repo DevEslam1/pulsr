@@ -2,12 +2,14 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../domain/models/ytm_track.dart';
 import '../constants/prefs_keys.dart';
+import 'ytm_service.dart';
 
 /// Service interfacing with the remote yt-dlp microservice (xdm-backend).
 ///
@@ -19,15 +21,24 @@ import '../constants/prefs_keys.dart';
 @lazySingleton
 class XdmBackendService {
   static const String defaultBaseUrl = 'https://xdm-backend-10763667121.europe-west1.run.app';
-  static const String defaultApiToken = 'KxPgwFT0VvqoJUgVfcWuvE3-QSrc7qM-1YDS1dzNJv0';
+  static const String _tokenSecureKey = 'xdm_backend_token_secure';
+  static const String defaultApiToken = String.fromEnvironment('XDM_BACKEND_TOKEN', defaultValue: '');
 
   final http.Client _client;
+  final FlutterSecureStorage _secureStorage;
 
   @factoryMethod
-  XdmBackendService() : _client = http.Client();
+  XdmBackendService({
+    FlutterSecureStorage secureStorage = const FlutterSecureStorage(),
+  })  : _client = http.Client(),
+        _secureStorage = secureStorage;
 
   @visibleForTesting
-  XdmBackendService.withClient(http.Client client) : _client = client;
+  XdmBackendService.withClient(
+    http.Client client, {
+    FlutterSecureStorage secureStorage = const FlutterSecureStorage(),
+  })  : _client = client,
+        _secureStorage = secureStorage;
 
   Future<String> _getBaseUrl() async {
     final prefs = await SharedPreferences.getInstance();
@@ -39,12 +50,22 @@ class XdmBackendService {
   }
 
   Future<String> _getApiToken() async {
+    try {
+      final secureToken = await _secureStorage.read(key: _tokenSecureKey);
+      if (secureToken != null && secureToken.isNotEmpty) return secureToken;
+    } catch (_) {}
+
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(PrefsKeys.ytdlpBackendToken)?.trim();
-    if (token != null && token.isNotEmpty) {
-      return token;
+    final prefsToken = prefs.getString(PrefsKeys.ytdlpBackendToken)?.trim();
+    if (prefsToken != null && prefsToken.isNotEmpty) {
+      try {
+        await _secureStorage.write(key: _tokenSecureKey, value: prefsToken);
+        await prefs.remove(PrefsKeys.ytdlpBackendToken);
+      } catch (_) {}
+      return prefsToken;
     }
-    return defaultApiToken;
+
+    return const String.fromEnvironment('XDM_BACKEND_TOKEN', defaultValue: '');
   }
 
   Future<bool> isEnabled() async {
@@ -54,9 +75,11 @@ class XdmBackendService {
     return prefs.getBool(PrefsKeys.ytdlpBackendEnabled) ?? true;
   }
 
-  Map<String, String> _headers(String token) => {
+  Map<String, String> _headers(String token, {String? cookies, String? userAgent}) => {
         'Authorization': 'Bearer $token',
         'Accept': 'application/json',
+        if (cookies != null && cookies.isNotEmpty) 'X-YouTube-Cookies': cookies,
+        if (userAgent != null && userAgent.isNotEmpty) 'X-User-Agent': userAgent,
       };
 
   /// Checks server health, returning a map with version, proxy count, and latency in ms.
@@ -112,10 +135,13 @@ class XdmBackendService {
 
       final response = await _client
           .get(uri, headers: _headers(token))
-          .timeout(const Duration(seconds: 25));
+          .timeout(const Duration(seconds: 12));
 
       if (response.statusCode != 200) {
         debugPrint('[XDM_BACKEND] /api/streams returned status ${response.statusCode}: ${response.body}');
+        if (response.statusCode == 400 && response.body.contains('407')) {
+          throw const YtmException('YTM_PROXY_AUTH', 'XDM Backend proxy authentication failed (407)');
+        }
         return null;
       }
 
@@ -189,7 +215,7 @@ class XdmBackendService {
   }
 
   /// Extracts playlist tracks from [playlistUrl] via the yt-dlp backend.
-  Future<List<YtmTrack>> getPlaylist(String playlistUrl, {int limit = 100}) async {
+  Future<List<YtmTrack>> getPlaylist(String playlistUrl, {int limit = 100, String? cookies}) async {
     if (!await isEnabled()) return const [];
 
     try {
@@ -198,11 +224,11 @@ class XdmBackendService {
       final uri = Uri.parse('$baseUrl/api/playlist').replace(queryParameters: {'url': playlistUrl});
 
       final response = await _client
-          .get(uri, headers: _headers(token))
+          .get(uri, headers: _headers(token, cookies: cookies))
           .timeout(const Duration(seconds: 40));
 
       if (response.statusCode != 200) {
-        debugPrint('[XDM_BACKEND] /api/playlist returned status ${response.statusCode}');
+        debugPrint('[XDM_BACKEND] /api/playlist returned status ${response.statusCode}: ${response.body}');
         return const [];
       }
 

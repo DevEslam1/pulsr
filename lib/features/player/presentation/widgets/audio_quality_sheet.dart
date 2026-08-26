@@ -224,6 +224,52 @@ class AudioQualitySheet extends StatelessWidget {
 
                   const SizedBox(height: 16),
 
+                  // Hardware Route & USB DAC Card
+                  Builder(
+                    builder: (context) {
+                      final outputDevice = context.watch<SettingsCubit?>()?.state.currentOutputDevice;
+                      final isUsb = outputDevice?.isUsbDac == true;
+                      final isBitPerfect = outputDevice?.isBitPerfectActive == true;
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: isUsb
+                              ? const Color(0xFFFFD700).withValues(alpha: 0.08)
+                              : p.surfaceContainer,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isUsb
+                                ? const Color(0xFFFFD700).withValues(alpha: 0.35)
+                                : p.hairline,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              isUsb ? Icons.usb_rounded : Icons.headphones_rounded,
+                              color: isUsb ? const Color(0xFFFFD700) : activeColor,
+                              size: 18,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Hardware Output: ${outputDevice?.deviceName ?? "Default Audio"}${isBitPerfect ? " • Direct Bit-Perfect" : ""}',
+                                style: TextStyle(
+                                  color: p.textPrimary,
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 10),
+
                   // Playback Engine Pill
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -238,7 +284,7 @@ class AudioQualitySheet extends StatelessWidget {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'Render Engine: ExoPlayer Media3 • Hardware Offload PCM',
+                            'Render Engine: ${info.renderEngineDescription}',
                             style: TextStyle(
                               color: p.textPrimary,
                               fontSize: 11.5,

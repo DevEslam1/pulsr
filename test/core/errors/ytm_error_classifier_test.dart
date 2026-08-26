@@ -52,5 +52,25 @@ void main() {
       expect(info.message, contains('not available in this build'));
       expect(info.recoveryAction, equals(YtmRecoveryAction.none));
     });
+
+    test('classifies 403 Forbidden stream errors correctly', () {
+      final forbiddenErr = Exception('HTTP Status Error: 403');
+      final info = YtmErrorClassifier.classify(forbiddenErr);
+
+      expect(info.message, contains('blocked this stream'));
+      expect(info.recoveryAction, equals(YtmRecoveryAction.skipToNextTrack));
+    });
+
+    test('classifies 407 Proxy Authentication errors correctly', () {
+      final proxyErr = Exception('curl: (7) CONNECT tunnel failed, response 407');
+      final info = YtmErrorClassifier.classify(proxyErr);
+
+      expect(info.message, contains('proxy authentication'));
+      expect(info.recoveryAction, equals(YtmRecoveryAction.skipToNextTrack));
+
+      const proxyEx = YtmException('YTM_PROXY_AUTH');
+      final infoCode = YtmErrorClassifier.classify(proxyEx);
+      expect(infoCode.recoveryAction, equals(YtmRecoveryAction.skipToNextTrack));
+    });
   });
 }

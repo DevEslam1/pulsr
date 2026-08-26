@@ -36,6 +36,8 @@ class SongsTable extends Table {
   RealColumn get replayGainAlbum => real().nullable()();
   RealColumn get replayGainTrackPeak => real().nullable()();
   RealColumn get replayGainAlbumPeak => real().nullable()();
+  /// EBU R128 Loudness Range (LRA in LU) for dynamics awareness
+  RealColumn get loudnessRange => real().nullable()();
   IntColumn get playCount => integer().withDefault(const Constant(0))();
   IntColumn get lastPlayed => integer().nullable()();
   IntColumn get lastPositionMs => integer().withDefault(const Constant(0))();

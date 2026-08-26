@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../domain/models/lyrics_line.dart';
 
 class LyricsView extends StatefulWidget {
@@ -142,7 +143,7 @@ class _LyricsViewState extends State<LyricsView> {
               Icon(Icons.lyrics_outlined, size: 48, color: p.textTertiary),
               const SizedBox(height: 12),
               Text(
-                'No Lyrics Found',
+                context.l10n.noLyricsFound,
                 style: TextStyle(
                   color: p.textPrimary,
                   fontWeight: FontWeight.w800,

@@ -89,9 +89,9 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
         showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Playlist Imported', style: TextStyle(fontWeight: FontWeight.w800)),
+            title: Text(context.l10n.playlistImported, style: const TextStyle(fontWeight: FontWeight.w800)),
             content: Text('${importResult.matchedTrackCount} of ${importResult.totalExtractedPaths} tracks matched.'),
-            actions: [ElevatedButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
+            actions: [ElevatedButton(onPressed: () => Navigator.pop(ctx), child: Text(context.l10n.close))],
           ),
         );
       },
@@ -103,17 +103,17 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Add YouTube Playlist', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: Text(context.l10n.addYouTubePlaylist, style: const TextStyle(fontWeight: FontWeight.w800)),
         content: TextField(
           controller: controller,
           autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Playlist URL or ID',
+          decoration: InputDecoration(
+            hintText: context.l10n.pastePlaylistUrl,
             helperText: 'e.g. https://www.youtube.com/playlist?list=PLxxx',
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(context.l10n.cancel)),
           ElevatedButton(
             onPressed: () {
               final url = controller.text.trim();
@@ -122,7 +122,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                 cubit.fetchOnlinePlaylistByUrl(url);
               }
             },
-            child: const Text('Fetch'),
+            child: Text(context.l10n.confirm),
           ),
         ],
       ),
@@ -144,28 +144,28 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Playlists'),
+            title: Text(context.l10n.playlists),
             actions: [
               if (_selectedTab == _PlaylistTabMode.online) ...[
                 IconButton(
                   icon: const Icon(Icons.refresh_rounded),
-                  tooltip: 'Sync Online Library',
+                  tooltip: context.l10n.syncOnlineLibrary,
                   onPressed: () => cubit.autoFetchOnlineLibrary(force: true),
                 ),
                 IconButton(
                   icon: const Icon(Icons.add_link_rounded),
-                  tooltip: 'Add Playlist URL',
+                  tooltip: context.l10n.addPlaylistUrl,
                   onPressed: () => _showAddOnlinePlaylistDialog(context, cubit),
                 ),
               ] else ...[
                 IconButton(
                   icon: const Icon(Icons.file_upload_rounded),
-                  tooltip: 'Import M3U',
+                  tooltip: context.l10n.importM3u,
                   onPressed: () => _importPlaylist(context),
                 ),
                 IconButton(
                   icon: const Icon(Icons.add_rounded),
-                  tooltip: 'Create Playlist',
+                  tooltip: context.l10n.createPlaylist,
                   onPressed: () => _showCreateDialog(context, cubit),
                 ),
               ],
@@ -183,7 +183,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(
-                          content: Text('Rescan complete ($count songs found)'),
+                          content: Text(context.l10n.scanResult(count)),
                           duration: const Duration(seconds: 2),
                         ),
                       );
@@ -198,8 +198,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
                     child: _PlaylistHeroCard(
-                      title: 'Liked Songs',
-                      subtitle: 'Auto-populated from favorites',
+                      title: context.l10n.favorites,
+                      subtitle: context.l10n.likedTracks,
                       icon: Icons.favorite_rounded,
                       colors: [p.favorite, const Color(0xFFB0316B)],
                       onTap: () async {
@@ -216,7 +216,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                   Padding(
                     padding: EdgeInsets.only(left: Adaptive.pagePadding(context), top: 24, bottom: 10),
                     child: Text(
-                      'SMART PLAYLISTS',
+                      context.l10n.smartPlaylists.toUpperCase(),
                       style: Theme.of(context).textTheme.labelSmall?.copyWith(color: p.textTertiary),
                     ),
                   ),
@@ -234,7 +234,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                               Icon(Icons.auto_awesome_rounded, color: p.accent, size: 20),
                               const SizedBox(width: 10),
                               Text(
-                                'Create Smart Playlist',
+                                context.l10n.createSmartPlaylist,
                                 style: TextStyle(color: p.accent, fontWeight: FontWeight.w800, fontSize: 14),
                               ),
                             ],
@@ -260,7 +260,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                           final count = state.smartPlaylistCounts[pl.id] ?? 0;
                           return _PlaylistCard(
                             name: pl.name,
-                            subtitle: '$count tracks • Smart',
+                            subtitle: '${context.l10n.tracksCount(count)} • Smart',
                             icon: Icons.auto_awesome_rounded,
                             gradient: [p.accent.withValues(alpha: 0.65), p.accent.withValues(alpha: 0.25)],
                             onTap: () => context.push('/playlist', extra: pl),
@@ -276,7 +276,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          'YOUR PLAYLISTS',
+                          context.l10n.playlists.toUpperCase(),
                           style: Theme.of(context).textTheme.labelSmall?.copyWith(color: p.textTertiary),
                         ),
                       ],
@@ -296,16 +296,16 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                             EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           ),
                         ),
-                        segments: const [
+                        segments: [
                           ButtonSegment(
                             value: _PlaylistTabMode.local,
-                            label: Text('Local', style: TextStyle(fontWeight: FontWeight.w700)),
-                            icon: Icon(Icons.folder_rounded, size: 16),
+                            label: Text(context.l10n.local, style: const TextStyle(fontWeight: FontWeight.w700)),
+                            icon: const Icon(Icons.folder_rounded, size: 16),
                           ),
                           ButtonSegment(
                             value: _PlaylistTabMode.online,
-                            label: Text('Online', style: TextStyle(fontWeight: FontWeight.w700)),
-                            icon: Icon(Icons.cloud_rounded, size: 16),
+                            label: Text(context.l10n.online, style: const TextStyle(fontWeight: FontWeight.w700)),
+                            icon: const Icon(Icons.cloud_rounded, size: 16),
                           ),
                         ],
                         selected: {_selectedTab},
@@ -971,7 +971,15 @@ class _LikedMusicOnlineCard extends StatelessWidget {
     }
 
     return InkWell(
-      onTap: status == YtmFetchStatus.loading ? null : (status == YtmFetchStatus.done ? onPlay : onFetch),
+      onTap: status == YtmFetchStatus.loading
+          ? null
+          : (status == YtmFetchStatus.done
+              ? onPlay
+              : (error != null &&
+                      (error!.toLowerCase().contains('sign in') ||
+                          error!.toLowerCase().contains('expired'))
+                  ? () => YtmWebLoginSheet.show(context)
+                  : onFetch)),
       borderRadius: BorderRadius.circular(22),
       child: Container(
         padding: const EdgeInsets.all(20),

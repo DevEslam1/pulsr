@@ -1,7 +1,7 @@
 // lib/core/constants/audio_formats.dart
 
 class AudioFormats {
-  /// Audio file extensions reliably supported and playable on Android via ExoPlayer.
+  /// Audio file extensions reliably supported and playable on Android via ExoPlayer & Native DSD Decoder.
   static const Set<String> supportedExtensions = {
     'mp3',
     'm4a',
@@ -11,6 +11,8 @@ class AudioFormats {
     'ogg',
     'opus',
     'mka',
+    'dsf',
+    'dff',
   };
 
   /// Playable file extensions set (alias of supportedExtensions for playback compatibility).
@@ -19,8 +21,6 @@ class AudioFormats {
   /// Extensions excluded from library scanning due to lack of standard Android decoding support.
   static const Set<String> unsupportedExtensions = {
     'wma',
-    'dsf',
-    'dff',
   };
 
   static bool isSupportedExtension(String pathOrExt) {

@@ -63,6 +63,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var isDynamicsEnabled = false
     private var currentDynamicsPreset = "off"
     private var currentAudioSessionId = 0
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var volumeBoostRetryRunnable: Runnable? = null
 
     // Graphic EQ state. The EQ is a 10-band DynamicsProcessing postEq bound to the
     // same session as the dynamics compressor, so a single engine owns both.
@@ -71,6 +73,62 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var eqCenterFreqs = DEFAULT_EQ_FREQS.copyOf()
     private var eqBandGains = DoubleArray(DEFAULT_EQ_FREQS.size)
     private var eqPreampDb = 0.0
+
+    // Native DSP Engine states
+    private var isNativeDspLoaded = false
+    private var isCrossfeedEnabled = false
+    private var crossfeedDelayUs = 350.0
+    private var crossfeedFeedDb = -9.0
+
+    private var isLimiterEnabled = false
+    private var limiterLookaheadMs = 3.0
+    private var limiterThresholdDb = -0.2
+    private var limiterReleaseMs = 50.0
+
+    private var isReverbEnabled = false
+    private var reverbPreset = 0
+    private var reverbWetDry = 0.2f
+
+    private var stereoBalance = 0.0
+    private var monoMix = false
+
+    private var isSincResamplerEnabled = true
+
+    init {
+        try {
+            System.loadLibrary("pulsr_dsp")
+            isNativeDspLoaded = true
+            Log.i(TAG, "Native DSP engine loaded successfully")
+        } catch (e: UnsatisfiedLinkError) {
+            Log.w(TAG, "Failed to load native DSP library: ${e.message}")
+            isNativeDspLoaded = false
+        } catch (e: Exception) {
+            Log.w(TAG, "Error loading native DSP library: ${e.message}")
+            isNativeDspLoaded = false
+        }
+    }
+
+    // JNI Declarations
+    private external fun nativeSetSampleRate(sampleRate: Double)
+    private external fun nativeSetEqEnabled(enabled: Boolean)
+    private external fun nativeSetEqBandCount(count: Int)
+    private external fun nativeSetEqBand(index: Int, freq: Double, gainDb: Double, q: Double, type: Int, enabled: Boolean)
+    private external fun nativeSetEqPreamp(preampDb: Double)
+    private external fun nativeSetCrossfeedEnabled(enabled: Boolean)
+    private external fun nativeSetCrossfeedParams(delayUs: Double, feedDb: Double)
+    private external fun nativeSetLimiterEnabled(enabled: Boolean)
+    private external fun nativeSetLimiterParams(lookaheadMs: Double, thresholdDb: Double, releaseMs: Double)
+    private external fun nativeSetReverbEnabled(enabled: Boolean)
+    private external fun nativeSetReverbPreset(preset: Int)
+    private external fun nativeSetReverbWetDry(wetRatio: Float)
+    private external fun nativeLoadImpulseResponse(irSamples: FloatArray)
+    private external fun nativeSetStereoBalance(balance: Double)
+    private external fun nativeSetMonoMix(mono: Boolean)
+    private external fun nativeSetSincResamplerEnabled(enabled: Boolean)
+    private external fun nativeSetSincResamplerRates(inRate: Double, outRate: Double)
+    private external fun nativeProcessAudio(buffer: FloatArray, frames: Int, channels: Int)
+    private external fun nativeDecodeDsd(dsdL: ByteArray, dsdR: ByteArray, byteCount: Int, dsdRate: Int, targetPcmSampleRate: Int, bitOrder: Int): FloatArray?
+    private external fun nativeReset()
 
     companion object {
         const val TAG = "AudioEffectsPlugin"
@@ -83,6 +141,53 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             32.0, 64.0, 125.0, 250.0, 500.0, 1000.0, 2000.0, 4000.0, 8000.0, 16000.0
         )
         private var cachedSupportedEffects: Array<AudioEffect.Descriptor>? = null
+
+        private val DOLBY_PACKAGES = listOf(
+            "com.dolby.daxservice",
+            "com.dolby.daxappui",
+            "com.dolby",
+            "com.atmos.daxservice",
+            "com.motorola.dolby.dolbyui",
+            "com.lenovo.dolby"
+        )
+
+        private val XIAOMI_AUDIO_PACKAGES = listOf(
+            "com.miui.soundfx",
+            "com.xiaomi.misound",
+            "com.miui.audioeffect"
+        )
+
+        private val REALME_AUDIO_PACKAGES = listOf(
+            "com.realme.soundfx",
+            "com.oplus.soundfx",
+            "com.oneplus.soundfx"
+        )
+
+        private val SAMSUNG_AUDIO_PACKAGES = listOf(
+            "com.sec.android.app.soundalive",
+            "com.samsung.android.soundalive"
+        )
+
+        private val DIRAC_AUDIO_PACKAGES = listOf(
+            "com.dirac.audio",
+            "com.dirac.soundfx",
+            "com.dirac.acs"
+        )
+
+        private val DTS_AUDIO_PACKAGES = listOf(
+            "com.dts.dtsxultra",
+            "com.dts.freeform",
+            "com.dts.audio"
+        )
+
+        private val SONY_AUDIO_PACKAGES = listOf(
+            "com.sonyericsson.soundenhancement",
+            "com.sonymobile.soundenhancement"
+        )
+
+        private val ASUS_AUDIO_PACKAGES = listOf(
+            "com.asus.audiowizard"
+        )
 
         val DYNAMICS_PRESETS: Map<String, DynamicsPresetConfig> = mapOf(
             "studioPunch" to DynamicsPresetConfig(
@@ -239,8 +344,242 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 "setEqPreamp" -> {
-                    setEqPreampValue(call.argument<Double>("preampDb") ?: 0.0)
+                    val preampDb = call.argument<Double>("preampDb") ?: 0.0
+                    setEqPreampValue(preampDb)
+                    if (isNativeDspLoaded) {
+                        try { nativeSetEqPreamp(preampDb) } catch (_: Exception) {}
+                    }
                     result.success(true)
+                }
+
+                // Native DSP Parametric EQ Methods
+                "setNativeEqBand" -> {
+                    val index = call.argument<Int>("index") ?: 0
+                    val freq = call.argument<Double>("frequency") ?: 1000.0
+                    val gainDb = call.argument<Double>("gainDb") ?: 0.0
+                    val q = call.argument<Double>("q") ?: 1.0
+                    val type = call.argument<Int>("type") ?: 0
+                    val enabled = call.argument<Boolean>("enabled") ?: true
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetEqBand(index, freq, gainDb, q, type, enabled)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetEqBand failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                "setNativeEqBandCount" -> {
+                    val count = call.argument<Int>("count") ?: 10
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetEqBandCount(count)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetEqBandCount failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                "setNativeEqEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetEqEnabled(enabled)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetEqEnabled failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                // Headphone Crossfeed
+                "setCrossfeedEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    isCrossfeedEnabled = enabled
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetCrossfeedEnabled(enabled)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetCrossfeedEnabled failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                "setCrossfeedParams" -> {
+                    val delayUs = call.argument<Double>("delayUs") ?: 350.0
+                    val feedDb = call.argument<Double>("feedDb") ?: -9.0
+                    crossfeedDelayUs = delayUs
+                    crossfeedFeedDb = feedDb
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetCrossfeedParams(delayUs, feedDb)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetCrossfeedParams failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                // Lookahead Brickwall Limiter
+                "setLimiterEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    isLimiterEnabled = enabled
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetLimiterEnabled(enabled)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetLimiterEnabled failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                "setLimiterParams" -> {
+                    val lookaheadMs = call.argument<Double>("lookaheadMs") ?: 3.0
+                    val thresholdDb = call.argument<Double>("thresholdDb") ?: -0.2
+                    val releaseMs = call.argument<Double>("releaseMs") ?: 50.0
+                    limiterLookaheadMs = lookaheadMs
+                    limiterThresholdDb = thresholdDb
+                    limiterReleaseMs = releaseMs
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetLimiterParams(lookaheadMs, thresholdDb, releaseMs)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetLimiterParams failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                // Convolution Reverb
+                "setReverbEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    isReverbEnabled = enabled
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetReverbEnabled(enabled)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetReverbEnabled failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                "setReverbPreset" -> {
+                    val preset = call.argument<Int>("preset") ?: 0
+                    reverbPreset = preset
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetReverbPreset(preset)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetReverbPreset failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                "setReverbWetDry" -> {
+                    val wetRatio = (call.argument<Double>("wetRatio") ?: 0.2).toFloat()
+                    reverbWetDry = wetRatio
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetReverbWetDry(wetRatio)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetReverbWetDry failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                "loadImpulseResponse" -> {
+                    val irList = call.argument<List<Double>>("irSamples")
+                    if (irList != null && isNativeDspLoaded) {
+                        try {
+                            val floatArray = FloatArray(irList.size) { irList[it].toFloat() }
+                            nativeLoadImpulseResponse(floatArray)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeLoadImpulseResponse failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                // Stereo Balance & Mono Mix
+                "setStereoBalance" -> {
+                    val balance = call.argument<Double>("balance") ?: 0.0
+                    stereoBalance = balance
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetStereoBalance(balance)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetStereoBalance failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                "setMonoMix" -> {
+                    val mono = call.argument<Boolean>("mono") ?: false
+                    monoMix = mono
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetMonoMix(mono)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetMonoMix failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                // Sinc Resampler
+                "setSincResamplerEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: true
+                    isSincResamplerEnabled = enabled
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetSincResamplerEnabled(enabled)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetSincResamplerEnabled failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                "setSincResamplerRates" -> {
+                    val inRate = call.argument<Double>("inRate") ?: 44100.0
+                    val outRate = call.argument<Double>("outRate") ?: 48000.0
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetSincResamplerRates(inRate, outRate)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetSincResamplerRates failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                // DSD Decoding
+                "decodeDsd" -> {
+                    val dsdL = call.argument<ByteArray>("dsdL")
+                    val dsdR = call.argument<ByteArray>("dsdR")
+                    val byteCount = call.argument<Int>("byteCount") ?: (dsdL?.size ?: 0)
+                    val dsdRate = call.argument<Int>("dsdRate") ?: 64
+                    val targetRate = call.argument<Int>("targetSampleRate") ?: 176400
+                    val bitOrder = call.argument<Int>("bitOrder") ?: 0 // 0 = MSB (DSF), 1 = LSB (DFF)
+
+                    if (dsdL != null && dsdR != null && isNativeDspLoaded) {
+                        try {
+                            val pcmFloats = nativeDecodeDsd(dsdL, dsdR, byteCount, dsdRate, targetRate, bitOrder)
+                            result.success(pcmFloats?.toList())
+                        } catch (e: Exception) {
+                            result.error("DSD_DECODE_ERROR", e.message, null)
+                        }
+                    } else {
+                        result.success(null)
+                    }
                 }
 
                 "isDynamicsSupported" -> {
@@ -263,11 +602,26 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(true)
                 }
 
+                "hasActiveEffects" -> {
+                    result.success(hasActiveEffects())
+                }
+
+                "isOffloadAllowed" -> {
+                    result.success(!hasActiveEffects())
+                }
+
                 "getCapabilities" -> {
                     val dynamicsSupported = isEffectTypeSupported(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING)
                     val caps = mapOf(
-                        "hasEqualizer" to dynamicsSupported,
-                        "eqBandCount" to if (dynamicsSupported) eqBandCount else 0,
+                        "hasEqualizer" to (dynamicsSupported || isNativeDspLoaded),
+                        "hasNativeDsp" to isNativeDspLoaded,
+                        "hasNativeParametricEq" to isNativeDspLoaded,
+                        "hasCrossfeed" to isNativeDspLoaded,
+                        "hasLookaheadLimiter" to isNativeDspLoaded,
+                        "hasConvolutionReverb" to isNativeDspLoaded,
+                        "hasSincResampler" to isNativeDspLoaded,
+                        "hasDsdDecoder" to isNativeDspLoaded,
+                        "eqBandCount" to if (isNativeDspLoaded) 32 else (if (dynamicsSupported) eqBandCount else 0),
                         "eqCenterFrequencies" to eqCenterFreqs.toList(),
                         "hasAudioEffects" to true,
                         "hasTagEditor" to true,
@@ -277,13 +631,27 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         "isVolumeBoostSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_LOUDNESS_ENHANCER),
                         "isBassBoostSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_BASS_BOOST),
                         "isDynamicsSupported" to dynamicsSupported,
-                        "isVirtualizerSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_VIRTUALIZER)
+                        "isVirtualizerSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_VIRTUALIZER),
+                        "isFloatOutputSupported" to (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP),
+                        "isHardwareOffloadSupported" to (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
                     )
                     result.success(caps)
                 }
 
+                "detectOemAudio" -> {
+                    val ctx = context
+                    if (ctx != null) {
+                        result.success(detectOemAudioProcessing(ctx))
+                    } else {
+                        result.success(mapOf("hasOemAudio" to false, "detectedEngines" to emptyList<String>()))
+                    }
+                }
+
                 "releaseEffects" -> {
                     releaseEffects()
+                    if (isNativeDspLoaded) {
+                        try { nativeReset() } catch (_: Exception) {}
+                    }
                     result.success(true)
                 }
 
@@ -342,7 +710,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 loudnessEnhancer?.enabled = volumeBoostMilliBels > 0
             } catch (e: Exception) {
                 Log.w(TAG, "LoudnessEnhancer init failed, retrying in 500ms: ${e.message}")
-                Handler(Looper.getMainLooper()).postDelayed({
+                volumeBoostRetryRunnable?.let { mainHandler.removeCallbacks(it) }
+                val runnable = Runnable {
                     try {
                         if (loudnessEnhancer == null && currentAudioSessionId != 0) {
                             loudnessEnhancer = LoudnessEnhancer(currentAudioSessionId)
@@ -354,7 +723,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     } catch (e2: Exception) {
                         Log.e(TAG, "LoudnessEnhancer retry failed: ${e2.message}")
                     }
-                }, 500)
+                }
+                volumeBoostRetryRunnable = runnable
+                mainHandler.postDelayed(runnable, 500)
             }
         }
     }
@@ -520,9 +891,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private fun setEqBandsLayout(freqs: List<Double>?) {
         if (freqs != null && freqs.isNotEmpty()) {
+            val oldBandCount = eqBandCount
             eqCenterFreqs = DoubleArray(freqs.size) { freqs[it] }
             eqBandCount = freqs.size
             if (eqBandGains.size != eqBandCount) eqBandGains = DoubleArray(eqBandCount)
+            if (oldBandCount == eqBandCount && dynamicsProcessing != null) {
+                updateEqInPlace()
+                return
+            }
         }
         // Band count change requires engine rebuild
         buildDynamicsProcessing()
@@ -635,12 +1011,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 val audioManager = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
                 val spatializer = audioManager?.spatializer
                 if (spatializer != null && spatializer.isAvailable) {
-                    // Hardware Spatializer detected; engage virtualizer supplement for wider staging
-                    setVirtualizerState(enabled)
-                    if (enabled && virtualizerStrength <= 0) {
-                        setVirtualizerStrengthValue(600)
+                    try {
+                        val setEnabledMethod = spatializer.javaClass.getMethod("setEnabled", Boolean::class.javaPrimitiveType)
+                        setEnabledMethod.invoke(spatializer, enabled)
+                    } catch (_: Exception) {
+                        // Some OEM ROMs or API revisions might not expose setEnabled directly
                     }
-                    return
+                    Log.i(TAG, "Hardware Spatializer ${if (enabled) "enabled" else "disabled"}")
+                    return  // Don't fall through to virtualizer
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Spatializer hardware check failed, falling back: ${e.message}")
@@ -689,6 +1067,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     fun releaseEffects() {
+        volumeBoostRetryRunnable?.let {
+            mainHandler.removeCallbacks(it)
+            volumeBoostRetryRunnable = null
+        }
         try {
             virtualizer?.enabled = false
             virtualizer?.release()
@@ -723,6 +1105,19 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         cachedSupportedEffects = null
     }
 
+    fun hasActiveEffects(): Boolean {
+        return isEqEnabled ||
+                (isDynamicsEnabled && currentDynamicsPreset != "off") ||
+                (isVirtualizerEnabled && virtualizerStrength > 0) ||
+                (volumeBoostMilliBels > 0) ||
+                (bassBoostStrength > 0) ||
+                isCrossfeedEnabled ||
+                isLimiterEnabled ||
+                isReverbEnabled ||
+                (Math.abs(stereoBalance) > 0.001) ||
+                monoMix
+    }
+
     private fun isEffectTypeSupported(effectType: UUID): Boolean {
         return try {
             val effects = cachedSupportedEffects ?: AudioEffect.queryEffects()?.also {
@@ -733,5 +1128,60 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             Log.w(TAG, "Effect support query failed: ${e.message}")
             false
         }
+    }
+
+    private fun detectOemAudioProcessing(ctx: Context): Map<String, Any> {
+        val pm = ctx.packageManager
+        val detected = mutableListOf<String>()
+
+        fun checkPackages(packages: List<String>, label: String) {
+            for (pkg in packages) {
+                try {
+                    val appInfo = pm.getApplicationInfo(pkg, 0)
+                    if (appInfo.enabled) {
+                        if (!detected.contains(label)) {
+                            detected.add(label)
+                        }
+                        break
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+
+        checkPackages(DOLBY_PACKAGES, "Dolby Atmos")
+        checkPackages(XIAOMI_AUDIO_PACKAGES, "Xiaomi Sound")
+        checkPackages(REALME_AUDIO_PACKAGES, "Realme / OPPO Sound")
+        checkPackages(SAMSUNG_AUDIO_PACKAGES, "Samsung SoundAlive")
+        checkPackages(DIRAC_AUDIO_PACKAGES, "Dirac Audio")
+        checkPackages(DTS_AUDIO_PACKAGES, "DTS Audio")
+        checkPackages(SONY_AUDIO_PACKAGES, "Sony DSEE / Sound Enhancement")
+        checkPackages(ASUS_AUDIO_PACKAGES, "Asus AudioWizard")
+
+        // Also query system audio effect descriptors for OEM effects
+        try {
+            val effects = AudioEffect.queryEffects()
+            if (effects != null) {
+                for (desc in effects) {
+                    val name = desc.name?.lowercase() ?: ""
+                    val implementor = desc.implementor?.lowercase() ?: ""
+                    if ((name.contains("dolby") || implementor.contains("dolby")) && !detected.contains("Dolby Atmos")) {
+                        detected.add("Dolby Atmos")
+                    } else if ((name.contains("dirac") || implementor.contains("dirac")) && !detected.contains("Dirac Audio")) {
+                        detected.add("Dirac Audio")
+                    } else if ((name.contains("dts") || implementor.contains("dts")) && !detected.contains("DTS Audio")) {
+                        detected.add("DTS Audio")
+                    } else if ((name.contains("soundalive") || implementor.contains("samsung")) && !detected.contains("Samsung SoundAlive")) {
+                        detected.add("Samsung SoundAlive")
+                    } else if ((name.contains("misound") || name.contains("miui")) && !detected.contains("Xiaomi Sound")) {
+                        detected.add("Xiaomi Sound")
+                    }
+                }
+            }
+        } catch (_: Exception) {}
+
+        return mapOf(
+            "hasOemAudio" to detected.isNotEmpty(),
+            "detectedEngines" to detected
+        )
     }
 }

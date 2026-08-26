@@ -8,6 +8,7 @@ import '../../../core/constants/app_radii.dart';
 import '../../../core/network/proxy_config.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
 
@@ -38,14 +39,21 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
   @override
   void initState() {
     super.initState();
-    final state = context.read<SettingsCubit>().state;
+    final cubit = context.read<SettingsCubit>();
+    final state = cubit.state;
     _enabled = state.proxyEnabled;
     _type = state.proxyType;
     _hostController = TextEditingController(text: state.proxyHost);
     _portController = TextEditingController(text: state.proxyPort.toString());
     _usernameController = TextEditingController(text: state.proxyUsername);
-    _passwordController = TextEditingController(text: state.proxyPassword);
+    _passwordController = TextEditingController();
     _bypassController = TextEditingController(text: state.proxyBypassHosts);
+
+    cubit.getProxyPassword().then((pw) {
+      if (mounted && _passwordController.text.isEmpty && pw.isNotEmpty) {
+        _passwordController.text = pw;
+      }
+    });
 
     if (widget.initialImportText != null && widget.initialImportText!.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -75,9 +83,6 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
     }
     if (_usernameController.text != state.proxyUsername) {
       _usernameController.text = state.proxyUsername;
-    }
-    if (_passwordController.text != state.proxyPassword) {
-      _passwordController.text = state.proxyPassword;
     }
     if (_bypassController.text != state.proxyBypassHosts) {
       _bypassController.text = state.proxyBypassHosts;
@@ -400,7 +405,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
               onPressed: () => Navigator.of(context).pop(),
             ),
             title: Text(
-              'Proxy Settings',
+              context.l10n.proxySettings,
               style: TextStyle(
                 color: p.textPrimary,
                 fontWeight: FontWeight.w700,
@@ -426,7 +431,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   ),
                   icon: const Icon(Icons.check_rounded, size: 16),
-                  label: const Text('Save', style: TextStyle(fontWeight: FontWeight.w700)),
+                  label: Text(context.l10n.save, style: const TextStyle(fontWeight: FontWeight.w700)),
                 ),
               ),
             ],

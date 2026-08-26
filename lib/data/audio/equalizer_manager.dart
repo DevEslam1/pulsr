@@ -33,6 +33,23 @@ class EqualizerManager {
 
   bool isSpatializerEnabled = false;
 
+  // Tier 1 & Tier 2 & Tier 3 Native DSP features
+  bool isCrossfeedEnabled = false;
+  double crossfeedDelayUs = 350.0; // 200 - 700 us
+  double crossfeedFeedDb = -9.0;   // -15 to -6 dB
+
+  bool isLimiterEnabled = false;
+  double limiterThresholdDb = -0.2;
+  double limiterReleaseMs = 50.0;
+
+  bool isReverbEnabled = false;
+  int reverbPreset = 0; // 0=Studio, 1=Concert Hall, 2=Warm Tube, 3=Plate
+  double reverbWetDry = 0.20;
+
+  double stereoBalance = 0.0; // -1.0 to +1.0
+  bool monoMix = false;
+  bool isSincResamplerEnabled = true;
+
   HeadphoneProfile? selectedHeadphoneProfile;
 
   List<double> customFrequencies = List.from(EqPreset.centerFrequencies);
@@ -98,6 +115,10 @@ class EqualizerManager {
         }
       }
 
+      if (gains.length != customFrequencies.length) {
+        gains = List<double>.filled(customFrequencies.length, 0.0);
+      }
+
       currentPreset = EqPreset(name: presetName, gains: gains, bassBoost: bass);
 
       isVirtualizerEnabled = prefs.getBool(PrefsKeys.eqVirtualizerEnabled) ?? false;
@@ -112,6 +133,23 @@ class EqualizerManager {
       _isDynamicsBypassed = prefs.getBool(PrefsKeys.eqDynamicsBypassed) ?? false;
 
       isSpatializerEnabled = prefs.getBool(PrefsKeys.eqSpatializerEnabled) ?? false;
+
+      // Native DSP preferences
+      isCrossfeedEnabled = prefs.getBool(PrefsKeys.crossfeedEnabled) ?? false;
+      crossfeedDelayUs = prefs.getDouble(PrefsKeys.crossfeedDelayUs) ?? 350.0;
+      crossfeedFeedDb = prefs.getDouble(PrefsKeys.crossfeedFeedDb) ?? -9.0;
+
+      isLimiterEnabled = prefs.getBool(PrefsKeys.lookaheadLimiterEnabled) ?? false;
+      limiterThresholdDb = prefs.getDouble(PrefsKeys.lookaheadLimiterThresholdDb) ?? -0.2;
+      limiterReleaseMs = prefs.getDouble(PrefsKeys.lookaheadLimiterReleaseMs) ?? 50.0;
+
+      isReverbEnabled = prefs.getBool(PrefsKeys.convolutionReverbEnabled) ?? false;
+      reverbPreset = prefs.getInt(PrefsKeys.convolutionReverbPreset) ?? 0;
+      reverbWetDry = prefs.getDouble(PrefsKeys.convolutionReverbWetDry) ?? 0.20;
+
+      stereoBalance = prefs.getDouble(PrefsKeys.stereoBalance) ?? 0.0;
+      monoMix = prefs.getBool(PrefsKeys.monoMix) ?? false;
+      isSincResamplerEnabled = prefs.getBool(PrefsKeys.sincResamplerEnabled) ?? true;
 
       final profileId = prefs.getString(PrefsKeys.eqHeadphoneProfileId);
       if (profileId != null) {
@@ -150,6 +188,28 @@ class EqualizerManager {
         if (isSpatializerEnabled) {
           await setSpatializerEnabled(true);
         }
+
+        // e. Apply Native DSP features
+        if (isCrossfeedEnabled) {
+          await _effectsChannel.setCrossfeedParams(crossfeedDelayUs, crossfeedFeedDb);
+          await _effectsChannel.setCrossfeedEnabled(true);
+        }
+        if (isLimiterEnabled) {
+          await _effectsChannel.setLimiterParams(3.0, limiterThresholdDb, limiterReleaseMs);
+          await _effectsChannel.setLimiterEnabled(true);
+        }
+        if (isReverbEnabled) {
+          await _effectsChannel.setReverbPreset(reverbPreset);
+          await _effectsChannel.setReverbWetDry(reverbWetDry);
+          await _effectsChannel.setReverbEnabled(true);
+        }
+        if (stereoBalance.abs() > 0.001) {
+          await _effectsChannel.setStereoBalance(stereoBalance);
+        }
+        if (monoMix) {
+          await _effectsChannel.setMonoMix(true);
+        }
+        await _effectsChannel.setSincResamplerEnabled(isSincResamplerEnabled);
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to restore equalizer preferences', error: e, stackTrace: st, category: 'EqualizerManager');
@@ -170,6 +230,21 @@ class EqualizerManager {
       await prefs.setBool(PrefsKeys.eqDynamicsEnabled, isDynamicsEnabled);
       await prefs.setBool(PrefsKeys.eqDynamicsBypassed, _isDynamicsBypassed);
       await prefs.setBool(PrefsKeys.eqSpatializerEnabled, isSpatializerEnabled);
+
+      // Save Native DSP settings
+      await prefs.setBool(PrefsKeys.crossfeedEnabled, isCrossfeedEnabled);
+      await prefs.setDouble(PrefsKeys.crossfeedDelayUs, crossfeedDelayUs);
+      await prefs.setDouble(PrefsKeys.crossfeedFeedDb, crossfeedFeedDb);
+      await prefs.setBool(PrefsKeys.lookaheadLimiterEnabled, isLimiterEnabled);
+      await prefs.setDouble(PrefsKeys.lookaheadLimiterThresholdDb, limiterThresholdDb);
+      await prefs.setDouble(PrefsKeys.lookaheadLimiterReleaseMs, limiterReleaseMs);
+      await prefs.setBool(PrefsKeys.convolutionReverbEnabled, isReverbEnabled);
+      await prefs.setInt(PrefsKeys.convolutionReverbPreset, reverbPreset);
+      await prefs.setDouble(PrefsKeys.convolutionReverbWetDry, reverbWetDry);
+      await prefs.setDouble(PrefsKeys.stereoBalance, stereoBalance);
+      await prefs.setBool(PrefsKeys.monoMix, monoMix);
+      await prefs.setBool(PrefsKeys.sincResamplerEnabled, isSincResamplerEnabled);
+
       if (selectedHeadphoneProfile != null) {
         await prefs.setString(PrefsKeys.eqHeadphoneProfileId, selectedHeadphoneProfile!.id);
       } else {
@@ -401,5 +476,78 @@ class EqualizerManager {
       isSpatializerEnabled = previous;
       ErrorLogger.log('Failed to set spatializer enabled', error: e, stackTrace: st, category: 'EqualizerManager');
     }
+  }
+
+  bool get hasOemAudio => _effectsChannel.hasOemAudio;
+  List<String> get detectedOemEngines => _effectsChannel.detectedOemEngines;
+
+  // --- NATIVE DSP SETTERS ---
+
+  Future<void> setCrossfeed(bool enabled, {double? delayUs, double? feedDb}) async {
+    isCrossfeedEnabled = enabled;
+    if (delayUs != null) crossfeedDelayUs = delayUs;
+    if (feedDb != null) crossfeedFeedDb = feedDb;
+    if (Platform.isAndroid) {
+      await _effectsChannel.setCrossfeedParams(crossfeedDelayUs, crossfeedFeedDb);
+      await _effectsChannel.setCrossfeedEnabled(enabled);
+    }
+    _debouncedSavePreferences();
+  }
+
+  Future<void> setLookaheadLimiter(bool enabled, {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {
+    isLimiterEnabled = enabled;
+    if (thresholdDb != null) limiterThresholdDb = thresholdDb;
+    if (releaseMs != null) limiterReleaseMs = releaseMs;
+    if (Platform.isAndroid) {
+      await _effectsChannel.setLimiterParams(lookaheadMs ?? 3.0, limiterThresholdDb, limiterReleaseMs);
+      await _effectsChannel.setLimiterEnabled(enabled);
+    }
+    _debouncedSavePreferences();
+  }
+
+  Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {
+    isReverbEnabled = enabled;
+    if (preset != null) reverbPreset = preset;
+    if (wetDry != null) reverbWetDry = wetDry;
+    if (Platform.isAndroid) {
+      if (preset != null) await _effectsChannel.setReverbPreset(preset);
+      if (wetDry != null) await _effectsChannel.setReverbWetDry(wetDry);
+      await _effectsChannel.setReverbEnabled(enabled);
+    }
+    _debouncedSavePreferences();
+  }
+
+  Future<void> loadCustomImpulseResponse(List<double> irSamples) async {
+    if (Platform.isAndroid) {
+      await _effectsChannel.loadImpulseResponse(irSamples);
+      isReverbEnabled = true;
+      reverbPreset = 4; // Custom
+      await _effectsChannel.setReverbEnabled(true);
+    }
+    _debouncedSavePreferences();
+  }
+
+  Future<void> setStereoBalance(double balance) async {
+    stereoBalance = balance.clamp(-1.0, 1.0);
+    if (Platform.isAndroid) {
+      await _effectsChannel.setStereoBalance(stereoBalance);
+    }
+    _debouncedSavePreferences();
+  }
+
+  Future<void> setMonoMix(bool mono) async {
+    monoMix = mono;
+    if (Platform.isAndroid) {
+      await _effectsChannel.setMonoMix(mono);
+    }
+    _debouncedSavePreferences();
+  }
+
+  Future<void> setSincResampler(bool enabled) async {
+    isSincResamplerEnabled = enabled;
+    if (Platform.isAndroid) {
+      await _effectsChannel.setSincResamplerEnabled(enabled);
+    }
+    _debouncedSavePreferences();
   }
 }

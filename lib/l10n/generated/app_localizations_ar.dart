@@ -45,7 +45,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get recentlyPlayed => 'تم تشغيله مؤخرًا';
 
   @override
-  String get recentlyAdded => 'المضاف حديثًا';
+  String get recentlyAdded => 'أضيف مؤخراً';
 
   @override
   String get favorites => 'المفضلة';
@@ -390,7 +390,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sampleRate => 'معدل العينة';
 
   @override
-  String get fileSize => 'الحجم';
+  String get fileSize => 'حجم الملف';
 
   @override
   String get settings => 'الإعدادات';
@@ -776,4 +776,392 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get unknownGenre => 'نوع غير معروف';
+
+  @override
+  String get localMusic => 'الموسيقى المحلية';
+
+  @override
+  String get onlineStream => 'البث المباشر';
+
+  @override
+  String get likedTracks => 'المقاطع المفضلة';
+
+  @override
+  String get autoMix => 'مزيج تلقائي';
+
+  @override
+  String get topPlayedTracks => 'الأكثر استماعًا';
+
+  @override
+  String get audioAndPlayback => 'الصوت والتشغيل';
+
+  @override
+  String get equalizerAndSoundEffects => 'معادل الصوت والتأثيرات';
+
+  @override
+  String get themeAndAppearance => 'المظهر والسمة';
+
+  @override
+  String get accentColor => 'اللون المميز';
+
+  @override
+  String get nowPlayingTheme => 'نمط شاشة التشغيل';
+
+  @override
+  String get colorSource => 'مصدر الألوان';
+
+  @override
+  String get gestures => 'الإيماءات';
+
+  @override
+  String get miniPlayerSwipeLeft => 'سحب المشغل الصغير لليسار';
+
+  @override
+  String get miniPlayerSwipeRight => 'سحب المشغل الصغير لليمين';
+
+  @override
+  String get nowPlayingDoubleTap => 'النقر المزدوج في المشغل';
+
+  @override
+  String get artworkSwipe => 'سحب صورة الألبوم';
+
+  @override
+  String get libraryAndScanning => 'المكتبة والفحص';
+
+  @override
+  String get hiddenAndExcludedFolders => 'المجلدات المخفية والمستبعدة';
+
+  @override
+  String get shortAudioFilter => 'تصفية المقاطع الصوتية القصيرة';
+
+  @override
+  String get filterShortAudio => 'تصفية الصوت القصير';
+
+  @override
+  String excludeTracksUnder(int seconds) {
+    return 'استبعاد المقاطع الأقل من $seconds ثانية (لتصفية الملاحظات الصوتية):';
+  }
+
+  @override
+  String ignoreFilesUnder(int seconds) {
+    return 'تجاهل الملفات الأقل من $seconds ثانية';
+  }
+
+  @override
+  String get youtubeMusicAndOnline => 'يوتيوب ميوزك وعبر الإنترنت';
+
+  @override
+  String get connectYtmAccount => 'ربط حساب يوتيوب ميوزك';
+
+  @override
+  String get connectYtmSubtitle =>
+      'سجّل الدخول للمزامنة التلقائية لمكتبة أغانيك المفضلة';
+
+  @override
+  String get ytmConnected => 'تم ربط يوتيوب ميوزك';
+
+  @override
+  String get openYtmWeb => 'فتح موقع يوتيوب ميوزك';
+
+  @override
+  String get openYtmWebSubtitle => 'تصفح المشغل وقوائم الأغاني والتريندات';
+
+  @override
+  String get offlineOnlyMode => 'وضع عدم الاتصال فقط';
+
+  @override
+  String get offlineOnlySubtitle => 'تعطيل ميزات الإنترنت والبث والبحث';
+
+  @override
+  String get wifiOnlyMode => 'وضع الواي فاي فقط';
+
+  @override
+  String get wifiOnlySubtitle => 'البث والتحميل عبر شبكة Wi-Fi فقط';
+
+  @override
+  String get searchYtm => 'بحث في يوتيوب ميوزك';
+
+  @override
+  String get searchYtmSubtitle => 'بحث واستماع وتحميل الأغاني';
+
+  @override
+  String get streamingQuality => 'جودة البث';
+
+  @override
+  String get downloadQuality => 'جودة التحميل';
+
+  @override
+  String get extractionEngine => 'محرك الاستخراج';
+
+  @override
+  String get ytdlpConfig => 'إعدادات خادم yt-dlp';
+
+  @override
+  String get storageAndCache => 'التخزين والذاكرة المؤقتة';
+
+  @override
+  String get privacyAndData => 'الخصوصية والبيانات';
+
+  @override
+  String get privacyGuaranteeSubtitle =>
+      '١٠٠٪ بدون اتصال. بدون تتبع، وبدون تليميتري.';
+
+  @override
+  String get aboutAppSubtitle => 'الإصدار 1.0.0 • صوت نقي بدون اتصال';
+
+  @override
+  String get signIn => 'تسجيل الدخول';
+
+  @override
+  String get lastSyncedJustNow => 'آخر مزامنة: الآن';
+
+  @override
+  String lastSyncedMinutesAgo(int minutes) {
+    return 'آخر مزامنة: منذ $minutes دقيقة';
+  }
+
+  @override
+  String lastSyncedHoursAgo(int hours) {
+    return 'آخر مزامنة: منذ $hours ساعة';
+  }
+
+  @override
+  String get connectedReadyToSync => 'متصل • جاهز للمزامنة';
+
+  @override
+  String get downloaded => 'تم تنزيلها';
+
+  @override
+  String get exploreOnlineMusic => 'استكشف الموسيقى عبر الإنترنت';
+
+  @override
+  String get noDownloadsYet => 'لا توجد تنزيلات بعد';
+
+  @override
+  String get noDownloadsSubtitle =>
+      'قم بتنزيل أغانيك المفضلة من يوتيوب ميوزك للاستماع دون اتصال في أي مكان.';
+
+  @override
+  String get offlineDownloads => 'التنزيلات دون اتصال';
+
+  @override
+  String get local => 'محلي';
+
+  @override
+  String get online => 'عبر الإنترنت';
+
+  @override
+  String get syncYouTubeMusic => 'مزامنة يوتيوب ميوزك';
+
+  @override
+  String get importByPlaylistLink => 'استيراد برابط قائمة تشغيل';
+
+  @override
+  String get noLocalFavorites => 'لا توجد مفضلات محلية';
+
+  @override
+  String get noLocalFavoritesSubtitle =>
+      'اضغط على أيقونة القلب على أي مقطع محلي لإضافته هنا.';
+
+  @override
+  String get noOnlineFavorites => 'لا توجد مفضلات عبر الإنترنت';
+
+  @override
+  String get scanStorage => 'فحص وحدة التخزين';
+
+  @override
+  String get noFoldersFound => 'لم يتم العثور على مجلدات';
+
+  @override
+  String get noFoldersSubtitle =>
+      'افحص وحدة التخزين لاكتشاف مجلدات الموسيقى وتنظيمها حسب المسار.';
+
+  @override
+  String get playNext => 'تشغيل التالي';
+
+  @override
+  String get favorite => 'تفضيل';
+
+  @override
+  String get all => 'الكل';
+
+  @override
+  String get importM3u => 'استيراد M3U';
+
+  @override
+  String get syncOnlineLibrary => 'مزامنة المكتبة عبر الإنترنت';
+
+  @override
+  String get addPlaylistUrl => 'إضافة رابط قائمة تشغيل';
+
+  @override
+  String get addYouTubePlaylist => 'إضافة قائمة تشغيل يوتيوب';
+
+  @override
+  String get playlistImported => 'تم استيراد قائمة التشغيل';
+
+  @override
+  String tracksMatched(int matched, int total) {
+    return 'تمت مطابقة $matched من أصل $total مسار.';
+  }
+
+  @override
+  String get fetch => 'جلب';
+
+  @override
+  String get ok => 'حسناً';
+
+  @override
+  String tracksCountPlural(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'مسار',
+      many: 'مساراً',
+      few: 'مسارات',
+      two: 'مساران',
+      one: 'مسار',
+      zero: 'مسار',
+    );
+    return '$count $_temp0';
+  }
+
+  @override
+  String get noTrackSelected => 'لم يتم تحديد أي مقطع';
+
+  @override
+  String get playbackSpeed => 'سرعة التشغيل';
+
+  @override
+  String get vinylCircle => 'قرص الفينيل';
+
+  @override
+  String get sortAndFilter => 'الترتيب والتصفية';
+
+  @override
+  String get title => 'العنوان';
+
+  @override
+  String get duration => 'المدة';
+
+  @override
+  String get qualityAndCodec => 'الجودة والترميز';
+
+  @override
+  String get audioFormat => 'تنسيق الصوت';
+
+  @override
+  String get channels => 'القنوات';
+
+  @override
+  String get playCount => 'عدد مرات التشغيل';
+
+  @override
+  String get ringtone => 'نغمة رنين';
+
+  @override
+  String get editTags => 'تعديل الوسوم';
+
+  @override
+  String get setAudioAs => 'تعيين الصوت كـ';
+
+  @override
+  String get phoneRingtone => 'نغمة رنين للهاتف';
+
+  @override
+  String get notificationSound => 'صوت الإشعار';
+
+  @override
+  String get alarmSound => 'صوت المنبه';
+
+  @override
+  String get turnOff => 'إيقاف';
+
+  @override
+  String get presets => 'خيارات جاهزة';
+
+  @override
+  String get customTime => 'وقت مخصص';
+
+  @override
+  String get stopAtSpecificTime => 'إيقاف في وقت محدد';
+
+  @override
+  String currentSpeed(String speed) {
+    return 'السرعة الحالية: $speed';
+  }
+
+  @override
+  String addedTo(String name) {
+    return 'تمت الإضافة إلى $name';
+  }
+
+  @override
+  String playCountTimes(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'مرة',
+      many: 'مرة',
+      few: 'مرات',
+      two: 'مرتان',
+      one: 'مرة واحدة',
+      zero: 'مرة',
+    );
+    return '$count $_temp0';
+  }
+
+  @override
+  String get pastePlaylistUrl => 'الصق رابط أو معرف قائمة تشغيل يوتيوب';
+
+  @override
+  String get hideCustomFolder => 'إخفاء مجلد مخصص';
+
+  @override
+  String get hideFolderDesc =>
+      'أدخل المسار الكامل للدليل الذي تريد إخفاءه من مكتبة الموسيقى الخاصة بك:';
+
+  @override
+  String get hideFolder => 'إخفاء المجلد';
+
+  @override
+  String get confirmRestore => 'تأكيد الاستعادة';
+
+  @override
+  String get confirmRestoreDesc =>
+      'هل أنت متأكد من رغبتك في استعادة بيانات النسخة الاحتياطية من هذا الملف؟';
+
+  @override
+  String get existingLibraryUpdateNotice =>
+      'سيتم تحديث المسارات المطابقة في المكتبة الحالية.';
+
+  @override
+  String get audioVisualizerPermission => 'إذن المؤثرات البصرية للصوت';
+
+  @override
+  String get audioVisualizerPermissionDesc =>
+      'يقرأ المؤثر البصري إخراج الصوت وليس الميكروفون. يتطلب نظام أندرويد إذن تسجيل الصوت لمعالجة بيانات التردد.';
+
+  @override
+  String get useSimulation => 'استخدام المحاكاة';
+
+  @override
+  String get visualizerSimulationNotice =>
+      'تم رفض إذن المؤثر البصري — يتم عرض رسم متحرك محاكى بدلاً من ذلك.';
+
+  @override
+  String get ytmAccount => 'حساب YouTube Music';
+
+  @override
+  String get disconnect => 'قطع الاتصال';
+
+  @override
+  String get openWebPlayer => 'فتح مشغل الويب';
+
+  @override
+  String get ytdlpServerConfig => 'إعدادات خادم yt-dlp';
+
+  @override
+  String get ytdlpServerDesc =>
+      'يربط التطبيق بخادم yt-dlp خارجي بوكلاء متناوبين لتجاوز حظر يوتيوب.';
 }

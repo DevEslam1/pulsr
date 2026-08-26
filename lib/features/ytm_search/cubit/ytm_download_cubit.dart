@@ -13,9 +13,16 @@ enum YtDownloadStatus { idle, queued, running, done, failed, canceled }
 class YtDownloadItem {
   final YtDownloadStatus status;
   final double? progress;
+  final double? speedKbps;
+  final int? etaSeconds;
   final String? error;
-  const YtDownloadItem(
-      {this.status = YtDownloadStatus.idle, this.progress, this.error});
+  const YtDownloadItem({
+    this.status = YtDownloadStatus.idle,
+    this.progress,
+    this.speedKbps,
+    this.etaSeconds,
+    this.error,
+  });
 
   Map<String, dynamic> toJson() => {'status': status.name, 'error': error};
   factory YtDownloadItem.fromJson(Map<String, dynamic> json) {
@@ -42,6 +49,7 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
   final PlayerCubit _playerCubit;
 
   Timer? _saveDebounce; // ⚡ FIX: Debounce timer for I/O operations
+  final Map<String, int> _lastEmitTimeByVideoId = {};
 
   YtmDownloadCubit(this._service, this._playerCubit)
       : super(const YtmDownloadState()) {
@@ -54,8 +62,14 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
       final jsonStr = prefs.getString(_prefKey);
       if (jsonStr != null && jsonStr.isNotEmpty) {
         final rawMap = jsonDecode(jsonStr) as Map<String, dynamic>;
-        final restored = rawMap.map((k, v) =>
-            MapEntry(k, YtDownloadItem.fromJson(v as Map<String, dynamic>)));
+        final restored = rawMap.map((k, v) {
+          final item = YtDownloadItem.fromJson(v as Map<String, dynamic>);
+          final cleanItem = (item.status == YtDownloadStatus.running ||
+                  item.status == YtDownloadStatus.queued)
+              ? const YtDownloadItem(status: YtDownloadStatus.idle)
+              : item;
+          return MapEntry(k, cleanItem);
+        });
         if (!isClosed) emit(YtmDownloadState(items: restored));
       }
     } catch (_) {}
@@ -104,6 +118,10 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
                 : YtDownloadStatus.running,
             progress:
                 p.stage == YtDownloadStage.downloading ? p.fraction : null,
+            speedKbps:
+                p.stage == YtDownloadStage.downloading ? p.speedKbps : null,
+            etaSeconds:
+                p.stage == YtDownloadStage.downloading ? p.etaSeconds : null,
           ));
     });
 
@@ -150,7 +168,32 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
     return queuedCount;
   }
 
+  static const int _maxThrottleEntries = 200;
+
   void _set(String videoId, YtDownloadItem item) {
+    if (isClosed) return;
+
+    if (_lastEmitTimeByVideoId.length >= _maxThrottleEntries) {
+      _lastEmitTimeByVideoId.clear();
+    }
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final lastEmit = _lastEmitTimeByVideoId[videoId] ?? 0;
+
+    // Throttle progress updates to at most 5 updates/sec (>= 200ms interval) per videoId.
+    // State transitions (e.g. idle -> queued -> running -> done/failed/canceled) and completion (progress >= 1.0)
+    // are emitted immediately without throttling.
+    final currentItem = state.itemFor(videoId);
+    final isIntermediateProgress = item.status == YtDownloadStatus.running &&
+        currentItem.status == YtDownloadStatus.running &&
+        item.progress != null &&
+        item.progress! < 1.0;
+
+    if (isIntermediateProgress && (now - lastEmit < 200)) {
+      return;
+    }
+
+    _lastEmitTimeByVideoId[videoId] = now;
     emit(YtmDownloadState(items: {...state.items, videoId: item}));
 
     // ⚡ FIX: Only persist immediately on terminal/state-change events. Debounce progress ticks.
@@ -160,6 +203,9 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
         item.status == YtDownloadStatus.queued;
 
     if (isTerminalOrQueued) {
+      if (item.status != YtDownloadStatus.queued) {
+        _lastEmitTimeByVideoId.remove(videoId);
+      }
       _saveDebounce?.cancel();
       _saveDebounce = null;
       _savePersistedState();

@@ -95,10 +95,11 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
                 }
             }
             val format = inputFormat ?: throw IllegalStateException("No audio track found")
+            val mime = format.getString(MediaFormat.KEY_MIME) ?: throw IllegalStateException("No audio MIME type found")
             extractor.selectTrack(trackIndex)
 
-            val mime = format.getString(MediaFormat.KEY_MIME)!!
-            val durationUs = if (format.containsKey(MediaFormat.KEY_DURATION)) format.getLong(MediaFormat.KEY_DURATION) else 0L
+            val formatDurationUs = if (format.containsKey(MediaFormat.KEY_DURATION)) format.getLong(MediaFormat.KEY_DURATION) else 0L
+            val sampleRate = if (format.containsKey(MediaFormat.KEY_SAMPLE_RATE)) format.getInteger(MediaFormat.KEY_SAMPLE_RATE).coerceAtLeast(1) else 44100
             var channelCount = if (format.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) {
                 format.getInteger(MediaFormat.KEY_CHANNEL_COUNT).coerceAtLeast(1)
             } else 2
@@ -109,6 +110,7 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
 
             val sumSq = DoubleArray(count)
             val cnt = LongArray(count)
+            var totalFramesDecoded = 0L
             // Used only when the container reports no duration: we cannot map by
             // time, so we collect per-buffer RMS and resample it to [count].
             val fallbackRms = ArrayList<Double>()
@@ -174,8 +176,9 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
                                 }
 
                                 if (frames > 0) {
-                                    if (durationUs > 0) {
-                                        val bucket = ((bufferInfo.presentationTimeUs.toDouble() / durationUs) * count)
+                                    totalFramesDecoded += frames
+                                    if (formatDurationUs > 0) {
+                                        val bucket = ((bufferInfo.presentationTimeUs.toDouble() / formatDurationUs) * count)
                                             .toInt().coerceIn(0, count - 1)
                                         sumSq[bucket] += frameSumSq
                                         cnt[bucket] += frames
@@ -195,8 +198,16 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
                 }
             }
 
+            val effectiveDurationUs = if (formatDurationUs > 0) {
+                formatDurationUs
+            } else if (totalFramesDecoded > 0 && sampleRate > 0) {
+                (totalFramesDecoded * 1_000_000L) / sampleRate
+            } else {
+                0L
+            }
+
             val rms = DoubleArray(count)
-            if (durationUs > 0) {
+            if (effectiveDurationUs > 0) {
                 for (b in 0 until count) rms[b] = if (cnt[b] > 0) sqrt(sumSq[b] / cnt[b]) else Double.NaN
                 fillGaps(rms)
             } else {

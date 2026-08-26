@@ -207,7 +207,9 @@ object PoTokenManager {
         return try {
             val minted = gen.generatePoToken(identifier)
             synchronized(tokenLru) {
-                tokenLru.put(identifier, CachedToken(minted, now))
+                // Stamp AFTER minting: WebView generation can take seconds, so
+                // using the pre-mint clock would silently shorten the TTL.
+                tokenLru.put(identifier, CachedToken(minted, Instant.now().epochSecond))
             }
             minted
         } catch (t: Throwable) {
@@ -273,6 +275,19 @@ object PoTokenManager {
             synchronized(tokenLru) {
                 tokenLru.evictAll()
             }
+        }
+    }
+
+    /**
+     * Evicts only the minted per-identifier tokens, keeping the WebView
+     * attestation (generator + visitorData + integrity token) alive. Used when
+     * YouTube bot-gates a resolution cycle: re-minting per-video tokens against
+     * the existing attestation is cheap, whereas a full [invalidate] forces a
+     * multi-second BotGuard WebView re-run every cycle while flagged.
+     */
+    fun evictMintedTokens() {
+        synchronized(tokenLru) {
+            tokenLru.evictAll()
         }
     }
 

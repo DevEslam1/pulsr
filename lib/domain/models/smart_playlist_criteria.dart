@@ -3,8 +3,13 @@ import '../../core/utils/error_logger.dart';
 
 enum SmartRuleField {
   playCount('playCount', 'Play Count'),
+  artist('artist', 'Artist'),
+  album('album', 'Album'),
+  title('title', 'Title'),
   genre('genre', 'Genre'),
   year('year', 'Year'),
+  decade('decade', 'Decade'),
+  isLossless('isLossless', 'Lossless Only'),
   dateAdded('dateAdded', 'Date Added'),
   durationMs('durationMs', 'Duration'),
   isFavorite('isFavorite', 'Is Favorite'),

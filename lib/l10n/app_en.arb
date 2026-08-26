@@ -304,5 +304,195 @@
   "unknownSong": "Unknown Track",
   "unknownArtist": "Unknown Artist",
   "unknownAlbum": "Unknown Album",
-  "unknownGenre": "Unknown Genre"
+  "unknownGenre": "Unknown Genre",
+
+  "localMusic": "Local Music",
+  "onlineStream": "Online Stream",
+  "likedTracks": "Liked tracks",
+  "autoMix": "Auto-mix",
+  "topPlayedTracks": "Top played",
+  "audioAndPlayback": "Audio & Playback",
+  "equalizerAndSoundEffects": "Equalizer & Sound Effects",
+  "themeAndAppearance": "Theme & Appearance",
+  "accentColor": "Accent Color",
+  "nowPlayingTheme": "Now Playing Style",
+  "colorSource": "Color Source",
+  "gestures": "Gestures",
+  "miniPlayerSwipeLeft": "Mini Player Swipe Left",
+  "miniPlayerSwipeRight": "Mini Player Swipe Right",
+  "nowPlayingDoubleTap": "Now Playing Double-Tap",
+  "artworkSwipe": "Artwork Swipe",
+  "libraryAndScanning": "Library & Scanning",
+  "hiddenAndExcludedFolders": "Hidden & Excluded Folders",
+  "shortAudioFilter": "Short Audio Filter",
+  "filterShortAudio": "Filter Short Audio",
+  "excludeTracksUnder": "Exclude tracks under {seconds} seconds (filters voice notes):",
+  "@excludeTracksUnder": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "ignoreFilesUnder": "Ignore files under {seconds}s",
+  "@ignoreFilesUnder": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "youtubeMusicAndOnline": "YouTube Music & Online",
+  "connectYtmAccount": "Connect YouTube Music Account",
+  "connectYtmSubtitle": "Sign in to auto-sync your Liked Music library",
+  "ytmConnected": "YouTube Music Connected",
+  "openYtmWeb": "Open YouTube Music Web",
+  "openYtmWebSubtitle": "Browse web player, explore charts, library & playlists",
+  "offlineOnlyMode": "Offline Only Mode",
+  "offlineOnlySubtitle": "Disable online features, streaming & web queries",
+  "wifiOnlyMode": "Wi-Fi Only Mode",
+  "wifiOnlySubtitle": "Only stream and download when on Wi-Fi",
+  "searchYtm": "Search YouTube Music",
+  "searchYtmSubtitle": "Search, stream & download songs",
+  "streamingQuality": "Streaming Quality",
+  "downloadQuality": "Download Quality",
+  "extractionEngine": "Extraction Engine",
+  "ytdlpConfig": "yt-dlp Server Config",
+  "storageAndCache": "Storage & Cache",
+  "privacyAndData": "Privacy & Data",
+  "privacyGuaranteeSubtitle": "100% offline. Zero telemetry, zero tracking.",
+  "aboutAppSubtitle": "Version 1.0.0 • Pure Offline Sound",
+  "signIn": "Sign In",
+  "lastSyncedJustNow": "Last synced: Just now",
+  "lastSyncedMinutesAgo": "Last synced: {minutes}m ago",
+  "@lastSyncedMinutesAgo": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "lastSyncedHoursAgo": "Last synced: {hours}h ago",
+  "@lastSyncedHoursAgo": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "connectedReadyToSync": "Connected • Ready to sync",
+  "downloaded": "Downloaded",
+  "exploreOnlineMusic": "Explore Online Music",
+  "noDownloadsYet": "No Downloads Yet",
+  "noDownloadsSubtitle": "Download your favorite songs from YouTube Music to listen offline anywhere.",
+  "offlineDownloads": "Offline Downloads",
+  "local": "Local",
+  "online": "Online",
+  "syncYouTubeMusic": "Sync YouTube Music",
+  "importByPlaylistLink": "Import by Playlist Link",
+  "noLocalFavorites": "No Local Favorites",
+  "noLocalFavoritesSubtitle": "Tap the heart icon on any of your local tracks to add them here.",
+  "noOnlineFavorites": "No Online Favorites",
+  "scanStorage": "Scan Storage",
+  "noFoldersFound": "No Folders Found",
+  "noFoldersSubtitle": "Scan device storage to discover music directories and organize by path.",
+  "playNext": "Play Next",
+  "favorite": "Favorite",
+  "all": "All",
+  "importM3u": "Import M3U",
+  "syncOnlineLibrary": "Sync Online Library",
+  "addPlaylistUrl": "Add Playlist URL",
+  "addYouTubePlaylist": "Add YouTube Playlist",
+  "playlistImported": "Playlist Imported",
+  "tracksMatched": "{matched} of {total} tracks matched.",
+  "@tracksMatched": {
+    "placeholders": {
+      "matched": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "fetch": "Fetch",
+  "ok": "OK",
+  "tracksCountPlural": "{count} {count, plural, =1{track} other{tracks}}",
+  "@tracksCountPlural": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noTrackSelected": "No Track Selected",
+  "playbackSpeed": "Playback Speed",
+  "vinylCircle": "Vinyl Circle",
+  "sortAndFilter": "Sort & Filter",
+  "title": "Title",
+  "artist": "Artist",
+  "recentlyAdded": "Recently Added",
+  "duration": "Duration",
+  "qualityAndCodec": "QUALITY & CODEC",
+  "audioFormat": "Audio Format",
+  "bitrate": "Bitrate",
+  "sampleRate": "Sample Rate",
+  "channels": "Channels",
+  "album": "Album",
+  "filePath": "File Path",
+  "playCount": "Play Count",
+  "fileSize": "File Size",
+  "ringtone": "Ringtone",
+  "share": "Share",
+  "editTags": "Edit Tags",
+  "setAudioAs": "Set Audio As",
+  "phoneRingtone": "Phone Ringtone",
+  "notificationSound": "Notification Sound",
+  "alarmSound": "Alarm Sound",
+  "turnOff": "Turn Off",
+  "presets": "Presets",
+  "customTime": "Custom Time",
+  "stopAtSpecificTime": "Stop at specific time",
+  "currentSpeed": "Current speed: {speed}",
+  "@currentSpeed": {
+    "placeholders": {
+      "speed": {
+        "type": "String"
+      }
+    }
+  },
+  "addedTo": "Added to {name}",
+  "@addedTo": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "playCountTimes": "{count} {count, plural, =1{time} other{times}}",
+  "@playCountTimes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "addYouTubePlaylist": "Add YouTube Playlist",
+  "pastePlaylistUrl": "Paste YouTube Playlist URL or ID",
+  "playlistImported": "Playlist Imported",
+  "hideCustomFolder": "Hide Custom Folder",
+  "hideFolderDesc": "Enter the full directory path you want to hide from your music library:",
+  "hideFolder": "Hide Folder",
+  "confirmRestore": "Confirm Restore",
+  "confirmRestoreDesc": "Are you sure you want to restore backup data from this file?",
+  "existingLibraryUpdateNotice": "Existing library matching tracks will be updated.",
+  "audioVisualizerPermission": "Audio Visualizer Permission",
+  "audioVisualizerPermissionDesc": "The visualizer reads audio output, not your microphone. Android requires the Record Audio permission to process frequency data.",
+  "useSimulation": "Use Simulation",
+  "visualizerSimulationNotice": "Visualizer permission denied — showing a simulated animation instead.",
+  "ytmAccount": "YouTube Music Account",
+  "disconnect": "Disconnect",
+  "openWebPlayer": "Open Web Player",
+  "ytdlpServerConfig": "yt-dlp Server Config",
+  "ytdlpServerDesc": "Connects Pulsr to a remote yt-dlp backend with rotating proxies to bypass YouTube bot detection and IP bans."
 }

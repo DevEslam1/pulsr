@@ -9,6 +9,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../domain/usecases/backup_usecases.dart';
 import '../../cubit/settings_cubit.dart';
 
@@ -143,25 +144,25 @@ class _BackupSectionState extends State<BackupSection> {
           children: [
             Icon(Icons.restore_rounded, color: context.palette.accent),
             const SizedBox(width: 8),
-            const Text('Confirm Restore'),
+            Text(context.l10n.confirmRestore),
           ],
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Are you sure you want to restore backup data from this file?',
-              style: TextStyle(fontWeight: FontWeight.w600),
+            Text(
+              context.l10n.confirmRestoreDesc,
+              style: const TextStyle(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 12),
-            Text('• Favorites: $favsCount items'),
-            Text('• Playlists: $playlistsCount items'),
-            Text('• Play History: $historyCount entries'),
-            Text('• Settings: ${hasSettings ? "Included" : "None"}'),
+            Text('• ${context.l10n.favorites}: $favsCount'),
+            Text('• ${context.l10n.playlists}: $playlistsCount'),
+            Text('• History: $historyCount'),
+            Text('• ${context.l10n.settings}: ${hasSettings ? "Included" : "None"}'),
             const SizedBox(height: 12),
             Text(
-              'Existing library matching tracks will be updated.',
+              context.l10n.existingLibraryUpdateNotice,
               style: TextStyle(fontSize: 12, color: context.palette.textSecondary),
             ),
           ],
@@ -169,7 +170,7 @@ class _BackupSectionState extends State<BackupSection> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text('Cancel', style: TextStyle(color: context.palette.textSecondary)),
+            child: Text(context.l10n.cancel, style: TextStyle(color: context.palette.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -177,7 +178,7 @@ class _BackupSectionState extends State<BackupSection> {
               backgroundColor: context.palette.accent,
               foregroundColor: Colors.white,
             ),
-            child: const Text('Restore Backup'),
+            child: Text(context.l10n.confirmRestore),
           ),
         ],
       ),

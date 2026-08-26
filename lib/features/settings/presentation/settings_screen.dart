@@ -1,13 +1,17 @@
 // lib/features/settings/presentation/settings_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/artwork_cache_manager.dart';
+import '../../../core/services/scrobbler_service.dart';
 import '../../../core/services/ytm_account_service.dart';
+import '../../../core/services/ytm_cache_manager.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
@@ -37,7 +41,7 @@ class SettingsScreen extends StatelessWidget {
         final cubit = context.read<SettingsCubit>();
 
         return Scaffold(
-          appBar: AppBar(title: const Text('Settings')),
+          appBar: AppBar(title: Text(context.l10n.settings)),
           body: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 760), // readable on tablets
@@ -45,13 +49,13 @@ class SettingsScreen extends StatelessWidget {
                 padding: EdgeInsets.only(bottom: 160, top: 8, left: Adaptive.pagePadding(context), right: Adaptive.pagePadding(context)),
                 children: [
                   _buildCloudSyncCard(context),
-                  _section(context, 'Audio & Playback', [
+                  _section(context, context.l10n.audioAndPlayback, [
                     _navTile(
                       context,
                       Icons.equalizer_rounded,
-                      'Equalizer & Sound Effects',
+                      context.l10n.equalizerAndSoundEffects,
                       PlatformCapabilities.hasEqualizer
-                          ? '10-band EQ, bass boost, presets'
+                          ? context.l10n.equalizerSubtitle
                           : 'Not available on this platform',
                       onTap: PlatformCapabilities.hasEqualizer
                           ? () => showModalBottomSheet(
@@ -63,16 +67,16 @@ class SettingsScreen extends StatelessWidget {
                           : null,
                     ),
                     _divider(p),
-                    _navTile(context, Icons.timer_outlined, 'Sleep Timer', 'Auto pause with gentle fade-out',
+                    _navTile(context, Icons.timer_outlined, context.l10n.sleepTimer, context.l10n.sleepTimerSubtitle,
                         onTap: () => showModalBottomSheet(context: context, useRootNavigator: true, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => const SleepTimerSheet())),
                     _divider(p),
-                    _switchTile(context, Icons.graphic_eq_rounded, 'Gapless Playback', 'Continuous audio without silence',
+                    _switchTile(context, Icons.graphic_eq_rounded, context.l10n.gaplessPlayback, context.l10n.gaplessSubtitle,
                         value: state.gaplessPlayback, onChanged: cubit.setGapless),
                     _divider(p),
-                    _switchTile(context, Icons.play_circle_outline_rounded, 'Resume After Interruption', 'Resume after calls & interruptions',
+                    _switchTile(context, Icons.play_circle_outline_rounded, context.l10n.resumeAfterInterruption, context.l10n.resumeAfterInterruptionSubtitle,
                         value: state.resumeAfterInterruption, onChanged: cubit.setResumeAfterInterruption),
                     _divider(p),
-                    _switchTile(context, Icons.waves_rounded, 'Waveform Seek Bar', 'Waveform visualization in the player',
+                    _switchTile(context, Icons.waves_rounded, context.l10n.waveformSeekBar, context.l10n.waveformSeekBarSubtitle,
                         value: state.waveformSeekBarEnabled, onChanged: cubit.setWaveformSeekBar),
                     _divider(p),
                     Padding(
@@ -83,7 +87,7 @@ class SettingsScreen extends StatelessWidget {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text('Crossfade Duration', style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14)),
+                              Text(context.l10n.crossfade, style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14)),
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(color: p.accentContainer, borderRadius: BorderRadius.circular(8)),
@@ -96,9 +100,216 @@ class SettingsScreen extends StatelessWidget {
                         ],
                       ),
                     ),
+                    _divider(p),
+                    // Audiophile & Hi-Res Output Card & Controls
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: p.surfaceContainer.withValues(alpha: 0.6),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: state.currentOutputDevice?.isUsbDac == true
+                                ? const Color(0xFFFFD700).withValues(alpha: 0.5)
+                                : p.hairline,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  state.currentOutputDevice?.isUsbDac == true
+                                      ? Icons.usb_rounded
+                                      : Icons.headphones_rounded,
+                                  color: state.currentOutputDevice?.isUsbDac == true
+                                      ? const Color(0xFFFFD700)
+                                      : p.accent,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    state.currentOutputDevice?.deviceName ?? 'Audio Output Device',
+                                    style: TextStyle(
+                                      color: p.textPrimary,
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 13,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (state.currentOutputDevice?.isBitPerfectActive == true)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFFD700).withValues(alpha: 0.15),
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: const Color(0xFFFFD700).withValues(alpha: 0.6)),
+                                    ),
+                                    child: const Text(
+                                      'BIT-PERFECT',
+                                      style: TextStyle(
+                                        color: Color(0xFFFFD700),
+                                        fontWeight: FontWeight.w900,
+                                        fontSize: 9,
+                                        letterSpacing: 0.5,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Sample Rate: ${(state.currentOutputDevice?.sampleRate ?? 44100) ~/ 1000} kHz • Bit Depth: ${state.currentOutputDevice?.bitDepth ?? 16}-bit',
+                              style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    _switchTile(
+                      context,
+                      Icons.album_rounded,
+                      'Bit-Perfect USB Pass-Through',
+                      'Direct hardware streaming to USB DACs (bypasses Android OS resampler on Android 14+)',
+                      value: state.bitPerfectOutput,
+                      onChanged: cubit.setBitPerfectOutput,
+                    ),
+                    _divider(p),
+                    _switchTile(
+                      context,
+                      Icons.tune_rounded,
+                      'Bypass DSP in Bit-Perfect Mode',
+                      'Bypasses Equalizer and virtualizer for an uncolored, pure audio bitstream to the DAC',
+                      value: state.bypassDspOnBitPerfect,
+                      onChanged: cubit.setBypassDspOnBitPerfect,
+                    ),
+                    _divider(p),
+                    // ReplayGain / Loudness Normalization Suite
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.volume_up_rounded, color: p.accent, size: 20),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'ReplayGain Loudness Normalization',
+                                      style: TextStyle(
+                                        color: p.textPrimary,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      'EBU R128 automatic volume leveling across diverse track masters',
+                                      style: TextStyle(
+                                        color: p.textSecondary,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: SegmentedButton<ReplayGainMode>(
+                              showSelectedIcon: false,
+                              style: const ButtonStyle(
+                                visualDensity: VisualDensity.compact,
+                                padding: WidgetStatePropertyAll(
+                                  EdgeInsets.symmetric(horizontal: 4),
+                                ),
+                              ),
+                              segments: const [
+                                ButtonSegment(
+                                  value: ReplayGainMode.off,
+                                  label: Text('Off', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                ),
+                                ButtonSegment(
+                                  value: ReplayGainMode.track,
+                                  label: Text('Track Gain', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                ),
+                                ButtonSegment(
+                                  value: ReplayGainMode.album,
+                                  label: Text('Album Gain', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                ),
+                              ],
+                              selected: {state.replayGainMode},
+                              onSelectionChanged: (selected) {
+                                if (selected.isNotEmpty) {
+                                  cubit.setReplayGainMode(selected.first);
+                                }
+                              },
+                            ),
+                          ),
+                          if (state.replayGainMode != ReplayGainMode.off) ...[
+                            const SizedBox(height: 14),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Preamp (With RG tag)',
+                                  style: TextStyle(color: p.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
+                                ),
+                                Text(
+                                  '${state.replayGainPreampWithRg >= 0 ? '+' : ''}${state.replayGainPreampWithRg.toStringAsFixed(1)} dB',
+                                  style: TextStyle(color: p.accent, fontSize: 12, fontWeight: FontWeight.w800),
+                                ),
+                              ],
+                            ),
+                            Slider(
+                              value: state.replayGainPreampWithRg,
+                              min: -12.0,
+                              max: 12.0,
+                              divisions: 48,
+                              onChanged: cubit.setReplayGainPreampWithRg,
+                            ),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  'Preamp (Without RG tag fallback)',
+                                  style: TextStyle(color: p.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
+                                ),
+                                Text(
+                                  '${state.replayGainPreampWithoutRg >= 0 ? '+' : ''}${state.replayGainPreampWithoutRg.toStringAsFixed(1)} dB',
+                                  style: TextStyle(color: p.accent, fontSize: 12, fontWeight: FontWeight.w800),
+                                ),
+                              ],
+                            ),
+                            Slider(
+                              value: state.replayGainPreampWithoutRg,
+                              min: -12.0,
+                              max: 12.0,
+                              divisions: 48,
+                              onChanged: cubit.setReplayGainPreampWithoutRg,
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
                     const BatteryOptimizationCard(),
                   ]),
-                  _section(context, 'Theme & Appearance', [
+                  _section(context, context.l10n.themeAndAppearance, [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
                       child: SizedBox(
@@ -115,7 +326,7 @@ class SettingsScreen extends StatelessWidget {
                             ButtonSegment(
                               value: AppThemeMode.system,
                               label: Text(
-                                'Auto',
+                                context.l10n.systemDefault,
                                 maxLines: 1,
                                 softWrap: false,
                                 style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
@@ -125,7 +336,7 @@ class SettingsScreen extends StatelessWidget {
                             ButtonSegment(
                               value: AppThemeMode.light,
                               label: Text(
-                                'Light',
+                                context.l10n.themeLight,
                                 maxLines: 1,
                                 softWrap: false,
                                 style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
@@ -135,7 +346,7 @@ class SettingsScreen extends StatelessWidget {
                             ButtonSegment(
                               value: AppThemeMode.dark,
                               label: Text(
-                                'Dark',
+                                context.l10n.themeDark,
                                 maxLines: 1,
                                 softWrap: false,
                                 style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
@@ -163,7 +374,7 @@ class SettingsScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Accent Color', style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14)),
+                          Text(context.l10n.accentColor, style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14)),
                           const SizedBox(height: 12),
                           SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
@@ -207,49 +418,49 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ),
                     _divider(p),
-                    _navTile(context, Icons.art_track_rounded, 'Now Playing Theme', _getThemeModeTitle(state.playerThemeMode),
+                    _navTile(context, Icons.art_track_rounded, context.l10n.nowPlayingTheme, _getThemeModeTitle(state.playerThemeMode),
                         onTap: () => _showThemePickerSheet(context, cubit, state.playerThemeMode)),
                     _divider(p),
-                    _navTile(context, Icons.graphic_eq_rounded, 'Visualizer Style', _getVisualizerStyleTitle(state.visualizerStyle),
+                    _navTile(context, Icons.graphic_eq_rounded, context.l10n.visualizerStyle, _getVisualizerStyleTitle(state.visualizerStyle),
                         onTap: () => _showVisualizerStylePickerSheet(context, cubit, state.visualizerStyle)),
                     _divider(p),
-                    _navTile(context, Icons.palette_outlined, 'Color Source', _getColorSourceTitle(state.themeColorSource),
+                    _navTile(context, Icons.palette_outlined, context.l10n.colorSource, _getColorSourceTitle(state.themeColorSource),
                         onTap: () => _showColorSourcePickerSheet(context, cubit, state.themeColorSource)),
                     _divider(p),
                     _navTile(context, Icons.language_rounded, context.l10n.language, _getLanguageTitle(state.languageCode, context.l10n),
                         onTap: () => _showLanguagePickerSheet(context, cubit, state.languageCode)),
                   ]),
-                  _section(context, 'Gestures', [
-                    _navTile(context, Icons.swipe_left_rounded, 'Mini Player Swipe Left', _getMiniPlayerSwipeTitle(state.miniPlayerSwipeLeft),
+                  _section(context, context.l10n.gestures, [
+                    _navTile(context, Icons.swipe_left_rounded, context.l10n.miniPlayerSwipeLeft, _getMiniPlayerSwipeTitle(state.miniPlayerSwipeLeft),
                         onTap: () => _showMiniPlayerSwipePickerSheet(context, cubit, isLeft: true, currentAction: state.miniPlayerSwipeLeft)),
                     _divider(p),
-                    _navTile(context, Icons.swipe_right_rounded, 'Mini Player Swipe Right', _getMiniPlayerSwipeTitle(state.miniPlayerSwipeRight),
+                    _navTile(context, Icons.swipe_right_rounded, context.l10n.miniPlayerSwipeRight, _getMiniPlayerSwipeTitle(state.miniPlayerSwipeRight),
                         onTap: () => _showMiniPlayerSwipePickerSheet(context, cubit, isLeft: false, currentAction: state.miniPlayerSwipeRight)),
                     _divider(p),
-                    _navTile(context, Icons.touch_app_rounded, 'Now Playing Double-Tap', _getNowPlayingDoubleTapTitle(state.nowPlayingDoubleTap),
+                    _navTile(context, Icons.touch_app_rounded, context.l10n.nowPlayingDoubleTap, _getNowPlayingDoubleTapTitle(state.nowPlayingDoubleTap),
                         onTap: () => _showNowPlayingDoubleTapPickerSheet(context, cubit, state.nowPlayingDoubleTap)),
                     _divider(p),
-                    _navTile(context, Icons.gesture_rounded, 'Artwork Swipe', _getNowPlayingArtworkSwipeTitle(state.nowPlayingArtworkSwipe),
+                    _navTile(context, Icons.gesture_rounded, context.l10n.artworkSwipe, _getNowPlayingArtworkSwipeTitle(state.nowPlayingArtworkSwipe),
                         onTap: () => _showNowPlayingArtworkSwipePickerSheet(context, cubit, state.nowPlayingArtworkSwipe)),
                   ]),
-                  _section(context, 'Library & Scanning', [
-                    _navTile(context, Icons.folder_off_rounded, 'Hidden & Excluded Folders',
+                  _section(context, context.l10n.libraryAndScanning, [
+                    _navTile(context, Icons.folder_off_rounded, context.l10n.hiddenAndExcludedFolders,
                         state.autoHideSystemMedia ? 'Auto-filtering voice memos • Custom paths' : 'Manage excluded directories',
                         onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HiddenFoldersScreen()))),
                     _divider(p),
                     _navTile(context, Icons.refresh_rounded,
-                        state.isScanning ? 'Scanning storage…' : 'Rescan Media Library',
+                        state.isScanning ? 'Scanning storage…' : context.l10n.rescanLibrary,
                         state.scanResultCount != null ? 'Last scan: ${state.scanResultCount} tracks' : 'Scan device storage for audio',
                         trailing: state.isScanning
                             ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: p.accent))
                             : null,
                         onTap: state.isScanning ? () {} : () => cubit.rescanLibrary()),
                     _divider(p),
-                    _navTile(context, Icons.filter_list_rounded, 'Short Audio Filter', 'Ignore files under ${state.minDurationSec}s',
+                    _navTile(context, Icons.filter_list_rounded, context.l10n.shortAudioFilter, context.l10n.ignoreFilesUnder(state.minDurationSec),
                         onTap: () => _showDurationFilterDialog(context, cubit, state.minDurationSec)),
                   ]),
                   if (AppConfig.ytmEnabled)
-                    _section(context, 'YouTube Music & Online', [
+                    _section(context, context.l10n.youtubeMusicAndOnline, [
                       () {
                         final ytmAccount = getIt<YtmAccountService>();
                         return ValueListenableBuilder<bool>(
@@ -259,16 +470,14 @@ class SettingsScreen extends StatelessWidget {
                               return _navTile(
                                 context,
                                 Icons.account_circle_outlined,
-                                'Connect YouTube Music Account',
-                                'Sign in to auto-sync your Liked Music library',
+                                context.l10n.connectYtmAccount,
+                                context.l10n.connectYtmSubtitle,
                                 onTap: () async {
                                   final ok = await YtmWebLoginSheet.show(context);
-                                  // loginState notifier fires automatically in
-                                  // saveSession — no manual setState needed.
                                   if (ok == true && context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('YouTube Music connected!'),
+                                      SnackBar(
+                                        content: Text(context.l10n.ytmConnected),
                                       ),
                                     );
                                   }
@@ -278,7 +487,7 @@ class SettingsScreen extends StatelessWidget {
                               return _navTile(
                                 context,
                                 Icons.account_circle_rounded,
-                                'YouTube Music Connected',
+                                context.l10n.ytmConnected,
                                 '${ytmAccount.accountName ?? "Connected"} • Tap to manage',
                                 onTap: () =>
                                     _showYtmAccountDisconnectDialog(context),
@@ -291,36 +500,36 @@ class SettingsScreen extends StatelessWidget {
                       _navTile(
                         context,
                         Icons.language_rounded,
-                        'Open YouTube Music Web',
-                        'Browse web player, explore charts, library & playlists',
+                        context.l10n.openYtmWeb,
+                        context.l10n.openYtmWebSubtitle,
                         onTap: () => _showYtmWebOptionsSheet(context),
                       ),
                       _divider(p),
-                      _switchTile(context, Icons.cloud_off_rounded, 'Offline Only Mode',
-                          'Disable online features, streaming & web queries',
+                      _switchTile(context, Icons.cloud_off_rounded, context.l10n.offlineOnlyMode,
+                          context.l10n.offlineOnlySubtitle,
                           value: state.offlineOnlyMode, onChanged: cubit.setOfflineOnlyMode),
                       if (!state.offlineOnlyMode) ...[
                         _divider(p),
-                        _switchTile(context, Icons.wifi_rounded, 'Wi-Fi Only Mode',
-                            'Only stream and download when on Wi-Fi',
+                        _switchTile(context, Icons.wifi_rounded, context.l10n.wifiOnlyMode,
+                            context.l10n.wifiOnlySubtitle,
                             value: state.wifiOnlyMode, onChanged: cubit.setWifiOnlyMode),
                         _divider(p),
-                        _navTile(context, Icons.travel_explore_rounded, 'Search YouTube Music',
-                            'Search, stream & download songs',
+                        _navTile(context, Icons.travel_explore_rounded, context.l10n.searchYtm,
+                            context.l10n.searchYtmSubtitle,
                             onTap: () => context.push('/ytm-search')),
                         _divider(p),
-                        _navTile(context, Icons.wifi_tethering_rounded, 'Streaming Quality',
+                        _navTile(context, Icons.wifi_tethering_rounded, context.l10n.streamingQuality,
                             _getQualityTitle(state.streamingQuality),
                             onTap: () => _showQualityPickerSheet(context, cubit, isStreaming: true, currentQuality: state.streamingQuality)),
                         _divider(p),
-                        _navTile(context, Icons.downloading_rounded, 'Download Quality',
+                        _navTile(context, Icons.downloading_rounded, context.l10n.downloadQuality,
                             _getQualityTitle(state.downloadQuality),
                             onTap: () => _showQualityPickerSheet(context, cubit, isStreaming: false, currentQuality: state.downloadQuality)),
                         _divider(p),
                         _navTile(
                           context,
                           Icons.precision_manufacturing_rounded,
-                          'Extraction Engine',
+                          context.l10n.extractionEngine,
                           _getExtractorEngineTitle(state.extractorEngine),
                           onTap: () => _showExtractorEnginePickerSheet(context, cubit, currentEngine: state.extractorEngine),
                         ),
@@ -329,7 +538,7 @@ class SettingsScreen extends StatelessWidget {
                           _navTile(
                             context,
                             Icons.dns_rounded,
-                            'yt-dlp Server Config',
+                            context.l10n.ytdlpConfig,
                             state.ytdlpBackendUrl,
                             onTap: () => _showYtdlpConfigDialog(context, cubit, state),
                           ),
@@ -338,7 +547,7 @@ class SettingsScreen extends StatelessWidget {
                         _navTile(
                           context,
                           Icons.vpn_lock_rounded,
-                          'Proxy Settings',
+                          context.l10n.proxySettings,
                           state.proxyEnabled
                               ? '${state.proxyType.displayName} • ${state.proxyHost.isNotEmpty ? "${state.proxyHost}:${state.proxyPort}" : "Enabled"}'
                               : 'Disabled • Tap to configure HTTP / SOCKS5',
@@ -363,11 +572,11 @@ class SettingsScreen extends StatelessWidget {
                       ],
                     ]),
                   if (!AppConfig.ytmEnabled)
-                    _section(context, 'Network & Proxy', [
+                    _section(context, context.l10n.networkAndProxy, [
                       _navTile(
                         context,
                         Icons.vpn_lock_rounded,
-                        'Proxy Settings',
+                        context.l10n.proxySettings,
                         state.proxyEnabled
                             ? '${state.proxyType.displayName} • ${state.proxyHost.isNotEmpty ? "${state.proxyHost}:${state.proxyPort}" : "Enabled"}'
                             : 'Disabled • Tap to configure HTTP / SOCKS5',
@@ -390,16 +599,24 @@ class SettingsScreen extends StatelessWidget {
                         onTap: () => context.push('/proxy-settings'),
                       ),
                     ]),
-                  _section(context, 'Storage & Cache', [
+                  _section(context, context.l10n.storageAndCache, [
                     const _CacheSection(),
                   ]),
-                  _section(context, 'Privacy & Data', [
+                  _section(context, context.l10n.privacyAndData, [
                     const BackupSection(),
                     _divider(p),
-                    _navTile(context, Icons.security_rounded, 'Privacy Guarantee', '100% offline. Zero telemetry, zero tracking.', onTap: () {}),
+                    _navTile(
+                      context,
+                      Icons.equalizer_outlined,
+                      'Scrobbling (Last.fm & ListenBrainz)',
+                      'Direct API scrobbling and Now Playing notifications',
+                      onTap: () => _showScrobblerSettingsModal(context),
+                    ),
+                    _divider(p),
+                    _navTile(context, Icons.security_rounded, context.l10n.privacyGuarantee, context.l10n.privacyGuaranteeSubtitle, onTap: () {}),
                   ]),
-                  _section(context, 'About', [
-                    _navTile(context, Icons.info_outline_rounded, 'Pulsr Music', 'Version 1.0.0 • Pure Offline Sound', onTap: () {}),
+                  _section(context, context.l10n.about, [
+                    _navTile(context, Icons.info_outline_rounded, context.l10n.appTitle, context.l10n.aboutAppSubtitle, onTap: () {}),
                   ]),
                 ],
               ),
@@ -480,7 +697,7 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Theme.of(context).colorScheme.surface,
-        title: const Text('Filter Short Audio'),
+        title: Text(context.l10n.minDuration),
         content: StatefulBuilder(
           builder: (context, setDialogState) => Column(
             mainAxisSize: MainAxisSize.min,
@@ -501,13 +718,13 @@ class SettingsScreen extends StatelessWidget {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(context.l10n.cancel)),
           ElevatedButton(
             onPressed: () {
               cubit.setMinDuration(selected);
               Navigator.pop(ctx);
             },
-            child: const Text('Save'),
+            child: Text(context.l10n.save),
           ),
         ],
       ),
@@ -1484,19 +1701,19 @@ class SettingsScreen extends StatelessWidget {
         final user = state.user;
         final isSyncing = state.syncStatus == SyncStatus.syncing;
 
-        String syncSubtitle = 'Sign in to back up favorites & playlists';
+        String syncSubtitle = context.l10n.cloudSyncSubtitle;
         if (user != null) {
           if (state.lastSyncedAt != null) {
             final diff = DateTime.now().difference(state.lastSyncedAt!);
             if (diff.inMinutes < 1) {
-              syncSubtitle = 'Last synced: Just now';
+              syncSubtitle = context.l10n.lastSyncedJustNow;
             } else if (diff.inHours < 1) {
-              syncSubtitle = 'Last synced: ${diff.inMinutes}m ago';
+              syncSubtitle = context.l10n.lastSyncedMinutesAgo(diff.inMinutes);
             } else {
-              syncSubtitle = 'Last synced: ${diff.inHours}h ago';
+              syncSubtitle = context.l10n.lastSyncedHoursAgo(diff.inHours);
             }
           } else {
-            syncSubtitle = 'Connected • Ready to sync';
+            syncSubtitle = context.l10n.connectedReadyToSync;
           }
         }
 
@@ -1537,7 +1754,7 @@ class SettingsScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          user?.displayName ?? user?.email ?? 'Cloud Sync & Backup',
+                          user?.displayName ?? user?.email ?? context.l10n.cloudSync,
                           style: TextStyle(
                             color: p.textPrimary,
                             fontSize: 15,
@@ -1566,18 +1783,18 @@ class SettingsScreen extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: const Text('Sign In', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      child: Text(context.l10n.signIn, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
                     ),
                   ] else ...[
                     IconButton(
-                      tooltip: 'Sync Now',
+                      tooltip: context.l10n.syncNow,
                       icon: isSyncing
                           ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: p.accent))
                           : Icon(Icons.sync_rounded, color: p.accent),
                       onPressed: isSyncing ? null : () => authCubit.syncNow(),
                     ),
                     IconButton(
-                      tooltip: 'Sign Out',
+                      tooltip: context.l10n.signOut,
                       icon: Icon(Icons.logout_rounded, color: p.textTertiary, size: 20),
                       onPressed: () => authCubit.signOut(),
                     ),
@@ -1772,7 +1989,7 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: p.surfaceContainerHigh,
-        title: Text('YouTube Music Account', style: TextStyle(color: p.textPrimary)),
+        title: Text(context.l10n.ytmAccount, style: TextStyle(color: p.textPrimary)),
         content: Text(
           'Connected as: ${account.accountName ?? "User"}\n\nManage your YouTube Music account or disconnect from this device.',
           style: TextStyle(color: p.textSecondary),
@@ -1787,11 +2004,11 @@ class SettingsScreen extends StatelessWidget {
               );
             },
             icon: Icon(Icons.language_rounded, size: 18, color: p.accent),
-            label: Text('Open Web Player', style: TextStyle(color: p.accent)),
+            label: Text(context.l10n.openWebPlayer, style: TextStyle(color: p.accent)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: TextStyle(color: p.textSecondary)),
+            child: Text(context.l10n.cancel, style: TextStyle(color: p.textSecondary)),
           ),
           FilledButton(
             onPressed: () async {
@@ -1804,7 +2021,7 @@ class SettingsScreen extends StatelessWidget {
               }
             },
             style: FilledButton.styleFrom(backgroundColor: p.error),
-            child: const Text('Disconnect'),
+            child: Text(context.l10n.disconnect),
           ),
         ],
       ),
@@ -1827,7 +2044,7 @@ class SettingsScreen extends StatelessWidget {
                 children: [
                   Icon(Icons.dns_rounded, color: p.accent),
                   const SizedBox(width: 10),
-                  const Text('yt-dlp Server Config'),
+                  Text(context.l10n.ytdlpServerConfig),
                 ],
               ),
               content: SingleChildScrollView(
@@ -1836,7 +2053,7 @@ class SettingsScreen extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Connects Pulsr to a remote yt-dlp backend with rotating proxies to bypass YouTube bot detection and IP bans.',
+                      context.l10n.ytdlpServerDesc,
                       style: TextStyle(fontSize: 12, color: p.textSecondary),
                     ),
                     const SizedBox(height: 16),
@@ -1904,7 +2121,7 @@ class SettingsScreen extends StatelessWidget {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Cancel'),
+                  child: Text(context.l10n.cancel),
                 ),
                 FilledButton(
                   onPressed: () {
@@ -1915,7 +2132,7 @@ class SettingsScreen extends StatelessWidget {
                       const SnackBar(content: Text('yt-dlp backend settings saved')),
                     );
                   },
-                  child: const Text('Save'),
+                  child: Text(context.l10n.save),
                 ),
               ],
             );
@@ -1934,8 +2151,10 @@ class _CacheSection extends StatefulWidget {
 }
 
 class _CacheSectionState extends State<_CacheSection> {
-  int _cacheSizeBytes = 0;
+  int _artCacheSizeBytes = 0;
+  int _streamCacheSizeBytes = 0;
   bool _isLoading = true;
+  final YtmCacheManager _ytmCacheManager = YtmCacheManager();
 
   @override
   void initState() {
@@ -1944,10 +2163,12 @@ class _CacheSectionState extends State<_CacheSection> {
   }
 
   Future<void> _refreshCacheSize() async {
-    final size = await ArtworkCacheManager().getDiskCacheSizeBytes();
+    final artSize = await ArtworkCacheManager().getDiskCacheSizeBytes();
+    final streamSize = await _ytmCacheManager.getCacheSizeBytes();
     if (mounted) {
       setState(() {
-        _cacheSizeBytes = size;
+        _artCacheSizeBytes = artSize;
+        _streamCacheSizeBytes = streamSize;
         _isLoading = false;
       });
     }
@@ -1978,11 +2199,11 @@ class _CacheSectionState extends State<_CacheSection> {
             child: Icon(Icons.photo_size_select_actual_rounded, color: p.accent, size: 22),
           ),
           title: Text(
-            'Artwork & Media Cache',
+            'Artwork Cache',
             style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14.5),
           ),
           subtitle: Text(
-            _isLoading ? 'Calculating…' : '${_formatSize(_cacheSizeBytes)} used of $maxMb MB max',
+            _isLoading ? 'Calculating…' : '${_formatSize(_artCacheSizeBytes)} used of $maxMb MB max',
             style: TextStyle(color: p.textSecondary, fontSize: 12.5),
           ),
           trailing: TextButton.icon(
@@ -2009,13 +2230,50 @@ class _CacheSectionState extends State<_CacheSection> {
           leading: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
+              color: Colors.redAccent.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.cloud_download_rounded, color: Colors.redAccent, size: 22),
+          ),
+          title: Text(
+            'YouTube Stream Disk Cache',
+            style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14.5),
+          ),
+          subtitle: Text(
+            _isLoading ? 'Calculating…' : '${_formatSize(_streamCacheSizeBytes)} cached for zero-latency replay',
+            style: TextStyle(color: p.textSecondary, fontSize: 12.5),
+          ),
+          trailing: TextButton.icon(
+            style: TextButton.styleFrom(
+              foregroundColor: p.error,
+              visualDensity: VisualDensity.compact,
+            ),
+            icon: const Icon(Icons.delete_outline_rounded, size: 18),
+            label: const Text('Clear'),
+            onPressed: () async {
+              await _ytmCacheManager.clearCache();
+              await _refreshCacheSize();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Stream cache cleared successfully')),
+                );
+              }
+            },
+          ),
+        ),
+        Divider(height: 1, color: p.hairline),
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
               color: p.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(Icons.disc_full_rounded, color: p.textSecondary, size: 22),
           ),
           title: Text(
-            'Maximum Cache Limit',
+            'Maximum Artwork Cache Limit',
             style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14.5),
           ),
           subtitle: Text(
@@ -2076,3 +2334,261 @@ class _CacheSectionState extends State<_CacheSection> {
     );
   }
 }
+
+void _showScrobblerSettingsModal(BuildContext context) {
+  final p = context.palette;
+
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: p.surfaceContainer,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (ctx) => const _ScrobblerConfigSheet(),
+  );
+}
+
+class _ScrobblerConfigSheet extends StatefulWidget {
+  const _ScrobblerConfigSheet();
+
+  @override
+  State<_ScrobblerConfigSheet> createState() => _ScrobblerConfigSheetState();
+}
+
+class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
+  bool _listenBrainzEnabled = false;
+  final _listenBrainzTokenController = TextEditingController();
+
+  bool _lastFmEnabled = false;
+  final _lastFmApiKeyController = TextEditingController();
+  final _lastFmSecretController = TextEditingController();
+  final _lastFmSessionKeyController = TextEditingController();
+
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadScrobblerPrefs();
+  }
+
+  Future<void> _loadScrobblerPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    const secureStorage = FlutterSecureStorage();
+    String lbToken = '';
+    String lastFmKey = '';
+    String lastFmSec = '';
+    String lastFmSession = '';
+    try {
+      lbToken = await secureStorage.read(key: ScrobblerService.keyListenBrainzTokenSecure) ?? '';
+      lastFmKey = await secureStorage.read(key: ScrobblerService.keyLastFmApiKeySecure) ?? '';
+      lastFmSec = await secureStorage.read(key: ScrobblerService.keyLastFmSecretSecure) ?? '';
+      lastFmSession = await secureStorage.read(key: ScrobblerService.keyLastFmSessionKeySecure) ?? '';
+    } catch (_) {}
+    if (lbToken.isEmpty) {
+      lbToken = prefs.getString(ScrobblerService.keyListenBrainzToken) ?? '';
+    }
+    if (lastFmKey.isEmpty) {
+      lastFmKey = prefs.getString(ScrobblerService.keyLastFmApiKey) ?? '';
+    }
+    if (lastFmSec.isEmpty) {
+      lastFmSec = prefs.getString(ScrobblerService.keyLastFmSecret) ?? '';
+    }
+    if (lastFmSession.isEmpty) {
+      lastFmSession = prefs.getString(ScrobblerService.keyLastFmSessionKey) ?? '';
+    }
+    setState(() {
+      _listenBrainzEnabled = prefs.getBool(ScrobblerService.keyListenBrainzEnabled) ?? false;
+      _listenBrainzTokenController.text = lbToken;
+
+      _lastFmEnabled = prefs.getBool(ScrobblerService.keyLastFmEnabled) ?? false;
+      _lastFmApiKeyController.text = lastFmKey;
+      _lastFmSecretController.text = lastFmSec;
+      _lastFmSessionKeyController.text = lastFmSession;
+      _isLoading = false;
+    });
+  }
+
+  Future<void> _saveScrobblerPrefs() async {
+    final prefs = await SharedPreferences.getInstance();
+    const secureStorage = FlutterSecureStorage();
+    await prefs.setBool(ScrobblerService.keyListenBrainzEnabled, _listenBrainzEnabled);
+    final lbToken = _listenBrainzTokenController.text.trim();
+    if (lbToken.isNotEmpty) {
+      await secureStorage.write(key: ScrobblerService.keyListenBrainzTokenSecure, value: lbToken);
+    } else {
+      await secureStorage.delete(key: ScrobblerService.keyListenBrainzTokenSecure);
+    }
+    await prefs.remove(ScrobblerService.keyListenBrainzToken);
+
+    await prefs.setBool(ScrobblerService.keyLastFmEnabled, _lastFmEnabled);
+    final lastFmKey = _lastFmApiKeyController.text.trim();
+    final lastFmSec = _lastFmSecretController.text.trim();
+    final lastFmSession = _lastFmSessionKeyController.text.trim();
+
+    if (lastFmKey.isNotEmpty) {
+      await secureStorage.write(key: ScrobblerService.keyLastFmApiKeySecure, value: lastFmKey);
+    } else {
+      await secureStorage.delete(key: ScrobblerService.keyLastFmApiKeySecure);
+    }
+    if (lastFmSec.isNotEmpty) {
+      await secureStorage.write(key: ScrobblerService.keyLastFmSecretSecure, value: lastFmSec);
+    } else {
+      await secureStorage.delete(key: ScrobblerService.keyLastFmSecretSecure);
+    }
+    if (lastFmSession.isNotEmpty) {
+      await secureStorage.write(key: ScrobblerService.keyLastFmSessionKeySecure, value: lastFmSession);
+    } else {
+      await secureStorage.delete(key: ScrobblerService.keyLastFmSessionKeySecure);
+    }
+    await prefs.remove(ScrobblerService.keyLastFmApiKey);
+    await prefs.remove(ScrobblerService.keyLastFmSecret);
+    await prefs.remove(ScrobblerService.keyLastFmSessionKey);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Scrobbler configuration saved!')),
+      );
+      Navigator.pop(context);
+    }
+  }
+
+  @override
+  void dispose() {
+    _listenBrainzTokenController.dispose();
+    _lastFmApiKeyController.dispose();
+    _lastFmSecretController.dispose();
+    _lastFmSessionKeyController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+
+    if (_isLoading) {
+      return const SizedBox(
+        height: 200,
+        child: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+        top: 20,
+        left: 20,
+        right: 20,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.equalizer_rounded, color: p.accent, size: 24),
+                const SizedBox(width: 10),
+                Text(
+                  'Scrobbler Settings',
+                  style: TextStyle(
+                    color: p.textPrimary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'ListenBrainz REST Scrobbler',
+              style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text('Enable ListenBrainz', style: TextStyle(color: p.textPrimary, fontSize: 14)),
+              value: _listenBrainzEnabled,
+              activeThumbColor: p.accent,
+              onChanged: (val) => setState(() => _listenBrainzEnabled = val),
+            ),
+            if (_listenBrainzEnabled)
+              TextField(
+                controller: _listenBrainzTokenController,
+                style: TextStyle(color: p.textPrimary, fontSize: 13),
+                decoration: InputDecoration(
+                  labelText: 'User Token',
+                  hintText: 'Enter ListenBrainz User Token',
+                  labelStyle: TextStyle(color: p.textSecondary),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  isDense: true,
+                ),
+              ),
+            const SizedBox(height: 20),
+            Divider(color: p.hairline),
+            const SizedBox(height: 8),
+            Text(
+              'Last.fm REST Scrobbler',
+              style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text('Enable Last.fm Direct Scrobbling', style: TextStyle(color: p.textPrimary, fontSize: 14)),
+              value: _lastFmEnabled,
+              activeThumbColor: p.accent,
+              onChanged: (val) => setState(() => _lastFmEnabled = val),
+            ),
+            if (_lastFmEnabled) ...[
+              TextField(
+                controller: _lastFmApiKeyController,
+                style: TextStyle(color: p.textPrimary, fontSize: 13),
+                decoration: InputDecoration(
+                  labelText: 'Last.fm API Key',
+                  labelStyle: TextStyle(color: p.textSecondary),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _lastFmSecretController,
+                style: TextStyle(color: p.textPrimary, fontSize: 13),
+                decoration: InputDecoration(
+                  labelText: 'Last.fm Shared Secret',
+                  labelStyle: TextStyle(color: p.textSecondary),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _lastFmSessionKeyController,
+                style: TextStyle(color: p.textPrimary, fontSize: 13),
+                decoration: InputDecoration(
+                  labelText: 'Last.fm Session Key (sk)',
+                  labelStyle: TextStyle(color: p.textSecondary),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  isDense: true,
+                ),
+              ),
+            ],
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: p.accent,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                onPressed: _saveScrobblerPrefs,
+                child: const Text('Save Settings', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.black)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+

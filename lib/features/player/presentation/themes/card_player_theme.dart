@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/glass_container.dart';
 import '../../../../core/widgets/waveform_logo.dart';
@@ -112,7 +113,7 @@ class CardPlayerTheme extends StatelessWidget {
                             ),
                             const SizedBox(width: 6),
                             Text(
-                              'NOW PLAYING',
+                              context.l10n.nowPlaying.toUpperCase(),
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                     fontSize: 10,
                                     letterSpacing: 1.2,
@@ -124,7 +125,7 @@ class CardPlayerTheme extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          song?.album ?? 'Library',
+                          song?.album ?? context.l10n.navLibrary,
                           style: Theme.of(context).textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.w800,
                                 color: textTitleColor,
@@ -279,7 +280,7 @@ class CardPlayerTheme extends StatelessWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  song?.title ?? 'No Track Selected',
+                                  song?.title ?? context.l10n.noTrackSelected,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
@@ -289,7 +290,7 @@ class CardPlayerTheme extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  song?.artist ?? 'Unknown Artist',
+                                  song?.artist ?? context.l10n.unknownArtist,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
@@ -378,7 +379,7 @@ class CardPlayerTheme extends StatelessWidget {
                                 builder: (_) => const EqualizerSheet(),
                               );
                             },
-                            tooltip: 'Equalizer',
+                            tooltip: context.l10n.equalizer,
                           ),
                           IconButton(
                             icon: Icon(Icons.speed_rounded, color: iconActionColor),
@@ -388,7 +389,7 @@ class CardPlayerTheme extends StatelessWidget {
                                 builder: (_) => const SpeedPickerSheet(),
                               );
                             },
-                            tooltip: 'Playback Speed',
+                            tooltip: context.l10n.playbackSpeed,
                           ),
                           IconButton(
                             icon: Icon(
@@ -396,7 +397,7 @@ class CardPlayerTheme extends StatelessWidget {
                               color: state.isLyricsVisible ? activeColor : iconActionColor,
                             ),
                             onPressed: () => cubit.toggleLyricsVisibility(),
-                            tooltip: 'Lyrics',
+                            tooltip: context.l10n.lyrics,
                           ),
                           IconButton(
                             icon: Icon(
@@ -412,7 +413,7 @@ class CardPlayerTheme extends StatelessWidget {
                                 builder: (_) => const SleepTimerSheet(),
                               );
                             },
-                            tooltip: 'Sleep Timer',
+                            tooltip: context.l10n.sleepTimer,
                           ),
                           IconButton(
                             icon: Icon(Icons.playlist_add_rounded, color: iconActionColor),
@@ -427,7 +428,7 @@ class CardPlayerTheme extends StatelessWidget {
                                 );
                               }
                             },
-                            tooltip: 'Add to Playlist',
+                            tooltip: context.l10n.addToPlaylist,
                           ),
                           IconButton(
                             icon: Icon(
@@ -435,7 +436,7 @@ class CardPlayerTheme extends StatelessWidget {
                               color: state.isQueueVisible ? activeColor : iconActionColor,
                             ),
                             onPressed: () => cubit.toggleQueueVisibility(),
-                            tooltip: 'Queue',
+                            tooltip: context.l10n.queue,
                           ),
                         ],
                       ),

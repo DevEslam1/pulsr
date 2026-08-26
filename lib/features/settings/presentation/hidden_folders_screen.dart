@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../../../core/utils/l10n_extensions.dart';
 import '../../../domain/usecases/folder_usecases.dart';
 import '../../library/cubit/library_cubit.dart';
 import '../cubit/settings_cubit.dart';
@@ -68,7 +69,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
           side: BorderSide(color: p.hairline),
         ),
         title: Text(
-          'Hide Custom Folder',
+          context.l10n.hideCustomFolder,
           style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 18),
         ),
         content: Column(
@@ -76,7 +77,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Enter the full directory path you want to hide from your music library:',
+              context.l10n.hideFolderDesc,
               style: TextStyle(color: p.textSecondary, fontSize: 13),
             ),
             const SizedBox(height: 14),
@@ -109,7 +110,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: TextStyle(color: p.textSecondary)),
+            child: Text(context.l10n.cancel, style: TextStyle(color: p.textSecondary)),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -124,7 +125,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                 await _toggleFolder(path);
               }
             },
-            child: const Text('Hide Folder'),
+            child: Text(context.l10n.hideFolder),
           ),
         ],
       ),
@@ -149,7 +150,7 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
 
         return Scaffold(
           appBar: AppBar(
-            title: const Text('Hidden & Excluded Folders'),
+            title: Text(context.l10n.hiddenFolders),
             actions: [
               IconButton(
                 icon: const Icon(Icons.create_new_folder_outlined),

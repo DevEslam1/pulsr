@@ -1,5 +1,6 @@
 // lib/domain/usecases/backup_usecases.dart
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:drift/drift.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -146,23 +147,32 @@ class ImportBackupUseCase {
       throw const FormatException('Invalid or unsupported backup version');
     }
 
-    return _db.transaction(() async {
     // Fetch all current library songs for path matching
     final songsResult = await _repository.getAllSongs();
     final allSongs = songsResult.fold((l) => <SongsTableData>[], (r) => r);
 
-    // Build lookup maps for robust matching (exact, normalized, filename)
+    // Build lookup maps for robust matching (exact, normalized, parent+filename, unique filename)
     final exactMap = <String, SongsTableData>{};
     final normalizedMap = <String, SongsTableData>{};
-    final filenameMap = <String, SongsTableData>{};
+    final parentAndFilenameMap = <String, SongsTableData>{};
+    final uniqueFilenameMap = <String, SongsTableData>{};
+    final filenameCountMap = <String, int>{};
 
     for (final song in allSongs) {
       exactMap[song.path] = song;
       final normPath = song.path.replaceAll('\\', '/').toLowerCase();
       normalizedMap[normPath] = song;
-      final filename = song.path.replaceAll('\\', '/').split('/').last.toLowerCase();
+
+      final segments = normPath.split('/');
+      if (segments.length >= 2) {
+        final parentAndFilename = '${segments[segments.length - 2]}/${segments.last}';
+        parentAndFilenameMap[parentAndFilename] = song;
+      }
+
+      final filename = segments.isNotEmpty ? segments.last : '';
       if (filename.isNotEmpty) {
-        filenameMap[filename] = song;
+        filenameCountMap[filename] = (filenameCountMap[filename] ?? 0) + 1;
+        uniqueFilenameMap[filename] = song;
       }
     }
 
@@ -170,89 +180,102 @@ class ImportBackupUseCase {
       if (exactMap.containsKey(path)) return exactMap[path];
       final normPath = path.replaceAll('\\', '/').toLowerCase();
       if (normalizedMap.containsKey(normPath)) return normalizedMap[normPath];
-      final filename = path.replaceAll('\\', '/').split('/').last.toLowerCase();
-      if (filenameMap.containsKey(filename)) return filenameMap[filename];
+
+      final segments = normPath.split('/');
+      if (segments.length >= 2) {
+        final parentAndFilename = '${segments[segments.length - 2]}/${segments.last}';
+        if (parentAndFilenameMap.containsKey(parentAndFilename)) {
+          return parentAndFilenameMap[parentAndFilename];
+        }
+      }
+
+      final filename = segments.isNotEmpty ? segments.last : '';
+      if (filename.isNotEmpty && filenameCountMap[filename] == 1) {
+        return uniqueFilenameMap[filename];
+      }
       return null;
     }
 
     final unmatchedPaths = <String>{};
 
-    // 1. Restore Favorites
+    // 1. Restore Favorites (Transaction 1)
     int restoredFavoritesCount = 0;
     if (data['favorites'] is List) {
       final favList = (data['favorites'] as List).cast<String>();
-      for (final path in favList) {
-        final matchedSong = matchPath(path);
-        if (matchedSong != null) {
-          await (_db.update(_db.songsTable)..where((t) => t.id.equals(matchedSong.id)))
-              .write(const SongsTableCompanion(isFavorite: Value(true)));
-          restoredFavoritesCount++;
-        } else {
-          unmatchedPaths.add(path);
+      await _db.transaction(() async {
+        for (final path in favList) {
+          final matchedSong = matchPath(path);
+          if (matchedSong != null) {
+            await (_db.update(_db.songsTable)..where((t) => t.id.equals(matchedSong.id)))
+                .write(const SongsTableCompanion(isFavorite: Value(true)));
+            restoredFavoritesCount++;
+          } else {
+            unmatchedPaths.add(path);
+          }
         }
-      }
+      });
     }
 
-    // 2. Restore Playlists
+    // 2. Restore Playlists (Transaction per playlist)
     int restoredPlaylistsCount = 0;
     if (data['playlists'] is List) {
       final playlistsList = data['playlists'] as List;
       for (final item in playlistsList) {
         if (item is Map<String, dynamic>) {
-          final name = item['name'] as String? ?? 'Restored Playlist';
-          final isSmart = item['isSmart'] as bool? ?? false;
-          final smartCriteria = item['smartCriteria'] as String?;
-          final songPaths = (item['songPaths'] as List?)?.cast<String>() ?? [];
+          await _db.transaction(() async {
+            final name = item['name'] as String? ?? 'Restored Playlist';
+            final isSmart = item['isSmart'] as bool? ?? false;
+            final smartCriteria = item['smartCriteria'] as String?;
+            final songPaths = (item['songPaths'] as List?)?.cast<String>() ?? [];
 
-          // Create new playlist or find existing by name
-          final existingPlaylistsRes = await _repository.getPlaylists();
-          final existingList = existingPlaylistsRes.fold((l) => <PlaylistsTableData>[], (r) => r);
-          final existing = existingList.where((p) => p.name == name).firstOrNull;
+            final existingPlaylistsRes = await _repository.getPlaylists();
+            final existingList = existingPlaylistsRes.fold((l) => <PlaylistsTableData>[], (r) => r);
+            final existing = existingList.where((p) => p.name == name).firstOrNull;
 
-          int? playlistId;
-          if (existing != null) {
-            playlistId = existing.id;
-            if (isSmart && smartCriteria != null) {
-              await _repository.updateSmartPlaylist(existing.id, name, smartCriteria);
+            int? playlistId;
+            if (existing != null) {
+              playlistId = existing.id;
+              if (isSmart && smartCriteria != null) {
+                await _repository.updateSmartPlaylist(existing.id, name, smartCriteria);
+              }
+            } else {
+              final createRes = await _repository.createPlaylist(
+                name,
+                isSmart: isSmart,
+                smartCriteria: smartCriteria,
+              );
+              playlistId = createRes.fold(
+                (f) => null,
+                (id) => id,
+              );
             }
-          } else {
-            final createRes = await _repository.createPlaylist(
-              name,
-              isSmart: isSmart,
-              smartCriteria: smartCriteria,
-            );
-            playlistId = createRes.fold(
-              (f) => null,
-              (id) => id,
-            );
-          }
 
-          if (playlistId != null) {
-            // For smart playlists, song items are evaluated dynamically from criteria, not manual entries
-            if (!isSmart) {
-              final matchedSongIds = <int>[];
-              for (final path in songPaths) {
-                final matched = matchPath(path);
-                if (matched != null) {
-                  if (!matchedSongIds.contains(matched.id)) {
-                    matchedSongIds.add(matched.id);
+            if (playlistId != null) {
+              if (!isSmart) {
+                final matchedSongIds = <int>[];
+                for (final path in songPaths) {
+                  final matched = matchPath(path);
+                  if (matched != null) {
+                    if (!matchedSongIds.contains(matched.id)) {
+                      matchedSongIds.add(matched.id);
+                    }
+                  } else {
+                    unmatchedPaths.add(path);
                   }
-                } else {
-                  unmatchedPaths.add(path);
+                }
+
+                if (matchedSongIds.isNotEmpty) {
+                  await _repository.addSongsToPlaylist(playlistId, matchedSongIds);
                 }
               }
-
-              if (matchedSongIds.isNotEmpty) {
-                await _repository.addSongsToPlaylist(playlistId, matchedSongIds);
-              }
+              restoredPlaylistsCount++;
             }
-            restoredPlaylistsCount++;
-          }
+          });
         }
       }
     }
 
-    // 3. Restore Settings
+    // 3. Restore Settings (No DB transaction required)
     int restoredSettingsCount = 0;
     if (data['settings'] is Map<String, dynamic>) {
       final settings = data['settings'] as Map<String, dynamic>;
@@ -295,31 +318,36 @@ class ImportBackupUseCase {
       restoredSettingsCount = settings.length;
     }
 
-    // 4. Restore Play History
+    // 4. Restore Play History (Batched Transactions of 100)
     int restoredHistoryCount = 0;
     if (data['playHistory'] is List) {
       final historyList = data['playHistory'] as List;
-      for (final item in historyList) {
-        if (item is Map<String, dynamic>) {
-          final path = item['path'] as String?;
-          final playCount = (item['playCount'] as num?)?.toInt() ?? 0;
-          final lastPlayed = (item['lastPlayed'] as num?)?.toInt();
+      for (var i = 0; i < historyList.length; i += 100) {
+        final batch = historyList.sublist(i, math.min(i + 100, historyList.length));
+        await _db.transaction(() async {
+          for (final item in batch) {
+            if (item is Map<String, dynamic>) {
+              final path = item['path'] as String?;
+              final playCount = (item['playCount'] as num?)?.toInt() ?? 0;
+              final lastPlayed = (item['lastPlayed'] as num?)?.toInt();
 
-          if (path != null) {
-            final matched = matchPath(path);
-            if (matched != null) {
-              await (_db.update(_db.songsTable)..where((t) => t.id.equals(matched.id))).write(
-                SongsTableCompanion(
-                  playCount: Value(playCount),
-                  lastPlayed: Value(lastPlayed),
-                ),
-              );
-              restoredHistoryCount++;
-            } else {
-              unmatchedPaths.add(path);
+              if (path != null) {
+                final matched = matchPath(path);
+                if (matched != null) {
+                  await (_db.update(_db.songsTable)..where((t) => t.id.equals(matched.id))).write(
+                    SongsTableCompanion(
+                      playCount: Value(playCount),
+                      lastPlayed: Value(lastPlayed),
+                    ),
+                  );
+                  restoredHistoryCount++;
+                } else {
+                  unmatchedPaths.add(path);
+                }
+              }
             }
           }
-        }
+        });
       }
     }
 
@@ -346,6 +374,5 @@ class ImportBackupUseCase {
       restoredExcludedFoldersCount: restoredExcludedCount,
       unmatchedPaths: unmatchedPaths.toList(),
     );
-    });
   }
 }

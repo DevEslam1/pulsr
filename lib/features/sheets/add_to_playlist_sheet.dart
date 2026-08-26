@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/di/injection.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/adaptive.dart';
+import '../../core/utils/l10n_extensions.dart';
 import '../../data/db/app_database.dart';
 import '../../domain/usecases/playlist_usecases.dart';
 
@@ -25,13 +26,13 @@ class AddToPlaylistSheet extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: p.surface,
-        title: Text('New Playlist', style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w800)),
+        title: Text(context.l10n.createPlaylist, style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w800)),
         content: TextField(
           controller: controller,
           autofocus: true,
           style: TextStyle(color: p.textPrimary),
           decoration: InputDecoration(
-            hintText: 'Playlist name',
+            hintText: context.l10n.enterPlaylistName,
             filled: true,
             fillColor: p.surfaceContainer,
           ),
@@ -39,7 +40,7 @@ class AddToPlaylistSheet extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('Cancel', style: TextStyle(color: p.textSecondary)),
+            child: Text(context.l10n.cancel, style: TextStyle(color: p.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -60,14 +61,14 @@ class AddToPlaylistSheet extends StatelessWidget {
                       Navigator.pop(ctx);
                       Navigator.pop(context);
                       ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Added to $name')),
+                        SnackBar(content: Text(context.l10n.addedTo(name))),
                       );
                     }
                   },
                 );
               }
             },
-            child: const Text('Create & Add'),
+            child: Text(context.l10n.save),
           ),
         ],
       ),
@@ -119,7 +120,7 @@ class AddToPlaylistSheet extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Add to Playlist',
+                            context.l10n.addToPlaylist,
                             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                   fontWeight: FontWeight.w800,
                                   color: p.textPrimary,
@@ -143,14 +144,14 @@ class AddToPlaylistSheet extends StatelessWidget {
                                 child: Column(
                                   children: [
                                     Text(
-                                      'No playlists created yet.',
+                                      context.l10n.emptyPlaylists,
                                       style: TextStyle(color: p.textSecondary),
                                     ),
                                     const SizedBox(height: 12),
                                     ElevatedButton.icon(
                                       onPressed: () => _showNewPlaylistDialog(context),
                                       icon: const Icon(Icons.add_rounded),
-                                      label: const Text('Create Playlist'),
+                                      label: Text(context.l10n.createPlaylist),
                                     ),
                                   ],
                                 ),

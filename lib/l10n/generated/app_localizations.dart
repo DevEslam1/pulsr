@@ -853,7 +853,7 @@ abstract class AppLocalizations {
   /// No description provided for @fileSize.
   ///
   /// In en, this message translates to:
-  /// **'Size'**
+  /// **'File Size'**
   String get fileSize;
 
   /// No description provided for @settings.
@@ -1551,6 +1551,684 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Unknown Genre'**
   String get unknownGenre;
+
+  /// No description provided for @localMusic.
+  ///
+  /// In en, this message translates to:
+  /// **'Local Music'**
+  String get localMusic;
+
+  /// No description provided for @onlineStream.
+  ///
+  /// In en, this message translates to:
+  /// **'Online Stream'**
+  String get onlineStream;
+
+  /// No description provided for @likedTracks.
+  ///
+  /// In en, this message translates to:
+  /// **'Liked tracks'**
+  String get likedTracks;
+
+  /// No description provided for @autoMix.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-mix'**
+  String get autoMix;
+
+  /// No description provided for @topPlayedTracks.
+  ///
+  /// In en, this message translates to:
+  /// **'Top played'**
+  String get topPlayedTracks;
+
+  /// No description provided for @audioAndPlayback.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio & Playback'**
+  String get audioAndPlayback;
+
+  /// No description provided for @equalizerAndSoundEffects.
+  ///
+  /// In en, this message translates to:
+  /// **'Equalizer & Sound Effects'**
+  String get equalizerAndSoundEffects;
+
+  /// No description provided for @themeAndAppearance.
+  ///
+  /// In en, this message translates to:
+  /// **'Theme & Appearance'**
+  String get themeAndAppearance;
+
+  /// No description provided for @accentColor.
+  ///
+  /// In en, this message translates to:
+  /// **'Accent Color'**
+  String get accentColor;
+
+  /// No description provided for @nowPlayingTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Now Playing Style'**
+  String get nowPlayingTheme;
+
+  /// No description provided for @colorSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Color Source'**
+  String get colorSource;
+
+  /// No description provided for @gestures.
+  ///
+  /// In en, this message translates to:
+  /// **'Gestures'**
+  String get gestures;
+
+  /// No description provided for @miniPlayerSwipeLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Mini Player Swipe Left'**
+  String get miniPlayerSwipeLeft;
+
+  /// No description provided for @miniPlayerSwipeRight.
+  ///
+  /// In en, this message translates to:
+  /// **'Mini Player Swipe Right'**
+  String get miniPlayerSwipeRight;
+
+  /// No description provided for @nowPlayingDoubleTap.
+  ///
+  /// In en, this message translates to:
+  /// **'Now Playing Double-Tap'**
+  String get nowPlayingDoubleTap;
+
+  /// No description provided for @artworkSwipe.
+  ///
+  /// In en, this message translates to:
+  /// **'Artwork Swipe'**
+  String get artworkSwipe;
+
+  /// No description provided for @libraryAndScanning.
+  ///
+  /// In en, this message translates to:
+  /// **'Library & Scanning'**
+  String get libraryAndScanning;
+
+  /// No description provided for @hiddenAndExcludedFolders.
+  ///
+  /// In en, this message translates to:
+  /// **'Hidden & Excluded Folders'**
+  String get hiddenAndExcludedFolders;
+
+  /// No description provided for @shortAudioFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Short Audio Filter'**
+  String get shortAudioFilter;
+
+  /// No description provided for @filterShortAudio.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter Short Audio'**
+  String get filterShortAudio;
+
+  /// No description provided for @excludeTracksUnder.
+  ///
+  /// In en, this message translates to:
+  /// **'Exclude tracks under {seconds} seconds (filters voice notes):'**
+  String excludeTracksUnder(int seconds);
+
+  /// No description provided for @ignoreFilesUnder.
+  ///
+  /// In en, this message translates to:
+  /// **'Ignore files under {seconds}s'**
+  String ignoreFilesUnder(int seconds);
+
+  /// No description provided for @youtubeMusicAndOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube Music & Online'**
+  String get youtubeMusicAndOnline;
+
+  /// No description provided for @connectYtmAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect YouTube Music Account'**
+  String get connectYtmAccount;
+
+  /// No description provided for @connectYtmSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to auto-sync your Liked Music library'**
+  String get connectYtmSubtitle;
+
+  /// No description provided for @ytmConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube Music Connected'**
+  String get ytmConnected;
+
+  /// No description provided for @openYtmWeb.
+  ///
+  /// In en, this message translates to:
+  /// **'Open YouTube Music Web'**
+  String get openYtmWeb;
+
+  /// No description provided for @openYtmWebSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse web player, explore charts, library & playlists'**
+  String get openYtmWebSubtitle;
+
+  /// No description provided for @offlineOnlyMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline Only Mode'**
+  String get offlineOnlyMode;
+
+  /// No description provided for @offlineOnlySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Disable online features, streaming & web queries'**
+  String get offlineOnlySubtitle;
+
+  /// No description provided for @wifiOnlyMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Wi-Fi Only Mode'**
+  String get wifiOnlyMode;
+
+  /// No description provided for @wifiOnlySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Only stream and download when on Wi-Fi'**
+  String get wifiOnlySubtitle;
+
+  /// No description provided for @searchYtm.
+  ///
+  /// In en, this message translates to:
+  /// **'Search YouTube Music'**
+  String get searchYtm;
+
+  /// No description provided for @searchYtmSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Search, stream & download songs'**
+  String get searchYtmSubtitle;
+
+  /// No description provided for @streamingQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'Streaming Quality'**
+  String get streamingQuality;
+
+  /// No description provided for @downloadQuality.
+  ///
+  /// In en, this message translates to:
+  /// **'Download Quality'**
+  String get downloadQuality;
+
+  /// No description provided for @extractionEngine.
+  ///
+  /// In en, this message translates to:
+  /// **'Extraction Engine'**
+  String get extractionEngine;
+
+  /// No description provided for @ytdlpConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'yt-dlp Server Config'**
+  String get ytdlpConfig;
+
+  /// No description provided for @storageAndCache.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage & Cache'**
+  String get storageAndCache;
+
+  /// No description provided for @privacyAndData.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy & Data'**
+  String get privacyAndData;
+
+  /// No description provided for @privacyGuaranteeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'100% offline. Zero telemetry, zero tracking.'**
+  String get privacyGuaranteeSubtitle;
+
+  /// No description provided for @aboutAppSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Version 1.0.0 • Pure Offline Sound'**
+  String get aboutAppSubtitle;
+
+  /// No description provided for @signIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign In'**
+  String get signIn;
+
+  /// No description provided for @lastSyncedJustNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Last synced: Just now'**
+  String get lastSyncedJustNow;
+
+  /// No description provided for @lastSyncedMinutesAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'Last synced: {minutes}m ago'**
+  String lastSyncedMinutesAgo(int minutes);
+
+  /// No description provided for @lastSyncedHoursAgo.
+  ///
+  /// In en, this message translates to:
+  /// **'Last synced: {hours}h ago'**
+  String lastSyncedHoursAgo(int hours);
+
+  /// No description provided for @connectedReadyToSync.
+  ///
+  /// In en, this message translates to:
+  /// **'Connected • Ready to sync'**
+  String get connectedReadyToSync;
+
+  /// No description provided for @downloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded'**
+  String get downloaded;
+
+  /// No description provided for @exploreOnlineMusic.
+  ///
+  /// In en, this message translates to:
+  /// **'Explore Online Music'**
+  String get exploreOnlineMusic;
+
+  /// No description provided for @noDownloadsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No Downloads Yet'**
+  String get noDownloadsYet;
+
+  /// No description provided for @noDownloadsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Download your favorite songs from YouTube Music to listen offline anywhere.'**
+  String get noDownloadsSubtitle;
+
+  /// No description provided for @offlineDownloads.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline Downloads'**
+  String get offlineDownloads;
+
+  /// No description provided for @local.
+  ///
+  /// In en, this message translates to:
+  /// **'Local'**
+  String get local;
+
+  /// No description provided for @online.
+  ///
+  /// In en, this message translates to:
+  /// **'Online'**
+  String get online;
+
+  /// No description provided for @syncYouTubeMusic.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync YouTube Music'**
+  String get syncYouTubeMusic;
+
+  /// No description provided for @importByPlaylistLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Import by Playlist Link'**
+  String get importByPlaylistLink;
+
+  /// No description provided for @noLocalFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'No Local Favorites'**
+  String get noLocalFavorites;
+
+  /// No description provided for @noLocalFavoritesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap the heart icon on any of your local tracks to add them here.'**
+  String get noLocalFavoritesSubtitle;
+
+  /// No description provided for @noOnlineFavorites.
+  ///
+  /// In en, this message translates to:
+  /// **'No Online Favorites'**
+  String get noOnlineFavorites;
+
+  /// No description provided for @scanStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan Storage'**
+  String get scanStorage;
+
+  /// No description provided for @noFoldersFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No Folders Found'**
+  String get noFoldersFound;
+
+  /// No description provided for @noFoldersSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan device storage to discover music directories and organize by path.'**
+  String get noFoldersSubtitle;
+
+  /// No description provided for @playNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Play Next'**
+  String get playNext;
+
+  /// No description provided for @favorite.
+  ///
+  /// In en, this message translates to:
+  /// **'Favorite'**
+  String get favorite;
+
+  /// No description provided for @all.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get all;
+
+  /// No description provided for @importM3u.
+  ///
+  /// In en, this message translates to:
+  /// **'Import M3U'**
+  String get importM3u;
+
+  /// No description provided for @syncOnlineLibrary.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync Online Library'**
+  String get syncOnlineLibrary;
+
+  /// No description provided for @addPlaylistUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Add Playlist URL'**
+  String get addPlaylistUrl;
+
+  /// No description provided for @addYouTubePlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Add YouTube Playlist'**
+  String get addYouTubePlaylist;
+
+  /// No description provided for @playlistImported.
+  ///
+  /// In en, this message translates to:
+  /// **'Playlist Imported'**
+  String get playlistImported;
+
+  /// No description provided for @tracksMatched.
+  ///
+  /// In en, this message translates to:
+  /// **'{matched} of {total} tracks matched.'**
+  String tracksMatched(int matched, int total);
+
+  /// No description provided for @fetch.
+  ///
+  /// In en, this message translates to:
+  /// **'Fetch'**
+  String get fetch;
+
+  /// No description provided for @ok.
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get ok;
+
+  /// No description provided for @tracksCountPlural.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} {count, plural, =1{track} other{tracks}}'**
+  String tracksCountPlural(int count);
+
+  /// No description provided for @noTrackSelected.
+  ///
+  /// In en, this message translates to:
+  /// **'No Track Selected'**
+  String get noTrackSelected;
+
+  /// No description provided for @playbackSpeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback Speed'**
+  String get playbackSpeed;
+
+  /// No description provided for @vinylCircle.
+  ///
+  /// In en, this message translates to:
+  /// **'Vinyl Circle'**
+  String get vinylCircle;
+
+  /// No description provided for @sortAndFilter.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort & Filter'**
+  String get sortAndFilter;
+
+  /// No description provided for @title.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get title;
+
+  /// No description provided for @duration.
+  ///
+  /// In en, this message translates to:
+  /// **'Duration'**
+  String get duration;
+
+  /// No description provided for @qualityAndCodec.
+  ///
+  /// In en, this message translates to:
+  /// **'QUALITY & CODEC'**
+  String get qualityAndCodec;
+
+  /// No description provided for @audioFormat.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Format'**
+  String get audioFormat;
+
+  /// No description provided for @channels.
+  ///
+  /// In en, this message translates to:
+  /// **'Channels'**
+  String get channels;
+
+  /// No description provided for @playCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Play Count'**
+  String get playCount;
+
+  /// No description provided for @ringtone.
+  ///
+  /// In en, this message translates to:
+  /// **'Ringtone'**
+  String get ringtone;
+
+  /// No description provided for @editTags.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Tags'**
+  String get editTags;
+
+  /// No description provided for @setAudioAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Set Audio As'**
+  String get setAudioAs;
+
+  /// No description provided for @phoneRingtone.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone Ringtone'**
+  String get phoneRingtone;
+
+  /// No description provided for @notificationSound.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification Sound'**
+  String get notificationSound;
+
+  /// No description provided for @alarmSound.
+  ///
+  /// In en, this message translates to:
+  /// **'Alarm Sound'**
+  String get alarmSound;
+
+  /// No description provided for @turnOff.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn Off'**
+  String get turnOff;
+
+  /// No description provided for @presets.
+  ///
+  /// In en, this message translates to:
+  /// **'Presets'**
+  String get presets;
+
+  /// No description provided for @customTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Time'**
+  String get customTime;
+
+  /// No description provided for @stopAtSpecificTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop at specific time'**
+  String get stopAtSpecificTime;
+
+  /// No description provided for @currentSpeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Current speed: {speed}'**
+  String currentSpeed(String speed);
+
+  /// No description provided for @addedTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Added to {name}'**
+  String addedTo(String name);
+
+  /// No description provided for @playCountTimes.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} {count, plural, =1{time} other{times}}'**
+  String playCountTimes(int count);
+
+  /// No description provided for @pastePlaylistUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'Paste YouTube Playlist URL or ID'**
+  String get pastePlaylistUrl;
+
+  /// No description provided for @hideCustomFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide Custom Folder'**
+  String get hideCustomFolder;
+
+  /// No description provided for @hideFolderDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the full directory path you want to hide from your music library:'**
+  String get hideFolderDesc;
+
+  /// No description provided for @hideFolder.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide Folder'**
+  String get hideFolder;
+
+  /// No description provided for @confirmRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm Restore'**
+  String get confirmRestore;
+
+  /// No description provided for @confirmRestoreDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to restore backup data from this file?'**
+  String get confirmRestoreDesc;
+
+  /// No description provided for @existingLibraryUpdateNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Existing library matching tracks will be updated.'**
+  String get existingLibraryUpdateNotice;
+
+  /// No description provided for @audioVisualizerPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio Visualizer Permission'**
+  String get audioVisualizerPermission;
+
+  /// No description provided for @audioVisualizerPermissionDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'The visualizer reads audio output, not your microphone. Android requires the Record Audio permission to process frequency data.'**
+  String get audioVisualizerPermissionDesc;
+
+  /// No description provided for @useSimulation.
+  ///
+  /// In en, this message translates to:
+  /// **'Use Simulation'**
+  String get useSimulation;
+
+  /// No description provided for @visualizerSimulationNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'Visualizer permission denied — showing a simulated animation instead.'**
+  String get visualizerSimulationNotice;
+
+  /// No description provided for @ytmAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube Music Account'**
+  String get ytmAccount;
+
+  /// No description provided for @disconnect.
+  ///
+  /// In en, this message translates to:
+  /// **'Disconnect'**
+  String get disconnect;
+
+  /// No description provided for @openWebPlayer.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Web Player'**
+  String get openWebPlayer;
+
+  /// No description provided for @ytdlpServerConfig.
+  ///
+  /// In en, this message translates to:
+  /// **'yt-dlp Server Config'**
+  String get ytdlpServerConfig;
+
+  /// No description provided for @ytdlpServerDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Connects Pulsr to a remote yt-dlp backend with rotating proxies to bypass YouTube bot detection and IP bans.'**
+  String get ytdlpServerDesc;
 }
 
 class _AppLocalizationsDelegate

@@ -53,10 +53,7 @@ class AuthCubit extends Cubit<AuthState> {
         emit(state.copyWith(status: AuthStatus.unauthenticated));
       }
     } catch (e) {
-      String msg = e.toString().replaceAll('Exception: ', '');
-      if (msg.contains('10') || msg.contains('ApiException: 10')) {
-        msg = 'Google Sign-In needs SHA-1 fingerprint registered in Firebase Console. You can sign in with Email below!';
-      }
+      final msg = _mapAuthError(e);
       emit(state.copyWith(
         status: AuthStatus.error,
         errorMessage: msg,
@@ -77,9 +74,10 @@ class AuthCubit extends Cubit<AuthState> {
         await syncNow();
       }
     } catch (e) {
+      final msg = _mapAuthError(e);
       emit(state.copyWith(
         status: AuthStatus.error,
-        errorMessage: e.toString().replaceAll('Exception: ', ''),
+        errorMessage: msg,
       ));
     }
   }
@@ -97,9 +95,10 @@ class AuthCubit extends Cubit<AuthState> {
         await syncNow();
       }
     } catch (e) {
+      final msg = _mapAuthError(e);
       emit(state.copyWith(
         status: AuthStatus.error,
-        errorMessage: e.toString().replaceAll('Exception: ', ''),
+        errorMessage: msg,
       ));
     }
   }
@@ -108,10 +107,34 @@ class AuthCubit extends Cubit<AuthState> {
     try {
       await _authService.sendPasswordResetEmail(email);
     } catch (e) {
+      final msg = _mapAuthError(e);
       emit(state.copyWith(
-        errorMessage: e.toString().replaceAll('Exception: ', ''),
+        errorMessage: msg,
       ));
     }
+  }
+
+  String _mapAuthError(Object e) {
+    final s = e.toString().toLowerCase();
+    if (s.contains('user-not-found') || s.contains('user not found')) {
+      return 'No account found with this email.';
+    }
+    if (s.contains('wrong-password') || s.contains('wrong password') || s.contains('invalid-credential')) {
+      return 'Incorrect email or password.';
+    }
+    if (s.contains('email-already-in-use') || s.contains('email already in use')) {
+      return 'This email is already registered.';
+    }
+    if (s.contains('weak-password') || s.contains('weak password')) {
+      return 'Password must be at least 6 characters.';
+    }
+    if (s.contains('network-request-failed') || s.contains('network error') || s.contains('socketexception')) {
+      return 'Network error. Check your internet connection.';
+    }
+    if (s.contains('10') || s.contains('apiexception: 10')) {
+      return 'Google Sign-In needs SHA-1 fingerprint registered in Firebase Console. You can sign in with Email below!';
+    }
+    return 'Sign-in failed. Please try again.';
   }
 
   Future<void> syncNow() async {

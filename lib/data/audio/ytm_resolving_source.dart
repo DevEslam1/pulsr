@@ -5,14 +5,12 @@
 // get lazy resolution + byte caching for YTM inside a ConcatenatingAudioSource.
 // ignore_for_file: experimental_member_use
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+import '../../core/services/ytm_cache_manager.dart';
 
 /// A [StreamAudioSource] for a YouTube Music track whose stream URL is resolved
 /// lazily, on the first byte request rather than up front.
@@ -20,12 +18,13 @@ import 'package:path_provider/path_provider.dart';
 /// Hardened with:
 /// - Parsing of `expire` query timestamp (proactive re-resolve when < 300s remaining)
 /// - Automatic transparent retry on 403 Forbidden / 416 Range Not Satisfiable
-/// - Resilient disk cache under application support
+/// - Resilient disk cache managed by [YtmCacheManager] with LRU pruning
 class YtmResolvingSource extends StreamAudioSource {
   YtmResolvingSource({
     required this.videoId,
     required Future<String> Function() resolve,
     this.userAgent,
+    this.cookies,
     this.onError,
     super.tag,
   }) : resolve = (({bool forceRefresh = false}) => resolve());
@@ -34,6 +33,7 @@ class YtmResolvingSource extends StreamAudioSource {
     required this.videoId,
     required this.resolve,
     this.userAgent,
+    this.cookies,
     this.onError,
     super.tag,
   });
@@ -48,10 +48,13 @@ class YtmResolvingSource extends StreamAudioSource {
   final void Function(Object error)? onError;
 
   String? userAgent;
+  String? cookies;
 
   LockCachingAudioSource? _inner;
   Future<LockCachingAudioSource>? _pending;
   DateTime? _resolvedExpiresAt;
+
+  static final YtmCacheManager _cacheManager = YtmCacheManager();
 
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
@@ -67,14 +70,22 @@ class YtmResolvingSource extends StreamAudioSource {
       try {
         return await inner.request(start, end);
       } catch (byteErr) {
+        final errStr = byteErr.toString().toLowerCase();
+
+        // Abort immediately on hard blocks (403/429/forbidden)
+        if (errStr.contains('403') || errStr.contains('forbidden') || errStr.contains('429')) {
+          debugPrint('[YtmResolvingSource] Hard block ($byteErr) for $videoId. Aborting re-resolution.');
+          _inner = null;
+          _pending = null;
+          onError?.call(byteErr);
+          rethrow;
+        }
+
         debugPrint('[YtmResolvingSource] Byte stream error ($byteErr) for $videoId. Re-resolving fresh stream...');
         _inner = null;
         _pending = null;
         try {
-          final cacheFile = await _cacheFileFor(videoId);
-          if (cacheFile.existsSync()) {
-            await cacheFile.delete();
-          }
+          await _deleteCacheFilesFor(videoId);
         } catch (_) {}
         final freshInner = await _createInner(forceRefresh: true);
         return await freshInner.request(start, end);
@@ -115,32 +126,80 @@ class YtmResolvingSource extends StreamAudioSource {
       }
     } catch (_) {}
 
-    final cacheFile = await _cacheFileFor(videoId);
+    final cacheFile = await _cacheFileFor(videoId, url);
     final ua = userAgent;
+    final ck = cookies;
     final headers = <String, String>{
       if (ua != null && ua.isNotEmpty)
         'User-Agent': ua
       else
         'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
+      if (ck != null && ck.isNotEmpty) 'Cookie': ck,
+      'Referer': 'https://music.youtube.com/',
     };
 
-    final inner = LockCachingAudioSource(
-      Uri.parse(url),
-      headers: headers,
-      cacheFile: cacheFile,
-    );
-    _inner = inner;
-    return inner;
+    // Serialize creation per cache path so two sources for the same videoId
+    // never start writing the same file at exactly the same time.
+    final pathKey = cacheFile.path;
+    if (_pathCreationLocks.length >= _maxLocks) {
+      _pathCreationLocks.clear();
+    }
+    final previous = _pathCreationLocks[pathKey];
+    final completer = Completer<void>();
+    _pathCreationLocks[pathKey] = completer.future;
+    try {
+      if (previous != null) {
+        await previous.catchError((_) {});
+      }
+
+      final inner = LockCachingAudioSource(
+        Uri.parse(url),
+        headers: headers,
+        cacheFile: cacheFile,
+      );
+      _inner = inner;
+
+      // Trigger asynchronous background cache pruning if exceeding size limit
+      _cacheManager.pruneIfExceedsLimit().ignore();
+
+      return inner;
+    } finally {
+      completer.complete();
+      if (identical(_pathCreationLocks[pathKey], completer.future)) {
+        _pathCreationLocks.remove(pathKey);
+      }
+    }
   }
 
-  static Future<File> _cacheFileFor(String videoId) async {
-    final base = await getApplicationSupportDirectory();
-    final dir = Directory(p.join(base.path, 'ytm_cache'));
-    if (!dir.existsSync()) {
-      await dir.create(recursive: true);
+  /// Deletes every container variant of this videoId's cache slot (the
+  /// resolver may alternate between m4a and webm across re-resolves).
+  static Future<void> _deleteCacheFilesFor(String videoId) async {
+    final dir = await _cacheManager.getCacheDirectory();
+    final hash = _cacheManager.getHashForVideoId(videoId);
+    for (final ext in const ['m4a', 'webm']) {
+      final f = File(p.join(dir.path, '$hash.$ext'));
+      if (f.existsSync()) {
+        await f.delete();
+      }
     }
-    final hash = sha256.convert(utf8.encode(videoId)).toString();
-    return File(p.join(dir.path, '$hash.m4a'));
+  }
+
+  /// In-flight creation guards keyed by cache-file path.
+  static const int _maxLocks = 64;
+  static final Map<String, Future<void>> _pathCreationLocks =
+      <String, Future<void>>{};
+
+  static Future<File> _cacheFileFor(String videoId, String url) async {
+    final dir = await _cacheManager.getCacheDirectory();
+    final hash = _cacheManager.getHashForVideoId(videoId);
+    // Container-aware extension: a webm/opus resolve must not reuse (or be
+    // poisoned by) an m4a cache slot written for a different format.
+    var ext = 'm4a';
+    try {
+      final mime = Uri.parse(url).queryParameters['mime'] ?? '';
+      if (mime.contains('webm')) ext = 'webm';
+    } catch (_) {}
+    return File(p.join(dir.path, '$hash.$ext'));
   }
 }

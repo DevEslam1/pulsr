@@ -63,129 +63,169 @@ class CloudSyncService {
   }
 
   Future<void> _uploadLocalData(DocumentReference userDoc) async {
-    // 1. Gather local favorites
+    final firestore = FirebaseFirestore.instance;
+    WriteBatch currentBatch = firestore.batch();
+    int opCount = 0;
+
+    Future<void> commitBatchIfFull() async {
+      if (opCount >= 400) {
+        try {
+          await currentBatch.commit();
+        } catch (e, st) {
+          ErrorLogger.log('Cloud sync batch commit failed',
+              error: e, stackTrace: st, category: 'CloudSync');
+          rethrow;
+        }
+        currentBatch = firestore.batch();
+        opCount = 0;
+      }
+    }
+
+    // 1. Upload favorites as subcollection in batch
     final favRes = await _repository.getFavorites();
     final localFavorites = favRes.fold((l) => <SongsTableData>[], (r) => r);
 
-    final favList = localFavorites.map((s) => {
-      'title': s.title,
-      'artist': s.artist,
-      'album': s.album,
-      'durationMs': s.durationMs,
-      'remoteId': s.remoteId,
-      'remoteArtworkUrl': s.remoteArtworkUrl,
-      'source': s.source,
-      'isFavorite': true,
-      'dateAdded': s.dateAdded,
-    }).toList();
-
-    // 2. Gather local custom playlists
-    final playlistRes = await _repository.getPlaylists();
-    final localPlaylists = playlistRes.fold((l) => <PlaylistsTableData>[], (r) => r);
-
-    final playlistsData = <Map<String, dynamic>>[];
-    for (final pl in localPlaylists) {
-      final songsRes = await _repository.getPlaylistSongs(pl.id);
-      final pSongs = songsRes.fold((l) => <SongsTableData>[], (r) => r);
-
-      playlistsData.add({
-        'name': pl.name,
-        'createdAt': pl.createdAt,
-        'songs': pSongs.map((s) => {
-          'title': s.title,
-          'artist': s.artist,
-          'album': s.album,
-          'durationMs': s.durationMs,
-          'remoteId': s.remoteId,
-          'remoteArtworkUrl': s.remoteArtworkUrl,
-          'source': s.source,
-        }).toList(),
-      });
+    final favCollection = userDoc.collection('favorites');
+    for (final song in localFavorites) {
+      currentBatch.set(favCollection.doc(song.id.toString()), {
+        'title': song.title,
+        'artist': song.artist,
+        'album': song.album,
+        'durationMs': song.durationMs,
+        'remoteId': song.remoteId,
+        'remoteArtworkUrl': song.remoteArtworkUrl,
+        'source': song.source,
+        'isFavorite': true,
+        'dateAdded': song.dateAdded,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      opCount++;
+      await commitBatchIfFull();
     }
 
-    // Save to Firestore batch/set
-    await userDoc.collection('sync').doc('favorites').set({
-      'updatedAt': FieldValue.serverTimestamp(),
-      'items': favList,
-    }, SetOptions(merge: true));
+    // 2. Upload playlists as subcollections in batch
+    final playlistRes = await _repository.getPlaylists();
+    final localPlaylists = playlistRes.fold((l) => <PlaylistsTableData>[], (r) => r);
+    for (final pl in localPlaylists) {
+      final plDoc = userDoc.collection('playlists').doc(pl.id.toString());
+      currentBatch.set(plDoc, {
+        'name': pl.name,
+        'createdAt': pl.createdAt.toIso8601String(),
+        'isSmart': pl.isSmart,
+        'smartCriteria': pl.smartCriteria,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      opCount++;
+      await commitBatchIfFull();
 
-    await userDoc.collection('sync').doc('playlists').set({
-      'updatedAt': FieldValue.serverTimestamp(),
-      'items': playlistsData,
-    }, SetOptions(merge: true));
+      final songsRes = await _repository.getPlaylistSongs(pl.id);
+      final pSongs = songsRes.fold((l) => <SongsTableData>[], (r) => r);
+      for (final song in pSongs) {
+        currentBatch.set(plDoc.collection('songs').doc(song.id.toString()), {
+          'title': song.title,
+          'artist': song.artist,
+          'album': song.album,
+          'remoteId': song.remoteId,
+          'remoteArtworkUrl': song.remoteArtworkUrl,
+          'durationMs': song.durationMs,
+          'source': song.source,
+          'updatedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        opCount++;
+        await commitBatchIfFull();
+      }
+    }
+
+    if (opCount > 0) {
+      try {
+        await currentBatch.commit();
+      } catch (e, st) {
+        ErrorLogger.log('Cloud sync final batch commit failed',
+            error: e, stackTrace: st, category: 'CloudSync');
+        rethrow;
+      }
+    }
   }
 
   Future<void> _downloadAndMergeCloudData(DocumentReference userDoc) async {
     // 1. Merge Favorites
-    final favDoc = await userDoc.collection('sync').doc('favorites').get();
-    if (favDoc.exists && favDoc.data() != null) {
-      final items = (favDoc.data()!['items'] as List<dynamic>?) ?? [];
-      for (final item in items) {
-        if (item is! Map<String, dynamic>) continue;
-        final title = (item['title'] as String?) ?? '';
-        final artist = (item['artist'] as String?) ?? '';
-        final remoteId = item['remoteId'] as String?;
-        final remoteArtworkUrl = item['remoteArtworkUrl'] as String?;
-        final durationMs = (item['durationMs'] as num?)?.toInt() ?? 0;
-
-        if (title.isEmpty) continue;
-
-        // Check if existing song matches
-        SongsTableData? match;
-        if (remoteId != null && remoteId.isNotEmpty) {
-          match = await (_db.select(_db.songsTable)..where((t) => t.remoteId.equals(remoteId))).getSingleOrNull();
-        }
-        match ??= await (_db.select(_db.songsTable)
-              ..where((t) => t.title.lower().equals(title.toLowerCase()) & t.artist.lower().equals(artist.toLowerCase()))
-              ..limit(1))
-            .getSingleOrNull();
-
-        if (match != null) {
-          if (!match.isFavorite) {
-            await _repository.toggleFavorite(match.id);
-          }
-        } else if (remoteId != null && remoteId.isNotEmpty) {
-          // Add as an online favorite song
-          final track = YtmTrack(
-            videoId: remoteId,
-            title: title,
-            artist: artist,
-            duration: Duration(milliseconds: durationMs),
-            artworkUrl: remoteArtworkUrl,
-          );
-          final songData = track.toSongData();
-          await _db.into(_db.songsTable).insert(
-            SongsTableCompanion(
-              id: Value(songData.id),
-              title: Value(songData.title),
-              artist: Value(songData.artist),
-              album: Value(songData.album),
-              durationMs: Value(songData.durationMs),
-              path: Value(songData.path),
-              source: const Value(SongSource.youtube),
-              isFavorite: const Value(true),
-              remoteId: Value(remoteId),
-              remoteArtworkUrl: Value(remoteArtworkUrl),
-            ),
-            mode: InsertMode.insertOrReplace,
-          );
+    final favSnapshot = await userDoc.collection('favorites').get();
+    final favItems = <Map<String, dynamic>>[];
+    if (favSnapshot.docs.isNotEmpty) {
+      for (final doc in favSnapshot.docs) {
+        favItems.add(doc.data());
+      }
+    } else {
+      // Legacy document fallback
+      final favDoc = await userDoc.collection('sync').doc('favorites').get();
+      if (favDoc.exists && favDoc.data() != null) {
+        final legacyItems = (favDoc.data()!['items'] as List<dynamic>?) ?? [];
+        for (final item in legacyItems) {
+          if (item is Map<String, dynamic>) favItems.add(item);
         }
       }
     }
 
-    // 2. Merge Playlists
-    final plDoc = await userDoc.collection('sync').doc('playlists').get();
-    if (plDoc.exists && plDoc.data() != null) {
-      final plItems = (plDoc.data()!['items'] as List<dynamic>?) ?? [];
-      final existingPlaylistsRes = await _repository.getPlaylists();
-      final existingPlaylists = existingPlaylistsRes.fold((l) => <PlaylistsTableData>[], (r) => r);
+    for (final item in favItems) {
+      final title = (item['title'] as String?) ?? '';
+      final artist = (item['artist'] as String?) ?? '';
+      final remoteId = item['remoteId'] as String?;
+      final remoteArtworkUrl = item['remoteArtworkUrl'] as String?;
+      final durationMs = (item['durationMs'] as num?)?.toInt() ?? 0;
 
-      for (final plItem in plItems) {
-        if (plItem is! Map<String, dynamic>) continue;
-        final name = (plItem['name'] as String?) ?? '';
+      if (title.isEmpty) continue;
+
+      SongsTableData? match;
+      if (remoteId != null && remoteId.isNotEmpty) {
+        match = await (_db.select(_db.songsTable)..where((t) => t.remoteId.equals(remoteId))).getSingleOrNull();
+      }
+      match ??= await (_db.select(_db.songsTable)
+            ..where((t) => t.title.lower().equals(title.toLowerCase()) & t.artist.lower().equals(artist.toLowerCase()))
+            ..limit(1))
+          .getSingleOrNull();
+
+      if (match != null) {
+        if (!match.isFavorite) {
+          await _repository.toggleFavorite(match.id);
+        }
+      } else if (remoteId != null && remoteId.isNotEmpty) {
+        final track = YtmTrack(
+          videoId: remoteId,
+          title: title,
+          artist: artist,
+          duration: Duration(milliseconds: durationMs),
+          artworkUrl: remoteArtworkUrl,
+        );
+        final songData = track.toSongData();
+        await _db.into(_db.songsTable).insert(
+          SongsTableCompanion(
+            id: Value(songData.id),
+            title: Value(songData.title),
+            artist: Value(songData.artist),
+            album: Value(songData.album),
+            durationMs: Value(songData.durationMs),
+            path: Value(songData.path),
+            source: const Value(SongSource.youtube),
+            isFavorite: const Value(true),
+            remoteId: Value(remoteId),
+            remoteArtworkUrl: Value(remoteArtworkUrl),
+          ),
+          mode: InsertMode.insertOrReplace,
+        );
+      }
+    }
+
+    // 2. Merge Playlists
+    final plSnapshot = await userDoc.collection('playlists').get();
+    final existingPlaylistsRes = await _repository.getPlaylists();
+    final existingPlaylists = existingPlaylistsRes.fold((l) => <PlaylistsTableData>[], (r) => r);
+
+    if (plSnapshot.docs.isNotEmpty) {
+      for (final plDoc in plSnapshot.docs) {
+        final plData = plDoc.data();
+        final name = (plData['name'] as String?) ?? '';
         if (name.isEmpty) continue;
 
-        // Check if playlist exists
         var pl = existingPlaylists.where((p) => p.name.toLowerCase() == name.toLowerCase()).firstOrNull;
         if (pl == null) {
           final createRes = await _repository.createPlaylist(name);
@@ -196,9 +236,9 @@ class CloudSyncService {
         }
 
         if (pl != null) {
-          final songs = (plItem['songs'] as List<dynamic>?) ?? [];
-          for (final sItem in songs) {
-            if (sItem is! Map<String, dynamic>) continue;
+          final songDocs = await plDoc.reference.collection('songs').get();
+          for (final sDoc in songDocs.docs) {
+            final sItem = sDoc.data();
             final title = (sItem['title'] as String?) ?? '';
             final artist = (sItem['artist'] as String?) ?? '';
             final remoteId = sItem['remoteId'] as String?;
@@ -245,6 +285,80 @@ class CloudSyncService {
 
             if (songId != null) {
               await _repository.addSongToPlaylist(pl.id, songId);
+            }
+          }
+        }
+      }
+    } else {
+      // Legacy document fallback
+      final plLegacyDoc = await userDoc.collection('sync').doc('playlists').get();
+      if (plLegacyDoc.exists && plLegacyDoc.data() != null) {
+        final plItems = (plLegacyDoc.data()!['items'] as List<dynamic>?) ?? [];
+        for (final plItem in plItems) {
+          if (plItem is! Map<String, dynamic>) continue;
+          final name = (plItem['name'] as String?) ?? '';
+          if (name.isEmpty) continue;
+
+          var pl = existingPlaylists.where((p) => p.name.toLowerCase() == name.toLowerCase()).firstOrNull;
+          if (pl == null) {
+            final createRes = await _repository.createPlaylist(name);
+            final newId = createRes.fold((l) => null, (r) => r);
+            if (newId != null) {
+              pl = await (_db.select(_db.playlistsTable)..where((t) => t.id.equals(newId))).getSingleOrNull();
+            }
+          }
+
+          if (pl != null) {
+            final songs = (plItem['songs'] as List<dynamic>?) ?? [];
+            for (final sItem in songs) {
+              if (sItem is! Map<String, dynamic>) continue;
+              final title = (sItem['title'] as String?) ?? '';
+              final artist = (sItem['artist'] as String?) ?? '';
+              final remoteId = sItem['remoteId'] as String?;
+              final remoteArtworkUrl = sItem['remoteArtworkUrl'] as String?;
+              final durationMs = (sItem['durationMs'] as num?)?.toInt() ?? 0;
+
+              if (title.isEmpty) continue;
+
+              SongsTableData? match;
+              if (remoteId != null && remoteId.isNotEmpty) {
+                match = await (_db.select(_db.songsTable)..where((t) => t.remoteId.equals(remoteId))).getSingleOrNull();
+              }
+              match ??= await (_db.select(_db.songsTable)
+                    ..where((t) => t.title.lower().equals(title.toLowerCase()) & t.artist.lower().equals(artist.toLowerCase()))
+                    ..limit(1))
+                  .getSingleOrNull();
+
+              int? songId = match?.id;
+              if (songId == null && remoteId != null && remoteId.isNotEmpty) {
+                final track = YtmTrack(
+                  videoId: remoteId,
+                  title: title,
+                  artist: artist,
+                  duration: Duration(milliseconds: durationMs),
+                  artworkUrl: remoteArtworkUrl,
+                );
+                final songData = track.toSongData();
+                await _db.into(_db.songsTable).insert(
+                  SongsTableCompanion(
+                    id: Value(songData.id),
+                    title: Value(songData.title),
+                    artist: Value(songData.artist),
+                    album: Value(songData.album),
+                    durationMs: Value(songData.durationMs),
+                    path: Value(songData.path),
+                    source: const Value(SongSource.youtube),
+                    remoteId: Value(remoteId),
+                    remoteArtworkUrl: Value(remoteArtworkUrl),
+                  ),
+                  mode: InsertMode.insertOrReplace,
+                );
+                songId = songData.id;
+              }
+
+              if (songId != null) {
+                await _repository.addSongToPlaylist(pl.id, songId);
+              }
             }
           }
         }

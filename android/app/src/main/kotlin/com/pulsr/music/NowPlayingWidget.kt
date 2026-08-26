@@ -60,8 +60,6 @@ class NowPlayingWidget : AppWidgetProvider() {
 
         when (intent.action) {
             ACTION_PLAY_PAUSE -> {
-                val newPlaying = !currentIsPlaying
-                prefs.edit().putBoolean("isPlaying", newPlaying).apply()
                 performMediaAction(context, KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) { controls, isPlaying, _, _ ->
                     if (isPlaying) controls.pause() else controls.play()
                 }
@@ -110,17 +108,19 @@ class NowPlayingWidget : AppWidgetProvider() {
             }
         }
 
-        // Immediately re-render all widget instances with optimistic state
-        try {
-            val appWidgetManager = AppWidgetManager.getInstance(context)
-            val componentName = ComponentName(context, NowPlayingWidget::class.java)
-            val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
-            if (appWidgetIds != null && appWidgetIds.isNotEmpty()) {
-                for (id in appWidgetIds) {
-                    updateAppWidget(context, appWidgetManager, id)
+        // Post a delayed update to refresh widget state from actual media controller playback state
+        Handler(Looper.getMainLooper()).postDelayed({
+            try {
+                val appWidgetManager = AppWidgetManager.getInstance(context)
+                val componentName = ComponentName(context, NowPlayingWidget::class.java)
+                val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
+                if (appWidgetIds != null && appWidgetIds.isNotEmpty()) {
+                    for (id in appWidgetIds) {
+                        updateAppWidget(context, appWidgetManager, id)
+                    }
                 }
-            }
-        } catch (_: Throwable) {}
+            } catch (_: Throwable) {}
+        }, 500)
     }
 
     override fun onUpdate(
@@ -135,6 +135,15 @@ class NowPlayingWidget : AppWidgetProvider() {
                 // Ignore
             }
         }
+    }
+
+    override fun onDisabled(context: Context) {
+        super.onDisabled(context)
+        try {
+            cachedMediaBrowser?.disconnect()
+        } catch (_: Throwable) {}
+        cachedMediaBrowser = null
+        cachedMediaController = null
     }
 
     companion object {
@@ -208,6 +217,9 @@ class NowPlayingWidget : AppWidgetProvider() {
                     }
 
                     override fun onConnectionFailed() {
+                        try {
+                            cachedMediaBrowser?.disconnect()
+                        } catch (_: Throwable) {}
                         cachedMediaBrowser = null
                         cachedMediaController = null
                         if (fallbackKeyCode != null) {
@@ -218,6 +230,19 @@ class NowPlayingWidget : AppWidgetProvider() {
 
                 cachedMediaBrowser = MediaBrowserCompat(appContext, component, connectionCallback, null)
                 cachedMediaBrowser?.connect()
+
+                Handler(Looper.getMainLooper()).postDelayed({
+                    if (cachedMediaBrowser?.isConnected != true) {
+                        try {
+                            cachedMediaBrowser?.disconnect()
+                        } catch (_: Throwable) {}
+                        cachedMediaBrowser = null
+                        cachedMediaController = null
+                        if (fallbackKeyCode != null) {
+                            sendExplicitMediaButton(appContext, fallbackKeyCode)
+                        }
+                    }
+                }, 5000)
             } catch (_: Throwable) {
                 if (fallbackKeyCode != null) {
                     sendExplicitMediaButton(context, fallbackKeyCode)
