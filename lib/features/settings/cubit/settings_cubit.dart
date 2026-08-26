@@ -5,8 +5,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/constants/prefs_keys.dart';
+import '../../../core/di/injection.dart';
 import '../../../core/network/app_http_overrides.dart';
 import '../../../core/network/proxy_config.dart';
+import '../../../core/services/xdm_backend_service.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
@@ -147,7 +150,6 @@ class SettingsCubit extends Cubit<SettingsState> {
       final offlineOnlyMode = prefs.getBool(_keyOfflineOnlyMode) ?? false;
 
       // Proxy Settings
-      final proxyEnabled = prefs.getBool(_keyProxyEnabled) ?? false;
       final proxyTypeStr = prefs.getString(_keyProxyType) ?? AppProxyType.http.name;
       final proxyType = AppProxyType.values.firstWhere(
         (e) => e.name == proxyTypeStr,
@@ -170,6 +172,9 @@ class SettingsCubit extends Cubit<SettingsState> {
               .toList();
         } catch (_) {}
       }
+
+      // Proxy Settings
+      final proxyEnabled = prefs.getBool(_keyProxyEnabled) ?? false;
 
       // Theme color source
       final ThemeColorSource themeColorSource;
@@ -218,6 +223,13 @@ class SettingsCubit extends Cubit<SettingsState> {
         proxyPassword: proxyPassword,
         proxyBypassHosts: proxyBypassHosts,
         proxyList: proxyList,
+        extractorEngine: ExtractorEngine.values.firstWhere(
+          (e) => e.name == prefs.getString(PrefsKeys.extractorEngine),
+          orElse: () => ExtractorEngine.auto,
+        ),
+        ytdlpBackendEnabled: prefs.getBool(PrefsKeys.ytdlpBackendEnabled) ?? true,
+        ytdlpBackendUrl: prefs.getString(PrefsKeys.ytdlpBackendUrl) ?? XdmBackendService.defaultBaseUrl,
+        ytdlpBackendToken: prefs.getString(PrefsKeys.ytdlpBackendToken) ?? XdmBackendService.defaultApiToken,
       );
 
       emit(newState);
@@ -573,6 +585,61 @@ class SettingsCubit extends Cubit<SettingsState> {
     });
     emit(state.copyWith(proxyList: list));
     await _saveProxyList(list);
+  }
+
+  Future<void> setExtractorEngine(ExtractorEngine engine) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(PrefsKeys.extractorEngine, engine.name);
+    final isBackendActive = engine != ExtractorEngine.onDevice;
+    await prefs.setBool(PrefsKeys.ytdlpBackendEnabled, isBackendActive);
+    emit(state.copyWith(
+      extractorEngine: engine,
+      ytdlpBackendEnabled: isBackendActive,
+    ));
+  }
+
+  Future<void> setYtdlpBackendEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.ytdlpBackendEnabled, enabled);
+    final newEngine = enabled ? ExtractorEngine.auto : ExtractorEngine.onDevice;
+    await prefs.setString(PrefsKeys.extractorEngine, newEngine.name);
+    emit(state.copyWith(
+      ytdlpBackendEnabled: enabled,
+      extractorEngine: newEngine,
+    ));
+  }
+
+  Future<void> setYtdlpBackendUrl(String url) async {
+    final cleanUrl = url.trim();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(PrefsKeys.ytdlpBackendUrl, cleanUrl);
+    emit(state.copyWith(ytdlpBackendUrl: cleanUrl));
+  }
+
+  Future<void> setYtdlpBackendToken(String token) async {
+    final cleanToken = token.trim();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(PrefsKeys.ytdlpBackendToken, cleanToken);
+    emit(state.copyWith(ytdlpBackendToken: cleanToken));
+  }
+
+  Future<void> testYtdlpBackend() async {
+    emit(state.copyWith(isTestingYtdlpBackend: true, ytdlpBackendStatusMessage: null));
+    try {
+      final xdm = getIt.isRegistered<XdmBackendService>()
+          ? getIt<XdmBackendService>()
+          : XdmBackendService();
+      final health = await xdm.checkHealth();
+      emit(state.copyWith(
+        isTestingYtdlpBackend: false,
+        ytdlpBackendStatusMessage: health.message,
+      ));
+    } catch (e) {
+      emit(state.copyWith(
+        isTestingYtdlpBackend: false,
+        ytdlpBackendStatusMessage: 'Error: $e',
+      ));
+    }
   }
 
   Future<int> rescanLibrary() async {

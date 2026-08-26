@@ -42,9 +42,9 @@ internal class InnertubeClient(
     ) {
         ANDROID_VR(
             "ANDROID_VR",
-            "1.60.19",
+            "1.63.27",
             "28",
-            "com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12; en_US; Quest 2) gzip",
+            "com.google.android.apps.youtube.vr.oculus/1.63.27 (Linux; U; Android 12; en_US; Quest 2) gzip",
             false,
             "https://www.youtube.com",
         ),
@@ -66,41 +66,41 @@ internal class InnertubeClient(
         ),
         ANDROID_MUSIC(
             "ANDROID_MUSIC",
-            "7.27.52",
+            "8.32.50",
             "21",
-            "com.google.android.apps.youtube.music/7.27.52 (Linux; U; Android 13; en_US) gzip",
+            "com.google.android.apps.youtube.music/8.32.50 (Linux; U; Android 14; en_US) gzip",
             false,
             "https://music.youtube.com",
         ),
         IOS_MUSIC(
             "IOS_MUSIC",
-            "7.27.1",
+            "8.32.1",
             "26",
-            "com.google.ios.youtubemusic/7.27.1 (iPhone14,3; U; CPU iOS 17_5_1 like Mac OS X; en_US)",
+            "com.google.ios.youtubemusic/8.32.1 (iPhone15,3; U; CPU iOS 18_0 like Mac OS X; en_US)",
             false,
             "https://music.youtube.com",
         ),
         WEB_REMIX(
             "WEB_REMIX",
-            "1.20250820.01.00",
+            "1.20260825.01.00",
             "67",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
             true,
             "https://music.youtube.com",
         ),
         WEB_EMBEDDED_PLAYER(
             "WEB_EMBEDDED_PLAYER",
-            "1.20250820.01.00",
+            "1.20260825.01.00",
             "56",
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
             true,
             "https://www.youtube.com",
         ),
         MWEB(
             "MWEB",
-            "2.20250820.01.00",
+            "2.20260825.01.00",
             "65",
-            "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36",
+            "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36",
             true,
             "https://m.youtube.com",
         ),
@@ -241,6 +241,7 @@ internal class InnertubeClient(
             }
         }
 
+        PoTokenManager.invalidate()
         throw InnertubeException(
             ErrorCategory.BOT_BLOCK,
             "All Innertube client fallback resolutions failed for video $videoId",
@@ -346,7 +347,7 @@ internal class InnertubeClient(
 
                         if (!sapisid.isNullOrEmpty()) {
                             val timestamp = Instant.now().epochSecond
-                            val toHash = "$timestamp $sapisid https://music.youtube.com"
+                            val toHash = "$timestamp $sapisid ${clientType.endpointHost}"
                             val hash = sha1Hex(toHash)
                             connection.setRequestProperty("Authorization", "SAPISIDHASH ${timestamp}_$hash")
                         }
@@ -427,7 +428,7 @@ internal class InnertubeClient(
         val playbackContext = JSONObject()
         val contentPlaybackContext = JSONObject().apply {
             put("html5Preference", "HTML5_PREF_WANTS")
-            if (PoTokenManager.isReady && clientType.isWeb) {
+            if (PoTokenManager.isReady && !cookieStore.isSessionValid()) {
                 val poToken = PoTokenManager.poTokenForSync(videoId)
                 if (poToken.isNotEmpty()) {
                     put("poToken", poToken)
@@ -446,6 +447,9 @@ internal class InnertubeClient(
             put("clientVersion", clientType.clientVersion)
             put("hl", "en")
             put("gl", "US")
+            if (PoTokenManager.visitorData.isNotEmpty() && !cookieStore.isSessionValid()) {
+                put("visitorData", PoTokenManager.visitorData)
+            }
 
             when (clientType) {
                 ClientType.ANDROID_VR -> {
@@ -466,16 +470,16 @@ internal class InnertubeClient(
                     put("platform", "TV")
                 }
                 ClientType.ANDROID_MUSIC -> {
-                    put("androidSdkVersion", 33)
+                    put("androidSdkVersion", 34)
                     put("osName", "Android")
-                    put("osVersion", "13")
+                    put("osVersion", "14")
                     put("platform", "MOBILE")
                 }
                 ClientType.IOS_MUSIC -> {
                     put("deviceMake", "Apple")
-                    put("deviceModel", "iPhone14,3")
+                    put("deviceModel", "iPhone15,3")
                     put("osName", "iOS")
-                    put("osVersion", "17.5.1")
+                    put("osVersion", "18.0")
                     put("platform", "MOBILE")
                 }
                 ClientType.ANDROID_TESTSUITE -> {
@@ -489,9 +493,6 @@ internal class InnertubeClient(
                 }
                 ClientType.WEB_REMIX -> {
                     put("platform", "DESKTOP")
-                    if (PoTokenManager.visitorData.isNotEmpty()) {
-                        put("visitorData", PoTokenManager.visitorData)
-                    }
                 }
             }
         }

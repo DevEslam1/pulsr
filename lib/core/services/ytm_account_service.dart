@@ -16,7 +16,7 @@ import '../../domain/models/ytm_track.dart';
 import '../utils/error_logger.dart';
 import '../utils/lrc_parser.dart';
 import '../utils/ytm_rate_limiter.dart';
-import 'package:webview_flutter/webview_flutter.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 
 class YtmAccountPlaylist {
   final String playlistId;
@@ -153,7 +153,7 @@ class YtmAccountService {
       await ytmService.invalidatePoToken();
     } catch (_) {}
     try {
-      await WebViewCookieManager().clearCookies();
+      await CookieManager.instance().deleteAllCookies();
     } catch (_) {}
   }
 
@@ -264,20 +264,20 @@ class YtmAccountService {
     };
 
     if (clientType == 'ANDROID_MUSIC') {
-      clientMap['clientVersion'] = '7.27.52';
-      clientMap['androidSdkVersion'] = 33;
+      clientMap['clientVersion'] = '8.32.50';
+      clientMap['androidSdkVersion'] = 34;
       clientMap['osName'] = 'Android';
-      clientMap['osVersion'] = '13';
+      clientMap['osVersion'] = '14';
       clientMap['platform'] = 'MOBILE';
     } else if (clientType == 'IOS_MUSIC') {
-      clientMap['clientVersion'] = '7.27.1';
+      clientMap['clientVersion'] = '8.32.1';
       clientMap['deviceMake'] = 'Apple';
-      clientMap['deviceModel'] = 'iPhone14,3';
+      clientMap['deviceModel'] = 'iPhone15,3';
       clientMap['osName'] = 'iOS';
-      clientMap['osVersion'] = '17.5.1';
+      clientMap['osVersion'] = '18.0';
       clientMap['platform'] = 'MOBILE';
     } else if (clientType == 'ANDROID_VR') {
-      clientMap['clientVersion'] = '1.60.19';
+      clientMap['clientVersion'] = '1.63.27';
       clientMap['androidSdkVersion'] = 32;
       clientMap['deviceMake'] = 'Oculus';
       clientMap['deviceModel'] = 'Quest 2';
@@ -294,10 +294,10 @@ class YtmAccountService {
       clientMap['clientVersion'] = '1.9';
       clientMap['androidSdkVersion'] = 28;
     } else if (clientType == 'MWEB') {
-      clientMap['clientVersion'] = '2.20250820.01.00';
+      clientMap['clientVersion'] = '2.20260825.01.00';
       clientMap['platform'] = 'MOBILE';
     } else if (clientType == 'WEB_EMBEDDED_PLAYER') {
-      clientMap['clientVersion'] = '1.20250820.01.00';
+      clientMap['clientVersion'] = '1.20260825.01.00';
       clientMap['platform'] = 'DESKTOP';
     } else if (clientType == 'ANDROID') {
       clientMap['androidSdkVersion'] = 33;
@@ -604,10 +604,17 @@ class YtmAccountService {
   /// 3. IOS client
   /// 4. TVHTML5_SIMPLY_EMBEDDED_PLAYER
   Future<YtmStream?> resolvePlayerStream(String videoId, {String quality = 'high'}) async {
+    // When authenticated, skip guest PoToken/visitorData entirely.
+    // The guest poToken is minted with guest visitorData — they're a matched pair.
+    // Sending poToken without matching visitorData (or vice versa) makes YouTube reject.
+    // Clean cookie-only auth (SAPISIDHASH + cookies) is correct for authenticated sessions.
+    final isAuthenticated = isLoggedIn && _cookies != null && _cookies!.isNotEmpty;
     Map<String, dynamic>? poState;
-    try {
-      poState = await getIt<YtmService>().getPoTokenState();
-    } catch (_) {}
+    if (!isAuthenticated) {
+      try {
+        poState = await getIt<YtmService>().getPoTokenState();
+      } catch (_) {}
+    }
     final poToken = poState?['streamingPoToken'] as String?;
     final visitorData = poState?['visitorData'] as String?;
 
@@ -661,22 +668,26 @@ class YtmAccountService {
                                       ? '62'
                                       : (client == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER' ? '85' : '89'))))))),
           'x-youtube-client-version': client == 'ANDROID_MUSIC'
-              ? '7.27.52'
+              ? '8.32.50'
               : (client == 'IOS_MUSIC'
-                  ? '7.27.1'
+                  ? '8.32.1'
                   : (client == 'ANDROID_VR'
-                      ? '1.60.19'
-                      : (client == 'ANDROID_CREATOR'
-                          ? '24.45.100'
-                          : (client == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER'
-                              ? '2.0'
-                              : (client == 'ANDROID_TESTSUITE' ? '1.9' : _clientVersion))))),
+                      ? '1.63.27'
+                      : (client == 'MWEB'
+                          ? '2.20260825.01.00'
+                          : (client == 'WEB_EMBEDDED_PLAYER'
+                              ? '1.20260825.01.00'
+                              : (client == 'ANDROID_CREATOR'
+                                  ? '24.45.100'
+                                  : (client == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER'
+                                      ? '2.0'
+                                      : (client == 'ANDROID_TESTSUITE' ? '1.9' : _clientVersion))))))),
           'User-Agent': client == 'ANDROID_MUSIC'
-              ? 'com.google.android.apps.youtube.music/7.27.52 (Linux; U; Android 13; en_US) gzip'
+              ? 'com.google.android.apps.youtube.music/8.32.50 (Linux; U; Android 14; en_US) gzip'
               : (client == 'IOS_MUSIC'
-                  ? 'com.google.ios.youtubemusic/7.27.1 (iPhone14,3; U; CPU iOS 17_5_1 like Mac OS X; en_US)'
+                  ? 'com.google.ios.youtubemusic/8.32.1 (iPhone15,3; U; CPU iOS 18_0 like Mac OS X; en_US)'
                   : (client == 'ANDROID_VR'
-                      ? 'com.google.android.apps.youtube.vr.oculus/1.60.19 (Linux; U; Android 12; en_US; Quest 2) gzip'
+                      ? 'com.google.android.apps.youtube.vr.oculus/1.63.27 (Linux; U; Android 12; en_US; Quest 2) gzip'
                       : (client == 'ANDROID_CREATOR'
                           ? 'com.google.android.apps.youtube.creator/24.45.100 (Linux; U; Android 13; en_US) gzip'
                           : (client == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER'
@@ -684,8 +695,8 @@ class YtmAccountService {
                               : (client == 'ANDROID_TESTSUITE'
                                   ? 'com.google.android.youtube/1.9 (Linux; U; Android 9; gzip)'
                                   : (client == 'MWEB'
-                                      ? 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36'
-                                      : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36')))))),
+                                      ? 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36'
+                                      : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36')))))),
         };
 
         if (isWeb) {
@@ -722,7 +733,7 @@ class YtmAccountService {
           'playbackContext': {
             'contentPlaybackContext': {
               'html5Preference': 'HTML5_PREF_WANTS',
-              if (isWeb && poToken != null && poToken.isNotEmpty) 'poToken': poToken,
+              if (poToken != null && poToken.isNotEmpty) 'poToken': poToken,
             },
           },
         });
@@ -740,18 +751,25 @@ class YtmAccountService {
           final status = playability?['status'] as String? ?? '';
 
           if (status == 'LOGIN_REQUIRED' || status == 'UNPLAYABLE' || status.contains('BOT')) {
-            debugPrint('[YTM_ACCOUNT] Client $client returned playability $status, falling back to next');
+            final statusReason = playability?['reason'] as String? ?? 'no reason';
+            debugPrint('[YTM_ACCOUNT] Client $client returned playability $status ($statusReason), falling back to next');
 
-            // If WEB_REMIX (the client using auth cookies) returns LOGIN_REQUIRED, the session is expired.
-            // Do NOT wipe cookies if guest clients (like ANDROID_VR) return LOGIN_REQUIRED.
+            // If WEB_REMIX (the client using auth cookies) returns LOGIN_REQUIRED,
+            // check whether it's a genuine session expiry or just a bot challenge.
+            // Bot challenges say "Sign in to confirm you're not a bot" — don't logout for those.
             if (client == 'WEB_REMIX' && status == 'LOGIN_REQUIRED' && _cookies != null && _cookies!.isNotEmpty) {
-              debugPrint('[YTM_ACCOUNT] Session expired detected on WEB_REMIX. Clearing cookies and notifying UI.');
-              unawaited(logout());
-              try {
-                getIt<YtmService>().notifyAuthExpired();
-              } catch (_) {}
+              final reason = (playability?['reason'] as String? ?? '').toLowerCase();
+              final isBotChallenge = reason.contains('bot') || reason.contains('confirm');
+              if (!isBotChallenge) {
+                debugPrint('[YTM_ACCOUNT] Session expired detected on WEB_REMIX. Clearing cookies and notifying UI.');
+                unawaited(logout());
+                try {
+                  getIt<YtmService>().notifyAuthExpired();
+                } catch (_) {}
 
-              throw const YtmException('YTM_AUTH', 'YouTube Music session expired. Please sign in again.');
+                throw const YtmException('YTM_AUTH', 'YouTube Music session expired. Please sign in again.');
+              }
+              debugPrint('[YTM_ACCOUNT] WEB_REMIX bot challenge detected, trying next client without logout');
             }
             continue;
           }
@@ -806,6 +824,8 @@ class YtmAccountService {
               artworkUrl: null,
               userAgent: headers['User-Agent'],
             );
+          } else {
+            debugPrint('[YTM_ACCOUNT] Client $client returned status $status but no audio formats (adaptiveFormats: ${adaptive.length} total, streamingData: ${streamingData != null})');
           }
         }
       } catch (e) {

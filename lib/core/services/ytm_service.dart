@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 
 import '../di/injection.dart';
+import 'xdm_backend_service.dart';
 import 'ytm_account_service.dart';
 import '../../domain/models/ytm_track.dart';
 import '../utils/error_logger.dart';
@@ -169,10 +170,21 @@ class YtmService {
       final results = await search(trimmed, limit: limit);
       if (results.isNotEmpty) return results;
     } catch (e) {
-      debugPrint('[YTM_SERVICE] Native search failed, trying Innertube fallback: $e');
+      debugPrint('[YTM_SERVICE] Native search failed, trying fallbacks: $e');
     }
 
-    // 2. Fallback: Innertube search
+    // 2. Try remote yt-dlp backend search
+    try {
+      if (getIt.isRegistered<XdmBackendService>()) {
+        final xdm = getIt<XdmBackendService>();
+        final xdmResults = await xdm.search(trimmed, limit: limit);
+        if (xdmResults.isNotEmpty) return xdmResults;
+      }
+    } catch (e) {
+      debugPrint('[YTM_SERVICE] Remote yt-dlp search fallback failed: $e');
+    }
+
+    // 3. Fallback: Innertube search
     try {
       final innertubeResults = await _searchInnertube(trimmed, limit: limit);
       if (innertubeResults.isNotEmpty) return innertubeResults;
@@ -308,6 +320,19 @@ class YtmService {
   }
 
   Future<List<YtmTrack>> getPlaylistTracks(String urlOrId, {int limit = 100}) async {
+    // 1. Try remote yt-dlp backend if enabled
+    try {
+      if (getIt.isRegistered<XdmBackendService>()) {
+        final xdm = getIt<XdmBackendService>();
+        final playlistTracks = await xdm.getPlaylist(urlOrId, limit: limit);
+        if (playlistTracks.isNotEmpty) {
+          return playlistTracks;
+        }
+      }
+    } catch (e) {
+      debugPrint('[YTM_SERVICE] Remote yt-dlp playlist fallback: $e');
+    }
+
     final raw = await _guard(
       () => _channel.invokeMethod<Map<Object?, Object?>>('getPlaylist', {
         'url': urlOrId.trim(),
@@ -333,9 +358,22 @@ class YtmService {
   }
 
   /// Resolves audio stream using multi-tier fallback:
-  /// (a) Direct authenticated account stream -> (b) Native multi-client extractor
+  /// (a) Remote yt-dlp backend -> (b) Direct authenticated account stream -> (c) Native multi-client extractor
   Future<YtmStream> resolveStream(String videoId, {String quality = 'high'}) async {
-    // 1. Try direct authenticated YouTube Music InnerTube Player API if logged in
+    // 1. Try remote yt-dlp backend (XdmBackendService) if enabled
+    try {
+      if (getIt.isRegistered<XdmBackendService>()) {
+        final xdm = getIt<XdmBackendService>();
+        final remoteStream = await xdm.resolveStream(videoId, quality: quality);
+        if (remoteStream != null) {
+          return remoteStream;
+        }
+      }
+    } catch (e) {
+      debugPrint('[YTM_SERVICE] Remote yt-dlp backend stream resolution fallback: $e');
+    }
+
+    // 2. Try direct authenticated YouTube Music InnerTube Player API if logged in
     try {
       if (getIt.isRegistered<YtmAccountService>()) {
         final account = getIt<YtmAccountService>();
@@ -350,7 +388,7 @@ class YtmService {
       debugPrint('[YTM_SERVICE] Direct account stream resolution fallback: $e');
     }
 
-    // 2. Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
+    // 3. Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
     final raw = await _guard(
       () => _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
         'videoId': videoId,

@@ -20,6 +20,7 @@ import 'package:pulsr/core/services/cloud_sync_service.dart' as _i225;
 import 'package:pulsr/core/services/file_intent_handler.dart' as _i134;
 import 'package:pulsr/core/services/lrclib_service.dart' as _i621;
 import 'package:pulsr/core/services/scrobbler_service.dart' as _i629;
+import 'package:pulsr/core/services/xdm_backend_service.dart' as _i1031;
 import 'package:pulsr/core/services/yt_download_service.dart' as _i742;
 import 'package:pulsr/core/services/ytm_account_service.dart' as _i631;
 import 'package:pulsr/core/services/ytm_client_version_resolver.dart' as _i169;
@@ -80,6 +81,8 @@ extension GetItInjectableX on _i174.GetIt {
     gh.singleton<_i682.AppDatabase>(() => _i682.AppDatabase());
     gh.singleton<_i265.PlaylistExportUseCase>(
         () => _i265.PlaylistExportUseCase());
+    gh.lazySingleton<_i1031.XdmBackendService>(
+        () => _i1031.XdmBackendService());
     gh.lazySingleton<_i42.WidgetService>(() => _i42.WidgetService());
     gh.singleton<_i399.SmartPlaylistEngine>(
         () => _i399.SmartPlaylistEngine(gh<_i682.AppDatabase>()));

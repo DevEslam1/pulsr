@@ -27,6 +27,8 @@ enum ReplayGainMode { off, track, album }
 
 enum YtmAudioQuality { low, medium, high }
 
+enum ExtractorEngine { auto, remoteYtdlp, onDevice }
+
 @freezed
 abstract class SettingsState with _$SettingsState {
   const SettingsState._();
@@ -65,6 +67,13 @@ abstract class SettingsState with _$SettingsState {
     @Default('localhost, 127.0.0.1') String proxyBypassHosts,
     @Default([]) List<ProxyEntry> proxyList,
     @Default(false) bool isTestingAllProxies,
+    // Extractor & Backend Settings
+    @Default(ExtractorEngine.auto) ExtractorEngine extractorEngine,
+    @Default(true) bool ytdlpBackendEnabled,
+    @Default('https://xdm-backend-10763667121.europe-west1.run.app') String ytdlpBackendUrl,
+    @Default('KxPgwFT0VvqoJUgVfcWuvE3-QSrc7qM-1YDS1dzNJv0') String ytdlpBackendToken,
+    @Default(false) bool isTestingYtdlpBackend,
+    String? ytdlpBackendStatusMessage,
     int? scanResultCount,
     String? errorMessage,
   }) = _SettingsState;

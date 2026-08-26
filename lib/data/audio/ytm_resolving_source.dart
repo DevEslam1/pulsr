@@ -116,15 +116,14 @@ class YtmResolvingSource extends StreamAudioSource {
     } catch (_) {}
 
     final cacheFile = await _cacheFileFor(videoId);
+    final ua = userAgent;
     final headers = <String, String>{
-      'User-Agent': userAgent ??
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+      if (ua != null && ua.isNotEmpty)
+        'User-Agent': ua
+      else
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
     };
-
-    if (url.contains('googlevideo.com') || url.contains('youtube.com')) {
-      headers['Origin'] = 'https://music.youtube.com';
-      headers['Referer'] = 'https://music.youtube.com/';
-    }
 
     final inner = LockCachingAudioSource(
       Uri.parse(url),

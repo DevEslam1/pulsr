@@ -28,4 +28,8 @@ class PrefsKeys {
   static const String replayGainPreampWithoutRg = 'setting_replay_gain_preamp_without_rg';
   static const String sleepTimerTarget = 'sleep_timer_target';
   static const String queueSlots = 'queue_slots_v1';
+  static const String ytdlpBackendEnabled = 'setting_ytdlp_backend_enabled';
+  static const String ytdlpBackendUrl = 'setting_ytdlp_backend_url';
+  static const String ytdlpBackendToken = 'setting_ytdlp_backend_token';
+  static const String extractorEngine = 'setting_extractor_engine';
 }

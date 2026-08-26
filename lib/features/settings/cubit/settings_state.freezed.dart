@@ -45,7 +45,13 @@ mixin _$SettingsState {
   String get proxyPassword;
   String get proxyBypassHosts;
   List<ProxyEntry> get proxyList;
-  bool get isTestingAllProxies;
+  bool get isTestingAllProxies; // Extractor & Backend Settings
+  ExtractorEngine get extractorEngine;
+  bool get ytdlpBackendEnabled;
+  String get ytdlpBackendUrl;
+  String get ytdlpBackendToken;
+  bool get isTestingYtdlpBackend;
+  String? get ytdlpBackendStatusMessage;
   int? get scanResultCount;
   String? get errorMessage;
 
@@ -125,6 +131,12 @@ mixin _$SettingsState {
             const DeepCollectionEquality().equals(other.proxyList, proxyList) &&
             (identical(other.isTestingAllProxies, isTestingAllProxies) ||
                 other.isTestingAllProxies == isTestingAllProxies) &&
+            (identical(other.extractorEngine, extractorEngine) || other.extractorEngine == extractorEngine) &&
+            (identical(other.ytdlpBackendEnabled, ytdlpBackendEnabled) || other.ytdlpBackendEnabled == ytdlpBackendEnabled) &&
+            (identical(other.ytdlpBackendUrl, ytdlpBackendUrl) || other.ytdlpBackendUrl == ytdlpBackendUrl) &&
+            (identical(other.ytdlpBackendToken, ytdlpBackendToken) || other.ytdlpBackendToken == ytdlpBackendToken) &&
+            (identical(other.isTestingYtdlpBackend, isTestingYtdlpBackend) || other.isTestingYtdlpBackend == isTestingYtdlpBackend) &&
+            (identical(other.ytdlpBackendStatusMessage, ytdlpBackendStatusMessage) || other.ytdlpBackendStatusMessage == ytdlpBackendStatusMessage) &&
             (identical(other.scanResultCount, scanResultCount) || other.scanResultCount == scanResultCount) &&
             (identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
   }
@@ -164,13 +176,19 @@ mixin _$SettingsState {
         proxyBypassHosts,
         const DeepCollectionEquality().hash(proxyList),
         isTestingAllProxies,
+        extractorEngine,
+        ytdlpBackendEnabled,
+        ytdlpBackendUrl,
+        ytdlpBackendToken,
+        isTestingYtdlpBackend,
+        ytdlpBackendStatusMessage,
         scanResultCount,
         errorMessage
       ]);
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, proxyPassword: $proxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, proxyPassword: $proxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
   }
 }
 
@@ -213,6 +231,12 @@ abstract mixin class $SettingsStateCopyWith<$Res> {
       String proxyBypassHosts,
       List<ProxyEntry> proxyList,
       bool isTestingAllProxies,
+      ExtractorEngine extractorEngine,
+      bool ytdlpBackendEnabled,
+      String ytdlpBackendUrl,
+      String ytdlpBackendToken,
+      bool isTestingYtdlpBackend,
+      String? ytdlpBackendStatusMessage,
       int? scanResultCount,
       String? errorMessage});
 }
@@ -262,6 +286,12 @@ class _$SettingsStateCopyWithImpl<$Res>
     Object? proxyBypassHosts = null,
     Object? proxyList = null,
     Object? isTestingAllProxies = null,
+    Object? extractorEngine = null,
+    Object? ytdlpBackendEnabled = null,
+    Object? ytdlpBackendUrl = null,
+    Object? ytdlpBackendToken = null,
+    Object? isTestingYtdlpBackend = null,
+    Object? ytdlpBackendStatusMessage = freezed,
     Object? scanResultCount = freezed,
     Object? errorMessage = freezed,
   }) {
@@ -394,6 +424,30 @@ class _$SettingsStateCopyWithImpl<$Res>
           ? _self.isTestingAllProxies
           : isTestingAllProxies // ignore: cast_nullable_to_non_nullable
               as bool,
+      extractorEngine: null == extractorEngine
+          ? _self.extractorEngine
+          : extractorEngine // ignore: cast_nullable_to_non_nullable
+              as ExtractorEngine,
+      ytdlpBackendEnabled: null == ytdlpBackendEnabled
+          ? _self.ytdlpBackendEnabled
+          : ytdlpBackendEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      ytdlpBackendUrl: null == ytdlpBackendUrl
+          ? _self.ytdlpBackendUrl
+          : ytdlpBackendUrl // ignore: cast_nullable_to_non_nullable
+              as String,
+      ytdlpBackendToken: null == ytdlpBackendToken
+          ? _self.ytdlpBackendToken
+          : ytdlpBackendToken // ignore: cast_nullable_to_non_nullable
+              as String,
+      isTestingYtdlpBackend: null == isTestingYtdlpBackend
+          ? _self.isTestingYtdlpBackend
+          : isTestingYtdlpBackend // ignore: cast_nullable_to_non_nullable
+              as bool,
+      ytdlpBackendStatusMessage: freezed == ytdlpBackendStatusMessage
+          ? _self.ytdlpBackendStatusMessage
+          : ytdlpBackendStatusMessage // ignore: cast_nullable_to_non_nullable
+              as String?,
       scanResultCount: freezed == scanResultCount
           ? _self.scanResultCount
           : scanResultCount // ignore: cast_nullable_to_non_nullable
@@ -532,6 +586,12 @@ extension SettingsStatePatterns on SettingsState {
             String proxyBypassHosts,
             List<ProxyEntry> proxyList,
             bool isTestingAllProxies,
+            ExtractorEngine extractorEngine,
+            bool ytdlpBackendEnabled,
+            String ytdlpBackendUrl,
+            String ytdlpBackendToken,
+            bool isTestingYtdlpBackend,
+            String? ytdlpBackendStatusMessage,
             int? scanResultCount,
             String? errorMessage)?
         $default, {
@@ -573,6 +633,12 @@ extension SettingsStatePatterns on SettingsState {
             _that.proxyBypassHosts,
             _that.proxyList,
             _that.isTestingAllProxies,
+            _that.extractorEngine,
+            _that.ytdlpBackendEnabled,
+            _that.ytdlpBackendUrl,
+            _that.ytdlpBackendToken,
+            _that.isTestingYtdlpBackend,
+            _that.ytdlpBackendStatusMessage,
             _that.scanResultCount,
             _that.errorMessage);
       case _:
@@ -628,6 +694,12 @@ extension SettingsStatePatterns on SettingsState {
             String proxyBypassHosts,
             List<ProxyEntry> proxyList,
             bool isTestingAllProxies,
+            ExtractorEngine extractorEngine,
+            bool ytdlpBackendEnabled,
+            String ytdlpBackendUrl,
+            String ytdlpBackendToken,
+            bool isTestingYtdlpBackend,
+            String? ytdlpBackendStatusMessage,
             int? scanResultCount,
             String? errorMessage)
         $default,
@@ -668,6 +740,12 @@ extension SettingsStatePatterns on SettingsState {
             _that.proxyBypassHosts,
             _that.proxyList,
             _that.isTestingAllProxies,
+            _that.extractorEngine,
+            _that.ytdlpBackendEnabled,
+            _that.ytdlpBackendUrl,
+            _that.ytdlpBackendToken,
+            _that.isTestingYtdlpBackend,
+            _that.ytdlpBackendStatusMessage,
             _that.scanResultCount,
             _that.errorMessage);
       case _:
@@ -722,6 +800,12 @@ extension SettingsStatePatterns on SettingsState {
             String proxyBypassHosts,
             List<ProxyEntry> proxyList,
             bool isTestingAllProxies,
+            ExtractorEngine extractorEngine,
+            bool ytdlpBackendEnabled,
+            String ytdlpBackendUrl,
+            String ytdlpBackendToken,
+            bool isTestingYtdlpBackend,
+            String? ytdlpBackendStatusMessage,
             int? scanResultCount,
             String? errorMessage)?
         $default,
@@ -762,6 +846,12 @@ extension SettingsStatePatterns on SettingsState {
             _that.proxyBypassHosts,
             _that.proxyList,
             _that.isTestingAllProxies,
+            _that.extractorEngine,
+            _that.ytdlpBackendEnabled,
+            _that.ytdlpBackendUrl,
+            _that.ytdlpBackendToken,
+            _that.isTestingYtdlpBackend,
+            _that.ytdlpBackendStatusMessage,
             _that.scanResultCount,
             _that.errorMessage);
       case _:
@@ -806,6 +896,13 @@ class _SettingsState extends SettingsState {
       this.proxyBypassHosts = 'localhost, 127.0.0.1',
       final List<ProxyEntry> proxyList = const [],
       this.isTestingAllProxies = false,
+      this.extractorEngine = ExtractorEngine.auto,
+      this.ytdlpBackendEnabled = true,
+      this.ytdlpBackendUrl =
+          'https://xdm-backend-10763667121.europe-west1.run.app',
+      this.ytdlpBackendToken = 'KxPgwFT0VvqoJUgVfcWuvE3-QSrc7qM-1YDS1dzNJv0',
+      this.isTestingYtdlpBackend = false,
+      this.ytdlpBackendStatusMessage,
       this.scanResultCount,
       this.errorMessage})
       : _proxyList = proxyList,
@@ -914,6 +1011,24 @@ class _SettingsState extends SettingsState {
   @override
   @JsonKey()
   final bool isTestingAllProxies;
+// Extractor & Backend Settings
+  @override
+  @JsonKey()
+  final ExtractorEngine extractorEngine;
+  @override
+  @JsonKey()
+  final bool ytdlpBackendEnabled;
+  @override
+  @JsonKey()
+  final String ytdlpBackendUrl;
+  @override
+  @JsonKey()
+  final String ytdlpBackendToken;
+  @override
+  @JsonKey()
+  final bool isTestingYtdlpBackend;
+  @override
+  final String? ytdlpBackendStatusMessage;
   @override
   final int? scanResultCount;
   @override
@@ -995,6 +1110,12 @@ class _SettingsState extends SettingsState {
             const DeepCollectionEquality()
                 .equals(other._proxyList, _proxyList) &&
             (identical(other.isTestingAllProxies, isTestingAllProxies) || other.isTestingAllProxies == isTestingAllProxies) &&
+            (identical(other.extractorEngine, extractorEngine) || other.extractorEngine == extractorEngine) &&
+            (identical(other.ytdlpBackendEnabled, ytdlpBackendEnabled) || other.ytdlpBackendEnabled == ytdlpBackendEnabled) &&
+            (identical(other.ytdlpBackendUrl, ytdlpBackendUrl) || other.ytdlpBackendUrl == ytdlpBackendUrl) &&
+            (identical(other.ytdlpBackendToken, ytdlpBackendToken) || other.ytdlpBackendToken == ytdlpBackendToken) &&
+            (identical(other.isTestingYtdlpBackend, isTestingYtdlpBackend) || other.isTestingYtdlpBackend == isTestingYtdlpBackend) &&
+            (identical(other.ytdlpBackendStatusMessage, ytdlpBackendStatusMessage) || other.ytdlpBackendStatusMessage == ytdlpBackendStatusMessage) &&
             (identical(other.scanResultCount, scanResultCount) || other.scanResultCount == scanResultCount) &&
             (identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
   }
@@ -1034,13 +1155,19 @@ class _SettingsState extends SettingsState {
         proxyBypassHosts,
         const DeepCollectionEquality().hash(_proxyList),
         isTestingAllProxies,
+        extractorEngine,
+        ytdlpBackendEnabled,
+        ytdlpBackendUrl,
+        ytdlpBackendToken,
+        isTestingYtdlpBackend,
+        ytdlpBackendStatusMessage,
         scanResultCount,
         errorMessage
       ]);
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, proxyPassword: $proxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, proxyPassword: $proxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, scanResultCount: $scanResultCount, errorMessage: $errorMessage)';
   }
 }
 
@@ -1085,6 +1212,12 @@ abstract mixin class _$SettingsStateCopyWith<$Res>
       String proxyBypassHosts,
       List<ProxyEntry> proxyList,
       bool isTestingAllProxies,
+      ExtractorEngine extractorEngine,
+      bool ytdlpBackendEnabled,
+      String ytdlpBackendUrl,
+      String ytdlpBackendToken,
+      bool isTestingYtdlpBackend,
+      String? ytdlpBackendStatusMessage,
       int? scanResultCount,
       String? errorMessage});
 }
@@ -1134,6 +1267,12 @@ class __$SettingsStateCopyWithImpl<$Res>
     Object? proxyBypassHosts = null,
     Object? proxyList = null,
     Object? isTestingAllProxies = null,
+    Object? extractorEngine = null,
+    Object? ytdlpBackendEnabled = null,
+    Object? ytdlpBackendUrl = null,
+    Object? ytdlpBackendToken = null,
+    Object? isTestingYtdlpBackend = null,
+    Object? ytdlpBackendStatusMessage = freezed,
     Object? scanResultCount = freezed,
     Object? errorMessage = freezed,
   }) {
@@ -1266,6 +1405,30 @@ class __$SettingsStateCopyWithImpl<$Res>
           ? _self.isTestingAllProxies
           : isTestingAllProxies // ignore: cast_nullable_to_non_nullable
               as bool,
+      extractorEngine: null == extractorEngine
+          ? _self.extractorEngine
+          : extractorEngine // ignore: cast_nullable_to_non_nullable
+              as ExtractorEngine,
+      ytdlpBackendEnabled: null == ytdlpBackendEnabled
+          ? _self.ytdlpBackendEnabled
+          : ytdlpBackendEnabled // ignore: cast_nullable_to_non_nullable
+              as bool,
+      ytdlpBackendUrl: null == ytdlpBackendUrl
+          ? _self.ytdlpBackendUrl
+          : ytdlpBackendUrl // ignore: cast_nullable_to_non_nullable
+              as String,
+      ytdlpBackendToken: null == ytdlpBackendToken
+          ? _self.ytdlpBackendToken
+          : ytdlpBackendToken // ignore: cast_nullable_to_non_nullable
+              as String,
+      isTestingYtdlpBackend: null == isTestingYtdlpBackend
+          ? _self.isTestingYtdlpBackend
+          : isTestingYtdlpBackend // ignore: cast_nullable_to_non_nullable
+              as bool,
+      ytdlpBackendStatusMessage: freezed == ytdlpBackendStatusMessage
+          ? _self.ytdlpBackendStatusMessage
+          : ytdlpBackendStatusMessage // ignore: cast_nullable_to_non_nullable
+              as String?,
       scanResultCount: freezed == scanResultCount
           ? _self.scanResultCount
           : scanResultCount // ignore: cast_nullable_to_non_nullable

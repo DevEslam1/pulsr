@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_colors.dart';
+import '../../../core/constants/app_radii.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/artwork_cache_manager.dart';
 import '../../../core/services/ytm_account_service.dart';
@@ -283,6 +284,14 @@ class SettingsScreen extends StatelessWidget {
                         );
                       }(),
                       _divider(p),
+                      _navTile(
+                        context,
+                        Icons.language_rounded,
+                        'Open YouTube Music Web',
+                        'Browse web player, explore charts, library & playlists',
+                        onTap: () => _showYtmWebOptionsSheet(context),
+                      ),
+                      _divider(p),
                       _switchTile(context, Icons.cloud_off_rounded, 'Offline Only Mode',
                           'Disable online features, streaming & web queries',
                           value: state.offlineOnlyMode, onChanged: cubit.setOfflineOnlyMode),
@@ -303,6 +312,24 @@ class SettingsScreen extends StatelessWidget {
                         _navTile(context, Icons.downloading_rounded, 'Download Quality',
                             _getQualityTitle(state.downloadQuality),
                             onTap: () => _showQualityPickerSheet(context, cubit, isStreaming: false, currentQuality: state.downloadQuality)),
+                        _divider(p),
+                        _navTile(
+                          context,
+                          Icons.precision_manufacturing_rounded,
+                          'Extraction Engine',
+                          _getExtractorEngineTitle(state.extractorEngine),
+                          onTap: () => _showExtractorEnginePickerSheet(context, cubit, currentEngine: state.extractorEngine),
+                        ),
+                        if (state.extractorEngine != ExtractorEngine.onDevice) ...[
+                          _divider(p),
+                          _navTile(
+                            context,
+                            Icons.dns_rounded,
+                            'yt-dlp Server Config',
+                            state.ytdlpBackendUrl,
+                            onTap: () => _showYtdlpConfigDialog(context, cubit, state),
+                          ),
+                        ],
                         _divider(p),
                         _navTile(
                           context,
@@ -1148,6 +1175,103 @@ class SettingsScreen extends StatelessWidget {
     }
   }
 
+  String _getExtractorEngineTitle(ExtractorEngine engine) {
+    switch (engine) {
+      case ExtractorEngine.auto:
+        return 'Auto (Remote + On-Device Fallback)';
+      case ExtractorEngine.remoteYtdlp:
+        return 'Remote yt-dlp Backend';
+      case ExtractorEngine.onDevice:
+        return 'On-Device Extractor (Native / NewPipe)';
+    }
+  }
+
+  void _showExtractorEnginePickerSheet(
+    BuildContext context,
+    SettingsCubit cubit, {
+    required ExtractorEngine currentEngine,
+  }) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+    final surfaceColor = Theme.of(context).colorScheme.surface;
+    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
+    final outlineColor = Theme.of(context).colorScheme.outline;
+    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? context.palette.textPrimary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
+
+    final options = [
+      (
+        engine: ExtractorEngine.auto,
+        title: 'Auto (Recommended)',
+        subtitle: 'Uses remote yt-dlp backend with automatic fallback to on-device extractor',
+        icon: Icons.auto_mode_rounded,
+      ),
+      (
+        engine: ExtractorEngine.remoteYtdlp,
+        title: 'Remote yt-dlp Backend',
+        subtitle: 'Resolves via cloud server with proxy pool & cookie rotation to prevent bot bans',
+        icon: Icons.cloud_done_rounded,
+      ),
+      (
+        engine: ExtractorEngine.onDevice,
+        title: 'On-Device Extractor',
+        subtitle: 'Extracts directly on your device via NewPipe / InnerTube (no remote server)',
+        icon: Icons.phone_android_rounded,
+      ),
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      backgroundColor: surfaceColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              child: Text(
+                'Stream Extraction Engine',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ...options.map((opt) {
+              final isSelected = opt.engine == currentEngine;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                child: Material(
+                  color: isSelected ? primaryColor.withValues(alpha: 0.12) : cardColor,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: isSelected ? primaryColor : outlineColor,
+                      width: isSelected ? 1.5 : 1.0,
+                    ),
+                  ),
+                  child: ListTile(
+                    leading: Icon(opt.icon, color: isSelected ? primaryColor : textSecondary),
+                    title: Text(opt.title, style: TextStyle(fontWeight: FontWeight.w700, color: isSelected ? primaryColor : textPrimary)),
+                    subtitle: Text(opt.subtitle, style: TextStyle(fontSize: 12, color: textSecondary)),
+                    trailing: isSelected ? Icon(Icons.check_circle_rounded, color: primaryColor) : null,
+                    onTap: () {
+                      cubit.setExtractorEngine(opt.engine);
+                      Navigator.pop(ctx);
+                    },
+                  ),
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showQualityPickerSheet(
     BuildContext context,
     SettingsCubit cubit, {
@@ -1368,19 +1492,200 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  void _showYtmWebOptionsSheet(BuildContext context) {
+    final p = context.palette;
+    showModalBottomSheet(
+      context: context,
+      useRootNavigator: true,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Center(
+          child: ConstrainedBox(
+            constraints: Adaptive.sheetConstraints(ctx),
+            child: Material(
+              color: p.surfaceContainerHigh,
+              borderRadius: AppRadii.bottomSheetRadius,
+              clipBehavior: Clip.antiAlias,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: p.textTertiary.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: p.accentContainer,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(Icons.language_rounded, color: p.accent, size: 22),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'YouTube Music Web',
+                                style: TextStyle(
+                                  color: p.textPrimary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 17,
+                                ),
+                              ),
+                              Text(
+                                'Select a page to open in the in-app browser',
+                                style: TextStyle(color: p.textSecondary, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _ytmWebOptionTile(
+                      ctx,
+                      icon: Icons.home_rounded,
+                      title: 'Home Page',
+                      subtitle: 'Personalized recommendations, mixes & quick picks',
+                      url: 'https://music.youtube.com',
+                      p: p,
+                    ),
+                    _ytmWebOptionTile(
+                      ctx,
+                      icon: Icons.explore_rounded,
+                      title: 'Explore & Charts',
+                      subtitle: 'Trending songs, top global charts & music videos',
+                      url: 'https://music.youtube.com/explore',
+                      p: p,
+                    ),
+                    _ytmWebOptionTile(
+                      ctx,
+                      icon: Icons.library_music_rounded,
+                      title: 'Your Library',
+                      subtitle: 'Saved playlists, albums, songs & subscribed artists',
+                      url: 'https://music.youtube.com/library',
+                      p: p,
+                    ),
+                    _ytmWebOptionTile(
+                      ctx,
+                      icon: Icons.favorite_rounded,
+                      title: 'Liked Music',
+                      subtitle: 'Thumbed-up songs synced with your Google account',
+                      url: 'https://music.youtube.com/playlist?list=LM',
+                      p: p,
+                    ),
+                    _ytmWebOptionTile(
+                      ctx,
+                      icon: Icons.fiber_new_rounded,
+                      title: 'New Releases',
+                      subtitle: 'Latest album drops, EPs and trending single releases',
+                      url: 'https://music.youtube.com/new_releases',
+                      p: p,
+                    ),
+                    _ytmWebOptionTile(
+                      ctx,
+                      icon: Icons.history_rounded,
+                      title: 'Listening History',
+                      subtitle: 'Recently played tracks and stations on your account',
+                      url: 'https://music.youtube.com/history',
+                      p: p,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _ytmWebOptionTile(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String url,
+    required PulsrPalette p,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        leading: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(
+            color: p.surface,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: p.hairline),
+          ),
+          child: Icon(icon, color: p.accent, size: 20),
+        ),
+        title: Text(
+          title,
+          style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w600, fontSize: 14),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(color: p.textSecondary, fontSize: 11.5),
+        ),
+        trailing: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: p.textTertiary),
+        onTap: () {
+          Navigator.pop(context);
+          YtmWebLoginSheet.show(
+            context,
+            initialUrl: url,
+            title: title,
+            isBrowseMode: true,
+          );
+        },
+      ),
+    );
+  }
+
   void _showYtmAccountDisconnectDialog(BuildContext context) {
     final account = getIt<YtmAccountService>();
+    final p = context.palette;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('YouTube Music Account'),
+        backgroundColor: p.surfaceContainerHigh,
+        title: Text('YouTube Music Account', style: TextStyle(color: p.textPrimary)),
         content: Text(
-          'Connected as: ${account.accountName ?? "User"}\n\nDo you want to disconnect your YouTube Music account?',
+          'Connected as: ${account.accountName ?? "User"}\n\nManage your YouTube Music account or disconnect from this device.',
+          style: TextStyle(color: p.textSecondary),
         ),
         actions: [
+          TextButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              YtmWebLoginSheet.show(
+                context,
+                isBrowseMode: true,
+              );
+            },
+            icon: Icon(Icons.language_rounded, size: 18, color: p.accent),
+            label: Text('Open Web Player', style: TextStyle(color: p.accent)),
+          ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text('Cancel', style: TextStyle(color: p.textSecondary)),
           ),
           FilledButton(
             onPressed: () async {
@@ -1392,10 +1697,125 @@ class SettingsScreen extends StatelessWidget {
                 );
               }
             },
+            style: FilledButton.styleFrom(backgroundColor: p.error),
             child: const Text('Disconnect'),
           ),
         ],
       ),
+    );
+  }
+
+  void _showYtdlpConfigDialog(BuildContext context, SettingsCubit cubit, SettingsState state) {
+    final urlController = TextEditingController(text: state.ytdlpBackendUrl);
+    final tokenController = TextEditingController(text: state.ytdlpBackendToken);
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return BlocBuilder<SettingsCubit, SettingsState>(
+          bloc: cubit,
+          builder: (context, liveState) {
+            final p = context.palette;
+            return AlertDialog(
+              title: Row(
+                children: [
+                  Icon(Icons.dns_rounded, color: p.accent),
+                  const SizedBox(width: 10),
+                  const Text('yt-dlp Server Config'),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Connects Pulsr to a remote yt-dlp backend with rotating proxies to bypass YouTube bot detection and IP bans.',
+                      style: TextStyle(fontSize: 12, color: p.textSecondary),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: urlController,
+                      decoration: const InputDecoration(
+                        labelText: 'Server Base URL',
+                        hintText: 'https://...',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: tokenController,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                        labelText: 'API Bearer Token',
+                        hintText: 'Token',
+                        border: OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Row(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: liveState.isTestingYtdlpBackend
+                              ? null
+                              : () {
+                                  cubit.setYtdlpBackendUrl(urlController.text);
+                                  cubit.setYtdlpBackendToken(tokenController.text);
+                                  cubit.testYtdlpBackend();
+                                },
+                          icon: liveState.isTestingYtdlpBackend
+                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.speed_rounded, size: 16),
+                          label: const Text('Test Connection'),
+                        ),
+                      ],
+                    ),
+                    if (liveState.ytdlpBackendStatusMessage != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: p.accentContainer.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          liveState.ytdlpBackendStatusMessage!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: liveState.ytdlpBackendStatusMessage!.startsWith('Connected')
+                                ? p.success
+                                : p.error,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    cubit.setYtdlpBackendUrl(urlController.text);
+                    cubit.setYtdlpBackendToken(tokenController.text);
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('yt-dlp backend settings saved')),
+                    );
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 }

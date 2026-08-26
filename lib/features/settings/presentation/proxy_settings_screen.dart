@@ -4,8 +4,10 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../core/constants/app_radii.dart';
 import '../../../core/network/proxy_config.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/adaptive.dart';
 import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
 
@@ -161,11 +163,23 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
     });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Applied preset: $name'),
+        content: Text('Applied preset: $name ($host:$port)'),
         duration: const Duration(seconds: 1),
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  void _appendBypassHost(String host) {
+    final current = _bypassController.text.trim();
+    if (current.isEmpty) {
+      _bypassController.text = host;
+    } else {
+      final list = current.split(',').map((e) => e.trim()).toList();
+      if (!list.contains(host)) {
+        _bypassController.text = '$current, $host';
+      }
+    }
   }
 
   Future<void> _showImportDialog({String? prefilledText}) async {
@@ -175,137 +189,188 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: p.surfaceContainerHigh,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 20,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Import Proxies',
-                    style: TextStyle(
-                      color: p.textPrimary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 18,
-                    ),
-                  ),
-                  TextButton.icon(
-                    onPressed: () async {
-                      try {
-                        final result = await FilePicker.platform.pickFiles(
-                          type: FileType.custom,
-                          allowedExtensions: ['txt', 'csv', 'list', 'conf'],
-                        );
-                        if (result != null && result.files.isNotEmpty) {
-                          final path = result.files.first.path;
-                          if (path != null) {
-                            final file = File(path);
-                            final content = await file.readAsString();
-                            textController.text = content;
-                          }
-                        }
-                      } catch (e) {
-                        if (ctx.mounted) {
-                          ScaffoldMessenger.of(ctx).showSnackBar(
-                            SnackBar(
-                              content: Text('Failed to pick file: $e'),
-                              behavior: SnackBarBehavior.floating,
+        return Center(
+          child: ConstrainedBox(
+            constraints: Adaptive.sheetConstraints(ctx),
+            child: Material(
+              color: p.surfaceContainerHigh,
+              borderRadius: AppRadii.bottomSheetRadius,
+              clipBehavior: Clip.antiAlias,
+              child: Padding(
+                padding: EdgeInsets.only(
+                  left: 20,
+                  right: 20,
+                  top: 20,
+                  bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: p.accentContainer,
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Icon(Icons.file_upload_outlined, color: p.accent, size: 20),
                             ),
-                          );
-                        }
-                      }
-                    },
-                    icon: Icon(Icons.file_open_rounded, size: 18, color: p.accent),
-                    label: Text('Pick .txt File', style: TextStyle(color: p.accent)),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Paste proxies or import a text file.\nSupported formats: IP:PORT:USER:PASS, IP:PORT, or URL format.',
-                style: TextStyle(color: p.textSecondary, fontSize: 13),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: textController,
-                maxLines: 8,
-                style: TextStyle(color: p.textPrimary, fontFamily: 'monospace', fontSize: 13),
-                decoration: InputDecoration(
-                  hintText: '31.59.20.176:6754:qmyizdto:n5fui7pyec1q\n45.38.107.97:6014:qmyizdto:n5fui7pyec1q\n198.105.121.200:6462',
-                  hintStyle: TextStyle(color: p.textTertiary, fontFamily: 'monospace'),
-                  filled: true,
-                  fillColor: p.surface,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: p.hairline),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: p.hairline),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide(color: p.accent, width: 2),
-                  ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Import Proxies',
+                              style: TextStyle(
+                                color: p.textPrimary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 18,
+                              ),
+                            ),
+                          ],
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.close_rounded, color: p.textSecondary),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Paste proxy lines or pick a text file. Lines will be parsed automatically.',
+                      style: TextStyle(color: p.textSecondary, fontSize: 13),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final data = await Clipboard.getData(Clipboard.kTextPlain);
+                            if (data != null && data.text != null && data.text!.isNotEmpty) {
+                              textController.text = data.text!;
+                            }
+                          },
+                          icon: Icon(Icons.content_paste_rounded, size: 16, color: p.accent),
+                          label: Text('Paste Clipboard', style: TextStyle(color: p.textPrimary, fontSize: 12)),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: p.hairline),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            try {
+                              final result = await FilePicker.platform.pickFiles(
+                                type: FileType.custom,
+                                allowedExtensions: ['txt', 'csv', 'list', 'conf'],
+                              );
+                              if (result != null && result.files.isNotEmpty) {
+                                final path = result.files.first.path;
+                                if (path != null) {
+                                  final file = File(path);
+                                  final content = await file.readAsString();
+                                  textController.text = content;
+                                }
+                              }
+                            } catch (e) {
+                              if (ctx.mounted) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Failed to pick file: $e'),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            }
+                          },
+                          icon: Icon(Icons.folder_open_rounded, size: 16, color: p.accent),
+                          label: Text('Pick File', style: TextStyle(color: p.textPrimary, fontSize: 12)),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: p.hairline),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: textController,
+                      maxLines: 6,
+                      style: TextStyle(color: p.textPrimary, fontFamily: 'monospace', fontSize: 12),
+                      decoration: InputDecoration(
+                        hintText: '31.59.20.176:6754:username:password\n45.38.107.97:6014\nsocks5://user:pass@127.0.0.1:1080',
+                        hintStyle: TextStyle(color: p.textTertiary, fontFamily: 'monospace', fontSize: 12),
+                        filled: true,
+                        fillColor: p.surface,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: p.hairline),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: p.hairline),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: p.accent, width: 2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          child: Text('Cancel', style: TextStyle(color: p.textSecondary)),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.icon(
+                          onPressed: () async {
+                            final raw = textController.text.trim();
+                            if (raw.isEmpty) return;
+                            final count = await context.read<SettingsCubit>().importProxiesFromText(raw);
+                            if (ctx.mounted) {
+                              Navigator.of(ctx).pop();
+                            }
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Row(
+                                    children: [
+                                      Icon(Icons.check_circle_rounded, color: p.success, size: 20),
+                                      const SizedBox(width: 10),
+                                      Text('Successfully imported $count new proxies'),
+                                    ],
+                                  ),
+                                  backgroundColor: p.surfaceContainerHigh,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          },
+                          style: FilledButton.styleFrom(
+                            backgroundColor: p.accent,
+                            foregroundColor: p.onAccent,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          ),
+                          icon: const Icon(Icons.download_rounded, size: 18),
+                          label: const Text('Import & Parse', style: TextStyle(fontWeight: FontWeight.w700)),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  TextButton(
-                    onPressed: () => Navigator.of(ctx).pop(),
-                    child: Text('Cancel', style: TextStyle(color: p.textSecondary)),
-                  ),
-                  const SizedBox(width: 8),
-                  FilledButton.icon(
-                    onPressed: () async {
-                      final raw = textController.text.trim();
-                      if (raw.isEmpty) return;
-                      final count = await context.read<SettingsCubit>().importProxiesFromText(raw);
-                      if (ctx.mounted) {
-                        Navigator.of(ctx).pop();
-                      }
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Row(
-                              children: [
-                                Icon(Icons.check_circle_rounded, color: p.success, size: 20),
-                                const SizedBox(width: 10),
-                                Text('Successfully imported $count new proxies'),
-                              ],
-                            ),
-                            backgroundColor: p.surfaceContainerHigh,
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      }
-                    },
-                    style: FilledButton.styleFrom(
-                      backgroundColor: p.accent,
-                      foregroundColor: p.onAccent,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    icon: const Icon(Icons.download_rounded, size: 18),
-                    label: const Text('Import & Parse', style: TextStyle(fontWeight: FontWeight.w700)),
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
         );
       },
@@ -315,6 +380,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final horizontalPad = Adaptive.pagePadding(context);
 
     return BlocConsumer<SettingsCubit, SettingsState>(
       listener: (context, state) {
@@ -343,13 +409,13 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
             ),
             actions: [
               IconButton(
-                tooltip: 'Import Proxies / Text File',
-                icon: Icon(Icons.add_link_rounded, color: p.accent),
+                tooltip: 'Import / Paste Proxies',
+                icon: Icon(Icons.file_upload_outlined, color: p.accent),
                 onPressed: () => _showImportDialog(),
               ),
               Padding(
                 padding: const EdgeInsets.only(right: 12),
-                child: FilledButton.tonal(
+                child: FilledButton.tonalIcon(
                   onPressed: _saveSettings,
                   style: FilledButton.styleFrom(
                     backgroundColor: p.accentContainer,
@@ -357,379 +423,179 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                   ),
-                  child: const Text('Save', style: TextStyle(fontWeight: FontWeight.w700)),
+                  icon: const Icon(Icons.check_rounded, size: 16),
+                  label: const Text('Save', style: TextStyle(fontWeight: FontWeight.w700)),
                 ),
               ),
             ],
           ),
-          body: Form(
-            key: _formKey,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
-              children: [
-                // Master Switch Card
-                _buildMasterToggle(p),
-                const SizedBox(height: 20),
+          body: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: Form(
+                key: _formKey,
+                child: ListView(
+                  padding: EdgeInsets.fromLTRB(horizontalPad, 8, horizontalPad, 48),
+                  children: [
+                    // Master Switch Card
+                    _buildMasterToggle(p),
+                    const SizedBox(height: 20),
 
-                // Multi-Proxy Pool Section
-                _buildProxyPoolSection(p, state, proxyList, isTestingAll),
-                const SizedBox(height: 20),
+                    // Multi-Proxy Pool Section
+                    _buildProxyPoolSection(p, state, proxyList, isTestingAll),
+                    const SizedBox(height: 20),
 
-                // Protocol Selection Card
-                _buildSection(
-                  p: p,
-                  title: 'ACTIVE PROXY PROTOCOL',
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        SegmentedButton<AppProxyType>(
-                          segments: const [
-                            ButtonSegment(
-                              value: AppProxyType.http,
-                              label: Text('HTTP / HTTPS'),
-                              icon: Icon(Icons.http_rounded),
-                            ),
-                            ButtonSegment(
-                              value: AppProxyType.socks5,
-                              label: Text('SOCKS5'),
-                              icon: Icon(Icons.shield_outlined),
-                            ),
-                          ],
-                          selected: {_type},
-                          onSelectionChanged: (newSelection) {
-                            setState(() {
-                              _type = newSelection.first;
-                              _testResult = null;
-                            });
-                          },
-                          style: ButtonStyle(
-                            backgroundColor: WidgetStateProperty.resolveWith<Color>((states) {
-                              if (states.contains(WidgetState.selected)) {
-                                return p.accentContainer;
-                              }
-                              return p.surface;
-                            }),
-                            foregroundColor: WidgetStateProperty.resolveWith<Color>((states) {
-                              if (states.contains(WidgetState.selected)) {
-                                return p.accent;
-                              }
-                              return p.textSecondary;
-                            }),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          _type == AppProxyType.http
-                              ? 'Routes standard HTTP and HTTPS web & extractor traffic.'
-                              : 'Routes all network streams via SOCKS5 (ideal for Tor, Clash, Shadowsocks).',
-                          style: TextStyle(color: p.textTertiary, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
+                    // Protocol Selection Card
+                    _buildProtocolSection(p),
+                    const SizedBox(height: 20),
 
-                // Active Server Address & Port
-                _buildSection(
-                  p: p,
-                  title: 'ACTIVE SERVER CONFIGURATION',
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        TextFormField(
-                          controller: _hostController,
-                          style: TextStyle(color: p.textPrimary),
-                          decoration: InputDecoration(
-                            labelText: 'Server Host / IP Address',
-                            hintText: 'e.g. 127.0.0.1 or proxy.example.com',
-                            labelStyle: TextStyle(color: p.textSecondary),
-                            hintStyle: TextStyle(color: p.textTertiary),
-                            prefixIcon: Icon(Icons.dns_rounded, color: p.accent),
-                            filled: true,
-                            fillColor: p.surface,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: p.hairline),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: p.hairline),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: p.accent, width: 2),
-                            ),
-                          ),
-                          validator: (value) {
-                            if (_enabled && (value == null || value.trim().isEmpty)) {
-                              return 'Please enter a proxy host';
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _portController,
-                          style: TextStyle(color: p.textPrimary),
-                          keyboardType: TextInputType.number,
-                          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                          decoration: InputDecoration(
-                            labelText: 'Port',
-                            hintText: 'e.g. 8080, 1080, 7890, 9050',
-                            labelStyle: TextStyle(color: p.textSecondary),
-                            hintStyle: TextStyle(color: p.textTertiary),
-                            prefixIcon: Icon(Icons.numbers_rounded, color: p.accent),
-                            filled: true,
-                            fillColor: p.surface,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: p.hairline),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: p.hairline),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: p.accent, width: 2),
-                            ),
-                          ),
-                          validator: (value) {
-                            if (_enabled) {
-                              final port = int.tryParse(value?.trim() ?? '');
-                              if (port == null || port <= 0 || port > 65535) {
-                                return 'Enter a valid port (1 - 65535)';
-                              }
-                            }
-                            return null;
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        // Quick Presets
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: Text(
-                            'QUICK PRESETS',
-                            style: TextStyle(
-                              color: p.textTertiary,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w600,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _presetChip(
-                              label: 'Clash / V2Ray (7890)',
-                              onTap: () => _applyPreset(
-                                name: 'Clash / V2Ray',
-                                type: AppProxyType.http,
-                                host: '127.0.0.1',
-                                port: 7890,
+                    // Active Server Address & Port
+                    _buildServerConfigSection(p),
+                    const SizedBox(height: 20),
+
+                    // Authentication (Optional)
+                    _buildAuthSection(p),
+                    const SizedBox(height: 20),
+
+                    // Bypass Hosts
+                    _buildBypassSection(p),
+                    const SizedBox(height: 24),
+
+                    // Test Active Proxy Connection Button
+                    FilledButton.icon(
+                      onPressed: _isTesting ? null : _runTest,
+                      icon: _isTesting
+                          ? SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: p.onAccent,
                               ),
-                              p: p,
-                            ),
-                            _presetChip(
-                              label: 'Tor SOCKS5 (9050)',
-                              onTap: () => _applyPreset(
-                                name: 'Tor (9050)',
-                                type: AppProxyType.socks5,
-                                host: '127.0.0.1',
-                                port: 9050,
-                              ),
-                              p: p,
-                            ),
-                            _presetChip(
-                              label: 'Local HTTP (8080)',
-                              onTap: () => _applyPreset(
-                                name: 'Local HTTP (8080)',
-                                type: AppProxyType.http,
-                                host: '127.0.0.1',
-                                port: 8080,
-                              ),
-                              p: p,
-                            ),
-                            _presetChip(
-                              label: 'Local SOCKS5 (1080)',
-                              onTap: () => _applyPreset(
-                                name: 'Local SOCKS5 (1080)',
-                                type: AppProxyType.socks5,
-                                host: '127.0.0.1',
-                                port: 1080,
-                              ),
-                              p: p,
-                            ),
-                          ],
+                            )
+                          : const Icon(Icons.speed_rounded),
+                      label: Text(
+                        _isTesting ? 'Testing Proxy Connectivity...' : 'Test Active Proxy Connection',
+                        style: const TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: p.accent,
+                        foregroundColor: p.onAccent,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-                const SizedBox(height: 20),
 
-                // Authentication (Optional)
-                _buildSection(
-                  p: p,
-                  title: 'AUTHENTICATION (OPTIONAL)',
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      children: [
-                        TextFormField(
-                          controller: _usernameController,
-                          style: TextStyle(color: p.textPrimary),
-                          decoration: InputDecoration(
-                            labelText: 'Username',
-                            hintText: 'Leave blank if unauthenticated',
-                            labelStyle: TextStyle(color: p.textSecondary),
-                            hintStyle: TextStyle(color: p.textTertiary),
-                            prefixIcon: Icon(Icons.person_outline_rounded, color: p.accent),
-                            filled: true,
-                            fillColor: p.surface,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: p.hairline),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: p.hairline),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: p.accent, width: 2),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _passwordController,
-                          style: TextStyle(color: p.textPrimary),
-                          obscureText: _obscurePassword,
-                          decoration: InputDecoration(
-                            labelText: 'Password',
-                            hintText: 'Leave blank if unauthenticated',
-                            labelStyle: TextStyle(color: p.textSecondary),
-                            hintStyle: TextStyle(color: p.textTertiary),
-                            prefixIcon: Icon(Icons.lock_outline_rounded, color: p.accent),
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                                color: p.textTertiary,
-                              ),
-                              onPressed: () {
-                                setState(() => _obscurePassword = !_obscurePassword);
-                              },
-                            ),
-                            filled: true,
-                            fillColor: p.surface,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: p.hairline),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: p.hairline),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: p.accent, width: 2),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+                    if (_testResult != null) ...[
+                      const SizedBox(height: 16),
+                      _buildTestResultCard(p, _testResult!),
+                    ],
+                  ],
                 ),
-                const SizedBox(height: 20),
-
-                // Bypass Hosts
-                _buildSection(
-                  p: p,
-                  title: 'BYPASS HOSTS',
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        TextFormField(
-                          controller: _bypassController,
-                          style: TextStyle(color: p.textPrimary),
-                          decoration: InputDecoration(
-                            labelText: 'Bypass List (comma-separated)',
-                            hintText: 'localhost, 127.0.0.1',
-                            labelStyle: TextStyle(color: p.textSecondary),
-                            hintStyle: TextStyle(color: p.textTertiary),
-                            prefixIcon: Icon(Icons.alt_route_rounded, color: p.accent),
-                            filled: true,
-                            fillColor: p.surface,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: p.hairline),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: p.hairline),
-                            ),
-                            focusedBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(color: p.accent, width: 2),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Connections to these hosts bypass the proxy and connect directly.',
-                          style: TextStyle(color: p.textTertiary, fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-
-                // Test Active Proxy Connection Button
-                FilledButton.icon(
-                  onPressed: _isTesting ? null : _runTest,
-                  icon: _isTesting
-                      ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: p.onAccent,
-                          ),
-                        )
-                      : const Icon(Icons.speed_rounded),
-                  label: Text(_isTesting ? 'Testing Proxy Connectivity...' : 'Test Active Proxy'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: p.accent,
-                    foregroundColor: p.onAccent,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                ),
-
-                if (_testResult != null) ...[
-                  const SizedBox(height: 16),
-                  _buildTestResultCard(p, _testResult!),
-                ],
-              ],
+              ),
             ),
           ),
         );
       },
+    );
+  }
+
+  Widget _buildMasterToggle(PulsrPalette p) {
+    return Container(
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: _enabled ? p.accent.withValues(alpha: 0.4) : p.hairline,
+          width: _enabled ? 1.5 : 1.0,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: _enabled ? p.accentContainer : p.surface,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _enabled ? p.accent.withValues(alpha: 0.3) : p.hairline,
+                  ),
+                ),
+                child: Icon(
+                  _enabled ? Icons.vpn_lock_rounded : Icons.vpn_lock_outlined,
+                  color: _enabled ? p.accent : p.textSecondary,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          'Enable Proxy',
+                          style: TextStyle(
+                            color: p.textPrimary,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: _enabled ? p.success.withValues(alpha: 0.15) : p.surfaceContainerHigh,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            _enabled ? 'ACTIVE' : 'DISABLED',
+                            style: TextStyle(
+                              color: _enabled ? p.success : p.textTertiary,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      _enabled
+                          ? 'Traffic routes through configured proxy'
+                          : 'Direct connection (proxy disabled)',
+                      style: TextStyle(color: p.textSecondary, fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: _enabled,
+                onChanged: (val) {
+                  setState(() {
+                    _enabled = val;
+                    _testResult = null;
+                  });
+                  context.read<SettingsCubit>().setProxyEnabled(val);
+                },
+                activeThumbColor: Colors.white,
+                activeTrackColor: p.accent,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -754,12 +620,13 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
                           color: p.textTertiary,
                           letterSpacing: 0.5,
+                          fontWeight: FontWeight.w700,
                         ),
                   ),
                   if (proxyList.isNotEmpty) ...[
                     const SizedBox(width: 8),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                       decoration: BoxDecoration(
                         color: p.accentContainer,
                         borderRadius: BorderRadius.circular(8),
@@ -777,8 +644,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                 ],
               ),
               if (proxyList.isNotEmpty)
-                TextButton(
-                  onPressed: () async {
+                InkWell(
+                  onTap: () async {
                     final confirm = await showDialog<bool>(
                       context: context,
                       builder: (ctx) => AlertDialog(
@@ -805,7 +672,11 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                       context.read<SettingsCubit>().clearProxyList();
                     }
                   },
-                  child: Text('Clear All', style: TextStyle(color: p.error, fontSize: 12)),
+                  borderRadius: BorderRadius.circular(6),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    child: Text('Clear All', style: TextStyle(color: p.error, fontSize: 12, fontWeight: FontWeight.w600)),
+                  ),
                 ),
             ],
           ),
@@ -818,7 +689,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
           ),
           clipBehavior: Clip.antiAlias,
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(14),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -826,6 +697,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
                     FilledButton.icon(
                       onPressed: () => _showImportDialog(),
@@ -833,10 +705,10 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                         backgroundColor: p.accent,
                         foregroundColor: p.onAccent,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
                       ),
                       icon: const Icon(Icons.file_upload_outlined, size: 16),
-                      label: const Text('Import / Paste', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      label: const Text('Import / Paste', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
                     ),
                     if (proxyList.isNotEmpty) ...[
                       FilledButton.tonalIcon(
@@ -844,8 +716,9 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                         style: FilledButton.styleFrom(
                           backgroundColor: p.surface,
                           foregroundColor: p.accent,
+                          side: BorderSide(color: p.hairline),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                         ),
                         icon: isTestingAll
                             ? SizedBox(
@@ -855,8 +728,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                               )
                             : const Icon(Icons.speed_rounded, size: 16),
                         label: Text(
-                          isTestingAll ? 'Testing All...' : 'Test All',
-                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                          isTestingAll ? 'Testing All...' : 'Test All Speeds',
+                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
                         ),
                       ),
                       FilledButton.tonalIcon(
@@ -864,20 +737,22 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                         style: FilledButton.styleFrom(
                           backgroundColor: p.surface,
                           foregroundColor: p.textPrimary,
+                          side: BorderSide(color: p.hairline),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                         ),
                         icon: const Icon(Icons.sort_rounded, size: 16),
-                        label: const Text('Sort by Speed', style: TextStyle(fontSize: 13)),
+                        label: const Text('Sort by Speed', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
                       ),
                     ],
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
 
                 if (proxyList.isEmpty)
                   Container(
-                    padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: p.surface,
@@ -886,17 +761,27 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                     ),
                     child: Column(
                       children: [
-                        Icon(Icons.hub_outlined, color: p.textTertiary, size: 36),
-                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: p.surfaceContainerHigh,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.hub_outlined, color: p.textTertiary, size: 32),
+                        ),
+                        const SizedBox(height: 12),
                         Text(
                           'No Proxies in Pool',
-                          style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w600, fontSize: 14),
+                          style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Import your proxy list (.txt) or paste lines in IP:PORT:USER:PASS format to test and switch seamlessly.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: p.textSecondary, fontSize: 12),
+                        const SizedBox(height: 6),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 420),
+                          child: Text(
+                            'Import your proxy list (.txt) or paste lines in IP:PORT:USER:PASS format to test latency and switch seamlessly.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: p.textSecondary, fontSize: 12, height: 1.4),
+                          ),
                         ),
                       ],
                     ),
@@ -906,7 +791,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     itemCount: proxyList.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
                       final item = proxyList[index];
                       final isActive = state.proxyEnabled &&
@@ -925,145 +810,180 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
   }
 
   Widget _buildProxyItemCard(PulsrPalette p, ProxyEntry item, bool isActive) {
-    return InkWell(
-      onTap: () {
-        context.read<SettingsCubit>().selectProxyEntry(item);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Activated proxy: ${item.displayAddress}'),
-            duration: const Duration(seconds: 1),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      },
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isActive ? p.accentContainer.withValues(alpha: 0.35) : p.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isActive ? p.accent : p.hairline,
-            width: isActive ? 1.5 : 1.0,
-          ),
+    return Material(
+      color: isActive ? p.accentContainer.withValues(alpha: 0.3) : p.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(
+          color: isActive ? p.accent : p.hairline,
+          width: isActive ? 1.5 : 1.0,
         ),
-        child: Row(
-          children: [
-            // Active / Select indicator
-            Container(
-              width: 28,
-              height: 28,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: isActive ? p.accent : p.surfaceContainerHigh,
-                border: Border.all(
-                  color: isActive ? p.accent : p.hairline,
-                  width: 2,
-                ),
-              ),
-              child: isActive
-                  ? Icon(Icons.check_rounded, color: p.onAccent, size: 18)
-                  : null,
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: () {
+          context.read<SettingsCubit>().selectProxyEntry(item);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Activated proxy: ${item.displayAddress}'),
+              duration: const Duration(seconds: 1),
+              behavior: SnackBarBehavior.floating,
             ),
-            const SizedBox(width: 12),
-
-            // Proxy Host & Details
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Top Row: Selection Radio, IP:Port, Active Pill, Latency & Actions
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(
-                          item.displayAddress,
-                          style: TextStyle(
-                            color: p.textPrimary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 14,
-                            fontFamily: 'monospace',
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                  // Active Radio / Selection Dot
+                  Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isActive ? p.accent : Colors.transparent,
+                      border: Border.all(
+                        color: isActive ? p.accent : p.textTertiary,
+                        width: 2,
                       ),
-                      if (isActive) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: p.accent,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            'ACTIVE',
-                            style: TextStyle(
-                              color: p.onAccent,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
+                    ),
+                    child: isActive
+                        ? Icon(Icons.check_rounded, color: p.onAccent, size: 14)
+                        : null,
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: p.surfaceContainerHigh,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          item.type == AppProxyType.socks5 ? 'SOCKS5' : 'HTTP',
-                          style: TextStyle(color: p.textSecondary, fontSize: 10, fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                      if (item.hasAuth) ...[
-                        const SizedBox(width: 6),
-                        Icon(Icons.lock_rounded, size: 12, color: p.accent),
-                        const SizedBox(width: 2),
+                  const SizedBox(width: 10),
+
+                  // Host:Port display
+                  Expanded(
+                    child: Row(
+                      children: [
                         Flexible(
                           child: Text(
-                            item.username,
-                            style: TextStyle(color: p.textSecondary, fontSize: 11),
+                            item.displayAddress,
+                            style: TextStyle(
+                              color: p.textPrimary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              fontFamily: 'monospace',
+                            ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
+                        if (isActive) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: p.accent,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'ACTIVE',
+                              style: TextStyle(
+                                color: p.onAccent,
+                                fontSize: 8,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
-                    ],
+                    ),
+                  ),
+
+                  const SizedBox(width: 8),
+
+                  // Latency Chip
+                  _buildLatencyChip(p, item),
+
+                  const SizedBox(width: 4),
+
+                  // Test Button
+                  SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      tooltip: 'Test latency',
+                      icon: item.isTesting
+                          ? SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: p.accent),
+                            )
+                          : Icon(Icons.speed_rounded, size: 18, color: p.accent),
+                      onPressed: item.isTesting
+                          ? null
+                          : () => context.read<SettingsCubit>().testSingleProxyEntry(item.id),
+                    ),
+                  ),
+
+                  // Delete Button
+                  SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      tooltip: 'Remove proxy',
+                      icon: Icon(Icons.close_rounded, size: 16, color: p.textTertiary),
+                      onPressed: () => context.read<SettingsCubit>().removeProxyEntry(item.id),
+                    ),
                   ),
                 ],
               ),
-            ),
 
-            // Latency / Status Badge
-            _buildLatencyChip(p, item),
-
-            const SizedBox(width: 4),
-
-            // Test Single Button
-            IconButton(
-              tooltip: 'Test this proxy',
-              icon: item.isTesting
-                  ? SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: p.accent),
-                    )
-                  : Icon(Icons.speed_rounded, size: 20, color: p.accent),
-              onPressed: item.isTesting ? null : () => context.read<SettingsCubit>().testSingleProxyEntry(item.id),
-            ),
-
-            // Delete Button
-            IconButton(
-              tooltip: 'Remove proxy',
-              icon: Icon(Icons.close_rounded, size: 18, color: p.textTertiary),
-              onPressed: () => context.read<SettingsCubit>().removeProxyEntry(item.id),
-            ),
-          ],
+              // Bottom Details Row: Protocol tag + username (if auth exists)
+              Padding(
+                padding: const EdgeInsets.only(left: 32, top: 4),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                      decoration: BoxDecoration(
+                        color: p.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        item.type == AppProxyType.socks5 ? 'SOCKS5' : 'HTTP',
+                        style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (item.hasAuth)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                        decoration: BoxDecoration(
+                          color: p.accentContainer.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.lock_outline_rounded, size: 10, color: p.accent),
+                            const SizedBox(width: 3),
+                            Text(
+                              item.username,
+                              style: TextStyle(color: p.accent, fontSize: 10, fontWeight: FontWeight.w600),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -1072,21 +992,21 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
   Widget _buildLatencyChip(PulsrPalette p, ProxyEntry item) {
     if (item.isTesting) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
         decoration: BoxDecoration(
           color: p.accentContainer.withValues(alpha: 0.3),
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(6),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             SizedBox(
-              width: 10,
-              height: 10,
+              width: 8,
+              height: 8,
               child: CircularProgressIndicator(strokeWidth: 1.5, color: p.accent),
             ),
-            const SizedBox(width: 6),
-            Text('Testing', style: TextStyle(color: p.accent, fontSize: 11, fontWeight: FontWeight.w600)),
+            const SizedBox(width: 5),
+            Text('Testing', style: TextStyle(color: p.accent, fontSize: 10, fontWeight: FontWeight.w600)),
           ],
         ),
       );
@@ -1097,26 +1017,26 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
       final Color color = latency < 3000 ? p.success : (latency < 6000 ? Colors.orange : p.error);
 
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: color.withValues(alpha: 0.4)),
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: color.withValues(alpha: 0.35)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 6,
-              height: 6,
+              width: 5,
+              height: 5,
               decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
-            const SizedBox(width: 5),
+            const SizedBox(width: 4),
             Text(
               '${latency}ms',
               style: TextStyle(
                 color: color,
-                fontSize: 11,
+                fontSize: 10,
                 fontWeight: FontWeight.w700,
                 fontFamily: 'monospace',
               ),
@@ -1128,20 +1048,20 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
 
     if (item.isWorking == false) {
       return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
         decoration: BoxDecoration(
-          color: p.error.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: p.error.withValues(alpha: 0.4)),
+          color: p.error.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: p.error.withValues(alpha: 0.35)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline_rounded, color: p.error, size: 12),
-            const SizedBox(width: 4),
+            Icon(Icons.error_outline_rounded, color: p.error, size: 10),
+            const SizedBox(width: 3),
             Text(
               'Failed',
-              style: TextStyle(color: p.error, fontSize: 11, fontWeight: FontWeight.w700),
+              style: TextStyle(color: p.error, fontSize: 10, fontWeight: FontWeight.w700),
             ),
           ],
         ),
@@ -1149,58 +1069,459 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(
         color: p.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
         'Unverified',
-        style: TextStyle(color: p.textTertiary, fontSize: 11),
+        style: TextStyle(color: p.textTertiary, fontSize: 10, fontWeight: FontWeight.w600),
       ),
     );
   }
 
-  Widget _buildMasterToggle(PulsrPalette p) {
-    return Material(
-      color: p.surfaceContainer,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-        side: BorderSide(color: p.hairline),
+  Widget _buildProtocolSection(PulsrPalette p) {
+    return _buildSection(
+      p: p,
+      title: 'ACTIVE PROXY PROTOCOL',
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<AppProxyType>(
+                showSelectedIcon: false,
+                expandedInsets: EdgeInsets.zero,
+                segments: const [
+                  ButtonSegment(
+                    value: AppProxyType.http,
+                    label: Text('HTTP / HTTPS', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    icon: Icon(Icons.http_rounded, size: 18),
+                  ),
+                  ButtonSegment(
+                    value: AppProxyType.socks5,
+                    label: Text('SOCKS5', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    icon: Icon(Icons.shield_outlined, size: 18),
+                  ),
+                ],
+                selected: {_type},
+                onSelectionChanged: (newSelection) {
+                  setState(() {
+                    _type = newSelection.first;
+                    _testResult = null;
+                  });
+                },
+                style: ButtonStyle(
+                  visualDensity: VisualDensity.comfortable,
+                  backgroundColor: WidgetStateProperty.resolveWith<Color>((states) {
+                    if (states.contains(WidgetState.selected)) {
+                      return p.accentContainer;
+                    }
+                    return p.surface;
+                  }),
+                  foregroundColor: WidgetStateProperty.resolveWith<Color>((states) {
+                    if (states.contains(WidgetState.selected)) {
+                      return p.accent;
+                    }
+                    return p.textSecondary;
+                  }),
+                  side: WidgetStatePropertyAll(BorderSide(color: p.hairline)),
+                  shape: WidgetStatePropertyAll(
+                    RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Icon(Icons.info_outline_rounded, size: 14, color: p.textTertiary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    _type == AppProxyType.http
+                        ? 'Routes standard HTTP & HTTPS web and stream extraction traffic.'
+                        : 'Routes network packets via SOCKS5 (recommended for Tor, Clash, Shadowsocks).',
+                    style: TextStyle(color: p.textTertiary, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: SwitchListTile.adaptive(
-        value: _enabled,
-        onChanged: (val) {
-          setState(() {
-            _enabled = val;
-            _testResult = null;
-          });
-        },
-        activeTrackColor: p.accent,
-        activeThumbColor: Colors.white,
-        secondary: Container(
-          width: 42,
-          height: 42,
-          decoration: BoxDecoration(
-            color: _enabled ? p.accentContainer : p.surface,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(
-            _enabled ? Icons.vpn_lock_rounded : Icons.vpn_lock_outlined,
-            color: _enabled ? p.accent : p.textSecondary,
-            size: 22,
-          ),
+    );
+  }
+
+  Widget _buildServerConfigSection(PulsrPalette p) {
+    return _buildSection(
+      p: p,
+      title: 'ACTIVE SERVER CONFIGURATION',
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isWide = constraints.maxWidth > 480;
+
+                final hostField = TextFormField(
+                  controller: _hostController,
+                  style: TextStyle(color: p.textPrimary, fontSize: 14),
+                  decoration: InputDecoration(
+                    labelText: 'Server Host / IP Address',
+                    hintText: 'e.g. 127.0.0.1 or proxy.example.com',
+                    labelStyle: TextStyle(color: p.textSecondary),
+                    hintStyle: TextStyle(color: p.textTertiary),
+                    prefixIcon: Icon(Icons.dns_rounded, color: p.accent, size: 20),
+                    filled: true,
+                    fillColor: p.surface,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: p.hairline),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: p.hairline),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: p.accent, width: 2),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  ),
+                  validator: (value) {
+                    if (_enabled && (value == null || value.trim().isEmpty)) {
+                      return 'Please enter a proxy host';
+                    }
+                    return null;
+                  },
+                );
+
+                final portField = TextFormField(
+                  controller: _portController,
+                  style: TextStyle(color: p.textPrimary, fontSize: 14),
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    labelText: 'Port',
+                    hintText: 'e.g. 8080',
+                    labelStyle: TextStyle(color: p.textSecondary),
+                    hintStyle: TextStyle(color: p.textTertiary),
+                    prefixIcon: Icon(Icons.numbers_rounded, color: p.accent, size: 20),
+                    filled: true,
+                    fillColor: p.surface,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: p.hairline),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: p.hairline),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: p.accent, width: 2),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  ),
+                  validator: (value) {
+                    if (_enabled) {
+                      final port = int.tryParse(value?.trim() ?? '');
+                      if (port == null || port <= 0 || port > 65535) {
+                        return 'Invalid port (1-65535)';
+                      }
+                    }
+                    return null;
+                  },
+                );
+
+                if (isWide) {
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 3, child: hostField),
+                      const SizedBox(width: 12),
+                      Expanded(flex: 1, child: portField),
+                    ],
+                  );
+                }
+
+                return Column(
+                  children: [
+                    hostField,
+                    const SizedBox(height: 14),
+                    portField,
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 16),
+
+            // Quick Presets Header
+            Text(
+              'QUICK PRESETS',
+              style: TextStyle(
+                color: p.textTertiary,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Presets Wrap
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _presetChip(
+                  label: 'Clash / V2Ray (7890)',
+                  icon: Icons.alt_route_rounded,
+                  onTap: () => _applyPreset(
+                    name: 'Clash / V2Ray',
+                    type: AppProxyType.http,
+                    host: '127.0.0.1',
+                    port: 7890,
+                  ),
+                  p: p,
+                ),
+                _presetChip(
+                  label: 'Tor SOCKS5 (9050)',
+                  icon: Icons.shield_outlined,
+                  onTap: () => _applyPreset(
+                    name: 'Tor',
+                    type: AppProxyType.socks5,
+                    host: '127.0.0.1',
+                    port: 9050,
+                  ),
+                  p: p,
+                ),
+                _presetChip(
+                  label: 'Local HTTP (8080)',
+                  icon: Icons.http_rounded,
+                  onTap: () => _applyPreset(
+                    name: 'Local HTTP',
+                    type: AppProxyType.http,
+                    host: '127.0.0.1',
+                    port: 8080,
+                  ),
+                  p: p,
+                ),
+                _presetChip(
+                  label: 'Local SOCKS5 (1080)',
+                  icon: Icons.shield_outlined,
+                  onTap: () => _applyPreset(
+                    name: 'Local SOCKS5',
+                    type: AppProxyType.socks5,
+                    host: '127.0.0.1',
+                    port: 1080,
+                  ),
+                  p: p,
+                ),
+                _presetChip(
+                  label: 'Shadowsocks (10808)',
+                  icon: Icons.cloud_outlined,
+                  onTap: () => _applyPreset(
+                    name: 'Shadowsocks',
+                    type: AppProxyType.socks5,
+                    host: '127.0.0.1',
+                    port: 10808,
+                  ),
+                  p: p,
+                ),
+              ],
+            ),
+          ],
         ),
-        title: const Text(
-          'Enable Proxy',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+      ),
+    );
+  }
+
+  Widget _buildAuthSection(PulsrPalette p) {
+    return _buildSection(
+      p: p,
+      title: 'AUTHENTICATION (OPTIONAL)',
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth > 480;
+
+            final usernameField = TextFormField(
+              controller: _usernameController,
+              style: TextStyle(color: p.textPrimary, fontSize: 14),
+              decoration: InputDecoration(
+                labelText: 'Username',
+                hintText: 'Leave blank if unauthenticated',
+                labelStyle: TextStyle(color: p.textSecondary),
+                hintStyle: TextStyle(color: p.textTertiary),
+                prefixIcon: Icon(Icons.person_outline_rounded, color: p.accent, size: 20),
+                filled: true,
+                fillColor: p.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: p.hairline),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: p.hairline),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: p.accent, width: 2),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              ),
+            );
+
+            final passwordField = TextFormField(
+              controller: _passwordController,
+              style: TextStyle(color: p.textPrimary, fontSize: 14),
+              obscureText: _obscurePassword,
+              decoration: InputDecoration(
+                labelText: 'Password',
+                hintText: 'Leave blank if unauthenticated',
+                labelStyle: TextStyle(color: p.textSecondary),
+                hintStyle: TextStyle(color: p.textTertiary),
+                prefixIcon: Icon(Icons.lock_outline_rounded, color: p.accent, size: 20),
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _obscurePassword ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                    color: p.textTertiary,
+                    size: 20,
+                  ),
+                  onPressed: () {
+                    setState(() => _obscurePassword = !_obscurePassword);
+                  },
+                ),
+                filled: true,
+                fillColor: p.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: p.hairline),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: p.hairline),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: p.accent, width: 2),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              ),
+            );
+
+            if (isWide) {
+              return Row(
+                children: [
+                  Expanded(child: usernameField),
+                  const SizedBox(width: 12),
+                  Expanded(child: passwordField),
+                ],
+              );
+            }
+
+            return Column(
+              children: [
+                usernameField,
+                const SizedBox(height: 14),
+                passwordField,
+              ],
+            );
+          },
         ),
-        subtitle: Text(
-          _enabled
-              ? 'All app and YouTube Music/NewPipe requests pass through proxy'
-              : 'Direct connection (proxy disabled)',
-          style: TextStyle(color: p.textSecondary, fontSize: 12),
+      ),
+    );
+  }
+
+  Widget _buildBypassSection(PulsrPalette p) {
+    return _buildSection(
+      p: p,
+      title: 'BYPASS HOSTS',
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextFormField(
+              controller: _bypassController,
+              style: TextStyle(color: p.textPrimary, fontSize: 14),
+              decoration: InputDecoration(
+                labelText: 'Bypass List (comma-separated)',
+                hintText: 'localhost, 127.0.0.1, *.local',
+                labelStyle: TextStyle(color: p.textSecondary),
+                hintStyle: TextStyle(color: p.textTertiary),
+                prefixIcon: Icon(Icons.alt_route_rounded, color: p.accent, size: 20),
+                filled: true,
+                fillColor: p.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: p.hairline),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: p.hairline),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: p.accent, width: 2),
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                _bypassChip('localhost', p),
+                _bypassChip('127.0.0.1', p),
+                _bypassChip('*.local', p),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(Icons.info_outline_rounded, size: 14, color: p.textTertiary),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Requests matching these hosts will connect directly without routing through proxy.',
+                    style: TextStyle(color: p.textTertiary, fontSize: 12),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _bypassChip(String host, PulsrPalette p) {
+    return InkWell(
+      onTap: () => _appendBypassHost(host),
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: p.surface,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: p.hairline),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.add_rounded, size: 12, color: p.accent),
+            const SizedBox(width: 3),
+            Text(host, style: TextStyle(color: p.textSecondary, fontSize: 11, fontFamily: 'monospace')),
+          ],
         ),
       ),
     );
@@ -1221,6 +1542,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: p.textTertiary,
                   letterSpacing: 0.5,
+                  fontWeight: FontWeight.w700,
                 ),
           ),
         ),
@@ -1239,15 +1561,38 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
 
   Widget _presetChip({
     required String label,
+    required IconData icon,
     required VoidCallback onTap,
     required PulsrPalette p,
   }) {
-    return ActionChip(
-      label: Text(label, style: TextStyle(color: p.textPrimary, fontSize: 12)),
-      backgroundColor: p.surface,
-      side: BorderSide(color: p.hairline),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      onPressed: onTap,
+    return Material(
+      color: p.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(color: p.hairline),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: p.accent),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: p.textPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
