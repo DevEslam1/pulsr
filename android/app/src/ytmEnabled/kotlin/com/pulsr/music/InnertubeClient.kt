@@ -188,7 +188,8 @@ internal class InnertubeClient(
         var lastException: Throwable? = null
         var sawBotGate = false
 
-        for (client in clientChain) {
+        // Helper function to attempt resolution on a single client
+        fun attemptClient(client: ClientType): Map<String, Any?>? {
             try {
                 Log.d(TAG, "Attempting player resolution for $videoId using client: ${client.name}")
                 val playerJson = requestPlayer(videoId, client)
@@ -200,14 +201,12 @@ internal class InnertubeClient(
                     status.equals("UNPLAYABLE", ignoreCase = true) ||
                     status.contains("BOT", ignoreCase = true)) {
                     val reason = playability?.optString("reason") ?: status
-                    Log.w(TAG, "Client ${client.name} returned status $status ($reason), trying next client")
-                    // UNPLAYABLE means this video is restricted/unavailable, not that
-                    // we are bot-gated — only LOGIN_REQUIRED/BOT prove an attestation gate.
+                    Log.w(TAG, "Client ${client.name} returned status $status ($reason)")
                     if (!status.equals("UNPLAYABLE", ignoreCase = true)) sawBotGate = true
-                    continue
+                    return null
                 }
 
-                val streamingData = playerJson.optJSONObject("streamingData") ?: continue
+                val streamingData = playerJson.optJSONObject("streamingData") ?: return null
                 val adaptiveFormats = streamingData.optJSONArray("adaptiveFormats") ?: JSONArray()
 
                 val audioFormats = mutableListOf<Pair<JSONObject, String>>()
@@ -220,10 +219,7 @@ internal class InnertubeClient(
                     }
                 }
 
-                if (audioFormats.isEmpty()) {
-                    Log.w(TAG, "Client ${client.name} provided no direct audio formats, trying next")
-                    continue
-                }
+                if (audioFormats.isEmpty()) return null
 
                 // Prefer M4A / AAC for jaudiotagger compatibility
                 val m4aFormats = audioFormats.filter { it.first.optString("mimeType").contains("mp4") }
@@ -261,7 +257,38 @@ internal class InnertubeClient(
             } catch (t: Throwable) {
                 Log.w(TAG, "Failed resolving with ${client.name}: ${t.message}")
                 lastException = t
+                return null
             }
+        }
+
+        // Fast parallel race for the top 3 high-probability clients
+        val fastTier = clientChain.take(3)
+        val slowTier = clientChain.drop(3)
+
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(fastTier.size)
+        try {
+            val completionService = java.util.concurrent.ExecutorCompletionService<Map<String, Any?>?>(executor)
+            for (client in fastTier) {
+                completionService.submit(java.util.concurrent.Callable { attemptClient(client) })
+            }
+
+            for (i in fastTier.indices) {
+                try {
+                    val future = completionService.poll(6, java.util.concurrent.TimeUnit.SECONDS) ?: continue
+                    val res = future.get()
+                    if (res != null) {
+                        return res
+                    }
+                } catch (_: Throwable) {}
+            }
+        } finally {
+            executor.shutdownNow()
+        }
+
+        // Fallback: sequential check for remaining specialized clients
+        for (client in slowTier) {
+            val res = attemptClient(client)
+            if (res != null) return res
         }
 
         // Only a real bot/auth gate justifies touching attestation state.
@@ -641,6 +668,6 @@ internal class InnertubeClient(
 
     companion object {
         private const val TAG = "InnertubeClient"
-        private const val API_KEY = "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30"
+        var API_KEY: String = System.getProperty("YTM_API_KEY") ?: "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30"
     }
 }

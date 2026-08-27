@@ -103,7 +103,7 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
         if (cachedBytes != null && cachedBytes.isNotEmpty) {
           imageProvider = MemoryImage(cachedBytes);
         } else {
-          imageProvider = NetworkImage(highResUrl);
+          imageProvider = ResizeImage(NetworkImage(highResUrl), width: 128, height: 128);
         }
       } else {
         // 2. Local audio file from MediaStore

@@ -210,6 +210,7 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
   @override
   Future<void> close() {
     _saveDebounce?.cancel();
+    _lastEmitTimeByVideoId.clear();
     return super.close();
   }
 }

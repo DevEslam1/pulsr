@@ -152,7 +152,7 @@ void ConvolutionReverb::process(float* L, float* R, int frames) {
         float convL = 0.0f;
         float convR = 0.0f;
 
-        int hIdx = historyIdx_;
+        int hIdx = (historyIdx_ - 1 + irLength_) % irLength_;
         for (int i = 0; i < irLength_; i += step) {
             convL += historyL_[hIdx] * irL_[i];
             convR += historyR_[hIdx] * irR_[i];
@@ -184,7 +184,7 @@ void ConvolutionReverb::processInterleaved(float* buffer, int frames) {
         float convL = 0.0f;
         float convR = 0.0f;
 
-        int hIdx = historyIdx_;
+        int hIdx = (historyIdx_ - 1 + irLength_) % irLength_;
         for (int i = 0; i < irLength_; i += step) {
             convL += historyL_[hIdx] * irL_[i];
             convR += historyR_[hIdx] * irR_[i];

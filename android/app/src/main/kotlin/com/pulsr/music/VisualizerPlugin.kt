@@ -78,7 +78,13 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
             val vis = Visualizer(audioSessionId)
             val captureSizeRange = Visualizer.getCaptureSizeRange()
             if (captureSizeRange != null && captureSizeRange.size >= 2) {
-                vis.captureSize = captureSizeRange[1] // Use max capture size
+                try {
+                    vis.captureSize = captureSizeRange[1] // Use max capture size
+                } catch (_: Exception) {
+                    try {
+                        vis.captureSize = captureSizeRange[0] // Fallback to min capture size
+                    } catch (_: Exception) {}
+                }
             }
             vis.setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
                 override fun onWaveFormDataCapture(
@@ -120,8 +126,8 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
             vis.enabled = true
             visualizer = vis
             true
-        } catch (e: Exception) {
-            android.util.Log.w("VisualizerPlugin", "Hardware visualizer unavailable on this device/emulator: ${e.message}")
+        } catch (e: Throwable) {
+            android.util.Log.w("VisualizerPlugin", "Hardware visualizer unavailable on this device/ROM: ${e.message}")
             false
         }
     }

@@ -148,7 +148,9 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
     AudioDspEngine::instance().dsdDecoder().configure(
             static_cast<DsdDecoder::DsdRate>(dsdRate), targetPcmSampleRate, dsdBitOrder);
 
-    int maxOutFrames = byteCount * 8; // generous max frame buffer
+    int dsdSampleRate = (dsdRate == 64) ? 2822400 : ((dsdRate == 128) ? 5644800 : 11289600);
+    int decimationRatio = (targetPcmSampleRate > 0) ? std::max(1, dsdSampleRate / targetPcmSampleRate) : 16;
+    int maxOutFrames = (byteCount * 8 / decimationRatio) + 64;
     std::vector<float> pcmOut(maxOutFrames * 2);
 
     int actualFrames = AudioDspEngine::instance().dsdDecoder().decodeDsdBytes(
@@ -168,6 +170,12 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
         env->SetFloatArrayRegion(result, 0, actualFrames * 2, pcmOut.data());
     }
     return result;
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetActiveStages(
+        JNIEnv* /* env */, jobject /* thiz */, jint bitmask) {
+    AudioDspEngine::instance().setActiveStages(static_cast<uint32_t>(bitmask));
 }
 
 JNIEXPORT void JNICALL

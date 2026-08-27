@@ -128,7 +128,14 @@ class PlaylistUseCases {
       ),
     ];
 
+    final existingRes = await _repository.getPlaylists();
+    final existingNames = existingRes.fold(
+      (l) => <String>{},
+      (r) => r.map((p) => p.name.toLowerCase()).toSet(),
+    );
+
     for (final item in defaults) {
+      if (existingNames.contains(item.name.toLowerCase())) continue;
       await _repository.createPlaylist(
         item.name,
         isSmart: true,

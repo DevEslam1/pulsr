@@ -151,6 +151,9 @@ class YtmResolvingSource extends StreamAudioSource {
     // never start writing the same file at exactly the same time.
     final pathKey = cacheFile.path;
     final completer = Completer<void>();
+    if (_pathCreationLocks.length >= 50 && !_pathCreationLocks.containsKey(pathKey)) {
+      _pathCreationLocks.remove(_pathCreationLocks.keys.first);
+    }
     final previous =
         _pathCreationLocks.putIfAbsent(pathKey, () => completer.future);
 

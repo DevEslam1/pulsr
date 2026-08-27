@@ -289,6 +289,10 @@ class PlaylistCubit extends Cubit<PlaylistState> {
   }
 
   Future<void> deletePlaylist(int playlistId) async {
+    _smartSubscriptions[playlistId]?.cancel();
+    _smartSubscriptions.remove(playlistId);
+    final updatedCounts = Map<int, int>.from(state.smartPlaylistCounts)..remove(playlistId);
+    emit(state.copyWith(smartPlaylistCounts: updatedCounts));
     final result = await _playlistUseCases.deletePlaylist(playlistId);
     result.fold(
       (failure) => emit(state.copyWith(errorMessage: failure.message)),

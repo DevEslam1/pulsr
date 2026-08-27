@@ -7,12 +7,12 @@ SpatialPanner::SpatialPanner() {
 
 void SpatialPanner::setBalance(double balance) {
     balance_ = std::max(-1.0, std::min(balance, 1.0));
-    // Linear balance with center at 1.0
+    // Equal power panning (sin/cos law)
     if (balance_ <= 0.0) {
         gainL_ = 1.0f;
-        gainR_ = static_cast<float>(1.0 + balance_);
+        gainR_ = static_cast<float>(std::cos(-balance_ * (M_PI * 0.5)));
     } else {
-        gainL_ = static_cast<float>(1.0 - balance_);
+        gainL_ = static_cast<float>(std::cos(balance_ * (M_PI * 0.5)));
         gainR_ = 1.0f;
     }
 }

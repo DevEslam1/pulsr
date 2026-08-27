@@ -64,4 +64,5 @@ private:
     double x2_[MAX_CHANNELS][MAX_BANDS] = {};
     double y1_[MAX_CHANNELS][MAX_BANDS] = {};
     double y2_[MAX_CHANNELS][MAX_BANDS] = {};
+    std::vector<float> tempBuf_;
 };

@@ -11,6 +11,7 @@ import 'package:injectable/injectable.dart';
 import '../di/injection.dart';
 import 'xdm_backend_service.dart';
 import 'ytm_account_service.dart';
+import 'ytm_client_version_resolver.dart';
 import '../../domain/models/ytm_track.dart';
 import '../utils/error_logger.dart';
 import '../utils/ytm_rate_limiter.dart';
@@ -220,12 +221,22 @@ class YtmService {
 
   Future<List<YtmTrack>> _searchInnertube(String query, {int limit = 30}) async {
     try {
-      const apiKey = 'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30';
+      String apiKey = const String.fromEnvironment(
+        'YTM_API_KEY',
+        defaultValue: 'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30',
+      );
+      String clientVersion = '1.20250820.01.00';
+      if (getIt.isRegistered<YtmClientVersionResolver>()) {
+        final resolver = getIt<YtmClientVersionResolver>();
+        apiKey = resolver.apiKey;
+        clientVersion = resolver.clientVersion;
+      }
+
       final body = jsonEncode({
         'context': {
           'client': {
             'clientName': 'WEB_REMIX',
-            'clientVersion': '1.20250820.01.00',
+            'clientVersion': clientVersion,
             'hl': 'en',
             'gl': 'US',
           },

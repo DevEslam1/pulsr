@@ -75,6 +75,12 @@ class AppHttpOverrides extends HttpOverrides {
       testClient.findProxy = (u) => testConfig.toFindProxyString(u);
 
       if (testConfig.enabled && testConfig.hasAuth) {
+        testClient.addProxyCredentials(
+          testConfig.host,
+          testConfig.port,
+          'Basic',
+          HttpClientBasicCredentials(testConfig.username, testConfig.password),
+        );
         testClient.authenticateProxy = (host, port, scheme, realm) async {
           testClient?.addProxyCredentials(
             host,

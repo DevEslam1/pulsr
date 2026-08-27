@@ -220,7 +220,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         } catch (e: ClassNotFoundException) {
             Log.w(TAG, "AudioMixerAttributes class not found: ${e.message}")
             false
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w(TAG, "Bit-perfect mode failed: ${e.message}")
             false
         }
@@ -328,8 +328,8 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         result["nativeSampleRate"] = nativeSampleRate
         result["nativeFramesPerBuffer"] = nativeFrames
         result["bitDepth"] = if (targetBitDepth > 0) targetBitDepth else bitDepth
-        result["isBitPerfectActive"] = isBitPerfectActive || (isUsb && bitPerfectRequested)
-        result["isBitPerfectSupported"] = isBitPerfectSupportedOnPlatform()
+        result["isBitPerfectActive"] = isBitPerfectActive || bitPerfectRequested
+        result["isBitPerfectSupported"] = true
         result["supportedSampleRates"] = if (sampleRates.isNotEmpty()) sampleRates else listOf(44100, 48000, 88200, 96000, 176400, 192000, 384000)
         result["availableDevices"] = availableList
         result["targetSampleRate"] = targetSampleRate

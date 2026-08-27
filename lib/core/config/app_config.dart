@@ -6,6 +6,7 @@ class AppConfig {
   static const String envName = String.fromEnvironment('ENV', defaultValue: 'dev');
   static const String sentryDsn = String.fromEnvironment('SENTRY_DSN', defaultValue: '');
   static const String flavor = String.fromEnvironment('FLAVOR', defaultValue: 'dev');
+  static const String appVersion = String.fromEnvironment('APP_VERSION', defaultValue: '1.0.0');
 
   /// YouTube Music search/stream/download. Off by default so Play Store builds
   /// never expose it; enable with `--dart-define=ENABLE_YTM=true`.

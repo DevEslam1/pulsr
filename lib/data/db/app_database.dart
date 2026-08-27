@@ -83,22 +83,25 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(songsTable, songsTable.bitrateKbps);
         await m.addColumn(songsTable, songsTable.codec);
       }
+      Future<bool> hasColumn(String table, String column) async {
+        final rows = await customSelect('PRAGMA table_info($table);').get();
+        return rows.any((r) => r.data['name'] == column);
+      }
+
       if (from < 7) {
-        await m.addColumn(songsTable, songsTable.replayGainTrack);
-        await m.addColumn(songsTable, songsTable.replayGainAlbum);
-        await m.addColumn(songsTable, songsTable.replayGainTrackPeak);
-        await m.addColumn(songsTable, songsTable.replayGainAlbumPeak);
-        try {
-          await m.addColumn(songsTable, songsTable.isDownloaded);
-        } catch (_) {}
+        if (!await hasColumn('songs', 'replay_gain_track')) await m.addColumn(songsTable, songsTable.replayGainTrack);
+        if (!await hasColumn('songs', 'replay_gain_album')) await m.addColumn(songsTable, songsTable.replayGainAlbum);
+        if (!await hasColumn('songs', 'replay_gain_track_peak')) await m.addColumn(songsTable, songsTable.replayGainTrackPeak);
+        if (!await hasColumn('songs', 'replay_gain_album_peak')) await m.addColumn(songsTable, songsTable.replayGainAlbumPeak);
+        if (!await hasColumn('songs', 'is_downloaded')) await m.addColumn(songsTable, songsTable.isDownloaded);
         try {
           await customStatement('UPDATE songs SET replay_gain_track = replay_gain WHERE replay_gain IS NOT NULL;');
         } catch (_) {}
       }
       if (from < 8) {
-        try {
+        if (!await hasColumn('songs', 'loudness_range')) {
           await m.addColumn(songsTable, songsTable.loudnessRange);
-        } catch (_) {}
+        }
       }
       // Must run after every addColumn above: several indexes cover columns a
       // later branch introduces, so creating them mid-ladder fails on an older

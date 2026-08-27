@@ -29,7 +29,7 @@ class MainActivity : AudioServiceActivity() {
     private var waveformPlugin: WaveformPlugin? = null
     private var proxyPlugin: ProxyPlugin? = null
     private var hiResDacPlugin: HiResDacPlugin? = null
-    private val backgroundExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val lyricsExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
  
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -45,9 +45,9 @@ class MainActivity : AudioServiceActivity() {
     override fun onDestroy() {
         pendingAudioUri = null
         try {
-            backgroundExecutor.shutdown()
+            lyricsExecutor.shutdown()
         } catch (e: Exception) {
-            Log.w("MainActivity", "Error shutting down background executor: ${e.message}")
+            Log.w("MainActivity", "Error shutting down lyrics executor: ${e.message}")
         }
         super.onDestroy()
     }
@@ -157,7 +157,7 @@ class MainActivity : AudioServiceActivity() {
                     result.error("INVALID_ARGUMENT", "File path is null", null)
                     return@setMethodCallHandler
                 }
-                backgroundExecutor.execute {
+                lyricsExecutor.execute {
                     val retriever = MediaMetadataRetriever()
                     try {
                         if (filePath.startsWith("content:")) {

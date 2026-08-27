@@ -118,7 +118,9 @@ class SmartPlaylistEngine {
         }
 
       case SmartRuleField.isLossless:
-        return t.path.lower().like('%.flac') |
+        return t.codec.isIn(const ['FLAC', 'ALAC', 'WAV', 'AIFF', 'PCM', 'DSF', 'DFF']) |
+            t.bitDepth.isBiggerOrEqualValue(24) |
+            t.path.lower().like('%.flac') |
             t.path.lower().like('%.wav') |
             t.path.lower().like('%.alac') |
             t.path.lower().like('%.aiff') |

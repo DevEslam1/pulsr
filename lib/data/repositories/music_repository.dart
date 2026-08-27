@@ -358,6 +358,9 @@ class MusicRepository implements IMusicRepository {
 
   @override
   Future<Result<void>> recordPlayHistory(int songId, {bool completed = false}) async {
+    if (songId <= 0) {
+      return const Right(null);
+    }
     try {
       final now = DateTime.now();
       if (_lastRecordedSongId == songId && _lastRecordedTime != null && now.difference(_lastRecordedTime!).inMilliseconds < 1500) {
@@ -855,21 +858,41 @@ class MusicRepository implements IMusicRepository {
 
       int markedMissingCount = 0;
       await _db.transaction(() async {
-        // Soft delete: mark missing songs instead of hard deleting to preserve playlist entries, play history & favorites.
-        // Non-local rows or pending local downloads without MediaStore IDs must not be flagged missing.
-        markedMissingCount = await (_db.update(_db.songsTable)
+        // Soft delete: mark missing songs only if the file actually no longer exists on disk
+        // to handle SD card remounts and transient indexing gaps cleanly.
+        final unscannedSongs = await (_db.select(_db.songsTable)
               ..where((t) =>
                   t.id.isNotIn(scannedSongIds) &
                   t.id.isBiggerThanValue(0) &
                   t.source.equals(SongSource.local)))
-            .write(
-          const SongsTableCompanion(isMissing: Value(true)),
-        );
+            .get();
 
-        // Ensure newly/currently scanned songs are marked active (not missing)
-        await (_db.update(_db.songsTable)..where((t) => t.id.isIn(scannedSongIds))).write(
-          const SongsTableCompanion(isMissing: Value(false)),
-        );
+        final trulyMissingIds = <int>[];
+        final reappearedIds = <int>[];
+
+        for (final song in unscannedSongs) {
+          if (song.path.isNotEmpty && (song.path.startsWith('content:') || File(song.path).existsSync())) {
+            reappearedIds.add(song.id);
+          } else {
+            trulyMissingIds.add(song.id);
+          }
+        }
+
+        if (trulyMissingIds.isNotEmpty) {
+          markedMissingCount = await (_db.update(_db.songsTable)
+                ..where((t) => t.id.isIn(trulyMissingIds)))
+              .write(
+            const SongsTableCompanion(isMissing: Value(true)),
+          );
+        }
+
+        // Ensure newly/currently scanned songs and reappeared songs are marked active (not missing)
+        final activeIds = {...scannedSongIds, ...reappearedIds};
+        if (activeIds.isNotEmpty) {
+          await (_db.update(_db.songsTable)..where((t) => t.id.isIn(activeIds))).write(
+            const SongsTableCompanion(isMissing: Value(false)),
+          );
+        }
 
         // Recalculate song counts using active (non-missing) local songs
         final albumCounts = await (_db.selectOnly(_db.songsTable)
@@ -973,7 +996,7 @@ class MusicRepository implements IMusicRepository {
                     t.source.equals(SongSource.local) &
                     t.title.lower().equals(matchMetadata.title.toLowerCase()) &
                     t.artist.lower().equals(matchMetadata.artist.toLowerCase()) &
-                    t.durationMs.isBetweenValues(matchMetadata.durationMs - 2000, matchMetadata.durationMs + 2000))
+                    t.durationMs.isBetweenValues(matchMetadata.durationMs - 5000, matchMetadata.durationMs + 5000))
                 ..orderBy([(t) => OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)])
                 ..limit(1))
               .getSingleOrNull();

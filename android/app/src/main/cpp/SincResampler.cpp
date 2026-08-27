@@ -64,8 +64,8 @@ int SincResampler::process(const float* inL, const float* inR, int inFrames,
     int needed = histSize + inFrames;
     if (needed > bufCapacity_) {
         bufCapacity_ = std::max(needed * 2, 4096);
-        bufL_.resize(bufCapacity_);
-        bufR_.resize(bufCapacity_);
+        bufL_.resize(bufCapacity_, 0.0f);
+        bufR_.resize(bufCapacity_, 0.0f);
     }
 
     std::memcpy(bufL_.data(), historyL_.data(), histSize * sizeof(float));

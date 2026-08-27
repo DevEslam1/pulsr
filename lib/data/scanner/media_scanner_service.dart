@@ -365,14 +365,30 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
   final List<SongsTableCompanion> songCompanions = [];
   final Map<int, AlbumsTableCompanion> albumMap = {};
   final Map<int, ArtistsTableCompanion> artistMap = {};
+  final Map<int, int> albumSongCounts = {};
+  final Map<int, int> artistSongCounts = {};
   final Set<int> validSongIds = {};
 
+  int? parseInt(Object? val) {
+    if (val is int) return val;
+    if (val is num) return val.toInt();
+    return int.tryParse(val?.toString() ?? '');
+  }
+
+  String? parseString(Object? val) {
+    if (val == null) return null;
+    final str = val.toString().trim();
+    return str.isNotEmpty ? str : null;
+  }
+
   for (final raw in input.rawSongs) {
-    final id = raw['_id'] as int? ?? raw['id'] as int? ?? 0;
-    final duration = raw['duration'] as int? ?? 0;
+    final id = parseInt(raw['_id']) ?? parseInt(raw['id']) ?? 0;
+    if (id <= 0 || validSongIds.contains(id)) continue;
+
+    final duration = parseInt(raw['duration']) ?? 0;
     if (duration < input.minDurationMs) continue;
 
-    final path = (raw['_data'] as String?) ?? (raw['data'] as String?) ?? '';
+    final path = parseString(raw['_data']) ?? parseString(raw['data']) ?? '';
     if (path.isEmpty || !AudioFormats.isSupportedExtension(path)) {
       continue;
     }
@@ -390,33 +406,31 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
       continue;
     }
 
-    final rawTitle = raw['title'] as String?;
-    final title = (rawTitle != null && rawTitle.trim().isNotEmpty) ? rawTitle.trim() : 'Unknown Song';
+    final rawTitle = parseString(raw['title']);
+    final title = (rawTitle != null && rawTitle.isNotEmpty) ? rawTitle : 'Unknown Song';
 
-    final rawArtist = raw['artist'] as String?;
-    final artist = (rawArtist != null && rawArtist.trim().isNotEmpty && rawArtist != '<unknown>')
-        ? rawArtist.trim()
+    final rawArtist = parseString(raw['artist']);
+    final artist = (rawArtist != null && rawArtist.isNotEmpty && rawArtist != '<unknown>')
+        ? rawArtist
         : 'Unknown Artist';
 
-    final rawAlbum = raw['album'] as String?;
-    final album = (rawAlbum != null && rawAlbum.trim().isNotEmpty && rawAlbum != '<unknown>')
-        ? rawAlbum.trim()
+    final rawAlbum = parseString(raw['album']);
+    final album = (rawAlbum != null && rawAlbum.isNotEmpty && rawAlbum != '<unknown>')
+        ? rawAlbum
         : 'Unknown Album';
 
-    final rawGenre = raw['genre']?.toString();
-    final genre = (rawGenre != null && rawGenre.trim().isNotEmpty && rawGenre != '<unknown>')
-        ? rawGenre.trim()
+    final rawGenre = parseString(raw['genre']);
+    final genre = (rawGenre != null && rawGenre.isNotEmpty && rawGenre != '<unknown>')
+        ? rawGenre
         : null;
 
-    final yearRaw = raw['year'];
-    final int? year = yearRaw is int ? yearRaw : int.tryParse(yearRaw?.toString() ?? '');
-
-    final artistId = raw['artist_id'] as int? ?? raw['artistId'] as int?;
-    final albumId = raw['album_id'] as int? ?? raw['albumId'] as int?;
-    final uri = raw['_uri'] as String? ?? raw['uri'] as String?;
-    final track = raw['track'] as int?;
-    final dateAdded = raw['date_added'] as int? ?? raw['dateAdded'] as int?;
-    final size = raw['_size'] as int? ?? raw['size'] as int?;
+    final int? year = parseInt(raw['year']);
+    final artistId = parseInt(raw['artist_id']) ?? parseInt(raw['artistId']);
+    final albumId = parseInt(raw['album_id']) ?? parseInt(raw['albumId']);
+    final uri = parseString(raw['_uri']) ?? parseString(raw['uri']);
+    final track = parseInt(raw['track']);
+    final dateAdded = parseInt(raw['date_added']) ?? parseInt(raw['dateAdded']);
+    final size = parseInt(raw['_size']) ?? parseInt(raw['size']);
 
     validSongIds.add(id);
 
@@ -442,31 +456,43 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
 
     // Aggregate Albums
     if (albumId != null) {
-      albumMap[albumId] = AlbumsTableCompanion(
-        id: Value(albumId),
-        title: Value(album),
-        artist: Value(artist),
-        artistId: Value(artistId),
-        songCount: Value((albumMap[albumId]?.songCount.value ?? 0) + 1),
-        artworkUri: Value(albumId.toString()),
-      );
+      albumSongCounts[albumId] = (albumSongCounts[albumId] ?? 0) + 1;
+      if (!albumMap.containsKey(albumId)) {
+        albumMap[albumId] = AlbumsTableCompanion(
+          id: Value(albumId),
+          title: Value(album),
+          artist: Value(artist),
+          artistId: Value(artistId),
+          artworkUri: Value(albumId.toString()),
+        );
+      }
     }
 
     // Aggregate Artists
     if (artistId != null) {
-      artistMap[artistId] = ArtistsTableCompanion(
-        id: Value(artistId),
-        name: Value(artist),
-        songCount: Value((artistMap[artistId]?.songCount.value ?? 0) + 1),
-        artworkUri: Value(artistId.toString()),
-      );
+      artistSongCounts[artistId] = (artistSongCounts[artistId] ?? 0) + 1;
+      if (!artistMap.containsKey(artistId)) {
+        artistMap[artistId] = ArtistsTableCompanion(
+          id: Value(artistId),
+          name: Value(artist),
+          artworkUri: Value(artistId.toString()),
+        );
+      }
     }
   }
 
+  final finalAlbums = albumMap.entries.map((e) {
+    return e.value.copyWith(songCount: Value(albumSongCounts[e.key] ?? 1));
+  }).toList();
+
+  final finalArtists = artistMap.entries.map((e) {
+    return e.value.copyWith(songCount: Value(artistSongCounts[e.key] ?? 1));
+  }).toList();
+
   return _ScanMediaResult(
     songs: songCompanions,
-    albums: albumMap.values.toList(),
-    artists: artistMap.values.toList(),
+    albums: finalAlbums,
+    artists: finalArtists,
     validSongIds: validSongIds,
   );
 }

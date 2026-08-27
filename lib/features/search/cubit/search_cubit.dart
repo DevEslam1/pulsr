@@ -76,11 +76,12 @@ class SearchCubit extends Cubit<SearchState> {
     str = str.replaceAll(RegExp(r'[\u064B-\u065F\u0670]'), '');
     // 2. Normalize Arabic Alef variants & letters
     str = str
-        .replaceAll(RegExp(r'[أإآ]'), 'ا')
+        .replaceAll(RegExp(r'[أإآٱ]'), 'ا')
         .replaceAll('ة', 'ه')
         .replaceAll('ى', 'ي')
         .replaceAll('ؤ', 'و')
-        .replaceAll('ئ', 'ي');
+        .replaceAll('ئ', 'ي')
+        .replaceAll('ـ', ''); // Strip Tatweel
     // 3. Normalize common Latin accents
     str = str
         .replaceAll(RegExp(r'[àáâãäå]'), 'a')
@@ -132,35 +133,50 @@ class SearchCubit extends Cubit<SearchState> {
   }
 
   static int _levenshtein(String a, String b) {
+    if (a.length > 200 || b.length > 200) return 999;
     if (a == b) return 0;
     if (a.isEmpty) return b.length;
     if (b.isEmpty) return a.length;
-    if (a.length > 50 || b.length > 50) return 999;
+    final lenDiff = (a.length - b.length).abs();
+    if (lenDiff > 2) return lenDiff;
 
-    final matrix = List.generate(a.length + 1, (i) => List.filled(b.length + 1, 0));
-    for (var i = 0; i <= a.length; i++) {
-      matrix[i][0] = i;
-    }
-    for (var j = 0; j <= b.length; j++) {
-      matrix[0][j] = j;
+    // Use 2-row buffer O(min(N, M)) memory instead of full (N+1)*(M+1) matrix
+    var s1 = a;
+    var s2 = b;
+    if (s1.length < s2.length) {
+      final temp = s1;
+      s1 = s2;
+      s2 = temp;
     }
 
-    for (var i = 1; i <= a.length; i++) {
-      for (var j = 1; j <= b.length; j++) {
-        final cost = a[i - 1] == b[j - 1] ? 0 : 1;
-        matrix[i][j] = math.min(
-          matrix[i - 1][j] + 1,
+    var prevRow = List<int>.generate(s2.length + 1, (i) => i);
+    var currRow = List<int>.filled(s2.length + 1, 0);
+
+    for (var i = 1; i <= s1.length; i++) {
+      currRow[0] = i;
+      for (var j = 1; j <= s2.length; j++) {
+        final cost = s1[i - 1] == s2[j - 1] ? 0 : 1;
+        currRow[j] = math.min(
+          prevRow[j] + 1,
           math.min(
-            matrix[i][j - 1] + 1,
-            matrix[i - 1][j - 1] + cost,
+            currRow[j - 1] + 1,
+            prevRow[j - 1] + cost,
           ),
         );
       }
+      final temp = prevRow;
+      prevRow = currRow;
+      currRow = temp;
     }
-    return matrix[a.length][b.length];
+    return prevRow[s2.length];
   }
 
   void clearQuery() {
+    _generation++;
+    _debounceTimer?.cancel();
+    _debounceTimer = null;
+    _searchSub?.cancel();
+    _searchSub = null;
     emit(state.copyWith(query: '', results: [], isLoading: false, errorMessage: null));
   }
 

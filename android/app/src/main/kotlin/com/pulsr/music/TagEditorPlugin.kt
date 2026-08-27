@@ -185,12 +185,18 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                             try {
                                 val bmp = BitmapFactory.decodeByteArray(effectiveArtworkBytes, 0, effectiveArtworkBytes.size)
                                 if (bmp != null) {
-                                    val scaled = Bitmap.createScaledBitmap(bmp, 500, 500, true)
-                                    val stream = ByteArrayOutputStream()
-                                    scaled.compress(Bitmap.CompressFormat.JPEG, 85, stream)
-                                    effectiveArtworkBytes = stream.toByteArray()
-                                    if (scaled != bmp) scaled.recycle()
-                                    bmp.recycle()
+                                    var scaled: Bitmap? = null
+                                    try {
+                                        scaled = Bitmap.createScaledBitmap(bmp, 500, 500, true)
+                                        val stream = ByteArrayOutputStream()
+                                        scaled.compress(Bitmap.CompressFormat.JPEG, 85, stream)
+                                        effectiveArtworkBytes = stream.toByteArray()
+                                    } finally {
+                                        if (scaled != null && scaled != bmp) {
+                                            scaled.recycle()
+                                        }
+                                        bmp.recycle()
+                                    }
                                 }
                             } catch (_: Exception) {}
                         }

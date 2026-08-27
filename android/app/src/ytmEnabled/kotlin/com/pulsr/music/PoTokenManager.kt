@@ -151,8 +151,16 @@ object PoTokenManager {
         if (webViewBroken) return visitorData.isNotEmpty()
         if (isReady && !isExpiringSoon() && generator != null) return true
 
+        // Fast-path: Return cached state if generator is still valid and not expired
+        val gen = generator
+        if (isReady && gen != null && !gen.isExpired()) return true
+
         synchronized(syncLock) {
             if (isReady && !isExpiringSoon() && generator != null) return true
+            // If we have a non-expired generator and visitorData, avoid blocking with WebView
+            if (visitorData.isNotEmpty() && generator != null && !generator!!.isExpired()) {
+                return true
+            }
             return try {
                 refreshInternal()
                 true

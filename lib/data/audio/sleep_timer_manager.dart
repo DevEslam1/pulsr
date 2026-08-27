@@ -69,17 +69,30 @@ class SleepTimerManager {
       // Only perform audio fade out if the player is actively playing
       if (fadeOut && player.playing) {
         final baseVol = _preFadeVolume ?? 1.0;
-        for (int i = 10; i >= 0; i--) {
-          if (_sleepFadeToken != currentToken) return;
+        final fadeCompleter = Completer<void>();
+        int step = 20;
+        Timer.periodic(const Duration(milliseconds: 150), (fadeTimer) {
+          if (_sleepFadeToken != currentToken) {
+            fadeTimer.cancel();
+            if (!fadeCompleter.isCompleted) fadeCompleter.complete();
+            return;
+          }
+          step--;
+          if (step < 0) {
+            fadeTimer.cancel();
+            if (!fadeCompleter.isCompleted) fadeCompleter.complete();
+            return;
+          }
           try {
-            await player.setVolume(((i / 10.0) * baseVol).clamp(0.0, 1.0));
+            player.setVolume(((step / 20.0) * baseVol).clamp(0.0, 1.0));
           } catch (e, st) {
             ErrorLogger.log('Error adjusting volume during sleep timer fade out',
                 error: e, stackTrace: st, category: 'SleepTimer');
-            break;
+            fadeTimer.cancel();
+            if (!fadeCompleter.isCompleted) fadeCompleter.complete();
           }
-          await Future.delayed(const Duration(milliseconds: 300));
-        }
+        });
+        await fadeCompleter.future;
       }
 
       if (_sleepFadeToken != currentToken) return;
@@ -107,9 +120,17 @@ class SleepTimerManager {
     required AudioPlayer Function() getActivePlayer,
   }) {
     final now = DateTime.now();
-    final difference = stopTime.isAfter(now)
-        ? stopTime.difference(now)
-        : stopTime.add(const Duration(days: 1)).difference(now);
+    Duration difference;
+    if (stopTime.isAfter(now)) {
+      difference = stopTime.difference(now);
+    } else {
+      final diffToNow = now.difference(stopTime);
+      if (diffToNow.inSeconds <= 60) {
+        difference = const Duration(seconds: 1);
+      } else {
+        difference = stopTime.add(const Duration(days: 1)).difference(now);
+      }
+    }
     startSleepTimer(
       difference,
       fadeOut: fadeOut,

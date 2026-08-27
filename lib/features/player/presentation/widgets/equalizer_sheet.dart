@@ -1974,6 +1974,7 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                       _buildReverbChip('Concert Hall', 1, state.reverbPreset, cubit, p),
                       _buildReverbChip('Warm Tube', 2, state.reverbPreset, cubit, p),
                       _buildReverbChip('Plate Reverb', 3, state.reverbPreset, cubit, p),
+                      _buildReverbChip('Custom', 4, state.reverbPreset, cubit, p),
                     ],
                   ),
                   const SizedBox(height: 12),

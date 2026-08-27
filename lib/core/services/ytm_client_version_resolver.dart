@@ -12,9 +12,16 @@ class YtmClientVersionResolver {
   static const String _prefKeyApiKey = 'ytm_cached_api_key';
   static const String _prefKeyLastFetchTime = 'ytm_client_version_fetch_ts';
 
-  static const String fallbackClientVersion = '1.20250820.01.00';
-  static const String fallbackApiKey = 'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30';
+  static const String fallbackClientVersion = String.fromEnvironment(
+    'YTM_CLIENT_VERSION',
+    defaultValue: '1.20250820.01.00',
+  );
+  static const String fallbackApiKey = String.fromEnvironment(
+    'YTM_API_KEY',
+    defaultValue: 'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30',
+  );
   static const Duration _cacheTtl = Duration(hours: 24);
+  static const Duration _maxStaleTtl = Duration(days: 30);
 
   String _clientVersion = fallbackClientVersion;
   String _apiKey = fallbackApiKey;
@@ -30,18 +37,19 @@ class YtmClientVersionResolver {
       final savedVersion = prefs.getString(_prefKeyClientVersion);
       final savedKey = prefs.getString(_prefKeyApiKey);
       final lastFetch = prefs.getInt(_prefKeyLastFetchTime) ?? 0;
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final isStale = (now - lastFetch) > _maxStaleTtl.inMilliseconds;
 
-      if (savedVersion != null && savedVersion.isNotEmpty) {
+      if (!isStale && savedVersion != null && savedVersion.isNotEmpty) {
         _clientVersion = savedVersion;
       }
-      if (savedKey != null && savedKey.isNotEmpty) {
+      if (!isStale && savedKey != null && savedKey.isNotEmpty) {
         _apiKey = savedKey;
       }
 
       _isInitialized = true;
 
-      final now = DateTime.now().millisecondsSinceEpoch;
-      if (now - lastFetch > _cacheTtl.inMilliseconds) {
+      if (now - lastFetch > _cacheTtl.inMilliseconds || isStale) {
         // Refresh asynchronously in background
         unawaited(refresh());
       }
@@ -70,12 +78,14 @@ class YtmClientVersionResolver {
         // 1. Extract clientVersion
         final versionMatch = RegExp(r'"INNERTUBE_CONTEXT_CLIENT_VERSION":\s*"([^"]+)"')
                 .firstMatch(body) ??
-            RegExp(r'"clientVersion":\s*"([^"]+)"').firstMatch(body);
+            RegExp(r'"clientVersion":\s*"([^"]+)"').firstMatch(body) ??
+            RegExp(r'"INNERTUBE_CLIENT_VERSION":\s*"([^"]+)"').firstMatch(body);
 
         // 2. Extract apiKey
         final apiKeyMatch = RegExp(r'"INNERTUBE_API_KEY":\s*"([^"]+)"')
                 .firstMatch(body) ??
-            RegExp(r'"innertubeApiKey":\s*"([^"]+)"').firstMatch(body);
+            RegExp(r'"innertubeApiKey":\s*"([^"]+)"').firstMatch(body) ??
+            RegExp(r'key=([a-zA-Z0-9_-]{39})').firstMatch(body);
 
         final prefs = await SharedPreferences.getInstance();
 

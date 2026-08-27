@@ -148,7 +148,7 @@ class YtDownloadService {
         task.completer.complete(Left(DownloadFailure('Download error: $e')));
       }).whenComplete(() {
         _activeDownloads.remove(videoId);
-        _processQueue();
+        Future.microtask(_processQueue);
       });
     }
   }
@@ -344,11 +344,19 @@ class YtDownloadService {
           }
         } catch (_) {}
       }
-      if (temp != null && await temp.exists()) {
-        await temp.delete().catchError((_) => temp!);
+      if (temp != null) {
+        try {
+          if (await temp.exists()) {
+            await temp.delete();
+          }
+        } catch (_) {}
       }
-      if (tempArt != null && await tempArt!.exists()) {
-        await tempArt!.delete().catchError((_) => tempArt!);
+      if (tempArt != null) {
+        try {
+          if (await tempArt!.exists()) {
+            await tempArt!.delete();
+          }
+        } catch (_) {}
       }
     }
   }
@@ -387,7 +395,8 @@ class YtDownloadService {
         debugPrint(
             '[YtDownloadService] Download attempt $attempts failed for $videoId: $e');
 
-        if (attempts >= maxAttempts ||
+        if (e is FileSystemException ||
+            attempts >= maxAttempts ||
             task.isCanceled ||
             _canceledVideoIds.contains(videoId)) {
           rethrow;
@@ -727,9 +736,10 @@ class YtDownloadService {
     }
   }
 
-  static String _sanitize(String value) {
+  static String _sanitize(String value, [String? ext]) {
     final cleaned = value.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
-    final truncated = cleaned.length > 200 ? cleaned.substring(0, 200) : cleaned;
+    final maxLen = ext != null ? (120 - ext.length - 1).clamp(20, 120) : 120;
+    final truncated = cleaned.length > maxLen ? cleaned.substring(0, maxLen) : cleaned;
     return truncated.isEmpty ? 'Unknown' : truncated;
   }
 }

@@ -291,6 +291,10 @@ class ScrobblerService {
         final resp = await _httpClient.post(url, headers: headers, body: body).timeout(const Duration(seconds: 10));
         if (resp.statusCode >= 200 && resp.statusCode < 300) {
           return true;
+        } else if (resp.statusCode == 429) {
+          if (attempt == maxAttempts) return false;
+          await Future.delayed(Duration(milliseconds: 500 * attempt));
+          continue;
         } else if (resp.statusCode >= 400 && resp.statusCode < 500) {
           return false;
         }
@@ -513,7 +517,7 @@ class ScrobblerService {
     final sortedKeys = params.keys.toList()..sort();
     final buffer = StringBuffer();
     for (final key in sortedKeys) {
-      if (key == 'format' || key == 'api_sig') continue;
+      if (key == 'format' || key == 'api_sig' || key == 'callback') continue;
       buffer.write(key);
       buffer.write(params[key]);
     }

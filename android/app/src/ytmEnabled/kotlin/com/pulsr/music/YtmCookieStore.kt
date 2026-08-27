@@ -33,7 +33,20 @@ internal class YtmCookieStore private constructor(context: Context) {
         synchronized(lock) {
             val saved = prefs.getString(KEY_COOKIES, null)
             if (!saved.isNullOrEmpty()) {
-                parseAndPut(saved)
+                if (saved.startsWith("{")) {
+                    try {
+                        val json = org.json.JSONObject(saved)
+                        val keys = json.keys()
+                        while (keys.hasNext()) {
+                            val k = keys.next()
+                            cookies[k] = json.getString(k)
+                        }
+                    } catch (_: Throwable) {
+                        parseAndPut(saved)
+                    }
+                } else {
+                    parseAndPut(saved)
+                }
             } else {
                 // Read from native CookieManager if prefs are empty
                 readFromCookieManager()
@@ -51,11 +64,8 @@ internal class YtmCookieStore private constructor(context: Context) {
                 val c = cm.getCookie(domain) ?: continue
                 parseAndPut(c)
             }
-            val merged = getMergedCookieHeader()
-            if (merged != null) {
-                saveToPrefs(merged)
-            }
-            return merged
+            saveToPrefs()
+            return getMergedCookieHeader()
         }
     }
 
@@ -69,8 +79,7 @@ internal class YtmCookieStore private constructor(context: Context) {
                 return
             }
             parseAndPut(rawCookieHeader)
-            val merged = getMergedCookieHeader() ?: ""
-            saveToPrefs(merged)
+            saveToPrefs()
         }
     }
 
@@ -98,12 +107,28 @@ internal class YtmCookieStore private constructor(context: Context) {
                     }
                 }
 
+                val expiresAttr = parts.find { it.trim().startsWith("expires=", true) }
+                if (expiresAttr != null) {
+                    val dateStr = expiresAttr.substringAfter("=").trim()
+                    val isExpired = try {
+                        val format = java.text.SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", java.util.Locale.US)
+                        val date = format.parse(dateStr)
+                        date != null && date.before(java.util.Date())
+                    } catch (_: Exception) {
+                        false
+                    }
+                    if (isExpired) {
+                        cookies.remove(kv[0].trim())
+                        updated = true
+                        continue
+                    }
+                }
+
                 cookies[kv[0].trim()] = kv[1].trim()
                 updated = true
             }
             if (updated) {
-                val merged = getMergedCookieHeader() ?: ""
-                saveToPrefs(merged)
+                saveToPrefs()
             }
         }
     }
@@ -165,8 +190,17 @@ internal class YtmCookieStore private constructor(context: Context) {
         }
     }
 
-    private fun saveToPrefs(cookieString: String) {
-        prefs.edit().putString(KEY_COOKIES, cookieString).apply()
+    private fun saveToPrefs() {
+        try {
+            val json = org.json.JSONObject()
+            for ((k, v) in cookies) {
+                json.put(k, v)
+            }
+            prefs.edit().putString(KEY_COOKIES, json.toString()).apply()
+        } catch (_: Throwable) {
+            val merged = getMergedCookieHeader() ?: ""
+            prefs.edit().putString(KEY_COOKIES, merged).apply()
+        }
     }
 
     companion object {

@@ -26,7 +26,7 @@ class LrcParser {
       final lastMatch = matches.last;
       final text = line.substring(lastMatch.end).trim();
       if (text.isEmpty && matches.length == 1) {
-        // Empty lyric line (e.g. instrumental pause)
+        continue;
       }
 
       for (final match in matches) {

@@ -810,7 +810,12 @@ class SettingsCubit extends Cubit<SettingsState> {
   }
 
   Future<void> setBitPerfectOutput(bool enabled) async {
-    emit(state.copyWith(bitPerfectOutput: enabled));
+    emit(state.copyWith(
+      bitPerfectOutput: enabled,
+      currentOutputDevice: state.currentOutputDevice?.copyWith(
+        isBitPerfectActive: enabled,
+      ),
+    ));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.bitPerfectOutput, enabled);
     await _hiResAudioService.setBitPerfectMode(enabled);

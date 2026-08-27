@@ -159,6 +159,7 @@ class MiniPlayer extends StatelessWidget {
                             final trackWidth = constraints.maxWidth;
                             return GestureDetector(
                               behavior: HitTestBehavior.opaque,
+                              onTap: () {},
                               onTapDown: (details) {
                                 if (trackWidth > 0 && state.duration.inMilliseconds > 0) {
                                   final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
@@ -166,6 +167,7 @@ class MiniPlayer extends StatelessWidget {
                                   cubit.seek(Duration(milliseconds: seekMs));
                                 }
                               },
+                              onHorizontalDragStart: (_) {},
                               onHorizontalDragUpdate: (details) {
                                 if (trackWidth > 0 && state.duration.inMilliseconds > 0) {
                                   final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);

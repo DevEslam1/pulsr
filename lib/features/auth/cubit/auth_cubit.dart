@@ -119,7 +119,7 @@ class AuthCubit extends Cubit<AuthState> {
     if (s.contains('user-not-found') || s.contains('user not found')) {
       return 'No account found with this email.';
     }
-    if (s.contains('wrong-password') || s.contains('wrong password') || s.contains('invalid-credential')) {
+    if (s.contains('wrong-password') || s.contains('wrong password') || s.contains('invalid-credential') || s.contains('invalid-email')) {
       return 'Incorrect email or password.';
     }
     if (s.contains('email-already-in-use') || s.contains('email already in use')) {

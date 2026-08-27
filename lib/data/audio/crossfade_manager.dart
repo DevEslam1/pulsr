@@ -75,7 +75,7 @@ class CrossfadeManager {
       case CrossfadeCurve.equalPower:
         return isFadeIn
             ? math.sin(f * (math.pi / 2))
-            : (1.0 - math.cos(f * (math.pi / 2)));
+            : math.cos(f * (math.pi / 2));
 
       case CrossfadeCurve.sCurve:
         // Smoothstep: 3f^2 - 2f^3
@@ -94,8 +94,10 @@ class CrossfadeManager {
           // Sharp attack after midpoint
           return f < 0.2 ? f * 1.5 : (0.3 + 0.7 * math.sin((f - 0.2) / 0.8 * (math.pi / 2)));
         } else {
-          // Drops quickly past midpoint
-          return f > 0.6 ? (1.0 - f) * 2.5 : (1.0 - 0.4 * (f / 0.6));
+          // Smooth blend before midpoint, drops quickly past midpoint without volume swell
+          return f > 0.6
+              ? (0.6 * (1.0 - (f - 0.6) / 0.4)).clamp(0.0, 1.0)
+              : (1.0 - 0.4 * (f / 0.6)).clamp(0.0, 1.0);
         }
     }
   }

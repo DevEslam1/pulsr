@@ -124,6 +124,23 @@ class ImportBackupUseCase {
 
   ImportBackupUseCase(this._repository, this._db);
 
+  Future<ImportResult> executeFromFile(dynamic file) async {
+    if (file is! String) {
+      try {
+        final len = await file.length();
+        if (len > maxBackupSizeBytes) {
+          throw const FormatException('Backup file exceeds maximum allowed size of 10 MB');
+        }
+        final content = await file.readAsString();
+        return execute(content);
+      } catch (e) {
+        if (e is FormatException) rethrow;
+        throw FormatException('Failed reading backup file: $e');
+      }
+    }
+    return execute(file);
+  }
+
   Future<ImportResult> execute(String jsonString) async {
     if (jsonString.length > maxBackupSizeBytes) {
       throw const FormatException('Backup file exceeds maximum allowed size of 10 MB');

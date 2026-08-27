@@ -22,21 +22,31 @@ class TagEditorCubit extends Cubit<TagEditorState> {
     MetadataSearchService? metadataSearchService,
   })  : _scannerService = scannerService,
         _metadataSearchService = metadataSearchService ?? MetadataSearchService(),
-        super(TagEditorState(
-          song: song,
-          batchSongs: batchSongs ?? const [],
-          title: (batchSongs != null && batchSongs.length > 1) ? '' : song.title,
-          artist: song.artist,
-          album: song.album,
-          genre: song.genre ?? '',
-          year: song.year != null ? song.year.toString() : '',
-          trackNumber: (batchSongs != null && batchSongs.length > 1) ? '' : (song.trackNumber != null ? song.trackNumber.toString() : ''),
-        )) {
+        super(_createInitialState(song, batchSongs)) {
     if (!state.isBatchMode) {
       loadTags();
     } else {
       emit(state.copyWith(status: TagEditorStatus.loaded));
     }
+  }
+
+  static TagEditorState _createInitialState(SongsTableData song, List<SongsTableData>? batchSongs) {
+    final isBatch = batchSongs != null && batchSongs.length > 1;
+    final allSameArtist = isBatch && batchSongs.every((s) => s.artist == song.artist);
+    final allSameAlbum = isBatch && batchSongs.every((s) => s.album == song.album);
+    final allSameGenre = isBatch && batchSongs.every((s) => s.genre == song.genre);
+    final allSameYear = isBatch && batchSongs.every((s) => s.year == song.year);
+
+    return TagEditorState(
+      song: song,
+      batchSongs: batchSongs ?? const [],
+      title: isBatch ? '' : song.title,
+      artist: isBatch ? (allSameArtist ? song.artist : '') : song.artist,
+      album: isBatch ? (allSameAlbum ? song.album : '') : song.album,
+      genre: isBatch ? (allSameGenre ? (song.genre ?? '') : '') : (song.genre ?? ''),
+      year: isBatch ? (allSameYear ? (song.year?.toString() ?? '') : '') : (song.year != null ? song.year.toString() : ''),
+      trackNumber: isBatch ? '' : (song.trackNumber != null ? song.trackNumber.toString() : ''),
+    );
   }
 
   Future<void> loadTags() async {

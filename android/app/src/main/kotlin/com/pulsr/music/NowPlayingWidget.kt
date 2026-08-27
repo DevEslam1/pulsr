@@ -201,6 +201,8 @@ class NowPlayingWidget : AppWidgetProvider() {
             } catch (_: Throwable) {}
         }
 
+        private val mediaBrowserLock = Any()
+
         private fun performMediaAction(
             context: Context,
             fallbackKeyCode: Int? = null,
@@ -212,25 +214,32 @@ class NowPlayingWidget : AppWidgetProvider() {
                 val position = getSafeLong(data, "positionMs", 0L)
                 val isPlaying = getSafeBoolean(data, "isPlaying", false)
 
-                val controller = cachedMediaController
-                if (controller != null && cachedMediaBrowser?.isConnected == true) {
-                    action(controller.transportControls, isPlaying, position, duration)
-                    return
+                synchronized(mediaBrowserLock) {
+                    val controller = cachedMediaController
+                    if (controller != null && cachedMediaBrowser?.isConnected == true) {
+                        action(controller.transportControls, isPlaying, position, duration)
+                        return
+                    }
                 }
 
                 val component = ComponentName(context, "com.ryanheise.audioservice.AudioService")
                 val appContext = context.applicationContext ?: context
+                val mainHandler = Handler(Looper.getMainLooper())
+                var timeoutRunnable: Runnable? = null
 
                 val connectionCallback = object : MediaBrowserCompat.ConnectionCallback() {
                     override fun onConnected() {
+                        timeoutRunnable?.let { mainHandler.removeCallbacks(it) }
                         try {
-                            val token = cachedMediaBrowser?.sessionToken
-                            if (token != null) {
-                                val newController = MediaControllerCompat(appContext, token)
-                                cachedMediaController = newController
-                                action(newController.transportControls, isPlaying, position, duration)
-                            } else if (fallbackKeyCode != null) {
-                                sendExplicitMediaButton(appContext, fallbackKeyCode)
+                            synchronized(mediaBrowserLock) {
+                                val token = cachedMediaBrowser?.sessionToken
+                                if (token != null) {
+                                    val newController = MediaControllerCompat(appContext, token)
+                                    cachedMediaController = newController
+                                    action(newController.transportControls, isPlaying, position, duration)
+                                } else if (fallbackKeyCode != null) {
+                                    sendExplicitMediaButton(appContext, fallbackKeyCode)
+                                }
                             }
                         } catch (_: Throwable) {
                             if (fallbackKeyCode != null) {
@@ -240,32 +249,43 @@ class NowPlayingWidget : AppWidgetProvider() {
                     }
 
                     override fun onConnectionFailed() {
-                        try {
-                            cachedMediaBrowser?.disconnect()
-                        } catch (_: Throwable) {}
-                        cachedMediaBrowser = null
-                        cachedMediaController = null
+                        timeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+                        synchronized(mediaBrowserLock) {
+                            try {
+                                cachedMediaBrowser?.disconnect()
+                            } catch (_: Throwable) {}
+                            cachedMediaBrowser = null
+                            cachedMediaController = null
+                        }
                         if (fallbackKeyCode != null) {
                             sendExplicitMediaButton(appContext, fallbackKeyCode)
                         }
                     }
                 }
 
-                cachedMediaBrowser = MediaBrowserCompat(appContext, component, connectionCallback, null)
-                cachedMediaBrowser?.connect()
+                synchronized(mediaBrowserLock) {
+                    try {
+                        cachedMediaBrowser?.disconnect()
+                    } catch (_: Throwable) {}
+                    cachedMediaBrowser = MediaBrowserCompat(appContext, component, connectionCallback, null)
+                    cachedMediaBrowser?.connect()
+                }
 
-                Handler(Looper.getMainLooper()).postDelayed({
-                    if (cachedMediaBrowser?.isConnected != true) {
-                        try {
-                            cachedMediaBrowser?.disconnect()
-                        } catch (_: Throwable) {}
-                        cachedMediaBrowser = null
-                        cachedMediaController = null
-                        if (fallbackKeyCode != null) {
-                            sendExplicitMediaButton(appContext, fallbackKeyCode)
+                timeoutRunnable = Runnable {
+                    synchronized(mediaBrowserLock) {
+                        if (cachedMediaBrowser?.isConnected != true) {
+                            try {
+                                cachedMediaBrowser?.disconnect()
+                            } catch (_: Throwable) {}
+                            cachedMediaBrowser = null
+                            cachedMediaController = null
+                            if (fallbackKeyCode != null) {
+                                sendExplicitMediaButton(appContext, fallbackKeyCode)
+                            }
                         }
                     }
-                }, 5000)
+                }
+                mainHandler.postDelayed(timeoutRunnable, 5000)
             } catch (_: Throwable) {
                 if (fallbackKeyCode != null) {
                     sendExplicitMediaButton(context, fallbackKeyCode)

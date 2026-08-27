@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:injectable/injectable.dart';
 import '../../domain/models/lyrics_line.dart';
+import '../config/app_config.dart';
 import '../utils/error_logger.dart';
 import '../utils/lrc_parser.dart';
 
@@ -80,7 +81,7 @@ class LrclibService {
 
       final uri = Uri.https('lrclib.net', '/api/get', queryParams);
       final request = await _client.getUrl(uri);
-      request.headers.set(HttpHeaders.userAgentHeader, 'PulsrMusic/1.0.0 (music player)');
+      request.headers.set(HttpHeaders.userAgentHeader, 'PulsrMusic/${AppConfig.appVersion} (music player)');
       final response = await request.close().timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {
@@ -98,7 +99,7 @@ class LrclibService {
     try {
       final uri = Uri.https('lrclib.net', '/api/search', {'q': query});
       final request = await _client.getUrl(uri);
-      request.headers.set(HttpHeaders.userAgentHeader, 'PulsrMusic/1.0.0 (music player)');
+      request.headers.set(HttpHeaders.userAgentHeader, 'PulsrMusic/${AppConfig.appVersion} (music player)');
       final response = await request.close().timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {

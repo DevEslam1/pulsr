@@ -16,11 +16,13 @@ class YtmRateLimiter {
   static const String _keyTokens = 'ytm_rate_limiter_tokens';
   static const String _keyLastRefill = 'ytm_rate_limiter_last_refill';
 
+  SharedPreferences? _prefs;
+
   Future<void> restore() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedTokens = prefs.getDouble(_keyTokens);
-      final savedLastRefill = prefs.getInt(_keyLastRefill);
+      _prefs ??= await SharedPreferences.getInstance();
+      final savedTokens = _prefs?.getDouble(_keyTokens);
+      final savedLastRefill = _prefs?.getInt(_keyLastRefill);
       if (savedTokens != null && savedLastRefill != null) {
         _tokens = savedTokens.clamp(0.0, _maxTokens.toDouble());
         _lastRefill = DateTime.fromMillisecondsSinceEpoch(savedLastRefill);
@@ -30,10 +32,16 @@ class YtmRateLimiter {
   }
 
   void _persist() {
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setDouble(_keyTokens, _tokens);
-      prefs.setInt(_keyLastRefill, _lastRefill.millisecondsSinceEpoch);
-    }).catchError((_) {});
+    if (_prefs != null) {
+      _prefs!.setDouble(_keyTokens, _tokens).catchError((_) => false);
+      _prefs!.setInt(_keyLastRefill, _lastRefill.millisecondsSinceEpoch).catchError((_) => false);
+    } else {
+      SharedPreferences.getInstance().then((p) {
+        _prefs = p;
+        p.setDouble(_keyTokens, _tokens).catchError((_) => false);
+        p.setInt(_keyLastRefill, _lastRefill.millisecondsSinceEpoch).catchError((_) => false);
+      }).catchError((_) {});
+    }
   }
 
   /// Test-only: restores pristine bucket/backoff state (the limiter is a

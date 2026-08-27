@@ -183,8 +183,8 @@ class EqualizerManager {
         selectedHeadphoneProfile = HeadphoneProfilesRepository().getProfileById(profileId);
       }
 
-      await applyCurrentPreset();
       if (isEnabled) {
+        await applyCurrentPreset();
         await _effectsChannel.setEqEnabled(true);
         await _effectsChannel.setNativeEqEnabled(true);
       }
@@ -333,7 +333,6 @@ class EqualizerManager {
   Future<void> setBandGain(int index, double gain) async {
     if (index < 0 || index >= currentPreset.gains.length) return;
     selectedHeadphoneProfile = null;
-    await setPreamp(0.0);
     final targetFreqs = is32BandMode ? custom32Frequencies : customFrequencies;
 
     final newGains = List<double>.from(currentPreset.gains);
@@ -341,7 +340,7 @@ class EqualizerManager {
     currentPreset = currentPreset.copyWith(name: 'Custom', gains: newGains);
     comparisonSlots[activeComparisonSlot] = currentPreset;
 
-    if (Platform.isAndroid) {
+    if (Platform.isAndroid && isEnabled) {
       if (is32BandMode) {
         await _effectsChannel.setNativeEqBand(
           index,
@@ -370,6 +369,7 @@ class EqualizerManager {
   }
 
   Future<void> applyCurrentPreset() async {
+    if (!isEnabled) return;
     final targetFreqs = is32BandMode ? custom32Frequencies : customFrequencies;
     if (Platform.isAndroid) {
       if (is32BandMode) {

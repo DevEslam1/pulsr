@@ -1,4 +1,5 @@
 // lib/features/onboarding/presentation/onboarding_screen.dart
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -38,9 +39,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     try {
       final granted = await widget.scannerService.requestPermission();
       if (granted) {
-        try {
-          await Permission.notification.request();
-        } catch (_) {}
+        if (Platform.isAndroid) {
+          try {
+            await Permission.notification.request();
+          } catch (_) {}
+        }
         await widget.scannerService.scanDeviceLibrary();
       } else {
         if (mounted) {

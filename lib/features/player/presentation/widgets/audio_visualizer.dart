@@ -65,7 +65,9 @@ class _AudioVisualizerState extends State<AudioVisualizer>
       duration: const Duration(milliseconds: 16),
     )..addListener(_onTick);
 
-    _startAnimation();
+    if (widget.isPlaying && widget.style != VisualizerStyle.off) {
+      _startAnimation();
+    }
     _initVisualizer();
   }
 

@@ -82,6 +82,7 @@ class WidgetService {
 
   /// Exports a corner-rounded artwork PNG for the widget, cached per song.
   Future<String?> _resolveArtworkPath(int songId) async {
+    if (songId <= 0) return null;
     final cachedPath = _artworkCache[songId];
     if (cachedPath != null) {
       if (await File(cachedPath).exists()) return cachedPath;
@@ -110,8 +111,7 @@ class WidgetService {
       await cachedFile.writeAsBytes(rounded, flush: true);
       _artworkCache[songId] = cachedFile.path;
       return cachedFile.path;
-    } catch (e, st) {
-      ErrorLogger.log('Failed to resolve widget artwork for song $songId', error: e, stackTrace: st, category: 'WidgetService');
+    } catch (_) {
       return null;
     }
   }

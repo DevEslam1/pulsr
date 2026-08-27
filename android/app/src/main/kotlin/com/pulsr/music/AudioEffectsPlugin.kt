@@ -65,6 +65,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var currentAudioSessionId = 0
     private val mainHandler = Handler(Looper.getMainLooper())
     private var volumeBoostRetryRunnable: Runnable? = null
+    private var volumeBoostRetryCount = 0
+    private val MAX_VOLUME_BOOST_RETRIES = 3
 
     // Graphic EQ state. The EQ is a 10-band DynamicsProcessing postEq bound to the
     // same session as the dynamics compressor, so a single engine owns both.
@@ -128,9 +130,38 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeSetSincResamplerRates(inRate: Double, outRate: Double)
     private external fun nativeProcessAudio(buffer: FloatArray, frames: Int, channels: Int)
     private external fun nativeDecodeDsd(dsdL: ByteArray, dsdR: ByteArray, byteCount: Int, dsdRate: Int, targetPcmSampleRate: Int, bitOrder: Int): FloatArray?
+    private external fun nativeSetActiveStages(bitmask: Int)
     private external fun nativeReset()
 
+    private var activeDspStages: Int = STAGE_EQ or STAGE_CROSSFEED or STAGE_REVERB or STAGE_PANNER or STAGE_LIMITER or STAGE_RESAMPLER
+
+    fun recalculateActiveStages() {
+        var mask = 0
+        if (isEqEnabled) mask = mask or STAGE_EQ
+        if (isCrossfeedEnabled) mask = mask or STAGE_CROSSFEED
+        if (isReverbEnabled) mask = mask or STAGE_REVERB
+        if (Math.abs(stereoBalance) > 0.001 || monoMix) mask = mask or STAGE_PANNER
+        if (isLimiterEnabled) mask = mask or STAGE_LIMITER
+        if (isSincResamplerEnabled) mask = mask or STAGE_RESAMPLER
+        activeDspStages = mask
+
+        if (isNativeDspLoaded) {
+            try {
+                nativeSetActiveStages(activeDspStages)
+            } catch (e: Exception) {
+                Log.w(TAG, "nativeSetActiveStages failed: ${e.message}")
+            }
+        }
+    }
+
     companion object {
+        const val STAGE_EQ = 1 shl 0
+        const val STAGE_CROSSFEED = 1 shl 1
+        const val STAGE_REVERB = 1 shl 2
+        const val STAGE_PANNER = 1 shl 3
+        const val STAGE_LIMITER = 1 shl 4
+        const val STAGE_RESAMPLER = 1 shl 5
+
         const val TAG = "AudioEffectsPlugin"
         const val CHANNEL_NAME = "com.pulsr.music/audio_effects"
         private const val CHANNEL_COUNT = 2 // Stereo
@@ -708,24 +739,20 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     loudnessEnhancer?.setTargetGain(volumeBoostMilliBels)
                 }
                 loudnessEnhancer?.enabled = volumeBoostMilliBels > 0
+                volumeBoostRetryCount = 0 // Reset on success
             } catch (e: Exception) {
-                Log.w(TAG, "LoudnessEnhancer init failed, retrying in 500ms: ${e.message}")
-                volumeBoostRetryRunnable?.let { mainHandler.removeCallbacks(it) }
-                val runnable = Runnable {
-                    try {
-                        if (loudnessEnhancer == null && currentAudioSessionId != 0) {
-                            loudnessEnhancer = LoudnessEnhancer(currentAudioSessionId)
-                            if (volumeBoostMilliBels > 0) {
-                                loudnessEnhancer?.setTargetGain(volumeBoostMilliBels)
-                            }
-                            loudnessEnhancer?.enabled = volumeBoostMilliBels > 0
-                        }
-                    } catch (e2: Exception) {
-                        Log.e(TAG, "LoudnessEnhancer retry failed: ${e2.message}")
-                    }
+                if (volumeBoostRetryCount < MAX_VOLUME_BOOST_RETRIES) {
+                    volumeBoostRetryCount++
+                    val delay = 500L * volumeBoostRetryCount
+                    Log.w(TAG, "LoudnessEnhancer init failed (attempt $volumeBoostRetryCount/$MAX_VOLUME_BOOST_RETRIES), retrying in ${delay}ms: ${e.message}")
+                    volumeBoostRetryRunnable?.let { mainHandler.removeCallbacks(it) }
+                    val runnable = Runnable { ensureVolumeBoost() }
+                    volumeBoostRetryRunnable = runnable
+                    mainHandler.postDelayed(runnable, delay)
+                } else {
+                    Log.e(TAG, "LoudnessEnhancer init failed after $MAX_VOLUME_BOOST_RETRIES retries: ${e.message}")
+                    volumeBoostRetryRunnable = null
                 }
-                volumeBoostRetryRunnable = runnable
-                mainHandler.postDelayed(runnable, 500)
             }
         }
     }
@@ -864,14 +891,17 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private fun neutralizeDynamics(dp: DynamicsProcessing) {
         try {
             val preampDb = if (isEqEnabled) eqPreampDb.toFloat() else 0f
+            val shouldKeepLimiter = isDynamicsEnabled && currentDynamicsPreset != "off"
             for (ch in 0 until CHANNEL_COUNT) {
                 val mbc = dp.getMbcByChannelIndex(ch)
                 for (i in 0 until MBC_BAND_COUNT) {
                     mbc.getBand(i).isEnabled = false
                 }
                 val limiter = dp.getLimiterByChannelIndex(ch)
-                limiter.isEnabled = false
-                limiter.postGain = preampDb
+                if (!shouldKeepLimiter) {
+                    limiter.isEnabled = false
+                    limiter.postGain = preampDb
+                }
             }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to neutralize dynamics: ${e.message}")
@@ -1042,7 +1072,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         loudnessEnhancer = null
         bassBoost = null
         dynamicsProcessing = null
-        cachedSupportedEffects = null
+        cachedSupportedEffects = runCatching { AudioEffect.queryEffects() }.getOrNull()
 
         if (isVirtualizerEnabled || virtualizerStrength > 0) {
             setVirtualizerState(isVirtualizerEnabled)
@@ -1065,6 +1095,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             mainHandler.removeCallbacks(it)
             volumeBoostRetryRunnable = null
         }
+        volumeBoostRetryCount = 0
         try {
             virtualizer?.enabled = false
             virtualizer?.release()

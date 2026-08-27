@@ -34,40 +34,42 @@ void AudioDspEngine::processInterleaved(float* buffer, int frames, int channels)
 
     if (channels == 2) {
         // 1. Parametric EQ (Stereo)
-        if (eq_.isEnabled()) {
+        if ((activeStages_ & STAGE_EQ) && eq_.isEnabled()) {
             eq_.processInterleaved(buffer, frames, 2);
         }
 
         // 2. Headphone Crossfeed (Stereo only)
-        if (crossfeed_.isEnabled()) {
+        if ((activeStages_ & STAGE_CROSSFEED) && crossfeed_.isEnabled()) {
             crossfeed_.processInterleaved(buffer, frames);
         }
 
         // 3. Convolution Reverb / Room Simulation (Stereo)
-        if (reverb_.isEnabled()) {
+        if ((activeStages_ & STAGE_REVERB) && reverb_.isEnabled()) {
             reverb_.processInterleaved(buffer, frames);
         }
 
         // 4. Stereo Balance & Mono Mix (Stereo)
-        panner_.processInterleaved(buffer, frames);
+        if (activeStages_ & STAGE_PANNER) {
+            panner_.processInterleaved(buffer, frames);
+        }
 
         // 5. Lookahead Brickwall Limiter (Stereo)
-        if (limiter_.isEnabled()) {
+        if ((activeStages_ & STAGE_LIMITER) && limiter_.isEnabled()) {
             limiter_.processInterleaved(buffer, frames);
         }
     } else if (channels == 1) {
         // Mono channel path
-        if (eq_.isEnabled()) {
+        if ((activeStages_ & STAGE_EQ) && eq_.isEnabled()) {
             eq_.processInterleaved(buffer, frames, 1);
         }
 
         // Apply Lookahead Limiter to mono stream
-        if (limiter_.isEnabled()) {
+        if ((activeStages_ & STAGE_LIMITER) && limiter_.isEnabled()) {
             limiter_.processMono(buffer, frames);
         }
     } else {
         // Multi-channel (>2) path
-        if (eq_.isEnabled()) {
+        if ((activeStages_ & STAGE_EQ) && eq_.isEnabled()) {
             eq_.processInterleaved(buffer, frames, channels);
         }
     }

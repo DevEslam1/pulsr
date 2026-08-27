@@ -104,43 +104,7 @@ class YtmBrowseService {
       }
     } catch (_) {}
 
-    return const [
-      YtmBrowseItem(
-        id: 'kJQP7kiw5Fk',
-        title: 'Despacito',
-        subtitle: 'Luis Fonsi ft. Daddy Yankee',
-        artworkUrl: 'https://i.ytimg.com/vi/kJQP7kiw5Fk/hqdefault.jpg',
-        type: 'song',
-      ),
-      YtmBrowseItem(
-        id: 'JGwWNGJdvx8',
-        title: 'Shape of You',
-        subtitle: 'Ed Sheeran',
-        artworkUrl: 'https://i.ytimg.com/vi/JGwWNGJdvx8/hqdefault.jpg',
-        type: 'song',
-      ),
-      YtmBrowseItem(
-        id: 'fJ9rUzIMcZQ',
-        title: 'Bohemian Rhapsody',
-        subtitle: 'Queen',
-        artworkUrl: 'https://i.ytimg.com/vi/fJ9rUzIMcZQ/hqdefault.jpg',
-        type: 'song',
-      ),
-      YtmBrowseItem(
-        id: '4NRXx6U8ABQ',
-        title: 'Blinding Lights',
-        subtitle: 'The Weeknd',
-        artworkUrl: 'https://i.ytimg.com/vi/4NRXx6U8ABQ/hqdefault.jpg',
-        type: 'song',
-      ),
-      YtmBrowseItem(
-        id: 'kffacxfA7G4',
-        title: 'Baby Shark',
-        subtitle: 'Pinkfong',
-        artworkUrl: 'https://i.ytimg.com/vi/kffacxfA7G4/hqdefault.jpg',
-        type: 'song',
-      ),
-    ];
+    return const [];
   }
 
   /// Fetches New Releases.
@@ -158,36 +122,7 @@ class YtmBrowseService {
       }
     } catch (_) {}
 
-    return const [
-      YtmBrowseItem(
-        id: 'OPf0YbXqDm0',
-        title: 'Uptown Funk',
-        subtitle: 'Mark Ronson ft. Bruno Mars',
-        artworkUrl: 'https://i.ytimg.com/vi/OPf0YbXqDm0/hqdefault.jpg',
-        type: 'song',
-      ),
-      YtmBrowseItem(
-        id: '09R8_2nJtjg',
-        title: 'Sugar',
-        subtitle: 'Maroon 5',
-        artworkUrl: 'https://i.ytimg.com/vi/09R8_2nJtjg/hqdefault.jpg',
-        type: 'song',
-      ),
-      YtmBrowseItem(
-        id: 'YQHsXMglC9A',
-        title: 'Hello',
-        subtitle: 'Adele',
-        artworkUrl: 'https://i.ytimg.com/vi/YQHsXMglC9A/hqdefault.jpg',
-        type: 'song',
-      ),
-      YtmBrowseItem(
-        id: 'hT_nvWreIhg',
-        title: 'Counting Stars',
-        subtitle: 'OneRepublic',
-        artworkUrl: 'https://i.ytimg.com/vi/hT_nvWreIhg/hqdefault.jpg',
-        type: 'song',
-      ),
-    ];
+    return const [];
   }
 
   /// Fetches Moods and Genres.

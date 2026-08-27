@@ -20,6 +20,13 @@ class FileIntentHandler {
   static const MethodChannel _channel =
       MethodChannel('com.pulsr.music/file_opener');
   static int _nextTempId = -100000;
+  static int _getNextTempId() {
+    _nextTempId--;
+    if (_nextTempId < -900000) {
+      _nextTempId = -100000;
+    }
+    return _nextTempId;
+  }
   final IMusicRepository _repository;
   final PlayerCubit _playerCubit;
 
@@ -126,7 +133,12 @@ class FileIntentHandler {
         return;
       }
 
-      String cleanPath = Uri.decodeFull(uriOrPath);
+      String cleanPath;
+      try {
+        cleanPath = Uri.decodeFull(uriOrPath);
+      } catch (_) {
+        cleanPath = uriOrPath;
+      }
       if (cleanPath.startsWith('file://')) {
         cleanPath = cleanPath.replaceFirst('file://', '');
       }
@@ -226,7 +238,7 @@ class FileIntentHandler {
       }
 
       final tempSong = SongsTableData(
-        id: _nextTempId--,
+        id: _getNextTempId(),
         title: title.isNotEmpty ? title : 'External Audio',
         artist: 'External Audio',
         album: 'Files',

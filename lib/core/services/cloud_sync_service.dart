@@ -83,12 +83,12 @@ class CloudSyncService {
       return 'yt_${song.remoteId}';
     }
     final raw = '${song.path}|${song.title.trim().toLowerCase()}|${song.artist.trim().toLowerCase()}';
-    return sha256.convert(utf8.encode(raw)).toString().substring(0, 24);
+    return sha256.convert(utf8.encode(raw)).toString();
   }
 
   String _stablePlaylistId(PlaylistsTableData pl) {
     final raw = '${pl.name.trim().toLowerCase()}|${pl.isSmart}';
-    return sha256.convert(utf8.encode(raw)).toString().substring(0, 24);
+    return sha256.convert(utf8.encode(raw)).toString();
   }
 
   Future<bool> syncAll({bool syncFavorites = true, bool syncPlaylists = true}) async {
@@ -119,16 +119,15 @@ class CloudSyncService {
     required bool syncPlaylists,
   }) async {
     final firestore = FirebaseFirestore.instance;
-    final List<Future<void>> pendingBatches = [];
     WriteBatch currentBatch = firestore.batch();
     int opCount = 0;
 
     Future<void> commitBatchIfFull() async {
-      if (opCount >= 350) {
+      if (opCount >= 200) {
         final batchToCommit = currentBatch;
-        pendingBatches.add(batchToCommit.commit());
         currentBatch = firestore.batch();
         opCount = 0;
+        await batchToCommit.commit();
       }
     }
 
@@ -205,11 +204,7 @@ class CloudSyncService {
     }
 
     if (opCount > 0) {
-      pendingBatches.add(currentBatch.commit());
-    }
-
-    if (pendingBatches.isNotEmpty) {
-      await Future.wait(pendingBatches, eagerError: false);
+      await currentBatch.commit();
     }
   }
 

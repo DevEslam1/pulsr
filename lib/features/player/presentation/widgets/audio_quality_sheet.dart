@@ -642,51 +642,51 @@ class AudioQualitySheet extends StatelessWidget {
             }).toList(),
           ),
         ),
-        if (outputDevice?.isBitPerfectSupported == true || outputDevice?.isUsbDac == true) ...[
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: isBitPerfectActive
-                  ? const Color(0xFFFFD700).withValues(alpha: 0.12)
-                  : p.surfaceContainer,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: isBitPerfectActive ? const Color(0xFFFFD700) : p.hairline,
-              ),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.stars_rounded, color: Color(0xFFFFD700), size: 22),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Direct Bit-Perfect Mode',
-                        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
-                      ),
-                      Text(
-                        'Bypasses OS audio mixer for pure hardware bit-matching',
-                        style: TextStyle(color: p.textSecondary, fontSize: 11),
-                      ),
-                    ],
-                  ),
-                ),
-                Switch.adaptive(
-                  value: isBitPerfectActive,
-                  activeTrackColor: const Color(0xFFFFD700),
-                  activeThumbColor: Colors.white,
-                  onChanged: (val) {
-                    HapticFeedback.selectionClick();
-                    cubit?.setBitPerfectOutput(val);
-                  },
-                ),
-              ],
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: isBitPerfectActive
+                ? const Color(0xFFFFD700).withValues(alpha: 0.12)
+                : p.surfaceContainer,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isBitPerfectActive ? const Color(0xFFFFD700) : p.hairline,
             ),
           ),
-        ],
+          child: Row(
+            children: [
+              const Icon(Icons.stars_rounded, color: Color(0xFFFFD700), size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Direct Bit-Perfect Mode',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12.5),
+                    ),
+                    Text(
+                      outputDevice?.isUsbDac == true
+                          ? 'Hardware direct pass-through active on USB DAC'
+                          : 'Bypasses Android mixer & DSP for bit-matched output',
+                      style: TextStyle(color: p.textSecondary, fontSize: 11),
+                    ),
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: isBitPerfectActive,
+                activeTrackColor: const Color(0xFFFFD700),
+                activeThumbColor: Colors.white,
+                onChanged: (val) {
+                  HapticFeedback.selectionClick();
+                  cubit?.setBitPerfectOutput(val);
+                },
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }

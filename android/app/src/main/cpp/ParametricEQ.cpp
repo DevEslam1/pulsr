@@ -147,9 +147,20 @@ void ParametricEQ::process(const float* in, float* out, int frames, int channels
         return;
     }
 
-    for (int f = 0; f < frames; ++f) {
-        for (int ch = 0; ch < chCount; ++ch) {
-            double sample = in[f * channels + ch] * preampLinear_;
+    const float* readPtr = in;
+    if (in == out) {
+        const size_t needed = static_cast<size_t>(frames) * channels;
+        if (tempBuf_.size() < needed) {
+            tempBuf_.resize(needed);
+        }
+        std::memcpy(tempBuf_.data(), in, needed * sizeof(float));
+        readPtr = tempBuf_.data();
+    }
+
+    for (int ch = 0; ch < chCount; ++ch) {
+        for (int f = 0; f < frames; ++f) {
+            const int idx = f * channels + ch;
+            double sample = readPtr[idx] * preampLinear_;
             for (int b = 0; b < bandCount_; ++b) {
                 if (!bands_[b].enabled || std::abs(bands_[b].gainDb) < 0.01) {
                     continue;
@@ -164,7 +175,7 @@ void ParametricEQ::process(const float* in, float* out, int frames, int channels
                 y1_[ch][b] = y;
                 sample = y;
             }
-            out[f * channels + ch] = static_cast<float>(sample);
+            out[idx] = static_cast<float>(sample);
         }
     }
 }

@@ -1,6 +1,7 @@
 // lib/core/services/ytm_account_service.dart
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
@@ -99,7 +100,6 @@ class YtmAccountService {
   /// Raw `datasyncId` of the authenticated account (e.g. "userSessionId||"), harvested from any
   /// authenticated Innertube response. Used as the account-bound poToken content-binding.
   String? _dataSyncId;
-  String? _pendingDataSyncId;
   Timer? _sessionHarvestDebounce;
 
   /// `visitorData` harvested from an authenticated response; sent in the WEB_REMIX player context.
@@ -342,8 +342,7 @@ class YtmAccountService {
       if (res.statusCode == 200) {
         final json = jsonDecode(res.body) as Map<String, dynamic>;
         if (_isUnauthenticatedResponse(json)) {
-          debugPrint('[YTM_ACCOUNT] Warmed session returned unauthenticated — logging out');
-          await logout();
+          debugPrint('[YTM_ACCOUNT] Warmed session returned unauthenticated — keeping session, notifying expiry check');
           getIt<YtmService>().notifyAuthExpired();
           return;
         }
@@ -379,11 +378,44 @@ class YtmAccountService {
       }
     }
 
-    for (final segment in setCookieHeader.split(_setCookieSplitter)) {
-      final cookiePart = segment.split(';').first.trim();
-      final parts = cookiePart.split('=');
-      if (parts.length >= 2 && parts[0].trim().isNotEmpty) {
-        map[parts[0].trim()] = parts.sublist(1).join('=').trim();
+    final cookies = setCookieHeader.split(_setCookieSplitter);
+    for (final cookie in cookies) {
+      final segments = cookie.split(';');
+      if (segments.isEmpty) continue;
+
+      final nameValue = segments.first.trim();
+      final eqIdx = nameValue.indexOf('=');
+      if (eqIdx <= 0) continue;
+
+      final name = nameValue.substring(0, eqIdx).trim();
+      final value = nameValue.substring(eqIdx + 1).trim();
+
+      bool shouldDelete = false;
+      for (int i = 1; i < segments.length; i++) {
+        final attr = segments[i].trim().toLowerCase();
+        if (attr.startsWith('max-age=')) {
+          final maxAge = int.tryParse(attr.substring(8)) ?? 0;
+          if (maxAge <= 0) shouldDelete = true;
+        }
+        if (attr.startsWith('expires=')) {
+          try {
+            final expires = HttpDate.parse(segments[i].trim().substring(8).trim());
+            if (expires.isBefore(DateTime.now())) {
+              shouldDelete = true;
+            }
+          } catch (_) {
+            final fallbackExp = DateTime.tryParse(attr.substring(8));
+            if (fallbackExp != null && fallbackExp.isBefore(DateTime.now())) {
+              shouldDelete = true;
+            }
+          }
+        }
+      }
+
+      if (shouldDelete) {
+        map.remove(name);
+      } else {
+        map[name] = value;
       }
     }
 
@@ -1100,6 +1132,16 @@ class YtmAccountService {
   /// 3. IOS client
   /// 4. TVHTML5_SIMPLY_EMBEDDED_PLAYER
   Future<YtmStream?> resolvePlayerStream(String videoId, {String quality = 'high'}) async {
+    try {
+      return await _resolvePlayerStreamInternal(videoId, quality: quality)
+          .timeout(const Duration(seconds: 25));
+    } on TimeoutException {
+      debugPrint('[YTM_ACCOUNT] Global stream resolution timed out after 25s for $videoId');
+      return null;
+    }
+  }
+
+  Future<YtmStream?> _resolvePlayerStreamInternal(String videoId, {String quality = 'high'}) async {
     // BotGuard requires a poToken on WEB_REMIX player requests regardless of login.
     // Authenticated → the token must be content-bound to the account's datasyncId, sent WITH
     // the session cookies + SAPISIDHASH. Unauthenticated → a guest token bound to guest visitorData.
@@ -1459,13 +1501,12 @@ class YtmAccountService {
     final dsid = _extractDataSyncId(json);
     if (dsid != null && dsid != _dataSyncId) {
       _dataSyncId = dsid;
-      _pendingDataSyncId = dsid;
       _sessionHarvestDebounce?.cancel();
-      _sessionHarvestDebounce = Timer(const Duration(seconds: 2), () async {
-        if (_pendingDataSyncId != null) {
-          final p = await SharedPreferences.getInstance();
-          await p.setString(_dataSyncIdPrefKey, _pendingDataSyncId!);
-        }
+      _sessionHarvestDebounce = null;
+      SharedPreferences.getInstance().then((p) {
+        p.setString(_dataSyncIdPrefKey, dsid);
+      }).catchError((e) {
+        debugPrint('[YTM_ACCOUNT] Failed to persist dataSyncId: $e');
       });
       getIt<YtmService>().setDataSyncId(dsid);
     }

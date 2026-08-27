@@ -30,7 +30,21 @@ class SharedPlaylistBundle {
         appVersion: json['appVersion'] as String? ?? '1.0.0',
         exportTimestamp: (json['exportTimestamp'] as num?)?.toInt() ?? 0,
         tracks: (json['tracks'] as List<dynamic>?)
-                ?.map((e) => e as Map<String, dynamic>)
+                ?.whereType<Map<String, dynamic>>()
+                .map((e) {
+                  final src = e['source'] as String?;
+                  final validSource = (src == SongSource.youtube || src == SongSource.local)
+                      ? src!
+                      : SongSource.local;
+                  return {
+                    'title': e['title'] as String? ?? 'Unknown Title',
+                    'artist': e['artist'] as String? ?? 'Unknown Artist',
+                    'album': e['album'] as String? ?? 'Unknown Album',
+                    'durationMs': (e['durationMs'] as num?)?.toInt() ?? 0,
+                    'remoteId': e['remoteId'] as String?,
+                    'source': validSource,
+                  };
+                })
                 .toList() ??
             [],
       );
