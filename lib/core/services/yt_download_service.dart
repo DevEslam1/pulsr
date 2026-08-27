@@ -15,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
 import '../../domain/repositories/music_repository_interface.dart';
+import '../constants/channels.dart';
 import '../errors/failures.dart';
 import '../utils/error_logger.dart';
 import '../widgets/cached_artwork.dart';
@@ -66,8 +67,8 @@ class _QueuedDownload {
 /// - User-friendly bot block handling and cancellation tokens
 @lazySingleton
 class YtDownloadService {
-  static const _downloadChannel = MethodChannel('com.pulsr.music/yt_download');
-  static const _tagChannel = MethodChannel('com.pulsr.music/tag_editor');
+  static const _downloadChannel = MethodChannel(PulsrChannels.ytDownload);
+  static const _tagChannel = MethodChannel(PulsrChannels.tagEditor);
   static const int _maxConcurrentDownloads = 3;
 
   final HttpClient _http;
@@ -78,15 +79,15 @@ class YtDownloadService {
   final Queue<_QueuedDownload> _queue = Queue<_QueuedDownload>();
   final Map<String, _QueuedDownload> _activeDownloads = {};
   static const int _maxCanceledIds = 200;
-  final Set<String> _canceledVideoIds = {};
+  final Set<String> _canceledVideoIds = <String>{};
 
   YtDownloadService(
       this._http, this._ytmService, this._scanner, this._repository);
 
   /// Cancels an active or queued download.
   void cancel(String videoId) {
-    if (_canceledVideoIds.length >= _maxCanceledIds) {
-      _canceledVideoIds.clear();
+    while (_canceledVideoIds.length >= _maxCanceledIds) {
+      _canceledVideoIds.remove(_canceledVideoIds.first);
     }
     _canceledVideoIds.add(videoId);
     final active = _activeDownloads[videoId];
@@ -115,6 +116,12 @@ class YtDownloadService {
     _canceledVideoIds.remove(videoId);
 
     final completer = Completer<Result<int>>();
+    final active = _activeDownloads[videoId];
+    if (active != null) {
+      active.completer.future.then(completer.complete, onError: completer.completeError);
+      return completer.future;
+    }
+
     final task = _QueuedDownload(
       song: song,
       onProgress: onProgress,
@@ -138,6 +145,11 @@ class YtDownloadService {
         _canceledVideoIds.remove(videoId);
         task.completer
             .complete(const Left(DownloadFailure('Download canceled')));
+        continue;
+      }
+
+      if (_activeDownloads.containsKey(videoId)) {
+        _activeDownloads[videoId]!.completer.future.then(task.completer.complete, onError: task.completer.completeError);
         continue;
       }
 
@@ -193,11 +205,10 @@ class YtDownloadService {
       try {
         final freeBytes = await _downloadChannel.invokeMethod<int>('getFreeDiskSpace');
         if (freeBytes != null && freeBytes > 0) {
-          final estimatedBytes = (stream.duration.inSeconds > 0 ? stream.duration.inSeconds : 240) *
-              (stream.bitrateKbps > 0 ? stream.bitrateKbps : 128) *
-              1000 ~/
-              8;
-          if (freeBytes < estimatedBytes * 1.2) {
+          final estBitrate = stream.bitrateKbps > 0 ? stream.bitrateKbps : 160;
+          final estDurationSec = stream.duration.inSeconds > 0 ? stream.duration.inSeconds : 240;
+          final estimatedBytes = (estDurationSec * estBitrate * 1000 ~/ 8) + (5 * 1024 * 1024);
+          if (freeBytes < estimatedBytes) {
             return const Left(DownloadFailure('Insufficient storage space for download'));
           }
         }
@@ -515,8 +526,18 @@ class YtDownloadService {
 
     final chunkReceived = List<int>.filled(_concurrentChunks, 0);
     var lastEmitTime = 0;
+    bool mergeCompleted = false;
 
     try {
+      try {
+        final freeBytes = await _downloadChannel.invokeMethod<int>('getFreeDiskSpace') ?? 0;
+        if (freeBytes > 0 && freeBytes < total) {
+          throw const DownloadFailure('Insufficient storage space');
+        }
+      } catch (e) {
+        if (e is DownloadFailure) rethrow;
+      }
+
       final futures = <Future<void>>[];
 
       for (var i = 0; i < _concurrentChunks; i++) {
@@ -594,26 +615,36 @@ class YtDownloadService {
 
       await Future.wait(futures);
 
+      // Check cancellation BEFORE merge to prevent corrupt file
+      if (task.isCanceled || _canceledVideoIds.contains(task.song.remoteId)) {
+        throw const DownloadFailure('Download canceled');
+      }
+
       // Verify total received byte sum and chunk file integrity
       if (total > 0) {
         final totalReceivedBytes = chunkReceived.reduce((a, b) => a + b);
-        if ((total - totalReceivedBytes).abs() > total * 0.02) {
+        if (totalReceivedBytes != total) {
           throw DownloadFailure('Parallel download byte mismatch: received $totalReceivedBytes, expected $total');
         }
-        final expectedChunkSize = (total / _concurrentChunks).ceil();
-        for (int i = 0; i < tempParts.length; i++) {
+        final chunkCount = tempParts.length;
+        for (int i = 0; i < chunkCount; i++) {
           final part = tempParts[i];
           if (!await part.exists()) {
             throw DownloadFailure('Chunk $i file missing after download');
           }
           final partSize = await part.length();
-          final expectedSize = (i == tempParts.length - 1)
-              ? total - (i * expectedChunkSize)
-              : expectedChunkSize;
-          if (partSize < expectedSize * 0.95) {
+          final expectedSize = (i == chunkCount - 1)
+              ? total - (chunkSize * (chunkCount - 1))
+              : chunkSize;
+          if (partSize != expectedSize) {
             throw DownloadFailure('Chunk $i incomplete: $partSize/$expectedSize bytes');
           }
         }
+      }
+
+      // Final cancellation check right before merge
+      if (task.isCanceled || _canceledVideoIds.contains(task.song.remoteId)) {
+        throw const DownloadFailure('Download canceled');
       }
 
       final outSink = dest.openWrite();
@@ -635,16 +666,26 @@ class YtDownloadService {
       // Verify merged total size
       if (total > 0) {
         final finalSize = await dest.length();
-        if (finalSize < total * 0.98) {
+        if (finalSize != total) {
           await dest.delete().catchError((_) => dest);
           throw DownloadFailure('Merged file size mismatch: $finalSize/$total');
         }
       }
+      mergeCompleted = true;
     } finally {
       for (final part in tempParts) {
-        if (await part.exists()) {
-          await part.delete().catchError((_) => part);
-        }
+        try {
+          if (await part.exists()) {
+            await part.delete();
+          }
+        } catch (_) {}
+      }
+      if (!mergeCompleted) {
+        try {
+          if (await dest.exists()) {
+            await dest.delete();
+          }
+        } catch (_) {}
       }
     }
   }

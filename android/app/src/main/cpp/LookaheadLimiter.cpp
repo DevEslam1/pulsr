@@ -19,7 +19,7 @@ void LookaheadLimiter::configure(double lookaheadMs, double thresholdDb, double 
     thresholdDb_ = std::max(-24.0, std::min(thresholdDb, 0.0));
     releaseMs_ = std::max(5.0, std::min(releaseMs, 1000.0));
 
-    lookaheadSamples_ = std::max(1, std::min(static_cast<int>(sampleRate_ * lookaheadMs_ / 1000.0), MAX_LOOKAHEAD_SAMPLES - 1));
+    lookaheadSamples_ = std::clamp(static_cast<int>(sampleRate_ * lookaheadMs_ / 1000.0), 1, MAX_LOOKAHEAD_SAMPLES - 1);
     threshold_ = static_cast<float>(std::pow(10.0, thresholdDb_ / 20.0));
 
     // Exponential release factor: env -> 1.0

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:injectable/injectable.dart';
 import '../../domain/models/ytm_track.dart';
 import '../utils/error_logger.dart';
@@ -9,6 +10,7 @@ class YtmBrowseItem {
   final String subtitle;
   final String? artworkUrl;
   final String type; // 'song', 'playlist', 'album', 'artist'
+  final Duration duration;
 
   const YtmBrowseItem({
     required this.id,
@@ -16,6 +18,7 @@ class YtmBrowseItem {
     required this.subtitle,
     this.artworkUrl,
     required this.type,
+    this.duration = const Duration(minutes: 3, seconds: 30),
   });
 
   YtmTrack toYtmTrack() {
@@ -23,7 +26,7 @@ class YtmBrowseItem {
       videoId: id,
       title: title,
       artist: subtitle,
-      duration: const Duration(minutes: 3, seconds: 30),
+      duration: duration,
       artworkUrl: artworkUrl,
     );
   }
@@ -47,6 +50,7 @@ class YtmBrowseService {
   static const Duration _cacheTtl = Duration(hours: 6);
   DateTime? _lastFetchTime;
   List<YtmBrowseSection>? _cachedSections;
+  Completer<List<YtmBrowseSection>>? _pendingFeed;
 
   YtmBrowseService(this._ytmService);
 
@@ -57,6 +61,8 @@ class YtmBrowseService {
         return _cachedSections!;
       }
     }
+    if (_pendingFeed != null) return _pendingFeed!.future;
+    _pendingFeed = Completer<List<YtmBrowseSection>>();
     try {
       // Curated diverse showcase when offline/initial load with dynamic fallback
       final charts = await getTrendingCharts();
@@ -82,15 +88,34 @@ class YtmBrowseService {
       ];
       _cachedSections = sections;
       _lastFetchTime = DateTime.now();
+      _pendingFeed?.complete(sections);
+      _pendingFeed = null;
       return sections;
     } catch (e, st) {
       ErrorLogger.log('Failed to fetch YTM home feed', error: e, stackTrace: st, category: 'YtmBrowseService');
-      return _cachedSections ?? [];
+      final fallback = _cachedSections ?? [];
+      _pendingFeed?.complete(fallback);
+      _pendingFeed = null;
+      return fallback;
     }
   }
 
   /// Fetches Top Charts.
   Future<List<YtmBrowseItem>> getTrendingCharts() async {
+    try {
+      final trendingTracks = await _ytmService.trending(limit: 15);
+      if (trendingTracks.isNotEmpty) {
+        return trendingTracks.take(8).map((t) => YtmBrowseItem(
+          id: t.videoId,
+          title: t.title,
+          subtitle: t.artist,
+          artworkUrl: t.artworkUrl,
+          type: 'song',
+          duration: t.duration,
+        )).toList();
+      }
+    } catch (_) {}
+
     try {
       final onlineTracks = await _ytmService.search('Top Global Hits');
       if (onlineTracks.isNotEmpty) {
@@ -100,6 +125,7 @@ class YtmBrowseService {
           subtitle: t.artist,
           artworkUrl: t.artworkUrl,
           type: 'song',
+          duration: t.duration,
         )).toList();
       }
     } catch (_) {}
@@ -118,6 +144,7 @@ class YtmBrowseService {
           subtitle: t.artist,
           artworkUrl: t.artworkUrl,
           type: 'song',
+          duration: t.duration,
         )).toList();
       }
     } catch (_) {}

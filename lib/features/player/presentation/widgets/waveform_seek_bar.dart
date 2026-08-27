@@ -118,6 +118,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                           duration: widget.duration,
                           loopPointA: widget.loopPointA,
                           loopPointB: widget.loopPointB,
+                          zoomScale: _zoomScale,
                         ),
                       ),
                     ),
@@ -166,6 +167,7 @@ class _WaveformPainter extends CustomPainter {
   final Duration duration;
   final Duration? loopPointA;
   final Duration? loopPointB;
+  final double zoomScale;
 
   _WaveformPainter({
     required this.samples,
@@ -176,13 +178,31 @@ class _WaveformPainter extends CustomPainter {
     required this.duration,
     this.loopPointA,
     this.loopPointB,
+    this.zoomScale = 1.0,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     if (samples.isEmpty) return;
 
-    final int count = samples.length;
+    final int totalCount = samples.length;
+    if (totalCount < 2) {
+      final rect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(0, (size.height - 4) / 2, size.width, 4),
+        const Radius.circular(2),
+      );
+      canvas.drawRRect(rect, Paint()..color = inactiveColor);
+      return;
+    }
+
+    final int visibleCount = (totalCount / zoomScale.clamp(1.0, 8.0)).round().clamp(2, totalCount);
+    final int centerIndex = (progress * totalCount).round();
+    final int halfVisible = visibleCount ~/ 2;
+    final int startIndex = (centerIndex - halfVisible).clamp(0, totalCount - visibleCount);
+    final int endIndex = (startIndex + visibleCount).clamp(0, totalCount);
+    final visibleSamples = samples.sublist(startIndex, endIndex);
+
+    final int count = visibleSamples.length;
     const double spacing = 2.5;
     final double totalSpacing = spacing * (count - 1);
     final double barWidth = ((size.width - totalSpacing) / count).clamp(1.0, 12.0);
@@ -198,7 +218,7 @@ class _WaveformPainter extends CustomPainter {
 
     // 1. Render inactive waveform bars
     for (int i = 0; i < count; i++) {
-      final double barHeight = (samples[i] * size.height).clamp(minBarHeight, size.height);
+      final double barHeight = (visibleSamples[i] * size.height).clamp(minBarHeight, size.height);
       final double x = i * (barWidth + spacing);
       final double y = (size.height - barHeight) / 2;
 
@@ -209,12 +229,13 @@ class _WaveformPainter extends CustomPainter {
       canvas.drawRRect(rect, inactivePaint);
     }
 
-    // 2. Render active waveform bars clipped to current progress
-    if (progress > 0) {
+    // 2. Render active waveform bars clipped to current progress in visible window
+    final double visibleProgress = ((progress * totalCount - startIndex) / visibleCount).clamp(0.0, 1.0);
+    if (visibleProgress > 0) {
       canvas.save();
-      canvas.clipRect(Rect.fromLTWH(0, 0, size.width * progress.clamp(0.0, 1.0), size.height));
+      canvas.clipRect(Rect.fromLTWH(0, 0, size.width * visibleProgress, size.height));
       for (int i = 0; i < count; i++) {
-        final double barHeight = (samples[i] * size.height).clamp(minBarHeight, size.height);
+        final double barHeight = (visibleSamples[i] * size.height).clamp(minBarHeight, size.height);
         final double x = i * (barWidth + spacing);
         final double y = (size.height - barHeight) / 2;
 
@@ -227,6 +248,13 @@ class _WaveformPainter extends CustomPainter {
       canvas.restore();
     }
 
+    // Helper for mapping global progress (0..1) to visible X coordinate
+    double? mapToVisibleX(double globalRatio) {
+      final sampleIdx = globalRatio * totalCount;
+      if (sampleIdx < startIndex || sampleIdx > endIndex) return null;
+      return ((sampleIdx - startIndex) / visibleCount) * size.width;
+    }
+
     // 3. Render Chapter Markers
     if (chapterMarkers != null && duration.inMilliseconds > 0) {
       final markerPaint = Paint()
@@ -235,8 +263,10 @@ class _WaveformPainter extends CustomPainter {
 
       for (final marker in chapterMarkers!) {
         final markerRatio = (marker.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
-        final markerX = markerRatio * size.width;
-        canvas.drawLine(Offset(markerX, 0), Offset(markerX, size.height), markerPaint);
+        final markerX = mapToVisibleX(markerRatio);
+        if (markerX != null) {
+          canvas.drawLine(Offset(markerX, 0), Offset(markerX, size.height), markerPaint);
+        }
       }
     }
 
@@ -248,11 +278,17 @@ class _WaveformPainter extends CustomPainter {
 
       if (loopPointA != null) {
         final ratioA = (loopPointA!.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
-        canvas.drawLine(Offset(ratioA * size.width, 0), Offset(ratioA * size.width, size.height), loopPaint);
+        final xA = mapToVisibleX(ratioA);
+        if (xA != null) {
+          canvas.drawLine(Offset(xA, 0), Offset(xA, size.height), loopPaint);
+        }
       }
       if (loopPointB != null) {
         final ratioB = (loopPointB!.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
-        canvas.drawLine(Offset(ratioB * size.width, 0), Offset(ratioB * size.width, size.height), loopPaint);
+        final xB = mapToVisibleX(ratioB);
+        if (xB != null) {
+          canvas.drawLine(Offset(xB, 0), Offset(xB, size.height), loopPaint);
+        }
       }
     }
   }
@@ -265,6 +301,7 @@ class _WaveformPainter extends CustomPainter {
         oldDelegate.inactiveColor != inactiveColor ||
         oldDelegate.chapterMarkers != chapterMarkers ||
         oldDelegate.loopPointA != loopPointA ||
-        oldDelegate.loopPointB != loopPointB;
+        oldDelegate.loopPointB != loopPointB ||
+        oldDelegate.zoomScale != zoomScale;
   }
 }

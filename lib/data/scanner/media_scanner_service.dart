@@ -8,6 +8,7 @@ import 'package:injectable/injectable.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../core/constants/audio_formats.dart';
+import '../../core/constants/channels.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../db/app_database.dart';
@@ -52,34 +53,34 @@ class MediaScannerService {
 
   static const List<String> systemIgnoredPathPatterns = [
     // WhatsApp
-    '/whatsapp/media/whatsapp voice notes',
-    '/whatsapp/media/whatsapp audio',
-    '/android/media/com.whatsapp',
-    '/com.whatsapp.w4b',
+    '/whatsapp/media/whatsapp voice notes/',
+    '/whatsapp/media/whatsapp audio/',
+    '/android/media/com.whatsapp/',
+    '/com.whatsapp.w4b/',
     // Telegram
-    '/telegram/telegram audio',
-    '/telegram/telegram voice',
-    '/android/media/org.telegram.messenger',
-    '/android/media/org.telegram.plus',
+    '/telegram/telegram audio/',
+    '/telegram/telegram voice/',
+    '/android/media/org.telegram.messenger/',
+    '/android/media/org.telegram.plus/',
     // Call & Voice recordings
-    '/recordings',
-    '/callrecordings',
-    '/call_recordings',
-    '/voicerecorder',
-    '/voice_recorder',
-    '/soundrecorder',
-    '/sound_recorder',
-    '/audiorecorder',
-    '/audio_recorder',
-    '/miui/sound_recorder',
-    '/samsung/voicerecorder',
+    '/recordings/',
+    '/callrecordings/',
+    '/call_recordings/',
+    '/voicerecorder/',
+    '/voice_recorder/',
+    '/soundrecorder/',
+    '/sound_recorder/',
+    '/audiorecorder/',
+    '/audio_recorder/',
+    '/miui/sound_recorder/',
+    '/samsung/voicerecorder/',
     // System tones & cache
-    '/ringtones',
-    '/notifications',
-    '/alarms',
-    '/.thumbnails',
-    '/.trash',
-    '/.cache',
+    '/ringtones/',
+    '/notifications/',
+    '/alarms/',
+    '/.thumbnails/',
+    '/.trash/',
+    '/.cache/',
   ];
 
   static bool isSystemIgnoredPath(String filePath) {
@@ -169,7 +170,7 @@ class MediaScannerService {
   }
 
   Future<void> rescanSingleFile(String path) async {
-    const channel = MethodChannel('com.pulsr.music/tag_editor');
+    const channel = MethodChannel(PulsrChannels.tagEditor);
     try {
       final Map<dynamic, dynamic>? tags = await channel.invokeMapMethod<dynamic, dynamic>('readTags', {
         'path': path,
@@ -217,7 +218,7 @@ class MediaScannerService {
     if (path.isEmpty || path.startsWith('http') || path.startsWith('ytmusic://')) {
       return;
     }
-    const channel = MethodChannel('com.pulsr.music/tag_editor');
+    const channel = MethodChannel(PulsrChannels.tagEditor);
     try {
       final Map<dynamic, dynamic>? tags = await channel.invokeMapMethod<dynamic, dynamic>('readTags', {
         'path': path,

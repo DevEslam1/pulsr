@@ -15,7 +15,7 @@ void main() {
       var calls = 0;
       final source = YtmResolvingSource(
         videoId: 'abc123',
-        resolve: () async {
+        resolve: ({bool forceRefresh = false}) async {
           calls++;
           throw StateError('url expired');
         },
@@ -33,7 +33,7 @@ void main() {
       var calls = 0;
       YtmResolvingSource(
         videoId: 'abc123',
-        resolve: () async {
+        resolve: ({bool forceRefresh = false}) async {
           calls++;
           return 'https://example.com/stream.m4a';
         },

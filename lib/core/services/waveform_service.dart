@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../constants/channels.dart';
 import '../utils/error_logger.dart';
 import '../utils/waveform_generator.dart';
 
@@ -19,7 +20,7 @@ class WaveformService {
   WaveformService._();
   static final WaveformService instance = WaveformService._();
 
-  static const MethodChannel _channel = MethodChannel('com.pulsr.music/waveform');
+  static const MethodChannel _channel = MethodChannel(PulsrChannels.waveform);
   static const int _maxMemCacheSize = 100;
 
   final LinkedHashMap<String, List<double>> _memCache = LinkedHashMap();
@@ -56,6 +57,10 @@ class WaveformService {
       path.isNotEmpty &&
       !path.startsWith('http') &&
       !path.startsWith('ytmusic://');
+
+  void clearMemoryCache() {
+    _memCache.clear();
+  }
 
   void _putMem(String key, List<double> value) {
     if (_memCache.length >= _maxMemCacheSize) {

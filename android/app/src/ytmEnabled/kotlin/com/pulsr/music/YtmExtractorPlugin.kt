@@ -670,11 +670,13 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
      * 2. InnertubeClient fallback chain (WEB_REMIX -> ANDROID -> IOS -> TV)
      */
     private fun resolveStreamWithFallback(videoId: String, quality: String): Map<String, Any?> {
+        var newPipeError: Throwable? = null
         // 1. Try NewPipeExtractor
         try {
             val stream = resolveStreamNewPipe(videoId, quality)
             return stream
         } catch (e: Throwable) {
+            newPipeError = e
             Log.w(TAG, "NewPipe stream extraction failed for $videoId: ${e.message}. Attempting Innertube client fallback...")
         }
 
@@ -682,10 +684,17 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         val ctx = context?.applicationContext
         if (ctx != null) {
             val client = InnertubeClient(ctx)
-            return client.resolvePlayerStream(videoId, quality)
+            try {
+                return client.resolvePlayerStream(videoId, quality)
+            } catch (innertubeErr: Throwable) {
+                if (newPipeError != null) {
+                    innertubeErr.addSuppressed(newPipeError)
+                }
+                throw innertubeErr
+            }
         }
 
-        throw ExtractionException("Unable to resolve audio stream for videoId: $videoId")
+        throw ExtractionException("Unable to resolve audio stream for videoId: $videoId", newPipeError)
     }
 
     private fun resolveStreamNewPipe(videoId: String, quality: String): Map<String, Any?> {
@@ -771,5 +780,6 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         channel?.setMethodCallHandler(null)
         channel = null
         executor.shutdownNow()
+        InnertubeClient.shutdown()
     }
 }

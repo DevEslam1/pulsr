@@ -6,6 +6,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_compile_options(-O3 -ffast-math -Wall -Wextra)
 
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    add_compile_options(-fsanitize=address,undefined)
+    add_link_options(-fsanitize=address,undefined)
+endif()
+
 add_library(pulsr_dsp SHARED
     ParametricEQ.cpp
     Crossfeed.cpp

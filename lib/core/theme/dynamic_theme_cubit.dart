@@ -173,7 +173,9 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
           _cachedPalettes.remove(_cachedPalettes.keys.first);
         }
         _cachedPalettes[cacheKey] = newState;
-        emit(newState);
+        if (!isClosed && token == _currentRequestToken) {
+          emit(newState);
+        }
         return;
       }
     } catch (e, st) {
@@ -195,6 +197,7 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
   @override
   Future<void> close() {
     _debounceTimer?.cancel();
+    _cachedPalettes.clear();
     return super.close();
   }
 }

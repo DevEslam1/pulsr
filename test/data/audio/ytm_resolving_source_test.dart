@@ -10,7 +10,7 @@ void main() {
       var resolvedCount = 0;
       final source = YtmResolvingSource(
         videoId: 'dQw4w9WgXcQ',
-        resolve: () async {
+        resolve: ({bool forceRefresh = false}) async {
           resolvedCount++;
           return 'https://rr1---sn-example.googlevideo.com/videoplayback?expire=${DateTime.now().add(const Duration(hours: 4)).millisecondsSinceEpoch ~/ 1000}';
         },

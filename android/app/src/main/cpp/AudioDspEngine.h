@@ -8,6 +8,8 @@
 #include "DsdDecoder.h"
 #include "SpatialPanner.h"
 
+#include <vector>
+
 enum DspStageMask {
     STAGE_EQ = 1 << 0,
     STAGE_CROSSFEED = 1 << 1,
@@ -36,7 +38,7 @@ public:
     SpatialPanner& panner() { return panner_; }
     DsdDecoder& dsdDecoder() { return dsdDecoder_; }
 
-    void processInterleaved(float* buffer, int frames, int channels = 2);
+    int processInterleaved(float* buffer, int frames, int channels = 2);
     void reset();
 
 private:
@@ -49,4 +51,5 @@ private:
     SincResampler resampler_;
     SpatialPanner panner_;
     DsdDecoder dsdDecoder_;
+    std::vector<float> resamplerOutBuf_;
 };

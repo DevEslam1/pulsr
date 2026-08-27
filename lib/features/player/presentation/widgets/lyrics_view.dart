@@ -65,11 +65,15 @@ class _LyricsViewState extends State<LyricsView> {
   }
 
   void _scrollToActive(int index) {
-    if (!_scrollController.hasClients) return;
+    if (!_scrollController.hasClients || widget.lyrics.isEmpty) return;
     final maxScroll = _scrollController.position.maxScrollExtent;
-    final estimatedOffset = (index / widget.lyrics.length) * maxScroll - 100;
+    final viewportHeight = _scrollController.position.viewportDimension;
+    final denom = widget.lyrics.length > 1 ? (widget.lyrics.length - 1) : 1;
+    final rawProgress = (index / denom);
+    // Interpolate offset so early lines are at top and late lines reveal bottom fully
+    final targetOffset = rawProgress * maxScroll - (1.0 - rawProgress) * (viewportHeight * 0.25);
     _scrollController.animateTo(
-      estimatedOffset.clamp(0.0, maxScroll),
+      targetOffset.clamp(0.0, maxScroll),
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
     );

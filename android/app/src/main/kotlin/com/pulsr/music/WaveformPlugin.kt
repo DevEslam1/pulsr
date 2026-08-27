@@ -6,6 +6,7 @@ import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.net.Uri
+import android.os.SystemClock
 import android.util.Log
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -51,6 +52,9 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
     fun cleanup() {
         if (::channel.isInitialized) channel.setMethodCallHandler(null)
         backgroundExecutor.shutdown()
+        try {
+            backgroundExecutor.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS)
+        } catch (_: Exception) {}
         context = null
     }
 
@@ -119,8 +123,19 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
             val bufferInfo = MediaCodec.BufferInfo()
             var sawInputEOS = false
             var sawOutputEOS = false
+            val maxIterations = 5_000_000
+            var iterations = 0
+            val deadline = SystemClock.elapsedRealtime() + 15_000L // 15s timeout
 
             while (!sawOutputEOS) {
+                if (SystemClock.elapsedRealtime() > deadline) {
+                    Log.w(TAG, "Waveform decode exceeded 15s timeout for $path; terminating loop")
+                    break
+                }
+                if (++iterations > maxIterations) {
+                    Log.w(TAG, "Exceeded maximum decode iterations ($maxIterations) for $path; terminating loop")
+                    break
+                }
                 if (!sawInputEOS) {
                     val inIndex = codec.dequeueInputBuffer(DEQUEUE_TIMEOUT_US)
                     if (inIndex >= 0) {
@@ -142,10 +157,13 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
                         if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) sawOutputEOS = true
                         if (bufferInfo.size > 0 && bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0) {
                             val outBuf = codec.getOutputBuffer(outIndex)
-                            if (outBuf != null) {
-                                outBuf.position(bufferInfo.offset)
-                                outBuf.limit(bufferInfo.offset + bufferInfo.size)
-                                outBuf.order(ByteOrder.nativeOrder())
+                            if (outBuf == null) {
+                                codec.releaseOutputBuffer(outIndex, false)
+                                continue
+                            }
+                            outBuf.position(bufferInfo.offset)
+                            outBuf.limit(bufferInfo.offset + bufferInfo.size)
+                            outBuf.order(ByteOrder.nativeOrder())
 
                                 var frameSumSq = 0.0
                                 var frames = 0
@@ -187,10 +205,9 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
                                     }
                                 }
                             }
+                            codec.releaseOutputBuffer(outIndex, false)
                         }
-                        codec.releaseOutputBuffer(outIndex, false)
-                    }
-                    outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                        outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                         val of = codec.outputFormat
                         if (of.containsKey(MediaFormat.KEY_PCM_ENCODING)) pcmEncoding = of.getInteger(MediaFormat.KEY_PCM_ENCODING)
                         if (of.containsKey(MediaFormat.KEY_CHANNEL_COUNT)) channelCount = of.getInteger(MediaFormat.KEY_CHANNEL_COUNT).coerceAtLeast(1)

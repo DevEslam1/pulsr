@@ -2,9 +2,11 @@
 <data-extraction-rules>
     <cloud-backup>
         <include domain="sharedpref" path="." />
+        <exclude domain="sharedpref" path="FlutterSecureStorage" />
     </cloud-backup>
     <device-transfer>
         <include domain="sharedpref" path="." />
+        <exclude domain="sharedpref" path="FlutterSecureStorage" />
     </device-transfer>
 </data-extraction-rules>
 

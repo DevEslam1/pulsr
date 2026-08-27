@@ -45,6 +45,10 @@ class ProxyPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         channel?.setMethodCallHandler(null)
         channel = null
         context = null
+        try {
+            executor.shutdownNow()
+        } catch (_: Exception) {}
+        ProxyManager.dispose()
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {

@@ -15,6 +15,7 @@ import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/models/lyrics_line.dart';
 import '../../domain/models/ytm_track.dart';
+import '../constants/channels.dart';
 import '../utils/error_logger.dart';
 import '../utils/lrc_parser.dart';
 import '../utils/ytm_rate_limiter.dart';
@@ -189,7 +190,7 @@ class YtmAccountService {
 
   /// Returns cookies from all YouTube Music / Google domains via native CookieManager.
   Future<String?> getNativeCookiesFromDomains() async {
-    const channel = MethodChannel('com.pulsr.music/ytm');
+    const channel = MethodChannel(PulsrChannels.ytm);
     try {
       final cookies = await channel.invokeMethod<String>('getCookies');
       return cookies;
@@ -362,9 +363,34 @@ class YtmAccountService {
 
   /// Splits a (possibly comma-merged) Set-Cookie header into individual
   /// cookies without breaking on `Expires=Wed, 21 Oct ...` dates: a comma only
-  /// starts a new cookie when it is directly followed by a `token=value` pair.
-  static final RegExp _setCookieSplitter =
-      RegExp(r',(?=\s*[^\s;,=]+=[^\s;])');
+  /// Robust splitting of comma-delimited Set-Cookie headers while respecting
+  /// expires dates containing commas (e.g. `Expires=Wed, 21 Oct 2026 07:28:00 GMT`).
+  static List<String> splitSetCookies(String header) {
+    final results = <String>[];
+    int start = 0;
+    bool inExpires = false;
+    for (int i = 0; i < header.length; i++) {
+      if (i + 8 <= header.length && header.substring(i, i + 8).toLowerCase() == 'expires=') {
+        inExpires = true;
+      }
+      if (header[i] == ';') {
+        inExpires = false;
+      }
+      if (header[i] == ',' && !inExpires) {
+        final nextPart = header.substring(i + 1).trim();
+        final eqIdx = nextPart.indexOf('=');
+        final semiIdx = nextPart.indexOf(';');
+        if (eqIdx > 0 && (semiIdx == -1 || eqIdx < semiIdx)) {
+          results.add(header.substring(start, i).trim());
+          start = i + 1;
+        }
+      }
+    }
+    if (start < header.length) {
+      results.add(header.substring(start).trim());
+    }
+    return results.where((s) => s.isNotEmpty).toList();
+  }
 
   /// Pure cookie-jar merge: applies a raw Set-Cookie header (possibly several
   /// comma-merged cookies) on top of a `k=v; k2=v2` jar. Static so it can be
@@ -378,7 +404,7 @@ class YtmAccountService {
       }
     }
 
-    final cookies = setCookieHeader.split(_setCookieSplitter);
+    final cookies = splitSetCookies(setCookieHeader);
     for (final cookie in cookies) {
       final segments = cookie.split(';');
       if (segments.isEmpty) continue;
@@ -622,13 +648,16 @@ class YtmAccountService {
         await YtmRateLimiter.shared.acquirePermit();
         final timeout = Duration(seconds: baseTimeoutSeconds + attempt * 5);
         final res = await http.post(uri, headers: headers, body: body).timeout(timeout);
-
-        if (res.statusCode == 429) {
-          YtmRateLimiter.shared.onRateLimited();
+        if (res.statusCode == 429 || res.statusCode >= 500) {
+          if (res.statusCode == 429) {
+            YtmRateLimiter.shared.onRateLimited();
+          }
           final backoffSec = (1 << attempt) + Random().nextInt(2);
-          debugPrint('[YTM_ACCOUNT] HTTP 429 rate limited. Backing off for ${backoffSec}s');
-          await Future.delayed(Duration(seconds: backoffSec));
-          continue;
+          debugPrint('[YTM_ACCOUNT] HTTP ${res.statusCode} encountered. Backing off for ${backoffSec}s (attempt ${attempt + 1}/$maxAttempts)');
+          if (attempt < maxAttempts - 1) {
+            await Future.delayed(Duration(seconds: backoffSec));
+            continue;
+          }
         }
 
         YtmRateLimiter.shared.onSuccess();
@@ -788,27 +817,32 @@ class YtmAccountService {
             const maxPages = 20;
             while (allTracks.length < maxTracks && pageCount < maxPages) {
               pageCount++;
-              final ctoken = _extractContinuationToken(currentJson);
-              if (ctoken == null || ctoken.isEmpty) break;
+              try {
+                final ctoken = _extractContinuationToken(currentJson);
+                if (ctoken == null || ctoken.isEmpty) break;
 
-              final contBody = jsonEncode({
-                'context': _buildClientContext('WEB_REMIX'),
-                'continuation': ctoken,
-              });
+                final contBody = jsonEncode({
+                  'context': _buildClientContext('WEB_REMIX'),
+                  'continuation': ctoken,
+                });
 
-              final contResponse = await _postWithRetry(
-                Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
-                headers: headers,
-                body: contBody,
-              );
+                final contResponse = await _postWithRetry(
+                  Uri.parse('$_innertubeBrowseUrl&key=$_apiKey'),
+                  headers: headers,
+                  body: contBody,
+                );
 
-              if (contResponse.statusCode == 200) {
-                currentJson =
-                    jsonDecode(contResponse.body) as Map<String, dynamic>;
-                final contTracks = _parseInnertubePlaylistTracks(currentJson);
-                if (contTracks.isEmpty) break;
-                allTracks.addAll(contTracks);
-              } else {
+                if (contResponse.statusCode == 200) {
+                  currentJson =
+                      jsonDecode(contResponse.body) as Map<String, dynamic>;
+                  final contTracks = _parseInnertubePlaylistTracks(currentJson);
+                  if (contTracks.isEmpty) break;
+                  allTracks.addAll(contTracks);
+                } else {
+                  break;
+                }
+              } catch (e) {
+                debugPrint('[YTM_ACCOUNT] Liked songs continuation error on page $pageCount: $e');
                 break;
               }
             }
@@ -1069,7 +1103,8 @@ class YtmAccountService {
       }
 
       findLyricsBrowseId(nextJson);
-      if (lyricsBrowseId == null) return null;
+      final id = lyricsBrowseId;
+      if (id == null || !id.startsWith('MPLYt')) return null;
 
       final browseBody = jsonEncode({
         'context': _buildClientContext('WEB_REMIX'),
@@ -1823,15 +1858,7 @@ class YtmAccountService {
               .where((t) => t.isNotEmpty && t != '•' && t != '·')
               .toList();
           for (final t in texts) {
-            final parts = t.split(':').map((e) => int.tryParse(e)).toList();
-            if (parts.length >= 2 && parts.every((p) => p != null)) {
-              if (parts.length == 2) {
-                durationMs = (parts[0]! * 60 + parts[1]!) * 1000;
-              } else if (parts.length == 3) {
-                durationMs =
-                    (parts[0]! * 3600 + parts[1]! * 60 + parts[2]!) * 1000;
-              }
-            } else if (t.toLowerCase() != 'song' &&
+            if (t.toLowerCase() != 'song' &&
                 t.toLowerCase() != 'video' &&
                 artist == 'Unknown Artist') {
               artist = t;
@@ -2001,5 +2028,10 @@ class YtmAccountService {
 
     traverse(root);
     return results;
+  }
+
+  void dispose() {
+    _sessionHarvestDebounce?.cancel();
+    loginState.dispose();
   }
 }

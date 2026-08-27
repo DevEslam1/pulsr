@@ -42,7 +42,7 @@ class _QueueSlotData {
   });
 }
 
-@lazySingleton
+@singleton
 class PlayerCubit extends Cubit<PlayerState> {
   static const int _maxQueueSize = 500;
   static const Duration _scrobbleInterval = Duration(seconds: 5);
@@ -71,12 +71,17 @@ class PlayerCubit extends Cubit<PlayerState> {
   int? _lastScrobbleSongId;
   bool? _lastScrobbleIsPlaying;
   int? _lastScrobblePosSec;
+  List<String>? _cachedNextTitles;
+  int? _cachedNextTitlesIndex;
+  int? _cachedQueueLength;
+  int? _cachedCurrentSongId;
 
   final Map<int, _QueueSlotData> _queueSlots = {
     0: const _QueueSlotData(songs: [], currentIndex: 0, position: Duration.zero, speed: 1.0),
     1: const _QueueSlotData(songs: [], currentIndex: 0, position: Duration.zero, speed: 1.0),
     2: const _QueueSlotData(songs: [], currentIndex: 0, position: Duration.zero, speed: 1.0),
   };
+  bool _queueRestorationDone = false;
 
   PlayerCubit({
     required PulsrAudioHandler audioHandler,
@@ -180,10 +185,14 @@ class PlayerCubit extends Cubit<PlayerState> {
   Future<void> _restoreQueueSlots() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      if (_queueRestorationDone) return;
       final raw = prefs.getString(PrefsKeys.queueSlots);
       if (raw == null) return;
-      final data = jsonDecode(raw) as Map<String, dynamic>;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) return;
+      final data = decoded;
       for (final key in data.keys) {
+        if (_queueRestorationDone) return;
         final slotIndex = int.tryParse(key);
         if (slotIndex == null || slotIndex < 0 || slotIndex > 2) continue;
         final slotData = data[key] as Map<String, dynamic>;
@@ -191,6 +200,7 @@ class PlayerCubit extends Cubit<PlayerState> {
             (slotData['songIds'] as List<dynamic>?)?.cast<int>() ?? [];
         if (songIds.isEmpty) continue;
         final songsResult = await _repository.getSongsByIds(songIds);
+        if (_queueRestorationDone) return;
         final songs = songsResult.fold((_) => <SongsTableData>[], (r) => r);
         if (songs.isEmpty) continue;
         _queueSlots[slotIndex] = _QueueSlotData(
@@ -210,6 +220,7 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   void _debouncedScrobble(
       SongsTableData song, Duration position, bool isPlaying) {
+    if (isClosed) return;
     final posSec = position.inSeconds;
     final isSongChange = _lastScrobbleSongId != song.id;
     final isPlayStateChange = _lastScrobbleIsPlaying != isPlaying;
@@ -221,13 +232,10 @@ class PlayerCubit extends Cubit<PlayerState> {
     _lastScrobbleIsPlaying = isPlaying;
     _lastScrobblePosSec = posSec;
 
-    // Only debounce if this is a minor update (not song change/play state/major seek)
-    if (!isSongChange && !isPlayStateChange && !isMajorSeek) {
-      return; // Skip minor position updates
-    }
-
-    _scrobbleDebounce?.cancel();
-    _scrobbleDebounce = Timer(_scrobbleInterval, () {
+    if (isSongChange || isPlayStateChange || isMajorSeek) {
+      // Major update: immediate flush + reset timer
+      _scrobbleDebounce?.cancel();
+      _scrobbleDebounce = null;
       _scrobblerService?.notifyPlaybackState(
         id: song.id,
         artist: song.artist,
@@ -237,6 +245,22 @@ class PlayerCubit extends Cubit<PlayerState> {
         positionMs: position.inMilliseconds,
         isPlaying: isPlaying,
       );
+      return;
+    }
+
+    // Minor progress tick: schedule debounced flush
+    _scrobbleDebounce ??= Timer(_scrobbleInterval, () {
+      if (isClosed) return;
+      _scrobblerService?.notifyPlaybackState(
+        id: song.id,
+        artist: song.artist,
+        track: song.title,
+        album: song.album,
+        durationMs: song.durationMs,
+        positionMs: position.inMilliseconds,
+        isPlaying: isPlaying,
+      );
+      _scrobbleDebounce = null;
     });
   }
 
@@ -268,19 +292,39 @@ class PlayerCubit extends Cubit<PlayerState> {
     });
   }
 
+  List<String>? _getNextTitles(PlayerState s) {
+    if (s.queue.isEmpty || s.currentIndex + 1 >= s.queue.length) {
+      _cachedNextTitles = null;
+      _cachedNextTitlesIndex = null;
+      _cachedQueueLength = 0;
+      _cachedCurrentSongId = null;
+      return null;
+    }
+    if (_cachedNextTitlesIndex == s.currentIndex &&
+        _cachedQueueLength == s.queue.length &&
+        _cachedCurrentSongId == s.currentSong?.id) {
+      return _cachedNextTitles;
+    }
+    _cachedNextTitlesIndex = s.currentIndex;
+    _cachedQueueLength = s.queue.length;
+    _cachedCurrentSongId = s.currentSong?.id;
+    _cachedNextTitles = s.queue
+        .skip(s.currentIndex + 1)
+        .take(3)
+        .map((item) => item.artist.isNotEmpty && item.artist != 'Unknown Artist'
+            ? '${item.title} • ${item.artist}'
+            : item.title)
+        .toList();
+    return _cachedNextTitles;
+  }
+
   void _updateWidgetThrottled({bool force = false}) {
     final now = DateTime.now();
     if (!force && _lastWidgetUpdateTime != null && now.difference(_lastWidgetUpdateTime!).inMilliseconds < 1000) {
       return;
     }
     _lastWidgetUpdateTime = now;
-    final nextTitles = (state.queue.isNotEmpty && state.currentIndex + 1 < state.queue.length)
-        ? state.queue
-            .skip(state.currentIndex + 1)
-            .take(3)
-            .map((s) => s.artist.isNotEmpty && s.artist != 'Unknown Artist' ? '${s.title} • ${s.artist}' : s.title)
-            .toList()
-        : null;
+    final nextTitles = _getNextTitles(state);
     _widgetService?.updateNowPlaying(
       song: state.currentSong,
       isPlaying: state.isPlaying,
@@ -335,6 +379,7 @@ class PlayerCubit extends Cubit<PlayerState> {
               remoteArtworkUrl: item.artUri?.toString(),
               isFavorite: false,
               isMissing: false,
+              isDownloaded: false,
               playCount: 0,
               lastPositionMs: 0,
             );
@@ -361,7 +406,7 @@ class PlayerCubit extends Cubit<PlayerState> {
 
             if (!isSameSong) {
               _loadLyricsForSong(resolvedSong!);
-              _enrichAudioQuality(resolvedSong!);
+              _enrichAudioQuality(resolvedSong!, gen);
             }
             if (gen != _mediaItemResolutionGen || isClosed) return;
             _updateWidgetThrottled(force: true);
@@ -402,6 +447,7 @@ class PlayerCubit extends Cubit<PlayerState> {
               remoteArtworkUrl: m.artUri?.toString(),
               isFavorite: false,
               isMissing: false,
+              isDownloaded: false,
               playCount: 0,
               lastPositionMs: 0,
             ));
@@ -467,7 +513,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   /// Reads real audio-header fields for a local song the first time it plays
   /// and caches them, so the quality badge shows actual metadata. Cheap: runs
   /// once per file (skips songs already enriched) and only for local files.
-  Future<void> _enrichAudioQuality(SongsTableData song) async {
+  Future<void> _enrichAudioQuality(SongsTableData song, int gen) async {
     if (song.source != SongSource.local) return;
     if (song.codec != null) return;
     final path = song.path;
@@ -476,10 +522,10 @@ class PlayerCubit extends Cubit<PlayerState> {
     }
     try {
       await getIt<MediaScannerService>().enrichAudioQuality(song.id, path);
-      if (isClosed) return;
+      if (isClosed || gen != _mediaItemResolutionGen) return;
       final refreshed = await _repository.getSongById(song.id);
       final updated = refreshed.fold((_) => null, (s) => s);
-      if (updated != null && !isClosed && state.currentSong?.id == updated.id) {
+      if (updated != null && !isClosed && gen == _mediaItemResolutionGen && state.currentSong?.id == updated.id) {
         emit(state.copyWith(currentSong: updated));
       }
     } catch (_) {}
@@ -536,6 +582,9 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   Future<void> playSong(SongsTableData song, {List<SongsTableData>? queue, Duration? initialPosition}) async {
     ++_mediaItemResolutionGen;
+    final capturedGen = _mediaItemResolutionGen;
+    // Mark restoration as done: any in-flight _restoreQueueSlots must abort
+    _queueRestorationDone = true;
     // If playing an online song that has already been downloaded to the device, swap to local song
     SongsTableData targetSong = song;
     if (song.source == SongSource.youtube) {
@@ -545,26 +594,48 @@ class PlayerCubit extends Cubit<PlayerState> {
           title: song.title,
           artist: song.artist,
         );
+        // Abort if a newer playSong call arrived while we were awaiting
+        if (_mediaItemResolutionGen != capturedGen) return;
         final local = match.fold((_) => null, (s) => s);
-        if (local != null && (File(local.path).existsSync() || local.path.startsWith('content:'))) {
+        if (local != null && (local.path.startsWith('content:') || await File(local.path).exists())) {
           targetSong = local;
         }
       } catch (_) {}
     }
 
-    var effectiveQueue = queue ?? [targetSong];
-    if (effectiveQueue.length > _maxQueueSize) {
-      effectiveQueue = effectiveQueue.sublist(0, _maxQueueSize);
-    }
+    var rawQueue = queue != null ? List<SongsTableData>.from(queue) : [targetSong];
     if (targetSong.id != song.id) {
-      effectiveQueue = effectiveQueue.map((s) => s.id == song.id ? targetSong : s).toList();
+      rawQueue = rawQueue.map((s) => s.id == song.id ? targetSong : s).toList();
     }
 
-    final index = effectiveQueue.indexWhere((s) => s.id == targetSong.id);
+    var targetIndex = rawQueue.indexWhere((s) => s.id == targetSong.id);
+    if (targetIndex == -1) {
+      targetIndex = 0;
+      rawQueue.insert(0, targetSong);
+    }
+
+    List<SongsTableData> effectiveQueue;
+    int effectiveIndex;
+
+    if (rawQueue.length > _maxQueueSize) {
+      // Center the 500-song window around the target song
+      final halfWindow = _maxQueueSize ~/ 2;
+      var start = targetIndex - halfWindow;
+      if (start < 0) start = 0;
+      if (start + _maxQueueSize > rawQueue.length) {
+        start = (rawQueue.length - _maxQueueSize).clamp(0, rawQueue.length);
+      }
+      effectiveQueue = rawQueue.sublist(start, start + _maxQueueSize);
+      effectiveIndex = targetIndex - start;
+    } else {
+      effectiveQueue = rawQueue;
+      effectiveIndex = targetIndex;
+    }
+
     final startPos = initialPosition ?? Duration.zero;
     _queueSlots[state.activeQueueSlot] = _QueueSlotData(
       songs: List.from(effectiveQueue),
-      currentIndex: index != -1 ? index : 0,
+      currentIndex: effectiveIndex,
       position: startPos,
       speed: state.playbackSpeed,
     );
@@ -572,7 +643,7 @@ class PlayerCubit extends Cubit<PlayerState> {
 
     emit(state.copyWith(
       queue: effectiveQueue,
-      currentIndex: index != -1 ? index : 0,
+      currentIndex: effectiveIndex,
       currentSong: targetSong,
       position: startPos,
       duration: Duration(milliseconds: targetSong.durationMs),
@@ -580,7 +651,7 @@ class PlayerCubit extends Cubit<PlayerState> {
     ));
     await _audioHandler.loadQueue(
       effectiveQueue,
-      initialIndex: index != -1 ? index : 0,
+      initialIndex: effectiveIndex,
       initialPosition: startPos,
     );
     _loadLyricsForSong(targetSong);
@@ -652,51 +723,58 @@ class PlayerCubit extends Cubit<PlayerState> {
     emit(state.copyWith(queue: updatedQueue));
   }
 
+  bool _isSwitchingSlot = false;
+
   Future<void> switchQueueSlot(int slot) async {
-    if (slot == state.activeQueueSlot || slot < 0 || slot > 2) return;
-    final wasPlaying = state.isPlaying;
-    _queueSlots[state.activeQueueSlot] = _QueueSlotData(
-      songs: List.from(state.queue),
-      currentIndex: state.currentIndex,
-      position: state.position,
-      speed: state.playbackSpeed,
-    );
-    final targetSlot = _queueSlots[slot] ?? const _QueueSlotData(songs: [], currentIndex: 0, position: Duration.zero, speed: 1.0);
-    final validSongs = targetSlot.songs.where((s) => !s.isMissing).toList();
+    if (_isSwitchingSlot || slot == state.activeQueueSlot || slot < 0 || slot > 2) return;
+    _isSwitchingSlot = true;
+    try {
+      final wasPlaying = state.isPlaying;
+      _queueSlots[state.activeQueueSlot] = _QueueSlotData(
+        songs: List.from(state.queue),
+        currentIndex: state.currentIndex,
+        position: state.position,
+        speed: state.playbackSpeed,
+      );
+      final targetSlot = _queueSlots[slot] ?? const _QueueSlotData(songs: [], currentIndex: 0, position: Duration.zero, speed: 1.0);
+      final validSongs = targetSlot.songs.where((s) => !s.isMissing).toList();
 
-    _debouncedPersistQueueSlots();
+      _debouncedPersistQueueSlots();
 
-    if (validSongs.isEmpty) {
+      if (validSongs.isEmpty) {
+        emit(state.copyWith(
+          activeQueueSlot: slot,
+          queue: [],
+          errorMessage: 'Queue slot is empty',
+        ));
+        return;
+      }
+
+      emit(state.copyWith(activeQueueSlot: slot, queue: validSongs));
+
+      final safeIdx = targetSlot.currentIndex.clamp(0, validSongs.length - 1);
+      final song = validSongs[safeIdx];
       emit(state.copyWith(
-        activeQueueSlot: slot,
-        queue: [],
-        errorMessage: 'Queue slot is empty',
+        currentIndex: safeIdx,
+        currentSong: song,
+        duration: Duration(milliseconds: song.durationMs),
+        position: targetSlot.position,
+        playbackSpeed: targetSlot.speed,
       ));
-      return;
+      await _audioHandler.setSpeed(targetSlot.speed);
+      await _audioHandler.loadQueue(
+        validSongs,
+        initialIndex: safeIdx,
+        initialPosition: targetSlot.position,
+      );
+      if (!wasPlaying) {
+        await _audioHandler.pause();
+        emit(state.copyWith(isPlaying: false));
+      }
+      _loadLyricsForSong(song);
+    } finally {
+      _isSwitchingSlot = false;
     }
-
-    emit(state.copyWith(activeQueueSlot: slot, queue: validSongs));
-
-    final safeIdx = targetSlot.currentIndex.clamp(0, validSongs.length - 1);
-    final song = validSongs[safeIdx];
-    emit(state.copyWith(
-      currentIndex: safeIdx,
-      currentSong: song,
-      duration: Duration(milliseconds: song.durationMs),
-      position: targetSlot.position,
-      playbackSpeed: targetSlot.speed,
-    ));
-    await _audioHandler.setSpeed(targetSlot.speed);
-    await _audioHandler.loadQueue(
-      validSongs,
-      initialIndex: safeIdx,
-      initialPosition: targetSlot.position,
-    );
-    if (!wasPlaying) {
-      await _audioHandler.pause();
-      emit(state.copyWith(isPlaying: false));
-    }
-    _loadLyricsForSong(song);
   }
 
   /// After a YouTube row is downloaded and folded into a positive-id local row,
@@ -727,6 +805,10 @@ class PlayerCubit extends Cubit<PlayerState> {
       ));
       _updateWidgetThrottled(force: true);
     }
+
+    try {
+      _audioHandler.swapReconciledSong(oldId, newSong);
+    } catch (_) {}
   }
 
   Future<void> togglePlayPause() async {
@@ -916,7 +998,7 @@ class PlayerCubit extends Cubit<PlayerState> {
       safeValue = ((6.0 - preampDb) / 10.0).clamp(0.0, 1.0);
     }
     emit(state.copyWith(volumeBoost: safeValue));
-    await _audioHandler.setVolumeBoost(value);
+    await _audioHandler.setVolumeBoost(safeValue);
   }
 
   Future<void> setSpatializerEnabled(bool enabled) async {

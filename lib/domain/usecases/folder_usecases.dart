@@ -2,6 +2,7 @@
 import 'dart:io';
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
+import 'package:path/path.dart' as p;
 import '../../core/errors/failures.dart';
 import '../../data/db/app_database.dart';
 import '../repositories/music_repository_interface.dart';
@@ -57,8 +58,7 @@ class FolderUseCases {
       // `ytmusic://` sentinels would otherwise collapse into one phantom folder
       // that the user could then "exclude".
       if (song.source != SongSource.local) continue;
-      final file = File(song.path);
-      final parentDir = file.parent.path;
+      final parentDir = p.dirname(song.path);
       folderSongCounts[parentDir] = (folderSongCounts[parentDir] ?? 0) + 1;
     }
 
@@ -87,7 +87,7 @@ class FolderUseCases {
         final normalizedTarget = folderPath.replaceAll('\\', '/').toLowerCase().trim();
         return songs.where((s) {
           if (s.source != SongSource.local) return false;
-          final parentDir = File(s.path).parent.path.replaceAll('\\', '/').toLowerCase().trim();
+          final parentDir = p.dirname(s.path).replaceAll('\\', '/').toLowerCase().trim();
           return parentDir == normalizedTarget;
         }).toList();
       });

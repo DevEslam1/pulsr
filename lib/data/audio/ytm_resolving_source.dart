@@ -23,12 +23,12 @@ import '../../core/services/ytm_cache_manager.dart';
 class YtmResolvingSource extends StreamAudioSource {
   YtmResolvingSource({
     required this.videoId,
-    required Future<String> Function() resolve,
+    required this.resolve,
     this.userAgent,
     this.cookies,
     this.onError,
     super.tag,
-  }) : resolve = (({bool forceRefresh = false}) => resolve());
+  });
 
   YtmResolvingSource.withRefresh({
     required this.videoId,
@@ -151,7 +151,7 @@ class YtmResolvingSource extends StreamAudioSource {
     // never start writing the same file at exactly the same time.
     final pathKey = cacheFile.path;
     final completer = Completer<void>();
-    if (_pathCreationLocks.length >= 50 && !_pathCreationLocks.containsKey(pathKey)) {
+    if (_pathCreationLocks.length >= _maxPathCreationLocks && !_pathCreationLocks.containsKey(pathKey)) {
       _pathCreationLocks.remove(_pathCreationLocks.keys.first);
     }
     final previous =
@@ -178,13 +178,15 @@ class YtmResolvingSource extends StreamAudioSource {
       _cacheManager.pruneIfExceedsLimit().ignore();
 
       return inner;
+    } catch (e) {
+      _inner = null;
+      _pending = null;
+      rethrow;
     } finally {
       if (!completer.isCompleted) {
         completer.complete();
       }
-      if (identical(_pathCreationLocks[pathKey], completer.future)) {
-        _pathCreationLocks.remove(pathKey);
-      }
+      _pathCreationLocks.remove(pathKey);
     }
   }
 
@@ -193,14 +195,17 @@ class YtmResolvingSource extends StreamAudioSource {
   static Future<void> _deleteCacheFilesFor(String videoId) async {
     final dir = await _cacheManager.getCacheDirectory();
     final hash = _cacheManager.getHashForVideoId(videoId);
-    for (final ext in const ['m4a', 'webm']) {
+    for (final ext in const ['m4a', 'webm', 'opus', 'mp4']) {
       final f = File(p.join(dir.path, '$hash.$ext'));
-      if (f.existsSync()) {
-        await f.delete();
+      if (await f.exists()) {
+        try {
+          await f.delete();
+        } catch (_) {}
       }
     }
   }
 
+  static const int _maxPathCreationLocks = 32;
   static final LinkedHashMap<String, Future<void>> _pathCreationLocks =
       LinkedHashMap<String, Future<void>>();
 

@@ -11,6 +11,10 @@ class MissingArtworkService {
 
   MissingArtworkService([http.Client? client]) : _client = client ?? http.Client();
 
+  void dispose() {
+    _client.close();
+  }
+
   /// Scans albums and identifies those lacking artwork.
   List<AlbumsTableData> findMissingArtworkAlbums(List<AlbumsTableData> allAlbums) {
     return allAlbums.where((album) {

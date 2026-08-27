@@ -50,7 +50,8 @@ void main() {
 
     test('dart:io HttpClient is provided by NetworkModule', () {
       expect(generated, contains(r'class _$NetworkModule'));
-      expect(generated, contains('HttpClient>(() => networkModule.httpClient)'));
+      expect(generated, contains('HttpClient>('));
+      expect(generated, contains('networkModule.httpClient'));
     });
   });
 }

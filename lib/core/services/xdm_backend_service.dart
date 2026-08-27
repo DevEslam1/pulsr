@@ -138,7 +138,6 @@ class XdmBackendService {
           .timeout(const Duration(seconds: 12));
 
       if (response.statusCode != 200) {
-        debugPrint('[XDM_BACKEND] /api/streams returned status ${response.statusCode}: ${response.body}');
         if (response.statusCode == 400 && response.body.contains('407')) {
           throw const YtmException('YTM_PROXY_AUTH', 'XDM Backend proxy authentication failed (407)');
         }
@@ -228,7 +227,6 @@ class XdmBackendService {
           .timeout(const Duration(seconds: 40));
 
       if (response.statusCode != 200) {
-        debugPrint('[XDM_BACKEND] /api/playlist returned status ${response.statusCode}: ${response.body}');
         return const [];
       }
 

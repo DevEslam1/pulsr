@@ -1,4 +1,4 @@
-﻿import 'package:bloc_test/bloc_test.dart';
+import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
@@ -31,6 +31,7 @@ void main() {
         source: SongSource.local,
         isFavorite: true,
         isMissing: false,
+        isDownloaded: false,
         playCount: 10,
         lastPositionMs: 0,
       ),
@@ -44,6 +45,7 @@ void main() {
         source: SongSource.local,
         isFavorite: false,
         isMissing: false,
+        isDownloaded: false,
         playCount: 5,
         lastPositionMs: 0,
       ),
@@ -57,6 +59,7 @@ void main() {
         source: SongSource.local,
         isFavorite: false,
         isMissing: false,
+        isDownloaded: false,
         playCount: 2,
         lastPositionMs: 0,
       ),

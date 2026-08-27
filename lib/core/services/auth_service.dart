@@ -102,11 +102,15 @@ class AuthService {
   Future<void> signOut() async {
     try {
       await _googleSignIn.signOut();
+    } catch (e, st) {
+      ErrorLogger.log('Google sign-out failed', error: e, stackTrace: st, category: 'AuthService');
+    }
+    try {
       if (_isFirebaseAvailable) {
         await FirebaseAuth.instance.signOut();
       }
     } catch (e, st) {
-      ErrorLogger.log('Sign-out failed', error: e, stackTrace: st, category: 'AuthService');
+      ErrorLogger.log('Firebase sign-out failed', error: e, stackTrace: st, category: 'AuthService');
     }
   }
 }

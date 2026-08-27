@@ -29,7 +29,9 @@ void SincResampler::reset() {
 
 int SincResampler::getExpectedOutFrames(int inFrames) const {
     if (ratio_ <= 0.0) return inFrames;
-    return static_cast<int>(std::ceil(inFrames / ratio_));
+    const int effectiveIn = inFrames - TAPS;
+    if (effectiveIn <= 0) return 0;
+    return static_cast<int>(std::ceil(effectiveIn / ratio_));
 }
 
 float SincResampler::sinc(float x) const {
@@ -121,12 +123,29 @@ int SincResampler::process(const float* inL, const float* inR, int inFrames,
         std::memcpy(historyR_.data(), bufR_.data() + startIdx, TAPS * sizeof(float));
     }
 
+    // Shrink capacity if needed drops significantly below allocated capacity
+    if (bufCapacity_ > 8192 && needed < bufCapacity_ / 4) {
+        bufCapacity_ = std::max(needed * 2, 4096);
+        bufL_.resize(bufCapacity_, 0.0f);
+        bufR_.resize(bufCapacity_, 0.0f);
+        bufL_.shrink_to_fit();
+        bufR_.shrink_to_fit();
+    }
+
     return outCount;
 }
 
 int SincResampler::processInterleaved(const float* in, int inFrames,
                                      float* out, int maxOutFrames) {
     if (!in || !out || inFrames <= 0 || maxOutFrames <= 0) return 0;
+
+    if (!enabled_ || std::abs(inRate_ - outRate_) < 1.0) {
+        int count = std::min(inFrames, maxOutFrames);
+        if (in != out) {
+            std::memcpy(out, in, count * 2 * sizeof(float));
+        }
+        return count;
+    }
 
     if (static_cast<int>(inL_.size()) < inFrames) {
         inL_.resize(inFrames * 2);

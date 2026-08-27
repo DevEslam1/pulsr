@@ -162,6 +162,7 @@ class EqPreset {
   }
 
   static List<double> _logSpread(int count, List<double> spanFreqs) {
+    if (count <= 1) return List.filled(count, spanFreqs.isNotEmpty ? spanFreqs.first : 0.0);
     final logLo = math.log(spanFreqs.first);
     final logHi = math.log(spanFreqs.last);
     return [

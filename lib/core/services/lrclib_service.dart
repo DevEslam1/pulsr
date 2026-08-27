@@ -13,6 +13,10 @@ class LrclibService {
 
   LrclibService({HttpClient? client}) : _client = client ?? (HttpClient()..connectionTimeout = const Duration(seconds: 4));
 
+  void dispose() {
+    _client.close(force: true);
+  }
+
   Future<LyricsResult?> fetchLyrics({
     required String trackName,
     required String artistName,

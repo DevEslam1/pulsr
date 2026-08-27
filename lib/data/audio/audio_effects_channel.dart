@@ -1,11 +1,12 @@
 // lib/data/audio/audio_effects_channel.dart
 import 'dart:io';
 import 'package:flutter/services.dart';
+import '../../core/constants/channels.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/models/audio_effects_config.dart';
 
 class AudioEffectsChannel {
-  static const MethodChannel _channel = MethodChannel('com.pulsr.music/audio_effects');
+  static const MethodChannel _channel = MethodChannel(PulsrChannels.audioEffects);
 
   static final AudioEffectsChannel _instance = AudioEffectsChannel._internal();
   factory AudioEffectsChannel() => _instance;

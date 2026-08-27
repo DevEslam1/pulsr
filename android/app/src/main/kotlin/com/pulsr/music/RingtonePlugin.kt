@@ -194,6 +194,9 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
                 context.contentResolver.update(insertedUri, updateValues, null, null)
             } catch (e: Exception) {
                 android.util.Log.w("RingtonePlugin", "Failed to write ringtone content stream: ${e.message}")
+                try {
+                    context.contentResolver.delete(insertedUri, null, null)
+                } catch (_: Exception) {}
             }
         }
 

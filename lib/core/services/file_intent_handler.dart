@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:injectable/injectable.dart';
+import 'package:path/path.dart' as p;
 import '../config/app_config.dart';
 import '../constants/audio_formats.dart';
 import '../di/injection.dart';
@@ -12,20 +14,18 @@ import '../../data/db/app_database.dart';
 import '../../domain/models/ytm_track.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../../features/player/cubit/player_cubit.dart';
+import '../constants/channels.dart';
 import '../network/proxy_config.dart';
 import 'ytm_service.dart';
 
-@lazySingleton
+@singleton
 class FileIntentHandler {
   static const MethodChannel _channel =
-      MethodChannel('com.pulsr.music/file_opener');
-  static int _nextTempId = -100000;
+      MethodChannel(PulsrChannels.fileOpener);
+  static int _tempIdCounter = 0;
   static int _getNextTempId() {
-    _nextTempId--;
-    if (_nextTempId < -900000) {
-      _nextTempId = -100000;
-    }
-    return _nextTempId;
+    final rand = math.Random().nextInt(1 << 16);
+    return (DateTime.now().millisecondsSinceEpoch * -1) - (++_tempIdCounter * 65536) - rand;
   }
   final IMusicRepository _repository;
   final PlayerCubit _playerCubit;
@@ -69,16 +69,19 @@ class FileIntentHandler {
     }
 
     final youTubeShort =
-        RegExp(r'youtu\.be\/([a-zA-Z0-9_-]{11})').firstMatch(trimmed);
+        RegExp(r'(?:https?:\/\/)?(?:www\.)?youtu\.be\/([a-zA-Z0-9_-]{11})').firstMatch(trimmed);
     if (youTubeShort != null) return youTubeShort.group(1);
 
     final youTubeLong = RegExp(
-            r'(?:v=|\/shorts\/|\/embed\/|\/watch\/|\/v\/)([a-zA-Z0-9_-]{11})')
+            r'(?:https?:\/\/)?(?:(?:[a-zA-Z0-9-]+\.)*youtube\.com|youtube-nocookie\.com)\/(?:(?:watch\?.*?v=)|(?:v|embed|shorts)\/)([a-zA-Z0-9_-]{11})')
         .firstMatch(trimmed);
     if (youTubeLong != null) return youTubeLong.group(1);
 
-    final fallback = RegExp(r'[?&]v=([a-zA-Z0-9_-]{11})').firstMatch(trimmed);
-    if (fallback != null) return fallback.group(1);
+    // Fallback: only if it contains youtube.com or youtu.be
+    if (trimmed.contains('youtube.com') || trimmed.contains('youtu.be')) {
+      final fallback = RegExp(r'[?&]v=([a-zA-Z0-9_-]{11})').firstMatch(trimmed);
+      if (fallback != null) return fallback.group(1);
+    }
 
     return null;
   }
@@ -140,7 +143,16 @@ class FileIntentHandler {
         cleanPath = uriOrPath;
       }
       if (cleanPath.startsWith('file://')) {
-        cleanPath = cleanPath.replaceFirst('file://', '');
+        try {
+          final parsed = Uri.parse(cleanPath);
+          if (parsed.scheme == 'file' && parsed.path.isNotEmpty) {
+            cleanPath = parsed.path;
+          } else {
+            cleanPath = cleanPath.replaceFirst('file://', '');
+          }
+        } catch (_) {
+          cleanPath = cleanPath.replaceFirst('file://', '');
+        }
       }
 
       // 1. Check if it's a PLAYABLE audio file FIRST (fast-path)
@@ -156,7 +168,7 @@ class FileIntentHandler {
         if (isTextExt) {
           try {
             final file = File(cleanPath);
-            if (file.existsSync()) {
+            if (await file.exists()) {
               final content = await file.readAsString();
               final proxies = ProxyEntry.parseList(content);
               if (proxies.isNotEmpty) {
@@ -221,18 +233,18 @@ class FileIntentHandler {
             ? parsedUri!.pathSegments.last
             : null;
         if (segment != null && segment.isNotEmpty) {
-          title = Uri.decodeComponent(segment)
-              .replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '');
+          final decoded = Uri.decodeComponent(segment);
+          title = p.withoutExtension(decoded);
         }
       } else {
         final file = File(cleanPath);
         final filename = file.uri.pathSegments.isNotEmpty
             ? file.uri.pathSegments.last
             : 'Audio File';
-        title = filename.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), '');
+        title = p.withoutExtension(filename);
         try {
-          if (file.existsSync()) {
-            fileSize = file.lengthSync();
+          if (await file.exists()) {
+            fileSize = await file.length();
           }
         } catch (_) {}
       }
@@ -249,12 +261,16 @@ class FileIntentHandler {
         fileSize: fileSize,
         isFavorite: false,
         isMissing: false,
+        isDownloaded: false,
         playCount: 0,
         lastPositionMs: 0,
       );
 
       await _playerCubit.playSong(tempSong);
-      rootNavigatorKey.currentContext?.push('/now-playing');
+      final navCtx = rootNavigatorKey.currentContext;
+      if (navCtx != null && navCtx.mounted) {
+        navCtx.push('/now-playing');
+      }
     } catch (e, st) {
       final context = rootNavigatorKey.currentContext;
       if (context != null && context.mounted) {

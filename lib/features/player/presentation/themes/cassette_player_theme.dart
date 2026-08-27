@@ -2,6 +2,7 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/adaptive.dart';
 import '../widgets/audio_quality_badge.dart';
 import '../widgets/player_controls.dart';
 import '../widgets/player_seek_bar.dart';
@@ -55,178 +56,218 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
     final p = context.palette;
     final song = state.currentSong;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      child: Column(
-        children: [
-          const SizedBox(height: 12),
-          // Cassette Tape Deck Visual
-          Expanded(
-            child: Center(
-              child: AspectRatio(
-                aspectRatio: 1.5,
-                child: Container(
-                  padding: const EdgeInsets.all(14),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E2028),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFF323646), width: 3),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        blurRadius: 24,
-                        offset: const Offset(0, 10),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isTwoPane = context.isTwoPane || constraints.maxWidth >= 680;
+
+        final cassetteBody = Center(
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: isTwoPane ? 240 : 300,
+              maxWidth: isTwoPane ? 360 : 420,
+            ),
+            child: AspectRatio(
+              aspectRatio: 1.5,
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1E2028),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFF323646), width: 3),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.5),
+                      blurRadius: 24,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    // Cassette Label Header
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: p.primary.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      // Cassette Label Header
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'SIDE A • TYPE II (CrO2)',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white70,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                          Text(
+                            'PULSR TAPE',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w900,
+                              color: p.primary,
+                              letterSpacing: 1.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Cassette Center Window with Spinning Spools
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
                         decoration: BoxDecoration(
-                          color: p.primary.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(8),
+                          color: const Color(0xFF0F1116),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.white12),
                         ),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            const Text(
-                              'SIDE A • TYPE II (CrO2)',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white70,
-                                letterSpacing: 1.2,
+                            // Left Spool
+                            _buildSpool(),
+                            // Center Tape Window
+                            Container(
+                              width: 70,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: Colors.white10),
+                              ),
+                              child: Center(
+                                child: Container(
+                                  height: 12,
+                                  width: 50,
+                                  color: const Color(0xFF5A3825), // Brown tape strip
+                                ),
                               ),
                             ),
-                            Text(
-                              'PULSR TAPE',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                                color: p.primary,
-                                letterSpacing: 1.5,
-                              ),
-                            ),
+                            // Right Spool
+                            _buildSpool(),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 14),
+                    ),
+                    const SizedBox(height: 10),
 
-                      // Cassette Center Window with Spinning Spools
-                      Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0F1116),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white12),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              // Left Spool
-                              _buildSpool(),
-                              // Center Tape Window
-                              Container(
-                                width: 70,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.05),
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: Colors.white10),
-                                ),
-                                child: Center(
-                                  child: Container(
-                                    height: 12,
-                                    width: 50,
-                                    color: const Color(0xFF5A3825), // Brown tape strip
-                                  ),
-                                ),
-                              ),
-                              // Right Spool
-                              _buildSpool(),
-                            ],
-                          ),
-                        ),
+                    // Track Title on Cassette Body
+                    Text(
+                      song?.title ?? 'Tape Loaded',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white70,
                       ),
-                      const SizedBox(height: 10),
-
-                      // Track Title on Cassette Body
-                      Text(
-                        song?.title ?? 'Tape Loaded',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white70,
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
-          const SizedBox(height: 16),
+        );
 
-          // Track Title & Artist
-          Text(
-            song?.title ?? 'No Track Playing',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: p.textPrimary,
+        final controlsColumn = Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Track Title & Artist
+            Text(
+              song?.title ?? 'No Track Playing',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: p.textPrimary,
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            song?.artist ?? 'Unknown Artist',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              fontSize: 14,
-              color: p.textSecondary,
+            const SizedBox(height: 4),
+            Text(
+              song?.artist ?? 'Unknown Artist',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 14,
+                color: p.textSecondary,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
+            const SizedBox(height: 8),
 
-          // Audio Quality & DAC Badge
-          if (song != null)
-            AudioQualityBadge(song: song, activeColor: widget.props.activeColor),
-          const SizedBox(height: 12),
+            // Audio Quality & DAC Badge
+            if (song != null)
+              AudioQualityBadge(song: song, activeColor: widget.props.activeColor),
+            const SizedBox(height: 12),
 
-          // Seek Bar
-          PlayerSeekBar(
-            position: state.position,
-            duration: state.duration,
-            activeColor: widget.props.activeColor,
-            songId: song?.id,
-            filePath: song?.path,
-            onSeek: (pos) => cubit.seek(pos),
-          ),
-          const SizedBox(height: 14),
+            // Seek Bar
+            PlayerSeekBar(
+              position: state.position,
+              duration: state.duration,
+              activeColor: widget.props.activeColor,
+              songId: song?.id,
+              filePath: song?.path,
+              onSeek: (pos) => cubit.seek(pos),
+            ),
+            const SizedBox(height: 14),
 
-          // Playback Controls
-          PlayerControls(
-            isPlaying: state.isPlaying,
-            isShuffle: state.isShuffle,
-            repeatMode: state.repeatMode,
-            primaryColor: widget.props.activeColor,
-            onPlayPause: () => cubit.togglePlayPause(),
-            onNext: () => cubit.next(),
-            onPrevious: () => cubit.previous(),
-            onToggleShuffle: () => cubit.toggleShuffle(),
-            onToggleRepeat: () => cubit.toggleRepeat(),
+            // Playback Controls
+            PlayerControls(
+              isPlaying: state.isPlaying,
+              isShuffle: state.isShuffle,
+              repeatMode: state.repeatMode,
+              primaryColor: widget.props.activeColor,
+              mainButtonSize: isTwoPane ? 56 : 64,
+              onPlayPause: () => cubit.togglePlayPause(),
+              onNext: () => cubit.next(),
+              onPrevious: () => cubit.previous(),
+              onToggleShuffle: () => cubit.toggleShuffle(),
+              onToggleRepeat: () => cubit.toggleRepeat(),
+            ),
+            const SizedBox(height: 16),
+          ],
+        );
+
+        if (isTwoPane) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: cassetteBody,
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  flex: 6,
+                  child: SingleChildScrollView(
+                    child: controlsColumn,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Column(
+            children: [
+              const SizedBox(height: 12),
+              Expanded(child: cassetteBody),
+              const SizedBox(height: 16),
+              controlsColumn,
+            ],
           ),
-          const SizedBox(height: 16),
-        ],
-      ),
+        );
+      },
     );
   }
 

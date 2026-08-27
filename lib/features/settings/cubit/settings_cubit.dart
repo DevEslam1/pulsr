@@ -7,6 +7,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/constants/channels.dart';
 import '../../../core/constants/prefs_keys.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/network/app_http_overrides.dart';
@@ -24,7 +25,7 @@ class SettingsCubit extends Cubit<SettingsState> {
   final MediaScannerService _scannerService;
   final HiResAudioService _hiResAudioService;
   StreamSubscription<AudioOutputInfo>? _deviceSub;
-  static const MethodChannel _proxyChannel = MethodChannel('com.pulsr.music/proxy');
+  static const MethodChannel _proxyChannel = MethodChannel(PulsrChannels.proxy);
 
   static const String _keyGapless = 'setting_gapless';
   static const String _keyCrossfade = 'setting_crossfade';
@@ -369,15 +370,17 @@ class SettingsCubit extends Cubit<SettingsState> {
   }
 
   Future<void> setCrossfade(double seconds) async {
-    emit(state.copyWith(crossfadeSeconds: seconds));
+    final clamped = seconds.clamp(0.0, 12.0);
+    emit(state.copyWith(crossfadeSeconds: clamped));
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(_keyCrossfade, seconds);
+    await prefs.setDouble(_keyCrossfade, clamped);
   }
 
   Future<void> setMinDuration(int seconds) async {
-    emit(state.copyWith(minDurationSec: seconds));
+    final clamped = seconds.clamp(0, 300);
+    emit(state.copyWith(minDurationSec: clamped));
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_keyMinDuration, seconds);
+    await prefs.setInt(_keyMinDuration, clamped);
   }
 
   Future<void> setAutoHideSystemMedia(bool value) async {
@@ -470,15 +473,17 @@ class SettingsCubit extends Cubit<SettingsState> {
   }
 
   Future<void> setReplayGainPreampWithRg(double db) async {
-    emit(state.copyWith(replayGainPreampWithRg: db));
+    final clamped = db.clamp(-15.0, 15.0);
+    emit(state.copyWith(replayGainPreampWithRg: clamped));
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(_keyReplayGainPreampWithRg, db);
+    await prefs.setDouble(_keyReplayGainPreampWithRg, clamped);
   }
 
   Future<void> setReplayGainPreampWithoutRg(double db) async {
-    emit(state.copyWith(replayGainPreampWithoutRg: db));
+    final clamped = db.clamp(-15.0, 15.0);
+    emit(state.copyWith(replayGainPreampWithoutRg: clamped));
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(_keyReplayGainPreampWithoutRg, db);
+    await prefs.setDouble(_keyReplayGainPreampWithoutRg, clamped);
   }
 
   Future<void> setStreamingQuality(YtmAudioQuality quality) async {
@@ -757,9 +762,16 @@ class SettingsCubit extends Cubit<SettingsState> {
 
   Future<void> setYtdlpBackendUrl(String url) async {
     final cleanUrl = url.trim();
+    if (cleanUrl.isNotEmpty) {
+      final parsed = Uri.tryParse(cleanUrl);
+      if (parsed == null || (!parsed.isScheme('http') && !parsed.isScheme('https')) || parsed.host.isEmpty) {
+        emit(state.copyWith(errorMessage: 'Invalid backend URL format. Must be http:// or https://'));
+        return;
+      }
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(PrefsKeys.ytdlpBackendUrl, cleanUrl);
-    emit(state.copyWith(ytdlpBackendUrl: cleanUrl));
+    emit(state.copyWith(ytdlpBackendUrl: cleanUrl, errorMessage: null));
   }
 
   Future<void> setYtdlpBackendToken(String token) async {

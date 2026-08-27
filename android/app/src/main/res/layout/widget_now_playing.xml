@@ -46,32 +46,16 @@
                 android:maxLines="1"
                 android:ellipsize="end" />
 
-            <LinearLayout
+            <TextView
+                android:id="@+id/widget_artist"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:layout_marginTop="2dp">
-
-                <TextView
-                    android:id="@+id/widget_artist"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:text="Nothing playing"
-                    android:textColor="#B3A8AC"
-                    android:textSize="12sp"
-                    android:maxLines="1"
-                    android:ellipsize="end" />
-
-                <ImageView
-                    android:id="@+id/widget_favorite"
-                    android:layout_width="28dp"
-                    android:layout_height="28dp"
-                    android:padding="4dp"
-                    android:src="@drawable/ic_widget_heart"
-                    android:contentDescription="Toggle Favorite" />
-            </LinearLayout>
+                android:layout_marginTop="2dp"
+                android:text="Nothing playing"
+                android:textColor="#B3A8AC"
+                android:textSize="12sp"
+                android:maxLines="1"
+                android:ellipsize="end" />
         </LinearLayout>
 
         <!-- Playback Action Buttons -->
@@ -80,6 +64,15 @@
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical">
+
+            <ImageView
+                android:id="@+id/widget_favorite"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_marginEnd="4dp"
+                android:padding="5dp"
+                android:src="@drawable/ic_widget_heart"
+                android:contentDescription="Toggle Favorite" />
 
             <ImageButton
                 android:id="@+id/btn_prev"
@@ -129,7 +122,7 @@
             android:progress="0"
             android:progressDrawable="@drawable/widget_progress_bar" />
 
-        <!-- 20 Granular Tap Zones (5% steps) for accurate place detection -->
+        <!-- 10 Granular Tap Zones (10% steps) for seek placement -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="22dp"
@@ -145,16 +138,6 @@
             <LinearLayout android:id="@+id/btn_seek_08" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
             <LinearLayout android:id="@+id/btn_seek_09" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
             <LinearLayout android:id="@+id/btn_seek_10" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_11" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_12" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_13" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_14" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_15" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_16" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_17" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_18" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_19" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_20" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
         </LinearLayout>
     </FrameLayout>
 

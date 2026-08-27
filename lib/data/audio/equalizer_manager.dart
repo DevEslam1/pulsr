@@ -489,9 +489,9 @@ class EqualizerManager {
     await _savePreferences();
   }
 
-  void onAppPaused() {
+  Future<void> onAppPaused() async {
     _saveDebounce?.cancel();
-    _savePreferences();
+    await _savePreferences();
   }
 
   Future<void> setVolumeBoost(double value) async {

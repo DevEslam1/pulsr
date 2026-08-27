@@ -198,7 +198,7 @@ class AudioQualitySheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 10),
 
-                  _buildOutputDevicesSelector(context, outputDevice, settingsCubit, p),
+                  _buildOutputDevicesSelector(context, outputDevice, settingsCubit, p, activeColor),
 
                   const SizedBox(height: 20),
 
@@ -214,7 +214,7 @@ class AudioQualitySheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
 
-                  _buildSampleRateSelector(context, outputDevice, settingsCubit, p),
+                  _buildSampleRateSelector(context, outputDevice, settingsCubit, p, activeColor),
 
                   const SizedBox(height: 20),
 
@@ -230,7 +230,7 @@ class AudioQualitySheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
 
-                  _buildBitDepthSelector(context, outputDevice, settingsCubit, p),
+                  _buildBitDepthSelector(context, outputDevice, settingsCubit, p, activeColor),
 
                   const SizedBox(height: 20),
 
@@ -382,6 +382,7 @@ class AudioQualitySheet extends StatelessWidget {
     AudioOutputInfo? outputDevice,
     SettingsCubit? cubit,
     PulsrPalette p,
+    Color activeColor,
   ) {
     final devices = outputDevice?.availableDevices ?? [];
 
@@ -501,6 +502,7 @@ class AudioQualitySheet extends StatelessWidget {
     AudioOutputInfo? outputDevice,
     SettingsCubit? cubit,
     PulsrPalette p,
+    Color activeColor,
   ) {
     final currentTarget = outputDevice?.targetSampleRate ?? 0;
 
@@ -575,6 +577,7 @@ class AudioQualitySheet extends StatelessWidget {
     AudioOutputInfo? outputDevice,
     SettingsCubit? cubit,
     PulsrPalette p,
+    Color activeColor,
   ) {
     final currentTarget = outputDevice?.targetBitDepth ?? 0;
     final isBitPerfectActive = outputDevice?.isBitPerfectActive == true;
@@ -668,8 +671,10 @@ class AudioQualitySheet extends StatelessWidget {
                     ),
                     Text(
                       outputDevice?.isUsbDac == true
-                          ? 'Hardware direct pass-through active on USB DAC'
-                          : 'Bypasses Android mixer & DSP for bit-matched output',
+                          ? (isBitPerfectActive
+                              ? 'Hardware direct pass-through active on USB DAC'
+                              : 'Bypasses Android mixer & DSP for bit-matched output')
+                          : 'Requires external USB DAC & Android 14+ (Unavailable on ${outputDevice?.deviceName ?? "Speaker"})',
                       style: TextStyle(color: p.textSecondary, fontSize: 11),
                     ),
                   ],
@@ -679,10 +684,12 @@ class AudioQualitySheet extends StatelessWidget {
                 value: isBitPerfectActive,
                 activeTrackColor: const Color(0xFFFFD700),
                 activeThumbColor: Colors.white,
-                onChanged: (val) {
-                  HapticFeedback.selectionClick();
-                  cubit?.setBitPerfectOutput(val);
-                },
+                onChanged: outputDevice?.isUsbDac == true
+                    ? (val) {
+                        HapticFeedback.selectionClick();
+                        cubit?.setBitPerfectOutput(val);
+                      }
+                    : null,
               ),
             ],
           ),

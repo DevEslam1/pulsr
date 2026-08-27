@@ -200,12 +200,11 @@ class ArtworkCacheManager {
     var transformed = url;
     if (transformed.contains('googleusercontent.com') ||
         transformed.contains('ggpht.com')) {
-      // Replace size specifier with compact dimensions and WebP/JPEG compression
-      transformed = transformed.replaceAll(
-          RegExp(r'=w\d+-h\d+[^?]*'), '=w$width-h$height-l80-rj');
-      transformed = transformed.replaceAll(
-          RegExp(r'=s\d+[^?]*'), '=w$width-h$height-l80-rj');
-      if (!transformed.contains('=w$width-h$height')) {
+      final sizePattern = RegExp(r'=(?:w\d+-h\d+|s\d+)[^?]*');
+      if (sizePattern.hasMatch(transformed)) {
+        transformed = transformed.replaceAll(
+            sizePattern, '=w$width-h$height-l80-rj');
+      } else {
         transformed = '$transformed=w$width-h$height-l80-rj';
       }
     } else if (transformed.contains('ytimg.com')) {

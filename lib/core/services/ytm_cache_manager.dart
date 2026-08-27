@@ -16,7 +16,7 @@ class YtmCacheManager {
   Future<Directory> getCacheDirectory() async {
     final base = await getApplicationSupportDirectory();
     final dir = Directory(p.join(base.path, 'ytm_cache'));
-    if (!dir.existsSync()) {
+    if (!await dir.exists()) {
       await dir.create(recursive: true);
     }
     return dir;

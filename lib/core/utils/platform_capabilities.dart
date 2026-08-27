@@ -1,11 +1,11 @@
 // lib/core/utils/platform_capabilities.dart
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import '../constants/channels.dart';
 
 class PlatformCapabilities {
-  static bool get isAndroid => !kIsWeb && Platform.isAndroid;
-  static bool get isIOS => !kIsWeb && Platform.isIOS;
+  static bool get isAndroid => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  static bool get isIOS => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
   static bool get hasEqualizer => isAndroid;
   static bool get hasAudioEffects => isAndroid;
@@ -31,7 +31,7 @@ class PlatformCapabilities {
     }
 
     try {
-      const channel = MethodChannel('com.pulsr.music/audio_effects');
+      const channel = MethodChannel(PulsrChannels.audioEffects);
       final caps = await channel.invokeMapMethod<String, dynamic>('getCapabilities');
       if (caps != null) {
         return caps.map((k, v) => MapEntry(k, v == true));
@@ -39,16 +39,16 @@ class PlatformCapabilities {
     } catch (_) {}
 
     return {
-      'hasEqualizer': true,
-      'hasAudioEffects': true,
-      'hasTagEditor': true,
-      'hasRingtoneManager': true,
-      'hasAppWidget': true,
-      'hasHardwareVisualizer': true,
-      'isVolumeBoostSupported': true,
-      'isBassBoostSupported': true,
-      'isDynamicsSupported': true,
-      'isVirtualizerSupported': true,
+      'hasEqualizer': false,
+      'hasAudioEffects': false,
+      'hasTagEditor': false,
+      'hasRingtoneManager': false,
+      'hasAppWidget': false,
+      'hasHardwareVisualizer': false,
+      'isVolumeBoostSupported': false,
+      'isBassBoostSupported': false,
+      'isDynamicsSupported': false,
+      'isVirtualizerSupported': false,
     };
   }
 }

@@ -72,7 +72,7 @@ class MockPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   @override
   Future<void> restoreLastPlaybackSession() async {}
   @override
-  void saveCurrentPositionImmediate() {}
+  Future<void> saveCurrentPositionImmediate() async {}
   @override
   Future<void> setEqualizerEnabled(bool enabled) async {}
   @override
@@ -170,7 +170,7 @@ class MockPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   @override
   Future<void> setCustomFrequencies(List<double> frequencies) async {}
   @override
-  void onAppPaused() {}
+  Future<void> onAppPaused() async {}
   @override
   void startSleepTimer(Duration duration, {bool fadeOut = true}) {}
   @override

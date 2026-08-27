@@ -67,7 +67,7 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   Future<void> restoreLastPlaybackSession() async {}
 
   @override
-  void saveCurrentPositionImmediate() {}
+  Future<void> saveCurrentPositionImmediate() async {}
 
   @override
   Future<void> setEqualizerEnabled(bool enabled) async {
@@ -196,7 +196,7 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   Future<void> setCustomFrequencies(List<double> frequencies) async {}
 
   @override
-  void onAppPaused() {}
+  Future<void> onAppPaused() async {}
 
   @override
   void startSleepTimer(Duration duration, {bool fadeOut = true}) {
@@ -400,6 +400,42 @@ void main() {
       testAudioHandler._positionController.add(const Duration(milliseconds: 300));
       await Future<void>.delayed(const Duration(milliseconds: 10));
       expect(cubit.state.position, const Duration(milliseconds: 300));
+
+      cubit.close();
+    });
+
+    test('playSong centers 500-song queue window around target song beyond index 500', () async {
+      final cubit = PlayerCubit(
+        audioHandler: testAudioHandler,
+        repository: mockRepository,
+        toggleFavoriteUseCase: mockToggleFavorite,
+      );
+
+      final largeQueue = List<SongsTableData>.generate(
+        800,
+        (i) => SongsTableData(
+          id: i,
+          title: 'Song $i',
+          artist: 'Artist',
+          album: 'Album',
+          durationMs: 180000,
+          path: '/path/song$i.mp3',
+          isFavorite: false,
+          isMissing: false,
+          isDownloaded: false,
+          playCount: 0,
+          lastPositionMs: 0,
+          source: SongSource.local,
+        ),
+      );
+
+      final target = largeQueue[600]; // song beyond index 500
+      await cubit.playSong(target, queue: largeQueue);
+
+      expect(cubit.state.queue.length, 500);
+      expect(cubit.state.currentSong?.id, 600);
+      expect(cubit.state.queue[cubit.state.currentIndex].id, 600);
+      expect(cubit.state.queue.any((s) => s.id == 600), isTrue);
 
       cubit.close();
     });

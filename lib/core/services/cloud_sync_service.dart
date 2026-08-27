@@ -96,6 +96,7 @@ class CloudSyncService {
     if (user == null) return false;
 
     try {
+      _syncedDocHashes.clear();
       final firestore = FirebaseFirestore.instance;
       final userDoc = firestore.collection('users').doc(user.uid);
 
@@ -113,6 +114,8 @@ class CloudSyncService {
     }
   }
 
+  final Map<String, String> _syncedDocHashes = <String, String>{};
+
   Future<void> _uploadLocalData(
     DocumentReference userDoc, {
     required bool syncFavorites,
@@ -127,11 +130,15 @@ class CloudSyncService {
         final batchToCommit = currentBatch;
         currentBatch = firestore.batch();
         opCount = 0;
-        await batchToCommit.commit();
+        try {
+          await batchToCommit.commit();
+        } catch (e, st) {
+          ErrorLogger.log('Batch commit failed', error: e, stackTrace: st, category: 'CloudSync');
+        }
       }
     }
 
-    // 1. Upload favorites with stable doc ID and version increment
+    // 1. Upload favorites with stable doc ID and version increment only on change
     if (syncFavorites) {
       final favRes = await _repository.getFavorites();
       final localFavorites = favRes.fold((l) => <SongsTableData>[], (r) => r);
@@ -139,6 +146,13 @@ class CloudSyncService {
 
       for (final song in localFavorites) {
         final docId = _stableSongId(song);
+        final payloadRaw = '${song.title}|${song.artist}|${song.album}|${song.durationMs}|${song.path}|${song.remoteId}|${song.remoteArtworkUrl}|${song.source}|true';
+        final hash = sha256.convert(utf8.encode(payloadRaw)).toString();
+
+        if (_syncedDocHashes[docId] == hash) {
+          continue; // Content unchanged, skip Firestore write
+        }
+
         final ref = favCollection.doc(docId);
         currentBatch.set(ref, {
           'id': song.id,
@@ -152,9 +166,11 @@ class CloudSyncService {
           'source': song.source,
           'isFavorite': true,
           'dateAdded': song.dateAdded,
+          'contentHash': hash,
           'localVersion': FieldValue.increment(1),
           'modifiedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
+        _syncedDocHashes[docId] = hash;
         opCount++;
         await commitBatchIfFull();
       }
@@ -167,44 +183,63 @@ class CloudSyncService {
 
       for (final pl in localPlaylists) {
         final plDocId = _stablePlaylistId(pl);
+        final plPayloadRaw = '${pl.name}|${pl.createdAt.toIso8601String()}|${pl.isSmart}|${pl.smartCriteria}';
+        final plHash = sha256.convert(utf8.encode(plPayloadRaw)).toString();
         final plDoc = userDoc.collection('playlists').doc(plDocId);
-        currentBatch.set(plDoc, {
-          'id': pl.id,
-          'name': pl.name,
-          'createdAt': pl.createdAt.toIso8601String(),
-          'isSmart': pl.isSmart,
-          'smartCriteria': pl.smartCriteria,
-          'localVersion': FieldValue.increment(1),
-          'modifiedAt': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-        opCount++;
-        await commitBatchIfFull();
+
+        if (_syncedDocHashes[plDocId] != plHash) {
+          currentBatch.set(plDoc, {
+            'id': pl.id,
+            'name': pl.name,
+            'createdAt': pl.createdAt.toIso8601String(),
+            'isSmart': pl.isSmart,
+            'smartCriteria': pl.smartCriteria,
+            'contentHash': plHash,
+            'localVersion': FieldValue.increment(1),
+            'modifiedAt': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+          _syncedDocHashes[plDocId] = plHash;
+          opCount++;
+          await commitBatchIfFull();
+        }
 
         final songsRes = await _repository.getPlaylistSongs(pl.id);
         final pSongs = songsRes.fold((l) => <SongsTableData>[], (r) => r);
         for (final song in pSongs) {
           final songDocId = _stableSongId(song);
-          currentBatch.set(plDoc.collection('songs').doc(songDocId), {
-            'id': song.id,
-            'title': song.title,
-            'artist': song.artist,
-            'album': song.album,
-            'path': song.path,
-            'remoteId': song.remoteId,
-            'remoteArtworkUrl': song.remoteArtworkUrl,
-            'durationMs': song.durationMs,
-            'source': song.source,
-            'localVersion': FieldValue.increment(1),
-            'modifiedAt': FieldValue.serverTimestamp(),
-          }, SetOptions(merge: true));
-          opCount++;
-          await commitBatchIfFull();
+          final songPayloadRaw = '${song.title}|${song.artist}|${song.album}|${song.path}|${song.remoteId}|${song.remoteArtworkUrl}|${song.durationMs}|${song.source}';
+          final sHash = sha256.convert(utf8.encode(songPayloadRaw)).toString();
+          final fullKey = '${plDocId}_$songDocId';
+
+          if (_syncedDocHashes[fullKey] != sHash) {
+            currentBatch.set(plDoc.collection('songs').doc(songDocId), {
+              'id': song.id,
+              'title': song.title,
+              'artist': song.artist,
+              'album': song.album,
+              'path': song.path,
+              'remoteId': song.remoteId,
+              'remoteArtworkUrl': song.remoteArtworkUrl,
+              'durationMs': song.durationMs,
+              'source': song.source,
+              'contentHash': sHash,
+              'localVersion': FieldValue.increment(1),
+              'modifiedAt': FieldValue.serverTimestamp(),
+            }, SetOptions(merge: true));
+            _syncedDocHashes[fullKey] = sHash;
+            opCount++;
+            await commitBatchIfFull();
+          }
         }
       }
     }
 
     if (opCount > 0) {
-      await currentBatch.commit();
+      try {
+        await currentBatch.commit();
+      } catch (e, st) {
+        ErrorLogger.log('Final batch commit failed', error: e, stackTrace: st, category: 'CloudSync');
+      }
     }
   }
 

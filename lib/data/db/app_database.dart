@@ -84,8 +84,12 @@ class AppDatabase extends _$AppDatabase {
         await m.addColumn(songsTable, songsTable.codec);
       }
       Future<bool> hasColumn(String table, String column) async {
-        final rows = await customSelect('PRAGMA table_info($table);').get();
-        return rows.any((r) => r.data['name'] == column);
+        try {
+          final rows = await customSelect('PRAGMA table_info($table);').get();
+          return rows.any((r) => r.data['name'] == column);
+        } catch (_) {
+          return false; // Table doesn't exist yet
+        }
       }
 
       if (from < 7) {
@@ -95,7 +99,9 @@ class AppDatabase extends _$AppDatabase {
         if (!await hasColumn('songs', 'replay_gain_album_peak')) await m.addColumn(songsTable, songsTable.replayGainAlbumPeak);
         if (!await hasColumn('songs', 'is_downloaded')) await m.addColumn(songsTable, songsTable.isDownloaded);
         try {
-          await customStatement('UPDATE songs SET replay_gain_track = replay_gain WHERE replay_gain IS NOT NULL;');
+          if (await hasColumn('songs', 'replay_gain')) {
+            await customStatement('UPDATE songs SET replay_gain_track = replay_gain WHERE replay_gain IS NOT NULL;');
+          }
         } catch (_) {}
       }
       if (from < 8) {
@@ -113,6 +119,7 @@ class AppDatabase extends _$AppDatabase {
       await customStatement('PRAGMA foreign_keys = ON;');
       await customStatement('PRAGMA journal_mode = WAL;');
       await customStatement('PRAGMA synchronous = NORMAL;');
+      await customStatement('PRAGMA case_sensitive_like = OFF;');
     },
   );
 }

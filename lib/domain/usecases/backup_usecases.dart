@@ -124,14 +124,14 @@ class ImportBackupUseCase {
 
   ImportBackupUseCase(this._repository, this._db);
 
-  Future<ImportResult> executeFromFile(dynamic file) async {
+  Future<ImportResult> executeFromFile(Object file) async {
     if (file is! String) {
       try {
-        final len = await file.length();
+        final len = await (file as dynamic).length();
         if (len > maxBackupSizeBytes) {
           throw const FormatException('Backup file exceeds maximum allowed size of 10 MB');
         }
-        final content = await file.readAsString();
+        final content = await (file as dynamic).readAsString();
         return execute(content);
       } catch (e) {
         if (e is FormatException) rethrow;
@@ -142,7 +142,7 @@ class ImportBackupUseCase {
   }
 
   Future<ImportResult> execute(String jsonString) async {
-    if (jsonString.length > maxBackupSizeBytes) {
+    if (utf8.encode(jsonString).length > maxBackupSizeBytes) {
       throw const FormatException('Backup file exceeds maximum allowed size of 10 MB');
     }
 
@@ -164,57 +164,68 @@ class ImportBackupUseCase {
     // Fetch all current library songs (including YTM tracks) for path matching
     final allSongs = await _db.select(_db.songsTable).get();
 
-    // Build lookup maps for robust matching (exact, normalized, parent+filename, unique filename)
-    final exactMap = <String, SongsTableData>{};
-    final normalizedMap = <String, SongsTableData>{};
-    final parentAndFilenameMap = <String, SongsTableData>{};
-    final uniqueFilenameMap = <String, SongsTableData>{};
-    final filenameCountMap = <String, int>{};
-
+    // Build lightweight direct lookup maps; fallbacks are initialized lazily only if needed
+    final pathMap = <String, SongsTableData>{};
     final remoteIdMap = <String, SongsTableData>{};
+
     for (final song in allSongs) {
+      pathMap[song.path] = song;
+      pathMap[song.path.replaceAll('\\', '/').toLowerCase()] = song;
       if (song.remoteId != null && song.remoteId!.isNotEmpty) {
         remoteIdMap[song.remoteId!] = song;
       }
-      exactMap[song.path] = song;
-      final normPath = song.path.replaceAll('\\', '/').toLowerCase();
-      normalizedMap[normPath] = song;
-
-      final segments = normPath.split('/');
-      if (segments.length >= 2) {
-        final parentAndFilename = '${segments[segments.length - 2]}/${segments.last}';
-        parentAndFilenameMap[parentAndFilename] = song;
-      }
-
-      final filename = segments.isNotEmpty ? segments.last : '';
-      if (filename.isNotEmpty) {
-        filenameCountMap[filename] = (filenameCountMap[filename] ?? 0) + 1;
-        uniqueFilenameMap[filename] = song;
-      }
     }
 
-    SongsTableData? matchPath(String path) {
-      if (exactMap.containsKey(path)) return exactMap[path];
-      final normPath = path.replaceAll('\\', '/').toLowerCase();
-      if (normalizedMap.containsKey(normPath)) return normalizedMap[normPath];
+    Map<String, SongsTableData>? lazyParentFilenameMap;
+    Map<String, SongsTableData>? lazyUniqueFilenameMap;
 
-      // 3. Fallback for ytmusic:// paths matching by remoteId
+    SongsTableData? matchPath(String path) {
+      // 1. Exact or normalized path match
+      final direct = pathMap[path] ?? pathMap[path.replaceAll('\\', '/').toLowerCase()];
+      if (direct != null) return direct;
+
+      // 2. Fallback for ytmusic:// paths matching by remoteId
       if (path.startsWith('ytmusic://')) {
         final videoId = path.replaceFirst('ytmusic://', '').split('?').first;
-        if (remoteIdMap.containsKey(videoId)) return remoteIdMap[videoId];
+        final remoteMatch = remoteIdMap[videoId];
+        if (remoteMatch != null) return remoteMatch;
       }
 
+      final normPath = path.replaceAll('\\', '/').toLowerCase();
       final segments = normPath.split('/');
+
+      // 3. Parent + Filename fallback (lazy init)
       if (segments.length >= 2) {
+        lazyParentFilenameMap ??= {
+          for (final s in allSongs)
+            if (s.path.replaceAll('\\', '/').split('/').length >= 2)
+              '${s.path.replaceAll('\\', '/').split('/')[s.path.replaceAll('\\', '/').split('/').length - 2].toLowerCase()}/${s.path.replaceAll('\\', '/').split('/').last.toLowerCase()}': s
+        };
         final parentAndFilename = '${segments[segments.length - 2]}/${segments.last}';
-        if (parentAndFilenameMap.containsKey(parentAndFilename)) {
-          return parentAndFilenameMap[parentAndFilename];
-        }
+        final match = lazyParentFilenameMap![parentAndFilename];
+        if (match != null) return match;
       }
 
+      // 4. Unique filename fallback (lazy init)
       final filename = segments.isNotEmpty ? segments.last : '';
-      if (filename.isNotEmpty && filenameCountMap[filename] == 1) {
-        return uniqueFilenameMap[filename];
+      if (filename.isNotEmpty) {
+        if (lazyUniqueFilenameMap == null) {
+          final countMap = <String, int>{};
+          final nameMap = <String, SongsTableData>{};
+          for (final s in allSongs) {
+            final fName = s.path.replaceAll('\\', '/').split('/').last.toLowerCase();
+            if (fName.isNotEmpty) {
+              countMap[fName] = (countMap[fName] ?? 0) + 1;
+              nameMap[fName] = s;
+            }
+          }
+          lazyUniqueFilenameMap = {
+            for (final entry in nameMap.entries)
+              if (countMap[entry.key] == 1) entry.key: entry.value
+          };
+        }
+        final match = lazyUniqueFilenameMap![filename];
+        if (match != null) return match;
       }
       return null;
     }
@@ -310,34 +321,38 @@ class ImportBackupUseCase {
       final prefs = await SharedPreferences.getInstance();
 
       if (settings.containsKey('gaplessPlayback')) {
-        await prefs.setBool('setting_gapless', settings['gaplessPlayback'] as bool);
+        await prefs.setBool('setting_gapless', settings['gaplessPlayback'] == true);
       }
       if (settings.containsKey('crossfadeSeconds')) {
-        await prefs.setDouble('setting_crossfade', (settings['crossfadeSeconds'] as num).toDouble());
+        final raw = settings['crossfadeSeconds'];
+        final val = raw is num ? raw.toDouble() : double.tryParse(raw?.toString() ?? '0') ?? 0.0;
+        await prefs.setDouble('setting_crossfade', val);
       }
       if (settings.containsKey('minDurationSec')) {
-        await prefs.setInt('setting_min_duration', (settings['minDurationSec'] as num).toInt());
+        final raw = settings['minDurationSec'];
+        final val = raw is num ? raw.toInt() : int.tryParse(raw?.toString() ?? '30') ?? 30;
+        await prefs.setInt('setting_min_duration', val);
       }
       if (settings.containsKey('dynamicThemingEnabled')) {
-        await prefs.setBool('setting_dynamic_theme', settings['dynamicThemingEnabled'] as bool);
+        await prefs.setBool('setting_dynamic_theme', settings['dynamicThemingEnabled'] == true);
       }
       if (settings['themeColorSource'] is String) {
         await prefs.setString('setting_theme_color_source', settings['themeColorSource'] as String);
       }
       if (settings.containsKey('resumeAfterInterruption')) {
-        await prefs.setBool('setting_resume_after_interruption', settings['resumeAfterInterruption'] as bool);
+        await prefs.setBool('setting_resume_after_interruption', settings['resumeAfterInterruption'] == true);
       }
       if (settings.containsKey('themeMode')) {
-        await prefs.setString('setting_theme_mode', settings['themeMode'] as String);
+        await prefs.setString('setting_theme_mode', (settings['themeMode'] as String?) ?? 'dark');
       }
       if (settings.containsKey('customAccentColorValue')) {
-        await prefs.setInt('setting_custom_accent', (settings['customAccentColorValue'] as num).toInt());
+        await prefs.setInt('setting_custom_accent', ((settings['customAccentColorValue'] as num?) ?? 0xFF9B9EF5).toInt());
       }
       if (settings.containsKey('playerThemeMode')) {
-        await prefs.setString('setting_player_theme_mode', settings['playerThemeMode'] as String);
+        await prefs.setString('setting_player_theme_mode', (settings['playerThemeMode'] as String?) ?? 'classic');
       }
       if (settings.containsKey('visualizerStyle')) {
-        await prefs.setString('setting_visualizer_style', settings['visualizerStyle'] as String);
+        await prefs.setString('setting_visualizer_style', (settings['visualizerStyle'] as String?) ?? 'bar');
       }
       if (settings.containsKey('eqPreset') && settings['eqPreset'] is Map) {
         await prefs.setString('setting_eq_preset', jsonEncode(settings['eqPreset']));

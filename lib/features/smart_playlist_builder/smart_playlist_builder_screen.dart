@@ -5,6 +5,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
@@ -116,8 +117,8 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 720),
               child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            children: [
+                padding: EdgeInsets.fromLTRB(context.pagePadding, 12, context.pagePadding, 160),
+                children: [
               // Playlist Name Card
               Container(
                 padding: const EdgeInsets.all(16),
@@ -449,7 +450,7 @@ class _RuleCardState extends State<_RuleCard> {
                     contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8)), borderSide: BorderSide.none),
                   ),
-                  items: SmartRuleField.values.map((f) {
+                  items: SmartRuleField.values.where((f) => f != SmartRuleField.bpm).map((f) {
                     return DropdownMenuItem(
                       value: f,
                       child: Text(f.label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
@@ -545,6 +546,7 @@ class _RuleCardState extends State<_RuleCard> {
 
   String _getHintForField(SmartRuleField field, SmartOperator op) {
     if (op == SmartOperator.withinDays) return 'e.g. 30 (days)';
+    if (op == SmartOperator.between) return 'e.g. 5, 20 or 5..20';
     switch (field) {
       case SmartRuleField.playCount:
         return 'e.g. 5';

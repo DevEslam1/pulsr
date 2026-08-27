@@ -22,6 +22,7 @@ enum CrossfadeCurve {
 /// selectable DSP loudness curves, BPM beat alignment, and robust cancellation safety.
 class CrossfadeManager {
   final Mutex _fadeMutex = Mutex();
+  final List<Timer> _activeTimers = [];
   Timer? _fadeTimer;
 
   Duration duration = Duration.zero;
@@ -65,40 +66,31 @@ class CrossfadeManager {
     return Duration(milliseconds: (alignedSeconds * 1000).round().clamp(1000, 20000));
   }
 
+  /// Returns the effective crossfade duration, optionally aligned to song [bpm].
+  Duration getEffectiveDuration({double? bpm}) =>
+      bpm != null ? calculateBpmAlignedDuration(duration, bpm) : duration;
+
   /// Evaluates the curve fraction (0.0 to 1.0) based on active [curve].
-  double evaluateCurve(double fraction, bool isFadeIn) {
+  /// Always returns 0→1; the caller controls direction via [from]/[to].
+  double evaluateCurve(double fraction) {
     final f = fraction.clamp(0.0, 1.0);
     switch (curve) {
       case CrossfadeCurve.linear:
-        return isFadeIn ? f : (1.0 - f);
+        return f;
 
       case CrossfadeCurve.equalPower:
-        return isFadeIn
-            ? math.sin(f * (math.pi / 2))
-            : math.cos(f * (math.pi / 2));
+        return math.sin(f * (math.pi / 2));
 
       case CrossfadeCurve.sCurve:
         // Smoothstep: 3f^2 - 2f^3
-        final s = f * f * (3.0 - 2.0 * f);
-        return isFadeIn ? s : (1.0 - s);
+        return f * f * (3.0 - 2.0 * f);
 
       case CrossfadeCurve.exponential:
-        if (isFadeIn) {
-          return f == 0.0 ? 0.0 : math.pow(2.0, 10.0 * (f - 1.0)).toDouble();
-        } else {
-          return f == 1.0 ? 1.0 : (1.0 - math.pow(2.0, -10.0 * f).toDouble());
-        }
+        return f == 0.0 ? 0.0 : math.pow(2.0, 10.0 * (f - 1.0)).toDouble();
 
       case CrossfadeCurve.djCutDrop:
-        if (isFadeIn) {
-          // Sharp attack after midpoint
-          return f < 0.2 ? f * 1.5 : (0.3 + 0.7 * math.sin((f - 0.2) / 0.8 * (math.pi / 2)));
-        } else {
-          // Smooth blend before midpoint, drops quickly past midpoint without volume swell
-          return f > 0.6
-              ? (0.6 * (1.0 - (f - 0.6) / 0.4)).clamp(0.0, 1.0)
-              : (1.0 - 0.4 * (f / 0.6)).clamp(0.0, 1.0);
-        }
+        // Sharp attack after midpoint
+        return f < 0.2 ? f * 1.5 : (0.3 + 0.7 * math.sin((f - 0.2) / 0.8 * (math.pi / 2)));
     }
   }
 
@@ -124,12 +116,12 @@ class CrossfadeManager {
 
     final completer = Completer<void>();
     final stopwatch = Stopwatch()..start();
-    final isFadeIn = to > from;
 
-    _fadeTimer?.cancel();
-    _fadeTimer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
+    late final Timer timer;
+    timer = Timer.periodic(const Duration(milliseconds: 33), (t) {
       if (_fadeId != fadeId) {
-        timer.cancel();
+        t.cancel();
+        _activeTimers.remove(t);
         if (!completer.isCompleted) completer.complete();
         return;
       }
@@ -137,7 +129,7 @@ class CrossfadeManager {
       final elapsed = stopwatch.elapsedMilliseconds.toDouble();
       final fraction = (elapsed / totalMs).clamp(0.0, 1.0);
 
-      final curveFraction = evaluateCurve(fraction, isFadeIn);
+      final curveFraction = evaluateCurve(fraction);
       final currentVol = from + (to - from) * curveFraction;
 
       try {
@@ -149,17 +141,20 @@ class CrossfadeManager {
           stackTrace: st,
           category: 'CrossfadeManager',
         );
-        timer.cancel();
+        t.cancel();
+        _activeTimers.remove(t);
         if (!completer.isCompleted) completer.complete();
         return;
       }
 
       if (fraction >= 1.0) {
-        timer.cancel();
+        t.cancel();
+        _activeTimers.remove(t);
         if (!completer.isCompleted) completer.complete();
       }
     });
 
+    _activeTimers.add(timer);
     return completer.future;
   }
 
@@ -169,10 +164,14 @@ class CrossfadeManager {
     AudioPlayer activePlayer, {
     double restoreVolume = 1.0,
   }) async {
-    final hadActiveFade = isCrossfading || _fadeTimer != null;
+    final hadActiveFade = isCrossfading || _activeTimers.isNotEmpty || _fadeTimer != null;
     if (!hadActiveFade) return;
 
     _fadeId++; // Invalidate any in-progress fade timers
+    for (final t in _activeTimers) {
+      t.cancel();
+    }
+    _activeTimers.clear();
     _fadeTimer?.cancel();
     _fadeTimer = null;
     isCrossfading = false; // Set BEFORE stopping players

@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
+import '../../../core/di/injection.dart';
 import '../../../core/services/cloud_sync_service.dart';
 import '../../../core/theme/aura_theme.dart';
 
 class CloudBackupDashboardScreen extends StatefulWidget {
-  final CloudSyncService syncService;
+  final CloudSyncService? syncService;
 
-  const CloudBackupDashboardScreen({super.key, required this.syncService});
+  const CloudBackupDashboardScreen({super.key, this.syncService});
 
   @override
   State<CloudBackupDashboardScreen> createState() => _CloudBackupDashboardScreenState();
 }
 
 class _CloudBackupDashboardScreenState extends State<CloudBackupDashboardScreen> {
+  late final CloudSyncService _syncService;
   bool _isSyncing = false;
   bool _syncFavorites = true;
   bool _syncPlaylists = true;
@@ -19,9 +21,15 @@ class _CloudBackupDashboardScreenState extends State<CloudBackupDashboardScreen>
   bool _syncEqPresets = true;
   bool _syncSettings = true;
 
+  @override
+  void initState() {
+    super.initState();
+    _syncService = widget.syncService ?? getIt<CloudSyncService>();
+  }
+
   Future<void> _performSync() async {
     setState(() => _isSyncing = true);
-    final success = await widget.syncService.syncAll();
+    final success = await _syncService.syncAll();
     if (mounted) {
       setState(() => _isSyncing = false);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -36,7 +44,7 @@ class _CloudBackupDashboardScreenState extends State<CloudBackupDashboardScreen>
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final lastSync = widget.syncService.lastSyncTime;
+    final lastSync = _syncService.lastSyncTime;
     final lastSyncStr = lastSync != null
         ? '${lastSync.toLocal()}'.split('.').first
         : 'Never';

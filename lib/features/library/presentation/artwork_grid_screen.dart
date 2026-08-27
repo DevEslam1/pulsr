@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/adaptive.dart';
 import '../../../core/widgets/cached_artwork.dart';
 import '../cubit/library_cubit.dart';
 import '../cubit/library_state.dart';
@@ -45,6 +46,8 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final maxCols = context.isTablet ? 8.0 : 5.0;
+    const minCols = 2.0;
 
     return Scaffold(
       backgroundColor: p.surface,
@@ -61,13 +64,13 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
               IconButton(
                 icon: const Icon(Icons.zoom_out_rounded),
                 onPressed: () {
-                  if (_columnCount < 5) setState(() => _columnCount += 1);
+                  if (_columnCount < maxCols) setState(() => _columnCount = (_columnCount + 1).clamp(minCols, maxCols));
                 },
               ),
               IconButton(
                 icon: const Icon(Icons.zoom_in_rounded),
                 onPressed: () {
-                  if (_columnCount > 2) setState(() => _columnCount -= 1);
+                  if (_columnCount > minCols) setState(() => _columnCount = (_columnCount - 1).clamp(minCols, maxCols));
                 },
               ),
             ],
@@ -89,81 +92,87 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
 
           final displayCount = albums.length > _visibleCount ? _visibleCount : albums.length;
 
-          return GestureDetector(
-            onScaleUpdate: (details) {
-              if (details.scale > 1.2 && _columnCount > 2) {
-                setState(() => _columnCount = (_columnCount - 0.05).clamp(2.0, 5.0));
-              } else if (details.scale < 0.8 && _columnCount < 5) {
-                setState(() => _columnCount = (_columnCount + 0.05).clamp(2.0, 5.0));
-              }
-            },
-            child: GridView.builder(
-              controller: _scrollController,
-              addRepaintBoundaries: true,
-              addAutomaticKeepAlives: false,
-              padding: const EdgeInsetsDirectional.fromSTEB(16, 8, 16, 120),
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: _columnCount.round(),
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-                childAspectRatio: 0.82,
-              ),
-              itemCount: displayCount,
-              itemBuilder: (context, index) {
-                final album = albums[index];
-                return InkWell(
-                  onTap: () => context.push('/album/${album.id}', extra: album),
-                  borderRadius: BorderRadius.circular(14),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: p.surfaceCard,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: CachedArtwork(
-                            id: album.id,
-                            type: ArtworkType.ALBUM,
-                            size: 250,
-                            borderRadius: 14,
-                            fallbackIcon: Icons.album_rounded,
-                          ),
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.all(6.0),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                album.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: p.textPrimary,
-                                ),
-                              ),
-                              Text(
-                                album.artist,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 10.5,
-                                  color: p.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
+          return Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: Adaptive.contentConstraints(context),
+              child: GestureDetector(
+                onScaleUpdate: (details) {
+                  if (details.scale > 1.2 && _columnCount > minCols) {
+                    setState(() => _columnCount = (_columnCount - 0.05).clamp(minCols, maxCols));
+                  } else if (details.scale < 0.8 && _columnCount < maxCols) {
+                    setState(() => _columnCount = (_columnCount + 0.05).clamp(minCols, maxCols));
+                  }
+                },
+                child: GridView.builder(
+                  controller: _scrollController,
+                  addRepaintBoundaries: true,
+                  addAutomaticKeepAlives: false,
+                  padding: EdgeInsetsDirectional.fromSTEB(context.pagePadding, 8, context.pagePadding, 160),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: _columnCount.round(),
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 10,
+                    childAspectRatio: 0.82,
                   ),
-                );
-              },
+                  itemCount: displayCount,
+                  itemBuilder: (context, index) {
+                    final album = albums[index];
+                    return InkWell(
+                      onTap: () => context.push('/album/${album.id}', extra: album),
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: p.surfaceCard,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: CachedArtwork(
+                                id: album.id,
+                                type: ArtworkType.ALBUM,
+                                size: 250,
+                                borderRadius: 14,
+                                fallbackIcon: Icons.album_rounded,
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.all(6.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    album.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: p.textPrimary,
+                                    ),
+                                  ),
+                                  Text(
+                                    album.artist,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      color: p.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
           );
         },

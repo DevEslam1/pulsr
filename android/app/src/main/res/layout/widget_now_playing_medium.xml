@@ -97,7 +97,7 @@
             android:progress="0"
             android:progressDrawable="@drawable/widget_progress_bar" />
 
-        <!-- 20 Granular Tap Zones (5% steps) for accurate place detection -->
+        <!-- 10 Granular Tap Zones (10% steps) for seek placement -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="22dp"
@@ -113,16 +113,6 @@
             <LinearLayout android:id="@+id/btn_seek_08" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
             <LinearLayout android:id="@+id/btn_seek_09" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
             <LinearLayout android:id="@+id/btn_seek_10" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_11" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_12" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_13" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_14" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_15" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_16" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_17" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_18" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_19" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_20" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
         </LinearLayout>
     </FrameLayout>
 

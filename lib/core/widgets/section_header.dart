@@ -30,7 +30,7 @@ class SectionHeader extends StatelessWidget {
               style: Theme.of(context).textTheme.labelSmall?.copyWith(color: p.textTertiary),
             ),
           ),
-          if (actionLabel != null)
+          if (actionLabel != null && onAction != null)
             TextButton(
               onPressed: onAction,
               style: TextButton.styleFrom(

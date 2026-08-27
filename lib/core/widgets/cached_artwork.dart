@@ -17,9 +17,12 @@ class ArtworkLruCache {
   ArtworkLruCache.withCapacity(this.maxCapacity);
 
   final int maxCapacity;
-  final Map<String, Uint8List?> _cache = {};
+  static const int maxBytes = 50 * 1024 * 1024; // 50MB cap
+  final Map<String, Uint8List> _cache = {};
+  int _currentBytes = 0;
 
   int get length => _cache.length;
+  int get currentBytes => _currentBytes;
 
   bool containsKey(String key) => _cache.containsKey(key);
 
@@ -34,24 +37,38 @@ class ArtworkLruCache {
 
   void put(String key, Uint8List? bytes) {
     if (bytes == null || bytes.isEmpty) {
-      _cache.remove(key);
+      remove(key);
       return;
     }
-    if (_cache.containsKey(key)) {
-      _cache.remove(key);
-    } else if (_cache.length >= maxCapacity) {
-      _cache.remove(_cache.keys.first);
+
+    final existing = _cache.remove(key);
+    if (existing != null) {
+      _currentBytes -= existing.length;
     }
+
+    while ((_cache.length >= maxCapacity || _currentBytes + bytes.length > maxBytes) && _cache.isNotEmpty) {
+      final oldestKey = _cache.keys.first;
+      final removed = _cache.remove(oldestKey);
+      if (removed != null) {
+        _currentBytes -= removed.length;
+      }
+    }
+
     _cache[key] = bytes;
+    _currentBytes += bytes.length;
     ArtworkCacheManager().put(key, bytes);
   }
 
   void remove(String key) {
-    _cache.remove(key);
+    final removed = _cache.remove(key);
+    if (removed != null) {
+      _currentBytes -= removed.length;
+    }
   }
 
   void clear() {
     _cache.clear();
+    _currentBytes = 0;
     ArtworkCacheManager().clearAllCache();
   }
 }
@@ -114,6 +131,7 @@ class _CachedArtworkState extends State<CachedArtwork> {
     if (oldWidget.id != widget.id ||
         oldWidget.type != widget.type ||
         oldWidget.remoteUrl != widget.remoteUrl) {
+      _loadToken++;
       _loadArtwork();
     }
   }
@@ -206,7 +224,6 @@ class _CachedArtworkState extends State<CachedArtwork> {
       if (mounted && token == _loadToken) {
         if (bytes != null && bytes.isNotEmpty) {
           _cache.put(key, bytes);
-          ArtworkCacheManager().put(key, bytes);
         }
         setState(() {
           _cachedBytes = bytes;

@@ -26,6 +26,13 @@ abstract class Adaptive {
   static bool isLandscape(BuildContext context) =>
       MediaQuery.orientationOf(context) == Orientation.landscape;
 
+  /// Returns true when screen width/orientation is ideal for a 2-pane master-detail arrangement.
+  static bool isTwoPane(BuildContext context) {
+    final w = widthOf(context);
+    final h = heightOf(context);
+    return isLandscape(context) || (w >= tabletBreakpoint && w > h);
+  }
+
   /// Responsive column count for grids dynamically computed from available width.
   static int gridColumns(
     BuildContext context, {
@@ -33,7 +40,11 @@ abstract class Adaptive {
     int phoneColumns = 2,
     int maxColumns = 8,
   }) {
-    final usable = widthOf(context) - pagePadding(context) * 2;
+    final w = widthOf(context);
+    final isTab = isTablet(context);
+    final railWidth = isTab ? (w >= railExtendedBreakpoint ? 232.0 : 92.0) : 0.0;
+    final available = (w - railWidth).clamp(0.0, maxContentWidth);
+    final usable = available - pagePadding(context) * 2;
     final calculated = (usable / minItemWidth).floor();
     return calculated.clamp(phoneColumns, maxColumns);
   }
@@ -60,6 +71,8 @@ extension AdaptiveContextX on BuildContext {
   double get screenHeight => MediaQuery.sizeOf(this).height;
   bool get isLandscape => MediaQuery.orientationOf(this) == Orientation.landscape;
   bool get isTablet => Adaptive.isTablet(this);
+  bool get isTwoPane => Adaptive.isTwoPane(this);
+  double get pagePadding => Adaptive.pagePadding(this);
   WindowClass get windowClass => Adaptive.windowOf(this);
 
   T responsive<T>({

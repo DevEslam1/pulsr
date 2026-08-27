@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 
+import '../constants/channels.dart';
 import '../di/injection.dart';
 import 'xdm_backend_service.dart';
 import 'ytm_account_service.dart';
@@ -29,7 +30,9 @@ class YtmException implements Exception {
   /// YouTube has flagged the IP / client as automated/bot and requires authentication.
   bool get isBotBlocked =>
       code == 'YTM_BOT_BLOCKED' ||
+      code == 'YTM_429' ||
       code == 'YTM_RECAPTCHA' ||
+      code == 'RECAPTCHA_REQUIRED' ||
       (details != null &&
           (details!.contains('bot') ||
               details!.contains('LOGIN_REQUIRED') ||
@@ -56,7 +59,7 @@ class YtmException implements Exception {
 
 @singleton
 class YtmService {
-  static const String channelName = 'com.pulsr.music/ytm';
+  static const String channelName = PulsrChannels.ytm;
   static const Duration _defaultSearchTimeout = Duration(seconds: 15);
   static const Duration _defaultResolveTimeout = Duration(seconds: 20);
 
@@ -69,6 +72,11 @@ class YtmService {
 
   void notifyAuthExpired() {
     _authExpiredController.add(null);
+  }
+
+  @disposeMethod
+  void dispose() {
+    _authExpiredController.close();
   }
 
   /// Synchronizes cookies into the native CookieManager so the extractor

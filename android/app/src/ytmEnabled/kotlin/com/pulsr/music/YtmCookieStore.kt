@@ -3,6 +3,8 @@ package com.pulsr.music
 import android.content.Context
 import android.content.SharedPreferences
 import android.webkit.CookieManager
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -18,8 +20,23 @@ import java.util.concurrent.ConcurrentHashMap
  * and session health / expiry detection (SAPISID + __Secure-3PSID presence).
  */
 internal class YtmCookieStore private constructor(context: Context) {
-    private val prefs: SharedPreferences =
+    private val legacyPrefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
+    private val prefs: SharedPreferences = try {
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+        EncryptedSharedPreferences.create(
+            context,
+            SECURE_PREFS_NAME,
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    } catch (_: Throwable) {
+        legacyPrefs
+    }
 
     // Keyed by cookie name -> cookie value
     private val cookies = ConcurrentHashMap<String, String>()
@@ -31,7 +48,22 @@ internal class YtmCookieStore private constructor(context: Context) {
 
     private fun loadFromPrefs() {
         synchronized(lock) {
-            val saved = prefs.getString(KEY_COOKIES, null)
+            var saved = prefs.getString(KEY_COOKIES, null)
+            // One-time migration: check legacy plaintext prefs
+            if (saved.isNullOrEmpty() && prefs !== legacyPrefs) {
+                val legacySaved = legacyPrefs.getString(KEY_COOKIES, null)
+                if (!legacySaved.isNullOrEmpty()) {
+                    try {
+                        prefs.edit().putString(KEY_COOKIES, legacySaved).apply()
+                        if (prefs.getString(KEY_COOKIES, null) == legacySaved) {
+                            legacyPrefs.edit().remove(KEY_COOKIES).apply()
+                        }
+                        saved = legacySaved
+                    } catch (_: Throwable) {
+                        saved = legacySaved
+                    }
+                }
+            }
             if (!saved.isNullOrEmpty()) {
                 if (saved.startsWith("{")) {
                     try {
@@ -124,6 +156,18 @@ internal class YtmCookieStore private constructor(context: Context) {
                     }
                 }
 
+                // Validate domain if present (only accept .youtube.com, .google.com or subdomains)
+                val domainAttr = parts.find { it.trim().startsWith("domain=", true) }
+                if (domainAttr != null) {
+                    val domainVal = domainAttr.substringAfter("=").trim().lowercase().removePrefix(".")
+                    val isAllowed = domainVal == "youtube.com" || domainVal.endsWith(".youtube.com") ||
+                                    domainVal == "google.com" || domainVal.endsWith(".google.com") ||
+                                    domainVal == "googleusercontent.com" || domainVal.endsWith(".googleusercontent.com")
+                    if (!isAllowed) {
+                        continue // Reject cookies from untrusted/unrelated domains
+                    }
+                }
+
                 cookies[kv[0].trim()] = kv[1].trim()
                 updated = true
             }
@@ -171,6 +215,9 @@ internal class YtmCookieStore private constructor(context: Context) {
         synchronized(lock) {
             cookies.clear()
             prefs.edit().remove(KEY_COOKIES).apply()
+            if (prefs !== legacyPrefs) {
+                legacyPrefs.edit().remove(KEY_COOKIES).apply()
+            }
             runCatching {
                 val cm = CookieManager.getInstance()
                 cm.removeAllCookies(null)
@@ -205,6 +252,7 @@ internal class YtmCookieStore private constructor(context: Context) {
 
     companion object {
         private const val PREFS_NAME = "ytm_session_cookies"
+        private const val SECURE_PREFS_NAME = "ytm_session_cookies_secure"
         private const val KEY_COOKIES = "cookies"
 
         val DOMAINS = listOf(

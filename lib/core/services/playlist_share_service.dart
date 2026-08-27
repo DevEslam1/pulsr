@@ -1,5 +1,6 @@
 // lib/core/services/playlist_share_service.dart
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
 import '../../data/db/app_database.dart';
 import '../utils/error_logger.dart';
@@ -33,9 +34,18 @@ class SharedPlaylistBundle {
                 ?.whereType<Map<String, dynamic>>()
                 .map((e) {
                   final src = e['source'] as String?;
-                  final validSource = (src == SongSource.youtube || src == SongSource.local)
-                      ? src!
-                      : SongSource.local;
+                  final String validSource;
+                  if (src == SongSource.youtube || src == SongSource.local) {
+                    validSource = src!;
+                  } else {
+                    // Unknown source type — warn so future source additions are
+                    // caught at import time rather than silently misclassifying.
+                    debugPrint(
+                      '[PlaylistShareService] Unknown source type "$src" in imported playlist; '
+                      'defaulting to ${SongSource.local}.',
+                    );
+                    validSource = SongSource.local;
+                  }
                   return {
                     'title': e['title'] as String? ?? 'Unknown Title',
                     'artist': e['artist'] as String? ?? 'Unknown Artist',

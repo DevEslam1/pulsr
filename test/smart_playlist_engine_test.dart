@@ -178,6 +178,60 @@ void main() {
       expect(result.map((s) => s.title), ['Matches Both']);
     });
 
+    test('between operator matches numeric ranges correctly', () async {
+      await insertSong(id: 301, title: 'EightiesSong', year: 1985, playCount: 25);
+      await insertSong(id: 302, title: 'SeventiesSong', year: 1975, playCount: 5);
+      await insertSong(id: 303, title: 'NinetiesSong', year: 1995, playCount: 100);
+
+      // Between with comma
+      final criteriaYear = const SmartCriteria(
+        rules: [
+          SmartRule(
+            field: SmartRuleField.year,
+            operator: SmartOperator.between,
+            value: '1980, 1989',
+          ),
+        ],
+      );
+      final resYear = await engine.evaluateCriteria(criteriaYear);
+      expect(resYear.map((s) => s.title), contains('EightiesSong'));
+      expect(resYear.map((s) => s.title), isNot(contains('SeventiesSong')));
+      expect(resYear.map((s) => s.title), isNot(contains('NinetiesSong')));
+
+      // Between with dots
+      final criteriaPlays = const SmartCriteria(
+        rules: [
+          SmartRule(
+            field: SmartRuleField.playCount,
+            operator: SmartOperator.between,
+            value: '10..50',
+          ),
+        ],
+      );
+      final resPlays = await engine.evaluateCriteria(criteriaPlays);
+      expect(resPlays.map((s) => s.title), contains('EightiesSong'));
+      expect(resPlays.map((s) => s.title), isNot(contains('SeventiesSong')));
+      expect(resPlays.map((s) => s.title), isNot(contains('NinetiesSong')));
+    });
+
+    test('bpm rule field is ignored safely and returns all songs', () async {
+      await insertSong(id: 401, title: 'Song1');
+      await insertSong(id: 402, title: 'Song2');
+
+      final criteria = const SmartCriteria(
+        rules: [
+          SmartRule(
+            field: SmartRuleField.bpm,
+            operator: SmartOperator.equals,
+            value: '120',
+          ),
+        ],
+      );
+
+      final result = await engine.evaluateCriteria(criteria);
+      expect(result.length, 2);
+    });
+
     test('empty criteria returns all songs', () async {
       await insertSong(id: 1, title: 'A');
       await insertSong(id: 2, title: 'B');

@@ -45,6 +45,9 @@ object ProxyManager {
     @Volatile
     private var bypassList: List<String> = listOf("localhost", "127.0.0.1")
 
+    private var proxyAuthenticator: Authenticator? = null
+    private val authLock = Any()
+
     @Synchronized
     fun setProxy(
         enabled: Boolean,
@@ -66,17 +69,22 @@ object ProxyManager {
             .map { it.trim().lowercase() }
             .filter { it.isNotEmpty() }
 
-        if (enabled && this.username.isNotEmpty()) {
-            Authenticator.setDefault(object : Authenticator() {
-                override fun getPasswordAuthentication(): PasswordAuthentication? {
-                    if (requestorType == RequestorType.PROXY) {
-                        return PasswordAuthentication(this@ProxyManager.username, this@ProxyManager.password.toCharArray())
+        synchronized(authLock) {
+            if (enabled && this.username.isNotEmpty()) {
+                val auth = object : Authenticator() {
+                    override fun getPasswordAuthentication(): PasswordAuthentication? {
+                        if (requestorType == RequestorType.PROXY) {
+                            return PasswordAuthentication(this@ProxyManager.username, this@ProxyManager.password.toCharArray())
+                        }
+                        return null
                     }
-                    return null
                 }
-            })
-        } else {
-            Authenticator.setDefault(null)
+                proxyAuthenticator = auth
+                Authenticator.setDefault(auth)
+            } else {
+                Authenticator.setDefault(null)
+                proxyAuthenticator = null
+            }
         }
 
         // Global JVM system properties intentionally omitted to prevent accidental proxying
@@ -86,8 +94,26 @@ object ProxyManager {
     }
 
     /**
+     * Resets proxy state and removes the default Authenticator.
+     */
+    @Synchronized
+    fun dispose() {
+        synchronized(authLock) {
+            Authenticator.setDefault(null)
+            proxyAuthenticator = null
+        }
+        enabled = false
+        host = ""
+        port = 0
+        username = ""
+        password = ""
+        bypassList = emptyList()
+    }
+
+    /**
      * Checks whether the target [url] matches the bypass host list.
      */
+    @Synchronized
     fun isBypassed(url: String?): Boolean {
         if (url == null) return false
         val uriHost = runCatching { Uri.parse(url).host?.lowercase() }.getOrNull() ?: return false
@@ -103,6 +129,7 @@ object ProxyManager {
      * Returns a [Proxy] instance to be passed to [URL.openConnection], or null if
      * proxying is disabled or bypassed for [url].
      */
+    @Synchronized
     fun getProxy(url: String? = null): Proxy? {
         if (!enabled || host.isBlank() || port <= 0) return null
         if (url != null && isBypassed(url)) return null

@@ -59,6 +59,9 @@ void ParametricEQ::setPreamp(double preampDb) {
 }
 
 void ParametricEQ::setEnabled(bool enabled) {
+    if (enabled_ && !enabled) {
+        reset();
+    }
     enabled_ = enabled;
 }
 
@@ -135,6 +138,15 @@ void ParametricEQ::computeCoeffs(EQBand& band) {
     band.coeffs.b2 = b2 / a0;
     band.coeffs.a1 = a1 / a0;
     band.coeffs.a2 = a2 / a0;
+
+    // A Peaking or Shelf band with gain ≈ 0 dB is perceptually transparent.
+    // Mark it bypassed so the process loop can skip the entire biquad (including
+    // state variable updates) — significant CPU saving at 32 bands × 48 kHz.
+    // LowPass and HighPass always alter the signal regardless of gainDb.
+    bool isGainBased = (band.type == FilterType::Peaking ||
+                        band.type == FilterType::LowShelf ||
+                        band.type == FilterType::HighShelf);
+    band.bypass = isGainBased && (std::abs(band.gainDb) < 0.01);
 }
 
 void ParametricEQ::process(const float* in, float* out, int frames, int channels) {
@@ -143,6 +155,11 @@ void ParametricEQ::process(const float* in, float* out, int frames, int channels
     if (!enabled_) {
         if (in != out) {
             std::memcpy(out, in, frames * channels * sizeof(float));
+        }
+        if (std::abs(preampDb_) > 0.01) {
+            for (int i = 0; i < frames * channels; ++i) {
+                out[i] *= preampLinear_;
+            }
         }
         return;
     }
@@ -162,15 +179,17 @@ void ParametricEQ::process(const float* in, float* out, int frames, int channels
             const int idx = f * channels + ch;
             double sample = readPtr[idx] * preampLinear_;
             for (int b = 0; b < bandCount_; ++b) {
-                if (!bands_[b].enabled || std::abs(bands_[b].gainDb) < 0.01) {
+                if (!bands_[b].enabled || bands_[b].bypass) {
                     continue;
                 }
                 const auto& c = bands_[b].coeffs;
                 double y = c.b0 * sample
                          + c.b1 * x1_[ch][b] + c.b2 * x2_[ch][b]
                          - c.a1 * y1_[ch][b] - c.a2 * y2_[ch][b];
+                // Denormal protection
+                if (std::abs(y) < 1.0e-15) y = 0.0;
                 x2_[ch][b] = x1_[ch][b];
-                x1_[ch][b] = sample;
+                x1_[ch][b] = (std::abs(sample) < 1.0e-15) ? 0.0 : sample;
                 y2_[ch][b] = y1_[ch][b];
                 y1_[ch][b] = y;
                 sample = y;

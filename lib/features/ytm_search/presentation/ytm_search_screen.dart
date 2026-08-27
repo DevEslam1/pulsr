@@ -103,7 +103,7 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
     PlayerCubit playerCubit,
     PulsrPalette p,
   ) {
-    if (state.isLoading) {
+    if (state.isLoading && state.results.isEmpty) {
       return Center(child: CircularProgressIndicator(color: p.accent));
     }
 

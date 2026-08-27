@@ -10,6 +10,7 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import androidx.annotation.MainThread
+import androidx.annotation.WorkerThread
 import org.json.JSONObject
 import org.schabi.newpipe.extractor.NewPipe
 import java.time.Instant
@@ -161,7 +162,16 @@ internal class PoTokenWebView private constructor(
     //endregion
 
     //region Obtaining poTokens
+    @WorkerThread
     override fun generatePoToken(identifier: String): String {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            throw IllegalStateException(
+                "generatePoToken() must not be called from the Main UI thread as it blocks waiting for WebView execution."
+            )
+        }
+        if (closed.get()) {
+            throw java.util.concurrent.CancellationException("PoTokenWebView is closed")
+        }
         val future = CompletableFuture<String>()
         addPoTokenFuture(identifier, future)
         runOnMainThread(future) {

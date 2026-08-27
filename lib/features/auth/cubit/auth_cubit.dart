@@ -72,6 +72,11 @@ class AuthCubit extends Cubit<AuthState> {
           errorMessage: null,
         ));
         await syncNow();
+      } else {
+        emit(state.copyWith(
+          status: AuthStatus.unauthenticated,
+          errorMessage: 'Sign in failed. Please try again.',
+        ));
       }
     } catch (e) {
       final msg = _mapAuthError(e);
@@ -93,6 +98,11 @@ class AuthCubit extends Cubit<AuthState> {
           errorMessage: null,
         ));
         await syncNow();
+      } else {
+        emit(state.copyWith(
+          status: AuthStatus.unauthenticated,
+          errorMessage: 'Sign up failed. Please try again.',
+        ));
       }
     } catch (e) {
       final msg = _mapAuthError(e);
@@ -131,7 +141,7 @@ class AuthCubit extends Cubit<AuthState> {
     if (s.contains('network-request-failed') || s.contains('network error') || s.contains('socketexception')) {
       return 'Network error. Check your internet connection.';
     }
-    if (s.contains('10') || s.contains('apiexception: 10')) {
+    if (s.contains('apiexception') && s.contains('10')) {
       return 'Google Sign-In needs SHA-1 fingerprint registered in Firebase Console. You can sign in with Email below!';
     }
     return 'Sign-in failed. Please try again.';

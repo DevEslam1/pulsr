@@ -3,12 +3,13 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
 import '../../domain/models/audio_output_info.dart';
+import '../constants/channels.dart';
 import '../utils/error_logger.dart';
 
 @lazySingleton
 class HiResAudioService {
-  static const MethodChannel _methodChannel = MethodChannel('com.pulsr.music/hires_dac');
-  static const EventChannel _eventChannel = EventChannel('com.pulsr.music/hires_dac_events');
+  static const MethodChannel _methodChannel = MethodChannel(PulsrChannels.hiresDac);
+  static const EventChannel _eventChannel = EventChannel(PulsrChannels.hiresDacEvents);
 
   final StreamController<AudioOutputInfo> _deviceController =
       StreamController<AudioOutputInfo>.broadcast();

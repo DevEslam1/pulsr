@@ -132,8 +132,8 @@ class _CrossfadeCurvePainter extends CustomPainter {
       final fraction = i / steps;
       final x = fraction * size.width;
 
-      final inVal = manager.evaluateCurve(fraction, true);
-      final outVal = manager.evaluateCurve(fraction, false);
+      final inVal = manager.evaluateCurve(fraction);
+      final outVal = manager.evaluateCurve(fraction);
 
       final inY = size.height - (inVal * (size.height - 4));
       final outY = size.height - (outVal * (size.height - 4));

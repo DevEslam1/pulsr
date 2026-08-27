@@ -16,7 +16,7 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : AudioServiceActivity() {
     private val LYRICS_CHANNEL = "com.pulsr.music/lyrics"
     private val FILE_OPENER_CHANNEL = "com.pulsr.music/file_opener"
-    private var pendingAudioUri: String? = null
+    private val pendingAudioUris = ArrayDeque<String>()
     private var fileOpenerChannel: MethodChannel? = null
     private var lyricsChannel: MethodChannel? = null
     private var audioEffectsPlugin: AudioEffectsPlugin? = null
@@ -43,9 +43,12 @@ class MainActivity : AudioServiceActivity() {
     }
 
     override fun onDestroy() {
-        pendingAudioUri = null
+        synchronized(pendingAudioUris) {
+            pendingAudioUris.clear()
+        }
         try {
-            lyricsExecutor.shutdown()
+            lyricsExecutor.shutdownNow()
+            lyricsExecutor.awaitTermination(1, java.util.concurrent.TimeUnit.SECONDS)
         } catch (e: Exception) {
             Log.w("MainActivity", "Error shutting down lyrics executor: ${e.message}")
         }
@@ -73,8 +76,12 @@ class MainActivity : AudioServiceActivity() {
     }
 
     private fun isProxyText(text: String): Boolean {
-        val pattern = Regex("""\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}:\d{2,5}\b""")
-        return pattern.containsMatchIn(text)
+        val pattern = Regex("""\b(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3}):(\d{2,5})\b""")
+        return pattern.containsMatchIn(text) && pattern.find(text)?.let { m ->
+            val octets = (1..4).map { m.groupValues[it].toIntOrNull() ?: 256 }
+            val port = m.groupValues[5].toIntOrNull() ?: 0
+            octets.all { it in 0..255 } && port in 1..65535
+        } ?: false
     }
 
     private fun isYouTubeUri(uri: Uri): Boolean {
@@ -111,11 +118,13 @@ class MainActivity : AudioServiceActivity() {
             }
         }
 
+        val uriStr = uri.toString()
         if (fromColdStart || fileOpenerChannel == null) {
-            pendingAudioUri = uri.toString()
+            synchronized(pendingAudioUris) {
+                pendingAudioUris.addLast(uriStr)
+            }
         } else {
-            fileOpenerChannel?.invokeMethod("onAudioFileOpened", uri.toString())
-            pendingAudioUri = null
+            fileOpenerChannel?.invokeMethod("onAudioFileOpened", uriStr)
         }
     }
  
@@ -140,8 +149,9 @@ class MainActivity : AudioServiceActivity() {
         fileOpenerChannel = fileChannel
         fileChannel.setMethodCallHandler { call, result ->
             if (call.method == "getInitialAudioUri") {
-                val uri = pendingAudioUri
-                pendingAudioUri = null
+                val uri = synchronized(pendingAudioUris) {
+                    pendingAudioUris.removeFirstOrNull()
+                }
                 result.success(uri)
             } else {
                 result.notImplemented()
@@ -221,6 +231,11 @@ class MainActivity : AudioServiceActivity() {
                 }
                 "getDeviceManufacturer" -> {
                     result.success(Build.MANUFACTURER ?: "")
+                }
+                "getBatteryLevel" -> {
+                    val bm = getSystemService(Context.BATTERY_SERVICE) as? android.os.BatteryManager
+                    val level = bm?.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: 100
+                    result.success(level)
                 }
                 else -> result.notImplemented()
             }

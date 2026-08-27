@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/adaptive.dart';
 import '../cubit/auth_cubit.dart';
 import '../cubit/auth_state.dart';
 
@@ -43,9 +44,6 @@ class _AuthSheetState extends State<AuthSheet> {
     return BlocConsumer<AuthCubit, AuthState>(
       listener: (context, state) {
         if (state.status == AuthStatus.authenticated) {
-          if (context.mounted && Navigator.of(context).canPop()) {
-            Navigator.of(context).pop();
-          }
           if (context.mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -53,6 +51,9 @@ class _AuthSheetState extends State<AuthSheet> {
                 behavior: SnackBarBehavior.floating,
               ),
             );
+          }
+          if (context.mounted && Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
           }
         } else if (state.status == AuthStatus.error && state.errorMessage != null) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -67,14 +68,18 @@ class _AuthSheetState extends State<AuthSheet> {
       builder: (context, state) {
         final isLoading = state.status == AuthStatus.authenticating;
 
-        return Container(
-          padding: EdgeInsets.fromLTRB(24, 16, 24, bottomInset + 24),
-          decoration: BoxDecoration(
-            color: p.surfaceContainer,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-            border: Border.all(color: p.hairline),
-          ),
-          child: SingleChildScrollView(
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: Adaptive.sheetConstraints(context).maxWidth),
+            child: Container(
+              padding: EdgeInsets.fromLTRB(24, 16, 24, bottomInset + 24),
+              decoration: BoxDecoration(
+                color: p.surfaceContainer,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+                border: Border.all(color: p.hairline),
+              ),
+              child: SingleChildScrollView(
             child: Form(
               key: _formKey,
               child: Column(
@@ -330,8 +335,10 @@ class _AuthSheetState extends State<AuthSheet> {
               ),
             ),
           ),
-        );
-      },
+        ),
+      ),
+    );
+  },
     );
   }
 }

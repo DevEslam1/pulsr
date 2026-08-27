@@ -65,7 +65,7 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   Future<void> restoreLastPlaybackSession() async {}
 
   @override
-  void saveCurrentPositionImmediate() {}
+  Future<void> saveCurrentPositionImmediate() async {}
 
   @override
   Future<void> setEqualizerEnabled(bool enabled) async {
@@ -194,7 +194,7 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   Future<void> setCustomFrequencies(List<double> frequencies) async {}
 
   @override
-  void onAppPaused() {}
+  Future<void> onAppPaused() async {}
 
   @override
   void startSleepTimer(Duration duration, {bool fadeOut = true}) {
@@ -264,6 +264,7 @@ void main() {
     path: '/path/1.mp3',
     isFavorite: false,
     isMissing: false,
+    isDownloaded: false,
     playCount: 0,
     lastPositionMs: 0,
     source: 'local',
@@ -278,6 +279,7 @@ void main() {
     path: '/path/missing.mp3',
     isFavorite: false,
     isMissing: true,
+    isDownloaded: false,
     playCount: 0,
     lastPositionMs: 0,
     source: 'local',
@@ -369,6 +371,7 @@ void main() {
           path: '/path/$i.mp3',
           isFavorite: false,
           isMissing: false,
+    isDownloaded: false,
           playCount: 0,
           lastPositionMs: 0,
           source: 'local',

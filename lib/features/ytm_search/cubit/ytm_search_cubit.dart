@@ -40,7 +40,11 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
 
   Future<void> retry() => _executeSearch(state.query);
 
-  Future<void> _executeSearch(String query, {bool isRetryAfterBotBlock = false}) async {
+  Future<void> _executeSearch(
+    String query, {
+    bool isRetryAfterBotBlock = false,
+    int retryDepth = 0,
+  }) async {
     final generation = ++_generation;
 
     if (query.trim().isEmpty) {
@@ -75,12 +79,12 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
     } on YtmException catch (e) {
       if (generation != _generation || isClosed) return;
 
-      // Auto-recovery: On bot block or recaptcha, invalidate poToken and retry once
-      if (e.isBotBlocked && !isRetryAfterBotBlock) {
+      // Auto-recovery: On bot block or recaptcha, invalidate poToken and retry with depth bound
+      if (e.isBotBlocked && !isRetryAfterBotBlock && retryDepth < 2) {
         await _service.invalidatePoToken();
         await _service.ensurePoTokenReady();
         if (generation != _generation || isClosed) return;
-        return _executeSearch(query, isRetryAfterBotBlock: true);
+        return _executeSearch(query, isRetryAfterBotBlock: true, retryDepth: retryDepth + 1);
       }
 
       final errorInfo = YtmErrorClassifier.classify(e);

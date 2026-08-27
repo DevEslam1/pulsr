@@ -49,6 +49,12 @@ int DsdDecoder::decodeDsdBytes(const uint8_t* dsdL, const uint8_t* dsdR, int byt
         return 0;
     }
 
+    const int expectedOut = (byteCount * 8) / decimationRatio_;
+    if (expectedOut > maxPcmFrames) {
+        byteCount = (maxPcmFrames * decimationRatio_) / 8;
+        if (byteCount <= 0) return 0;
+    }
+
     int totalBits = byteCount * 8;
     int pcmFrames = 0;
 

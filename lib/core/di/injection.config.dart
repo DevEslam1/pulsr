@@ -75,10 +75,10 @@ import 'package:pulsr/features/ytm_search/cubit/ytm_search_cubit.dart' as _i171;
 
 extension GetItInjectableX on _i174.GetIt {
 // initializes the registration of main-scope dependencies inside of GetIt
-  Future<_i174.GetIt> init({
+  _i174.GetIt init({
     String? environment,
     _i526.EnvironmentFilter? environmentFilter,
-  }) async {
+  }) {
     final gh = _i526.GetItHelper(
       this,
       environment,
@@ -86,7 +86,10 @@ extension GetItInjectableX on _i174.GetIt {
     );
     final networkModule = _$NetworkModule();
     final storageModule = _$StorageModule();
-    gh.singleton<_i497.HttpClient>(() => networkModule.httpClient);
+    gh.singleton<_i497.HttpClient>(
+      () => networkModule.httpClient,
+      dispose: _i953.disposeHttpClient,
+    );
     gh.singleton<_i519.Client>(() => networkModule.pkgHttpClient);
     gh.singleton<_i305.ArtworkCacheManager>(() => _i305.ArtworkCacheManager());
     gh.singleton<_i535.AuthService>(() => _i535.AuthService());
@@ -106,7 +109,10 @@ extension GetItInjectableX on _i174.GetIt {
     gh.singleton<_i498.YtmCacheManager>(() => _i498.YtmCacheManager());
     gh.singleton<_i169.YtmClientVersionResolver>(
         () => _i169.YtmClientVersionResolver());
-    gh.singleton<_i391.YtmService>(() => _i391.YtmService());
+    gh.singleton<_i391.YtmService>(
+      () => _i391.YtmService(),
+      dispose: (i) => i.dispose(),
+    );
     gh.singleton<_i401.DynamicThemeCubit>(() => _i401.DynamicThemeCubit());
     gh.singleton<_i682.AppDatabase>(() => _i682.AppDatabase());
     gh.singleton<_i265.PlaylistExportUseCase>(
@@ -193,12 +199,11 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i320.IMusicRepository>(),
           gh<_i682.AppDatabase>(),
         ));
-    await gh.singletonAsync<_i366.PulsrAudioHandler>(
+    gh.singletonAsync<_i366.PulsrAudioHandler>(
       () => _i366.PulsrAudioHandler.create(
         gh<_i320.IMusicRepository>(),
         gh<_i391.YtmService>(),
       ),
-      preResolve: true,
       dispose: (i) => i.dispose(),
     );
     gh.factory<_i984.SearchCubit>(() => _i984.SearchCubit(
@@ -221,22 +226,24 @@ extension GetItInjectableX on _i174.GetIt {
           hiResAudioService: gh<_i722.HiResAudioService>(),
           secureStorage: gh<_i558.FlutterSecureStorage>(),
         ));
-    gh.lazySingleton<_i147.PlayerCubit>(() => _i147.PlayerCubit(
-          audioHandler: gh<_i366.PulsrAudioHandler>(),
+    gh.singletonAsync<_i147.PlayerCubit>(() async => _i147.PlayerCubit(
+          audioHandler: await getAsync<_i366.PulsrAudioHandler>(),
           repository: gh<_i320.IMusicRepository>(),
           toggleFavoriteUseCase: gh<_i800.ToggleFavoriteUseCase>(),
           settingsCubit: gh<_i41.SettingsCubit>(),
           widgetService: gh<_i42.WidgetService>(),
           scrobblerService: gh<_i629.ScrobblerService>(),
         ));
-    gh.lazySingleton<_i873.YtmDownloadCubit>(() => _i873.YtmDownloadCubit(
-          gh<_i742.YtDownloadService>(),
-          gh<_i147.PlayerCubit>(),
-        ));
-    gh.lazySingleton<_i134.FileIntentHandler>(() => _i134.FileIntentHandler(
-          gh<_i320.IMusicRepository>(),
-          gh<_i147.PlayerCubit>(),
-        ));
+    gh.singletonAsync<_i873.YtmDownloadCubit>(
+        () async => _i873.YtmDownloadCubit(
+              gh<_i742.YtDownloadService>(),
+              await getAsync<_i147.PlayerCubit>(),
+            ));
+    gh.singletonAsync<_i134.FileIntentHandler>(
+        () async => _i134.FileIntentHandler(
+              gh<_i320.IMusicRepository>(),
+              await getAsync<_i147.PlayerCubit>(),
+            ));
     return this;
   }
 }

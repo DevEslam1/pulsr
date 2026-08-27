@@ -5,6 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
+import '../../../../core/constants/channels.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/error_logger.dart';
 
@@ -26,6 +27,7 @@ class AudioVisualizer extends StatefulWidget {
   final double height;
   final bool isPlaying;
   final int? audioSessionId;
+  final int? trackSeed;
 
   const AudioVisualizer({
     super.key,
@@ -35,6 +37,7 @@ class AudioVisualizer extends StatefulWidget {
     this.height = 120.0,
     this.isPlaying = true,
     this.audioSessionId,
+    this.trackSeed,
   });
 
   @override
@@ -43,8 +46,8 @@ class AudioVisualizer extends StatefulWidget {
 
 class _AudioVisualizerState extends State<AudioVisualizer>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
-  static const MethodChannel _methodChannel = MethodChannel('com.pulsr.music/visualizer');
-  static const EventChannel _eventChannel = EventChannel('com.pulsr.music/visualizer_stream');
+  static const MethodChannel _methodChannel = MethodChannel(PulsrChannels.visualizer);
+  static const EventChannel _eventChannel = EventChannel(PulsrChannels.visualizerStream);
 
   StreamSubscription? _subscription;
   late AnimationController _animController;
@@ -130,6 +133,7 @@ class _AudioVisualizerState extends State<AudioVisualizer>
       if (status.isDenied) {
         status = await Permission.microphone.request();
       }
+      if (!mounted) return;
       if (status.isGranted) {
         _subscribeToStream();
       }
@@ -150,7 +154,7 @@ class _AudioVisualizerState extends State<AudioVisualizer>
           final len = math.min(event.length, _numBands);
           for (int i = 0; i < len; i++) {
             final val = (event[i] as num).toDouble();
-            _targetData[i] = (val / 255.0).clamp(0.0, 1.0);
+            _targetData[i] = val.clamp(0.0, 1.0);
           }
         }
       },
@@ -183,10 +187,12 @@ class _AudioVisualizerState extends State<AudioVisualizer>
 
     if (isStale && widget.isPlaying && widget.style != VisualizerStyle.off) {
       final t = now.millisecondsSinceEpoch / 1000.0;
+      final seed = widget.trackSeed ?? widget.audioSessionId ?? 0;
+      final seedOffset = (seed.abs() % 100) / 100.0;
       for (int i = 0; i < _numBands; i++) {
-        final phase = i * 0.25;
-        final wave1 = math.sin(t * 3.5 + phase);
-        final wave2 = math.cos(t * 2.1 + phase * 1.5);
+        final phase = i * 0.25 + seedOffset;
+        final wave1 = math.sin(t * (3.5 + (seed.abs() % 4) * 0.1) + phase);
+        final wave2 = math.cos(t * (2.1 + (seed.abs() % 3) * 0.1) + phase * 1.5);
         final sim = ((wave1 + wave2) / 4.0 + 0.35).clamp(0.05, 0.85);
         _targetData[i] = sim;
       }

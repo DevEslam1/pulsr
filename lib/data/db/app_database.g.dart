@@ -227,7 +227,7 @@ class $SongsTableTable extends SongsTable
       const VerificationMeta('isDownloaded');
   @override
   late final GeneratedColumn<bool> isDownloaded = GeneratedColumn<bool>(
-      'is_downloaded', aliasedName, true,
+      'is_downloaded', aliasedName, false,
       type: DriftSqlType.bool,
       requiredDuringInsert: false,
       defaultConstraints: GeneratedColumn.constraintIsAlways(
@@ -538,7 +538,7 @@ class $SongsTableTable extends SongsTable
       pendingDownloadPath: attachedDatabase.typeMapping.read(
           DriftSqlType.string, data['${effectivePrefix}pending_download_path']),
       isDownloaded: attachedDatabase.typeMapping
-          .read(DriftSqlType.bool, data['${effectivePrefix}is_downloaded']),
+          .read(DriftSqlType.bool, data['${effectivePrefix}is_downloaded'])!,
     );
   }
 
@@ -605,7 +605,7 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
   final String? pendingDownloadPath;
 
   /// Explicit flag indicating whether this song was downloaded from YouTube Music / Online.
-  final bool? isDownloaded;
+  final bool isDownloaded;
   const SongsTableData(
       {required this.id,
       required this.title,
@@ -641,7 +641,7 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       this.remoteId,
       this.remoteArtworkUrl,
       this.pendingDownloadPath,
-      this.isDownloaded});
+      required this.isDownloaded});
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
@@ -725,9 +725,7 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
     if (!nullToAbsent || pendingDownloadPath != null) {
       map['pending_download_path'] = Variable<String>(pendingDownloadPath);
     }
-    if (!nullToAbsent || isDownloaded != null) {
-      map['is_downloaded'] = Variable<bool>(isDownloaded);
-    }
+    map['is_downloaded'] = Variable<bool>(isDownloaded);
     return map;
   }
 
@@ -807,9 +805,7 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       pendingDownloadPath: pendingDownloadPath == null && nullToAbsent
           ? const Value.absent()
           : Value(pendingDownloadPath),
-      isDownloaded: isDownloaded == null && nullToAbsent
-          ? const Value.absent()
-          : Value(isDownloaded),
+      isDownloaded: Value(isDownloaded),
     );
   }
 
@@ -854,7 +850,7 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       remoteArtworkUrl: serializer.fromJson<String?>(json['remoteArtworkUrl']),
       pendingDownloadPath:
           serializer.fromJson<String?>(json['pendingDownloadPath']),
-      isDownloaded: serializer.fromJson<bool?>(json['isDownloaded']),
+      isDownloaded: serializer.fromJson<bool>(json['isDownloaded']),
     );
   }
   @override
@@ -895,7 +891,7 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
       'remoteId': serializer.toJson<String?>(remoteId),
       'remoteArtworkUrl': serializer.toJson<String?>(remoteArtworkUrl),
       'pendingDownloadPath': serializer.toJson<String?>(pendingDownloadPath),
-      'isDownloaded': serializer.toJson<bool?>(isDownloaded),
+      'isDownloaded': serializer.toJson<bool>(isDownloaded),
     };
   }
 
@@ -934,7 +930,7 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
           Value<String?> remoteId = const Value.absent(),
           Value<String?> remoteArtworkUrl = const Value.absent(),
           Value<String?> pendingDownloadPath = const Value.absent(),
-          Value<bool?> isDownloaded = const Value.absent()}) =>
+          bool? isDownloaded}) =>
       SongsTableData(
         id: id ?? this.id,
         title: title ?? this.title,
@@ -983,8 +979,7 @@ class SongsTableData extends DataClass implements Insertable<SongsTableData> {
         pendingDownloadPath: pendingDownloadPath.present
             ? pendingDownloadPath.value
             : this.pendingDownloadPath,
-        isDownloaded:
-            isDownloaded.present ? isDownloaded.value : this.isDownloaded,
+        isDownloaded: isDownloaded ?? this.isDownloaded,
       );
   SongsTableData copyWithCompanion(SongsTableCompanion data) {
     return SongsTableData(
@@ -1208,7 +1203,7 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
   final Value<String?> remoteId;
   final Value<String?> remoteArtworkUrl;
   final Value<String?> pendingDownloadPath;
-  final Value<bool?> isDownloaded;
+  final Value<bool> isDownloaded;
   const SongsTableCompanion({
     this.id = const Value.absent(),
     this.title = const Value.absent(),
@@ -1398,7 +1393,7 @@ class SongsTableCompanion extends UpdateCompanion<SongsTableData> {
       Value<String?>? remoteId,
       Value<String?>? remoteArtworkUrl,
       Value<String?>? pendingDownloadPath,
-      Value<bool?>? isDownloaded}) {
+      Value<bool>? isDownloaded}) {
     return SongsTableCompanion(
       id: id ?? this.id,
       title: title ?? this.title,
@@ -3773,7 +3768,7 @@ typedef $$SongsTableTableCreateCompanionBuilder = SongsTableCompanion Function({
   Value<String?> remoteId,
   Value<String?> remoteArtworkUrl,
   Value<String?> pendingDownloadPath,
-  Value<bool?> isDownloaded,
+  Value<bool> isDownloaded,
 });
 typedef $$SongsTableTableUpdateCompanionBuilder = SongsTableCompanion Function({
   Value<int> id,
@@ -3810,7 +3805,7 @@ typedef $$SongsTableTableUpdateCompanionBuilder = SongsTableCompanion Function({
   Value<String?> remoteId,
   Value<String?> remoteArtworkUrl,
   Value<String?> pendingDownloadPath,
-  Value<bool?> isDownloaded,
+  Value<bool> isDownloaded,
 });
 
 class $$SongsTableTableFilterComposer
@@ -4234,7 +4229,7 @@ class $$SongsTableTableTableManager extends RootTableManager<
             Value<String?> remoteId = const Value.absent(),
             Value<String?> remoteArtworkUrl = const Value.absent(),
             Value<String?> pendingDownloadPath = const Value.absent(),
-            Value<bool?> isDownloaded = const Value.absent(),
+            Value<bool> isDownloaded = const Value.absent(),
           }) =>
               SongsTableCompanion(
             id: id,
@@ -4308,7 +4303,7 @@ class $$SongsTableTableTableManager extends RootTableManager<
             Value<String?> remoteId = const Value.absent(),
             Value<String?> remoteArtworkUrl = const Value.absent(),
             Value<String?> pendingDownloadPath = const Value.absent(),
-            Value<bool?> isDownloaded = const Value.absent(),
+            Value<bool> isDownloaded = const Value.absent(),
           }) =>
               SongsTableCompanion.insert(
             id: id,

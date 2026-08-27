@@ -68,7 +68,7 @@ class SongsTable extends Table {
   TextColumn get pendingDownloadPath => text().nullable()();
 
   /// Explicit flag indicating whether this song was downloaded from YouTube Music / Online.
-  BoolColumn get isDownloaded => boolean().withDefault(const Constant(false)).nullable()();
+  BoolColumn get isDownloaded => boolean().withDefault(const Constant(false))();
 
   @override
   Set<Column> get primaryKey => {id};

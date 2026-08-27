@@ -96,6 +96,7 @@ class PlaylistImportUseCase {
       final exactMap = <String, SongsTableData>{};
       final normalizedMap = <String, SongsTableData>{};
       final filenameMap = <String, SongsTableData>{};
+      final filenameCounts = <String, int>{};
 
       for (final song in allSongs) {
         exactMap[song.path] = song;
@@ -103,9 +104,14 @@ class PlaylistImportUseCase {
         normalizedMap[normPath] = song;
         final filename = song.path.replaceAll('\\', '/').split('/').last.toLowerCase();
         if (filename.isNotEmpty) {
+          filenameCounts[filename] = (filenameCounts[filename] ?? 0) + 1;
           filenameMap[filename] = song;
         }
       }
+      // Remove ambiguous filenames that map to multiple songs
+      filenameCounts.forEach((filename, count) {
+        if (count > 1) filenameMap.remove(filename);
+      });
 
       final matchedSongIds = <int>[];
       final matchedSet = <int>{};

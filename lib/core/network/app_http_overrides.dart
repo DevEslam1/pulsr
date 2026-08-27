@@ -32,21 +32,19 @@ class AppHttpOverrides extends HttpOverrides {
       return _config.toFindProxyString(uri);
     };
 
-    // Proxy authentication credentials if configured
-    if (_config.enabled && _config.hasAuth) {
-      client.authenticateProxy = (host, port, scheme, realm) async {
-        if (_config.hasAuth) {
-          client.addProxyCredentials(
-            host,
-            port,
-            realm ?? '',
-            HttpClientBasicCredentials(_config.username, _config.password),
-          );
-          return true;
-        }
-        return false;
-      };
-    }
+    // Dynamic proxy authentication credentials
+    client.authenticateProxy = (host, port, scheme, realm) async {
+      if (_config.enabled && _config.hasAuth) {
+        client.addProxyCredentials(
+          host,
+          port,
+          realm ?? '',
+          HttpClientBasicCredentials(_config.username, _config.password),
+        );
+        return true;
+      }
+      return false;
+    };
 
     // Default resilient timeouts
     client.connectionTimeout = const Duration(seconds: 15);
@@ -70,7 +68,9 @@ class AppHttpOverrides extends HttpOverrides {
       final uri = Uri.parse(testUrl);
       testClient = HttpClient()
         ..connectionTimeout = timeout
-        ..idleTimeout = timeout;
+        ..idleTimeout = timeout
+        ..badCertificateCallback = (cert, host, port) =>
+            testConfig.enabled && (host == testConfig.host || host == uri.host);
 
       testClient.findProxy = (u) => testConfig.toFindProxyString(u);
 

@@ -35,8 +35,6 @@ import '../../features/library/presentation/library_stats_screen.dart';
 import '../../features/player/presentation/themes/custom_theme_builder_screen.dart';
 import '../../features/settings/presentation/scrobble_stats_screen.dart';
 import '../../features/settings/presentation/cloud_backup_dashboard_screen.dart';
-import '../services/cloud_sync_service.dart';
-import '../di/injection.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
@@ -338,9 +336,7 @@ GoRouter createRouter(MediaScannerService scannerService) {
         path: '/cloud-backup-dashboard',
         name: 'cloud-backup-dashboard',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => CloudBackupDashboardScreen(
-          syncService: getIt<CloudSyncService>(),
-        ),
+        builder: (context, state) => const CloudBackupDashboardScreen(),
       ),
     ],
   );

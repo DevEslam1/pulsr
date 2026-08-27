@@ -148,11 +148,32 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       }
     });
 
-    // Periodic poll to detect login completion as soon as session cookies are available
-    _authPollTimer = Timer.periodic(const Duration(seconds: 2), (_) {
-      if (mounted && !_isLoggedIn) {
-        _checkIfLoggedIn();
+    _pollIntervalSeconds = 2;
+    _scheduleNextAuthPoll();
+  }
+
+  int _pollIntervalSeconds = 2;
+
+  void _scheduleNextAuthPoll() {
+    _authPollTimer?.cancel();
+    if (!mounted || _isLoggedIn) return;
+
+    _authPollTimer = Timer(Duration(seconds: _pollIntervalSeconds), () async {
+      if (!mounted || _isLoggedIn) return;
+      if (_webViewController != null && !_isLoading) {
+        final loggedIn = await _checkIfLoggedIn();
+        if (loggedIn) return;
       }
+      if (_pollIntervalSeconds < 3) {
+        _pollIntervalSeconds = 3;
+      } else if (_pollIntervalSeconds < 5) {
+        _pollIntervalSeconds = 5;
+      } else if (_pollIntervalSeconds < 8) {
+        _pollIntervalSeconds = 8;
+      } else {
+        _pollIntervalSeconds = 10;
+      }
+      _scheduleNextAuthPoll();
     });
   }
 
@@ -243,6 +264,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   }
 
   void _navigateTo(String url) {
+    _pollIntervalSeconds = 2;
+    _scheduleNextAuthPoll();
     _webViewController?.loadUrl(
       urlRequest: URLRequest(url: WebUri(url)),
     );
@@ -859,6 +882,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
                         if (host.endsWith('youtube.com') || host == 'youtu.be') {
                           _hadSuccessfulYtLoad = true;
+                          _pollIntervalSeconds = 2;
+                          _scheduleNextAuthPoll();
                         }
                         _mismatchAutoNavCount = 0;
                         await _checkIfLoggedIn(urlStr);

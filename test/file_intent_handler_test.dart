@@ -28,6 +28,7 @@ void main() {
       source: SongSource.local,
       isFavorite: false,
       isMissing: false,
+      isDownloaded: false,
       playCount: 0,
       lastPositionMs: 0,
     ));
@@ -52,6 +53,7 @@ void main() {
         source: SongSource.local,
         isFavorite: false,
         isMissing: false,
+        isDownloaded: false,
         playCount: 0,
         lastPositionMs: 0,
       );

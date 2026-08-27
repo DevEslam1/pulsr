@@ -127,4 +127,12 @@ class SettingsProfilesService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyProfiles, json.encode(updated.map((p) => p.toJson()).toList()));
   }
+
+  Future<void> deleteProfile(String profileId) async {
+    final list = await getProfiles();
+    final updated = List<SettingsProfile>.from(list);
+    updated.removeWhere((p) => p.id == profileId);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_keyProfiles, json.encode(updated.map((p) => p.toJson()).toList()));
+  }
 }

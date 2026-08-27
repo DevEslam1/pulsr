@@ -26,7 +26,16 @@ import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import 'package:go_router/go_router.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final YtmService? ytmService;
+  final YtmAccountService? ytmAccountService;
+  final GetSongsUseCase? getSongsUseCase;
+
+  const HomeScreen({
+    super.key,
+    this.ytmService,
+    this.ytmAccountService,
+    this.getSongsUseCase,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -36,13 +45,17 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedTab = 0; // 0: Local, 1: Online
   String _selectedOnlineCategory = 'Recommended For You';
 
+  YtmService get _ytmService => widget.ytmService ?? getIt<YtmService>();
+  YtmAccountService get _ytmAccountService => widget.ytmAccountService ?? getIt<YtmAccountService>();
+  GetSongsUseCase get _getSongsUseCase => widget.getSongsUseCase ?? getIt<GetSongsUseCase>();
+
   /// Resolved once and reused across rebuilds with 10-minute TTL cache.
   final Map<String, Future<List<YtmTrack>>> _categoryFutures = {};
   final Map<String, DateTime> _categoryFetchTimestamps = {};
   static const Duration _categoryTtl = Duration(minutes: 10);
 
   List<String> get _onlineCategories {
-    final isLoggedIn = getIt<YtmAccountService>().isLoggedIn;
+    final isLoggedIn = _ytmAccountService.isLoggedIn;
     if (isLoggedIn) {
       return const [
         'Recommended For You',
@@ -92,23 +105,25 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    final isLoggedIn = getIt<YtmAccountService>().isLoggedIn;
+    final isLoggedIn = _ytmAccountService.isLoggedIn;
     _selectedOnlineCategory = isLoggedIn ? 'Recommended For You' : 'Trending Egypt';
-    getIt<YtmAccountService>().loginState.addListener(_onLoginStateChanged);
+    _ytmAccountService.loginState.addListener(_onLoginStateChanged);
   }
 
   void _onLoginStateChanged() {
     if (!mounted) return;
     setState(() {
       _categoryFutures.clear();
-      final isLoggedIn = getIt<YtmAccountService>().isLoggedIn;
+      final isLoggedIn = _ytmAccountService.isLoggedIn;
       _selectedOnlineCategory = isLoggedIn ? 'Recommended For You' : 'Trending Egypt';
     });
   }
 
   @override
   void dispose() {
-    getIt<YtmAccountService>().loginState.removeListener(_onLoginStateChanged);
+    _ytmAccountService.loginState.removeListener(_onLoginStateChanged);
+    _categoryFutures.clear();
+    _categoryFetchTimestamps.clear();
     super.dispose();
   }
 
@@ -126,7 +141,7 @@ class _HomeScreenState extends State<HomeScreen> {
         _categoryFetchTimestamps[category] = DateTime.now();
         try {
           if (category == 'Recommended For You') {
-            final account = getIt<YtmAccountService>();
+            final account = _ytmAccountService;
             if (account.isLoggedIn) {
               try {
                 final recs = await account.fetchHomeRecommendations(maxTracks: 50);
@@ -134,22 +149,23 @@ class _HomeScreenState extends State<HomeScreen> {
               } catch (_) {}
             }
             try {
-              final trending = await getIt<YtmService>().trending(limit: 25);
+              final trending = await _ytmService.trending(limit: 25);
               if (trending.isNotEmpty) return trending;
             } catch (_) {}
-            return await getIt<YtmService>().searchWithFallback(_categoryQueries['Recommended For You'] ?? 'top hits music', limit: 25);
+            return await _ytmService.searchWithFallback(_categoryQueries['Recommended For You'] ?? 'top hits music', limit: 25);
           }
           if (category == 'Trending Egypt') {
             try {
-              final trending = await getIt<YtmService>().trending(limit: 25);
+              final trending = await _ytmService.trending(limit: 25);
               if (trending.isNotEmpty) return trending;
             } catch (_) {}
-            return await getIt<YtmService>().searchWithFallback(_categoryQueries['Trending Egypt'] ?? 'أغاني مصرية جديدة تريند', limit: 25);
+            return await _ytmService.searchWithFallback(_categoryQueries['Trending Egypt'] ?? 'أغاني مصرية جديدة تريند', limit: 25);
           }
           final query = _categoryQueries[category] ?? '$category songs';
-          return await getIt<YtmService>().searchWithFallback(query, limit: 25);
+          return await _ytmService.searchWithFallback(query, limit: 25);
         } catch (e) {
           _categoryFutures.remove(category);
+          _categoryFetchTimestamps.remove(category);
           rethrow;
         }
       },
@@ -172,7 +188,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final getSongsUseCase = getIt<GetSongsUseCase>();
+    final getSongsUseCase = _getSongsUseCase;
     final playerCubit = context.read<PlayerCubit>();
     final isTablet = Adaptive.isTablet(context);
     final offlineOnly = context.watch<SettingsCubit?>()?.state.offlineOnlyMode ?? false;
@@ -665,11 +681,11 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Row(
             children: [
               _QuickCard(
-                title: getIt<YtmAccountService>().isLoggedIn ? 'For You' : 'Top Hits',
-                subtitle: getIt<YtmAccountService>().isLoggedIn ? 'Personalized' : 'Trending',
-                icon: getIt<YtmAccountService>().isLoggedIn ? Icons.auto_awesome_rounded : Icons.local_fire_department_rounded,
-                color: getIt<YtmAccountService>().isLoggedIn ? p.accent : const Color(0xFFFF5252),
-                onTap: () => setState(() => _selectedOnlineCategory = getIt<YtmAccountService>().isLoggedIn ? 'Recommended For You' : 'Global Top Hits'),
+                title: _ytmAccountService.isLoggedIn ? 'For You' : 'Top Hits',
+                subtitle: _ytmAccountService.isLoggedIn ? 'Personalized' : 'Trending',
+                icon: _ytmAccountService.isLoggedIn ? Icons.auto_awesome_rounded : Icons.local_fire_department_rounded,
+                color: _ytmAccountService.isLoggedIn ? p.accent : const Color(0xFFFF5252),
+                onTap: () => setState(() => _selectedOnlineCategory = _ytmAccountService.isLoggedIn ? 'Recommended For You' : 'Global Top Hits'),
               ),
               const SizedBox(width: 10),
               _QuickCard(
@@ -777,14 +793,14 @@ class _OnlineCategorySection extends StatelessWidget {
             children: [
               SectionHeader(title: title),
               SizedBox(
-                height: isTablet ? 214 : 196,
+                height: isTablet ? 232 : 212,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   physics: const NeverScrollableScrollPhysics(),
                   padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
                   itemCount: 4,
                   itemBuilder: (context, index) => Padding(
-                    padding: const EdgeInsets.only(right: 14),
+                    padding: const EdgeInsetsDirectional.only(end: 14),
                     child: SizedBox(
                       width: size,
                       child: Column(
@@ -867,7 +883,7 @@ class _OnlineCategorySection extends StatelessWidget {
             children: [
               SectionHeader(title: title),
               SizedBox(
-                height: isTablet ? 214 : 196,
+                height: isTablet ? 232 : 212,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
@@ -967,7 +983,7 @@ class _TrendingCard extends StatelessWidget {
     final size = isTablet ? 158.0 : 138.0;
 
     return Padding(
-      padding: const EdgeInsets.only(right: 14),
+      padding: const EdgeInsetsDirectional.only(end: 14),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: onTap,
@@ -986,8 +1002,8 @@ class _TrendingCard extends StatelessWidget {
                     borderRadius: 18,
                   ),
                   // Scrim keeps the download icon legible over arbitrary artwork.
-                  Positioned(
-                    right: 6,
+                  PositionedDirectional(
+                    end: 6,
                     bottom: 6,
                     child: DecoratedBox(
                       decoration: BoxDecoration(

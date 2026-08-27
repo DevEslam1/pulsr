@@ -40,7 +40,6 @@ class MiniPlayer extends StatelessWidget {
           a.currentSong?.artist != b.currentSong?.artist ||
           a.currentSong?.remoteArtworkUrl != b.currentSong?.remoteArtworkUrl ||
           a.isPlaying != b.isPlaying ||
-          a.position != b.position ||
           a.duration != b.duration,
       builder: (context, state) {
         final song = state.currentSong;
@@ -48,10 +47,6 @@ class MiniPlayer extends StatelessWidget {
 
         final cubit = context.read<PlayerCubit>();
         final activeAccent = p.accent;
-
-        final progress = state.duration.inMilliseconds > 0
-            ? (state.position.inMilliseconds / state.duration.inMilliseconds).clamp(0.0, 1.0)
-            : 0.0;
 
         return Semantics(
           label: 'Now playing: ${song.title} by ${song.artist}',
@@ -68,162 +63,193 @@ class MiniPlayer extends StatelessWidget {
             },
             child: Padding(
               padding: const EdgeInsetsDirectional.fromSTEB(12, 4, 12, 8),
-            child: RepaintBoundary(
-              child: GlassContainer(
-                blur: 16,
-                opacity: p.isDark ? 0.92 : 0.96,
-                borderRadius: AppRadii.miniPlayerRadius,
-                color: Color.alphaBlend(activeAccent.withValues(alpha: p.isDark ? 0.12 : 0.08), p.surface),
-                border: Border.all(color: activeAccent.withValues(alpha: 0.22), width: 1.2),
-                child: ClipRRect(
+              child: RepaintBoundary(
+                child: GlassContainer(
+                  blur: 16,
+                  opacity: p.isDark ? 0.92 : 0.96,
                   borderRadius: AppRadii.miniPlayerRadius,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Directionality(
-                        textDirection: TextDirection.ltr,
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Hero(
-                                tag: 'now_playing_art',
-                                child: CachedArtwork(
-                                  id: song.id,
-                                  remoteUrl: song.remoteArtworkUrl,
-                                  type: ArtworkType.AUDIO,
-                                  size: 48,
-                                  borderRadius: 12,
+                  color: Color.alphaBlend(activeAccent.withValues(alpha: p.isDark ? 0.12 : 0.08), p.surface),
+                  border: Border.all(color: activeAccent.withValues(alpha: 0.22), width: 1.2),
+                  child: ClipRRect(
+                    borderRadius: AppRadii.miniPlayerRadius,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Directionality(
+                          textDirection: TextDirection.ltr,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(12, 8, 8, 8),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                Hero(
+                                  tag: 'now_playing_art_mini',
+                                  child: CachedArtwork(
+                                    id: song.id,
+                                    remoteUrl: song.remoteArtworkUrl,
+                                    type: ArtworkType.AUDIO,
+                                    size: 48,
+                                    borderRadius: 12,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      song.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: p.textPrimary,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 14.5,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      song.artist,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        color: p.textSecondary,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              IconButton(
-                                tooltip: state.isPlaying ? context.l10n.pause : context.l10n.play,
-                                icon: Icon(
-                                  state.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                                  color: activeAccent,
-                                  size: 32,
-                                ),
-                                onPressed: cubit.togglePlayPause,
-                              ),
-                              IconButton(
-                                tooltip: context.l10n.next,
-                                icon: Icon(
-                                  Icons.skip_next_rounded,
-                                  color: p.textPrimary,
-                                  size: 28,
-                                ),
-                                onPressed: cubit.next,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      // Edge-to-edge full width timeline with direct tap & scrub seeking
-                      Directionality(
-                        textDirection: TextDirection.ltr,
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            final trackWidth = constraints.maxWidth;
-                            return GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: () {},
-                              onTapDown: (details) {
-                                if (trackWidth > 0 && state.duration.inMilliseconds > 0) {
-                                  final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
-                                  final seekMs = (state.duration.inMilliseconds * ratio).round();
-                                  cubit.seek(Duration(milliseconds: seekMs));
-                                }
-                              },
-                              onHorizontalDragStart: (_) {},
-                              onHorizontalDragUpdate: (details) {
-                                if (trackWidth > 0 && state.duration.inMilliseconds > 0) {
-                                  final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
-                                  final seekMs = (state.duration.inMilliseconds * ratio).round();
-                                  cubit.seek(Duration(milliseconds: seekMs));
-                                }
-                              },
-                              child: SizedBox(
-                                height: 6.0,
-                                width: double.infinity,
-                                child: Stack(
-                                  alignment: Alignment.centerLeft,
-                                  children: [
-                                    Positioned.fill(
-                                      child: ColoredBox(color: p.hairline.withValues(alpha: 0.35)),
-                                    ),
-                                    Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: FractionallySizedBox(
-                                        widthFactor: progress,
-                                        alignment: Alignment.centerLeft,
-                                        child: Container(
-                                          height: 6.0,
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              colors: [
-                                                activeAccent.withValues(alpha: 0.7),
-                                                activeAccent,
-                                              ],
-                                            ),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: activeAccent.withValues(alpha: 0.45),
-                                                blurRadius: 4,
-                                              ),
-                                            ],
-                                          ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        song.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: p.textPrimary,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 14.5,
                                         ),
                                       ),
-                                    ),
-                                  ],
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        song.artist,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                          color: p.textSecondary,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            );
-                          },
+                                const SizedBox(width: 4),
+                                IconButton(
+                                  tooltip: state.isPlaying ? context.l10n.pause : context.l10n.play,
+                                  icon: Icon(
+                                    state.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                                    color: activeAccent,
+                                    size: 32,
+                                  ),
+                                  onPressed: cubit.togglePlayPause,
+                                ),
+                                IconButton(
+                                  tooltip: context.l10n.next,
+                                  icon: Icon(
+                                    Icons.skip_next_rounded,
+                                    color: p.textPrimary,
+                                    size: 28,
+                                  ),
+                                  onPressed: cubit.next,
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
-                    ],
+                        _MiniPlayerProgressBar(
+                          duration: state.duration,
+                          activeAccent: activeAccent,
+                          hairlineColor: p.hairline,
+                          onSeek: (pos) => cubit.seek(pos),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ),
           ),
-        ),
-      );
-    },
-  );
+        );
+      },
+    );
+  }
 }
+
+class _MiniPlayerProgressBar extends StatelessWidget {
+  final Duration duration;
+  final Color activeAccent;
+  final Color hairlineColor;
+  final void Function(Duration) onSeek;
+
+  const _MiniPlayerProgressBar({
+    required this.duration,
+    required this.activeAccent,
+    required this.hairlineColor,
+    required this.onSeek,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final trackWidth = constraints.maxWidth;
+          return BlocSelector<PlayerCubit, PlayerState, Duration>(
+            selector: (s) => s.position,
+            builder: (context, position) {
+              final progress = duration.inMilliseconds > 0
+                  ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
+                  : 0.0;
+
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTapDown: (details) {
+                  if (trackWidth > 0 && duration.inMilliseconds > 0) {
+                    final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                    final seekMs = (duration.inMilliseconds * ratio).round();
+                    onSeek(Duration(milliseconds: seekMs));
+                  }
+                },
+                onHorizontalDragStart: (_) {},
+                onHorizontalDragUpdate: (details) {
+                  if (trackWidth > 0 && duration.inMilliseconds > 0) {
+                    final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                    final seekMs = (duration.inMilliseconds * ratio).round();
+                    onSeek(Duration(milliseconds: seekMs));
+                  }
+                },
+                child: SizedBox(
+                  height: 6.0,
+                  width: double.infinity,
+                  child: Stack(
+                    alignment: Alignment.centerLeft,
+                    children: [
+                      Positioned.fill(
+                        child: ColoredBox(color: hairlineColor.withValues(alpha: 0.35)),
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: FractionallySizedBox(
+                          widthFactor: progress,
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            height: 6.0,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  activeAccent.withValues(alpha: 0.7),
+                                  activeAccent,
+                                ],
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: activeAccent.withValues(alpha: 0.45),
+                                  blurRadius: 4,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
 }

@@ -124,19 +124,8 @@ class NowPlayingWidget : AppWidgetProvider() {
             }
         }
 
-        // Post a delayed update to refresh widget state from actual media controller playback state
-        Handler(Looper.getMainLooper()).postDelayed({
-            try {
-                val appWidgetManager = AppWidgetManager.getInstance(context)
-                val componentName = ComponentName(context, NowPlayingWidget::class.java)
-                val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
-                if (appWidgetIds != null && appWidgetIds.isNotEmpty()) {
-                    for (id in appWidgetIds) {
-                        updateAppWidget(context, appWidgetManager, id)
-                    }
-                }
-            } catch (_: Throwable) {}
-        }, 500)
+        // Post a debounced delayed update to refresh widget state from actual media controller playback state
+        scheduleDebouncedWidgetUpdate(context, 300L)
     }
 
     override fun onUpdate(
@@ -155,14 +144,21 @@ class NowPlayingWidget : AppWidgetProvider() {
 
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
+        synchronized(mediaBrowserLock) {
+            try {
+                cachedMediaBrowser?.disconnect()
+            } catch (_: Throwable) {}
+            cachedMediaBrowser = null
+            cachedMediaController = null
+        }
         try {
-            cachedMediaBrowser?.disconnect()
+            cachedArtworkBitmap?.let {
+                if (!it.isRecycled) it.recycle()
+            }
         } catch (_: Throwable) {}
         cachedArtworkBitmap = null
         cachedArtworkPath = null
         cachedArtworkTargetPx = 0
-        cachedMediaBrowser = null
-        cachedMediaController = null
     }
 
     companion object {
@@ -203,6 +199,28 @@ class NowPlayingWidget : AppWidgetProvider() {
 
         private val mediaBrowserLock = Any()
 
+        private val updateHandler = Handler(Looper.getMainLooper())
+        private var pendingUpdateRunnable: Runnable? = null
+
+        fun scheduleDebouncedWidgetUpdate(context: Context, delayMs: Long = 150L) {
+            val appContext = context.applicationContext ?: context
+            pendingUpdateRunnable?.let { updateHandler.removeCallbacks(it) }
+            val runnable = Runnable {
+                try {
+                    val appWidgetManager = AppWidgetManager.getInstance(appContext)
+                    val componentName = ComponentName(appContext, NowPlayingWidget::class.java)
+                    val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
+                    if (appWidgetIds != null && appWidgetIds.isNotEmpty()) {
+                        for (id in appWidgetIds) {
+                            updateAppWidget(appContext, appWidgetManager, id)
+                        }
+                    }
+                } catch (_: Throwable) {}
+            }
+            pendingUpdateRunnable = runnable
+            updateHandler.postDelayed(runnable, delayMs)
+        }
+
         private fun performMediaAction(
             context: Context,
             fallbackKeyCode: Int? = null,
@@ -222,74 +240,87 @@ class NowPlayingWidget : AppWidgetProvider() {
                     }
                 }
 
-                val component = ComponentName(context, "com.ryanheise.audioservice.AudioService")
                 val appContext = context.applicationContext ?: context
                 val mainHandler = Handler(Looper.getMainLooper())
+                val actionExecuted = java.util.concurrent.atomic.AtomicBoolean(false)
                 var timeoutRunnable: Runnable? = null
+                var localBrowser: MediaBrowserCompat? = null
 
                 val connectionCallback = object : MediaBrowserCompat.ConnectionCallback() {
                     override fun onConnected() {
                         timeoutRunnable?.let { mainHandler.removeCallbacks(it) }
-                        try {
+                        if (!actionExecuted.compareAndSet(false, true)) {
                             synchronized(mediaBrowserLock) {
-                                val token = cachedMediaBrowser?.sessionToken
+                                try { localBrowser?.disconnect() } catch (_: Throwable) {}
+                            }
+                            return
+                        }
+                        try {
+                            val latestData = HomeWidgetPlugin.getData(appContext)
+                            val latestIsPlaying = getSafeBoolean(latestData, "isPlaying", false)
+                            synchronized(mediaBrowserLock) {
+                                val token = localBrowser?.sessionToken
                                 if (token != null) {
                                     val newController = MediaControllerCompat(appContext, token)
                                     cachedMediaController = newController
-                                    action(newController.transportControls, isPlaying, position, duration)
-                                } else if (fallbackKeyCode != null) {
-                                    sendExplicitMediaButton(appContext, fallbackKeyCode)
+                                    cachedMediaBrowser = localBrowser
+                                    action(
+                                        newController.transportControls,
+                                        latestIsPlaying,
+                                        getSafeLong(latestData, "positionMs", 0L),
+                                        getSafeLong(latestData, "durationMs", 0L)
+                                    )
+                                } else {
+                                    fallbackKeyCode?.let { sendExplicitMediaButton(appContext, it) }
+                                    try { localBrowser?.disconnect() } catch (_: Throwable) {}
                                 }
                             }
                         } catch (_: Throwable) {
-                            if (fallbackKeyCode != null) {
-                                sendExplicitMediaButton(appContext, fallbackKeyCode)
+                            fallbackKeyCode?.let { sendExplicitMediaButton(appContext, it) }
+                            synchronized(mediaBrowserLock) {
+                                try { localBrowser?.disconnect() } catch (_: Throwable) {}
                             }
                         }
                     }
 
                     override fun onConnectionFailed() {
                         timeoutRunnable?.let { mainHandler.removeCallbacks(it) }
+                        if (!actionExecuted.compareAndSet(false, true)) return
                         synchronized(mediaBrowserLock) {
-                            try {
-                                cachedMediaBrowser?.disconnect()
-                            } catch (_: Throwable) {}
-                            cachedMediaBrowser = null
-                            cachedMediaController = null
+                            try { localBrowser?.disconnect() } catch (_: Throwable) {}
                         }
-                        if (fallbackKeyCode != null) {
-                            sendExplicitMediaButton(appContext, fallbackKeyCode)
-                        }
+                        fallbackKeyCode?.let { sendExplicitMediaButton(appContext, it) }
                     }
                 }
 
                 synchronized(mediaBrowserLock) {
-                    try {
-                        cachedMediaBrowser?.disconnect()
-                    } catch (_: Throwable) {}
-                    cachedMediaBrowser = MediaBrowserCompat(appContext, component, connectionCallback, null)
-                    cachedMediaBrowser?.connect()
+                    try { cachedMediaBrowser?.disconnect() } catch (_: Throwable) {}
+                    cachedMediaBrowser = null
+                    cachedMediaController = null
+
+                    localBrowser = MediaBrowserCompat(
+                        appContext,
+                        ComponentName(appContext, "com.ryanheise.audioservice.AudioService"),
+                        connectionCallback,
+                        null
+                    )
+                    localBrowser?.connect()
                 }
 
                 timeoutRunnable = Runnable {
+                    if (!actionExecuted.compareAndSet(false, true)) return@Runnable
                     synchronized(mediaBrowserLock) {
-                        if (cachedMediaBrowser?.isConnected != true) {
-                            try {
-                                cachedMediaBrowser?.disconnect()
-                            } catch (_: Throwable) {}
+                        try { localBrowser?.disconnect() } catch (_: Throwable) {}
+                        if (cachedMediaBrowser == localBrowser) {
                             cachedMediaBrowser = null
                             cachedMediaController = null
-                            if (fallbackKeyCode != null) {
-                                sendExplicitMediaButton(appContext, fallbackKeyCode)
-                            }
                         }
                     }
+                    fallbackKeyCode?.let { sendExplicitMediaButton(appContext, it) }
                 }
                 mainHandler.postDelayed(timeoutRunnable, 5000)
             } catch (_: Throwable) {
-                if (fallbackKeyCode != null) {
-                    sendExplicitMediaButton(context, fallbackKeyCode)
-                }
+                fallbackKeyCode?.let { sendExplicitMediaButton(context, it) }
             }
         }
 
@@ -336,11 +367,11 @@ class NowPlayingWidget : AppWidgetProvider() {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     val viewsCompact = createPopulatedRemoteViews(context, R.layout.widget_now_playing, data, 56)
                     val viewsMedium = createPopulatedRemoteViews(context, R.layout.widget_now_playing_medium, data, 68)
-                    val viewsLarge = createPopulatedRemoteViews(context, R.layout.widget_now_playing_large, data, 96)
+                    val viewsLarge = createPopulatedRemoteViews(context, R.layout.widget_now_playing_large, data, 88)
                     val viewMapping = mapOf(
                         SizeF(140f, 60f) to viewsCompact,
-                        SizeF(180f, 130f) to viewsMedium,
-                        SizeF(180f, 200f) to viewsLarge
+                        SizeF(180f, 110f) to viewsMedium,
+                        SizeF(180f, 160f) to viewsLarge
                     )
                     val remoteViews = RemoteViews(viewMapping)
                     appWidgetManager.updateAppWidget(appWidgetId, remoteViews)
@@ -348,15 +379,15 @@ class NowPlayingWidget : AppWidgetProvider() {
                     val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
                     val minHeight = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0) ?: 0
                     val (layoutId, artDp) = when {
-                        minHeight >= 200 -> Pair(R.layout.widget_now_playing_large, 96)
-                        minHeight >= 130 -> Pair(R.layout.widget_now_playing_medium, 68)
+                        minHeight >= 160 -> Pair(R.layout.widget_now_playing_large, 88)
+                        minHeight >= 110 -> Pair(R.layout.widget_now_playing_medium, 68)
                         else -> Pair(R.layout.widget_now_playing, 56)
                     }
                     val views = createPopulatedRemoteViews(context, layoutId, data, artDp)
                     appWidgetManager.updateAppWidget(appWidgetId, views)
                 }
-            } catch (_: Throwable) {
-                // Ignore
+            } catch (e: Throwable) {
+                android.util.Log.e("NowPlayingWidget", "Widget update failed", e)
             }
         }
 
@@ -376,20 +407,44 @@ class NowPlayingWidget : AppWidgetProvider() {
 
             // ---- Album (for Medium & Large Layouts) ----
             val album = getSafeString(data, "album")
-            if (!album.isNullOrBlank() && album != "Unknown Album") {
-                views.setTextViewText(R.id.widget_album, album)
-                views.setViewVisibility(R.id.widget_album, View.VISIBLE)
-            } else {
-                views.setViewVisibility(R.id.widget_album, View.GONE)
+            if (layoutId == R.layout.widget_now_playing_medium || layoutId == R.layout.widget_now_playing_large) {
+                if (!album.isNullOrBlank() && album != "Unknown Album") {
+                    views.setTextViewText(R.id.widget_album, album)
+                    views.setViewVisibility(R.id.widget_album, View.VISIBLE)
+                } else {
+                    views.setViewVisibility(R.id.widget_album, View.GONE)
+                }
             }
 
             // ---- Up Next Queue Preview (for Large Layout) ----
-            val nextTrack0 = getSafeString(data, "nextTrack0")
-            if (!nextTrack0.isNullOrBlank()) {
-                views.setTextViewText(R.id.widget_next_track_title, nextTrack0)
+            if (layoutId == R.layout.widget_now_playing_large) {
+                val nextTrack0 = getSafeString(data, "nextTrack0")
+                val nextTrack1 = getSafeString(data, "nextTrack1")
+                val nextTrack2 = getSafeString(data, "nextTrack2")
+
+                if (!nextTrack0.isNullOrBlank()) {
+                    views.setTextViewText(R.id.widget_next_track_0, "1. $nextTrack0")
+                    views.setViewVisibility(R.id.widget_next_track_0, View.VISIBLE)
+                } else {
+                    views.setTextViewText(R.id.widget_next_track_0, "No upcoming tracks")
+                    views.setViewVisibility(R.id.widget_next_track_0, View.VISIBLE)
+                }
+
+                if (!nextTrack1.isNullOrBlank()) {
+                    views.setTextViewText(R.id.widget_next_track_1, "2. $nextTrack1")
+                    views.setViewVisibility(R.id.widget_next_track_1, View.VISIBLE)
+                } else {
+                    views.setViewVisibility(R.id.widget_next_track_1, View.GONE)
+                }
+
+                if (!nextTrack2.isNullOrBlank()) {
+                    views.setTextViewText(R.id.widget_next_track_2, "3. $nextTrack2")
+                    views.setViewVisibility(R.id.widget_next_track_2, View.VISIBLE)
+                } else {
+                    views.setViewVisibility(R.id.widget_next_track_2, View.GONE)
+                }
+
                 views.setViewVisibility(R.id.widget_queue_container, View.VISIBLE)
-            } else {
-                views.setTextViewText(R.id.widget_next_track_title, "Queue is empty")
             }
 
             // ---- Progress ----
@@ -477,13 +532,25 @@ class NowPlayingWidget : AppWidgetProvider() {
                             val rawBitmap = BitmapFactory.decodeFile(artworkPath, decodeOptions)
                             if (rawBitmap != null) {
                                 val scaledBitmap = if (rawBitmap.width > targetPx || rawBitmap.height > targetPx) {
-                                    Bitmap.createScaledBitmap(rawBitmap, targetPx, targetPx, true)
+                                    val scaled = Bitmap.createScaledBitmap(rawBitmap, targetPx, targetPx, true)
+                                    if (scaled != rawBitmap) {
+                                        rawBitmap.recycle()
+                                    }
+                                    scaled
                                 } else {
                                     rawBitmap
                                 }
                                 val cornerRadiusPx = (if (targetArtDp >= 90) 18f else 14f) * density
                                 val roundedBitmap = getRoundedCornerBitmap(scaledBitmap, cornerRadiusPx)
+                                if (roundedBitmap != scaledBitmap && !scaledBitmap.isRecycled) {
+                                    scaledBitmap.recycle()
+                                }
 
+                                cachedArtworkBitmap?.let {
+                                    if (!it.isRecycled && it != roundedBitmap) {
+                                        it.recycle()
+                                    }
+                                }
                                 cachedArtworkBitmap = roundedBitmap
                                 cachedArtworkPath = artworkPath
                                 cachedArtworkMtime = mtime
@@ -510,7 +577,9 @@ class NowPlayingWidget : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widget_artwork, openAppIntent)
             views.setOnClickPendingIntent(R.id.widget_info_area, openAppIntent)
-            views.setOnClickPendingIntent(R.id.widget_queue_container, openAppIntent)
+            if (layoutId == R.layout.widget_now_playing_large) {
+                views.setOnClickPendingIntent(R.id.widget_queue_container, openAppIntent)
+            }
 
             // ---- Background Actions (Exclusively targeted to Pulsr) ----
             views.setOnClickPendingIntent(
@@ -538,15 +607,13 @@ class NowPlayingWidget : AppWidgetProvider() {
                 createBroadcastPendingIntent(context, ACTION_FAVORITE, 106)
             )
 
-            // ---- 20 Granular Slider Seek Tap Zones (5% steps) ----
+            // ---- 10 Granular Slider Seek Tap Zones (10% steps) ----
             val seekViews = intArrayOf(
                 R.id.btn_seek_01, R.id.btn_seek_02, R.id.btn_seek_03, R.id.btn_seek_04, R.id.btn_seek_05,
-                R.id.btn_seek_06, R.id.btn_seek_07, R.id.btn_seek_08, R.id.btn_seek_09, R.id.btn_seek_10,
-                R.id.btn_seek_11, R.id.btn_seek_12, R.id.btn_seek_13, R.id.btn_seek_14, R.id.btn_seek_15,
-                R.id.btn_seek_16, R.id.btn_seek_17, R.id.btn_seek_18, R.id.btn_seek_19, R.id.btn_seek_20
+                R.id.btn_seek_06, R.id.btn_seek_07, R.id.btn_seek_08, R.id.btn_seek_09, R.id.btn_seek_10
             )
             for (i in seekViews.indices) {
-                val ratio = ((i + 1) * 0.05f).coerceIn(0.02f, 0.99f)
+                val ratio = ((i + 1).toFloat() / seekViews.size.toFloat()).coerceIn(0.01f, 0.99f)
                 views.setOnClickPendingIntent(
                     seekViews[i],
                     createSeekPendingIntent(context, ratio, 300 + i)
@@ -583,7 +650,7 @@ class NowPlayingWidget : AppWidgetProvider() {
 
         private fun getRoundedCornerBitmap(bitmap: Bitmap, cornerRadiusPx: Float): Bitmap {
             return try {
-                val output = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+                val output = Bitmap.createBitmap(bitmap.width, bitmap.height, bitmap.config ?: Bitmap.Config.ARGB_8888)
                 val canvas = Canvas(output)
                 val paint = Paint(Paint.ANTI_ALIAS_FLAG)
                 val rect = Rect(0, 0, bitmap.width, bitmap.height)

@@ -41,8 +41,12 @@ class MusicRepository implements IMusicRepository {
       }
 
       if (excludedFolders.isNotEmpty) {
-        for (final folder in excludedFolders) {
-          final prefix = folder.endsWith(Platform.pathSeparator) ? folder : '$folder${Platform.pathSeparator}';
+        final sanitizedFolders = excludedFolders
+            .where((f) => f.trim().isNotEmpty)
+            .map((folder) => folder.endsWith(Platform.pathSeparator) ? folder : '$folder${Platform.pathSeparator}')
+            .toList();
+
+        for (final prefix in sanitizedFolders) {
           query.where((t) => t.path.like('$prefix%').not());
         }
       }
@@ -86,6 +90,10 @@ class MusicRepository implements IMusicRepository {
         query.orderBy([(t) => OrderingTerm(expression: t.title, mode: ascending ? OrderingMode.asc : OrderingMode.desc)]);
       } else if (sortBy == 'artist') {
         query.orderBy([(t) => OrderingTerm(expression: t.artist, mode: ascending ? OrderingMode.asc : OrderingMode.desc)]);
+      } else if (sortBy == 'dateAdded') {
+        query.orderBy([(t) => OrderingTerm(expression: t.dateAdded, mode: ascending ? OrderingMode.asc : OrderingMode.desc)]);
+      } else if (sortBy == 'duration') {
+        query.orderBy([(t) => OrderingTerm(expression: t.durationMs, mode: ascending ? OrderingMode.asc : OrderingMode.desc)]);
       }
       if (limit != null) {
         query.limit(limit, offset: offset);
@@ -856,28 +864,40 @@ class MusicRepository implements IMusicRepository {
         return const Right(0);
       }
 
-      int markedMissingCount = 0;
-      await _db.transaction(() async {
-        // Soft delete: mark missing songs only if the file actually no longer exists on disk
-        // to handle SD card remounts and transient indexing gaps cleanly.
-        final unscannedSongs = await (_db.select(_db.songsTable)
-              ..where((t) =>
-                  t.id.isNotIn(scannedSongIds) &
-                  t.id.isBiggerThanValue(0) &
-                  t.source.equals(SongSource.local)))
-            .get();
+      // 1. Fetch unscanned local songs outside the transaction
+      final unscannedSongs = await (_db.select(_db.songsTable)
+            ..where((t) =>
+                t.id.isNotIn(scannedSongIds) &
+                t.id.isBiggerThanValue(0) &
+                t.source.equals(SongSource.local)))
+          .get();
 
-        final trulyMissingIds = <int>[];
-        final reappearedIds = <int>[];
+      // 2. Perform bounded async disk checks (max 16 concurrent) without blocking database locks
+      final trulyMissingIds = <int>[];
+      final reappearedIds = <int>[];
+      const chunkSize = 16;
 
-        for (final song in unscannedSongs) {
-          if (song.path.isNotEmpty && (song.path.startsWith('content:') || File(song.path).existsSync())) {
+      for (var i = 0; i < unscannedSongs.length; i += chunkSize) {
+        final end = (i + chunkSize < unscannedSongs.length) ? i + chunkSize : unscannedSongs.length;
+        final chunk = unscannedSongs.sublist(i, end);
+        await Future.wait(chunk.map((song) async {
+          if (song.path.isEmpty) {
+            trulyMissingIds.add(song.id);
+          } else if (song.path.startsWith('content:')) {
             reappearedIds.add(song.id);
           } else {
-            trulyMissingIds.add(song.id);
+            final exists = await File(song.path).exists();
+            if (exists) {
+              reappearedIds.add(song.id);
+            } else {
+              trulyMissingIds.add(song.id);
+            }
           }
-        }
+        }));
+      }
 
+      int markedMissingCount = 0;
+      await _db.transaction(() async {
         if (trulyMissingIds.isNotEmpty) {
           markedMissingCount = await (_db.update(_db.songsTable)
                 ..where((t) => t.id.isIn(trulyMissingIds)))
@@ -954,10 +974,17 @@ class MusicRepository implements IMusicRepository {
 
       // Reconcile and cleanup orphaned albums and artists in single SQL queries
       await _db.customStatement(
-        'DELETE FROM albums WHERE id NOT IN (SELECT DISTINCT album_id FROM songs WHERE album_id IS NOT NULL);',
+        'DELETE FROM albums WHERE NOT EXISTS (SELECT 1 FROM songs WHERE songs.album_id = albums.id AND songs.is_missing = 0);',
       );
       await _db.customStatement(
-        'DELETE FROM artists WHERE id NOT IN (SELECT DISTINCT artist_id FROM songs WHERE artist_id IS NOT NULL);',
+        'DELETE FROM artists WHERE NOT EXISTS (SELECT 1 FROM songs WHERE songs.artist_id = artists.id AND songs.is_missing = 0);',
+      );
+      // Update songCount for surviving albums/artists that partially lost songs
+      await _db.customStatement(
+        'UPDATE albums SET song_count = (SELECT COUNT(*) FROM songs WHERE songs.album_id = albums.id AND songs.is_missing = 0);',
+      );
+      await _db.customStatement(
+        'UPDATE artists SET song_count = (SELECT COUNT(*) FROM songs WHERE songs.artist_id = artists.id AND songs.is_missing = 0);',
       );
 
       return Right(deletedCount);
@@ -974,36 +1001,41 @@ class MusicRepository implements IMusicRepository {
   }) async {
     try {
       int? survivingId;
-      await _db.transaction(() async {
-        final oldRow = await (_db.select(_db.songsTable)..where((t) => t.id.equals(oldId))).getSingleOrNull();
+      // Step 1: Read + Compute outside transaction
+      final oldRow = await (_db.select(_db.songsTable)..where((t) => t.id.equals(oldId))).getSingleOrNull();
 
-        // Find the row the scanner minted for the downloaded file. getSongByPath
-        // is unusable here: getSingleOrNull() throws if MediaStore re-indexed
-        // the same path under more than one id (there is no unique index on path).
-        var newRow = await (_db.select(_db.songsTable)
-              ..where((t) => t.path.equals(newPath) & t.id.isBiggerThanValue(0))
+      // Find the row the scanner minted for the downloaded file.
+      var newRow = await (_db.select(_db.songsTable)
+            ..where((t) => t.path.equals(newPath))
+            ..orderBy([(t) => OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)])
+            ..limit(1))
+          .getSingleOrNull();
+
+      // Fallback: match on normalized metadata
+      final matchMetadata = oldRow ?? fallbackSong;
+      if (newRow == null && matchMetadata != null) {
+        newRow = await (_db.select(_db.songsTable)
+              ..where((t) =>
+                  t.source.equals(SongSource.local) &
+                  t.title.lower().equals(matchMetadata.title.toLowerCase()) &
+                  t.artist.lower().equals(matchMetadata.artist.toLowerCase()) &
+                  t.durationMs.isBetweenValues(matchMetadata.durationMs - 5000, matchMetadata.durationMs + 5000))
               ..orderBy([(t) => OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)])
               ..limit(1))
             .getSingleOrNull();
 
-        // Fallback: MediaStore may rename the file to dodge a collision, so the
-        // path won't match. Match on normalized metadata instead.
-        final matchMetadata = oldRow ?? fallbackSong;
-        if (newRow == null && matchMetadata != null) {
-          newRow = await (_db.select(_db.songsTable)
-                ..where((t) =>
-                    t.id.isBiggerThanValue(0) &
-                    t.source.equals(SongSource.local) &
-                    t.title.lower().equals(matchMetadata.title.toLowerCase()) &
-                    t.artist.lower().equals(matchMetadata.artist.toLowerCase()) &
-                    t.durationMs.isBetweenValues(matchMetadata.durationMs - 5000, matchMetadata.durationMs + 5000))
-                ..orderBy([(t) => OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)])
-                ..limit(1))
-              .getSingleOrNull();
+        // Verify the file actually exists before accepting the metadata match (R3-02)
+        if (newRow != null && !await File(newRow.path).exists()) {
+          newRow = null;
         }
+      }
 
+      final fileExists = await File(newPath).exists();
+
+      // Step 2: Write phase in focused transaction
+      await _db.transaction(() async {
         if (newRow == null) {
-          if (File(newPath).existsSync()) {
+          if (fileExists) {
             final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
             if (oldRow != null) {
               await (_db.update(_db.songsTable)..where((t) => t.id.equals(oldId))).write(
@@ -1040,10 +1072,10 @@ class MusicRepository implements IMusicRepository {
           }
           return;
         }
+
         final targetId = newRow.id;
         survivingId = targetId;
 
-        // Old row already gone (reconciled twice) or scanner reused the id: nothing to fold.
         if (oldRow == null || oldRow.id == targetId) return;
 
         try {
@@ -1065,14 +1097,14 @@ class MusicRepository implements IMusicRepository {
           await (_db.update(_db.playHistoryTable)..where((t) => t.songId.equals(oldId)))
               .write(PlayHistoryTableCompanion(songId: Value(targetId)));
 
-          // Delete the YT row BEFORE writing remoteId onto the new row: the
-          // partial unique index on remote_id would otherwise see two rows.
+          // Delete old row
           await (_db.delete(_db.songsTable)..where((t) => t.id.equals(oldId))).go();
         } catch (e, st) {
-          ErrorLogger.log('Constraint exception in reconcileDownloadedSong; applying direct cleanup',
+          ErrorLogger.log('Constraint exception in reconcileDownloadedSong; marking row as missing',
               error: e, stackTrace: st, category: 'MusicRepository');
           try {
-            await (_db.delete(_db.songsTable)..where((t) => t.id.equals(oldId))).go();
+            await (_db.update(_db.songsTable)..where((t) => t.id.equals(oldId)))
+                .write(const SongsTableCompanion(isMissing: Value(true)));
           } catch (_) {}
         }
 

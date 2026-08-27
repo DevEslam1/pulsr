@@ -190,9 +190,11 @@ internal class InnertubeClient(
 
         // Helper function to attempt resolution on a single client
         fun attemptClient(client: ClientType): Map<String, Any?>? {
+            if (Thread.currentThread().isInterrupted) return null
             try {
                 Log.d(TAG, "Attempting player resolution for $videoId using client: ${client.name}")
                 val playerJson = requestPlayer(videoId, client)
+                if (Thread.currentThread().isInterrupted) return null
 
                 val playability = playerJson.optJSONObject("playabilityStatus")
                 val status = playability?.optString("status") ?: ""
@@ -261,32 +263,38 @@ internal class InnertubeClient(
             }
         }
 
+        // Overall deadline for the entire stream resolution (25s total budget)
+        val overallDeadline = android.os.SystemClock.elapsedRealtime() + 25_000L
+
         // Fast parallel race for the top 3 high-probability clients
         val fastTier = clientChain.take(3)
         val slowTier = clientChain.drop(3)
 
-        val executor = java.util.concurrent.Executors.newFixedThreadPool(fastTier.size)
-        try {
-            val completionService = java.util.concurrent.ExecutorCompletionService<Map<String, Any?>?>(executor)
-            for (client in fastTier) {
-                completionService.submit(java.util.concurrent.Callable { attemptClient(client) })
-            }
-
-            for (i in fastTier.indices) {
-                try {
-                    val future = completionService.poll(6, java.util.concurrent.TimeUnit.SECONDS) ?: continue
-                    val res = future.get()
-                    if (res != null) {
-                        return res
-                    }
-                } catch (_: Throwable) {}
-            }
-        } finally {
-            executor.shutdownNow()
+        val completionService = java.util.concurrent.ExecutorCompletionService<Map<String, Any?>?>(streamResolverPool)
+        for (client in fastTier) {
+            completionService.submit(java.util.concurrent.Callable { attemptClient(client) })
         }
 
-        // Fallback: sequential check for remaining specialized clients
+        for (i in fastTier.indices) {
+            val remainingMs = overallDeadline - android.os.SystemClock.elapsedRealtime()
+            if (remainingMs <= 0) break
+            val pollMs = remainingMs.coerceAtMost(6000L)
+            try {
+                val future = completionService.poll(pollMs, java.util.concurrent.TimeUnit.MILLISECONDS) ?: continue
+                val res = future.get()
+                if (res != null) {
+                    return res
+                }
+            } catch (_: Throwable) {}
+        }
+
+        // Fallback: sequential check for remaining specialized clients within remaining time budget
         for (client in slowTier) {
+            val remainingMs = overallDeadline - android.os.SystemClock.elapsedRealtime()
+            if (remainingMs <= 0) {
+                Log.w(TAG, "Timed out waiting for slow tier stream resolution for $videoId")
+                break
+            }
             val res = attemptClient(client)
             if (res != null) return res
         }
@@ -395,7 +403,7 @@ internal class InnertubeClient(
                 connection.setRequestProperty("User-Agent", clientType.userAgent)
                 connection.setRequestProperty("X-Goog-Api-Key", API_KEY)
                 connection.setRequestProperty("x-youtube-client-name", clientType.clientNameId)
-                connection.setRequestProperty("x-youtube-client-version", clientType.clientVersion)
+                connection.setRequestProperty("x-youtube-client-version", clientType.effectiveClientVersion)
 
                 // Attach visitorData if available
                 val authedWeb = clientType.isWeb && cookieStore.isSessionValid()
@@ -550,13 +558,8 @@ internal class InnertubeClient(
         val playbackContext = JSONObject()
         val contentPlaybackContext = JSONObject().apply {
             put("html5Preference", "HTML5_PREF_WANTS")
-            if (PoTokenManager.isReady) {
-                val dataSyncId = PoTokenManager.dataSyncId
-                val poToken = if (clientType.isWeb && cookieStore.isSessionValid() && dataSyncId.isNotEmpty()) {
-                    PoTokenManager.accountPoTokenForSync(dataSyncId)
-                } else {
-                    PoTokenManager.poTokenForSync(videoId)
-                }
+            if (!clientType.isWeb && PoTokenManager.isReady) {
+                val poToken = PoTokenManager.poTokenForSync(videoId)
                 if (poToken.isNotEmpty()) {
                     put("poToken", poToken)
                 }
@@ -565,14 +568,20 @@ internal class InnertubeClient(
         playbackContext.put("contentPlaybackContext", contentPlaybackContext)
         root.put("playbackContext", playbackContext)
 
-        // Web clients attest via root-level serviceIntegrityDimensions as well;
-        // mobile clients only read contentPlaybackContext.poToken. Sending both
-        // keeps every client in the chain covered.
-        if (clientType.isWeb && contentPlaybackContext.has("poToken")) {
-            root.put(
-                "serviceIntegrityDimensions",
-                JSONObject().put("poToken", contentPlaybackContext.getString("poToken")),
-            )
+        // Web clients attest via root-level serviceIntegrityDimensions; mobile clients use contentPlaybackContext.poToken.
+        if (clientType.isWeb && PoTokenManager.isReady) {
+            val dataSyncId = PoTokenManager.dataSyncId
+            val poToken = if (cookieStore.isSessionValid() && dataSyncId.isNotEmpty()) {
+                PoTokenManager.accountPoTokenForSync(dataSyncId)
+            } else {
+                PoTokenManager.poTokenForSync(videoId)
+            }
+            if (poToken.isNotEmpty()) {
+                root.put(
+                    "serviceIntegrityDimensions",
+                    JSONObject().put("poToken", poToken),
+                )
+            }
         }
 
         return root
@@ -669,5 +678,17 @@ internal class InnertubeClient(
     companion object {
         private const val TAG = "InnertubeClient"
         var API_KEY: String = System.getProperty("YTM_API_KEY") ?: "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30"
+        val streamResolverPool: java.util.concurrent.ExecutorService = java.util.concurrent.Executors.newFixedThreadPool(3) { r ->
+            Thread(r).apply {
+                isDaemon = true
+                name = "InnertubeStream-${id}"
+            }
+        }
+
+        fun shutdown() {
+            try {
+                streamResolverPool.shutdownNow()
+            } catch (_: Exception) {}
+        }
     }
 }

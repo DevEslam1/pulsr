@@ -18,6 +18,7 @@ class WidgetService {
 
   final OnAudioQuery _audioQuery = OnAudioQuery();
   final Map<int, String> _artworkCache = {};
+  final Map<int, Uint8List> _roundedArtworkCache = {};
 
   int? _lastSavedArtworkSongId;
 
@@ -96,17 +97,22 @@ class WidgetService {
         _artworkCache[songId] = cachedFile.path;
         return cachedFile.path;
       }
-      final bytes = await _audioQuery.queryArtwork(
-        songId,
-        ArtworkType.AUDIO,
-        format: ArtworkFormat.JPEG,
-        size: 256,
-        quality: 90,
-      );
-      if (bytes == null || bytes.isEmpty) return null;
 
-      final rounded = await _roundCorners(bytes, size: 256, radius: 56);
-      if (rounded == null) return null;
+      Uint8List? rounded = _roundedArtworkCache[songId];
+      if (rounded == null) {
+        final bytes = await _audioQuery.queryArtwork(
+          songId,
+          ArtworkType.AUDIO,
+          format: ArtworkFormat.JPEG,
+          size: 256,
+          quality: 90,
+        );
+        if (bytes == null || bytes.isEmpty) return null;
+
+        rounded = await _roundCorners(bytes, size: 256, radius: 56);
+        if (rounded == null) return null;
+        _roundedArtworkCache[songId] = rounded;
+      }
 
       await cachedFile.writeAsBytes(rounded, flush: true);
       _artworkCache[songId] = cachedFile.path;
@@ -121,13 +127,17 @@ class WidgetService {
     required int size,
     required double radius,
   }) async {
+    ui.Codec? codec;
+    ui.FrameInfo? frame;
+    ui.Picture? picture;
+    ui.Image? out;
     try {
-      final codec = await ui.instantiateImageCodec(
+      codec = await ui.instantiateImageCodec(
         src,
         targetWidth: size,
         targetHeight: size,
       );
-      final frame = await codec.getNextFrame();
+      frame = await codec.getNextFrame();
 
       final recorder = ui.PictureRecorder();
       final canvas = ui.Canvas(recorder);
@@ -140,19 +150,19 @@ class WidgetService {
         ui.Paint()..filterQuality = ui.FilterQuality.medium,
       );
 
-      final picture = recorder.endRecording();
-      final out = await picture.toImage(size, size);
+      picture = recorder.endRecording();
+      out = await picture.toImage(size, size);
       final byteData = await out.toByteData(format: ui.ImageByteFormat.png);
-
-      picture.dispose();
-      out.dispose();
-      frame.image.dispose();
-      codec.dispose();
 
       return byteData?.buffer.asUint8List();
     } catch (e, st) {
       ErrorLogger.log('Failed to round corners for widget artwork', error: e, stackTrace: st, category: 'WidgetService');
       return null;
+    } finally {
+      picture?.dispose();
+      out?.dispose();
+      frame?.image.dispose();
+      codec?.dispose();
     }
   }
 

@@ -27,7 +27,7 @@ class ArtworkPicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final bool hasCustomNewImage = newArtworkPath != null && File(newArtworkPath!).existsSync();
+    final bool hasCustomNewImage = newArtworkPath != null && newArtworkPath!.isNotEmpty;
     final bool hasBytesImage = artworkBytes != null && artworkBytes!.isNotEmpty && !removeArtwork;
 
     return Center(
@@ -61,6 +61,9 @@ class ArtworkPicker extends StatelessWidget {
                             fit: BoxFit.cover,
                             width: 150,
                             height: 150,
+                            errorBuilder: (_, __, ___) => Center(
+                              child: Icon(Icons.music_note_rounded, size: 64, color: p.textSecondary),
+                            ),
                           )
                         : hasBytesImage
                             ? Image.memory(

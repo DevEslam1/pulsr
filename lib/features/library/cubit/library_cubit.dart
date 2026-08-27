@@ -200,10 +200,27 @@ class LibraryCubit extends Cubit<LibraryState> {
   }
 
   Future<void> toggleFavorite(int songId) async {
+    final previousFavorites = state.favorites;
+    final currentFavs = List<SongsTableData>.from(state.favorites);
+    final isFav = currentFavs.any((s) => s.id == songId);
+    if (isFav) {
+      currentFavs.removeWhere((s) => s.id == songId);
+      emit(state.copyWith(favorites: currentFavs));
+    } else {
+      final matchingSong = state.songs.cast<SongsTableData?>().firstWhere(
+            (s) => s?.id == songId,
+            orElse: () => null,
+          );
+      if (matchingSong != null) {
+        currentFavs.add(matchingSong.copyWith(isFavorite: true));
+        emit(state.copyWith(favorites: currentFavs));
+      }
+    }
+
     final result = await _toggleFavoriteUseCase(songId);
     if (isClosed) return;
     result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
+      (failure) => emit(state.copyWith(favorites: previousFavorites, errorMessage: failure.message)),
       (_) => null,
     );
   }
@@ -261,13 +278,20 @@ class LibraryCubit extends Cubit<LibraryState> {
 
   /// Synchronizes private Liked Music from the authenticated YouTube Music web account.
   Future<int> syncYtmAccountLikes() async {
-    final accountService = getIt<YtmAccountService>();
-    if (!accountService.isLoggedIn) {
-      throw Exception('Not signed in to YouTube Music');
+    try {
+      final accountService = getIt<YtmAccountService>();
+      if (!accountService.isLoggedIn) {
+        emit(state.copyWith(errorMessage: 'Not signed in to YouTube Music'));
+        return 0;
+      }
+      final tracks = await accountService.fetchLikedSongs();
+      final count = await importYtmTracksAsFavorites(tracks);
+      return count;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to sync YTM account likes', error: e, stackTrace: st, category: 'LibraryCubit');
+      if (!isClosed) emit(state.copyWith(errorMessage: 'Failed to sync YouTube Music likes'));
+      return 0;
     }
-    final tracks = await accountService.fetchLikedSongs();
-    final count = await importYtmTracksAsFavorites(tracks);
-    return count;
   }
 
   @override

@@ -49,13 +49,17 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
             // poToken + guest visitorData), so attaching account cookies there produces a
             // cookie/token mismatch YouTube rejects. Cookies still flow to browse/search/next.
             if (!isPlayerRequest(request.url())) {
-                val cookieHeader = resolveCookies(request.url())
-                if (!cookieHeader.isNullOrEmpty()) {
-                    val existing = connection.getRequestProperty("Cookie")
-                    if (existing.isNullOrEmpty()) {
-                        connection.setRequestProperty("Cookie", cookieHeader)
-                    } else {
-                        connection.setRequestProperty("Cookie", "$existing; $cookieHeader")
+                val rawCookieHeader = resolveCookies(request.url())
+                if (!rawCookieHeader.isNullOrEmpty()) {
+                    val cookieHeader = sanitizeCookieHeader(rawCookieHeader)
+                    if (cookieHeader.isNotEmpty()) {
+                        val existing = connection.getRequestProperty("Cookie")
+                        if (existing.isNullOrEmpty()) {
+                            connection.setRequestProperty("Cookie", cookieHeader)
+                        } else {
+                            val combined = sanitizeCookieHeader("$existing; $cookieHeader")
+                            connection.setRequestProperty("Cookie", combined)
+                        }
                     }
                 }
             }
@@ -160,5 +164,12 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
         private const val CONNECT_TIMEOUT_MS = 15_000
         private const val READ_TIMEOUT_MS = 30_000
         private const val HTTP_TOO_MANY_REQUESTS = 429
+
+        fun sanitizeCookieHeader(cookies: String): String {
+            return cookies.split(';')
+                .map { it.trim() }
+                .filter { it.contains('=') && !it.startsWith('=') }
+                .joinToString("; ")
+        }
     }
 }

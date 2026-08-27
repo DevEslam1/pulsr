@@ -25,22 +25,36 @@ void ConvolutionReverb::setPreset(ReverbPreset preset) {
 }
 
 void ConvolutionReverb::loadCustomIR(const float* irSamples, int sampleCount) {
-    if (!irSamples || sampleCount <= 0) return;
+    if (!irSamples || sampleCount <= 0 || sampleRate_ <= 0) {
+        irLength_ = 0;
+        irL_.clear();
+        irR_.clear();
+        historyL_.clear();
+        historyR_.clear();
+        historyIdx_ = 0;
+        return;
+    }
     int maxLen = static_cast<int>(sampleRate_ * 3.0); // max 3 seconds
     irLength_ = std::min(sampleCount, maxLen);
+    if (irLength_ <= 0) {
+        irLength_ = 0;
+        return;
+    }
     irL_.resize(irLength_);
     irR_.resize(irLength_);
 
-    float maxVal = 0.0001f;
+    float sumSq = 0.0f;
     for (int i = 0; i < irLength_; ++i) {
         irL_[i] = irSamples[i];
         irR_[i] = irSamples[i];
-        maxVal = std::max(maxVal, std::abs(irSamples[i]));
+        sumSq += irSamples[i] * irSamples[i];
     }
-    // Normalize IR energy
-    for (int i = 0; i < irLength_; ++i) {
-        irL_[i] /= maxVal;
-        irR_[i] /= maxVal;
+    float rms = std::sqrt(sumSq / irLength_);
+    if (rms > 0.0001f) {
+        for (int i = 0; i < irLength_; ++i) {
+            irL_[i] = (irL_[i] / rms) * 0.4f;
+            irR_[i] = (irR_[i] / rms) * 0.4f;
+        }
     }
 
     historyL_.assign(irLength_, 0.0f);
@@ -138,7 +152,9 @@ void ConvolutionReverb::generatePresetIR(ReverbPreset preset) {
 void ConvolutionReverb::process(float* L, float* R, int frames) {
     if (!enabled_ || !L || !R || frames <= 0 || irLength_ <= 0 || wetRatio_ <= 0.001f) return;
 
-    const int step = qualityStep_;
+    const int step = (irLength_ < 256) ? 1 : std::min(qualityStep_, irLength_);
+    if (step <= 0) return;
+
     float dryGain = 1.0f - wetRatio_ * 0.5f;
     float wetGain = wetRatio_ * std::sqrt(static_cast<float>(step));
 
@@ -157,7 +173,7 @@ void ConvolutionReverb::process(float* L, float* R, int frames) {
             convL += historyL_[hIdx] * irL_[i];
             convR += historyR_[hIdx] * irR_[i];
             hIdx -= step;
-            if (hIdx < 0) hIdx += irLength_;
+            while (hIdx < 0) hIdx += irLength_;
         }
 
         historyIdx_ = (historyIdx_ + 1) % irLength_;
@@ -170,7 +186,9 @@ void ConvolutionReverb::process(float* L, float* R, int frames) {
 void ConvolutionReverb::processInterleaved(float* buffer, int frames) {
     if (!enabled_ || !buffer || frames <= 0 || irLength_ <= 0 || wetRatio_ <= 0.001f) return;
 
-    const int step = qualityStep_;
+    const int step = (irLength_ < 256) ? 1 : std::min(qualityStep_, irLength_);
+    if (step <= 0) return;
+
     float dryGain = 1.0f - wetRatio_ * 0.5f;
     float wetGain = wetRatio_ * std::sqrt(static_cast<float>(step));
 
@@ -189,7 +207,7 @@ void ConvolutionReverb::processInterleaved(float* buffer, int frames) {
             convL += historyL_[hIdx] * irL_[i];
             convR += historyR_[hIdx] * irR_[i];
             hIdx -= step;
-            if (hIdx < 0) hIdx += irLength_;
+            while (hIdx < 0) hIdx += irLength_;
         }
 
         historyIdx_ = (historyIdx_ + 1) % irLength_;

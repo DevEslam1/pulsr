@@ -119,15 +119,21 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSincResamplerRates(
     AudioDspEngine::instance().resampler().setRates(inRate, outRate);
 }
 
-JNIEXPORT void JNICALL
+JNIEXPORT jint JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeProcessAudio(
         JNIEnv* env, jobject /* thiz */, jfloatArray buffer, jint frames, jint channels) {
-    if (!buffer || frames <= 0) return;
-    jfloat* data = env->GetFloatArrayElements(buffer, nullptr);
-    if (data) {
-        AudioDspEngine::instance().processInterleaved(data, frames, channels);
-        env->ReleaseFloatArrayElements(buffer, data, 0); // 0 = commit back to Java array
+    if (!buffer || frames <= 0 || channels < 1 || channels > 8) return 0;
+    jsize arrayLen = env->GetArrayLength(buffer);
+    jsize requiredLen = static_cast<jsize>(frames) * channels;
+    if (arrayLen < requiredLen) {
+        frames = static_cast<jint>(arrayLen / channels);
+        if (frames <= 0) return 0;
     }
+    jfloat* data = env->GetFloatArrayElements(buffer, nullptr);
+    if (!data) return 0;
+    int outFrames = AudioDspEngine::instance().processInterleaved(data, frames, channels);
+    env->ReleaseFloatArrayElements(buffer, data, 0); // 0 = commit back to Java array
+    return static_cast<jint>(outFrames);
 }
 
 JNIEXPORT jfloatArray JNICALL

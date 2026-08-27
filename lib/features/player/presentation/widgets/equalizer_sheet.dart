@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/adaptive.dart';
 import '../../../../data/audio/headphone_profiles_repository.dart';
 import '../../../../domain/models/audio_effects_config.dart';
 import '../../../../domain/models/eq_preset.dart';
@@ -155,118 +156,127 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
       builder: (context, state) {
         final cubit = context.read<PlayerCubit>();
 
-        return Material(
-          color: p.surface,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          clipBehavior: Clip.antiAlias,
-          child: SizedBox(
-            height: MediaQuery.of(context).size.height * 0.82,
-            child: Column(
-              children: [
-                // Top Handle
-                const SizedBox(height: 12),
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: p.hairline,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Header Title + Global EQ Toggle
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
+        return Align(
+          alignment: Alignment.bottomCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxWidth: Adaptive.sheetConstraints(context).maxWidth,
+              maxHeight: MediaQuery.sizeOf(context).height * (context.isLandscape ? 0.95 : 0.84),
+            ),
+            child: Material(
+              color: p.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              clipBehavior: Clip.antiAlias,
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  children: [
+                    // Top Handle
+                    const SizedBox(height: 12),
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
                         decoration: BoxDecoration(
-                          color: p.accent.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
+                          color: p.hairline,
+                          borderRadius: BorderRadius.circular(2),
                         ),
-                        child: Icon(Icons.graphic_eq_rounded, color: p.accent, size: 20),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Audio Engine & Effects',
-                              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: p.textPrimary),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Header Title + Global EQ Toggle
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: p.accent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            Text(
-                              state.isEqEnabled
-                                  ? (state.selectedHeadphoneProfile != null
-                                      ? 'Tuned for ${state.selectedHeadphoneProfile!.name}'
-                                      : 'Preset: ${state.eqPreset.name}')
-                                  : 'Audio effects bypassed',
-                              style: TextStyle(fontSize: 11, color: p.textTertiary, fontWeight: FontWeight.w500),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            child: Icon(Icons.graphic_eq_rounded, color: p.accent, size: 20),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Audio Engine & Effects',
+                                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: p.textPrimary),
+                                ),
+                                Text(
+                                  state.isEqEnabled
+                                      ? (state.selectedHeadphoneProfile != null
+                                          ? 'Tuned for ${state.selectedHeadphoneProfile!.name}'
+                                          : 'Preset: ${state.eqPreset.name}')
+                                      : 'Audio effects bypassed',
+                                  style: TextStyle(fontSize: 11, color: p.textTertiary, fontWeight: FontWeight.w500),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
                             ),
+                          ),
+                          Switch.adaptive(
+                            value: state.isEqEnabled,
+                            activeTrackColor: p.accent,
+                            activeThumbColor: p.onAccent,
+                            onChanged: (val) => cubit.setEqualizerEnabled(val),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Tabs Navigation
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Container(
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: p.surfaceContainer,
+                          borderRadius: BorderRadius.circular(19),
+                          border: Border.all(color: p.hairline),
+                        ),
+                        child: TabBar(
+                          controller: _tabController,
+                          tabAlignment: TabAlignment.fill,
+                          indicator: BoxDecoration(
+                            color: p.accent,
+                            borderRadius: BorderRadius.circular(19),
+                          ),
+                          indicatorSize: TabBarIndicatorSize.tab,
+                          labelColor: p.onAccent,
+                          unselectedLabelColor: p.textSecondary,
+                          labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
+                          dividerColor: Colors.transparent,
+                          tabs: const [
+                            Tab(text: 'Equalizer'),
+                            Tab(text: 'AutoEq'),
+                            Tab(text: 'Spatial & DSP'),
                           ],
                         ),
                       ),
-                      Switch.adaptive(
-                        value: state.isEqEnabled,
-                        activeTrackColor: p.accent,
-                        activeThumbColor: p.onAccent,
-                        onChanged: (val) => cubit.setEqualizerEnabled(val),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // Tabs Navigation
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Container(
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: p.surfaceContainer,
-                      borderRadius: BorderRadius.circular(19),
-                      border: Border.all(color: p.hairline),
                     ),
-                    child: TabBar(
-                      controller: _tabController,
-                      tabAlignment: TabAlignment.fill,
-                      indicator: BoxDecoration(
-                        color: p.accent,
-                        borderRadius: BorderRadius.circular(19),
-                      ),
-                      indicatorSize: TabBarIndicatorSize.tab,
-                      labelColor: p.onAccent,
-                      unselectedLabelColor: p.textSecondary,
-                      labelStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12),
-                      dividerColor: Colors.transparent,
-                      tabs: const [
-                        Tab(text: 'Equalizer'),
-                        Tab(text: 'AutoEq'),
-                        Tab(text: 'Spatial & DSP'),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
+                    const SizedBox(height: 8),
 
-                // Tab Content
-                Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      _buildEqualizerTab(context, cubit, state, p),
-                      _buildAutoEqTab(context, cubit, state, p),
-                      _buildSpatialDynamicsTab(context, cubit, state, p),
-                    ],
-                  ),
+                    // Tab Content
+                    Expanded(
+                      child: TabBarView(
+                        controller: _tabController,
+                        children: [
+                          _buildEqualizerTab(context, cubit, state, p),
+                          _buildAutoEqTab(context, cubit, state, p),
+                          _buildSpatialDynamicsTab(context, cubit, state, p),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         );
@@ -595,25 +605,27 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
               children: List.generate(_bandLabels.length, (index) {
                 final gain = index < preset.gains.length ? preset.gains[index] : 0.0;
                 return Expanded(
-                  child: _VerticalEqSlider(
-                    value: gain,
-                    label: _bandLabels[index],
-                    isEnabled: isEnabled,
-                    accentColor: p.accent,
-                    trackColor: p.hairline,
-                    surfaceColor: p.surface,
-                    textColor: p.textPrimary,
-                    onInteraction: () {
-                      if (!state.isEqEnabled) {
-                        cubit.setEqualizerEnabled(true);
-                      }
-                    },
-                    onChanged: (val) {
-                      if (!state.isEqEnabled) {
-                        cubit.setEqualizerEnabled(true);
-                      }
-                      cubit.setBandGain(index, val);
-                    },
+                  child: RepaintBoundary(
+                    child: _VerticalEqSlider(
+                      value: gain,
+                      label: _bandLabels[index],
+                      isEnabled: isEnabled,
+                      accentColor: p.accent,
+                      trackColor: p.hairline,
+                      surfaceColor: p.surface,
+                      textColor: p.textPrimary,
+                      onInteraction: () {
+                        if (!state.isEqEnabled) {
+                          cubit.setEqualizerEnabled(true);
+                        }
+                      },
+                      onChanged: (val) {
+                        if (!state.isEqEnabled) {
+                          cubit.setEqualizerEnabled(true);
+                        }
+                        cubit.setBandGain(index, val);
+                      },
+                    ),
                   ),
                 );
               }),
@@ -2066,7 +2078,7 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
   bool _isDragging = false;
   double? _dragGain;
 
-  void _handlePointer(double localY, double totalHeight) {
+  void _handlePointer(double localY, double totalHeight, {bool notifyParent = false}) {
     widget.onInteraction?.call();
     const topMargin = 12.0;
     const bottomMargin = 12.0;
@@ -2079,7 +2091,9 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
     setState(() {
       _dragGain = roundedGain;
     });
-    widget.onChanged(roundedGain);
+    if (notifyParent) {
+      widget.onChanged(roundedGain);
+    }
   }
 
   @override
@@ -2129,12 +2143,14 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
                 behavior: HitTestBehavior.opaque,
                 onVerticalDragStart: (details) {
                   setState(() => _isDragging = true);
-                  _handlePointer(details.localPosition.dy, height);
+                  _handlePointer(details.localPosition.dy, height, notifyParent: true);
                 },
                 onVerticalDragUpdate: (details) {
-                  _handlePointer(details.localPosition.dy, height);
+                  _handlePointer(details.localPosition.dy, height, notifyParent: true);
                 },
                 onVerticalDragEnd: (_) {
+                  final finalGain = _dragGain ?? widget.value;
+                  widget.onChanged(finalGain);
                   setState(() {
                     _isDragging = false;
                     _dragGain = null;
@@ -2147,7 +2163,7 @@ class _VerticalEqSliderState extends State<_VerticalEqSlider> {
                   });
                 },
                 onTapDown: (details) {
-                  _handlePointer(details.localPosition.dy, height);
+                  _handlePointer(details.localPosition.dy, height, notifyParent: true);
                 },
                 child: CustomPaint(
                   size: Size(constraints.maxWidth, height),

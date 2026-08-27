@@ -127,6 +127,7 @@ class _SwipeDownToDismiss extends StatefulWidget {
 class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     with SingleTickerProviderStateMixin {
   late final AnimationController _animController;
+  late final CurvedAnimation _curvedAnimation;
   late Animation<double> _anim;
   double _dragOffset = 0.0;
 
@@ -137,7 +138,11 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
       vsync: this,
       duration: const Duration(milliseconds: 240),
     );
-    _anim = Tween<double>(begin: 0.0, end: 0.0).animate(_animController);
+    _curvedAnimation = CurvedAnimation(
+      parent: _animController,
+      curve: Curves.easeOutCubic,
+    );
+    _anim = Tween<double>(begin: 0.0, end: 0.0).animate(_curvedAnimation);
     _animController.addListener(() {
       setState(() {
         _dragOffset = _anim.value;
@@ -147,6 +152,7 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
 
   @override
   void dispose() {
+    _curvedAnimation.dispose();
     _animController.dispose();
     super.dispose();
   }
@@ -167,9 +173,7 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     if (_dragOffset > 100 || velocity > 450) {
       widget.onDismiss();
     } else if (_dragOffset > 0) {
-      _anim = Tween<double>(begin: _dragOffset, end: 0.0).animate(
-        CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
-      );
+      _anim = Tween<double>(begin: _dragOffset, end: 0.0).animate(_curvedAnimation);
       _animController.forward(from: 0.0);
     }
   }

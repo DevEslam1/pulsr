@@ -3,10 +3,11 @@ import 'dart:collection';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import '../../domain/models/lyrics_line.dart';
+import '../constants/channels.dart';
 import 'error_logger.dart';
 
 class LrcParser {
-  static const MethodChannel _lyricsChannel = MethodChannel('com.pulsr.music/lyrics');
+  static const MethodChannel _lyricsChannel = MethodChannel(PulsrChannels.lyrics);
   static const int _maxCacheSize = 50;
   static final LinkedHashMap<String, LyricsResult?> _lyricsCache = LinkedHashMap();
 
@@ -137,7 +138,7 @@ class LrcParser {
     String? artist,
     String? album,
     int? durationSec,
-    dynamic lrclibService,
+    Object? lrclibService,
   }) async {
     final cacheKey = songId != null ? 'song_$songId' : audioFilePath;
     if (_lyricsCache.containsKey(cacheKey)) {
@@ -174,7 +175,7 @@ class LrcParser {
     if (resolved == null && trackTitle != null && trackTitle.isNotEmpty && artist != null && artist.isNotEmpty) {
       try {
         if (lrclibService != null) {
-          resolved = await lrclibService.fetchLyrics(
+          resolved = await (lrclibService as dynamic).fetchLyrics(
             trackName: trackTitle,
             artistName: artist,
             albumName: album,
@@ -193,6 +194,16 @@ class LrcParser {
     _lyricsCache[cacheKey] = resolved;
 
     return resolved;
+  }
+
+  /// Invalidate lyrics cache for a specific song
+  static void invalidateSong({int? songId, String? path}) {
+    if (songId != null) {
+      _lyricsCache.remove('song_$songId');
+    }
+    if (path != null) {
+      _lyricsCache.remove(path);
+    }
   }
 
   /// Clear the lyrics cache (e.g. on tag edit or rescan)

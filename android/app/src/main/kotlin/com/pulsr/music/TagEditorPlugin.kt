@@ -182,23 +182,42 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
 
                         var effectiveArtworkBytes = rawArtworkBytes
                         if (effectiveArtworkBytes != null && effectiveArtworkBytes.size > 1024 * 1024) {
-                            try {
-                                val bmp = BitmapFactory.decodeByteArray(effectiveArtworkBytes, 0, effectiveArtworkBytes.size)
-                                if (bmp != null) {
-                                    var scaled: Bitmap? = null
-                                    try {
-                                        scaled = Bitmap.createScaledBitmap(bmp, 500, 500, true)
-                                        val stream = ByteArrayOutputStream()
-                                        scaled.compress(Bitmap.CompressFormat.JPEG, 85, stream)
-                                        effectiveArtworkBytes = stream.toByteArray()
-                                    } finally {
-                                        if (scaled != null && scaled != bmp) {
-                                            scaled.recycle()
+                            val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                            BitmapFactory.decodeByteArray(effectiveArtworkBytes, 0, effectiveArtworkBytes.size, options)
+                            // Scale down whenever the file exceeds 1 MB — regardless of pixel count.
+                            // Previously the condition was `<= 10000000L` which was inverted: it scaled
+                            // moderate images (< 10 MP) but let extremely large images through unscaled.
+                            if (options.outWidth > 0 && options.outHeight > 0) {
+                                try {
+                                    val bmp = BitmapFactory.decodeByteArray(effectiveArtworkBytes, 0, effectiveArtworkBytes.size)
+                                    if (bmp != null) {
+                                        var scaled: Bitmap? = null
+                                        try {
+                                            scaled = Bitmap.createScaledBitmap(bmp, 500, 500, true)
+                                            val stream = ByteArrayOutputStream()
+                                            scaled.compress(Bitmap.CompressFormat.JPEG, 85, stream)
+                                            effectiveArtworkBytes = stream.toByteArray()
+                                        } catch (oom: OutOfMemoryError) {
+                                            if (rawArtworkBytes.size > 5 * 1024 * 1024) {
+                                                throw IllegalArgumentException("Artwork exceeds 5MB limit and cannot be scaled down due to low memory")
+                                            }
+                                            effectiveArtworkBytes = rawArtworkBytes
+                                        } finally {
+                                            if (scaled != null && scaled != bmp) {
+                                                scaled.recycle()
+                                            }
+                                            bmp.recycle()
                                         }
-                                        bmp.recycle()
                                     }
+                                } catch (oom: OutOfMemoryError) {
+                                    if (rawArtworkBytes.size > 5 * 1024 * 1024) {
+                                        throw IllegalArgumentException("Artwork exceeds 5MB limit and cannot be scaled down due to low memory")
+                                    }
+                                    effectiveArtworkBytes = rawArtworkBytes
+                                } catch (_: Throwable) {
+                                    effectiveArtworkBytes = rawArtworkBytes
                                 }
-                            } catch (_: Exception) {}
+                            }
                         }
 
                         if (effectiveArtworkBytes != null && effectiveArtworkBytes.isNotEmpty()) {

@@ -42,7 +42,7 @@ class YtmDownloadState {
       items[videoId] ?? const YtDownloadItem();
 }
 
-@lazySingleton
+@singleton
 class YtmDownloadCubit extends Cubit<YtmDownloadState> {
   static const String _prefKey = 'ytm_download_states';
   final YtDownloadService _service;
@@ -173,8 +173,9 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
   void _set(String videoId, YtDownloadItem item) {
     if (isClosed) return;
 
-    if (_lastEmitTimeByVideoId.length >= _maxThrottleEntries) {
-      _lastEmitTimeByVideoId.clear();
+    if (_lastEmitTimeByVideoId.length >= _maxThrottleEntries &&
+        !_lastEmitTimeByVideoId.containsKey(videoId)) {
+      _lastEmitTimeByVideoId.remove(_lastEmitTimeByVideoId.keys.first);
     }
 
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -202,14 +203,18 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
         item.status == YtDownloadStatus.canceled) {
       _lastEmitTimeByVideoId.remove(videoId);
       _saveDebounce?.cancel();
-      _saveDebounce = null;
-      _savePersistedState();
+      _saveDebounce = Timer(const Duration(milliseconds: 1500), () {
+        _saveDebounce = null;
+        _savePersistedState();
+      });
     }
   }
 
   @override
   Future<void> close() {
     _saveDebounce?.cancel();
+    _saveDebounce = null;
+    _savePersistedState();
     _lastEmitTimeByVideoId.clear();
     return super.close();
   }

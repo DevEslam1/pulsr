@@ -34,7 +34,13 @@ class AudioFormats {
 
   static String extractExtension(String pathOrExt) {
     final clean = pathOrExt.split('?').first.split('#').first.trim().toLowerCase();
+    if (clean.isEmpty || clean.endsWith('/') || clean.endsWith(r'\')) {
+      return '';
+    }
     final filename = clean.split('/').last.split(r'\').last;
+    if (filename.isEmpty || filename == '.nomedia' || filename.startsWith('.')) {
+      return '';
+    }
     final dotIndex = filename.lastIndexOf('.');
     if (dotIndex > 0 && dotIndex < filename.length - 1) {
       return filename.substring(dotIndex + 1);

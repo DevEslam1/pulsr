@@ -54,6 +54,7 @@ class YtmTrack {
         remoteArtworkUrl: artworkUrl,
         isFavorite: false,
         isMissing: false,
+        isDownloaded: false,
         playCount: 0,
         lastPositionMs: 0,
       );

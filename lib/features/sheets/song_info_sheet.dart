@@ -7,6 +7,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../core/constants/app_radii.dart';
+import '../../core/constants/channels.dart';
 import '../../core/theme/aura_theme.dart';
 import '../../core/utils/adaptive.dart';
 import '../../core/utils/formatters.dart';
@@ -22,18 +23,20 @@ class SongInfoSheet extends StatelessWidget {
 
   const SongInfoSheet({super.key, required this.song});
 
-  void _shareSong(BuildContext context) {
+  Future<void> _shareSong(BuildContext context) async {
     final text = 'Check out "${song.title}" by ${song.artist} on Pulsr Music!';
-    final file = File(song.path);
-    if (file.existsSync()) {
-      Share.shareXFiles([XFile(song.path)], text: text);
-    } else {
-      Share.share(text);
+    if (song.path.isNotEmpty && !song.path.startsWith('ytmusic://')) {
+      final exists = await File(song.path).exists();
+      if (exists) {
+        Share.shareXFiles([XFile(song.path)], text: text);
+        return;
+      }
     }
+    Share.share(text);
   }
 
   Future<void> _setRingtone(BuildContext context, String type) async {
-    const channel = MethodChannel('com.pulsr.music/ringtone');
+    const channel = MethodChannel(PulsrChannels.ringtone);
     final label = type == 'notification'
         ? 'Notification sound'
         : type == 'alarm'

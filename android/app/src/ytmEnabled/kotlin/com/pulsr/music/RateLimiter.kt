@@ -1,8 +1,10 @@
 package com.pulsr.music
 
 import android.os.SystemClock
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.locks.ReentrantLock
 import kotlin.math.min
 import kotlin.random.Random
 
@@ -21,7 +23,8 @@ internal class RateLimiter(
     private val backoffUntilTimestamp = AtomicLong(0L)
     private val consecutiveThrottles = AtomicInteger(0)
 
-    private val lock = Any()
+    private val lock = ReentrantLock()
+    private val condition = lock.newCondition()
 
     /**
      * Blocks the calling thread until a token permit is available and any backoff has elapsed.
@@ -34,31 +37,37 @@ internal class RateLimiter(
             if (now < backoffUntil) {
                 val sleepTime = backoffUntil - now
                 if (sleepTime > 0) {
+                    lock.lock()
                     try {
-                        Thread.sleep(sleepTime)
+                        condition.await(sleepTime, TimeUnit.MILLISECONDS)
                     } catch (_: InterruptedException) {
                         Thread.currentThread().interrupt()
                         return
+                    } finally {
+                        lock.unlock()
                     }
                 }
                 continue
             }
 
-            synchronized(lock) {
+            lock.lock()
+            try {
                 refillTokens()
                 val current = availableTokens.get()
                 if (current > 0) {
                     availableTokens.decrementAndGet()
                     return
                 }
-            }
 
-            // If tokens are exhausted, sleep briefly before trying again
-            try {
-                Thread.sleep(100)
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
-                return
+                val waitTimeMs = (1000.0 / refillTokensPerSecond).toLong().coerceIn(50L, 500L)
+                try {
+                    condition.await(waitTimeMs, TimeUnit.MILLISECONDS)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    return
+                }
+            } finally {
+                lock.unlock()
             }
         }
     }

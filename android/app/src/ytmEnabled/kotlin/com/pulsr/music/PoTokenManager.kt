@@ -7,6 +7,7 @@ import android.os.Looper
 import android.util.Log
 import android.util.LruCache
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -78,24 +79,22 @@ object PoTokenManager {
 
     private var appContext: Context? = null
     private var prefs: SharedPreferences? = null
-    private val mutex = Mutex()
-    private val syncLock = Any()
+    private val stateMutex = kotlinx.coroutines.sync.Mutex()
+    private var refreshInFlight: kotlinx.coroutines.Deferred<Boolean>? = null
 
     private data class CachedToken(val token: String, val timestamp: Long)
     private val tokenLru = LruCache<String, CachedToken>(LRU_CAPACITY)
 
     fun init(context: Context) {
-        synchronized(syncLock) {
-            if (appContext == null) {
-                appContext = context.applicationContext
-                val p = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                prefs = p
-                visitorData = p.getString(KEY_VISITOR_DATA, "") ?: ""
-                integrityToken = p.getString(KEY_INTEGRITY_TOKEN, "") ?: ""
-                expiryInstant = p.getLong(KEY_EXPIRY_INSTANT, 0L)
-                streamingPoToken = p.getString(KEY_LAST_STREAMING_TOKEN, "") ?: ""
-                dataSyncId = p.getString(KEY_DATA_SYNC_ID, "") ?: ""
-            }
+        if (appContext == null) {
+            appContext = context.applicationContext
+            val p = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            prefs = p
+            visitorData = p.getString(KEY_VISITOR_DATA, "") ?: ""
+            integrityToken = p.getString(KEY_INTEGRITY_TOKEN, "") ?: ""
+            expiryInstant = p.getLong(KEY_EXPIRY_INSTANT, 0L)
+            streamingPoToken = p.getString(KEY_LAST_STREAMING_TOKEN, "") ?: ""
+            dataSyncId = p.getString(KEY_DATA_SYNC_ID, "") ?: ""
         }
     }
 
@@ -114,7 +113,7 @@ object PoTokenManager {
 
     /**
      * Ensures attestation state is ready. Loads cached values, or runs BotGuard VM in WebView
-     * if expired or missing.
+     * if expired or missing. Deduplicates in-flight refreshes to prevent thundering herd.
      */
     suspend fun ensureReady(): Boolean = withContext(Dispatchers.IO) {
         if (webViewBroken) {
@@ -125,21 +124,37 @@ object PoTokenManager {
             return@withContext true
         }
 
-        mutex.withLock {
+        stateMutex.withLock {
             if (isReady && !isExpiringSoon() && generator != null) {
-                return@withLock true
+                return@withContext true
             }
 
+            refreshInFlight?.let { existing ->
+                return@withContext try {
+                    existing.await()
+                } catch (_: Throwable) {
+                    visitorData.isNotEmpty()
+                }
+            }
+
+            val deferred = kotlinx.coroutines.CoroutineScope(Dispatchers.IO).async {
+                try {
+                    refreshInternal()
+                    true
+                } catch (e: BadWebViewException) {
+                    Log.e(TAG, "System WebView is broken for BotGuard: ${e.message}", e)
+                    webViewBroken = true
+                    visitorData.isNotEmpty()
+                } catch (t: Throwable) {
+                    Log.e(TAG, "Failed to ensure PoToken readiness: ${t.message}", t)
+                    visitorData.isNotEmpty()
+                }
+            }
+            refreshInFlight = deferred
             try {
-                refreshInternal()
-                return@withLock true
-            } catch (e: BadWebViewException) {
-                Log.e(TAG, "System WebView is broken for BotGuard: ${e.message}", e)
-                webViewBroken = true
-                return@withLock visitorData.isNotEmpty()
-            } catch (t: Throwable) {
-                Log.e(TAG, "Failed to ensure PoToken readiness: ${t.message}", t)
-                return@withLock visitorData.isNotEmpty()
+                deferred.await()
+            } finally {
+                refreshInFlight = null
             }
         }
     }
@@ -151,27 +166,8 @@ object PoTokenManager {
         if (webViewBroken) return visitorData.isNotEmpty()
         if (isReady && !isExpiringSoon() && generator != null) return true
 
-        // Fast-path: Return cached state if generator is still valid and not expired
-        val gen = generator
-        if (isReady && gen != null && !gen.isExpired()) return true
-
-        synchronized(syncLock) {
-            if (isReady && !isExpiringSoon() && generator != null) return true
-            // If we have a non-expired generator and visitorData, avoid blocking with WebView
-            if (visitorData.isNotEmpty() && generator != null && !generator!!.isExpired()) {
-                return true
-            }
-            return try {
-                refreshInternal()
-                true
-            } catch (e: BadWebViewException) {
-                Log.e(TAG, "System WebView is broken: ${e.message}", e)
-                webViewBroken = true
-                visitorData.isNotEmpty()
-            } catch (t: Throwable) {
-                Log.e(TAG, "Sync PoToken refresh failed: ${t.message}", t)
-                visitorData.isNotEmpty()
-            }
+        return kotlinx.coroutines.runBlocking(Dispatchers.IO) {
+            ensureReady()
         }
     }
 
@@ -236,15 +232,13 @@ object PoTokenManager {
     fun setDataSyncId(id: String) {
         val normalized = id.trim()
         if (normalized.isEmpty()) return
-        synchronized(syncLock) {
+        synchronized(tokenLru) {
             if (normalized == dataSyncId) return
             val old = dataSyncId
             dataSyncId = normalized
             prefs?.edit()?.putString(KEY_DATA_SYNC_ID, normalized)?.apply()
-            synchronized(tokenLru) {
-                if (old.isNotEmpty()) tokenLru.remove(old)
-                tokenLru.remove(normalized)
-            }
+            if (old.isNotEmpty()) tokenLru.remove(old)
+            tokenLru.remove(normalized)
         }
     }
 
@@ -272,17 +266,15 @@ object PoTokenManager {
      * Forces full cache invalidation and triggers re-attestation on the next request.
      */
     fun invalidate() {
-        synchronized(syncLock) {
-            val oldGen = generator
-            generator = null
-            expiryInstant = 0L
-            dataSyncId = ""
-            sessionVisitorData = ""
-            oldGen?.let { Handler(Looper.getMainLooper()).post { it.close() } }
-            prefs?.edit()?.remove(KEY_EXPIRY_INSTANT)?.remove(KEY_DATA_SYNC_ID)?.apply()
-            synchronized(tokenLru) {
-                tokenLru.evictAll()
-            }
+        val oldGen = generator
+        generator = null
+        expiryInstant = 0L
+        dataSyncId = ""
+        sessionVisitorData = ""
+        oldGen?.let { Handler(Looper.getMainLooper()).post { it.close() } }
+        prefs?.edit()?.remove(KEY_EXPIRY_INSTANT)?.remove(KEY_DATA_SYNC_ID)?.apply()
+        synchronized(tokenLru) {
+            tokenLru.evictAll()
         }
     }
 

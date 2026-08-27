@@ -41,5 +41,10 @@ class AppConfig {
     if (flavor.toLowerCase() == 'prod' && envName.toLowerCase() == 'dev') {
       throw StateError('CRITICAL: Production flavor cannot run with ENV=dev');
     }
+    if (isProd && ytmEnabled) {
+      throw StateError(
+        'CRITICAL: Production builds for Play Store compliance must not enable YouTube Music features (ENABLE_YTM=true).',
+      );
+    }
   }
 }

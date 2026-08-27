@@ -125,6 +125,7 @@ class SettingsScreen extends StatelessWidget {
                                   source: SongSource.local,
                                   isFavorite: false,
                                   isMissing: false,
+                                  isDownloaded: false,
                                   playCount: 0,
                                   lastPositionMs: 0,
                                 );
@@ -2223,7 +2224,7 @@ class _CacheSection extends StatefulWidget {
   State<_CacheSection> createState() => _CacheSectionState();
 }
 
-class _CacheSectionState extends State<_CacheSection> {
+class _CacheSectionState extends State<_CacheSection> with WidgetsBindingObserver {
   int _artCacheSizeBytes = 0;
   int _streamCacheSizeBytes = 0;
   bool _isLoading = true;
@@ -2232,7 +2233,21 @@ class _CacheSectionState extends State<_CacheSection> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _refreshCacheSize();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _refreshCacheSize();
+    }
   }
 
   Future<void> _refreshCacheSize() async {

@@ -4,10 +4,10 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="16dp"
+    android:padding="14dp"
     android:background="@drawable/widget_background">
 
-    <!-- Top Hero Section: Large Artwork & Detailed Track Metadata -->
+    <!-- Top Track Info & Artwork Row -->
     <LinearLayout
         android:id="@+id/widget_main_row"
         android:layout_width="match_parent"
@@ -15,11 +15,11 @@
         android:orientation="horizontal"
         android:gravity="center_vertical">
 
-        <!-- Hero Album Artwork -->
+        <!-- Album Artwork (88dp rounded) -->
         <ImageView
             android:id="@+id/widget_artwork"
-            android:layout_width="96dp"
-            android:layout_height="96dp"
+            android:layout_width="88dp"
+            android:layout_height="88dp"
             android:scaleType="centerCrop"
             android:src="@mipmap/launcher_icon"
             android:contentDescription="Album Artwork" />
@@ -40,7 +40,7 @@
                 android:layout_height="wrap_content"
                 android:text="Pulsr Music"
                 android:textColor="#FFFFFF"
-                android:textSize="17.5sp"
+                android:textSize="16.5sp"
                 android:textStyle="bold"
                 android:maxLines="2"
                 android:ellipsize="end" />
@@ -52,7 +52,7 @@
                 android:layout_marginTop="3dp"
                 android:text="Nothing playing"
                 android:textColor="#B3A8AC"
-                android:textSize="13.5sp"
+                android:textSize="13sp"
                 android:maxLines="1"
                 android:ellipsize="end" />
 
@@ -63,7 +63,7 @@
                 android:layout_marginTop="2dp"
                 android:text=""
                 android:textColor="#8E7E84"
-                android:textSize="12sp"
+                android:textSize="11.5sp"
                 android:maxLines="1"
                 android:ellipsize="end"
                 android:visibility="gone" />
@@ -72,17 +72,12 @@
         <!-- Favorite Button -->
         <ImageView
             android:id="@+id/widget_favorite"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
             android:padding="8dp"
             android:src="@drawable/ic_widget_heart"
             android:contentDescription="Toggle Favorite" />
     </LinearLayout>
-
-    <View
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
 
     <!-- Interactive Track Slider & High Precision Touch Zones -->
     <FrameLayout
@@ -101,10 +96,10 @@
             android:progress="0"
             android:progressDrawable="@drawable/widget_progress_bar" />
 
-        <!-- 20 Granular Tap Zones (5% steps) for accurate place detection -->
+        <!-- 10 Granular Tap Zones (10% steps) for seek placement -->
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="24dp"
+            android:layout_height="22dp"
             android:orientation="horizontal">
 
             <LinearLayout android:id="@+id/btn_seek_01" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
@@ -117,16 +112,6 @@
             <LinearLayout android:id="@+id/btn_seek_08" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
             <LinearLayout android:id="@+id/btn_seek_09" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
             <LinearLayout android:id="@+id/btn_seek_10" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_11" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_12" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_13" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_14" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_15" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_16" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_17" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_18" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_19" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
-            <LinearLayout android:id="@+id/btn_seek_20" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:clickable="true" android:focusable="true" android:background="@android:color/transparent" />
         </LinearLayout>
     </FrameLayout>
 
@@ -136,7 +121,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:layout_marginTop="3dp">
+        android:layout_marginTop="2dp">
 
         <TextView
             android:id="@+id/widget_elapsed"
@@ -144,7 +129,7 @@
             android:layout_height="wrap_content"
             android:text="0:00"
             android:textColor="#8E7E84"
-            android:textSize="12sp"
+            android:textSize="11.5sp"
             android:fontFamily="sans-serif-medium" />
 
         <View
@@ -158,23 +143,23 @@
             android:layout_height="wrap_content"
             android:text="0:00"
             android:textColor="#8E7E84"
-            android:textSize="12sp"
+            android:textSize="11.5sp"
             android:fontFamily="sans-serif-medium" />
     </LinearLayout>
 
-    <!-- Spacious Full Playback Controls Row -->
+    <!-- Full Playback Controls Row -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center"
-        android:layout_marginTop="10dp">
+        android:gravity="center_vertical"
+        android:layout_marginTop="8dp">
 
         <ImageView
             android:id="@+id/widget_shuffle"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:padding="8dp"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:padding="7dp"
             android:src="@drawable/ic_widget_shuffle"
             android:contentDescription="Shuffle" />
 
@@ -185,47 +170,47 @@
 
         <ImageButton
             android:id="@+id/btn_prev"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
-            android:padding="8dp"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:padding="7dp"
             android:background="@android:color/transparent"
             android:src="@drawable/ic_widget_skip_prev"
             android:contentDescription="Previous" />
 
         <ImageButton
             android:id="@+id/btn_rewind"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:padding="7dp"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:padding="6dp"
             android:background="@android:color/transparent"
             android:src="@drawable/ic_widget_rewind"
             android:contentDescription="Rewind 10s" />
 
         <ImageButton
             android:id="@+id/btn_play_pause"
-            android:layout_width="54dp"
-            android:layout_height="54dp"
-            android:layout_marginStart="8dp"
-            android:layout_marginEnd="8dp"
-            android:padding="13dp"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="6dp"
+            android:padding="12dp"
             android:background="@drawable/widget_play_button_background"
             android:src="@drawable/ic_widget_play"
             android:contentDescription="Play/Pause" />
 
         <ImageButton
             android:id="@+id/btn_forward"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:padding="7dp"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:padding="6dp"
             android:background="@android:color/transparent"
             android:src="@drawable/ic_widget_forward"
             android:contentDescription="Forward 10s" />
 
         <ImageButton
             android:id="@+id/btn_next"
-            android:layout_width="42dp"
-            android:layout_height="42dp"
-            android:padding="8dp"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:padding="7dp"
             android:background="@android:color/transparent"
             android:src="@drawable/ic_widget_skip_next"
             android:contentDescription="Next" />
@@ -237,25 +222,21 @@
 
         <ImageView
             android:id="@+id/widget_repeat"
-            android:layout_width="36dp"
-            android:layout_height="36dp"
-            android:padding="8dp"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:padding="7dp"
             android:src="@drawable/ic_widget_repeat"
             android:contentDescription="Repeat" />
     </LinearLayout>
 
-    <View
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
-
-    <!-- Up Next Queue Preview Card Section -->
+    <!-- Up Next Queue Card Section (Fills remaining height smoothly) -->
     <LinearLayout
         android:id="@+id/widget_queue_container"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:orientation="vertical"
-        android:layout_marginTop="12dp"
+        android:layout_marginTop="10dp"
         android:padding="10dp"
         android:background="@drawable/widget_queue_card_background">
 
@@ -263,11 +244,12 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center_vertical">
+            android:gravity="center_vertical"
+            android:layout_marginBottom="4dp">
 
             <ImageView
-                android:layout_width="15dp"
-                android:layout_height="15dp"
+                android:layout_width="14dp"
+                android:layout_height="14dp"
                 android:src="@drawable/ic_widget_queue"
                 android:contentDescription="Queue Icon" />
 
@@ -279,18 +261,46 @@
                 android:textColor="#FF4D61"
                 android:textSize="10.5sp"
                 android:textStyle="bold"
-                android:letterSpacing="0.06" />
+                android:letterSpacing="0.08" />
         </LinearLayout>
 
+        <!-- Up Next Item 1 -->
         <TextView
-            android:id="@+id/widget_next_track_title"
+            android:id="@+id/widget_next_track_0"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
+            android:layout_marginTop="2dp"
             android:text="No upcoming tracks"
-            android:textColor="#D0C6CA"
+            android:textColor="#FFFFFF"
             android:textSize="12sp"
+            android:textStyle="bold"
             android:maxLines="1"
             android:ellipsize="end" />
+
+        <!-- Up Next Item 2 -->
+        <TextView
+            android:id="@+id/widget_next_track_1"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:text=""
+            android:textColor="#B3A8AC"
+            android:textSize="11.5sp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:visibility="gone" />
+
+        <!-- Up Next Item 3 -->
+        <TextView
+            android:id="@+id/widget_next_track_2"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="3dp"
+            android:text=""
+            android:textColor="#8E7E84"
+            android:textSize="11sp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:visibility="gone" />
     </LinearLayout>
 </LinearLayout>

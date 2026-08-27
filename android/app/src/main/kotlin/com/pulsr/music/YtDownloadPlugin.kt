@@ -129,33 +129,44 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                 put(MediaStore.Audio.Media.IS_PENDING, 1)
             }
             val uri = resolver.insert(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, values) ?: return null
+            var success = false
+            try {
+                val copied = resolver.openOutputStream(uri)?.use { out ->
+                    FileInputStream(source).use { input -> input.copyTo(out) }
+                    true
+                } ?: false
+                if (!copied) {
+                    return null
+                }
 
-            val copied = resolver.openOutputStream(uri)?.use { out ->
-                FileInputStream(source).use { input -> input.copyTo(out) }
-                true
-            } ?: false
-            if (!copied) {
-                resolver.delete(uri, null, null)
-                return null
-            }
+                resolver.update(uri, ContentValues().apply { put(MediaStore.Audio.Media.IS_PENDING, 0) }, null, null)
+                success = true
 
-            resolver.update(uri, ContentValues().apply { put(MediaStore.Audio.Media.IS_PENDING, 0) }, null, null)
-
-            var path: String? = null
-            resolver.query(uri, arrayOf(MediaStore.Audio.Media.DATA), null, null, null)?.use { c ->
-                if (c.moveToFirst()) {
-                    val idx = c.getColumnIndex(MediaStore.Audio.Media.DATA)
-                    if (idx >= 0) path = c.getString(idx)
+                var path: String? = null
+                resolver.query(uri, arrayOf(MediaStore.Audio.Media.DATA), null, null, null)?.use { c ->
+                    if (c.moveToFirst()) {
+                        val idx = c.getColumnIndex(MediaStore.Audio.Media.DATA)
+                        if (idx >= 0) path = c.getString(idx)
+                    }
+                }
+                if (path.isNullOrEmpty()) {
+                    val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
+                    path = File(musicDir, displayName).absolutePath
+                }
+                if (path != null) {
+                    MediaScannerConnection.scanFile(context, arrayOf(path), arrayOf(mimeType), null)
+                }
+                return path
+            } finally {
+                if (!success) {
+                    try {
+                        resolver.update(uri, ContentValues().apply {
+                            put(MediaStore.Audio.Media.IS_PENDING, 0)
+                        }, null, null)
+                        resolver.delete(uri, null, null)
+                    } catch (_: Throwable) {}
                 }
             }
-            if (path.isNullOrEmpty()) {
-                val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
-                path = File(musicDir, displayName).absolutePath
-            }
-            if (path != null) {
-                MediaScannerConnection.scanFile(context, arrayOf(path), arrayOf(mimeType), null)
-            }
-            return path
         }
 
         // Pre-Q: write straight into the public Music dir, then index it.

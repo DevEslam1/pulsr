@@ -101,7 +101,7 @@ class StubPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   @override
   Future<void> restoreLastPlaybackSession() async {}
   @override
-  void saveCurrentPositionImmediate() {}
+  Future<void> saveCurrentPositionImmediate() async {}
   @override
   Future<void> setEqualizerEnabled(bool enabled) async {}
   @override
@@ -149,7 +149,7 @@ class StubPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   @override
   Future<void> setCustomFrequencies(List<double> frequencies) async {}
   @override
-  void onAppPaused() {}
+  Future<void> onAppPaused() async {}
   @override
   void startSleepTimer(Duration duration, {bool fadeOut = true}) {}
   @override
@@ -189,7 +189,7 @@ void main() {
       Object? capturedError;
       final source = YtmResolvingSource(
         videoId: 'video_bot_1',
-        resolve: () async {
+        resolve: ({bool forceRefresh = false}) async {
           throw const YtmException('YTM_BOT_BLOCKED', 'Bot detection triggered');
         },
         onError: (err) {
@@ -237,6 +237,7 @@ void main() {
       durationMs: 180000,
       isFavorite: false,
       isMissing: false,
+      isDownloaded: false,
       playCount: 0,
       lastPositionMs: 0,
       source: SongSource.local,
@@ -251,6 +252,7 @@ void main() {
       durationMs: 200000,
       isFavorite: false,
       isMissing: false,
+      isDownloaded: false,
       playCount: 0,
       lastPositionMs: 0,
       source: SongSource.local,
@@ -305,6 +307,42 @@ void main() {
       // 4. Current song MUST remain song 102 and not be clobbered by stale song 101
       expect(cubit.state.currentSong?.id, 102);
       expect(cubit.state.currentSong?.title, 'Local Track 2');
+    });
+
+    test('saveCurrentPositionImmediate completes asynchronously without errors', () async {
+      await expectLater(stubAudioHandler.saveCurrentPositionImmediate(), completes);
+    });
+
+    test('bounded concurrency pool processes large task lists without unbounded spawning', () async {
+      int active = 0;
+      int maxSimultaneous = 0;
+      final completed = <int>[];
+      const totalTasks = 100;
+      const maxConcurrency = 16;
+      final pool = <Future<void>>{};
+
+      for (int i = 0; i < totalTasks; i++) {
+        final taskIdx = i;
+        final fut = () async {
+          active++;
+          if (active > maxSimultaneous) maxSimultaneous = active;
+          await Future.delayed(const Duration(milliseconds: 5));
+          completed.add(taskIdx);
+          active--;
+        }();
+
+        pool.add(fut);
+        fut.whenComplete(() => pool.remove(fut));
+        if (pool.length >= maxConcurrency) {
+          await Future.any(pool);
+        }
+      }
+      if (pool.isNotEmpty) {
+        await Future.wait(pool);
+      }
+
+      expect(completed.length, 100);
+      expect(maxSimultaneous, lessThanOrEqualTo(maxConcurrency));
     });
   });
 }

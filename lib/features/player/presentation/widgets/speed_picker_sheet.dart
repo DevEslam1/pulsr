@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
@@ -31,19 +32,24 @@ class SpeedPickerSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    return Material(
-      color: p.surface,
-      borderRadius: AppRadii.bottomSheetRadius,
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-        child: BlocBuilder<PlayerCubit, PlayerState>(
-        builder: (context, state) {
-          final cubit = context.read<PlayerCubit>();
-          final currentSpeed = state.playbackSpeed;
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: Adaptive.sheetConstraints(context).maxWidth),
+        child: Material(
+          color: p.surface,
+          borderRadius: AppRadii.bottomSheetRadius,
+          clipBehavior: Clip.antiAlias,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+            child: BlocBuilder<PlayerCubit, PlayerState>(
+              builder: (context, state) {
+                final cubit = context.read<PlayerCubit>();
+                final currentSpeed = state.playbackSpeed;
 
-          return SafeArea(
-            child: Column(
+                return SafeArea(
+                  top: false,
+                  child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -101,11 +107,13 @@ class SpeedPickerSheet extends StatelessWidget {
                   ),
                 ),
               ],
+                  ),
+                );
+              },
             ),
-          );
-        },
+          ),
+        ),
       ),
-    ),
-  );
-}
+    );
+  }
 }

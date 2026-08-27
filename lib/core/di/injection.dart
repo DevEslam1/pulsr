@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:get_it/get_it.dart';
@@ -9,12 +10,20 @@ import 'injection.config.dart';
 final GetIt getIt = GetIt.instance;
 
 @InjectableInit()
-Future<void> configureDependencies() async => getIt.init();
+Future<void> configureDependencies() async {
+  getIt.init();
+  await getIt.allReady();
+}
+
+FutureOr<void> disposeHttpClient(HttpClient client) {
+  client.close(force: true);
+}
 
 @module
 abstract class NetworkModule {
-  @singleton
+  @Singleton(dispose: disposeHttpClient)
   HttpClient get httpClient => HttpClient()
+    ..maxConnectionsPerHost = 5
     ..connectionTimeout = const Duration(seconds: 15)
     ..idleTimeout = const Duration(seconds: 90);
 
@@ -25,6 +34,16 @@ abstract class NetworkModule {
 @module
 abstract class StorageModule {
   @lazySingleton
-  FlutterSecureStorage get secureStorage => const FlutterSecureStorage();
+  FlutterSecureStorage get secureStorage => const FlutterSecureStorage(
+        // ignore: deprecated_member_use_from_same_package, deprecated_member_use
+        aOptions: AndroidOptions(
+          // ignore: deprecated_member_use
+          encryptedSharedPreferences: true,
+          resetOnError: true,
+        ),
+        iOptions: IOSOptions(
+          accessibility: KeychainAccessibility.first_unlock,
+        ),
+      );
 }
 

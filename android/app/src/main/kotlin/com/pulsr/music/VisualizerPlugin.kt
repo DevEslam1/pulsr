@@ -1,6 +1,8 @@
 package com.pulsr.music
 
 import android.media.audiofx.Visualizer
+import android.os.Handler
+import android.os.Looper
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.EventChannel
@@ -15,6 +17,7 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
     private lateinit var eventChannel: EventChannel
     private var visualizer: Visualizer? = null
     private var eventSink: EventChannel.EventSink? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     companion object {
         const val METHOD_CHANNEL = "com.pulsr.music/visualizer"
@@ -55,16 +58,25 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
 
     override fun onMethodCall(call: MethodCall, result: Result) {
         when (call.method) {
-            "start" -> {
+            "start", "setAudioSessionId" -> {
                 val audioSessionId = call.argument<Int>("audioSessionId") ?: 0
+                stopVisualizer()
                 val success = startVisualizer(audioSessionId)
                 if (success) {
                     result.success(true)
                 } else {
-                    result.error("VISUALIZER_ERROR", "Failed to start visualizer", null)
+                    // Try global audio session 0 fallback if specific session failed
+                    if (audioSessionId != 0) {
+                        val fallbackSuccess = startVisualizer(0)
+                        if (fallbackSuccess) {
+                            result.success(true)
+                            return
+                        }
+                    }
+                    result.success(false)
                 }
             }
-            "stop" -> {
+            "stop", "releaseVisualizer" -> {
                 stopVisualizer()
                 result.success(true)
             }
@@ -72,8 +84,11 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
         }
     }
 
+    private var currentSessionId: Int = 0
+
     private fun startVisualizer(audioSessionId: Int): Boolean {
         stopVisualizer()
+        currentSessionId = audioSessionId
         return try {
             val vis = Visualizer(audioSessionId)
             val captureSizeRange = Visualizer.getCaptureSizeRange()
@@ -82,7 +97,7 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
                     vis.captureSize = captureSizeRange[1] // Use max capture size
                 } catch (_: Exception) {
                     try {
-                        vis.captureSize = captureSizeRange[0] // Fallback to min capture size
+                        vis.captureSize = captureSizeRange[0]
                     } catch (_: Exception) {}
                 }
             }
@@ -98,28 +113,49 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
                     fft: ByteArray?,
                     samplingRate: Int
                 ) {
-                    if (fft == null || eventSink == null) return
+                    if (fft == null || fft.size < 4 || eventSink == null) return
                     val n = fft.size
-                    if (n < 2) return
+                    val rawBins = n / 2
+                    val rawMagnitudes = DoubleArray(rawBins)
+                    rawMagnitudes[0] = kotlin.math.abs(fft[0].toInt()).toDouble()
 
-                    // Process FFT magnitudes: fft[0]=DC, fft[1]=Nyquist
-                    // fft[2*i] = real, fft[2*i+1] = imag
-                    val numBands = n / 2
-                    val magnitudes = DoubleArray(numBands)
-                    magnitudes[0] = Math.abs(fft[0].toInt()).toDouble()
-
-                    for (i in 1 until numBands) {
+                    for (i in 1 until rawBins) {
                         val real = fft[2 * i].toDouble()
                         val imag = fft[2 * i + 1].toDouble()
-                        magnitudes[i] = hypot(real, imag)
+                        rawMagnitudes[i] = hypot(real, imag)
                     }
 
-                    // Normalize values between 0.0 and 1.0
-                    val normalized = List(numBands) { idx ->
-                        (magnitudes[idx] / 128.0).coerceIn(0.0, 1.0)
+                    // Map raw FFT bins to 32 logarithmic perceptual frequency bands
+                    val numBands = 32
+                    val bandValues = DoubleArray(numBands)
+                    for (b in 0 until numBands) {
+                        val bFraction = b.toDouble() / numBands
+                        val nextFraction = (b + 1).toDouble() / numBands
+                        val startFraction = bFraction * bFraction
+                        val endFraction = nextFraction * nextFraction
+                        val startBin = (startFraction * (rawBins - 1)).toInt().coerceIn(0, rawBins - 1)
+                        val endBin = (endFraction * rawBins).toInt().coerceIn(startBin + 1, rawBins)
+
+                        var sum = 0.0
+                        var count = 0
+                        for (bin in startBin until endBin) {
+                            sum += rawMagnitudes[bin]
+                            count++
+                        }
+                        val avg = if (count > 0) sum / count else 0.0
+
+                        // High-frequency pre-emphasis tilt (+dB slope for higher bands)
+                        val tiltMultiplier = 1.0 + (b.toDouble() / numBands) * 1.8
+                        val scaled = (avg * tiltMultiplier) / 72.0
+                        bandValues[b] = scaled.coerceIn(0.0, 1.0)
                     }
 
-                    eventSink?.success(normalized)
+                    val normalizedList = bandValues.toList()
+                    mainHandler.post {
+                        try {
+                            eventSink?.success(normalizedList)
+                        } catch (_: Throwable) {}
+                    }
                 }
             }, Visualizer.getMaxCaptureRate() / 2, false, true)
 
@@ -127,7 +163,12 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
             visualizer = vis
             true
         } catch (e: Throwable) {
-            android.util.Log.w("VisualizerPlugin", "Hardware visualizer unavailable on this device/ROM: ${e.message}")
+            android.util.Log.w("VisualizerPlugin", "Hardware visualizer unavailable for session $audioSessionId: ${e.message}")
+            if (audioSessionId != 0) {
+                try {
+                    return startVisualizer(0)
+                } catch (_: Throwable) {}
+            }
             false
         }
     }
@@ -144,6 +185,9 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
 
     override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
         eventSink = events
+        if (visualizer == null) {
+            startVisualizer(currentSessionId)
+        }
     }
 
     override fun onCancel(arguments: Any?) {

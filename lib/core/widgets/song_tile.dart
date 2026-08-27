@@ -226,7 +226,12 @@ class _NowPlayingIndicatorState extends State<NowPlayingIndicator>
   void didUpdateWidget(NowPlayingIndicator old) {
     super.didUpdateWidget(old);
     if (widget.isPlaying != old.isPlaying) {
-      widget.isPlaying ? _c.repeat(reverse: true) : _c.stop();
+      if (widget.isPlaying) {
+        _c.repeat(reverse: true);
+      } else {
+        _c.value = 0.0;
+        _c.stop();
+      }
     }
   }
 

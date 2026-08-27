@@ -57,6 +57,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           );
         }
+        return;
       }
 
       final prefs = await SharedPreferences.getInstance();

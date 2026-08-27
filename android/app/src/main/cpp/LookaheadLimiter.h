@@ -5,7 +5,7 @@
 
 class LookaheadLimiter {
 public:
-    static constexpr int MAX_LOOKAHEAD_SAMPLES = 2048; // ~42ms at 48kHz
+    static constexpr int MAX_LOOKAHEAD_SAMPLES = 8192; // Supports up to 768kHz at 10ms lookahead
 
     LookaheadLimiter();
     void setSampleRate(double sampleRate);

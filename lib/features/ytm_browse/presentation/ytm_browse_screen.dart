@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/services/ytm_browse_service.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/adaptive.dart';
 import '../../player/cubit/player_cubit.dart';
 
 class YtmBrowseScreen extends StatefulWidget {
@@ -26,7 +27,9 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
   }
 
   Future<void> _loadFeed() async {
-    setState(() => _isLoading = true);
+    if (_sections.isEmpty) {
+      setState(() => _isLoading = true);
+    }
     final sections = await _browseService.getHomeFeed();
     if (mounted) {
       setState(() {
@@ -65,58 +68,64 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
           : RefreshIndicator(
               onRefresh: _loadFeed,
               color: p.primary,
-              child: ListView.separated(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                itemCount: _sections.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 24),
-                itemBuilder: (context, index) {
-                  final section = _sections[index];
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              section.title,
-                              style: TextStyle(
-                                color: p.textPrimary,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            if (section.subtitle != null) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                section.subtitle!,
-                                style: TextStyle(
-                                  color: p.textSecondary,
-                                  fontSize: 12,
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: Adaptive.contentConstraints(context),
+                  child: ListView.separated(
+                    padding: const EdgeInsets.only(top: 16, bottom: 160),
+                    itemCount: _sections.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 24),
+                    itemBuilder: (context, index) {
+                      final section = _sections[index];
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  section.title,
+                                  style: TextStyle(
+                                    color: p.textPrimary,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        height: 210,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(horizontal: 20),
-                          itemCount: section.items.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 14),
-                          itemBuilder: (context, i) {
-                            final item = section.items[i];
-                            return _buildBrowseCard(context, item, p);
-                          },
-                        ),
-                      ),
-                    ],
-                  );
-                },
+                                if (section.subtitle != null) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    section.subtitle!,
+                                    style: TextStyle(
+                                      color: p.textSecondary,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 210,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              itemCount: section.items.length,
+                              separatorBuilder: (_, __) => const SizedBox(width: 14),
+                              itemBuilder: (context, i) {
+                                final item = section.items[i];
+                                return _buildBrowseCard(context, item, p);
+                              },
+                            ),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
+                ),
               ),
             ),
     );

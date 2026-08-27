@@ -28,7 +28,7 @@ class GlassContainer extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final effectiveRadius = borderRadius ?? AppRadii.cardRadius;
-    final baseColor = color ?? p.surface;
+    final baseColor = (color ?? p.surface).withValues(alpha: opacity);
 
     return ClipRRect(
       borderRadius: effectiveRadius,
@@ -37,7 +37,7 @@ class GlassContainer extends StatelessWidget {
         child: Container(
           padding: padding,
           decoration: BoxDecoration(
-            color: color ?? baseColor.withValues(alpha: opacity),
+            color: baseColor,
             borderRadius: effectiveRadius,
             border: border ?? Border.all(
               color: p.hairline.withValues(alpha: 0.5),

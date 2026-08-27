@@ -27,6 +27,7 @@ struct EQBand {
     double q = 1.0;            // 0.1 to 10.0
     FilterType type = FilterType::Peaking;
     bool enabled = true;
+    bool bypass = false;       // true when gainDb ≈ 0 for Peaking/Shelf — skip biquad entirely
     BiquadCoeffs coeffs;
 };
 

@@ -39,22 +39,38 @@ class SearchCubit extends Cubit<SearchState> {
   }
 
   int _generation = 0;
+  List<String>? _cachedExcludedFolders;
+  DateTime? _lastExcludedFetch;
 
   Future<void> _executeSearch(String query, {String? filterOverride}) async {
     final generation = ++_generation;
     _searchSub?.cancel();
     _searchSub = null;
-    if (query.trim().isEmpty) {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) {
       emit(state.copyWith(results: [], isLoading: false, errorMessage: null));
       return;
     }
 
-    emit(state.copyWith(isLoading: true));
-    final excludedRes = await _folderUseCases.getExcludedFolders();
-    if (generation != _generation || isClosed) return;
-    final excluded = excludedRes.fold((l) => <String>[], (r) => r);
+    // Limit search query to 64 chars to avoid CPU starvation on huge pastes
+    final boundedQuery = trimmed.length > 64 ? trimmed.substring(0, 64) : trimmed;
 
-    _searchSub = _searchUseCase.searchSongs(query, excludedFolders: excluded).listen((result) {
+    emit(state.copyWith(isLoading: true));
+    
+    // Cache excluded folders for 5 seconds to reduce DB round-trips while typing
+    final now = DateTime.now();
+    if (_cachedExcludedFolders == null ||
+        _lastExcludedFetch == null ||
+        now.difference(_lastExcludedFetch!).inSeconds > 5) {
+      final excludedRes = await _folderUseCases.getExcludedFolders();
+      if (generation != _generation || isClosed) return;
+      _cachedExcludedFolders = excludedRes.fold((l) => <String>[], (r) => r);
+      _lastExcludedFetch = now;
+    }
+
+    final excluded = _cachedExcludedFolders ?? const <String>[];
+
+    _searchSub = _searchUseCase.searchSongs(boundedQuery, excludedFolders: excluded).listen((result) {
       if (generation != _generation || isClosed) return;
       result.fold(
         (failure) => emit(state.copyWith(isLoading: false, errorMessage: failure.message)),
@@ -95,6 +111,8 @@ class SearchCubit extends Cubit<SearchState> {
     return str.trim();
   }
 
+  static final Expando<({String title, String artist, String album})> _normCache = Expando();
+
   List<SongsTableData> _filterWithFuzzy(List<SongsTableData> songs, String rawQ, String filter) {
     final q = rawQ.length > 20 ? rawQ.substring(0, 20) : rawQ;
     final results = <SongsTableData>[];
@@ -102,9 +120,14 @@ class SearchCubit extends Cubit<SearchState> {
     for (final song in songs) {
       if (results.length >= 100) break;
 
-      final title = normalize(song.title);
-      final artist = normalize(song.artist);
-      final album = normalize(song.album);
+      final norm = _normCache[song] ??= (
+        title: normalize(song.title),
+        artist: normalize(song.artist),
+        album: normalize(song.album),
+      );
+      final title = norm.title;
+      final artist = norm.artist;
+      final album = norm.album;
 
       bool matchesField(String text) {
         if (text.contains(q)) return true;

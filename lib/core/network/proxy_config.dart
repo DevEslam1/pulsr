@@ -222,9 +222,9 @@ class ProxyEntry {
 
     // Handle user:pass@host:port format
     if (line.contains('@')) {
-      final atParts = line.split('@');
-      final authPart = atParts[0];
-      final serverPart = atParts[1];
+      final lastAtIndex = line.lastIndexOf('@');
+      final authPart = line.substring(0, lastAtIndex);
+      final serverPart = line.substring(lastAtIndex + 1);
 
       final authTokens = authPart.split(':');
       final user = authTokens[0].trim();

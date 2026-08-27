@@ -4,6 +4,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/glass_container.dart';
@@ -149,314 +150,361 @@ class CardPlayerTheme extends StatelessWidget {
                 ),
               ),
 
-              // Central Area: Floating Artwork or Lyrics or Queue
+              // Responsive Two-Pane (Landscape / Tablet) vs Single Column (Portrait)
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  child: GestureDetector(
-                    onTap: () => cubit.toggleLyricsVisibility(),
-                    onDoubleTap: () {
-                      switch (settingsState.nowPlayingDoubleTap) {
-                        case NowPlayingDoubleTapAction.toggleFavorite:
-                          if (song != null) cubit.toggleFavorite(song.id);
-                          break;
-                        case NowPlayingDoubleTapAction.toggleLyrics:
-                          cubit.toggleLyricsVisibility();
-                          break;
-                        case NowPlayingDoubleTapAction.none:
-                          break;
-                      }
-                    },
-                    onHorizontalDragEnd: (details) {
-                      if (settingsState.nowPlayingArtworkSwipe == NowPlayingArtworkSwipeAction.nextPrev &&
-                          details.primaryVelocity != null) {
-                        if (details.primaryVelocity! < -200) {
-                          cubit.next();
-                        } else if (details.primaryVelocity! > 200) {
-                          cubit.previous();
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final isTwoPane = context.isTwoPane || constraints.maxWidth >= 680;
+
+                    final centerDisplay = GestureDetector(
+                      onTap: () => cubit.toggleLyricsVisibility(),
+                      onDoubleTap: () {
+                        switch (settingsState.nowPlayingDoubleTap) {
+                          case NowPlayingDoubleTapAction.toggleFavorite:
+                            if (song != null) cubit.toggleFavorite(song.id);
+                            break;
+                          case NowPlayingDoubleTapAction.toggleLyrics:
+                            cubit.toggleLyricsVisibility();
+                            break;
+                          case NowPlayingDoubleTapAction.none:
+                            break;
                         }
-                      }
-                    },
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 300),
-                      child: state.isLyricsVisible
-                          ? LyricsView(
-                              key: const ValueKey('lyrics_view'),
-                              lyrics: state.lyrics,
-                              currentPosition: state.position,
-                              isLoading: state.isLoadingLyrics,
-                              activeColor: activeColor,
-                              source: state.lyricsSource,
-                            )
-                          : state.isQueueVisible
-                              ? const NowPlayingQueueView(key: ValueKey('queue_view'))
-                              : Center(
-                                  key: const ValueKey('artwork_card'),
-                                  child: ConstrainedBox(
-                                    constraints: const BoxConstraints(maxHeight: 340, maxWidth: 340),
-                                    child: AspectRatio(
-                                      aspectRatio: 1.0,
-                                      child: Hero(
-                                        tag: 'now_playing_art',
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(28),
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.black.withValues(alpha: isDark ? 0.6 : 0.2),
-                                                blurRadius: 30,
-                                                spreadRadius: 4,
-                                                offset: const Offset(0, 12),
-                                              ),
-                                              BoxShadow(
-                                                color: activeColor.withValues(alpha: 0.3),
-                                                blurRadius: 24,
-                                                spreadRadius: -2,
-                                                offset: const Offset(0, 8),
-                                              ),
-                                            ],
-                                          ),
-                                          child: song != null
-                                              ? CachedArtwork(
-                                                  id: song.id,
-                                                  remoteUrl: song.remoteArtworkUrl,
-                                                  type: ArtworkType.AUDIO,
-                                                  size: 340,
-                                                  borderRadius: 28,
-                                                )
-                                              : Container(
-                                                  decoration: BoxDecoration(
-                                                    color: p.surfaceContainer,
-                                                    borderRadius: BorderRadius.circular(28),
-                                                  ),
-                                                  child: Icon(
-                                                    Icons.music_note_rounded,
-                                                    size: 96,
-                                                    color: textSubtitleColor.withValues(alpha: 0.4),
-                                                  ),
+                      },
+                      onHorizontalDragEnd: (details) {
+                        if (settingsState.nowPlayingArtworkSwipe == NowPlayingArtworkSwipeAction.nextPrev &&
+                            details.primaryVelocity != null) {
+                          if (details.primaryVelocity! < -200) {
+                            cubit.next();
+                          } else if (details.primaryVelocity! > 200) {
+                            cubit.previous();
+                          }
+                        }
+                      },
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        child: state.isLyricsVisible
+                            ? LyricsView(
+                                key: const ValueKey('lyrics_view'),
+                                lyrics: state.lyrics,
+                                currentPosition: state.position,
+                                isLoading: state.isLoadingLyrics,
+                                activeColor: activeColor,
+                                source: state.lyricsSource,
+                              )
+                            : state.isQueueVisible
+                                ? const NowPlayingQueueView(key: ValueKey('queue_view'))
+                                : Center(
+                                    key: const ValueKey('artwork_card'),
+                                    child: ConstrainedBox(
+                                      constraints: BoxConstraints(
+                                        maxHeight: isTwoPane ? 280 : 340,
+                                        maxWidth: isTwoPane ? 280 : 340,
+                                      ),
+                                      child: AspectRatio(
+                                        aspectRatio: 1.0,
+                                        child: Hero(
+                                          tag: 'now_playing_art_full',
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              borderRadius: BorderRadius.circular(28),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black.withValues(alpha: isDark ? 0.6 : 0.2),
+                                                  blurRadius: 30,
+                                                  spreadRadius: 4,
+                                                  offset: const Offset(0, 12),
                                                 ),
+                                                BoxShadow(
+                                                  color: activeColor.withValues(alpha: 0.3),
+                                                  blurRadius: 24,
+                                                  spreadRadius: -2,
+                                                  offset: const Offset(0, 8),
+                                                ),
+                                              ],
+                                            ),
+                                            child: song != null
+                                                ? CachedArtwork(
+                                                    id: song.id,
+                                                    remoteUrl: song.remoteArtworkUrl,
+                                                    type: ArtworkType.AUDIO,
+                                                    size: 340,
+                                                    borderRadius: 28,
+                                                  )
+                                                : Container(
+                                                    decoration: BoxDecoration(
+                                                      color: p.surfaceContainer,
+                                                      borderRadius: BorderRadius.circular(28),
+                                                    ),
+                                                    child: Icon(
+                                                      Icons.music_note_rounded,
+                                                      size: 96,
+                                                      color: textSubtitleColor.withValues(alpha: 0.4),
+                                                    ),
+                                                  ),
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
-                                ),
-                    ),
-                  ),
-                ),
-              ),
+                      ),
+                    );
 
-              // Visualizer Strip under cover
-              if (settingsState.visualizerStyle != VisualizerStyle.off && !state.isLyricsVisible && !state.isQueueVisible)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 2),
-                  child: AudioVisualizer(
-                    style: settingsState.visualizerStyle,
-                    color: activeColor,
-                    height: settingsState.visualizerStyle == VisualizerStyle.circular ? 90 : 56,
-                    isPlaying: state.isPlaying,
-                    audioSessionId: state.audioSessionId,
-                  ),
-                ),
+                    final visualizer = (settingsState.visualizerStyle != VisualizerStyle.off && !state.isLyricsVisible && !state.isQueueVisible)
+                        ? Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 2),
+                            child: AudioVisualizer(
+                              style: settingsState.visualizerStyle,
+                              color: activeColor,
+                              height: settingsState.visualizerStyle == VisualizerStyle.circular ? 70 : 46,
+                              isPlaying: state.isPlaying,
+                              audioSessionId: state.audioSessionId,
+                            ),
+                          )
+                        : const SizedBox.shrink();
 
-              // Bottom Glass Card: Track Meta, Seek, Controls, Actions
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                child: GlassContainer(
-                  borderRadius: BorderRadius.circular(28),
-                  blur: 24,
-                  color: cardBgColor,
-                  border: Border.all(
-                    color: cardBorderColor,
-                    width: 1,
-                  ),
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Song Title, Artist, Favorite
-                      Row(
+                    final bottomGlassCard = GlassContainer(
+                      borderRadius: BorderRadius.circular(28),
+                      blur: 24,
+                      color: cardBgColor,
+                      border: Border.all(
+                        color: cardBorderColor,
+                        width: 1,
+                      ),
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  song?.title ?? context.l10n.noTrackSelected,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                        fontWeight: FontWeight.w900,
-                                        color: textTitleColor,
-                                      ),
+                          // Song Title, Artist, Favorite
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      song?.title ?? context.l10n.noTrackSelected,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                            fontWeight: FontWeight.w900,
+                                            color: textTitleColor,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      song?.artist ?? context.l10n.unknownArtist,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                            color: textSubtitleColor,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                    ),
+                                    if (song != null) ...[
+                                      const SizedBox(height: 6),
+                                      AudioQualityBadge(song: song, activeColor: activeColor),
+                                    ],
+                                  ],
                                 ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  song?.artist ?? context.l10n.unknownArtist,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                        color: textSubtitleColor,
-                                        fontWeight: FontWeight.w600,
-                                      ),
+                              ),
+                              if (song != null && (song.source == SongSource.youtube || (song.remoteId != null && song.remoteId!.isNotEmpty))) ...[
+                                YtmDownloadButton(
+                                  song: song,
+                                  activeColor: activeColor,
+                                  iconColor: textSubtitleColor,
+                                  iconSize: 24,
                                 ),
-                                if (song != null) ...[
-                                  const SizedBox(height: 6),
-                                  AudioQualityBadge(song: song, activeColor: activeColor),
-                                ],
+                                const SizedBox(width: 4),
                               ],
-                            ),
+                              IconButton(
+                                icon: Icon(
+                                  song?.isFavorite == true
+                                      ? Icons.favorite_rounded
+                                      : Icons.favorite_border_rounded,
+                                  color: song?.isFavorite == true
+                                      ? p.favorite
+                                      : textSubtitleColor,
+                                  size: 28,
+                                ),
+                                onPressed: () {
+                                  if (song != null) {
+                                    cubit.toggleFavorite(song.id);
+                                  }
+                                },
+                              ),
+                            ],
                           ),
-                          if (song != null && (song.source == SongSource.youtube || (song.remoteId != null && song.remoteId!.isNotEmpty))) ...[
-                            YtmDownloadButton(
-                              song: song,
-                              activeColor: activeColor,
-                              iconColor: textSubtitleColor,
-                              iconSize: 24,
+
+                          const SizedBox(height: 8),
+
+                          // Seek Bar
+                          PlayerSeekBar(
+                            position: state.position,
+                            duration: state.duration,
+                            activeColor: activeColor,
+                            songId: state.currentSong?.id,
+                            filePath: state.currentSong?.path,
+                            onSeek: (pos) => cubit.seek(pos),
+                          ),
+
+                          const SizedBox(height: 4),
+
+                          // Player Controls
+                          PlayerControls(
+                            isPlaying: state.isPlaying,
+                            isShuffle: state.isShuffle,
+                            repeatMode: state.repeatMode,
+                            primaryColor: activeColor,
+                            mainButtonSize: isTwoPane ? 56 : 64,
+                            onPlayPause: () => cubit.togglePlayPause(),
+                            onNext: () => cubit.next(),
+                            onPrevious: () => cubit.previous(),
+                            onToggleShuffle: () => cubit.toggleShuffle(),
+                            onToggleRepeat: () => cubit.toggleRepeat(),
+                          ),
+
+                          const SizedBox(height: 6),
+
+                          // Bottom Action Strip
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: [
+                              IconButton(
+                                icon: Icon(
+                                  Icons.settings_input_component_rounded,
+                                  color: settingsState.currentOutputDevice?.isUsbDac == true
+                                      ? const Color(0xFFFFD700)
+                                      : iconActionColor,
+                                ),
+                                onPressed: () {
+                                  if (song != null) {
+                                    AudioQualitySheet.show(context, song, activeColor);
+                                  }
+                                },
+                                tooltip: 'Audio Output & DAC',
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  Icons.equalizer_rounded,
+                                  color: state.isEqEnabled ? activeColor : iconActionColor,
+                                ),
+                                onPressed: () {
+                                  showModalBottomSheet(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    backgroundColor: Colors.transparent,
+                                    builder: (_) => const EqualizerSheet(),
+                                  );
+                                },
+                                tooltip: context.l10n.equalizer,
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.speed_rounded, color: iconActionColor),
+                                onPressed: () {
+                                  showModalBottomSheet(
+                                    context: context,
+                                    builder: (_) => const SpeedPickerSheet(),
+                                  );
+                                },
+                                tooltip: context.l10n.playbackSpeed,
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  Icons.lyrics_rounded,
+                                  color: state.isLyricsVisible ? activeColor : iconActionColor,
+                                ),
+                                onPressed: () => cubit.toggleLyricsVisibility(),
+                                tooltip: context.l10n.lyrics,
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  Icons.timer_outlined,
+                                  color: state.sleepTimerRemaining != null ? activeColor : iconActionColor,
+                                ),
+                                onPressed: () {
+                                  showModalBottomSheet(
+                                    context: context,
+                                    useRootNavigator: true,
+                                    isScrollControlled: true,
+                                    backgroundColor: Colors.transparent,
+                                    builder: (_) => const SleepTimerSheet(),
+                                  );
+                                },
+                                tooltip: context.l10n.sleepTimer,
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.playlist_add_rounded, color: iconActionColor),
+                                onPressed: () {
+                                  if (song != null) {
+                                    showModalBottomSheet(
+                                      context: context,
+                                      useRootNavigator: true,
+                                      isScrollControlled: true,
+                                      backgroundColor: Colors.transparent,
+                                      builder: (_) => AddToPlaylistSheet(song: song),
+                                    );
+                                  }
+                                },
+                                tooltip: context.l10n.addToPlaylist,
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  Icons.queue_music_rounded,
+                                  color: state.isQueueVisible ? activeColor : iconActionColor,
+                                ),
+                                onPressed: () => cubit.toggleQueueVisibility(),
+                                tooltip: context.l10n.queue,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+
+                    if (isTwoPane) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Expanded(
+                              flex: 5,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Expanded(child: centerDisplay),
+                                  visualizer,
+                                ],
+                              ),
                             ),
-                            const SizedBox(width: 4),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              flex: 6,
+                              child: SingleChildScrollView(
+                                child: bottomGlassCard,
+                              ),
+                            ),
                           ],
-                          IconButton(
-                            icon: Icon(
-                              song?.isFavorite == true
-                                  ? Icons.favorite_rounded
-                                  : Icons.favorite_border_rounded,
-                              color: song?.isFavorite == true
-                                  ? p.favorite
-                                  : textSubtitleColor,
-                              size: 28,
-                            ),
-                            onPressed: () {
-                              if (song != null) {
-                                cubit.toggleFavorite(song.id);
-                              }
-                            },
-                          ),
-                        ],
-                      ),
+                        ),
+                      );
+                    }
 
-                      const SizedBox(height: 8),
-
-                      // Seek Bar
-                      PlayerSeekBar(
-                        position: state.position,
-                        duration: state.duration,
-                        activeColor: activeColor,
-                        songId: state.currentSong?.id,
-                        filePath: state.currentSong?.path,
-                        onSeek: (pos) => cubit.seek(pos),
-                      ),
-
-                      const SizedBox(height: 4),
-
-                      // Player Controls
-                      PlayerControls(
-                        isPlaying: state.isPlaying,
-                        isShuffle: state.isShuffle,
-                        repeatMode: state.repeatMode,
-                        primaryColor: activeColor,
-                        onPlayPause: () => cubit.togglePlayPause(),
-                        onNext: () => cubit.next(),
-                        onPrevious: () => cubit.previous(),
-                        onToggleShuffle: () => cubit.toggleShuffle(),
-                        onToggleRepeat: () => cubit.toggleRepeat(),
-                      ),
-
-                      const SizedBox(height: 6),
-
-                      // Bottom Action Strip
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              Icons.settings_input_component_rounded,
-                              color: settingsState.currentOutputDevice?.isUsbDac == true
-                                  ? const Color(0xFFFFD700)
-                                  : iconActionColor,
-                            ),
-                            onPressed: () {
-                              if (song != null) {
-                                AudioQualitySheet.show(context, song, activeColor);
-                              }
-                            },
-                            tooltip: 'Audio Output & DAC',
+                    return Column(
+                      children: [
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                            child: centerDisplay,
                           ),
-                          IconButton(
-                            icon: Icon(
-                              Icons.equalizer_rounded,
-                              color: state.isEqEnabled ? activeColor : iconActionColor,
-                            ),
-                            onPressed: () {
-                              showModalBottomSheet(
-                                context: context,
-                                isScrollControlled: true,
-                                backgroundColor: Colors.transparent,
-                                builder: (_) => const EqualizerSheet(),
-                              );
-                            },
-                            tooltip: context.l10n.equalizer,
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.speed_rounded, color: iconActionColor),
-                            onPressed: () {
-                              showModalBottomSheet(
-                                context: context,
-                                builder: (_) => const SpeedPickerSheet(),
-                              );
-                            },
-                            tooltip: context.l10n.playbackSpeed,
-                          ),
-                          IconButton(
-                            icon: Icon(
-                              Icons.lyrics_rounded,
-                              color: state.isLyricsVisible ? activeColor : iconActionColor,
-                            ),
-                            onPressed: () => cubit.toggleLyricsVisibility(),
-                            tooltip: context.l10n.lyrics,
-                          ),
-                          IconButton(
-                            icon: Icon(
-                              Icons.timer_outlined,
-                              color: state.sleepTimerRemaining != null ? activeColor : iconActionColor,
-                            ),
-                            onPressed: () {
-                              showModalBottomSheet(
-                                context: context,
-                                useRootNavigator: true,
-                                isScrollControlled: true,
-                                backgroundColor: Colors.transparent,
-                                builder: (_) => const SleepTimerSheet(),
-                              );
-                            },
-                            tooltip: context.l10n.sleepTimer,
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.playlist_add_rounded, color: iconActionColor),
-                            onPressed: () {
-                              if (song != null) {
-                                showModalBottomSheet(
-                                  context: context,
-                                  useRootNavigator: true,
-                                  isScrollControlled: true,
-                                  backgroundColor: Colors.transparent,
-                                  builder: (_) => AddToPlaylistSheet(song: song),
-                                );
-                              }
-                            },
-                            tooltip: context.l10n.addToPlaylist,
-                          ),
-                          IconButton(
-                            icon: Icon(
-                              Icons.queue_music_rounded,
-                              color: state.isQueueVisible ? activeColor : iconActionColor,
-                            ),
-                            onPressed: () => cubit.toggleQueueVisibility(),
-                            tooltip: context.l10n.queue,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                        ),
+                        visualizer,
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: bottomGlassCard,
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
             ],

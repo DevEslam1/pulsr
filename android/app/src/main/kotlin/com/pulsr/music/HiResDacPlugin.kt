@@ -33,6 +33,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     private var eventSink: EventChannel.EventSink? = null
 
     private var bitPerfectRequested: Boolean = false
+    private var lastBitPerfectReason: String? = null
     private var selectedDeviceId: Int? = null
     private var targetSampleRate: Int = 0
     private var targetBitDepth: Int = 0
@@ -81,7 +82,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         }
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                context.registerReceiver(usbReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+                context.registerReceiver(usbReceiver, filter, Context.RECEIVER_EXPORTED)
             } else {
                 context.registerReceiver(usbReceiver, filter)
             }
@@ -94,7 +95,11 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
 
     private fun notifyDeviceChange() {
         val info = getAudioOutputDetails()
-        eventSink?.success(info)
+        android.os.Handler(android.os.Looper.getMainLooper()).post {
+            try {
+                eventSink?.success(info)
+            } catch (_: Exception) {}
+        }
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -112,16 +117,23 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 notifyDeviceChange()
                 result.success(success)
             }
+            "setBitPerfectModeDetailed" -> {
+                val enabled = call.argument<Boolean>("enabled") ?: false
+                bitPerfectRequested = enabled
+                val success = applyBitPerfectMode(enabled)
+                notifyDeviceChange()
+                result.success(mapOf("success" to success, "reason" to lastBitPerfectReason))
+            }
             "setOutputDevice" -> {
                 val deviceId = call.argument<Int>("deviceId")
                 selectedDeviceId = deviceId
                 var success = false
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && audioManager != null && deviceId != null) {
                     val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
-                    val targetDev = devices.firstOrNull { it.id == deviceId }
-                    if (targetDev != null) {
+                    val target = devices.firstOrNull { it.id == deviceId }
+                    if (target != null) {
                         try {
-                            success = audioManager.setCommunicationDevice(targetDev)
+                            success = audioManager.setCommunicationDevice(target)
                         } catch (_: Exception) {}
                     }
                 }
@@ -138,11 +150,11 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 notifyDeviceChange()
                 result.success(true)
             }
-            "setTargetOutputFormat" -> {
-                val sRate = call.argument<Int>("sampleRate") ?: 0
-                val bDepth = call.argument<Int>("bitDepth") ?: 0
-                targetSampleRate = sRate
-                targetBitDepth = bDepth
+            "configureTargetAudio" -> {
+                val sampleRate = call.argument<Int>("sampleRate") ?: 0
+                val bitDepth = call.argument<Int>("bitDepth") ?: 0
+                targetSampleRate = sampleRate
+                targetBitDepth = bitDepth
                 notifyDeviceChange()
                 result.success(true)
             }
@@ -178,16 +190,23 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
 
     private fun applyBitPerfectMode(enabled: Boolean): Boolean {
         if (Build.VERSION.SDK_INT < 34 || audioManager == null) {
+            lastBitPerfectReason = "requires_android_14"
             return false
         }
         return try {
             val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
             val usbDevice = devices.firstOrNull { it.type == AudioDeviceInfo.TYPE_USB_DEVICE || it.type == AudioDeviceInfo.TYPE_USB_HEADSET }
-                ?: return false
+            if (usbDevice == null) {
+                lastBitPerfectReason = "no_usb_device"
+                return false
+            }
 
             val getSupportedMethod = AudioManager::class.java.getMethod("getSupportedAudioMixerAttributes", AudioDeviceInfo::class.java)
             val supportedAttributes = getSupportedMethod.invoke(audioManager, usbDevice) as? List<*> ?: emptyList<Any>()
-            if (supportedAttributes.isEmpty()) return false
+            if (supportedAttributes.isEmpty()) {
+                lastBitPerfectReason = "no_supported_mixer_attributes"
+                return false
+            }
 
             if (enabled) {
                 var selectedAttr: Any? = null
@@ -209,19 +228,39 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
 
                 val mixerAttrClass = Class.forName("android.media.AudioMixerAttributes")
                 val setMethod = AudioManager::class.java.getMethod("setAudioMixerAttributes", AudioDeviceInfo::class.java, mixerAttrClass)
-                (setMethod.invoke(audioManager, usbDevice, selectedAttr) as? Boolean) ?: false
+                val ok = (setMethod.invoke(audioManager, usbDevice, selectedAttr) as? Boolean) ?: false
+                if (ok) {
+                    lastBitPerfectReason = null
+                } else {
+                    lastBitPerfectReason = "set_mixer_attributes_failed"
+                }
+                ok
             } else {
                 val clearMethod = AudioManager::class.java.getMethod("clearAudioMixerAttributes", AudioDeviceInfo::class.java)
-                (clearMethod.invoke(audioManager, usbDevice) as? Boolean) ?: false
+                val ok = (clearMethod.invoke(audioManager, usbDevice) as? Boolean) ?: false
+                lastBitPerfectReason = null
+                ok
             }
         } catch (e: NoSuchMethodException) {
+            lastBitPerfectReason = "reflection_method_not_found"
             Log.w(TAG, "Bit-perfect API not available on this device: ${e.message}")
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                eventSink?.error("BIT_PERFECT_NOT_AVAILABLE", e.message, null)
+            }
             false
         } catch (e: ClassNotFoundException) {
+            lastBitPerfectReason = "audio_mixer_class_not_found"
             Log.w(TAG, "AudioMixerAttributes class not found: ${e.message}")
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                eventSink?.error("AUDIO_MIXER_CLASS_NOT_FOUND", e.message, null)
+            }
             false
         } catch (e: Throwable) {
+            lastBitPerfectReason = "unknown_error_${e.message}"
             Log.w(TAG, "Bit-perfect mode failed: ${e.message}")
+            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                eventSink?.error("BIT_PERFECT_FAILED", e.message, null)
+            }
             false
         }
     }
@@ -253,15 +292,8 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
 
         val isUsb = (usbDevice != null)
         val deviceName = when {
-            usbDevice != null -> {
-                val name = usbDevice.productName.toString()
-                if (name.isNotBlank()) "$name (USB DAC)" else "USB Audio DAC"
-            }
-            activeDevice != null -> {
-                val typeName = getDeviceTypeName(activeDevice.type)
-                val name = activeDevice.productName.toString()
-                if (name.isNotBlank() && name != typeName) "$name ($typeName)" else typeName
-            }
+            usbDevice != null -> getCleanDeviceName(usbDevice)
+            activeDevice != null -> getCleanDeviceName(activeDevice)
             else -> "Default Audio Output"
         }
 
@@ -309,7 +341,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                     AudioFormat.ENCODING_PCM_32BIT -> dBitDepth = maxOf(dBitDepth, 32)
                 }
             }
-            val dName = device.productName.toString().ifBlank { getDeviceTypeName(device.type) }
+            val dName = getCleanDeviceName(device)
             val isCurrent = (device.id == currentDevId)
             availableList.add(mapOf(
                 "id" to device.id,
@@ -328,14 +360,42 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         result["nativeSampleRate"] = nativeSampleRate
         result["nativeFramesPerBuffer"] = nativeFrames
         result["bitDepth"] = if (targetBitDepth > 0) targetBitDepth else bitDepth
-        result["isBitPerfectActive"] = isBitPerfectActive || bitPerfectRequested
-        result["isBitPerfectSupported"] = true
+        result["isBitPerfectActive"] = isUsb && (isBitPerfectActive || bitPerfectRequested)
+        result["isBitPerfectSupported"] = isUsb && isBitPerfectSupportedOnPlatform()
         result["supportedSampleRates"] = if (sampleRates.isNotEmpty()) sampleRates else listOf(44100, 48000, 88200, 96000, 176400, 192000, 384000)
         result["availableDevices"] = availableList
         result["targetSampleRate"] = targetSampleRate
         result["targetBitDepth"] = targetBitDepth
+        result["bitPerfectFailureReason"] = if (isUsb) lastBitPerfectReason else "usb_dac_not_connected"
 
         return result
+    }
+
+    private fun getCleanDeviceName(device: AudioDeviceInfo): String {
+        val prodName = device.productName.toString().trim()
+        val isGenericModel = prodName.isBlank() ||
+            prodName.startsWith("sdk_") ||
+            prodName.contains("emulator", ignoreCase = true) ||
+            prodName.equals(Build.PRODUCT, ignoreCase = true) ||
+            prodName.equals(Build.MODEL, ignoreCase = true) ||
+            prodName.equals(Build.DEVICE, ignoreCase = true)
+
+        return when (device.type) {
+            AudioDeviceInfo.TYPE_BUILTIN_SPEAKER -> "Phone Speaker"
+            AudioDeviceInfo.TYPE_BUILTIN_EARPIECE -> "Phone Earpiece"
+            AudioDeviceInfo.TYPE_WIRED_HEADPHONES -> "Wired Headphones"
+            AudioDeviceInfo.TYPE_WIRED_HEADSET -> "Wired Headset"
+            AudioDeviceInfo.TYPE_BLUETOOTH_A2DP, AudioDeviceInfo.TYPE_BLUETOOTH_SCO -> {
+                if (!isGenericModel) prodName else "Bluetooth Audio"
+            }
+            AudioDeviceInfo.TYPE_USB_DEVICE, AudioDeviceInfo.TYPE_USB_HEADSET -> {
+                if (!isGenericModel) "$prodName (USB DAC)" else "USB Audio DAC"
+            }
+            AudioDeviceInfo.TYPE_LINE_ANALOG, AudioDeviceInfo.TYPE_AUX_LINE -> "Line Output (Aux)"
+            AudioDeviceInfo.TYPE_LINE_DIGITAL -> "Digital Line Out"
+            AudioDeviceInfo.TYPE_HDMI, AudioDeviceInfo.TYPE_HDMI_ARC, AudioDeviceInfo.TYPE_HDMI_EARC -> "HDMI Output"
+            else -> if (!isGenericModel) prodName else getDeviceTypeName(device.type)
+        }
     }
 
     private fun getNativeSampleRate(): Int {

@@ -24,6 +24,7 @@ class ArtistInfo {
 class ArtistBioService {
   final http.Client _client;
   final Map<String, ArtistInfo> _cache = {};
+  static const int _maxCacheSize = 150;
 
   ArtistBioService([http.Client? client]) : _client = client ?? http.Client();
 
@@ -74,6 +75,9 @@ class ArtistBioService {
         fanCount: fanCount,
       );
 
+      if (_cache.length >= _maxCacheSize) {
+        _cache.remove(_cache.keys.first);
+      }
       _cache[cleanName.toLowerCase()] = info;
       return info;
     } catch (e, st) {

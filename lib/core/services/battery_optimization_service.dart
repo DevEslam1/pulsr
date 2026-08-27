@@ -3,9 +3,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../constants/channels.dart';
 
 class BatteryOptimizationService {
-  static const MethodChannel _channel = MethodChannel('com.pulsr.music/battery_optimization');
+  static const MethodChannel _channel = MethodChannel(PulsrChannels.battery);
   static const String prefDismissedKey = 'battery_opt_card_dismissed';
 
   static Future<bool> isIgnoringBatteryOptimizations() async {
@@ -14,7 +15,7 @@ class BatteryOptimizationService {
       final isIgnoring = await _channel.invokeMethod<bool>('isIgnoringBatteryOptimizations');
       return isIgnoring ?? false;
     } catch (_) {
-      return true;
+      return false;
     }
   }
 
@@ -35,6 +36,16 @@ class BatteryOptimizationService {
       return m?.toLowerCase() ?? '';
     } catch (_) {
       return '';
+    }
+  }
+
+  static Future<int> getBatteryLevel() async {
+    if (kIsWeb || !Platform.isAndroid) return 100;
+    try {
+      final level = await _channel.invokeMethod<int>('getBatteryLevel');
+      return level ?? 100;
+    } catch (_) {
+      return 100;
     }
   }
 

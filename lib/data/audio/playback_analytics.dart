@@ -60,8 +60,8 @@ class PlaybackAnalytics {
   /// Resets error counters on successful track progress.
   void resetErrorCounters() {
     _bufferUnderrunCount = 0;
-    if (_recentEvents.length > 50) {
-      _recentEvents.removeRange(0, _recentEvents.length - 50);
+    if (_recentEvents.length > 1000) {
+      _recentEvents.removeRange(0, _recentEvents.length - 1000);
     }
   }
 }

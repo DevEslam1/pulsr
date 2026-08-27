@@ -21,12 +21,13 @@ class ArtworkUriResolver {
       final oldestKey = map.keys.first;
       final oldestUri = map.remove(oldestKey);
       if (oldestUri != null && oldestUri.scheme == 'file') {
-        try {
-          final f = File(oldestUri.toFilePath());
-          if (f.existsSync()) f.deleteSync();
-        } catch (e, st) {
+        File(oldestUri.toFilePath()).exists().then((exists) {
+          if (exists) {
+            File(oldestUri.toFilePath()).delete().ignore();
+          }
+        }).catchError((e, st) {
           ErrorLogger.log('Failed to delete evicted artwork temp file', error: e, stackTrace: st, category: 'ArtworkUriResolver');
-        }
+        });
       }
     }
     map[key] = value;
@@ -35,15 +36,14 @@ class ArtworkUriResolver {
   static Future<void> cleanupTempArtwork() async {
     try {
       final tempDir = await getTemporaryDirectory();
-      final entities = tempDir.listSync();
-      for (final entity in entities) {
+      await for (final entity in tempDir.list()) {
         if (entity is File) {
-          final name = entity.uri.pathSegments.last;
+          final name = entity.uri.pathSegments.isNotEmpty ? entity.uri.pathSegments.last : '';
           if (name.startsWith('pulsr_art_') ||
               name.startsWith('pulsr_album_art_') ||
               name.startsWith('pulsr_artist_art_')) {
             try {
-              entity.deleteSync();
+              await entity.delete();
             } catch (e, st) {
               ErrorLogger.log('Failed to delete temp artwork file during cleanup: $name', error: e, stackTrace: st, category: 'ArtworkUriResolver');
             }
@@ -53,9 +53,11 @@ class ArtworkUriResolver {
     } catch (e, st) {
       ErrorLogger.log('Failed to cleanup temp artwork directory', error: e, stackTrace: st, category: 'ArtworkUriResolver');
     }
-    _cachedArtworkUris.clear();
-    _cachedAlbumArtUris.clear();
-    _cachedArtistArtUris.clear();
+    try {
+      _cachedArtworkUris.clear();
+      _cachedAlbumArtUris.clear();
+      _cachedArtistArtUris.clear();
+    } catch (_) {}
   }
 
   static Future<Uri?> getArtworkUri(int songId) async {

@@ -39,5 +39,6 @@ class ThemeSchedulerService {
   void dispose() {
     _timer?.cancel();
     _timer = null;
+    _isNightSubject.close();
   }
 }
