@@ -120,6 +120,9 @@ class WaveformService {
 
   Future<File> _diskCacheFile(String path, int mtime, int size, int count) async {
     final dir = _cacheDir ??= await _initCacheDir();
+    if (path.startsWith('content:')) {
+      return File('${dir.path}/content_${_hashPath(path)}_$count.json');
+    }
     return File('${dir.path}/${_hashPath(path)}_${mtime}_${size}_$count.json');
   }
 
@@ -129,7 +132,9 @@ class WaveformService {
     try {
       final dir = _cacheDir;
       if (dir == null) return;
-      final prefix = '${_hashPath(path)}_';
+      final prefix = path.startsWith('content:')
+          ? 'content_${_hashPath(path)}_'
+          : '${_hashPath(path)}_';
       await for (final entity in dir.list()) {
         if (entity is File &&
             entity.path != keep &&

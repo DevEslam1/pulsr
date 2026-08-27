@@ -57,6 +57,10 @@ class PlaylistUseCases {
     return _repository.removeSongFromPlaylist(playlistId, songId);
   }
 
+  Future<Result<void>> reorderPlaylistSongs(int playlistId, List<int> orderedSongIds) {
+    return _repository.reorderPlaylistSongs(playlistId, orderedSongIds);
+  }
+
   Future<void> seedDefaultSmartPlaylists() async {
     final defaults = [
       (

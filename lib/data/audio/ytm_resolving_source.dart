@@ -5,6 +5,7 @@
 // get lazy resolution + byte caching for YTM inside a ConcatenatingAudioSource.
 // ignore_for_file: experimental_member_use
 import 'dart:async';
+import 'dart:collection';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -60,7 +61,8 @@ class YtmResolvingSource extends StreamAudioSource {
   Future<StreamAudioResponse> request([int? start, int? end]) async {
     // 1. Proactive expiry check: if URL is within 5 minutes of expiring, discard & re-resolve
     if (_isExpiringSoon()) {
-      debugPrint('[YtmResolvingSource] Stream URL for $videoId is expiring soon. Re-resolving...');
+      debugPrint(
+          '[YtmResolvingSource] Stream URL for $videoId is expiring soon. Re-resolving...');
       _inner = null;
       _pending = null;
     }
@@ -73,15 +75,19 @@ class YtmResolvingSource extends StreamAudioSource {
         final errStr = byteErr.toString().toLowerCase();
 
         // Abort immediately on hard blocks (403/429/forbidden)
-        if (errStr.contains('403') || errStr.contains('forbidden') || errStr.contains('429')) {
-          debugPrint('[YtmResolvingSource] Hard block ($byteErr) for $videoId. Aborting re-resolution.');
+        if (errStr.contains('403') ||
+            errStr.contains('forbidden') ||
+            errStr.contains('429')) {
+          debugPrint(
+              '[YtmResolvingSource] Hard block ($byteErr) for $videoId. Aborting re-resolution.');
           _inner = null;
           _pending = null;
           onError?.call(byteErr);
           rethrow;
         }
 
-        debugPrint('[YtmResolvingSource] Byte stream error ($byteErr) for $videoId. Re-resolving fresh stream...');
+        debugPrint(
+            '[YtmResolvingSource] Byte stream error ($byteErr) for $videoId. Re-resolving fresh stream...');
         _inner = null;
         _pending = null;
         try {
@@ -111,7 +117,8 @@ class YtmResolvingSource extends StreamAudioSource {
     return _pending ??= _createInner();
   }
 
-  Future<LockCachingAudioSource> _createInner({bool forceRefresh = false}) async {
+  Future<LockCachingAudioSource> _createInner(
+      {bool forceRefresh = false}) async {
     final url = await resolve(forceRefresh: forceRefresh);
 
     // Parse 'expire' Unix timestamp from query
@@ -121,7 +128,8 @@ class YtmResolvingSource extends StreamAudioSource {
       if (expireParam != null) {
         final epochSeconds = int.tryParse(expireParam);
         if (epochSeconds != null) {
-          _resolvedExpiresAt = DateTime.fromMillisecondsSinceEpoch(epochSeconds * 1000);
+          _resolvedExpiresAt =
+              DateTime.fromMillisecondsSinceEpoch(epochSeconds * 1000);
         }
       }
     } catch (_) {}
@@ -142,17 +150,20 @@ class YtmResolvingSource extends StreamAudioSource {
     // Serialize creation per cache path so two sources for the same videoId
     // never start writing the same file at exactly the same time.
     final pathKey = cacheFile.path;
-    if (_pathCreationLocks.length >= _maxLocks) {
-      _pathCreationLocks.clear();
-    }
-    final previous = _pathCreationLocks[pathKey];
     final completer = Completer<void>();
-    _pathCreationLocks[pathKey] = completer.future;
-    try {
-      if (previous != null) {
-        await previous.catchError((_) {});
-      }
+    final previous =
+        _pathCreationLocks.putIfAbsent(pathKey, () => completer.future);
 
+    if (!identical(previous, completer.future)) {
+      // Another creation is in progress; wait for it
+      try {
+        await previous;
+      } catch (_) {}
+      final existing = _inner;
+      if (existing != null) return existing;
+    }
+
+    try {
       final inner = LockCachingAudioSource(
         Uri.parse(url),
         headers: headers,
@@ -165,7 +176,9 @@ class YtmResolvingSource extends StreamAudioSource {
 
       return inner;
     } finally {
-      completer.complete();
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
       if (identical(_pathCreationLocks[pathKey], completer.future)) {
         _pathCreationLocks.remove(pathKey);
       }
@@ -185,10 +198,8 @@ class YtmResolvingSource extends StreamAudioSource {
     }
   }
 
-  /// In-flight creation guards keyed by cache-file path.
-  static const int _maxLocks = 64;
-  static final Map<String, Future<void>> _pathCreationLocks =
-      <String, Future<void>>{};
+  static final LinkedHashMap<String, Future<void>> _pathCreationLocks =
+      LinkedHashMap<String, Future<void>>();
 
   static Future<File> _cacheFileFor(String videoId, String url) async {
     final dir = await _cacheManager.getCacheDirectory();

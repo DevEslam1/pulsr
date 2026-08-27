@@ -28,9 +28,8 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
 
-  /// Whether the "Online" chip is active. Can only ever be true in an
-  /// ENABLE_YTM build, since that is the only build where the chip is shown.
-  bool _onlineMode = false;
+  /// 0 = Local Music, 1 = Online Stream
+  int _selectedTab = 0;
   StreamSubscription? _settingsSub;
 
   bool _isOnlineAvailable(BuildContext context) {
@@ -38,22 +37,17 @@ class _SearchScreenState extends State<SearchScreen> {
     return AppConfig.ytmEnabled && !offlineOnly;
   }
 
-  List<String> _filters(BuildContext context) => _isOnlineAvailable(context)
-      ? const ['All', 'Songs', 'Artists', 'Albums', 'Online']
-      : const ['All', 'Songs', 'Artists', 'Albums'];
+  static const List<String> _localFilters = ['All', 'Songs', 'Artists', 'Albums'];
 
   @override
   void initState() {
     super.initState();
-    // Drive the clear button off the field itself so it stays correct in online
-    // mode too, where keystrokes are routed to YtmSearchCubit and never touch
-    // SearchState.query.
     _searchController.addListener(_onControllerChanged);
 
-    // Reset online search if offline-only mode gets enabled
+    // Reset to local tab if offline-only mode gets enabled
     _settingsSub = context.read<SettingsCubit?>()?.stream.listen((settings) {
-      if (settings.offlineOnlyMode && _onlineMode && mounted) {
-        setState(() => _onlineMode = false);
+      if (settings.offlineOnlyMode && _selectedTab == 1 && mounted) {
+        setState(() => _selectedTab = 0);
       }
     });
   }
@@ -71,7 +65,7 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   void _onQueryChanged(BuildContext context, String value) {
-    if (AppConfig.ytmEnabled && _onlineMode) {
+    if (_isOnlineTab) {
       context.read<YtmSearchCubit>().onQueryChanged(value);
     } else {
       context.read<SearchCubit>().onQueryChanged(value);
@@ -80,26 +74,28 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _clear(BuildContext context) {
     _searchController.clear();
-    if (AppConfig.ytmEnabled && _onlineMode) {
+    if (_isOnlineTab) {
       context.read<YtmSearchCubit>().clearQuery();
     } else {
       context.read<SearchCubit>().clearQuery();
     }
   }
 
-  void _selectFilter(BuildContext context, String filter) {
+  bool get _isOnlineTab => AppConfig.ytmEnabled && _selectedTab == 1;
+
+  void _onTabChanged(int index) {
+    if (_selectedTab == index) return;
+    setState(() => _selectedTab = index);
     final query = _searchController.text;
-    if (AppConfig.ytmEnabled && filter == 'Online') {
-      if (_onlineMode) return;
-      setState(() => _onlineMode = true);
+    if (index == 1 && AppConfig.ytmEnabled) {
       context.read<YtmSearchCubit>().onQueryChanged(query);
-      return;
+    } else {
+      context.read<SearchCubit>().onQueryChanged(query);
     }
-    if (_onlineMode) setState(() => _onlineMode = false);
-    final cubit = context.read<SearchCubit>();
-    // Carry over anything typed while browsing online, then apply the filter.
-    if (cubit.state.query != query) cubit.onQueryChanged(query);
-    cubit.setFilter(filter);
+  }
+
+  void _selectLocalFilter(BuildContext context, String filter) {
+    context.read<SearchCubit>().setFilter(filter);
   }
 
   @override
@@ -117,6 +113,8 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildScaffold(BuildContext context) {
     final p = context.palette;
+    final showOnline = _isOnlineAvailable(context);
+    final currentTab = showOnline ? _selectedTab : 0;
 
     return Scaffold(
       body: SafeArea(
@@ -130,17 +128,61 @@ class _SearchScreenState extends State<SearchScreen> {
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // ---------- Header ----------
                     Padding(
-                      padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 12),
-                      child: Text('Search', style: Theme.of(context).textTheme.headlineMedium),
+                      padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 0),
+                      child: Text(
+                        context.l10n.search,
+                        style: Theme.of(context).textTheme.headlineMedium,
+                      ),
                     ),
+
+                    // ---------- Segmented Tab Selector (Local vs Online) ----------
+                    if (showOnline) ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        margin: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: p.surfaceContainer,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: p.hairline),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _buildTabButton(
+                                title: context.l10n.localMusic,
+                                icon: Icons.library_music_rounded,
+                                isSelected: currentTab == 0,
+                                p: p,
+                                onTap: () => _onTabChanged(0),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: _buildTabButton(
+                                title: context.l10n.onlineStream,
+                                icon: Icons.public_rounded,
+                                isSelected: currentTab == 1,
+                                p: p,
+                                onTap: () => _onTabChanged(1),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+
+                    // ---------- Search Input Field ----------
+                    const SizedBox(height: 12),
                     Padding(
                       padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
                       child: TextField(
                         controller: _searchController,
                         onChanged: (value) => _onQueryChanged(context, value),
                         decoration: InputDecoration(
-                          hintText: (AppConfig.ytmEnabled && _onlineMode)
+                          hintText: (showOnline && currentTab == 1)
                               ? context.l10n.searchOnline
                               : context.l10n.searchPlaceholder,
                           prefixIcon: Icon(Icons.search_rounded, color: p.textTertiary),
@@ -153,26 +195,39 @@ class _SearchScreenState extends State<SearchScreen> {
                         ),
                       ),
                     ),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context), vertical: 6),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        child: Row(
-                          children: [
-                            for (final filter in _filters(context))
-                              Padding(
-                                padding: const EdgeInsetsDirectional.only(end: 8),
-                                child: _buildChip(context, state, filter, p),
-                              ),
-                          ],
+
+                    // ---------- Filter Chips (Local Tab Only) ----------
+                    if (currentTab == 0) ...[
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
+                          child: Row(
+                            children: [
+                              for (final filter in _localFilters)
+                                Padding(
+                                  padding: const EdgeInsetsDirectional.only(end: 8),
+                                  child: _buildChip(context, state, filter, p),
+                                ),
+                            ],
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
+                    ],
+
+                    const SizedBox(height: 8),
+
+                    // ---------- Search Content Body ----------
                     Expanded(
-                      child: (_isOnlineAvailable(context) && _onlineMode)
-                          ? const _OnlineResults()
+                      child: (showOnline && currentTab == 1)
+                          ? _OnlineResults(
+                              onSelectTag: (tag) {
+                                _searchController.text = tag;
+                                _onQueryChanged(context, tag);
+                              },
+                            )
                           : _buildLocalBody(context, state, playerCubit, p),
                     ),
                   ],
@@ -180,6 +235,54 @@ class _SearchScreenState extends State<SearchScreen> {
               },
             ),
           ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTabButton({
+    required String title,
+    required IconData icon,
+    required bool isSelected,
+    required PulsrPalette p,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? p.accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: p.glow.withValues(alpha: 0.35),
+                    blurRadius: 10,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 17,
+              color: isSelected ? p.onAccent : p.textSecondary,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: TextStyle(
+                color: isSelected ? p.onAccent : p.textSecondary,
+                fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -195,15 +298,13 @@ class _SearchScreenState extends State<SearchScreen> {
         return context.l10n.artists;
       case 'Albums':
         return context.l10n.albums;
-      case 'Online':
-        return context.l10n.online;
       default:
         return filter;
     }
   }
 
   Widget _buildChip(BuildContext context, SearchState state, String filter, PulsrPalette p) {
-    final selected = filter == 'Online' ? _onlineMode : (!_onlineMode && state.selectedFilter == filter);
+    final selected = state.selectedFilter == filter;
     return ChoiceChip(
       label: Text(_getFilterLabel(context, filter)),
       selected: selected,
@@ -211,7 +312,7 @@ class _SearchScreenState extends State<SearchScreen> {
         color: selected ? p.accent : p.textSecondary,
         fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
       ),
-      onSelected: (_) => _selectFilter(context, filter),
+      onSelected: (_) => _selectLocalFilter(context, filter),
     );
   }
 
@@ -270,12 +371,12 @@ class _SearchScreenState extends State<SearchScreen> {
       }
       return EmptyStateWidget(
         icon: Icons.search_off_rounded,
-              title: context.l10n.noResultsFound,
-              subtitle: context.l10n.noResultsSubtitle,
-              primaryActionLabel: context.l10n.clearSearchHistory,
-              primaryActionIcon: Icons.backspace_rounded,
-              onPrimaryAction: () => _clear(context),
-            );
+        title: context.l10n.noResultsFound,
+        subtitle: context.l10n.noResultsSubtitle,
+        primaryActionLabel: context.l10n.clearSearchHistory,
+        primaryActionIcon: Icons.backspace_rounded,
+        onPrimaryAction: () => _clear(context),
+      );
     }
     return ListView(
       padding: const EdgeInsets.only(bottom: 160, top: 4),
@@ -302,7 +403,9 @@ class _SearchScreenState extends State<SearchScreen> {
 /// controls. Only ever mounted in an ENABLE_YTM build, under the
 /// [YtmSearchCubit] / [YtmDownloadCubit] providers created by [SearchScreen].
 class _OnlineResults extends StatelessWidget {
-  const _OnlineResults();
+  final ValueChanged<String>? onSelectTag;
+
+  const _OnlineResults({this.onSelectTag});
 
   @override
   Widget build(BuildContext context) {
@@ -327,17 +430,57 @@ class _OnlineResults extends StatelessWidget {
         }
 
         if (state.results.isEmpty) {
-          return state.hasSearched
-              ? EmptyStateWidget(
-                  icon: Icons.search_off_rounded,
-                  title: 'No Results Found',
-                  subtitle: 'No YouTube Music matches for "${state.query.trim()}".',
-                )
-              : const EmptyStateWidget(
-                  icon: Icons.travel_explore_rounded,
-                  title: 'Search YouTube Music',
-                  subtitle: 'Stream and download songs from YouTube Music, ad-free.',
-                );
+          if (state.hasSearched) {
+            return EmptyStateWidget(
+              icon: Icons.search_off_rounded,
+              title: 'No Results Found',
+              subtitle: 'No YouTube Music matches for "${state.query.trim()}".',
+            );
+          }
+
+          return Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.travel_explore_rounded, size: 48, color: p.textTertiary),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Search YouTube Music',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.textPrimary),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Stream and download millions of songs from YouTube Music, ad-free.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: p.textSecondary, fontSize: 13),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'POPULAR SEARCHES',
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: p.textTertiary, letterSpacing: 1.2),
+                  ),
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.center,
+                    children: [
+                      for (final tag in ['Top Hits', 'Trending', 'Lo-Fi Beats', 'Pop', 'Hip-Hop', 'Rock Classics', 'Chillout', 'Electronic'])
+                        ActionChip(
+                          label: Text(tag),
+                          backgroundColor: p.surfaceContainer,
+                          side: BorderSide(color: p.hairline),
+                          labelStyle: TextStyle(color: p.accent, fontSize: 12, fontWeight: FontWeight.w700),
+                          onPressed: () => onSelectTag?.call(tag),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
         }
 
         final songs = [for (final track in state.results) track.toSongData()];

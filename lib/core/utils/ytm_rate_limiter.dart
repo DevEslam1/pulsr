@@ -1,6 +1,7 @@
 // lib/core/utils/ytm_rate_limiter.dart
 import 'dart:async';
 import 'dart:math';
+import 'package:shared_preferences/shared_preferences.dart';
 
 /// Dart-side token-bucket rate limiter for YouTube Music API requests.
 ///
@@ -11,6 +12,29 @@ import 'dart:math';
 class YtmRateLimiter {
   YtmRateLimiter._();
   static final YtmRateLimiter shared = YtmRateLimiter._();
+
+  static const String _keyTokens = 'ytm_rate_limiter_tokens';
+  static const String _keyLastRefill = 'ytm_rate_limiter_last_refill';
+
+  Future<void> restore() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedTokens = prefs.getDouble(_keyTokens);
+      final savedLastRefill = prefs.getInt(_keyLastRefill);
+      if (savedTokens != null && savedLastRefill != null) {
+        _tokens = savedTokens.clamp(0.0, _maxTokens.toDouble());
+        _lastRefill = DateTime.fromMillisecondsSinceEpoch(savedLastRefill);
+        _refill();
+      }
+    } catch (_) {}
+  }
+
+  void _persist() {
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setDouble(_keyTokens, _tokens);
+      prefs.setInt(_keyLastRefill, _lastRefill.millisecondsSinceEpoch);
+    }).catchError((_) {});
+  }
 
   /// Test-only: restores pristine bucket/backoff state (the limiter is a
   /// process-wide singleton, so tests need a way to isolate runs).
@@ -43,6 +67,7 @@ class YtmRateLimiter {
     _refill();
     if (_tokens >= 1.0) {
       _tokens -= 1.0;
+      _persist();
       return;
     }
 
@@ -51,6 +76,7 @@ class YtmRateLimiter {
     await Future<void>.delayed(Duration(milliseconds: waitMs));
     _refill();
     _tokens = (_tokens - 1.0).clamp(0.0, _maxTokens.toDouble());
+    _persist();
   }
 
   /// Called when a 429 rate-limit response is received. Triggers exponential

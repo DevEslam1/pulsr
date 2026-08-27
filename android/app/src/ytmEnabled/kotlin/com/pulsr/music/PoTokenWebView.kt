@@ -299,6 +299,7 @@ internal class PoTokenWebView private constructor(
         // Stops the page doing anything further before it is torn down.
         webView.loadUrl("about:blank")
         webView.onPause()
+        webView.webChromeClient = null
         webView.removeAllViews()
         webView.destroy()
     }

@@ -4,9 +4,10 @@ import 'package:pulsr/core/utils/formatters.dart';
 
 void main() {
   group('Formatters Unit Tests', () {
-    test('formatDuration formats null and zero duration', () {
+    test('formatDuration formats null, negative and zero duration', () {
       expect(Formatters.formatDuration(null), '0:00');
       expect(Formatters.formatDuration(Duration.zero), '0:00');
+      expect(Formatters.formatDuration(const Duration(seconds: -10)), '0:00');
     });
 
     test('formatDuration formats standard mm:ss durations', () {

@@ -250,6 +250,31 @@ class MediaScannerService {
     }
   }
 
+  /// Batch enriches audio quality for multiple songs, processing in batches of 10 concurrently.
+  Future<void> enrichAudioQualityBatch(
+    List<SongsTableData> songs, {
+    void Function(int processed, int total)? onProgress,
+  }) async {
+    if (!Platform.isAndroid || songs.isEmpty) return;
+
+    final eligible = songs.where((s) =>
+      s.codec == null &&
+      s.path.isNotEmpty &&
+      !s.path.startsWith('http') &&
+      !s.path.startsWith('ytmusic://')
+    ).toList();
+
+    final total = eligible.length;
+    int processed = 0;
+
+    for (int i = 0; i < eligible.length; i += 10) {
+      final batch = eligible.sublist(i, (i + 10).clamp(0, eligible.length));
+      await Future.wait(batch.map((song) => enrichAudioQuality(song.id, song.path)));
+      processed += batch.length;
+      onProgress?.call(processed, total);
+    }
+  }
+
   /// Computes inter-sample peak using 4x oversampling interpolation.
   /// Standard PCM sample peak misses peaks occurring between samples during DAC reconstruction.
   static double computeTruePeak(List<int> samples, {int bitDepth = 16}) {

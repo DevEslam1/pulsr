@@ -69,8 +69,6 @@ Future<void> main() async {
   );
 
   await configureDependencies();
-  // Early registration of file intent handler so warm-start file opens are never dropped
-  getIt<FileIntentHandler>();
   await getIt<AuthService>().initialize();
   await getIt<YtmAccountService>().init();
 

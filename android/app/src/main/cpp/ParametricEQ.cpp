@@ -31,6 +31,18 @@ void ParametricEQ::setBandCount(int count) {
     reset();
 }
 
+void ParametricEQ::setDynamicBands(int count, const double* freqs, const double* qs) {
+    bandCount_ = std::max(1, std::min(count, MAX_BANDS));
+    for (int i = 0; i < bandCount_; ++i) {
+        bands_[i].frequency = std::max(10.0, std::min(freqs[i], sampleRate_ * 0.499));
+        bands_[i].q = std::max(0.05, std::min(qs[i], 20.0));
+        bands_[i].type = FilterType::Peaking;
+        bands_[i].enabled = true;
+        computeCoeffs(bands_[i]);
+    }
+    reset();
+}
+
 void ParametricEQ::setBand(int idx, double freq, double gainDb, double q, FilterType type, bool enabled) {
     if (idx < 0 || idx >= MAX_BANDS) return;
     bands_[idx].frequency = std::max(10.0, std::min(freq, sampleRate_ * 0.499));

@@ -1,6 +1,8 @@
 package com.pulsr.music
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.media.MediaScannerConnection
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -11,6 +13,7 @@ import io.flutter.plugin.common.MethodChannel.Result
 import org.jaudiotagger.audio.AudioFileIO
 import org.jaudiotagger.tag.FieldKey
 import org.jaudiotagger.tag.images.ArtworkFactory
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.logging.Level
 import java.util.logging.Logger
@@ -171,16 +174,31 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                         tags["comment"]?.let { tag.setField(FieldKey.COMMENT, it.toString()) }
 
                         // Handle artwork update if provided via bytes or file path
-                        val artworkBytes = (tags["artworkBytes"] as? ByteArray)
+                        val rawArtworkBytes = (tags["artworkBytes"] as? ByteArray)
                             ?: (tags["artworkPath"] as? String)?.let { artPath ->
                                 val artFile = File(artPath)
                                 if (artFile.exists()) artFile.readBytes() else null
                             }
 
-                        if (artworkBytes != null && artworkBytes.isNotEmpty()) {
+                        var effectiveArtworkBytes = rawArtworkBytes
+                        if (effectiveArtworkBytes != null && effectiveArtworkBytes.size > 1024 * 1024) {
+                            try {
+                                val bmp = BitmapFactory.decodeByteArray(effectiveArtworkBytes, 0, effectiveArtworkBytes.size)
+                                if (bmp != null) {
+                                    val scaled = Bitmap.createScaledBitmap(bmp, 500, 500, true)
+                                    val stream = ByteArrayOutputStream()
+                                    scaled.compress(Bitmap.CompressFormat.JPEG, 85, stream)
+                                    effectiveArtworkBytes = stream.toByteArray()
+                                    if (scaled != bmp) scaled.recycle()
+                                    bmp.recycle()
+                                }
+                            } catch (_: Exception) {}
+                        }
+
+                        if (effectiveArtworkBytes != null && effectiveArtworkBytes.isNotEmpty()) {
                             try {
                                 val artwork = ArtworkFactory.getNew()
-                                artwork.binaryData = artworkBytes
+                                artwork.binaryData = effectiveArtworkBytes
                                 val mime = tags["artworkMimeType"] as? String ?: "image/jpeg"
                                 artwork.mimeType = mime
                                 tag.deleteArtworkField()

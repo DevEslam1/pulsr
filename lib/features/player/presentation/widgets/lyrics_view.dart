@@ -1,9 +1,12 @@
 // lib/features/player/presentation/widgets/lyrics_view.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../domain/models/lyrics_line.dart';
+import '../../cubit/player_cubit.dart';
 
 class LyricsView extends StatefulWidget {
   final List<LyricsLine> lyrics;
@@ -11,6 +14,7 @@ class LyricsView extends StatefulWidget {
   final bool isLoading;
   final Color activeColor;
   final LyricsSource source;
+  final ValueChanged<Duration>? onLineTapped;
 
   const LyricsView({
     super.key,
@@ -19,6 +23,7 @@ class LyricsView extends StatefulWidget {
     this.isLoading = false,
     this.activeColor = Colors.white,
     this.source = LyricsSource.none,
+    this.onLineTapped,
   });
 
   @override
@@ -188,17 +193,38 @@ class _LyricsViewState extends State<LyricsView> {
                   final isCurrent = currentMs >= line.timestamp.inMilliseconds && currentMs < nextLineMs;
 
                   return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: AnimatedDefaultTextStyle(
-                      duration: const Duration(milliseconds: 200),
-                      style: TextStyle(
-                        fontSize: isCurrent ? 20 : 15,
-                        fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w500,
-                        color: isCurrent ? widget.activeColor : Colors.white.withValues(alpha: 0.45),
-                        height: 1.3,
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          if (widget.onLineTapped != null) {
+                            widget.onLineTapped!(line.timestamp);
+                          } else {
+                            try {
+                              context.read<PlayerCubit>().seek(line.timestamp);
+                            } catch (_) {}
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        splashColor: widget.activeColor.withValues(alpha: 0.15),
+                        highlightColor: widget.activeColor.withValues(alpha: 0.08),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                          child: AnimatedDefaultTextStyle(
+                            duration: const Duration(milliseconds: 200),
+                            style: TextStyle(
+                              fontSize: isCurrent ? 20 : 15,
+                              fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w500,
+                              color: isCurrent ? widget.activeColor : Colors.white.withValues(alpha: 0.45),
+                              height: 1.3,
+                            ),
+                            textAlign: TextAlign.center,
+                            child: Text(line.text.isNotEmpty ? line.text : '•••'),
+                          ),
+                        ),
                       ),
-                      textAlign: TextAlign.center,
-                      child: Text(line.text.isNotEmpty ? line.text : '•••'),
                     ),
                   );
                 } else {

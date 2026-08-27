@@ -43,6 +43,9 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
   final bool isDark;
 
   Color get background => bg;
+  Color get primary => accent;
+  Color get surfaceCard => surfaceContainer;
+  Color get surfaceVariant => surfaceContainerHigh;
 
   @override
   PulsrPalette copyWith({
@@ -75,21 +78,21 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
   PulsrPalette lerp(covariant ThemeExtension<PulsrPalette>? other, double t) {
     if (other is! PulsrPalette) return this;
     return PulsrPalette(
-      accent: Color.lerp(accent, other.accent, t)!,
-      onAccent: Color.lerp(onAccent, other.onAccent, t)!,
-      accentContainer: Color.lerp(accentContainer, other.accentContainer, t)!,
-      glow: Color.lerp(glow, other.glow, t)!,
-      bg: Color.lerp(bg, other.bg, t)!,
-      surface: Color.lerp(surface, other.surface, t)!,
-      surfaceContainer: Color.lerp(surfaceContainer, other.surfaceContainer, t)!,
-      surfaceContainerHigh: Color.lerp(surfaceContainerHigh, other.surfaceContainerHigh, t)!,
-      hairline: Color.lerp(hairline, other.hairline, t)!,
-      textPrimary: Color.lerp(textPrimary, other.textPrimary, t)!,
-      textSecondary: Color.lerp(textSecondary, other.textSecondary, t)!,
-      textTertiary: Color.lerp(textTertiary, other.textTertiary, t)!,
-      favorite: Color.lerp(favorite, other.favorite, t)!,
-      success: Color.lerp(success, other.success, t)!,
-      error: Color.lerp(error, other.error, t)!,
+      accent: Color.lerp(accent, other.accent, t) ?? accent,
+      onAccent: Color.lerp(onAccent, other.onAccent, t) ?? onAccent,
+      accentContainer: Color.lerp(accentContainer, other.accentContainer, t) ?? accentContainer,
+      glow: Color.lerp(glow, other.glow, t) ?? glow,
+      bg: Color.lerp(bg, other.bg, t) ?? bg,
+      surface: Color.lerp(surface, other.surface, t) ?? surface,
+      surfaceContainer: Color.lerp(surfaceContainer, other.surfaceContainer, t) ?? surfaceContainer,
+      surfaceContainerHigh: Color.lerp(surfaceContainerHigh, other.surfaceContainerHigh, t) ?? surfaceContainerHigh,
+      hairline: Color.lerp(hairline, other.hairline, t) ?? hairline,
+      textPrimary: Color.lerp(textPrimary, other.textPrimary, t) ?? textPrimary,
+      textSecondary: Color.lerp(textSecondary, other.textSecondary, t) ?? textSecondary,
+      textTertiary: Color.lerp(textTertiary, other.textTertiary, t) ?? textTertiary,
+      favorite: Color.lerp(favorite, other.favorite, t) ?? favorite,
+      success: Color.lerp(success, other.success, t) ?? success,
+      error: Color.lerp(error, other.error, t) ?? error,
       isDark: t < 0.5 ? isDark : other.isDark,
     );
   }
@@ -105,6 +108,7 @@ class AuraTheme {
   static ThemeData get darkTheme => customTheme(AppColors.primary, brightness: Brightness.dark);
   static ThemeData get lightTheme => customTheme(AppColors.lightPrimary, brightness: Brightness.light);
   static ThemeData get amoledTheme => customTheme(AppColors.primary, brightness: Brightness.dark, isAmoled: true);
+  static ThemeData get highContrastTheme => customTheme(const Color(0xFF00E5FF), brightness: Brightness.dark, isAmoled: true);
 
   static PulsrPalette _palette(Color accent, Brightness brightness, bool isAmoled) {
     final isDark = brightness == Brightness.dark;

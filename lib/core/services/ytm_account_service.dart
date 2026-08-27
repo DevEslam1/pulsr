@@ -99,6 +99,8 @@ class YtmAccountService {
   /// Raw `datasyncId` of the authenticated account (e.g. "userSessionId||"), harvested from any
   /// authenticated Innertube response. Used as the account-bound poToken content-binding.
   String? _dataSyncId;
+  String? _pendingDataSyncId;
+  Timer? _sessionHarvestDebounce;
 
   /// `visitorData` harvested from an authenticated response; sent in the WEB_REMIX player context.
   String? _sessionVisitorData;
@@ -255,7 +257,9 @@ class YtmAccountService {
     loginState.value = true;
 
     // Warm session in background & harvest any Set-Cookie headers
-    unawaited(_warmSession());
+    unawaited(_warmSession().catchError((e) {
+      debugPrint('[YTM_ACCOUNT] Session warming failed (non-fatal): $e');
+    }));
     return true;
   }
 
@@ -1203,10 +1207,15 @@ class YtmAccountService {
                                       : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36')))))),
         };
 
+        if (visitorData != null && visitorData.isNotEmpty) {
+          headers['X-Goog-Visitor-Id'] = visitorData;
+        }
+
         if (isWeb) {
           final origin = endpointHost;
           headers['Origin'] = origin;
           headers['Referer'] = '$origin/';
+          headers['X-Origin'] = origin;
           headers['x-origin'] = origin;
           headers['x-goog-authuser'] = '0';
           if (_cookies != null && _cookies!.isNotEmpty) {
@@ -1216,15 +1225,18 @@ class YtmAccountService {
               headers['Authorization'] = authHeader;
             }
           }
-        } else if ((client == 'ANDROID_MUSIC' || client == 'IOS_MUSIC') &&
-            _cookies != null &&
-            _cookies!.isNotEmpty) {
-          headers['Cookie'] = _cookies!;
+        } else {
+          headers['X-Origin'] = endpointHost;
+          if ((client == 'ANDROID_MUSIC' || client == 'IOS_MUSIC') &&
+              _cookies != null &&
+              _cookies!.isNotEmpty) {
+            headers['Cookie'] = _cookies!;
+          }
         }
 
         final clientContext = _buildClientContext(client, videoId);
-        if (isWeb && visitorData != null && visitorData.isNotEmpty && clientContext['client'] is Map<String, dynamic>) {
-          (clientContext['client'] as Map<String, dynamic>)['visitorData'] = visitorData;
+        if (visitorData != null && visitorData.isNotEmpty && clientContext.containsKey('client') && clientContext['client'] is Map) {
+          (clientContext['client'] as Map)['visitorData'] = visitorData;
         }
 
         final body = jsonEncode({
@@ -1240,7 +1252,7 @@ class YtmAccountService {
           'playbackContext': {
             'contentPlaybackContext': {
               'html5Preference': 'HTML5_PREF_WANTS',
-              if (isWeb && poToken != null && poToken.isNotEmpty) 'poToken': poToken,
+              if (poToken != null && poToken.isNotEmpty) 'poToken': poToken,
             },
           },
         });
@@ -1447,8 +1459,14 @@ class YtmAccountService {
     final dsid = _extractDataSyncId(json);
     if (dsid != null && dsid != _dataSyncId) {
       _dataSyncId = dsid;
-      SharedPreferences.getInstance()
-          .then((p) => p.setString(_dataSyncIdPrefKey, dsid));
+      _pendingDataSyncId = dsid;
+      _sessionHarvestDebounce?.cancel();
+      _sessionHarvestDebounce = Timer(const Duration(seconds: 2), () async {
+        if (_pendingDataSyncId != null) {
+          final p = await SharedPreferences.getInstance();
+          await p.setString(_dataSyncIdPrefKey, _pendingDataSyncId!);
+        }
+      });
       getIt<YtmService>().setDataSyncId(dsid);
     }
     final rc = json['responseContext'];

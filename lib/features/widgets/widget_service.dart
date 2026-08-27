@@ -17,9 +17,8 @@ class WidgetService {
   static const String qualifiedAndroidName = 'com.pulsr.music.NowPlayingWidget';
 
   final OnAudioQuery _audioQuery = OnAudioQuery();
+  final Map<int, String> _artworkCache = {};
 
-  int? _lastArtworkSongId;
-  String? _lastArtworkPath;
   int? _lastSavedArtworkSongId;
 
   Future<void> updateNowPlaying({
@@ -30,6 +29,7 @@ class WidgetService {
     bool isFavorite = false,
     bool isShuffle = false,
     String repeatMode = 'off',
+    List<String>? nextQueueTitles,
   }) async {
     try {
       final hasSong = song != null;
@@ -42,12 +42,20 @@ class WidgetService {
         'artist',
         hasSong && song.artist.trim().isNotEmpty ? song.artist : 'Nothing playing',
       );
+      await HomeWidget.saveWidgetData<String>(
+        'album',
+        hasSong && song.album.trim().isNotEmpty && song.album != 'Unknown Album' ? song.album : '',
+      );
       await HomeWidget.saveWidgetData<bool>('isPlaying', isPlaying);
       await HomeWidget.saveWidgetData<int>('positionMs', position.inMilliseconds);
       await HomeWidget.saveWidgetData<int>('durationMs', duration.inMilliseconds);
       await HomeWidget.saveWidgetData<bool>('isFavorite', isFavorite);
       await HomeWidget.saveWidgetData<bool>('isShuffle', isShuffle);
       await HomeWidget.saveWidgetData<String>('repeatMode', repeatMode);
+      for (int i = 0; i < 3; i++) {
+        final title = (nextQueueTitles != null && i < nextQueueTitles.length) ? nextQueueTitles[i] : '';
+        await HomeWidget.saveWidgetData<String>('nextTrack$i', title);
+      }
 
       if (hasSong) {
         if (_lastSavedArtworkSongId != song.id) {
@@ -73,20 +81,18 @@ class WidgetService {
   }
 
   /// Exports a corner-rounded artwork PNG for the widget, cached per song.
-  /// The widget refreshes ~1s during playback, so we only re-encode when
-  /// the track actually changes.
   Future<String?> _resolveArtworkPath(int songId) async {
-    if (_lastArtworkSongId == songId && _lastArtworkPath != null) {
-      if (await File(_lastArtworkPath!).exists()) return _lastArtworkPath;
-      _lastArtworkSongId = null;
-      _lastArtworkPath = null;
+    final cachedPath = _artworkCache[songId];
+    if (cachedPath != null) {
+      if (await File(cachedPath).exists()) return cachedPath;
+      _artworkCache.remove(songId);
     }
+
     try {
       final dir = await getTemporaryDirectory();
       final cachedFile = File('${dir.path}/pulsr_widget_art_$songId.png');
       if (await cachedFile.exists()) {
-        _lastArtworkSongId = songId;
-        _lastArtworkPath = cachedFile.path;
+        _artworkCache[songId] = cachedFile.path;
         return cachedFile.path;
       }
       final bytes = await _audioQuery.queryArtwork(
@@ -102,9 +108,7 @@ class WidgetService {
       if (rounded == null) return null;
 
       await cachedFile.writeAsBytes(rounded, flush: true);
-
-      _lastArtworkSongId = songId;
-      _lastArtworkPath = cachedFile.path;
+      _artworkCache[songId] = cachedFile.path;
       return cachedFile.path;
     } catch (e, st) {
       ErrorLogger.log('Failed to resolve widget artwork for song $songId', error: e, stackTrace: st, category: 'WidgetService');

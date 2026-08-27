@@ -39,6 +39,7 @@ public:
     void setSampleRate(double sampleRate);
     void setBandCount(int count);
     int getBandCount() const { return bandCount_; }
+    void setDynamicBands(int count, const double* freqs, const double* qs);
     void setBand(int idx, double freq, double gainDb, double q, FilterType type = FilterType::Peaking, bool enabled = true);
     void setPreamp(double preampDb);
     void setEnabled(bool enabled);

@@ -10,7 +10,11 @@ import '../../../../domain/models/eq_preset.dart';
 import '../../../../domain/models/headphone_profile.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
+import '../../../../data/audio/equalizer_manager.dart';
 import 'eq_curve_visualizer.dart';
+import 'autoeq_search_sheet.dart';
+import 'compressor_limiter_sheet.dart';
+import '../../../../core/di/injection.dart';
 
 class EqualizerSheet extends StatefulWidget {
   const EqualizerSheet({super.key});
@@ -383,6 +387,92 @@ class _EqualizerSheetState extends State<EqualizerSheet> with SingleTickerProvid
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 10),
+
+          // A/B/C/D 4-Slot Comparison & Studio Tools Row
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                // A/B/C/D Slot Selector
+                Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: p.surfaceContainer,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: p.hairline),
+                  ),
+                  child: Row(
+                    children: [
+                      for (final slot in ComparisonSlot.values) ...[
+                        InkWell(
+                          onTap: () => cubit.switchComparisonSlot(slot),
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(
+                              slot.name.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: p.textPrimary,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+
+                // AutoEQ Online Search
+                ActionChip(
+                  avatar: Icon(Icons.search_rounded, size: 14, color: p.accent),
+                  label: const Text('AutoEQ 2.0 Search', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  backgroundColor: p.surfaceContainer,
+                  side: BorderSide(color: p.hairline),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  onPressed: () {
+                    showModalBottomSheet(
+                      context: context,
+                      useRootNavigator: true,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => AutoEqSearchSheet(
+                        equalizerManager: getIt<EqualizerManager>(),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+
+                // Studio Dynamics Compressor
+                ActionChip(
+                  avatar: Icon(Icons.compress_rounded, size: 14, color: p.primary),
+                  label: const Text('Dynamics Compressor', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                  backgroundColor: p.surfaceContainer,
+                  side: BorderSide(color: p.hairline),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  onPressed: () {
+                    showModalBottomSheet(
+                      context: context,
+                      useRootNavigator: true,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => CompressorLimiterSheet(
+                        equalizerManager: getIt<EqualizerManager>(),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 14),
 

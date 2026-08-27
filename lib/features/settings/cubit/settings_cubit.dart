@@ -116,16 +116,45 @@ class SettingsCubit extends Cubit<SettingsState> {
     }
   }
 
+  Future<String?> _safeSecureRead(String key) async {
+    try {
+      return await _secureStorage.read(key: key);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read secure storage key: $key', error: e, stackTrace: st, category: 'SettingsCubit');
+      return null;
+    }
+  }
+
   Future<void> _loadPreferences() async {
     try {
       final results = await Future.wait([
         SharedPreferences.getInstance(),
-        _secureStorage.read(key: _keyProxyPasswordSecure).catchError((_) => null),
-        _secureStorage.read(key: 'xdm_backend_token_secure').catchError((_) => null),
+        _safeSecureRead(_keyProxyPasswordSecure),
+        _safeSecureRead('xdm_backend_token_secure'),
       ]);
       final prefs = results[0] as SharedPreferences;
       String proxyPassword = (results[1] as String?) ?? '';
       String xdmToken = (results[2] as String?) ?? '';
+
+      // Migration verification for proxy password
+      if (prefs.containsKey(_keyProxyPassword) && proxyPassword.isEmpty) {
+        final legacyPass = prefs.getString(_keyProxyPassword) ?? '';
+        if (legacyPass.isNotEmpty) {
+          try {
+            await _secureStorage.write(key: _keyProxyPasswordSecure, value: legacyPass);
+            final verify = await _secureStorage.read(key: _keyProxyPasswordSecure);
+            if (verify == legacyPass) {
+              await prefs.remove(_keyProxyPassword);
+              proxyPassword = legacyPass;
+            } else {
+              ErrorLogger.log('Secure storage migration mismatch for proxy password', category: 'SettingsCubit');
+              proxyPassword = legacyPass;
+            }
+          } catch (e) {
+            proxyPassword = legacyPass;
+          }
+        }
+      }
 
       final themeModeStr = prefs.getString(_keyThemeMode) ?? AppThemeMode.dark.name;
       final themeMode = AppThemeMode.values.firstWhere(
@@ -318,6 +347,14 @@ class SettingsCubit extends Cubit<SettingsState> {
       emit(newState);
       if (newState.bitPerfectOutput) {
         await _hiResAudioService.setBitPerfectMode(true);
+      }
+      final savedSampleRate = prefs.getInt('target_output_sample_rate') ?? 0;
+      final savedBitDepth = prefs.getInt('target_output_bit_depth') ?? 0;
+      if (savedSampleRate > 0 || savedBitDepth > 0) {
+        await _hiResAudioService.setTargetOutputFormat(
+          sampleRate: savedSampleRate,
+          bitDepth: savedBitDepth,
+        );
       }
       await _syncProxySettings(activeProxyConfig);
     } catch (e, st) {
@@ -742,9 +779,7 @@ class SettingsCubit extends Cubit<SettingsState> {
   Future<void> testYtdlpBackend() async {
     emit(state.copyWith(isTestingYtdlpBackend: true, ytdlpBackendStatusMessage: null));
     try {
-      final xdm = getIt.isRegistered<XdmBackendService>()
-          ? getIt<XdmBackendService>()
-          : XdmBackendService();
+      final xdm = getIt<XdmBackendService>();
       final health = await xdm.checkHealth();
       emit(state.copyWith(
         isTestingYtdlpBackend: false,
@@ -786,6 +821,32 @@ class SettingsCubit extends Cubit<SettingsState> {
     emit(state.copyWith(bypassDspOnBitPerfect: enabled));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.bypassDspOnBitPerfect, enabled);
+  }
+
+  Future<void> selectOutputDevice(int deviceId) async {
+    await _hiResAudioService.selectOutputDevice(deviceId);
+    await refreshOutputDevice();
+  }
+
+  Future<void> clearOutputDevice() async {
+    await _hiResAudioService.clearOutputDevice();
+    await refreshOutputDevice();
+  }
+
+  Future<void> setTargetOutputSampleRate(int sampleRate) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('target_output_sample_rate', sampleRate);
+    final bitDepth = state.currentOutputDevice?.targetBitDepth ?? 0;
+    await _hiResAudioService.setTargetOutputFormat(sampleRate: sampleRate, bitDepth: bitDepth);
+    await refreshOutputDevice();
+  }
+
+  Future<void> setTargetOutputBitDepth(int bitDepth) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('target_output_bit_depth', bitDepth);
+    final sampleRate = state.currentOutputDevice?.targetSampleRate ?? 0;
+    await _hiResAudioService.setTargetOutputFormat(sampleRate: sampleRate, bitDepth: bitDepth);
+    await refreshOutputDevice();
   }
 
   Future<void> refreshOutputDevice() async {

@@ -196,24 +196,14 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
     _lastEmitTimeByVideoId[videoId] = now;
     emit(YtmDownloadState(items: {...state.items, videoId: item}));
 
-    // ⚡ FIX: Only persist immediately on terminal/state-change events. Debounce progress ticks.
-    final isTerminalOrQueued = item.status == YtDownloadStatus.done ||
+    // Persist only on terminal states to avoid disk churn during downloads
+    if (item.status == YtDownloadStatus.done ||
         item.status == YtDownloadStatus.failed ||
-        item.status == YtDownloadStatus.canceled ||
-        item.status == YtDownloadStatus.queued;
-
-    if (isTerminalOrQueued) {
-      if (item.status != YtDownloadStatus.queued) {
-        _lastEmitTimeByVideoId.remove(videoId);
-      }
+        item.status == YtDownloadStatus.canceled) {
+      _lastEmitTimeByVideoId.remove(videoId);
       _saveDebounce?.cancel();
       _saveDebounce = null;
       _savePersistedState();
-    } else {
-      _saveDebounce ??= Timer(const Duration(seconds: 3), () {
-        _savePersistedState();
-        _saveDebounce = null;
-      });
     }
   }
 

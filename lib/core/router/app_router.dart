@@ -28,6 +28,15 @@ import '../../features/splash/presentation/splash_screen.dart';
 import '../../features/tag_editor/tag_editor_screen.dart';
 import '../../features/year_detail/presentation/year_detail_screen.dart';
 import '../../features/ytm_search/presentation/ytm_search_screen.dart';
+import '../../features/ytm_browse/presentation/ytm_browse_screen.dart';
+import '../../features/library/presentation/artwork_grid_screen.dart';
+import '../../features/library/presentation/duplicate_finder_screen.dart';
+import '../../features/library/presentation/library_stats_screen.dart';
+import '../../features/player/presentation/themes/custom_theme_builder_screen.dart';
+import '../../features/settings/presentation/scrobble_stats_screen.dart';
+import '../../features/settings/presentation/cloud_backup_dashboard_screen.dart';
+import '../services/cloud_sync_service.dart';
+import '../di/injection.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(debugLabel: 'root');
 
@@ -281,13 +290,58 @@ GoRouter createRouter(MediaScannerService scannerService) {
       ),
       // Gated: only reachable in an ENABLE_YTM build. In prod this collection-if
       // is const-false, so the route and YtmSearchScreen tree-shake away.
-      if (AppConfig.ytmEnabled)
+      if (AppConfig.ytmEnabled) ...[
         GoRoute(
           path: '/ytm-search',
           name: 'ytm-search',
           parentNavigatorKey: rootNavigatorKey,
           builder: (context, state) => const YtmSearchScreen(),
         ),
+        GoRoute(
+          path: '/ytm-explore',
+          name: 'ytm-explore',
+          parentNavigatorKey: rootNavigatorKey,
+          builder: (context, state) => const YtmBrowseScreen(),
+        ),
+      ],
+      GoRoute(
+        path: '/artwork-grid',
+        name: 'artwork-grid',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const ArtworkGridScreen(),
+      ),
+      GoRoute(
+        path: '/duplicate-finder',
+        name: 'duplicate-finder',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const DuplicateFinderScreen(),
+      ),
+      GoRoute(
+        path: '/library-stats',
+        name: 'library-stats',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const LibraryStatsScreen(),
+      ),
+      GoRoute(
+        path: '/theme-studio',
+        name: 'theme-studio',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const CustomThemeBuilderScreen(),
+      ),
+      GoRoute(
+        path: '/scrobble-stats',
+        name: 'scrobble-stats',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const ScrobbleStatsScreen(),
+      ),
+      GoRoute(
+        path: '/cloud-backup-dashboard',
+        name: 'cloud-backup-dashboard',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => CloudBackupDashboardScreen(
+          syncService: getIt<CloudSyncService>(),
+        ),
+      ),
     ],
   );
 }

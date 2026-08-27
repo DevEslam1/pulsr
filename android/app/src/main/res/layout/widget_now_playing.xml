@@ -59,7 +59,7 @@
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="Nothing playing"
-                    android:textColor="#9EADC8"
+                    android:textColor="#B3A8AC"
                     android:textSize="12sp"
                     android:maxLines="1"
                     android:ellipsize="end" />
@@ -183,7 +183,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
             android:text="0:00"
-            android:textColor="#7C88A2"
+            android:textColor="#8E7E84"
             android:textSize="10.5sp"
             android:fontFamily="sans-serif-medium" />
 
@@ -216,7 +216,7 @@
             android:layout_height="wrap_content"
             android:layout_marginEnd="4dp"
             android:text="0:00"
-            android:textColor="#7C88A2"
+            android:textColor="#8E7E84"
             android:textSize="10.5sp"
             android:fontFamily="sans-serif-medium" />
 

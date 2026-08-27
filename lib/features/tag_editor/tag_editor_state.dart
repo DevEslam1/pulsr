@@ -20,6 +20,7 @@ class TagEditorState {
   final String? newArtworkPath;
   final bool removeArtwork;
   final bool isAutoFetching;
+  final double? batchProgress;
   final String? errorMessage;
 
   bool get isBatchMode => batchSongs.length > 1;
@@ -40,6 +41,7 @@ class TagEditorState {
     this.newArtworkPath,
     this.removeArtwork = false,
     this.isAutoFetching = false,
+    this.batchProgress,
     this.errorMessage,
   });
 
@@ -61,6 +63,8 @@ class TagEditorState {
     bool clearNewArtworkPath = false,
     bool? removeArtwork,
     bool? isAutoFetching,
+    double? batchProgress,
+    bool clearBatchProgress = false,
     String? errorMessage,
     bool clearErrorMessage = false,
   }) {
@@ -80,6 +84,7 @@ class TagEditorState {
       newArtworkPath: clearNewArtworkPath ? null : (newArtworkPath ?? this.newArtworkPath),
       removeArtwork: removeArtwork ?? this.removeArtwork,
       isAutoFetching: isAutoFetching ?? this.isAutoFetching,
+      batchProgress: clearBatchProgress ? null : (batchProgress ?? this.batchProgress),
       errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
     );
   }

@@ -142,14 +142,10 @@ class ImportBackupUseCase {
     }
 
     final data = decoded;
-    final version = data['version'];
-    if (version == null || version is! int || version < 1) {
-      throw const FormatException('Invalid or unsupported backup version');
-    }
+    _validateSchema(data);
 
-    // Fetch all current library songs for path matching
-    final songsResult = await _repository.getAllSongs();
-    final allSongs = songsResult.fold((l) => <SongsTableData>[], (r) => r);
+    // Fetch all current library songs (including YTM tracks) for path matching
+    final allSongs = await _db.select(_db.songsTable).get();
 
     // Build lookup maps for robust matching (exact, normalized, parent+filename, unique filename)
     final exactMap = <String, SongsTableData>{};
@@ -158,7 +154,11 @@ class ImportBackupUseCase {
     final uniqueFilenameMap = <String, SongsTableData>{};
     final filenameCountMap = <String, int>{};
 
+    final remoteIdMap = <String, SongsTableData>{};
     for (final song in allSongs) {
+      if (song.remoteId != null && song.remoteId!.isNotEmpty) {
+        remoteIdMap[song.remoteId!] = song;
+      }
       exactMap[song.path] = song;
       final normPath = song.path.replaceAll('\\', '/').toLowerCase();
       normalizedMap[normPath] = song;
@@ -181,6 +181,12 @@ class ImportBackupUseCase {
       final normPath = path.replaceAll('\\', '/').toLowerCase();
       if (normalizedMap.containsKey(normPath)) return normalizedMap[normPath];
 
+      // 3. Fallback for ytmusic:// paths matching by remoteId
+      if (path.startsWith('ytmusic://')) {
+        final videoId = path.replaceFirst('ytmusic://', '').split('?').first;
+        if (remoteIdMap.containsKey(videoId)) return remoteIdMap[videoId];
+      }
+
       final segments = normPath.split('/');
       if (segments.length >= 2) {
         final parentAndFilename = '${segments[segments.length - 2]}/${segments.last}';
@@ -200,8 +206,11 @@ class ImportBackupUseCase {
 
     // 1. Restore Favorites (Transaction 1)
     int restoredFavoritesCount = 0;
-    if (data['favorites'] is List) {
-      final favList = (data['favorites'] as List).cast<String>();
+    if (data['favorites'] != null && data['favorites'] is List) {
+      final favList = (data['favorites'] as List)
+          .whereType<String>()
+          .where((p) => p.trim().isNotEmpty)
+          .toList();
       await _db.transaction(() async {
         for (final path in favList) {
           final matchedSong = matchPath(path);
@@ -218,15 +227,17 @@ class ImportBackupUseCase {
 
     // 2. Restore Playlists (Transaction per playlist)
     int restoredPlaylistsCount = 0;
-    if (data['playlists'] is List) {
+    if (data['playlists'] != null && data['playlists'] is List) {
       final playlistsList = data['playlists'] as List;
       for (final item in playlistsList) {
-        if (item is Map<String, dynamic>) {
+        if (item is Map<String, dynamic> && item.containsKey('name')) {
           await _db.transaction(() async {
             final name = item['name'] as String? ?? 'Restored Playlist';
             final isSmart = item['isSmart'] as bool? ?? false;
             final smartCriteria = item['smartCriteria'] as String?;
-            final songPaths = (item['songPaths'] as List?)?.cast<String>() ?? [];
+            final songPaths = (item['songPaths'] is List)
+                ? (item['songPaths'] as List).whereType<String>().toList()
+                : <String>[];
 
             final existingPlaylistsRes = await _repository.getPlaylists();
             final existingList = existingPlaylistsRes.fold((l) => <PlaylistsTableData>[], (r) => r);
@@ -320,7 +331,7 @@ class ImportBackupUseCase {
 
     // 4. Restore Play History (Batched Transactions of 100)
     int restoredHistoryCount = 0;
-    if (data['playHistory'] is List) {
+    if (data['playHistory'] != null && data['playHistory'] is List) {
       final historyList = data['playHistory'] as List;
       for (var i = 0; i < historyList.length; i += 100) {
         final batch = historyList.sublist(i, math.min(i + 100, historyList.length));
@@ -331,7 +342,7 @@ class ImportBackupUseCase {
               final playCount = (item['playCount'] as num?)?.toInt() ?? 0;
               final lastPlayed = (item['lastPlayed'] as num?)?.toInt();
 
-              if (path != null) {
+              if (path != null && path.isNotEmpty) {
                 final matched = matchPath(path);
                 if (matched != null) {
                   await (_db.update(_db.songsTable)..where((t) => t.id.equals(matched.id))).write(
@@ -353,13 +364,13 @@ class ImportBackupUseCase {
 
     // 5. Restore Excluded Folders
     int restoredExcludedCount = 0;
-    if (data['excludedFolders'] is List) {
-      final folderList = (data['excludedFolders'] as List).cast<String>();
+    if (data['excludedFolders'] != null && data['excludedFolders'] is List) {
+      final folderList = (data['excludedFolders'] as List).whereType<String>().toList();
       final existingExcluded = await _repository.getExcludedFolderPaths();
       final existingPaths = existingExcluded.fold((l) => <String>[], (r) => r).toSet();
 
       for (final path in folderList) {
-        if (!existingPaths.contains(path)) {
+        if (path.isNotEmpty && !existingPaths.contains(path)) {
           await _repository.toggleFolderExclusion(path);
           restoredExcludedCount++;
         }
@@ -375,4 +386,46 @@ class ImportBackupUseCase {
       unmatchedPaths: unmatchedPaths.toList(),
     );
   }
+
+  void _validateSchema(Map<String, dynamic> data) {
+    final version = data['version'];
+    if (version == null || version is! int || version < 1) {
+      throw const FormatException('Invalid or unsupported backup version');
+    }
+
+    if (data['favorites'] != null && data['favorites'] is! List) {
+      throw const FormatException('favorites must be a list');
+    }
+
+    if (data['playlists'] != null) {
+      if (data['playlists'] is! List) {
+        throw const FormatException('playlists must be a list');
+      }
+      for (final item in data['playlists'] as List) {
+        if (item is! Map<String, dynamic>) {
+          throw const FormatException('Playlist entries must be objects');
+        }
+        final name = item['name'];
+        if (name is! String || name.trim().isEmpty) {
+          throw const FormatException('Playlist missing or empty name field');
+        }
+        if (item['songPaths'] != null && item['songPaths'] is! List) {
+          throw const FormatException('Playlist songPaths must be a list');
+        }
+      }
+    }
+
+    if (data['settings'] != null && data['settings'] is! Map) {
+      throw const FormatException('settings must be a JSON object');
+    }
+
+    if (data['playHistory'] != null && data['playHistory'] is! List) {
+      throw const FormatException('playHistory must be a list');
+    }
+
+    if (data['excludedFolders'] != null && data['excludedFolders'] is! List) {
+      throw const FormatException('excludedFolders must be a list');
+    }
+  }
 }
+

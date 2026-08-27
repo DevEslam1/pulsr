@@ -5,19 +5,25 @@ class EqCurveVisualizer extends StatelessWidget {
   final List<double> gains;
   final Color activeColor;
   final double height;
+  final List<double>? spectrumData;
 
   const EqCurveVisualizer({
     super.key,
     required this.gains,
     required this.activeColor,
     this.height = 80,
+    this.spectrumData,
   });
 
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
       size: Size(double.infinity, height),
-      painter: _EqCurvePainter(gains: gains, color: activeColor),
+      painter: _EqCurvePainter(
+        gains: gains,
+        color: activeColor,
+        spectrumData: spectrumData,
+      ),
     );
   }
 }
@@ -25,8 +31,13 @@ class EqCurveVisualizer extends StatelessWidget {
 class _EqCurvePainter extends CustomPainter {
   final List<double> gains;
   final Color color;
+  final List<double>? spectrumData;
 
-  _EqCurvePainter({required this.gains, required this.color});
+  _EqCurvePainter({
+    required this.gains,
+    required this.color,
+    this.spectrumData,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -35,6 +46,26 @@ class _EqCurvePainter extends CustomPainter {
     final midY = size.height / 2;
     final stepX = gains.length > 1 ? size.width / (gains.length - 1) : size.width;
     const maxGain = 15.0;
+
+    // Draw real-time FFT spectrum analyzer background if available
+    if (spectrumData != null && spectrumData!.isNotEmpty) {
+      final specPaint = Paint()
+        ..color = color.withValues(alpha: 0.15)
+        ..style = PaintingStyle.fill;
+
+      final specWidth = size.width / spectrumData!.length;
+      for (int i = 0; i < spectrumData!.length; i++) {
+        final val = spectrumData![i].clamp(0.0, 1.0);
+        final barH = val * size.height * 0.85;
+        final x = i * specWidth + 1.0;
+        final y = size.height - barH;
+        final rect = RRect.fromRectAndRadius(
+          Rect.fromLTWH(x, y, specWidth - 2.0, barH),
+          const Radius.circular(2),
+        );
+        canvas.drawRRect(rect, specPaint);
+      }
+    }
 
     // Draw 0 dB center reference line
     final centerPaint = Paint()
@@ -98,10 +129,8 @@ class _EqCurvePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _EqCurvePainter oldDelegate) {
-    if (oldDelegate.color != color || oldDelegate.gains.length != gains.length) return true;
-    for (int i = 0; i < gains.length; i++) {
-      if (oldDelegate.gains[i] != gains[i]) return true;
-    }
-    return false;
+    return oldDelegate.gains != gains ||
+        oldDelegate.color != color ||
+        oldDelegate.spectrumData != spectrumData;
   }
 }

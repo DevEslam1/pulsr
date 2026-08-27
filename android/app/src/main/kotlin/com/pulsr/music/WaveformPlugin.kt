@@ -242,7 +242,14 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
         when {
             path.startsWith("content:") -> {
                 val ctx = context ?: throw IllegalStateException("No context for content URI")
-                extractor.setDataSource(ctx, Uri.parse(path), null)
+                val uri = Uri.parse(path)
+                val pfd = ctx.contentResolver.openFileDescriptor(uri, "r")
+                    ?: throw IllegalStateException("Could not open file descriptor for $path")
+                try {
+                    extractor.setDataSource(pfd.fileDescriptor)
+                } finally {
+                    try { pfd.close() } catch (_: Exception) {}
+                }
             }
             path.startsWith("file://") -> extractor.setDataSource(Uri.parse(path).path ?: path)
             else -> extractor.setDataSource(path)

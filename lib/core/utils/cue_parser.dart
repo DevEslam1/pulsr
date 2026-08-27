@@ -4,15 +4,18 @@ import '../../domain/models/chapter_info.dart';
 import 'error_logger.dart';
 
 class CueParser {
-  /// Parses standard CUE sheet text content into a sorted list of ChapterInfo.
+  /// Parses standard CUE sheet text content into a sorted list of ChapterInfo,
+  /// supporting both single-file album sheets and multi-file split-track sheets.
   static List<ChapterInfo> parse(String cueContent) {
     final lines = cueContent.split(RegExp(r'\r?\n'));
     final List<ChapterInfo> chapters = [];
 
     int currentTrackIndex = 0;
     String currentTitle = '';
+    String? currentFileName;
     Duration? currentStart;
 
+    final fileRegex = RegExp(r'^\s*FILE\s+"?([^"]+?)"?\s+([A-Z0-9]+)', caseSensitive: false);
     final trackRegex = RegExp(r'^\s*TRACK\s+(\d+)\s+AUDIO', caseSensitive: false);
     final titleRegex = RegExp(r'^\s*TITLE\s+"?([^"]+)"?', caseSensitive: false);
     final indexRegex = RegExp(r'^\s*INDEX\s+01\s+(\d{2}):(\d{2}):(\d{2})', caseSensitive: false);
@@ -24,11 +27,22 @@ class CueParser {
           index: currentTrackIndex,
           title: title,
           start: currentStart,
+          fileName: currentFileName,
         ));
       }
     }
 
     for (final line in lines) {
+      final fileMatch = fileRegex.firstMatch(line);
+      if (fileMatch != null) {
+        savePrevious();
+        currentTrackIndex = 0;
+        currentTitle = '';
+        currentStart = null;
+        currentFileName = fileMatch.group(1)?.trim();
+        continue;
+      }
+
       final trackMatch = trackRegex.firstMatch(line);
       if (trackMatch != null) {
         savePrevious();
@@ -60,12 +74,16 @@ class CueParser {
     final List<ChapterInfo> resolved = [];
     for (int i = 0; i < chapters.length; i++) {
       final c = chapters[i];
-      final Duration? end = (i + 1 < chapters.length) ? chapters[i + 1].start : null;
+      // Only set end duration if next track is in the same source file
+      final Duration? end = (i + 1 < chapters.length && chapters[i + 1].fileName == c.fileName)
+          ? chapters[i + 1].start
+          : null;
       resolved.add(ChapterInfo(
         index: c.index,
         title: c.title,
         start: c.start,
         end: end,
+        fileName: c.fileName,
       ));
     }
 

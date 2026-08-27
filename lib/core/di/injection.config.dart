@@ -16,17 +16,27 @@ import 'package:get_it/get_it.dart' as _i174;
 import 'package:http/http.dart' as _i519;
 import 'package:injectable/injectable.dart' as _i526;
 import 'package:pulsr/core/di/injection.dart' as _i953;
+import 'package:pulsr/core/services/artist_bio_service.dart' as _i968;
 import 'package:pulsr/core/services/artwork_cache_manager.dart' as _i305;
 import 'package:pulsr/core/services/auth_service.dart' as _i535;
+import 'package:pulsr/core/services/autoeq_service.dart' as _i565;
+import 'package:pulsr/core/services/automation_rules_service.dart' as _i281;
 import 'package:pulsr/core/services/cloud_sync_service.dart' as _i225;
+import 'package:pulsr/core/services/duplicate_finder_service.dart' as _i1027;
 import 'package:pulsr/core/services/file_intent_handler.dart' as _i134;
 import 'package:pulsr/core/services/hires_audio_service.dart' as _i722;
 import 'package:pulsr/core/services/lrclib_service.dart' as _i621;
 import 'package:pulsr/core/services/metadata_search_service.dart' as _i451;
+import 'package:pulsr/core/services/missing_artwork_service.dart' as _i417;
+import 'package:pulsr/core/services/playlist_share_service.dart' as _i118;
+import 'package:pulsr/core/services/playlist_suggestions_service.dart' as _i179;
 import 'package:pulsr/core/services/scrobbler_service.dart' as _i629;
+import 'package:pulsr/core/services/settings_profiles_service.dart' as _i461;
+import 'package:pulsr/core/services/theme_scheduler_service.dart' as _i991;
 import 'package:pulsr/core/services/xdm_backend_service.dart' as _i1031;
 import 'package:pulsr/core/services/yt_download_service.dart' as _i742;
 import 'package:pulsr/core/services/ytm_account_service.dart' as _i631;
+import 'package:pulsr/core/services/ytm_browse_service.dart' as _i222;
 import 'package:pulsr/core/services/ytm_cache_manager.dart' as _i498;
 import 'package:pulsr/core/services/ytm_client_version_resolver.dart' as _i169;
 import 'package:pulsr/core/services/ytm_service.dart' as _i391;
@@ -80,6 +90,19 @@ extension GetItInjectableX on _i174.GetIt {
     gh.singleton<_i519.Client>(() => networkModule.pkgHttpClient);
     gh.singleton<_i305.ArtworkCacheManager>(() => _i305.ArtworkCacheManager());
     gh.singleton<_i535.AuthService>(() => _i535.AuthService());
+    gh.singleton<_i565.AutoEqService>(() => _i565.AutoEqService());
+    gh.singleton<_i281.AutomationRulesService>(
+        () => _i281.AutomationRulesService());
+    gh.singleton<_i1027.DuplicateFinderService>(
+        () => _i1027.DuplicateFinderService());
+    gh.singleton<_i118.PlaylistShareService>(
+        () => _i118.PlaylistShareService());
+    gh.singleton<_i179.PlaylistSuggestionsService>(
+        () => _i179.PlaylistSuggestionsService());
+    gh.singleton<_i461.SettingsProfilesService>(
+        () => _i461.SettingsProfilesService());
+    gh.singleton<_i991.ThemeSchedulerService>(
+        () => _i991.ThemeSchedulerService());
     gh.singleton<_i498.YtmCacheManager>(() => _i498.YtmCacheManager());
     gh.singleton<_i169.YtmClientVersionResolver>(
         () => _i169.YtmClientVersionResolver());
@@ -136,6 +159,8 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i800.ToggleFavoriteUseCase(gh<_i320.IMusicRepository>()));
     gh.factory<_i431.PlaylistCubit>(() =>
         _i431.PlaylistCubit(playlistUseCases: gh<_i792.PlaylistUseCases>()));
+    gh.singleton<_i222.YtmBrowseService>(
+        () => _i222.YtmBrowseService(gh<_i391.YtmService>()));
     gh.lazySingleton<_i1031.XdmBackendService>(() => _i1031.XdmBackendService(
         secureStorage: gh<_i558.FlutterSecureStorage>()));
     gh.singleton<_i225.CloudSyncService>(() => _i225.CloudSyncService(
@@ -148,6 +173,10 @@ extension GetItInjectableX on _i174.GetIt {
               gh<_i399.SmartPlaylistEngine>(),
               gh<_i792.PlaylistUseCases>(),
             ));
+    gh.singleton<_i968.ArtistBioService>(
+        () => _i968.ArtistBioService(gh<_i519.Client>()));
+    gh.singleton<_i417.MissingArtworkService>(
+        () => _i417.MissingArtworkService(gh<_i519.Client>()));
     gh.singleton<_i631.YtmAccountService>(
         () => _i631.YtmAccountService(gh<_i169.YtmClientVersionResolver>()));
     gh.lazySingleton<_i742.YtDownloadService>(() => _i742.YtDownloadService(
@@ -204,7 +233,7 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i742.YtDownloadService>(),
           gh<_i147.PlayerCubit>(),
         ));
-    gh.singleton<_i134.FileIntentHandler>(() => _i134.FileIntentHandler(
+    gh.lazySingleton<_i134.FileIntentHandler>(() => _i134.FileIntentHandler(
           gh<_i320.IMusicRepository>(),
           gh<_i147.PlayerCubit>(),
         ));

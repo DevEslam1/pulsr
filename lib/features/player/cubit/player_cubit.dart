@@ -15,6 +15,7 @@ import '../../../core/services/ytm_account_service.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/lrc_parser.dart';
 import '../../../data/audio/audio_handler.dart';
+import '../../../data/audio/equalizer_manager.dart';
 import '../../../data/db/app_database.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 import '../../../domain/models/audio_effects_config.dart';
@@ -56,6 +57,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   StreamSubscription? _mediaItemSub;
   StreamSubscription? _playbackStateSub;
   StreamSubscription? _positionSub;
+  StreamSubscription? _queueSub;
   StreamSubscription? _settingsSub;
   StreamSubscription? _widgetClickSub;
   StreamSubscription? _sleepTimerSub;
@@ -171,6 +173,7 @@ class PlayerCubit extends Cubit<PlayerState> {
     } catch (e, st) {
       ErrorLogger.log('Failed to persist queue slots',
           error: e, stackTrace: st, category: 'PlayerCubit');
+      emit(state.copyWith(errorMessage: 'Failed to save queue'));
     }
   }
 
@@ -271,6 +274,13 @@ class PlayerCubit extends Cubit<PlayerState> {
       return;
     }
     _lastWidgetUpdateTime = now;
+    final nextTitles = (state.queue.isNotEmpty && state.currentIndex + 1 < state.queue.length)
+        ? state.queue
+            .skip(state.currentIndex + 1)
+            .take(3)
+            .map((s) => s.artist.isNotEmpty && s.artist != 'Unknown Artist' ? '${s.title} • ${s.artist}' : s.title)
+            .toList()
+        : null;
     _widgetService?.updateNowPlaying(
       song: state.currentSong,
       isPlaying: state.isPlaying,
@@ -283,6 +293,7 @@ class PlayerCubit extends Cubit<PlayerState> {
         PlayerRepeatMode.all => 'all',
         PlayerRepeatMode.off => 'off',
       },
+      nextQueueTitles: nextTitles,
     );
   }
 
@@ -302,6 +313,33 @@ class PlayerCubit extends Cubit<PlayerState> {
               ? _audioHandler.currentSong
               : state.queue.where((s) => s.id == id).firstOrNull;
 
+          // Check all queue slots if not found in active queue
+          if (resolvedSong == null) {
+            for (final slot in _queueSlots.values) {
+              resolvedSong = slot.songs.where((s) => s.id == id).firstOrNull;
+              if (resolvedSong != null) break;
+            }
+          }
+
+          // Final fallback — construct from MediaItem extras
+          if (resolvedSong == null && item.id.isNotEmpty) {
+            resolvedSong = SongsTableData(
+              id: id,
+              title: item.title,
+              artist: item.artist ?? 'Unknown',
+              album: item.album ?? '',
+              durationMs: item.duration?.inMilliseconds ?? 0,
+              path: (item.extras?['path'] as String?) ?? '',
+              source: SongSource.youtube,
+              remoteId: item.extras?['remoteId'] as String?,
+              remoteArtworkUrl: item.artUri?.toString(),
+              isFavorite: false,
+              isMissing: false,
+              playCount: 0,
+              lastPositionMs: 0,
+            );
+          }
+
           if (resolvedSong != null) {
             if (gen != _mediaItemResolutionGen || isClosed) return;
             final duration = (item.duration != null && item.duration! > Duration.zero)
@@ -319,10 +357,13 @@ class PlayerCubit extends Cubit<PlayerState> {
               ),
             );
 
+            if (gen != _mediaItemResolutionGen || isClosed) return;
+
             if (!isSameSong) {
               _loadLyricsForSong(resolvedSong!);
               _enrichAudioQuality(resolvedSong!);
             }
+            if (gen != _mediaItemResolutionGen || isClosed) return;
             _updateWidgetThrottled(force: true);
             _debouncedScrobble(resolvedSong!, state.position, state.isPlaying);
           }
@@ -336,6 +377,42 @@ class PlayerCubit extends Cubit<PlayerState> {
       }
     });
 
+    _queueSub = _audioHandler.queue.listen((mediaItems) async {
+      if (mediaItems.isNotEmpty && (state.queue.isEmpty || state.queue.length != mediaItems.length)) {
+        final ids = mediaItems.map((m) => int.tryParse(m.id)).whereType<int>().toList();
+        final songsRes = await _repository.getSongsByIds(ids);
+        final songsMap = {
+          for (final s in songsRes.fold((_) => <SongsTableData>[], (r) => r)) s.id: s
+        };
+        final restoredSongs = <SongsTableData>[];
+        for (final m in mediaItems) {
+          final mid = int.tryParse(m.id);
+          if (mid != null && songsMap.containsKey(mid)) {
+            restoredSongs.add(songsMap[mid]!);
+          } else if (mid != null) {
+            restoredSongs.add(SongsTableData(
+              id: mid,
+              title: m.title,
+              artist: m.artist ?? 'Unknown',
+              album: m.album ?? '',
+              durationMs: m.duration?.inMilliseconds ?? 0,
+              path: (m.extras?['path'] as String?) ?? '',
+              source: SongSource.youtube,
+              remoteId: m.extras?['remoteId'] as String?,
+              remoteArtworkUrl: m.artUri?.toString(),
+              isFavorite: false,
+              isMissing: false,
+              playCount: 0,
+              lastPositionMs: 0,
+            ));
+          }
+        }
+        if (restoredSongs.isNotEmpty && !isClosed) {
+          emit(state.copyWith(queue: restoredSongs));
+        }
+      }
+    });
+
     _playbackStateSub = _audioHandler.playbackState.listen((playbackState) {
       final isCompleted = playbackState.processingState == AudioProcessingState.completed;
       final repeat = switch (playbackState.repeatMode) {
@@ -345,10 +422,16 @@ class PlayerCubit extends Cubit<PlayerState> {
       };
 
       final isPlaying = playbackState.playing && !isCompleted;
+      final effectivePos = isCompleted
+          ? Duration.zero
+          : (playbackState.position > Duration.zero
+              ? playbackState.position
+              : (state.position > Duration.zero ? state.position : playbackState.position));
+
       emit(
         state.copyWith(
           isPlaying: isPlaying,
-          position: isCompleted ? Duration.zero : playbackState.position,
+          position: effectivePos,
           isShuffle: playbackState.shuffleMode == AudioServiceShuffleMode.all,
           repeatMode: repeat,
           currentIndex: playbackState.queueIndex ?? state.currentIndex,
@@ -358,7 +441,7 @@ class PlayerCubit extends Cubit<PlayerState> {
       _updateWidgetThrottled(force: false);
       final currentSong = state.currentSong;
       if (currentSong != null) {
-        _debouncedScrobble(currentSong, playbackState.position, isPlaying);
+        _debouncedScrobble(currentSong, effectivePos, isPlaying);
       }
     });
 
@@ -414,7 +497,7 @@ class PlayerCubit extends Cubit<PlayerState> {
 
     // 1. For local files, check embedded metadata and sidecar .lrc files
     if (song.source == SongSource.local && !song.path.startsWith('http') && !song.path.startsWith('ytmusic://')) {
-      lyricsResult = await LrcParser.resolveLyrics(song.path);
+      lyricsResult = await LrcParser.resolveLyrics(song.path, songId: song.id);
     }
 
     if (isClosed || state.currentSong?.id != song.id) return;
@@ -611,6 +694,7 @@ class PlayerCubit extends Cubit<PlayerState> {
     );
     if (!wasPlaying) {
       await _audioHandler.pause();
+      emit(state.copyWith(isPlaying: false));
     }
     _loadLyricsForSong(song);
   }
@@ -770,6 +854,32 @@ class PlayerCubit extends Cubit<PlayerState> {
       eqPreset: EqPreset(name: state.eqPreset.name, gains: state.eqPreset.gains, bassBoost: clamped),
     ));
     await _audioHandler.setBassBoost(clamped);
+  }
+
+  Future<void> set32BandMode(bool enabled) async {
+    await _audioHandler.set32BandMode(enabled);
+    emit(state.copyWith(
+      eqPreset: _audioHandler.currentPreset,
+    ));
+  }
+
+  Future<void> switchComparisonSlot(ComparisonSlot slot) async {
+    await _audioHandler.switchComparisonSlot(slot);
+    emit(state.copyWith(
+      eqPreset: _audioHandler.currentPreset,
+    ));
+  }
+
+  String exportPresetToJson() => _audioHandler.exportPresetToJson();
+
+  Future<bool> importPresetFromJson(String jsonStr) async {
+    final ok = await _audioHandler.importPresetFromJson(jsonStr);
+    if (ok) {
+      emit(state.copyWith(
+        eqPreset: _audioHandler.currentPreset,
+      ));
+    }
+    return ok;
   }
 
   Future<void> setVirtualizerEnabled(bool enabled) async {
@@ -942,6 +1052,7 @@ class PlayerCubit extends Cubit<PlayerState> {
     _persistQueueDebounce?.cancel();
     _scrobbleDebounce?.cancel();
     _mediaItemSub?.cancel();
+    _queueSub?.cancel();
     _errorSub?.cancel();
     _playbackStateSub?.cancel();
     _positionSub?.cancel();

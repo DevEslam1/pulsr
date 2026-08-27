@@ -240,7 +240,7 @@ class _CachedArtworkState extends State<CachedArtwork> {
           icon: widget.fallbackIcon,
         );
 
-        final decodeDim = (effectiveSize * 2).clamp(100, 800).round();
+        final decodeDim = (effectiveSize * 1.5).clamp(80, 800).round();
 
         final content = _cachedBytes != null
             ? Image.memory(

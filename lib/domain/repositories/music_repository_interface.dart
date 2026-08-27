@@ -79,6 +79,7 @@ abstract class IMusicRepository {
   Future<Result<void>> addSongToPlaylist(int playlistId, int songId);
   Future<Result<void>> addSongsToPlaylist(int playlistId, List<int> songIds);
   Future<Result<void>> removeSongFromPlaylist(int playlistId, int songId);
+  Future<Result<void>> reorderPlaylistSongs(int playlistId, List<int> orderedSongIds);
 
   // --- EXCLUDED FOLDERS ---
   Stream<Result<List<ExcludedFoldersTableData>>> watchExcludedFolders();

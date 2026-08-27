@@ -15,7 +15,7 @@ import '../../features/player/cubit/player_cubit.dart';
 import '../network/proxy_config.dart';
 import 'ytm_service.dart';
 
-@singleton
+@lazySingleton
 class FileIntentHandler {
   static const MethodChannel _channel =
       MethodChannel('com.pulsr.music/file_opener');
@@ -131,36 +131,42 @@ class FileIntentHandler {
         cleanPath = cleanPath.replaceFirst('file://', '');
       }
 
-      // Check if this is a shared proxy list text or text file (.txt, .list, .conf, .csv)
-      final isTextExt = cleanPath.toLowerCase().endsWith('.txt') ||
-          cleanPath.toLowerCase().endsWith('.list') ||
-          cleanPath.toLowerCase().endsWith('.conf') ||
-          cleanPath.toLowerCase().endsWith('.csv');
-
-      if (isTextExt) {
-        try {
-          final file = File(cleanPath);
-          if (file.existsSync()) {
-            final content = await file.readAsString();
-            final proxies = ProxyEntry.parseList(content);
-            if (proxies.isNotEmpty) {
-              rootNavigatorKey.currentContext
-                  ?.push('/proxy-settings', extra: content);
-              return;
-            }
-          }
-        } catch (_) {}
+      // 1. Check if it's a PLAYABLE audio file FIRST (fast-path)
+      if (AudioFormats.isPlayableExtension(cleanPath)) {
+        // Proceed directly to audio handling below
       } else {
-        final parsedProxies = ProxyEntry.parseList(uriOrPath);
-        if (parsedProxies.isNotEmpty &&
-            !AudioFormats.isPlayableExtension(cleanPath)) {
-          rootNavigatorKey.currentContext
-              ?.push('/proxy-settings', extra: uriOrPath);
-          return;
-        }
-      }
+        // 2. Only check for proxy/text files if NOT audio
+        final isTextExt = cleanPath.toLowerCase().endsWith('.txt') ||
+            cleanPath.toLowerCase().endsWith('.list') ||
+            cleanPath.toLowerCase().endsWith('.conf') ||
+            cleanPath.toLowerCase().endsWith('.csv');
 
-      if (!AudioFormats.isPlayableExtension(cleanPath)) {
+        if (isTextExt) {
+          try {
+            final file = File(cleanPath);
+            if (file.existsSync()) {
+              final content = await file.readAsString();
+              final proxies = ProxyEntry.parseList(content);
+              if (proxies.isNotEmpty) {
+                final navCtx = rootNavigatorKey.currentContext;
+                if (navCtx != null && navCtx.mounted) {
+                  navCtx.push('/proxy-settings', extra: content);
+                }
+                return;
+              }
+            }
+          } catch (_) {}
+        } else {
+          final parsedProxies = ProxyEntry.parseList(uriOrPath);
+          if (parsedProxies.isNotEmpty) {
+            final navCtx = rootNavigatorKey.currentContext;
+            if (navCtx != null && navCtx.mounted) {
+              navCtx.push('/proxy-settings', extra: uriOrPath);
+            }
+            return;
+          }
+        }
+
         final context = rootNavigatorKey.currentContext;
         if (context != null && context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -184,7 +190,10 @@ class FileIntentHandler {
 
       if (match != null) {
         await _playerCubit.playSong(match);
-        rootNavigatorKey.currentContext?.push('/now-playing');
+        final navCtx = rootNavigatorKey.currentContext;
+        if (navCtx != null && navCtx.mounted) {
+          navCtx.push('/now-playing');
+        }
         return;
       }
 

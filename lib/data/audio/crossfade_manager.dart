@@ -1,16 +1,31 @@
+// lib/data/audio/crossfade_manager.dart
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:just_audio/just_audio.dart';
 import 'package:mutex/mutex.dart';
 import '../../core/utils/error_logger.dart';
 
+/// Supported crossfade curves.
+enum CrossfadeCurve {
+  linear('Linear', 'Equal slope linear volume ramp'),
+  equalPower('Equal Power', 'Constant perceived acoustic loudness (sine/cosine)'),
+  sCurve('S-Curve', 'Smooth ease-in ease-out transition'),
+  exponential('Exponential', 'Natural logarithmic acoustic response'),
+  djCutDrop('DJ Cut/Drop', 'Aggressive club DJ blend with quick drop-in');
+
+  final String label;
+  final String description;
+  const CrossfadeCurve(this.label, this.description);
+}
+
 /// Manages crossfading between two [AudioPlayer] instances with atomic concurrency,
-/// equal-power loudness curves, and robust cancellation safety.
+/// selectable DSP loudness curves, BPM beat alignment, and robust cancellation safety.
 class CrossfadeManager {
   final Mutex _fadeMutex = Mutex();
   Timer? _fadeTimer;
 
   Duration duration = Duration.zero;
+  CrossfadeCurve curve = CrossfadeCurve.equalPower;
   bool isCrossfading = false;
   int? pendingIndex;
   int _fadeId = 0;
@@ -25,8 +40,68 @@ class CrossfadeManager {
   /// Executes [action] with exclusive access to the crossfade pipeline.
   Future<T> protect<T>(Future<T> Function() action) => _fadeMutex.protect(action);
 
+  /// Calculates beat-aligned duration if BPM is provided.
+  static Duration calculateBpmAlignedDuration(Duration baseDuration, double? bpm) {
+    if (bpm == null || bpm <= 40.0 || bpm >= 240.0) return baseDuration;
+    final secondsPerBeat = 60.0 / bpm;
+    // Align to nearest 2, 4, 8, or 16 beats
+    final baseSec = baseDuration.inMilliseconds / 1000.0;
+    if (baseSec <= 0) return Duration.zero;
+
+    final candidateBeats = [2.0, 4.0, 8.0, 16.0, 32.0];
+    double bestBeats = 4.0;
+    double bestDiff = double.infinity;
+
+    for (final beats in candidateBeats) {
+      final durationForBeats = beats * secondsPerBeat;
+      final diff = (durationForBeats - baseSec).abs();
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        bestBeats = beats;
+      }
+    }
+
+    final alignedSeconds = bestBeats * secondsPerBeat;
+    return Duration(milliseconds: (alignedSeconds * 1000).round().clamp(1000, 20000));
+  }
+
+  /// Evaluates the curve fraction (0.0 to 1.0) based on active [curve].
+  double evaluateCurve(double fraction, bool isFadeIn) {
+    final f = fraction.clamp(0.0, 1.0);
+    switch (curve) {
+      case CrossfadeCurve.linear:
+        return isFadeIn ? f : (1.0 - f);
+
+      case CrossfadeCurve.equalPower:
+        return isFadeIn
+            ? math.sin(f * (math.pi / 2))
+            : (1.0 - math.cos(f * (math.pi / 2)));
+
+      case CrossfadeCurve.sCurve:
+        // Smoothstep: 3f^2 - 2f^3
+        final s = f * f * (3.0 - 2.0 * f);
+        return isFadeIn ? s : (1.0 - s);
+
+      case CrossfadeCurve.exponential:
+        if (isFadeIn) {
+          return f == 0.0 ? 0.0 : math.pow(2.0, 10.0 * (f - 1.0)).toDouble();
+        } else {
+          return f == 1.0 ? 1.0 : (1.0 - math.pow(2.0, -10.0 * f).toDouble());
+        }
+
+      case CrossfadeCurve.djCutDrop:
+        if (isFadeIn) {
+          // Sharp attack after midpoint
+          return f < 0.2 ? f * 1.5 : (0.3 + 0.7 * math.sin((f - 0.2) / 0.8 * (math.pi / 2)));
+        } else {
+          // Drops quickly past midpoint
+          return f > 0.6 ? (1.0 - f) * 2.5 : (1.0 - 0.4 * (f / 0.6));
+        }
+    }
+  }
+
   /// Gradually transitions the volume of [player] from [from] to [to] over [fadeDuration]
-  /// using an equal-power crossfade curve sampled at 16ms intervals (~60 FPS).
+  /// using the selected [curve] sampled at 16ms intervals (~60 FPS).
   Future<void> fadeVolume(
     AudioPlayer player,
     double from,
@@ -46,7 +121,8 @@ class CrossfadeManager {
     }
 
     final completer = Completer<void>();
-    final startTime = DateTime.now();
+    final stopwatch = Stopwatch()..start();
+    final isFadeIn = to > from;
 
     _fadeTimer?.cancel();
     _fadeTimer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
@@ -56,20 +132,12 @@ class CrossfadeManager {
         return;
       }
 
-      final elapsed = DateTime.now().difference(startTime).inMilliseconds.toDouble();
+      final elapsed = stopwatch.elapsedMilliseconds.toDouble();
       final fraction = (elapsed / totalMs).clamp(0.0, 1.0);
 
-      // Equal-power crossfade curve: maintains perceived constant acoustic volume
-      final double curveFraction;
-      if (to > from) {
-        // Fade in: sin(fraction * pi / 2)
-        curveFraction = math.sin(fraction * (math.pi / 2));
-      } else {
-        // Fade out: 1 - cos(fraction * pi / 2) -> fraction 0 -> curve 0 (vol=from), fraction 1 -> curve 1 (vol=to)
-        curveFraction = 1.0 - math.cos(fraction * (math.pi / 2));
-      }
-
+      final curveFraction = evaluateCurve(fraction, isFadeIn);
       final currentVol = from + (to - from) * curveFraction;
+
       try {
         player.setVolume(currentVol.clamp(0.0, 1.0));
       } catch (e, st) {
@@ -110,10 +178,6 @@ class CrossfadeManager {
 
     try {
       await inactivePlayer.stop();
-      try {
-        await inactivePlayer
-            .setAudioSource(AudioSource.uri(Uri.parse('about:blank')));
-      } catch (_) {}
       await inactivePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));
       await activePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));
     } catch (e, st) {

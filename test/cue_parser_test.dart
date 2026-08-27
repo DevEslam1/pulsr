@@ -44,5 +44,31 @@ FILE "audiobook.mp3" MP3
       final noTracks = CueParser.parse('TITLE "Something"\nPERFORMER "Nobody"');
       expect(noTracks, isEmpty);
     });
+
+    test('Parses multi-file CUE sheet with separate FILE directives', () {
+      const cueContent = '''
+TITLE "Split Album"
+PERFORMER "Artist Name"
+FILE "01_intro.wav" WAVE
+  TRACK 01 AUDIO
+    TITLE "Intro Track"
+    INDEX 01 00:00:00
+FILE "02_verse.flac" FLAC
+  TRACK 02 AUDIO
+    TITLE "Verse Track"
+    INDEX 01 00:00:00
+''';
+
+      final chapters = CueParser.parse(cueContent);
+
+      expect(chapters.length, equals(2));
+      expect(chapters[0].fileName, equals('01_intro.wav'));
+      expect(chapters[0].title, equals('Intro Track'));
+      expect(chapters[0].end, isNull); // Different file, so end is null
+
+      expect(chapters[1].fileName, equals('02_verse.flac'));
+      expect(chapters[1].title, equals('Verse Track'));
+      expect(chapters[1].end, isNull);
+    });
   });
 }

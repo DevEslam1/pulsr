@@ -15,8 +15,8 @@ class LrcParser {
     final lines = lrcContent.split(RegExp(r'\r?\n'));
     final List<LyricsLine> result = [];
 
-    // Match tags like [01:23.45] or [01:23.456] or [01:23]
-    final RegExp timeExp = RegExp(r'\[(\d{2}):(\d{2})(?:\.(\d{2,3}))?\]');
+    // Match tags like [01:23.45] or [01:23.456] or [01:23.4] or [01:23] or [120:00.00]
+    final RegExp timeExp = RegExp(r'\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]');
 
     for (final line in lines) {
       final matches = timeExp.allMatches(line).toList();
@@ -33,14 +33,7 @@ class LrcParser {
         final minutes = int.parse(match.group(1)!);
         final seconds = int.parse(match.group(2)!);
         final fractionStr = match.group(3) ?? '0';
-        int milliseconds = 0;
-        if (fractionStr.length == 2) {
-          milliseconds = int.parse(fractionStr) * 10;
-        } else if (fractionStr.length == 3) {
-          milliseconds = int.parse(fractionStr);
-        } else if (fractionStr.length == 1) {
-          milliseconds = int.parse(fractionStr) * 100;
-        }
+        final milliseconds = int.parse(fractionStr.padRight(3, '0').substring(0, 3));
 
         final totalDuration = Duration(
           minutes: minutes,
@@ -139,15 +132,17 @@ class LrcParser {
   /// 5. null
   static Future<LyricsResult?> resolveLyrics(
     String audioFilePath, {
+    int? songId,
     String? trackTitle,
     String? artist,
     String? album,
     int? durationSec,
     dynamic lrclibService,
   }) async {
-    if (_lyricsCache.containsKey(audioFilePath)) {
-      final cached = _lyricsCache.remove(audioFilePath);
-      _lyricsCache[audioFilePath] = cached;
+    final cacheKey = songId != null ? 'song_$songId' : audioFilePath;
+    if (_lyricsCache.containsKey(cacheKey)) {
+      final cached = _lyricsCache.remove(cacheKey);
+      _lyricsCache[cacheKey] = cached;
       return cached;
     }
 
@@ -195,7 +190,7 @@ class LrcParser {
     if (_lyricsCache.length >= _maxCacheSize) {
       _lyricsCache.remove(_lyricsCache.keys.first);
     }
-    _lyricsCache[audioFilePath] = resolved;
+    _lyricsCache[cacheKey] = resolved;
 
     return resolved;
   }

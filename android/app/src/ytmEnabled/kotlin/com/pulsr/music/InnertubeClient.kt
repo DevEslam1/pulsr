@@ -370,12 +370,26 @@ internal class InnertubeClient(
                 connection.setRequestProperty("x-youtube-client-name", clientType.clientNameId)
                 connection.setRequestProperty("x-youtube-client-version", clientType.clientVersion)
 
+                // Attach visitorData if available
+                val authedWeb = clientType.isWeb && cookieStore.isSessionValid()
+                val visitorData = if (authedWeb) {
+                    PoTokenManager.sessionVisitorData.ifEmpty { PoTokenManager.visitorData }
+                } else {
+                    PoTokenManager.visitorData
+                }
+                if (visitorData.isNotEmpty()) {
+                    connection.setRequestProperty("X-Goog-Visitor-Id", visitorData)
+                }
+
                 if (clientType.isWeb) {
                     val origin = clientType.endpointHost
                     connection.setRequestProperty("Origin", origin)
                     connection.setRequestProperty("Referer", "$origin/")
+                    connection.setRequestProperty("X-Origin", origin)
                     connection.setRequestProperty("x-origin", origin)
                     connection.setRequestProperty("x-goog-authuser", "0")
+                } else {
+                    connection.setRequestProperty("X-Origin", clientType.endpointHost)
                 }
 
                 // Only attach session cookies and SAPISIDHASH for Web client requests
@@ -433,8 +447,11 @@ internal class InnertubeClient(
 
                 val stream: InputStream? = if (code in 200..299) connection.inputStream else connection.errorStream
                 val responseStr = stream?.let { raw ->
-                    val isGzip = connection.contentEncoding.equals("gzip", ignoreCase = true)
-                    val input = if (isGzip) GZIPInputStream(raw) else raw
+                    val encoding = connection.getHeaderField("Content-Encoding")?.lowercase()
+                    val input = when (encoding) {
+                        "gzip" -> GZIPInputStream(raw)
+                        else -> raw
+                    }
                     input.bufferedReader(StandardCharsets.UTF_8).use { it.readText() }
                 } ?: ""
 

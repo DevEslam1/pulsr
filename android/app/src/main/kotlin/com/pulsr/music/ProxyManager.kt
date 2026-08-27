@@ -66,6 +66,19 @@ object ProxyManager {
             .map { it.trim().lowercase() }
             .filter { it.isNotEmpty() }
 
+        if (enabled && this.username.isNotEmpty()) {
+            Authenticator.setDefault(object : Authenticator() {
+                override fun getPasswordAuthentication(): PasswordAuthentication? {
+                    if (requestorType == RequestorType.PROXY) {
+                        return PasswordAuthentication(this@ProxyManager.username, this@ProxyManager.password.toCharArray())
+                    }
+                    return null
+                }
+            })
+        } else {
+            Authenticator.setDefault(null)
+        }
+
         // Global JVM system properties intentionally omitted to prevent accidental proxying
         // of third-party SDK traffic (Firebase, Sentry, crash analytics). Proxies are injected
         // explicitly via getProxy() into InnertubeClient and PulsrDownloader.

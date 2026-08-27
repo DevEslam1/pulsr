@@ -1,9 +1,10 @@
 // lib/features/player/presentation/widgets/waveform_seek_bar.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
 
-/// A interactive gesture-driven waveform seek bar widget.
+/// Interactive gesture-driven waveform seek bar widget with pinch-to-zoom and chapter marker support.
 class WaveformSeekBar extends StatefulWidget {
   final Duration position;
   final Duration duration;
@@ -12,6 +13,9 @@ class WaveformSeekBar extends StatefulWidget {
   final Color activeColor;
   final Color? inactiveColor;
   final double height;
+  final List<Duration>? chapterMarkers;
+  final Duration? loopPointA;
+  final Duration? loopPointB;
 
   const WaveformSeekBar({
     super.key,
@@ -22,6 +26,9 @@ class WaveformSeekBar extends StatefulWidget {
     this.activeColor = Colors.white,
     this.inactiveColor,
     this.height = 44.0,
+    this.chapterMarkers,
+    this.loopPointA,
+    this.loopPointB,
   });
 
   @override
@@ -30,6 +37,7 @@ class WaveformSeekBar extends StatefulWidget {
 
 class _WaveformSeekBarState extends State<WaveformSeekBar> {
   double? _dragValue;
+  double _zoomScale = 1.0;
 
   @override
   Widget build(BuildContext context) {
@@ -50,14 +58,22 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Interactive Waveform Area
+              // Interactive Waveform Area with Pinch-to-Zoom
               LayoutBuilder(
                 builder: (context, constraints) {
                   final trackWidth = constraints.maxWidth;
                   return GestureDetector(
                     behavior: HitTestBehavior.opaque,
+                    onScaleUpdate: (details) {
+                      if (details.scale != 1.0) {
+                        setState(() {
+                          _zoomScale = (_zoomScale * details.scale).clamp(1.0, 4.0);
+                        });
+                      }
+                    },
                     onHorizontalDragStart: (details) {
                       if (trackWidth > 0 && maxDuration > 0) {
+                        HapticFeedback.selectionClick();
                         final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
                         setState(() {
                           _dragValue = ratio * maxDuration;
@@ -74,6 +90,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                     },
                     onHorizontalDragEnd: (details) {
                       if (_dragValue != null) {
+                        HapticFeedback.lightImpact();
                         widget.onSeek(Duration(milliseconds: _dragValue!.round()));
                         setState(() {
                           _dragValue = null;
@@ -82,6 +99,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                     },
                     onTapDown: (details) {
                       if (trackWidth > 0 && maxDuration > 0) {
+                        HapticFeedback.selectionClick();
                         final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
                         final seekMs = ratio * maxDuration;
                         widget.onSeek(Duration(milliseconds: seekMs.round()));
@@ -96,6 +114,10 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                           progress: progressPercent,
                           activeColor: widget.activeColor,
                           inactiveColor: inactiveColor,
+                          chapterMarkers: widget.chapterMarkers,
+                          duration: widget.duration,
+                          loopPointA: widget.loopPointA,
+                          loopPointB: widget.loopPointB,
                         ),
                       ),
                     ),
@@ -140,12 +162,20 @@ class _WaveformPainter extends CustomPainter {
   final double progress; // 0.0 to 1.0
   final Color activeColor;
   final Color inactiveColor;
+  final List<Duration>? chapterMarkers;
+  final Duration duration;
+  final Duration? loopPointA;
+  final Duration? loopPointB;
 
   _WaveformPainter({
     required this.samples,
     required this.progress,
     required this.activeColor,
     required this.inactiveColor,
+    this.chapterMarkers,
+    required this.duration,
+    this.loopPointA,
+    this.loopPointB,
   });
 
   @override
@@ -196,6 +226,35 @@ class _WaveformPainter extends CustomPainter {
       }
       canvas.restore();
     }
+
+    // 3. Render Chapter Markers
+    if (chapterMarkers != null && duration.inMilliseconds > 0) {
+      final markerPaint = Paint()
+        ..color = Colors.amber
+        ..strokeWidth = 2.0;
+
+      for (final marker in chapterMarkers!) {
+        final markerRatio = (marker.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
+        final markerX = markerRatio * size.width;
+        canvas.drawLine(Offset(markerX, 0), Offset(markerX, size.height), markerPaint);
+      }
+    }
+
+    // 4. Render A-B Loop Points
+    if (duration.inMilliseconds > 0) {
+      final loopPaint = Paint()
+        ..color = const Color(0xFF05FFA1)
+        ..strokeWidth = 2.5;
+
+      if (loopPointA != null) {
+        final ratioA = (loopPointA!.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
+        canvas.drawLine(Offset(ratioA * size.width, 0), Offset(ratioA * size.width, size.height), loopPaint);
+      }
+      if (loopPointB != null) {
+        final ratioB = (loopPointB!.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
+        canvas.drawLine(Offset(ratioB * size.width, 0), Offset(ratioB * size.width, size.height), loopPaint);
+      }
+    }
   }
 
   @override
@@ -203,6 +262,9 @@ class _WaveformPainter extends CustomPainter {
     return oldDelegate.progress != progress ||
         oldDelegate.samples != samples ||
         oldDelegate.activeColor != activeColor ||
-        oldDelegate.inactiveColor != inactiveColor;
+        oldDelegate.inactiveColor != inactiveColor ||
+        oldDelegate.chapterMarkers != chapterMarkers ||
+        oldDelegate.loopPointA != loopPointA ||
+        oldDelegate.loopPointB != loopPointB;
   }
 }

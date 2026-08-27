@@ -41,28 +41,36 @@ class PlayerControls extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          IconButton(
-            tooltip: isShuffle ? 'Disable shuffle' : 'Enable shuffle',
-            onPressed: () {
-              HapticFeedback.selectionClick();
-              onToggleShuffle();
-            },
-            icon: Icon(
-              Icons.shuffle_rounded,
-              color: isShuffle ? primaryColor : p.textSecondary,
-              size: 24,
+          Semantics(
+            label: isShuffle ? 'Disable shuffle' : 'Enable shuffle',
+            button: true,
+            child: IconButton(
+              tooltip: isShuffle ? 'Disable shuffle' : 'Enable shuffle',
+              onPressed: () {
+                HapticFeedback.selectionClick();
+                onToggleShuffle();
+              },
+              icon: Icon(
+                Icons.shuffle_rounded,
+                color: isShuffle ? primaryColor : p.textSecondary,
+                size: 24,
+              ),
             ),
           ),
-          IconButton(
-            tooltip: 'Previous track',
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              onPrevious();
-            },
-            icon: Icon(
-              Icons.skip_previous_rounded,
-              color: p.textPrimary,
-              size: 38,
+          Semantics(
+            label: 'Previous track',
+            button: true,
+            child: IconButton(
+              tooltip: 'Previous track',
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                onPrevious();
+              },
+              icon: Icon(
+                Icons.skip_previous_rounded,
+                color: p.textPrimary,
+                size: 38,
+              ),
             ),
           ),
           Semantics(
@@ -98,36 +106,48 @@ class PlayerControls extends StatelessWidget {
                   .scale(duration: 120.ms, begin: const Offset(0.92, 0.92), end: const Offset(1.0, 1.0)),
             ),
           ),
-          IconButton(
-            tooltip: 'Next track',
-            onPressed: () {
-              HapticFeedback.lightImpact();
-              onNext();
-            },
-            icon: Icon(
-              Icons.skip_next_rounded,
-              color: p.textPrimary,
-              size: 38,
+          Semantics(
+            label: 'Next track',
+            button: true,
+            child: IconButton(
+              tooltip: 'Next track',
+              onPressed: () {
+                HapticFeedback.lightImpact();
+                onNext();
+              },
+              icon: Icon(
+                Icons.skip_next_rounded,
+                color: p.textPrimary,
+                size: 38,
+              ),
             ),
           ),
-          IconButton(
-            tooltip: repeatMode == PlayerRepeatMode.one
+          Semantics(
+            label: repeatMode == PlayerRepeatMode.one
                 ? 'Repeat one'
                 : repeatMode == PlayerRepeatMode.all
                     ? 'Repeat all'
                     : 'Repeat off',
-            onPressed: () {
-              HapticFeedback.selectionClick();
-              onToggleRepeat();
-            },
-            icon: Icon(
-              repeatMode == PlayerRepeatMode.one
-                  ? Icons.repeat_one_rounded
-                  : Icons.repeat_rounded,
-              color: repeatMode != PlayerRepeatMode.off
-                  ? primaryColor
-                  : p.textSecondary,
-              size: 24,
+            button: true,
+            child: IconButton(
+              tooltip: repeatMode == PlayerRepeatMode.one
+                  ? 'Repeat one'
+                  : repeatMode == PlayerRepeatMode.all
+                      ? 'Repeat all'
+                      : 'Repeat off',
+              onPressed: () {
+                HapticFeedback.selectionClick();
+                onToggleRepeat();
+              },
+              icon: Icon(
+                repeatMode == PlayerRepeatMode.one
+                    ? Icons.repeat_one_rounded
+                    : Icons.repeat_rounded,
+                color: repeatMode != PlayerRepeatMode.off
+                    ? primaryColor
+                    : p.textSecondary,
+                size: 24,
+              ),
             ),
           ),
         ],

@@ -15,6 +15,7 @@ import '../../../domain/usecases/get_artists_usecase.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
 import '../../../core/errors/failures.dart';
+import '../../../core/services/artist_bio_service.dart';
 
 class ArtistDetailScreen extends StatefulWidget {
   final ArtistsTableData artist;
@@ -86,7 +87,58 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                   style: TextStyle(color: p.textSecondary, fontSize: 13),
                 ),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 12),
+
+              // Artist Biography & HD Info
+              FutureBuilder(
+                future: ArtistBioService().getArtistInfo(artist.name),
+                builder: (context, snapshot) {
+                  if (snapshot.hasData && snapshot.data?.bio != null) {
+                    final bio = snapshot.data!.bio!;
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: p.surfaceContainer.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: p.hairline),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.info_outline_rounded, size: 16, color: p.accent),
+                              const SizedBox(width: 6),
+                              Text(
+                                'About Artist',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  color: p.accent,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            bio,
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: p.textSecondary,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+              const SizedBox(height: 16),
 
               // Discography (Albums)
               StreamBuilder<Result<List<AlbumsTableData>>>(

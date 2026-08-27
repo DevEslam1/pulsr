@@ -35,7 +35,7 @@ class SleepTimerSheet extends StatelessWidget {
               child: SafeArea(
                 top: false,
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+                  padding: const EdgeInsetsDirectional.fromSTEB(24, 16, 24, 32),
                   child: BlocBuilder<PlayerCubit, PlayerState>(
                     builder: (context, state) {
                       final cubit = context.read<PlayerCubit>();

@@ -77,6 +77,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         final cubit = context.read<LibraryCubit>();
         final playerCubit = context.read<PlayerCubit>();
         final isMultiSelect = state.isMultiSelectMode;
+        final p = context.palette;
 
         return Scaffold(
           appBar: isMultiSelect
@@ -172,7 +173,32 @@ class _LibraryScreenState extends State<LibraryScreen>
                     physics: const BouncingScrollPhysics(),
                     tabs: [
                       Tab(text: context.l10n.songs),
-                      Tab(text: context.l10n.downloaded),
+                      Tab(
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(context.l10n.downloaded),
+                            if (state.songs.where((s) => s.isDownloaded == true).isNotEmpty) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: p.accent.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  '${state.songs.where((s) => s.isDownloaded == true).length}',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: p.accent,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
                       Tab(text: context.l10n.albums),
                       Tab(text: context.l10n.artists),
                       Tab(text: context.l10n.favorites),
@@ -381,6 +407,7 @@ class _LibraryScreenState extends State<LibraryScreen>
           ListView.builder(
             physics: const AlwaysScrollableScrollPhysics(),
             controller: _songsScrollController,
+            itemExtent: songs.length > 500 ? 58.0 : null,
             padding:
                 const EdgeInsets.only(bottom: 160, top: 8, left: 4, right: 4),
             itemCount: songs.length,
@@ -651,16 +678,12 @@ class _LibraryScreenState extends State<LibraryScreen>
 
   bool _isOnlineDownload(SongsTableData s) {
     if (s.path.isEmpty || s.path.startsWith('ytmusic://')) return false;
-    // Use the isDownloaded DB column
+    // Primary: use the isDownloaded flag from DB
     if (s.isDownloaded == true) return true;
-    // Check remoteId presence (downloaded songs have remoteId)
+    // Secondary: source is local but has remoteId (reconciled download)
     if (s.source == SongSource.local &&
         s.remoteId != null &&
         s.remoteId!.isNotEmpty) {
-      return true;
-    }
-    // Path-based heuristic (no blocking file I/O)
-    if (s.path.contains('ytdl_') || s.path.toLowerCase().contains('pulsr')) {
       return true;
     }
     return false;
@@ -1195,10 +1218,9 @@ class _LibraryScreenState extends State<LibraryScreen>
   }
 
   bool _isOnlineFavorite(SongsTableData s) {
-    return (s.source == SongSource.local && (s.remoteId != null && s.remoteId!.isNotEmpty)) ||
-        s.path.startsWith('ytmusic://') ||
-        s.path.contains('ytdl_') ||
-        s.path.toLowerCase().contains('pulsr');
+    return s.source == SongSource.youtube ||
+        (s.remoteId != null && s.remoteId!.isNotEmpty) ||
+        s.isDownloaded == true;
   }
 
   Widget _buildFavoritesEmptyState(

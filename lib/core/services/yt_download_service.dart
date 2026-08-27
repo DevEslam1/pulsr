@@ -504,13 +504,14 @@ class YtDownloadService {
     final tempParts = <File>[];
     final dir = dest.parent;
 
-    var totalReceived = 0;
+    final chunkReceived = List<int>.filled(_concurrentChunks, 0);
     var lastEmitTime = 0;
 
     try {
       final futures = <Future<void>>[];
 
       for (var i = 0; i < _concurrentChunks; i++) {
+        final chunkIndex = i;
         final start = i * chunkSize;
         final end =
             (i == _concurrentChunks - 1) ? total - 1 : (start + chunkSize - 1);
@@ -539,7 +540,7 @@ class YtDownloadService {
           if (resp.statusCode != HttpStatus.partialContent &&
               resp.statusCode != HttpStatus.ok) {
             throw DownloadFailure(
-                'Server returned ${resp.statusCode} for chunk $i');
+                'Server returned ${resp.statusCode} for chunk $chunkIndex');
           }
 
           final sink = partFile.openWrite();
@@ -550,17 +551,18 @@ class YtDownloadService {
                 throw const DownloadFailure('Download canceled');
               }
               sink.add(chunk);
-              totalReceived += chunk.length;
+              chunkReceived[chunkIndex] += chunk.length;
+              final totalReceived = chunkReceived.reduce((a, b) => a + b);
               if (onProgress != null && total > 0) {
                 final now = DateTime.now().millisecondsSinceEpoch;
-                if (now - lastEmitTime > 80 || totalReceived == total) {
+                if (now - lastEmitTime > 80 || totalReceived >= total) {
                   lastEmitTime = now;
                   final elapsedSeconds = stopwatch.elapsedMilliseconds / 1000.0;
                   final speedKbps = elapsedSeconds > 0
                       ? (totalReceived / elapsedSeconds) / 1024.0
                       : 0.0;
                   final fraction = (totalReceived / total).clamp(0.0, 1.0);
-                  final remainingBytes = total - totalReceived;
+                  final remainingBytes = (total - totalReceived).clamp(0, total);
                   final etaSeconds = (speedKbps > 0 && remainingBytes > 0)
                       ? (remainingBytes / (speedKbps * 1024.0)).round()
                       : null;
@@ -583,8 +585,12 @@ class YtDownloadService {
 
       await Future.wait(futures);
 
-      // Verify each chunk file exists and has expected size
+      // Verify total received byte sum and chunk file integrity
       if (total > 0) {
+        final totalReceivedBytes = chunkReceived.reduce((a, b) => a + b);
+        if ((total - totalReceivedBytes).abs() > total * 0.02) {
+          throw DownloadFailure('Parallel download byte mismatch: received $totalReceivedBytes, expected $total');
+        }
         final expectedChunkSize = (total / _concurrentChunks).ceil();
         for (int i = 0; i < tempParts.length; i++) {
           final part = tempParts[i];

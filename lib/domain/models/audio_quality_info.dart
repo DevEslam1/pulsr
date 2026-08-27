@@ -162,10 +162,9 @@ class AudioQualityInfo {
             // header is available to trust.
             (!hasRealHeader &&
                 ((calculatedBitrate != null && calculatedBitrate >= 1411) ||
-                    path.contains('24bit') ||
-                    path.contains('hi-res') ||
-                    path.contains('hires') ||
-                    path.contains('master') ||
+                    RegExp(r'(?:^|[\s_\-\.\/])24bit(?:$|[\s_\-\.\/])', caseSensitive: false).hasMatch(path) ||
+                    RegExp(r'(?:^|[\s_\-\.\/])hi-?res(?:$|[\s_\-\.\/])', caseSensitive: false).hasMatch(path) ||
+                    RegExp(r'(?:^|[\s_\-\.\/])master(?:$|[\s_\-\.\/])', caseSensitive: false).hasMatch(path) ||
                     RegExp(r'[\s_\-\.\/]96k(?:hz)?[\s_\-\.\/]', caseSensitive: false).hasMatch(path) ||
                     RegExp(r'[\s_\-\.\/]192k(?:hz)?[\s_\-\.\/]', caseSensitive: false).hasMatch(path))));
 

@@ -37,9 +37,8 @@ class AppConfig {
 
   /// Validates that build flavor and runtime environment configuration are aligned.
   static void validateConfiguration() {
-    assert(
-      !(flavor.toLowerCase() == 'prod' && envName.toLowerCase() == 'dev'),
-      'CRITICAL: Production flavor cannot run with ENV=dev',
-    );
+    if (flavor.toLowerCase() == 'prod' && envName.toLowerCase() == 'dev') {
+      throw StateError('CRITICAL: Production flavor cannot run with ENV=dev');
+    }
   }
 }

@@ -36,8 +36,11 @@ class MiniPlayer extends StatelessWidget {
     return BlocBuilder<PlayerCubit, PlayerState>(
       buildWhen: (a, b) =>
           a.currentSong?.id != b.currentSong?.id ||
+          a.currentSong?.title != b.currentSong?.title ||
+          a.currentSong?.artist != b.currentSong?.artist ||
+          a.currentSong?.remoteArtworkUrl != b.currentSong?.remoteArtworkUrl ||
           a.isPlaying != b.isPlaying ||
-          a.position.inSeconds != b.position.inSeconds ||
+          a.position != b.position ||
           a.duration != b.duration,
       builder: (context, state) {
         final song = state.currentSong;
@@ -50,18 +53,21 @@ class MiniPlayer extends StatelessWidget {
             ? (state.position.inMilliseconds / state.duration.inMilliseconds).clamp(0.0, 1.0)
             : 0.0;
 
-        return GestureDetector(
-          onTap: onTap,
-          onVerticalDragEnd: (d) {
-            if ((d.primaryVelocity ?? 0) < -200) onTap();
-          },
-          onHorizontalDragEnd: (d) {
-            final v = d.primaryVelocity ?? 0;
-            if (v < -200) _handleSwipe(cubit, settingsState.miniPlayerSwipeLeft, isLeft: true);
-            if (v > 200) _handleSwipe(cubit, settingsState.miniPlayerSwipeRight, isLeft: false);
-          },
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+        return Semantics(
+          label: 'Now playing: ${song.title} by ${song.artist}',
+          button: true,
+          child: GestureDetector(
+            onTap: onTap,
+            onVerticalDragEnd: (d) {
+              if ((d.primaryVelocity ?? 0) < -200) onTap();
+            },
+            onHorizontalDragEnd: (d) {
+              final v = d.primaryVelocity ?? 0;
+              if (v < -200) _handleSwipe(cubit, settingsState.miniPlayerSwipeLeft, isLeft: true);
+              if (v > 200) _handleSwipe(cubit, settingsState.miniPlayerSwipeRight, isLeft: false);
+            },
+            child: Padding(
+              padding: const EdgeInsetsDirectional.fromSTEB(12, 4, 12, 8),
             child: RepaintBoundary(
               child: GlassContainer(
                 blur: 16,
@@ -213,8 +219,9 @@ class MiniPlayer extends StatelessWidget {
               ),
             ),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 }

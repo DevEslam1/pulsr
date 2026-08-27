@@ -103,6 +103,51 @@ class HiResAudioService {
     }
   }
 
+  Future<bool> selectOutputDevice(int deviceId) async {
+    try {
+      final bool? success = await _methodChannel.invokeMethod<bool>(
+        'setOutputDevice',
+        {'deviceId': deviceId},
+      );
+      await getAudioOutputInfo();
+      return success ?? false;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to selectOutputDevice($deviceId)',
+          error: e, stackTrace: st, category: 'HiResAudio');
+      return false;
+    }
+  }
+
+  Future<bool> clearOutputDevice() async {
+    try {
+      final bool? success = await _methodChannel.invokeMethod<bool>('clearOutputDevice');
+      await getAudioOutputInfo();
+      return success ?? false;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to clearOutputDevice',
+          error: e, stackTrace: st, category: 'HiResAudio');
+      return false;
+    }
+  }
+
+  Future<bool> setTargetOutputFormat({int sampleRate = 0, int bitDepth = 0}) async {
+    try {
+      final bool? success = await _methodChannel.invokeMethod<bool>(
+        'setTargetOutputFormat',
+        {
+          'sampleRate': sampleRate,
+          'bitDepth': bitDepth,
+        },
+      );
+      await getAudioOutputInfo();
+      return success ?? false;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to setTargetOutputFormat($sampleRate, $bitDepth)',
+          error: e, stackTrace: st, category: 'HiResAudio');
+      return false;
+    }
+  }
+
   void dispose() {
     _eventSubscription?.cancel();
     _deviceController.close();

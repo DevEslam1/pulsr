@@ -13,7 +13,10 @@ enum SmartRuleField {
   dateAdded('dateAdded', 'Date Added'),
   durationMs('durationMs', 'Duration'),
   isFavorite('isFavorite', 'Is Favorite'),
-  lastPlayed('lastPlayed', 'Last Played');
+  lastPlayed('lastPlayed', 'Last Played'),
+  bpm('bpm', 'BPM / Tempo'),
+  loudnessRange('loudnessRange', 'LRA Dynamic Range'),
+  bitrate('bitrate', 'Bitrate (kbps)');
 
   final String key;
   final String label;
@@ -34,7 +37,8 @@ enum SmartOperator {
   greaterThanOrEqual('>=', '>='),
   lessThanOrEqual('<=', '<='),
   contains('contains', 'Contains'),
-  withinDays('within_days', 'Within Days');
+  withinDays('within_days', 'Within Days'),
+  between('between', 'Between');
 
   final String key;
   final String label;
@@ -100,7 +104,7 @@ class SmartCriteria {
     this.matchAll = true,
     this.limit,
     this.sortBy,
-    this.sortAscending = false,
+    this.sortAscending = true,
   });
 
   Map<String, dynamic> toJson() {
@@ -114,25 +118,35 @@ class SmartCriteria {
   }
 
   factory SmartCriteria.fromJson(Map<String, dynamic> json) {
-    final rulesRaw = json['rules'] as List<dynamic>? ?? [];
+    final rulesList = (json['rules'] as List<dynamic>?)
+            ?.map((e) => SmartRule.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        [];
     return SmartCriteria(
-      rules: rulesRaw.map((r) => SmartRule.fromJson(r as Map<String, dynamic>)).toList(),
+      rules: rulesList,
       matchAll: json['matchAll'] as bool? ?? true,
       limit: json['limit'] as int?,
       sortBy: json['sortBy'] as String?,
-      sortAscending: json['sortAscending'] as bool? ?? false,
+      sortAscending: json['sortAscending'] as bool? ?? true,
     );
   }
 
-  String toJsonString() => jsonEncode(toJson());
+  factory SmartCriteria.fromJsonString(String jsonString) =>
+      tryDecode(jsonString) ?? const SmartCriteria();
 
-  factory SmartCriteria.fromJsonString(String source) {
-    if (source.trim().isEmpty) return const SmartCriteria();
+  static SmartCriteria? tryDecode(String? jsonString) {
+    if (jsonString == null || jsonString.isEmpty) return null;
     try {
-      return SmartCriteria.fromJson(jsonDecode(source) as Map<String, dynamic>);
+      final decoded = json.decode(jsonString) as Map<String, dynamic>;
+      return SmartCriteria.fromJson(decoded);
     } catch (e, st) {
-      ErrorLogger.log('Failed to parse SmartCriteria from JSON string', error: e, stackTrace: st, category: 'SmartCriteria');
-      return const SmartCriteria();
+      ErrorLogger.log(
+        'Failed to decode SmartCriteria JSON: $jsonString',
+        error: e,
+        stackTrace: st,
+        category: 'SmartCriteria',
+      );
+      return null;
     }
   }
 
@@ -151,4 +165,58 @@ class SmartCriteria {
       sortAscending: sortAscending ?? this.sortAscending,
     );
   }
+
+  String toJsonString() => json.encode(toJson());
+  String encode() => json.encode(toJson());
+
+  static const Map<String, SmartCriteria> presetTemplates = {
+    'Chill Evening': SmartCriteria(
+      rules: [
+        SmartRule(field: SmartRuleField.genre, operator: SmartOperator.contains, value: 'chill'),
+      ],
+      sortBy: 'lastPlayed',
+      sortAscending: false,
+      limit: 50,
+    ),
+    'Workout Energy': SmartCriteria(
+      rules: [
+        SmartRule(field: SmartRuleField.genre, operator: SmartOperator.contains, value: 'electronic'),
+      ],
+      sortBy: 'playCount',
+      sortAscending: false,
+      limit: 50,
+    ),
+    'Lossless Collection': SmartCriteria(
+      rules: [
+        SmartRule(field: SmartRuleField.isLossless, operator: SmartOperator.equals, value: 'true'),
+      ],
+      sortBy: 'title',
+      sortAscending: true,
+    ),
+    '90s Gems': SmartCriteria(
+      rules: [
+        SmartRule(field: SmartRuleField.decade, operator: SmartOperator.equals, value: '1990'),
+      ],
+      sortBy: 'year',
+      sortAscending: true,
+      limit: 100,
+    ),
+    'Recently Added': SmartCriteria(
+      rules: [
+        SmartRule(field: SmartRuleField.dateAdded, operator: SmartOperator.withinDays, value: '30'),
+      ],
+      sortBy: 'dateAdded',
+      sortAscending: false,
+      limit: 50,
+    ),
+    'Heavy Rotation': SmartCriteria(
+      rules: [
+        SmartRule(field: SmartRuleField.playCount, operator: SmartOperator.greaterThanOrEqual, value: '10'),
+      ],
+      sortBy: 'playCount',
+      sortAscending: false,
+      limit: 50,
+    ),
+  };
 }
+

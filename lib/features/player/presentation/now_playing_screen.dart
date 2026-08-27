@@ -8,10 +8,14 @@ import '../../settings/cubit/settings_state.dart';
 import '../cubit/player_cubit.dart';
 import '../cubit/player_state.dart';
 import 'themes/card_player_theme.dart';
+import 'themes/cassette_player_theme.dart';
 import 'themes/circle_player_theme.dart';
 import 'themes/classic_player_theme.dart';
+import 'themes/lyrics_player_theme.dart';
 import 'themes/minimal_player_theme.dart';
 import 'themes/player_theme.dart';
+import 'themes/vinyl_player_theme.dart';
+import 'themes/waveform_player_theme.dart';
 
 class NowPlayingScreen extends StatelessWidget {
   const NowPlayingScreen({super.key});
@@ -59,6 +63,18 @@ class NowPlayingScreen extends StatelessWidget {
             break;
           case PlayerThemeMode.minimal:
             themeWidget = MinimalPlayerTheme(props: props);
+            break;
+          case PlayerThemeMode.vinyl:
+            themeWidget = VinylPlayerTheme(props: props);
+            break;
+          case PlayerThemeMode.cassette:
+            themeWidget = CassettePlayerTheme(props: props);
+            break;
+          case PlayerThemeMode.waveform:
+            themeWidget = WaveformPlayerTheme(props: props);
+            break;
+          case PlayerThemeMode.lyricsFocus:
+            themeWidget = LyricsPlayerTheme(props: props);
             break;
         }
 

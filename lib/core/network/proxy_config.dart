@@ -67,11 +67,12 @@ class ProxyConfig {
       return 'DIRECT';
     }
     final cleanHost = host.trim();
+    final formattedHost = cleanHost.contains(':') ? '[$cleanHost]' : cleanHost;
     switch (type) {
       case AppProxyType.http:
-        return 'PROXY $cleanHost:$port; DIRECT';
+        return 'PROXY $formattedHost:$port; DIRECT';
       case AppProxyType.socks5:
-        return 'SOCKS5 $cleanHost:$port; SOCKS $cleanHost:$port; DIRECT';
+        return 'SOCKS5 $formattedHost:$port; SOCKS $formattedHost:$port; DIRECT';
     }
   }
 
@@ -263,7 +264,7 @@ class ProxyEntry {
     final host = parts[0];
     final port = parts.length > 1 ? (int.tryParse(parts[1]) ?? 8080) : 8080;
     final username = parts.length > 2 ? parts[2] : '';
-    final password = parts.length > 3 ? parts[3] : '';
+    final password = parts.length > 3 ? parts.sublist(3).join(':') : '';
 
     if (host.isEmpty) return null;
 

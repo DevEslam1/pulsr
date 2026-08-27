@@ -15,6 +15,7 @@ import '../../../sheets/sleep_timer_sheet.dart';
 import '../../../sheets/song_info_sheet.dart';
 import '../../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../widgets/audio_quality_badge.dart';
+import '../widgets/audio_quality_sheet.dart';
 import '../widgets/audio_visualizer.dart';
 import '../widgets/equalizer_sheet.dart';
 import '../widgets/lyrics_view.dart';
@@ -305,6 +306,20 @@ class ClassicPlayerTheme extends StatelessWidget {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.settings_input_component_rounded,
+                      color: settingsState.currentOutputDevice?.isUsbDac == true
+                          ? const Color(0xFFFFD700)
+                          : p.textSecondary,
+                    ),
+                    onPressed: () {
+                      if (song != null) {
+                        AudioQualitySheet.show(context, song, activeColor);
+                      }
+                    },
+                    tooltip: 'Audio Output & DAC',
+                  ),
                   IconButton(
                     icon: Icon(
                       Icons.equalizer_rounded,

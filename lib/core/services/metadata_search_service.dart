@@ -100,10 +100,13 @@ class MetadataSearchService {
     return results;
   }
 
-  /// Downloads the artwork image from [url] to a local temporary file and returns its path.
   Future<String?> downloadArtworkToTemp(String url) async {
     try {
-      final response = await _httpClient.get(Uri.parse(url)).timeout(const Duration(seconds: 12));
+      final uri = Uri.tryParse(url);
+      if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
+        return null;
+      }
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 12));
       if (response.statusCode == 200 && response.bodyBytes.isNotEmpty) {
         final dir = await getTemporaryDirectory();
         final fileName = 'auto_art_${DateTime.now().millisecondsSinceEpoch}.jpg';

@@ -33,6 +33,9 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     private var eventSink: EventChannel.EventSink? = null
 
     private var bitPerfectRequested: Boolean = false
+    private var selectedDeviceId: Int? = null
+    private var targetSampleRate: Int = 0
+    private var targetBitDepth: Int = 0
     private var audioDeviceCallback: AudioDeviceCallback? = null
     private var usbReceiver: BroadcastReceiver? = null
 
@@ -59,8 +62,14 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         usbReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
                 when (intent?.action) {
-                    UsbManager.ACTION_USB_DEVICE_ATTACHED,
                     UsbManager.ACTION_USB_DEVICE_DETACHED -> {
+                        if (bitPerfectRequested) {
+                            bitPerfectRequested = false
+                            try { applyBitPerfectMode(false) } catch (_: Exception) {}
+                        }
+                        notifyDeviceChange()
+                    }
+                    UsbManager.ACTION_USB_DEVICE_ATTACHED -> {
                         notifyDeviceChange()
                     }
                 }
@@ -102,6 +111,40 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 val success = applyBitPerfectMode(enabled)
                 notifyDeviceChange()
                 result.success(success)
+            }
+            "setOutputDevice" -> {
+                val deviceId = call.argument<Int>("deviceId")
+                selectedDeviceId = deviceId
+                var success = false
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && audioManager != null && deviceId != null) {
+                    val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                    val targetDev = devices.firstOrNull { it.id == deviceId }
+                    if (targetDev != null) {
+                        try {
+                            success = audioManager.setCommunicationDevice(targetDev)
+                        } catch (_: Exception) {}
+                    }
+                }
+                notifyDeviceChange()
+                result.success(success)
+            }
+            "clearOutputDevice" -> {
+                selectedDeviceId = null
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && audioManager != null) {
+                    try {
+                        audioManager.clearCommunicationDevice()
+                    } catch (_: Exception) {}
+                }
+                notifyDeviceChange()
+                result.success(true)
+            }
+            "setTargetOutputFormat" -> {
+                val sRate = call.argument<Int>("sampleRate") ?: 0
+                val bDepth = call.argument<Int>("bitDepth") ?: 0
+                targetSampleRate = sRate
+                targetBitDepth = bDepth
+                notifyDeviceChange()
+                result.success(true)
             }
             else -> result.notImplemented()
         }
@@ -254,15 +297,43 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         val nativeSampleRate = getNativeSampleRate()
         val nativeFrames = getNativeFramesPerBuffer()
 
+        val availableList = mutableListOf<Map<String, Any?>>()
+        val currentDevId = selectedDeviceId ?: activeDevice?.id
+        for (device in devices) {
+            val dRates = device.sampleRates.toList().filter { it > 0 }
+            var dBitDepth = 16
+            for (encoding in device.encodings) {
+                when (encoding) {
+                    AudioFormat.ENCODING_PCM_FLOAT -> dBitDepth = maxOf(dBitDepth, 32)
+                    AudioFormat.ENCODING_PCM_24BIT_PACKED -> dBitDepth = maxOf(dBitDepth, 24)
+                    AudioFormat.ENCODING_PCM_32BIT -> dBitDepth = maxOf(dBitDepth, 32)
+                }
+            }
+            val dName = device.productName.toString().ifBlank { getDeviceTypeName(device.type) }
+            val isCurrent = (device.id == currentDevId)
+            availableList.add(mapOf(
+                "id" to device.id,
+                "name" to dName,
+                "type" to device.type,
+                "typeName" to getDeviceTypeName(device.type),
+                "isCurrent" to isCurrent,
+                "sampleRates" to (if (dRates.isNotEmpty()) dRates else listOf(44100, 48000)),
+                "maxBitDepth" to dBitDepth
+            ))
+        }
+
         result["deviceName"] = deviceName
         result["isUsbDac"] = isUsb
-        result["sampleRate"] = if (isUsb) maxSampleRate else nativeSampleRate
+        result["sampleRate"] = if (targetSampleRate > 0) targetSampleRate else (if (isUsb) maxSampleRate else nativeSampleRate)
         result["nativeSampleRate"] = nativeSampleRate
         result["nativeFramesPerBuffer"] = nativeFrames
-        result["bitDepth"] = bitDepth
+        result["bitDepth"] = if (targetBitDepth > 0) targetBitDepth else bitDepth
         result["isBitPerfectActive"] = isBitPerfectActive || (isUsb && bitPerfectRequested)
         result["isBitPerfectSupported"] = isBitPerfectSupportedOnPlatform()
-        result["supportedSampleRates"] = if (sampleRates.isNotEmpty()) sampleRates else listOf(44100, 48000, 96000, 192000)
+        result["supportedSampleRates"] = if (sampleRates.isNotEmpty()) sampleRates else listOf(44100, 48000, 88200, 96000, 176400, 192000, 384000)
+        result["availableDevices"] = availableList
+        result["targetSampleRate"] = targetSampleRate
+        result["targetBitDepth"] = targetBitDepth
 
         return result
     }

@@ -115,19 +115,53 @@ class TagEditorCubit extends Cubit<TagEditorState> {
     ));
   }
 
+  /// Searches online metadata without immediately auto-applying.
+  Future<List<OnlineTrackMetadata>> searchOnlineMatches() async {
+    final searchTitle = state.title.isNotEmpty ? state.title : state.song.title;
+    final searchArtist = state.artist.isNotEmpty ? state.artist : state.song.artist;
+    return await _metadataSearchService.searchMetadata(
+      title: searchTitle,
+      artist: searchArtist,
+      album: state.album,
+    );
+  }
+
+  /// Applies the selected metadata result to the form state.
+  Future<bool> applyMetadataResult(OnlineTrackMetadata match) async {
+    emit(state.copyWith(isAutoFetching: true, clearErrorMessage: true));
+    try {
+      String? downloadedArtPath;
+      if (match.artworkUrl != null) {
+        downloadedArtPath = await _metadataSearchService.downloadArtworkToTemp(match.artworkUrl!);
+      }
+
+      emit(state.copyWith(
+        isAutoFetching: false,
+        title: match.title.isNotEmpty ? match.title : state.title,
+        artist: match.artist.isNotEmpty ? match.artist : state.artist,
+        album: match.album.isNotEmpty ? match.album : state.album,
+        genre: (match.genre != null && match.genre!.isNotEmpty) ? match.genre : state.genre,
+        year: (match.releaseYear != null && match.releaseYear!.isNotEmpty) ? match.releaseYear : state.year,
+        trackNumber: (match.trackNumber != null && match.trackNumber!.isNotEmpty) ? match.trackNumber : state.trackNumber,
+        newArtworkPath: downloadedArtPath ?? state.newArtworkPath,
+        removeArtwork: false,
+      ));
+      return true;
+    } catch (e, st) {
+      ErrorLogger.log('Applying metadata result failed', error: e, stackTrace: st, category: 'TagEditorCubit');
+      emit(state.copyWith(
+        isAutoFetching: false,
+        errorMessage: 'Failed to apply metadata: $e',
+      ));
+      return false;
+    }
+  }
+
   /// Automatically searches online (iTunes & MusicBrainz) and updates tags + cover art in 1 tap.
   Future<bool> autoFetchOnlineTags() async {
     emit(state.copyWith(isAutoFetching: true, clearErrorMessage: true));
     try {
-      final searchTitle = state.title.isNotEmpty ? state.title : state.song.title;
-      final searchArtist = state.artist.isNotEmpty ? state.artist : state.song.artist;
-
-      final results = await _metadataSearchService.searchMetadata(
-        title: searchTitle,
-        artist: searchArtist,
-        album: state.album,
-      );
-
+      final results = await searchOnlineMatches();
       if (results.isEmpty) {
         emit(state.copyWith(
           isAutoFetching: false,
@@ -135,25 +169,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
         ));
         return false;
       }
-
-      final bestMatch = results.first;
-      String? downloadedArtPath;
-      if (bestMatch.artworkUrl != null) {
-        downloadedArtPath = await _metadataSearchService.downloadArtworkToTemp(bestMatch.artworkUrl!);
-      }
-
-      emit(state.copyWith(
-        isAutoFetching: false,
-        title: bestMatch.title.isNotEmpty ? bestMatch.title : state.title,
-        artist: bestMatch.artist.isNotEmpty ? bestMatch.artist : state.artist,
-        album: bestMatch.album.isNotEmpty ? bestMatch.album : state.album,
-        genre: (bestMatch.genre != null && bestMatch.genre!.isNotEmpty) ? bestMatch.genre : state.genre,
-        year: (bestMatch.releaseYear != null && bestMatch.releaseYear!.isNotEmpty) ? bestMatch.releaseYear : state.year,
-        trackNumber: (bestMatch.trackNumber != null && bestMatch.trackNumber!.isNotEmpty) ? bestMatch.trackNumber : state.trackNumber,
-        newArtworkPath: downloadedArtPath ?? state.newArtworkPath,
-        removeArtwork: false,
-      ));
-      return true;
+      return await applyMetadataResult(results.first);
     } catch (e, st) {
       ErrorLogger.log('Auto-fetch online tags failed', error: e, stackTrace: st, category: 'TagEditorCubit');
       emit(state.copyWith(
@@ -165,10 +181,16 @@ class TagEditorCubit extends Cubit<TagEditorState> {
   }
 
   Future<void> saveTags() async {
-    emit(state.copyWith(status: TagEditorStatus.saving, clearErrorMessage: true));
+    emit(state.copyWith(status: TagEditorStatus.saving, clearErrorMessage: true, batchProgress: 0.0));
     try {
       if (state.isBatchMode) {
-        for (final s in state.batchSongs) {
+        final total = state.batchSongs.length;
+        for (int i = 0; i < total; i++) {
+          final s = state.batchSongs[i];
+          emit(state.copyWith(
+            status: TagEditorStatus.saving,
+            batchProgress: total > 0 ? (i + 1) / total : 1.0,
+          ));
           await _channel.invokeMethod('writeTags', {
             'path': s.path,
             'title': s.title, // keep individual title
@@ -185,7 +207,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
           await _scannerService.rescanSingleFile(s.path);
         }
         LrcParser.clearCache();
-        emit(state.copyWith(status: TagEditorStatus.success));
+        emit(state.copyWith(status: TagEditorStatus.success, clearBatchProgress: true));
         return;
       }
 

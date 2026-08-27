@@ -1,7 +1,7 @@
 // lib/core/utils/formatters.dart
 class Formatters {
   static String formatDuration(Duration? duration) {
-    if (duration == null) return '0:00';
+    if (duration == null || duration.isNegative) return '0:00';
     final minutes = duration.inMinutes;
     final seconds = duration.inSeconds.remainder(60);
     return '$minutes:${seconds.toString().padLeft(2, '0')}';

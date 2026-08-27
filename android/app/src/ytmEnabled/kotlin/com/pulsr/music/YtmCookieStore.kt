@@ -82,12 +82,24 @@ internal class YtmCookieStore private constructor(context: Context) {
         synchronized(lock) {
             var updated = false
             for (header in headerValues) {
-                val firstPart = header.split(";").firstOrNull()?.trim() ?: continue
-                val parts = firstPart.split("=", limit = 2)
-                if (parts.size == 2 && parts[0].isNotBlank()) {
-                    cookies[parts[0].trim()] = parts[1].trim()
-                    updated = true
+                val parts = header.split(";")
+                val nameValue = parts.firstOrNull()?.trim() ?: continue
+                val kv = nameValue.split("=", limit = 2)
+                if (kv.size != 2 || kv[0].isBlank()) continue
+
+                // Check if cookie specifies max-age=0 or expired
+                val maxAgeAttr = parts.find { it.trim().startsWith("max-age=", true) }
+                if (maxAgeAttr != null) {
+                    val maxAgeVal = maxAgeAttr.substringAfter("=").trim().toLongOrNull()
+                    if (maxAgeVal != null && maxAgeVal <= 0) {
+                        cookies.remove(kv[0].trim())
+                        updated = true
+                        continue
+                    }
                 }
+
+                cookies[kv[0].trim()] = kv[1].trim()
+                updated = true
             }
             if (updated) {
                 val merged = getMergedCookieHeader() ?: ""
@@ -100,8 +112,10 @@ internal class YtmCookieStore private constructor(context: Context) {
      * Returns the formatted `Cookie` header string for HTTP requests.
      */
     fun getMergedCookieHeader(): String? {
-        if (cookies.isEmpty()) return null
-        return cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
+        synchronized(lock) {
+            if (cookies.isEmpty()) return null
+            return cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
+        }
     }
 
     /**

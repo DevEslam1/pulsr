@@ -77,12 +77,20 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
         : 'AUDIO_$songId';
 
     if (_cachedPalettes.containsKey(cacheKey)) {
+      _debounceTimer?.cancel();
       final cached = _cachedPalettes.remove(cacheKey)!;
       _cachedPalettes[cacheKey] = cached; // Refresh LRU position
       emit(cached);
       return;
     }
 
+    _debounceTimer?.cancel();
+    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+      _extractPalette(songId: songId, remoteArtworkUrl: remoteArtworkUrl, cacheKey: cacheKey);
+    });
+  }
+
+  Future<void> _extractPalette({required int songId, String? remoteArtworkUrl, required String cacheKey}) async {
     final token = ++_currentRequestToken;
 
     try {
@@ -170,9 +178,10 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to generate dynamic theme palette for $cacheKey', error: e, stackTrace: st, category: 'DynamicTheme');
+      return;
     }
 
-    if (token == _currentRequestToken && !isClosed) {
+    if (token == _currentRequestToken && !isClosed && !state.hasCustomArtworkColor) {
       emit(const DynamicThemeState());
     }
   }

@@ -1,9 +1,11 @@
 // lib/data/repositories/music_repository.dart
 import 'dart:io';
+import 'dart:math';
 import 'package:drift/drift.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 import '../../core/errors/failures.dart';
+import '../../core/utils/error_logger.dart';
 import '../../domain/models/genre_item.dart';
 import '../../domain/models/year_item.dart';
 import '../../domain/models/ytm_track.dart';
@@ -421,7 +423,10 @@ class MusicRepository implements IMusicRepository {
                 t.isMissing.equals(false) &
                 t.source.equals(SongSource.local) &
                 t.path.like('ytmusic://%').not())
-            ..orderBy([(t) => OrderingTerm(expression: t.trackNumber)]))
+            ..orderBy([
+              (t) => OrderingTerm(expression: t.discNumber, mode: OrderingMode.asc),
+              (t) => OrderingTerm(expression: t.trackNumber, mode: OrderingMode.asc),
+            ]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
           .handleError((e) => Left<AppFailure, List<SongsTableData>>(DatabaseFailure('Failed to watch album songs', e)));
@@ -452,7 +457,10 @@ class MusicRepository implements IMusicRepository {
                 t.isMissing.equals(false) &
                 t.source.equals(SongSource.local) &
                 t.path.like('ytmusic://%').not())
-            ..orderBy([(t) => OrderingTerm(expression: t.trackNumber)]))
+            ..orderBy([
+              (t) => OrderingTerm(expression: t.discNumber, mode: OrderingMode.asc),
+              (t) => OrderingTerm(expression: t.trackNumber, mode: OrderingMode.asc),
+            ]))
           .get();
       return Right(songs);
     } catch (e) {
@@ -685,7 +693,9 @@ class MusicRepository implements IMusicRepository {
             ..where((t) => t.playlistId.equals(playlistId)))
           .get();
       final existingSongIds = existingRows.map((r) => r.songId).toSet();
-      int count = existingRows.length;
+      int nextOrderIndex = existingRows.isEmpty
+          ? 0
+          : existingRows.map((r) => r.orderIndex).reduce(max) + 1;
 
       await _db.transaction(() async {
         for (final songId in songIds) {
@@ -695,7 +705,7 @@ class MusicRepository implements IMusicRepository {
               PlaylistEntriesTableCompanion.insert(
                 playlistId: playlistId,
                 songId: songId,
-                orderIndex: count++,
+                orderIndex: nextOrderIndex++,
               ),
             );
           }
@@ -716,6 +726,22 @@ class MusicRepository implements IMusicRepository {
       return const Right(null);
     } catch (e) {
       return Left(DatabaseFailure('Failed to remove song from playlist', e));
+    }
+  }
+
+  @override
+  Future<Result<void>> reorderPlaylistSongs(int playlistId, List<int> orderedSongIds) async {
+    try {
+      await _db.transaction(() async {
+        for (int i = 0; i < orderedSongIds.length; i++) {
+          await (_db.update(_db.playlistEntriesTable)
+                ..where((t) => t.playlistId.equals(playlistId) & t.songId.equals(orderedSongIds[i])))
+              .write(PlaylistEntriesTableCompanion(orderIndex: Value(i)));
+        }
+      });
+      return const Right(null);
+    } catch (e) {
+      return Left(DatabaseFailure('Failed to reorder playlist songs', e));
     }
   }
 
@@ -997,21 +1023,35 @@ class MusicRepository implements IMusicRepository {
         // Old row already gone (reconciled twice) or scanner reused the id: nothing to fold.
         if (oldRow == null || oldRow.id == targetId) return;
 
-        // Re-point children off the negative id BEFORE deleting it so the FK
-        // cascade finds nothing to remove. playlist_entries has no unique
-        // (playlist_id, song_id) index, so dedupe first or membership doubles.
-        await _db.customStatement(
-          'DELETE FROM playlist_entries WHERE song_id = ? '
-          'AND playlist_id IN (SELECT playlist_id FROM playlist_entries WHERE song_id = ?);',
-          [oldId, targetId],
-        );
-        await _db.customStatement('UPDATE playlist_entries SET song_id = ? WHERE song_id = ?;', [targetId, oldId]);
-        await _db.customStatement('UPDATE queue_items SET song_id = ? WHERE song_id = ?;', [targetId, oldId]);
-        await _db.customStatement('UPDATE play_history SET song_id = ? WHERE song_id = ?;', [targetId, oldId]);
+        try {
+          final duplicatePlaylists = await (_db.selectOnly(_db.playlistEntriesTable, distinct: true)
+                ..addColumns([_db.playlistEntriesTable.playlistId])
+                ..where(_db.playlistEntriesTable.songId.equals(targetId)))
+              .map((row) => row.read(_db.playlistEntriesTable.playlistId)!)
+              .get();
 
-        // Delete the YT row BEFORE writing remoteId onto the new row: the
-        // partial unique index on remote_id would otherwise see two rows.
-        await _db.customStatement('DELETE FROM songs WHERE id = ?;', [oldId]);
+          if (duplicatePlaylists.isNotEmpty) {
+            await (_db.delete(_db.playlistEntriesTable)
+                  ..where((t) => t.songId.equals(oldId) & t.playlistId.isIn(duplicatePlaylists)))
+                .go();
+          }
+          await (_db.update(_db.playlistEntriesTable)..where((t) => t.songId.equals(oldId)))
+              .write(PlaylistEntriesTableCompanion(songId: Value(targetId)));
+          await (_db.update(_db.queueItemsTable)..where((t) => t.songId.equals(oldId)))
+              .write(QueueItemsTableCompanion(songId: Value(targetId)));
+          await (_db.update(_db.playHistoryTable)..where((t) => t.songId.equals(oldId)))
+              .write(PlayHistoryTableCompanion(songId: Value(targetId)));
+
+          // Delete the YT row BEFORE writing remoteId onto the new row: the
+          // partial unique index on remote_id would otherwise see two rows.
+          await (_db.delete(_db.songsTable)..where((t) => t.id.equals(oldId))).go();
+        } catch (e, st) {
+          ErrorLogger.log('Constraint exception in reconcileDownloadedSong; applying direct cleanup',
+              error: e, stackTrace: st, category: 'MusicRepository');
+          try {
+            await (_db.delete(_db.songsTable)..where((t) => t.id.equals(oldId))).go();
+          } catch (_) {}
+        }
 
         // Merge stats (don't clobber — the scanned row may predate the download).
         final int? mergedLastPlayed;

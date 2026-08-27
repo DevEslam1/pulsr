@@ -16,7 +16,7 @@ enum AppThemeMode { dark, light, amoled, system }
 /// - [custom]: the user-picked [customAccentColor].
 enum ThemeColorSource { system, artwork, custom }
 
-enum PlayerThemeMode { classic, card, circle, minimal }
+enum PlayerThemeMode { classic, card, circle, minimal, vinyl, cassette, waveform, lyricsFocus }
 
 enum MiniPlayerSwipeAction { next, prev, volume, none }
 
@@ -24,7 +24,7 @@ enum NowPlayingDoubleTapAction { toggleFavorite, toggleLyrics, none }
 
 enum NowPlayingArtworkSwipeAction { nextPrev, none }
 
-enum ReplayGainMode { off, track, album }
+enum ReplayGainMode { off, track, album, auto }
 
 enum YtmAudioQuality { low, medium, high }
 

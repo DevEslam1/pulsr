@@ -1,7 +1,7 @@
-import 'dart:convert';
 // lib/features/playlists/cubit/playlist_cubit.dart
 import 'dart:async';
-import 'package:flutter/foundation.dart';
+import 'dart:convert';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -157,10 +157,12 @@ class PlaylistCubit extends Cubit<PlaylistState> {
     if (AppConfig.ytmEnabled) {
       getIt<YtmAccountService>().loginState.removeListener(_onYtmLoginStateChanged);
       getIt<YtmAccountService>().loginState.addListener(_onYtmLoginStateChanged);
-      Future.delayed(const Duration(milliseconds: 600), () {
-        if (!isClosed) {
-          autoFetchOnlineLibrary(force: true);
-        }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.delayed(const Duration(seconds: 2), () {
+          if (!isClosed) {
+            autoFetchOnlineLibrary(force: true);
+          }
+        });
       });
     }
   }

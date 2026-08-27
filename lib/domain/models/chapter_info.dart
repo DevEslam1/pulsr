@@ -5,12 +5,14 @@ class ChapterInfo {
   final String title;
   final Duration start;
   final Duration? end;
+  final String? fileName;
 
   const ChapterInfo({
     required this.index,
     required this.title,
     required this.start,
     this.end,
+    this.fileName,
   });
 
   @override
@@ -21,11 +23,18 @@ class ChapterInfo {
           index == other.index &&
           title == other.title &&
           start == other.start &&
-          end == other.end;
+          end == other.end &&
+          fileName == other.fileName;
 
   @override
-  int get hashCode => index.hashCode ^ title.hashCode ^ start.hashCode ^ end.hashCode;
+  int get hashCode =>
+      index.hashCode ^
+      title.hashCode ^
+      start.hashCode ^
+      end.hashCode ^
+      fileName.hashCode;
 
   @override
-  String toString() => 'ChapterInfo($index: $title [${start.inSeconds}s])';
+  String toString() =>
+      'ChapterInfo($index: $title [${start.inSeconds}s]${fileName != null ? ' file: $fileName' : ''})';
 }

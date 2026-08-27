@@ -8,6 +8,7 @@ import '../../../core/config/app_config.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_radii.dart';
 import '../../../core/di/injection.dart';
+import '../../../data/db/app_database.dart';
 import '../../../core/services/artwork_cache_manager.dart';
 import '../../../core/services/scrobbler_service.dart';
 import '../../../core/services/ytm_account_service.dart';
@@ -20,6 +21,8 @@ import '../../auth/cubit/auth_cubit.dart';
 import '../../auth/cubit/auth_state.dart';
 import '../../auth/presentation/auth_sheet.dart';
 import '../../auth/presentation/ytm_web_login_sheet.dart';
+import '../../player/cubit/player_cubit.dart';
+import '../../player/presentation/widgets/audio_quality_sheet.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
 import '../../player/presentation/widgets/equalizer_sheet.dart';
 import '../../sheets/sleep_timer_sheet.dart';
@@ -104,74 +107,100 @@ class SettingsScreen extends StatelessWidget {
                     // Audiophile & Hi-Res Output Card & Controls
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: p.surfaceContainer.withValues(alpha: 0.6),
+                      child: Material(
+                        color: p.surfaceContainer.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(14),
+                        child: InkWell(
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: state.currentOutputDevice?.isUsbDac == true
-                                ? const Color(0xFFFFD700).withValues(alpha: 0.5)
-                                : p.hairline,
-                          ),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(
-                                  state.currentOutputDevice?.isUsbDac == true
-                                      ? Icons.usb_rounded
-                                      : Icons.headphones_rounded,
-                                  color: state.currentOutputDevice?.isUsbDac == true
-                                      ? const Color(0xFFFFD700)
-                                      : p.accent,
-                                  size: 18,
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    state.currentOutputDevice?.deviceName ?? 'Audio Output Device',
-                                    style: TextStyle(
-                                      color: p.textPrimary,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 13,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                                if (state.currentOutputDevice?.isBitPerfectActive == true)
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFFFFD700).withValues(alpha: 0.15),
-                                      borderRadius: BorderRadius.circular(6),
-                                      border: Border.all(color: const Color(0xFFFFD700).withValues(alpha: 0.6)),
-                                    ),
-                                    child: const Text(
-                                      'BIT-PERFECT',
-                                      style: TextStyle(
-                                        color: Color(0xFFFFD700),
-                                        fontWeight: FontWeight.w900,
-                                        fontSize: 9,
-                                        letterSpacing: 0.5,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Sample Rate: ${(state.currentOutputDevice?.sampleRate ?? 44100) ~/ 1000} kHz • Bit Depth: ${state.currentOutputDevice?.bitDepth ?? 16}-bit',
-                              style: TextStyle(
-                                color: p.textSecondary,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
+                          onTap: () {
+                            final playerState = context.read<PlayerCubit>().state;
+                            final currentSong = playerState.currentSong ??
+                                const SongsTableData(
+                                  id: 0,
+                                  title: 'Hardware Audio Output',
+                                  artist: 'Master Audio Engine',
+                                  album: 'Internal / USB DAC',
+                                  durationMs: 0,
+                                  path: '',
+                                  source: SongSource.local,
+                                  isFavorite: false,
+                                  isMissing: false,
+                                  playCount: 0,
+                                  lastPositionMs: 0,
+                                );
+                            AudioQualitySheet.show(context, currentSong, p.accent);
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(14),
+                              border: Border.all(
+                                color: state.currentOutputDevice?.isUsbDac == true
+                                    ? const Color(0xFFFFD700).withValues(alpha: 0.5)
+                                    : p.hairline,
                               ),
                             ),
-                          ],
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      state.currentOutputDevice?.isUsbDac == true
+                                          ? Icons.usb_rounded
+                                          : Icons.headphones_rounded,
+                                      color: state.currentOutputDevice?.isUsbDac == true
+                                          ? const Color(0xFFFFD700)
+                                          : p.accent,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        state.currentOutputDevice?.deviceName ?? 'Audio Output Device',
+                                        style: TextStyle(
+                                          color: p.textPrimary,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 13,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (state.currentOutputDevice?.isBitPerfectActive == true)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFFFD700).withValues(alpha: 0.15),
+                                          borderRadius: BorderRadius.circular(6),
+                                          border: Border.all(color: const Color(0xFFFFD700).withValues(alpha: 0.6)),
+                                        ),
+                                        child: const Text(
+                                          'BIT-PERFECT',
+                                          style: TextStyle(
+                                            color: Color(0xFFFFD700),
+                                            fontWeight: FontWeight.w900,
+                                            fontSize: 9,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                      ),
+                                    const SizedBox(width: 6),
+                                    Icon(Icons.tune_rounded, size: 16, color: p.textSecondary),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Tap to configure Output Device • Sample Rate (${(state.currentOutputDevice?.sampleRate ?? 44100) ~/ 1000} kHz) • Bit Depth (${state.currentOutputDevice?.bitDepth ?? 16}-bit)',
+                                  style: TextStyle(
+                                    color: p.textSecondary,
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -242,15 +271,19 @@ class SettingsScreen extends StatelessWidget {
                               segments: const [
                                 ButtonSegment(
                                   value: ReplayGainMode.off,
-                                  label: Text('Off', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                  label: Text('Off', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
                                 ),
                                 ButtonSegment(
                                   value: ReplayGainMode.track,
-                                  label: Text('Track Gain', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                  label: Text('Track', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
                                 ),
                                 ButtonSegment(
                                   value: ReplayGainMode.album,
-                                  label: Text('Album Gain', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                                  label: Text('Album', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                                ),
+                                ButtonSegment(
+                                  value: ReplayGainMode.auto,
+                                  label: Text('Auto', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
                                 ),
                               ],
                               selected: {state.replayGainMode},
@@ -741,6 +774,14 @@ class SettingsScreen extends StatelessWidget {
         return 'Vinyl Circle (Spinning)';
       case PlayerThemeMode.minimal:
         return 'Minimalist Waveform';
+      case PlayerThemeMode.vinyl:
+        return 'Vinyl Turntable Studio';
+      case PlayerThemeMode.cassette:
+        return 'Retro Cassette Deck';
+      case PlayerThemeMode.waveform:
+        return 'Full-Bleed Waveform';
+      case PlayerThemeMode.lyricsFocus:
+        return 'Karaoke Lyrics Immersion';
     }
   }
 
@@ -754,6 +795,14 @@ class SettingsScreen extends StatelessWidget {
         return 'Wave (Smooth Line Spectrum)';
       case VisualizerStyle.circular:
         return 'Circular (Radial Spectrum)';
+      case VisualizerStyle.particles:
+        return 'Particles (Audio Field)';
+      case VisualizerStyle.terrain3D:
+        return '3D Terrain (Wireframe Mountain)';
+      case VisualizerStyle.albumArtReactive:
+        return 'Album Art Reactive Glow';
+      case VisualizerStyle.custom:
+        return 'Custom JSON Visualizer';
     }
   }
 
@@ -793,6 +842,30 @@ class SettingsScreen extends StatelessWidget {
         title: 'Minimalist Waveform',
         subtitle: 'Spacious studio focus on dynamic audio waveform visualizer',
         icon: Icons.graphic_eq_rounded,
+      ),
+      (
+        mode: PlayerThemeMode.vinyl,
+        title: 'Vinyl Turntable Studio',
+        subtitle: 'True vinyl record with realistic grooves, center label & tonearm',
+        icon: Icons.album_rounded,
+      ),
+      (
+        mode: PlayerThemeMode.cassette,
+        title: 'Retro Cassette Deck',
+        subtitle: 'Vintage cassette tape with spinning spools & magnetic tape counter',
+        icon: Icons.radio_rounded,
+      ),
+      (
+        mode: PlayerThemeMode.waveform,
+        title: 'Full-Bleed Waveform',
+        subtitle: 'Full screen audio-reactive glowing waveform visualizer backdrop',
+        icon: Icons.waves_rounded,
+      ),
+      (
+        mode: PlayerThemeMode.lyricsFocus,
+        title: 'Karaoke Lyrics Immersion',
+        subtitle: 'Magnified synchronized lyrics-first karaoke player interface',
+        icon: Icons.mic_rounded,
       ),
     ];
 

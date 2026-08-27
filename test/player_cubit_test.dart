@@ -369,6 +369,7 @@ void main() {
           isFavorite: any(named: 'isFavorite'),
           isShuffle: any(named: 'isShuffle'),
           repeatMode: any(named: 'repeatMode'),
+          nextQueueTitles: any(named: 'nextQueueTitles'),
         ),
       ).thenAnswer((_) async {});
 

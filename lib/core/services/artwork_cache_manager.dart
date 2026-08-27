@@ -84,6 +84,9 @@ class ArtworkCacheManager {
     return null;
   }
 
+  int _putCount = 0;
+  static const int _enforceEvery = 20;
+
   /// Stores artwork bytes in both memory and persistent disk cache
   Future<void> put(String key, Uint8List? bytes) async {
     if (bytes == null || bytes.isEmpty) return;
@@ -95,7 +98,10 @@ class ArtworkCacheManager {
       if (_cacheDir != null) {
         final file = File(p.join(_cacheDir!.path, _keyToFileName(key)));
         await file.writeAsBytes(bytes, flush: false);
-        _enforceDiskLimit();
+        _putCount++;
+        if (_putCount % _enforceEvery == 0) {
+          _enforceDiskLimit();
+        }
       }
     } catch (e) {
       debugPrint('[ArtworkCache] Write error: $e');

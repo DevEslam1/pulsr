@@ -17,10 +17,12 @@ import android.graphics.Rect
 import android.graphics.RectF
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.support.v4.media.MediaBrowserCompat
 import android.support.v4.media.session.MediaControllerCompat
+import android.util.SizeF
 import android.view.KeyEvent
 import android.view.View
 import android.widget.RemoteViews
@@ -47,6 +49,20 @@ class NowPlayingWidget : AppWidgetProvider() {
                     updateAppWidget(context, appWidgetManager, appWidgetId)
                 }
             }
+        } catch (_: Throwable) {
+            // Ignore
+        }
+    }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle?
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        try {
+            updateAppWidget(context, appWidgetManager, appWidgetId)
         } catch (_: Throwable) {
             // Ignore
         }
@@ -142,6 +158,9 @@ class NowPlayingWidget : AppWidgetProvider() {
         try {
             cachedMediaBrowser?.disconnect()
         } catch (_: Throwable) {}
+        cachedArtworkBitmap = null
+        cachedArtworkPath = null
+        cachedArtworkTargetPx = 0
         cachedMediaBrowser = null
         cachedMediaController = null
     }
@@ -158,6 +177,10 @@ class NowPlayingWidget : AppWidgetProvider() {
 
         private var cachedMediaBrowser: MediaBrowserCompat? = null
         private var cachedMediaController: MediaControllerCompat? = null
+        private var cachedArtworkPath: String? = null
+        private var cachedArtworkMtime: Long = 0L
+        private var cachedArtworkTargetPx: Int = 0
+        private var cachedArtworkBitmap: Bitmap? = null
 
         private fun sendExplicitMediaButton(context: Context, keyCode: Int) {
             try {
@@ -290,65 +313,131 @@ class NowPlayingWidget : AppWidgetProvider() {
         ) {
             try {
                 val data = HomeWidgetPlugin.getData(context)
-                val views = RemoteViews(context.packageName, R.layout.widget_now_playing)
-
-                // ---- Text ----
-                val title = getSafeString(data, "title")
-                val artist = getSafeString(data, "artist")
-                views.setTextViewText(R.id.widget_title, if (title.isNullOrBlank()) "Pulsr Music" else title)
-                views.setTextViewText(R.id.widget_artist, if (artist.isNullOrBlank()) "Nothing playing" else artist)
-
-                // ---- Progress ----
-                val duration = getSafeLong(data, "durationMs", 0L)
-                val position = getSafeLong(data, "positionMs", 0L).coerceAtLeast(0L)
-                if (duration > 0) {
-                    views.setViewVisibility(R.id.widget_progress_container, View.VISIBLE)
-                    views.setViewVisibility(R.id.widget_times_row, View.VISIBLE)
-                    val max = 1000
-                    val prog = ((position.toDouble() / duration.toDouble()) * max).toInt().coerceIn(0, max)
-                    views.setProgressBar(R.id.widget_progress, max, prog, false)
-                    views.setTextViewText(R.id.widget_elapsed, formatMs(position))
-                    views.setTextViewText(R.id.widget_duration, formatMs(duration))
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val viewsCompact = createPopulatedRemoteViews(context, R.layout.widget_now_playing, data, 56)
+                    val viewsMedium = createPopulatedRemoteViews(context, R.layout.widget_now_playing_medium, data, 68)
+                    val viewsLarge = createPopulatedRemoteViews(context, R.layout.widget_now_playing_large, data, 96)
+                    val viewMapping = mapOf(
+                        SizeF(140f, 60f) to viewsCompact,
+                        SizeF(180f, 130f) to viewsMedium,
+                        SizeF(180f, 200f) to viewsLarge
+                    )
+                    val remoteViews = RemoteViews(viewMapping)
+                    appWidgetManager.updateAppWidget(appWidgetId, remoteViews)
                 } else {
-                    views.setViewVisibility(R.id.widget_progress_container, View.GONE)
-                    views.setViewVisibility(R.id.widget_times_row, View.GONE)
+                    val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
+                    val minHeight = options?.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 0) ?: 0
+                    val (layoutId, artDp) = when {
+                        minHeight >= 200 -> Pair(R.layout.widget_now_playing_large, 96)
+                        minHeight >= 130 -> Pair(R.layout.widget_now_playing_medium, 68)
+                        else -> Pair(R.layout.widget_now_playing, 56)
+                    }
+                    val views = createPopulatedRemoteViews(context, layoutId, data, artDp)
+                    appWidgetManager.updateAppWidget(appWidgetId, views)
                 }
+            } catch (_: Throwable) {
+                // Ignore
+            }
+        }
 
-                // ---- Favorite ----
-                val isFavorite = getSafeBoolean(data, "isFavorite", false)
-                views.setImageViewResource(
-                    R.id.widget_favorite,
-                    if (isFavorite) R.drawable.ic_widget_heart_filled else R.drawable.ic_widget_heart
-                )
+        private fun createPopulatedRemoteViews(
+            context: Context,
+            layoutId: Int,
+            data: SharedPreferences,
+            targetArtDp: Int
+        ): RemoteViews {
+            val views = RemoteViews(context.packageName, layoutId)
 
-                // ---- Shuffle / Repeat indicators ----
-                val isShuffle = getSafeBoolean(data, "isShuffle", false)
+            // ---- Text (Title & Artist) ----
+            val title = getSafeString(data, "title")
+            val artist = getSafeString(data, "artist")
+            views.setTextViewText(R.id.widget_title, if (title.isNullOrBlank()) "Pulsr Music" else title)
+            views.setTextViewText(R.id.widget_artist, if (artist.isNullOrBlank()) "Nothing playing" else artist)
+
+            // ---- Album (for Medium & Large Layouts) ----
+            val album = getSafeString(data, "album")
+            if (!album.isNullOrBlank() && album != "Unknown Album") {
+                views.setTextViewText(R.id.widget_album, album)
+                views.setViewVisibility(R.id.widget_album, View.VISIBLE)
+            } else {
+                views.setViewVisibility(R.id.widget_album, View.GONE)
+            }
+
+            // ---- Up Next Queue Preview (for Large Layout) ----
+            val nextTrack0 = getSafeString(data, "nextTrack0")
+            if (!nextTrack0.isNullOrBlank()) {
+                views.setTextViewText(R.id.widget_next_track_title, nextTrack0)
+                views.setViewVisibility(R.id.widget_queue_container, View.VISIBLE)
+            } else {
+                views.setTextViewText(R.id.widget_next_track_title, "Queue is empty")
+            }
+
+            // ---- Progress ----
+            val duration = getSafeLong(data, "durationMs", 0L)
+            val position = getSafeLong(data, "positionMs", 0L).coerceAtLeast(0L)
+            if (duration > 0) {
+                views.setViewVisibility(R.id.widget_progress_container, View.VISIBLE)
+                views.setViewVisibility(R.id.widget_times_row, View.VISIBLE)
+                val max = 1000
+                val prog = ((position.toDouble() / duration.toDouble()) * max).toInt().coerceIn(0, max)
+                views.setProgressBar(R.id.widget_progress, max, prog, false)
+                views.setTextViewText(R.id.widget_elapsed, formatMs(position))
+                views.setTextViewText(R.id.widget_duration, formatMs(duration))
+            } else {
+                views.setViewVisibility(R.id.widget_progress_container, View.GONE)
+                views.setViewVisibility(R.id.widget_times_row, View.GONE)
+            }
+
+            // ---- Favorite ----
+            val isFavorite = getSafeBoolean(data, "isFavorite", false)
+            views.setImageViewResource(
+                R.id.widget_favorite,
+                if (isFavorite) R.drawable.ic_widget_heart_filled else R.drawable.ic_widget_heart
+            )
+
+            // ---- Shuffle / Repeat indicators ----
+            val isShuffle = getSafeBoolean(data, "isShuffle", false)
+            if (layoutId == R.layout.widget_now_playing) {
                 views.setViewVisibility(R.id.widget_shuffle, if (isShuffle) View.VISIBLE else View.GONE)
+            } else {
+                views.setViewVisibility(R.id.widget_shuffle, View.VISIBLE)
+                views.setImageViewResource(R.id.widget_shuffle, R.drawable.ic_widget_shuffle)
+            }
 
-                val repeatMode = getSafeString(data, "repeatMode", "off") ?: "off"
+            val repeatMode = getSafeString(data, "repeatMode", "off") ?: "off"
+            if (layoutId == R.layout.widget_now_playing) {
                 views.setViewVisibility(R.id.widget_repeat, if (repeatMode != "off") View.VISIBLE else View.GONE)
-                views.setImageViewResource(
-                    R.id.widget_repeat,
-                    if (repeatMode == "one") R.drawable.ic_widget_repeat_one else R.drawable.ic_widget_repeat
-                )
+            } else {
+                views.setViewVisibility(R.id.widget_repeat, View.VISIBLE)
+            }
+            views.setImageViewResource(
+                R.id.widget_repeat,
+                if (repeatMode == "one") R.drawable.ic_widget_repeat_one else R.drawable.ic_widget_repeat
+            )
 
-                // ---- Play / Pause ----
-                val isPlaying = getSafeBoolean(data, "isPlaying", false)
-                views.setImageViewResource(
-                    R.id.btn_play_pause,
-                    if (isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play
-                )
+            // ---- Play / Pause ----
+            val isPlaying = getSafeBoolean(data, "isPlaying", false)
+            views.setImageViewResource(
+                R.id.btn_play_pause,
+                if (isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play
+            )
 
-                // ---- Artwork (with Downsampling & RGB_565 to prevent OOM) ----
-                val artworkPath = getSafeString(data, "artwork")
-                var bitmapSet = false
-                if (!artworkPath.isNullOrEmpty()) {
-                    try {
-                        val file = File(artworkPath)
-                        if (file.exists() && file.length() > 0) {
-                            val density = context.resources.displayMetrics.density
-                            val targetPx = (112 * density).toInt().coerceAtLeast(112)
+            // ---- Artwork (with Downsampling, RGB_565 & Bitmap caching to prevent OOM) ----
+            val artworkPath = getSafeString(data, "artwork")
+            var bitmapSet = false
+            if (!artworkPath.isNullOrEmpty()) {
+                try {
+                    val file = File(artworkPath)
+                    if (file.exists() && file.length() > 0) {
+                        val mtime = file.lastModified()
+                        val density = context.resources.displayMetrics.density
+                        val targetPx = (targetArtDp * density).toInt().coerceAtLeast(112)
+                        val cachedBmp = cachedArtworkBitmap
 
+                        if (cachedArtworkPath == artworkPath && cachedArtworkMtime == mtime && cachedBmp != null && !cachedBmp.isRecycled && cachedArtworkTargetPx == targetPx) {
+                            views.setImageViewBitmap(R.id.widget_artwork, cachedBmp)
+                            bitmapSet = true
+                        } else {
                             val boundsOptions = BitmapFactory.Options().apply {
                                 inJustDecodeBounds = true
                             }
@@ -368,80 +457,83 @@ class NowPlayingWidget : AppWidgetProvider() {
                             val rawBitmap = BitmapFactory.decodeFile(artworkPath, decodeOptions)
                             if (rawBitmap != null) {
                                 val scaledBitmap = if (rawBitmap.width > targetPx || rawBitmap.height > targetPx) {
-                                    val s = Bitmap.createScaledBitmap(rawBitmap, targetPx, targetPx, true)
-                                    if (s != rawBitmap) rawBitmap.recycle()
-                                    s
+                                    Bitmap.createScaledBitmap(rawBitmap, targetPx, targetPx, true)
                                 } else {
                                     rawBitmap
                                 }
-                                val roundedBitmap = getRoundedCornerBitmap(scaledBitmap, 14f * density)
-                                if (roundedBitmap != scaledBitmap) scaledBitmap.recycle()
+                                val cornerRadiusPx = (if (targetArtDp >= 90) 18f else 14f) * density
+                                val roundedBitmap = getRoundedCornerBitmap(scaledBitmap, cornerRadiusPx)
+
+                                cachedArtworkBitmap = roundedBitmap
+                                cachedArtworkPath = artworkPath
+                                cachedArtworkMtime = mtime
+                                cachedArtworkTargetPx = targetPx
+
                                 views.setImageViewBitmap(R.id.widget_artwork, roundedBitmap)
                                 bitmapSet = true
                             }
                         }
-                    } catch (e: Throwable) {
-                        bitmapSet = false
                     }
+                } catch (e: Throwable) {
+                    bitmapSet = false
                 }
-                if (!bitmapSet) {
-                    views.setImageViewResource(R.id.widget_artwork, R.mipmap.launcher_icon)
-                }
-
-                // ---- App Opening Intents (Artwork & Title area ONLY) ----
-                val openAppIntent = HomeWidgetLaunchIntent.getActivity(
-                    context,
-                    MainActivity::class.java,
-                    Uri.parse("pulsrWidget://open")
-                )
-                views.setOnClickPendingIntent(R.id.widget_artwork, openAppIntent)
-                views.setOnClickPendingIntent(R.id.widget_info_area, openAppIntent)
-
-                // ---- Background Actions (Exclusively targeted to Pulsr) ----
-                views.setOnClickPendingIntent(
-                    R.id.btn_play_pause,
-                    createBroadcastPendingIntent(context, ACTION_PLAY_PAUSE, 101)
-                )
-                views.setOnClickPendingIntent(
-                    R.id.btn_prev,
-                    createBroadcastPendingIntent(context, ACTION_PREV, 102)
-                )
-                views.setOnClickPendingIntent(
-                    R.id.btn_next,
-                    createBroadcastPendingIntent(context, ACTION_NEXT, 103)
-                )
-                views.setOnClickPendingIntent(
-                    R.id.btn_rewind,
-                    createBroadcastPendingIntent(context, ACTION_REWIND, 104)
-                )
-                views.setOnClickPendingIntent(
-                    R.id.btn_forward,
-                    createBroadcastPendingIntent(context, ACTION_FORWARD, 105)
-                )
-                views.setOnClickPendingIntent(
-                    R.id.widget_favorite,
-                    createBroadcastPendingIntent(context, ACTION_FAVORITE, 106)
-                )
-
-                // ---- 20 Granular Slider Seek Tap Zones (5% steps) ----
-                val seekViews = intArrayOf(
-                    R.id.btn_seek_01, R.id.btn_seek_02, R.id.btn_seek_03, R.id.btn_seek_04, R.id.btn_seek_05,
-                    R.id.btn_seek_06, R.id.btn_seek_07, R.id.btn_seek_08, R.id.btn_seek_09, R.id.btn_seek_10,
-                    R.id.btn_seek_11, R.id.btn_seek_12, R.id.btn_seek_13, R.id.btn_seek_14, R.id.btn_seek_15,
-                    R.id.btn_seek_16, R.id.btn_seek_17, R.id.btn_seek_18, R.id.btn_seek_19, R.id.btn_seek_20
-                )
-                for (i in seekViews.indices) {
-                    val ratio = ((i + 1) * 0.05f).coerceIn(0.02f, 0.99f)
-                    views.setOnClickPendingIntent(
-                        seekViews[i],
-                        createSeekPendingIntent(context, ratio, 300 + i)
-                    )
-                }
-
-                appWidgetManager.updateAppWidget(appWidgetId, views)
-            } catch (_: Throwable) {
-                // Ignore
             }
+            if (!bitmapSet) {
+                views.setImageViewResource(R.id.widget_artwork, R.mipmap.launcher_icon)
+            }
+
+            // ---- App Opening Intents (Artwork, Title area & Queue Area) ----
+            val openAppIntent = HomeWidgetLaunchIntent.getActivity(
+                context,
+                MainActivity::class.java,
+                Uri.parse("pulsrWidget://open")
+            )
+            views.setOnClickPendingIntent(R.id.widget_artwork, openAppIntent)
+            views.setOnClickPendingIntent(R.id.widget_info_area, openAppIntent)
+            views.setOnClickPendingIntent(R.id.widget_queue_container, openAppIntent)
+
+            // ---- Background Actions (Exclusively targeted to Pulsr) ----
+            views.setOnClickPendingIntent(
+                R.id.btn_play_pause,
+                createBroadcastPendingIntent(context, ACTION_PLAY_PAUSE, 101)
+            )
+            views.setOnClickPendingIntent(
+                R.id.btn_prev,
+                createBroadcastPendingIntent(context, ACTION_PREV, 102)
+            )
+            views.setOnClickPendingIntent(
+                R.id.btn_next,
+                createBroadcastPendingIntent(context, ACTION_NEXT, 103)
+            )
+            views.setOnClickPendingIntent(
+                R.id.btn_rewind,
+                createBroadcastPendingIntent(context, ACTION_REWIND, 104)
+            )
+            views.setOnClickPendingIntent(
+                R.id.btn_forward,
+                createBroadcastPendingIntent(context, ACTION_FORWARD, 105)
+            )
+            views.setOnClickPendingIntent(
+                R.id.widget_favorite,
+                createBroadcastPendingIntent(context, ACTION_FAVORITE, 106)
+            )
+
+            // ---- 20 Granular Slider Seek Tap Zones (5% steps) ----
+            val seekViews = intArrayOf(
+                R.id.btn_seek_01, R.id.btn_seek_02, R.id.btn_seek_03, R.id.btn_seek_04, R.id.btn_seek_05,
+                R.id.btn_seek_06, R.id.btn_seek_07, R.id.btn_seek_08, R.id.btn_seek_09, R.id.btn_seek_10,
+                R.id.btn_seek_11, R.id.btn_seek_12, R.id.btn_seek_13, R.id.btn_seek_14, R.id.btn_seek_15,
+                R.id.btn_seek_16, R.id.btn_seek_17, R.id.btn_seek_18, R.id.btn_seek_19, R.id.btn_seek_20
+            )
+            for (i in seekViews.indices) {
+                val ratio = ((i + 1) * 0.05f).coerceIn(0.02f, 0.99f)
+                views.setOnClickPendingIntent(
+                    seekViews[i],
+                    createSeekPendingIntent(context, ratio, 300 + i)
+                )
+            }
+
+            return views
         }
 
         private fun createBroadcastPendingIntent(context: Context, actionName: String, requestCode: Int): PendingIntent {

@@ -36,9 +36,10 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedTab = 0; // 0: Local, 1: Online
   String _selectedOnlineCategory = 'Recommended For You';
 
-  /// Resolved once and reused across rebuilds so scrolling/retry never refetches.
-  /// Only populated in an ENABLE_YTM build; null (and unused) otherwise.
+  /// Resolved once and reused across rebuilds with 10-minute TTL cache.
   final Map<String, Future<List<YtmTrack>>> _categoryFutures = {};
+  final Map<String, DateTime> _categoryFetchTimestamps = {};
+  static const Duration _categoryTtl = Duration(minutes: 10);
 
   List<String> get _onlineCategories {
     final isLoggedIn = getIt<YtmAccountService>().isLoggedIn;
@@ -112,32 +113,45 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<List<YtmTrack>> _getCategoryFuture(String category) {
+    final now = DateTime.now();
+    final lastFetch = _categoryFetchTimestamps[category];
+    if (lastFetch != null && now.difference(lastFetch) > _categoryTtl) {
+      _categoryFutures.remove(category);
+      _categoryFetchTimestamps.remove(category);
+    }
+
     return _categoryFutures.putIfAbsent(
       category,
       () async {
-        if (category == 'Recommended For You') {
-          final account = getIt<YtmAccountService>();
-          if (account.isLoggedIn) {
+        _categoryFetchTimestamps[category] = DateTime.now();
+        try {
+          if (category == 'Recommended For You') {
+            final account = getIt<YtmAccountService>();
+            if (account.isLoggedIn) {
+              try {
+                final recs = await account.fetchHomeRecommendations(maxTracks: 50);
+                if (recs.isNotEmpty) return recs;
+              } catch (_) {}
+            }
             try {
-              final recs = await account.fetchHomeRecommendations(maxTracks: 50);
-              if (recs.isNotEmpty) return recs;
+              final trending = await getIt<YtmService>().trending(limit: 25);
+              if (trending.isNotEmpty) return trending;
             } catch (_) {}
+            return await getIt<YtmService>().searchWithFallback(_categoryQueries['Recommended For You'] ?? 'top hits music', limit: 25);
           }
-          try {
-            final trending = await getIt<YtmService>().trending(limit: 25);
-            if (trending.isNotEmpty) return trending;
-          } catch (_) {}
-          return getIt<YtmService>().searchWithFallback(_categoryQueries['Recommended For You'] ?? 'top hits music', limit: 25);
+          if (category == 'Trending Egypt') {
+            try {
+              final trending = await getIt<YtmService>().trending(limit: 25);
+              if (trending.isNotEmpty) return trending;
+            } catch (_) {}
+            return await getIt<YtmService>().searchWithFallback(_categoryQueries['Trending Egypt'] ?? 'أغاني مصرية جديدة تريند', limit: 25);
+          }
+          final query = _categoryQueries[category] ?? '$category songs';
+          return await getIt<YtmService>().searchWithFallback(query, limit: 25);
+        } catch (e) {
+          _categoryFutures.remove(category);
+          rethrow;
         }
-        if (category == 'Trending Egypt') {
-          try {
-            final trending = await getIt<YtmService>().trending(limit: 25);
-            if (trending.isNotEmpty) return trending;
-          } catch (_) {}
-          return getIt<YtmService>().searchWithFallback(_categoryQueries['Trending Egypt'] ?? 'أغاني مصرية جديدة تريند', limit: 25);
-        }
-        final query = _categoryQueries[category] ?? '$category songs';
-        return getIt<YtmService>().searchWithFallback(query, limit: 25);
       },
     );
   }
@@ -193,11 +207,11 @@ class _HomeScreenState extends State<HomeScreen> {
               },
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
-                padding: const EdgeInsets.only(bottom: 120),
+                padding: const EdgeInsets.only(bottom: 160),
                 children: [
                   // ---------- Header ----------
                   Padding(
-                    padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 4),
+                    padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 0),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
@@ -235,7 +249,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   // ---------- Segmented Tab Selector (Local vs Online) ----------
                   if (showOnlineTab) ...[
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 16),
                     Container(
                       margin: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
                       padding: const EdgeInsets.all(4),
@@ -270,7 +284,55 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
 
-                  const SizedBox(height: 8),
+                  // ---------- Quick Discovery Tools Row ----------
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    height: 38,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+                      children: [
+                        if (AppConfig.ytmEnabled) ...[
+                          _DiscoveryChip(
+                            icon: Icons.explore_rounded,
+                            label: 'Explore YTM',
+                            iconColor: p.primary,
+                            onTap: () => context.push('/ytm-explore'),
+                          ),
+                          const SizedBox(width: 8),
+                        ],
+                        _DiscoveryChip(
+                          icon: Icons.grid_view_rounded,
+                          label: 'Artwork Wall',
+                          iconColor: p.accent,
+                          onTap: () => context.push('/artwork-grid'),
+                        ),
+                        const SizedBox(width: 8),
+                        _DiscoveryChip(
+                          icon: Icons.insights_rounded,
+                          label: 'Library Stats',
+                          iconColor: Colors.amber,
+                          onTap: () => context.push('/library-stats'),
+                        ),
+                        const SizedBox(width: 8),
+                        _DiscoveryChip(
+                          icon: Icons.cleaning_services_rounded,
+                          label: 'Duplicate Cleaner',
+                          iconColor: Colors.tealAccent,
+                          onTap: () => context.push('/duplicate-finder'),
+                        ),
+                        const SizedBox(width: 8),
+                        _DiscoveryChip(
+                          icon: Icons.palette_rounded,
+                          label: 'Theme Studio',
+                          iconColor: Colors.pinkAccent,
+                          onTap: () => context.push('/theme-studio'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
 
                   // ---------- Content (Local vs Online) ----------
                   if (currentTab == 0)
@@ -346,7 +408,7 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         // ---------- Quick actions ----------
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context), vertical: 14),
+          padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 0, Adaptive.pagePadding(context), 16),
           child: Row(
             children: [
               _QuickCard(
@@ -362,7 +424,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   });
                 },
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               _QuickCard(
                 title: context.l10n.dailyDrive,
                 subtitle: context.l10n.autoMix,
@@ -378,7 +440,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   });
                 },
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 10),
               _QuickCard(
                 title: context.l10n.focusFlow,
                 subtitle: context.l10n.topPlayedTracks,
@@ -410,9 +472,10 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 SectionHeader(title: context.l10n.recentlyPlayed),
                 SizedBox(
-                  height: isTablet ? 214 : 196,
+                  height: isTablet ? 232 : 212,
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
                     padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
                     itemCount: songs.length,
                     itemBuilder: (context, index) {
@@ -455,12 +518,28 @@ class _HomeScreenState extends State<HomeScreen> {
                                     ),
                                   ],
                                 ),
-                                const SizedBox(height: 9),
-                                Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 13)),
+                                const SizedBox(height: 8),
+                                SizedBox(
+                                  height: 34,
+                                  child: Text(
+                                    song.title,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: p.textPrimary,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 12.5,
+                                      height: 1.25,
+                                    ),
+                                  ),
+                                ),
                                 const SizedBox(height: 2),
-                                Text(song.artist, maxLines: 1, overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(color: p.textSecondary, fontSize: 11.5)),
+                                Text(
+                                  song.artist,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(color: p.textSecondary, fontSize: 11.5),
+                                ),
                               ],
                             ),
                           ),
@@ -826,6 +905,55 @@ class _OnlineCategorySection extends StatelessWidget {
   }
 }
 
+class _DiscoveryChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color iconColor;
+  final VoidCallback onTap;
+
+  const _DiscoveryChip({
+    required this.icon,
+    required this.label,
+    required this.iconColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+    return Material(
+      color: p.surfaceContainer,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: p.hairline),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 15, color: iconColor),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  color: p.textPrimary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _TrendingCard extends StatelessWidget {
   final SongsTableData song;
   final VoidCallback onTap;
@@ -871,12 +999,28 @@ class _TrendingCard extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 9),
-              Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 13)),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 34,
+                child: Text(
+                  song.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: p.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12.5,
+                    height: 1.25,
+                  ),
+                ),
+              ),
               const SizedBox(height: 2),
-              Text(song.artist, maxLines: 1, overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: p.textSecondary, fontSize: 11.5)),
+              Text(
+                song.artist,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: p.textSecondary, fontSize: 11.5),
+              ),
             ],
           ),
         ),
@@ -903,57 +1047,71 @@ class _QuickCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final isCompact = MediaQuery.sizeOf(context).width < 360;
+    final isCompact = MediaQuery.sizeOf(context).width < 380;
 
     return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: EdgeInsets.all(isCompact ? 10 : 14),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [color.withValues(alpha: 0.16), color.withValues(alpha: 0.04)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: isCompact ? 10 : 12,
+              vertical: isCompact ? 10 : 12,
             ),
-            color: p.surfaceContainer,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: p.hairline),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: EdgeInsets.all(isCompact ? 6 : 8),
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.18),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: color, size: isCompact ? 18 : 20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [color.withValues(alpha: 0.16), color.withValues(alpha: 0.03)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
               ),
-              SizedBox(height: isCompact ? 10 : 14),
-              Text(
-                title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: p.textPrimary,
-                  fontWeight: FontWeight.w800,
-                  fontSize: isCompact ? 12 : 13.5,
+              color: p.surfaceContainer,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: p.hairline),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: EdgeInsets.all(isCompact ? 6 : 7),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.18),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(icon, color: color, size: isCompact ? 17 : 19),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: p.textSecondary,
-                  fontSize: isCompact ? 10 : 11,
+                SizedBox(height: isCompact ? 8 : 10),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    title,
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: p.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: isCompact ? 12 : 13,
+                    ),
+                  ),
                 ),
-              ),
-            ],
+                const SizedBox(height: 2),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: AlignmentDirectional.centerStart,
+                  child: Text(
+                    subtitle,
+                    maxLines: 1,
+                    style: TextStyle(
+                      color: p.textSecondary,
+                      fontSize: isCompact ? 10 : 11,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

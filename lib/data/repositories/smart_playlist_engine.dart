@@ -89,35 +89,32 @@ class SmartPlaylistEngine {
 
       case SmartRuleField.artist:
         if (valStr.isEmpty) return null;
-        final escapedArtist = valStr.replaceAll('\\', r'\\').replaceAll('%', r'\%').replaceAll('_', r'\_').toLowerCase();
         switch (rule.operator) {
           case SmartOperator.equals:
             return t.artist.lower().equals(valStr.toLowerCase());
           case SmartOperator.contains:
           default:
-            return t.artist.lower().like('%$escapedArtist%');
+            return t.artist.lower().contains(valStr.toLowerCase());
         }
 
       case SmartRuleField.album:
         if (valStr.isEmpty) return null;
-        final escapedAlbum = valStr.replaceAll('\\', r'\\').replaceAll('%', r'\%').replaceAll('_', r'\_').toLowerCase();
         switch (rule.operator) {
           case SmartOperator.equals:
             return t.album.lower().equals(valStr.toLowerCase());
           case SmartOperator.contains:
           default:
-            return t.album.lower().like('%$escapedAlbum%');
+            return t.album.lower().contains(valStr.toLowerCase());
         }
 
       case SmartRuleField.title:
         if (valStr.isEmpty) return null;
-        final escapedTitle = valStr.replaceAll('\\', r'\\').replaceAll('%', r'\%').replaceAll('_', r'\_').toLowerCase();
         switch (rule.operator) {
           case SmartOperator.equals:
             return t.title.lower().equals(valStr.toLowerCase());
           case SmartOperator.contains:
           default:
-            return t.title.lower().like('%$escapedTitle%');
+            return t.title.lower().contains(valStr.toLowerCase());
         }
 
       case SmartRuleField.isLossless:
@@ -136,13 +133,12 @@ class SmartPlaylistEngine {
 
       case SmartRuleField.genre:
         if (valStr.isEmpty) return null;
-        final escaped = valStr.replaceAll('\\', r'\\').replaceAll('%', r'\%').replaceAll('_', r'\_').toLowerCase();
         switch (rule.operator) {
           case SmartOperator.equals:
             return t.genre.lower().equals(valStr.toLowerCase());
           case SmartOperator.contains:
           default:
-            return t.genre.lower().like('%$escaped%');
+            return t.genre.lower().contains(valStr.toLowerCase());
         }
 
       case SmartRuleField.year:
@@ -225,6 +221,32 @@ class SmartPlaylistEngine {
             return t.lastPlayed.isSmallerOrEqualValue(valInt);
           default:
             return t.lastPlayed.isBiggerOrEqualValue(valInt);
+        }
+
+      case SmartRuleField.bpm:
+        return null;
+
+      case SmartRuleField.loudnessRange:
+        final valDouble = double.tryParse(valStr);
+        if (valDouble == null) return null;
+        switch (rule.operator) {
+          case SmartOperator.greaterThan:
+            return t.loudnessRange.isBiggerThanValue(valDouble);
+          case SmartOperator.lessThan:
+            return t.loudnessRange.isSmallerThanValue(valDouble);
+          default:
+            return t.loudnessRange.equals(valDouble);
+        }
+
+      case SmartRuleField.bitrate:
+        if (valInt == null) return null;
+        switch (rule.operator) {
+          case SmartOperator.greaterThan:
+            return t.bitrateKbps.isBiggerThanValue(valInt);
+          case SmartOperator.lessThan:
+            return t.bitrateKbps.isSmallerThanValue(valInt);
+          default:
+            return t.bitrateKbps.equals(valInt);
         }
     }
   }

@@ -291,7 +291,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 "setVolumeBoost" -> {
-                    val milliBels = call.argument<Int>("milliBels") ?: 0
+                    val milliBels = (call.argument<Int>("milliBels") ?: 0).coerceIn(0, 1000)
                     setVolumeBoost(milliBels)
                     result.success(true)
                 }
@@ -1032,11 +1032,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     private fun recreateEffects() {
-        // Build new effects before releasing old ones for gapless transition
-        val oldVirtualizer = virtualizer
-        val oldLoudnessEnhancer = loudnessEnhancer
-        val oldBassBoost = bassBoost
-        val oldDynamics = dynamicsProcessing
+        // Release old instances BEFORE creating new ones to prevent audio session conflicts
+        try { virtualizer?.release() } catch (_: Exception) {}
+        try { loudnessEnhancer?.release() } catch (_: Exception) {}
+        try { bassBoost?.release() } catch (_: Exception) {}
+        try { dynamicsProcessing?.release() } catch (_: Exception) {}
 
         virtualizer = null
         loudnessEnhancer = null
@@ -1058,12 +1058,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
 
         buildDynamicsProcessing()
-
-        // Release old instances safely
-        try { oldVirtualizer?.release() } catch (_: Exception) {}
-        try { oldLoudnessEnhancer?.release() } catch (_: Exception) {}
-        try { oldBassBoost?.release() } catch (_: Exception) {}
-        try { oldDynamics?.release() } catch (_: Exception) {}
     }
 
     fun releaseEffects() {

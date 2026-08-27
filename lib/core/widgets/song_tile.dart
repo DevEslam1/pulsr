@@ -46,11 +46,10 @@ class SongTile extends StatelessWidget {
     final effectiveArtworkSize = isCompact ? (artworkSize * 0.88).clamp(42.0, 52.0) : artworkSize;
 
     final isDownloadedTrack = isDownloaded ??
-        (song.source == SongSource.local &&
-            ((song.remoteId != null && song.remoteId!.isNotEmpty) ||
-                (song.remoteArtworkUrl != null && song.remoteArtworkUrl!.isNotEmpty) ||
-                song.path.contains('ytdl_') ||
-                song.path.toLowerCase().contains('pulsr')));
+        (song.isDownloaded == true ||
+            (song.source == SongSource.local &&
+                song.remoteId != null &&
+                song.remoteId!.isNotEmpty));
 
     return BlocBuilder<PlayerCubit, PlayerState>(
       buildWhen: (a, b) =>
@@ -59,9 +58,12 @@ class SongTile extends StatelessWidget {
         final isActive = playerState.currentSong?.id == song.id;
         final isPlaying = isActive && playerState.isPlaying;
 
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-          child: Material(
+        return Semantics(
+          label: '${song.title} by ${song.artist}',
+          button: true,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            child: Material(
             color: selected ? p.accentContainer : Colors.transparent,
             borderRadius: BorderRadius.circular(16),
             child: InkWell(
@@ -192,10 +194,11 @@ class SongTile extends StatelessWidget {
               ),
             ),
           ),
-        );
-      },
-    );
-  }
+        ),
+      );
+    },
+  );
+}
 }
 
 /// Animated 3-bar "now playing" EQ glyph.

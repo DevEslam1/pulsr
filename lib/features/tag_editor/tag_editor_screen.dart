@@ -150,14 +150,99 @@ class _TagEditorView extends StatelessWidget {
                                     onPressed: (isAutoFetching || isSaving)
                                         ? null
                                         : () async {
-                                            final ok = await cubit.autoFetchOnlineTags();
-                                            if (ok && context.mounted) {
+                                            final matches = await cubit.searchOnlineMatches();
+                                            if (!context.mounted) return;
+                                            if (matches.isEmpty) {
                                               ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(
-                                                  content: const Text('Online metadata retrieved successfully!'),
-                                                  backgroundColor: p.accent,
+                                                const SnackBar(
+                                                  content: Text('No matching online metadata found.'),
                                                 ),
                                               );
+                                              return;
+                                            }
+
+                                            if (matches.length == 1) {
+                                              final ok = await cubit.applyMetadataResult(matches.first);
+                                              if (ok && context.mounted) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(
+                                                    content: const Text('Online metadata applied successfully!'),
+                                                    backgroundColor: p.accent,
+                                                  ),
+                                                );
+                                              }
+                                              return;
+                                            }
+
+                                            final selected = await showModalBottomSheet<OnlineTrackMetadata>(
+                                              context: context,
+                                              backgroundColor: p.surfaceCard,
+                                              shape: const RoundedRectangleBorder(
+                                                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                                              ),
+                                              builder: (ctx) {
+                                                return SafeArea(
+                                                  child: Column(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Padding(
+                                                        padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                                                        child: Text(
+                                                          'Select Best Match (${matches.length})',
+                                                          style: TextStyle(
+                                                            color: p.textPrimary,
+                                                            fontSize: 16,
+                                                            fontWeight: FontWeight.bold,
+                                                          ),
+                                                        ),
+                                                      ),
+                                                      Flexible(
+                                                        child: ListView.separated(
+                                                          shrinkWrap: true,
+                                                          itemCount: matches.length,
+                                                          separatorBuilder: (_, __) => Divider(color: p.hairline, height: 1),
+                                                          itemBuilder: (ctx, idx) {
+                                                            final item = matches[idx];
+                                                            return ListTile(
+                                                              leading: item.artworkUrl != null
+                                                                  ? ClipRRect(
+                                                                      borderRadius: BorderRadius.circular(8),
+                                                                      child: Image.network(
+                                                                        item.artworkUrl!,
+                                                                        width: 44,
+                                                                        height: 44,
+                                                                        fit: BoxFit.cover,
+                                                                        errorBuilder: (_, __, ___) => Icon(Icons.music_note_rounded, color: p.accent),
+                                                                      ),
+                                                                    )
+                                                                  : Icon(Icons.music_note_rounded, color: p.accent),
+                                                              title: Text(item.title, style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w600)),
+                                                              subtitle: Text(
+                                                                '${item.artist} • ${item.album}${item.releaseYear != null ? " (${item.releaseYear})" : ""}',
+                                                                style: TextStyle(color: p.textSecondary, fontSize: 12),
+                                                              ),
+                                                              onTap: () => Navigator.of(ctx).pop(item),
+                                                            );
+                                                          },
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                );
+                                              },
+                                            );
+
+                                            if (selected != null && context.mounted) {
+                                              final ok = await cubit.applyMetadataResult(selected);
+                                              if (ok && context.mounted) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(
+                                                    content: const Text('Online metadata applied successfully!'),
+                                                    backgroundColor: p.accent,
+                                                  ),
+                                                );
+                                              }
                                             }
                                           },
                                     icon: isAutoFetching
@@ -258,7 +343,25 @@ class _TagEditorView extends StatelessWidget {
                           Container(
                             color: Colors.black45,
                             child: Center(
-                              child: CircularProgressIndicator(color: p.accent),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  CircularProgressIndicator(
+                                    value: state.isBatchMode ? state.batchProgress : null,
+                                    color: p.accent,
+                                  ),
+                                  if (state.isBatchMode && state.batchProgress != null) ...[
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      '${(state.batchProgress! * 100).toInt()}%',
+                                      style: TextStyle(
+                                        color: p.textPrimary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
                           ),
                       ],

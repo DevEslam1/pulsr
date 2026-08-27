@@ -22,12 +22,19 @@ class ScrobblerService {
   static const String keyLastFmSessionKey = 'setting_lastfm_session_key';
   static const String keyLastFmEnabled = 'setting_lastfm_enabled';
 
+  static const String keyLibreFmSessionKey = 'setting_librefm_session_key';
+  static const String keyLibreFmEnabled = 'setting_librefm_enabled';
+
+  static const String keyCustomWebhookUrl = 'setting_custom_scrobbler_url';
+  static const String keyCustomWebhookEnabled = 'setting_custom_scrobbler_enabled';
+
   static const String keyListenBrainzToken = 'setting_listenbrainz_token';
   static const String keyListenBrainzEnabled = 'setting_listenbrainz_enabled';
 
   static const String keyLastFmApiKeySecure = 'lastfm_api_key_secure';
   static const String keyLastFmSecretSecure = 'lastfm_secret_secure';
   static const String keyLastFmSessionKeySecure = 'lastfm_session_key_secure';
+  static const String keyLibreFmSessionKeySecure = 'librefm_session_key_secure';
   static const String keyListenBrainzTokenSecure = 'listenbrainz_token_secure';
 
   Future<String?> _getSecureOrMigrate(String secureKey, String legacyKey) async {
@@ -49,12 +56,69 @@ class ScrobblerService {
     return null;
   }
 
+  static const String _keyLastScrobbleSong = 'scrobbler_last_song';
+  static const String _keyLastScrobbleTime = 'scrobbler_last_time';
+  static const String _keyLastScrobblePos = 'scrobbler_last_position';
+  static const String _keyLastScrobbleArtist = 'scrobbler_last_artist';
+  static const String _keyLastScrobbleTrack = 'scrobbler_last_track';
+  static const String _keyLastScrobbleAlbum = 'scrobbler_last_album';
+  static const String _keyLastScrobbleDuration = 'scrobbler_last_duration';
+  static const String _keyOfflineQueue = 'scrobbler_offline_queue';
+
   int? _lastScrobbledTrackId;
   int? _nowPlayingTrackId;
   DateTime? _trackStartTime;
+  final Map<String, DateTime> _lastScrobblePerService = {};
 
-  /// Broadcasts playback state to both native Android scrobbler apps (Pano Scrobbler, Simple Last.fm)
-  /// and direct REST APIs (Last.fm & ListenBrainz).
+  bool _canScrobbleService(String service) {
+    final last = _lastScrobblePerService[service];
+    if (last == null) return true;
+    return DateTime.now().difference(last) >= const Duration(seconds: 30);
+  }
+
+  /// Checks for pending scrobble from previous session when app was terminated
+  Future<void> checkPendingScrobble() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastId = prefs.getInt(_keyLastScrobbleSong);
+      final lastTime = prefs.getInt(_keyLastScrobbleTime);
+      final lastPos = prefs.getInt(_keyLastScrobblePos) ?? 0;
+      final duration = prefs.getInt(_keyLastScrobbleDuration) ?? 0;
+      final artist = prefs.getString(_keyLastScrobbleArtist);
+      final track = prefs.getString(_keyLastScrobbleTrack);
+      final album = prefs.getString(_keyLastScrobbleAlbum) ?? '';
+
+      if (lastId != null && lastTime != null && artist != null && track != null && duration > 0) {
+        final elapsed = DateTime.now().millisecondsSinceEpoch - lastTime;
+        final isThresholdReached = (lastPos >= 240000) || (duration > 0 && (lastPos / duration) >= 0.5);
+
+        if (isThresholdReached && elapsed < 86400000) {
+          final timestamp = DateTime.fromMillisecondsSinceEpoch(lastTime);
+          await _submitScrobble(
+            artist: artist,
+            track: track,
+            album: album,
+            durationSec: (duration / 1000).round(),
+            timestamp: timestamp,
+          );
+        }
+      }
+
+      await prefs.remove(_keyLastScrobbleSong);
+      await prefs.remove(_keyLastScrobbleTime);
+      await prefs.remove(_keyLastScrobblePos);
+      await prefs.remove(_keyLastScrobbleArtist);
+      await prefs.remove(_keyLastScrobbleTrack);
+      await prefs.remove(_keyLastScrobbleAlbum);
+      await prefs.remove(_keyLastScrobbleDuration);
+
+      await flushOfflineQueue();
+    } catch (e, st) {
+      ErrorLogger.log('Failed checking pending scrobble from previous session', error: e, stackTrace: st, category: 'Scrobbler');
+    }
+  }
+
+  /// Broadcasts playback state to both native Android scrobbler apps and direct REST APIs.
   Future<void> notifyPlaybackState({
     required int id,
     required String artist,
@@ -63,6 +127,7 @@ class ScrobblerService {
     required int durationMs,
     required int positionMs,
     required bool isPlaying,
+    String? artworkUrl,
   }) async {
     // 1. Android Broadcast Intent
     try {
@@ -88,6 +153,18 @@ class ScrobblerService {
         _trackStartTime = DateTime.now();
         _lastScrobbledTrackId = null;
 
+        // Persist session state for crash / kill recovery
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt(_keyLastScrobbleSong, id);
+          await prefs.setInt(_keyLastScrobbleTime, DateTime.now().millisecondsSinceEpoch);
+          await prefs.setInt(_keyLastScrobblePos, positionMs);
+          await prefs.setInt(_keyLastScrobbleDuration, durationMs);
+          await prefs.setString(_keyLastScrobbleArtist, artist);
+          await prefs.setString(_keyLastScrobbleTrack, track);
+          await prefs.setString(_keyLastScrobbleAlbum, album);
+        } catch (_) {}
+
         // Send "Now Playing" update
         await _updateNowPlaying(
           artist: artist,
@@ -95,6 +172,14 @@ class ScrobblerService {
           album: album,
           durationSec: (durationMs / 1000).round(),
         );
+      }
+
+      if (isPlaying) {
+        // Update last played position periodically
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt(_keyLastScrobblePos, positionMs);
+        } catch (_) {}
       }
 
       // Check scrobble threshold (played >50% of duration or >4 minutes (240s))
@@ -112,10 +197,19 @@ class ScrobblerService {
           album: album,
           durationSec: totalSec,
           timestamp: timestamp,
+          artworkUrl: artworkUrl,
         );
+
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setInt('last_scrobbled_id', id);
+          await prefs.setInt('last_scrobble_time', DateTime.now().millisecondsSinceEpoch);
+          // Clear active session since track scrobbled
+          await prefs.remove(_keyLastScrobbleSong);
+        } catch (_) {}
       }
     } catch (e, st) {
-      ErrorLogger.log('Error in direct REST scrobbling', error: e, stackTrace: st, category: 'Scrobbler');
+      ErrorLogger.log('Error during REST scrobbling: $e', error: e, stackTrace: st, category: 'Scrobbler');
     }
   }
 
@@ -127,7 +221,7 @@ class ScrobblerService {
   }) async {
     final prefs = await SharedPreferences.getInstance();
 
-    // Last.fm Now Playing
+    // 1. Last.fm Now Playing
     if (prefs.getBool(keyLastFmEnabled) == true) {
       final apiKey = await _getSecureOrMigrate(keyLastFmApiKeySecure, keyLastFmApiKey);
       final secret = await _getSecureOrMigrate(keyLastFmSecretSecure, keyLastFmSecret);
@@ -155,7 +249,7 @@ class ScrobblerService {
       }
     }
 
-    // ListenBrainz Playing Now
+    // 2. ListenBrainz Playing Now
     if (prefs.getBool(keyListenBrainzEnabled) == true) {
       final token = await _getSecureOrMigrate(keyListenBrainzTokenSecure, keyListenBrainzToken);
       if (token != null && token.isNotEmpty) {
@@ -191,22 +285,103 @@ class ScrobblerService {
     }
   }
 
-  Future<void> _submitScrobble({
+  Future<bool> _postWithRetry(Uri url, {Map<String, String>? headers, Object? body, int maxAttempts = 3}) async {
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        final resp = await _httpClient.post(url, headers: headers, body: body).timeout(const Duration(seconds: 10));
+        if (resp.statusCode >= 200 && resp.statusCode < 300) {
+          return true;
+        } else if (resp.statusCode >= 400 && resp.statusCode < 500) {
+          return false;
+        }
+      } catch (e) {
+        if (attempt == maxAttempts) return false;
+        await Future.delayed(Duration(milliseconds: 250 * attempt));
+      }
+    }
+    return false;
+  }
+
+  Future<void> _enqueueOfflineScrobble({
     required String artist,
     required String track,
     required String album,
     required int durationSec,
     required DateTime timestamp,
   }) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final queueJson = prefs.getString(_keyOfflineQueue);
+      final list = <Map<String, dynamic>>[];
+      if (queueJson != null && queueJson.isNotEmpty) {
+        final decoded = jsonDecode(queueJson) as List<dynamic>;
+        for (final item in decoded) {
+          if (item is Map<String, dynamic>) list.add(item);
+        }
+      }
+      list.add({
+        'artist': artist,
+        'track': track,
+        'album': album,
+        'durationSec': durationSec,
+        'timestamp': timestamp.millisecondsSinceEpoch,
+      });
+      final trimmed = list.length > 200 ? list.sublist(list.length - 200) : list;
+      await prefs.setString(_keyOfflineQueue, jsonEncode(trimmed));
+    } catch (_) {}
+  }
+
+  Future<void> _submitScrobble({
+    required String artist,
+    required String track,
+    required String album,
+    required int durationSec,
+    required DateTime timestamp,
+    String? artworkUrl,
+  }) async {
     final prefs = await SharedPreferences.getInstance();
+    bool anyFailure = false;
 
-    // Last.fm Scrobble
+    // 1. Last.fm Scrobble
     if (prefs.getBool(keyLastFmEnabled) == true) {
-      final apiKey = await _getSecureOrMigrate(keyLastFmApiKeySecure, keyLastFmApiKey);
-      final secret = await _getSecureOrMigrate(keyLastFmSecretSecure, keyLastFmSecret);
-      final sessionKey = await _getSecureOrMigrate(keyLastFmSessionKeySecure, keyLastFmSessionKey);
+      if (!_canScrobbleService('lastfm')) {
+        await _enqueueOfflineScrobble(artist: artist, track: track, album: album, durationSec: durationSec, timestamp: timestamp);
+      } else {
+        final apiKey = await _getSecureOrMigrate(keyLastFmApiKeySecure, keyLastFmApiKey);
+        final secret = await _getSecureOrMigrate(keyLastFmSecretSecure, keyLastFmSecret);
+        final sessionKey = await _getSecureOrMigrate(keyLastFmSessionKeySecure, keyLastFmSessionKey);
 
-      if (apiKey != null && secret != null && sessionKey != null && apiKey.isNotEmpty && sessionKey.isNotEmpty) {
+        if (apiKey != null && secret != null && sessionKey != null && apiKey.isNotEmpty && sessionKey.isNotEmpty) {
+          final params = <String, String>{
+            'method': 'track.scrobble',
+            'artist': artist,
+            'track': track,
+            if (album.isNotEmpty) 'album': album,
+            'duration': durationSec.toString(),
+            'timestamp': (timestamp.millisecondsSinceEpoch ~/ 1000).toString(),
+            'api_key': apiKey,
+            'sk': sessionKey,
+          };
+          params['api_sig'] = _generateLastFmSignature(params, secret);
+          params['format'] = 'json';
+
+          final ok = await _postWithRetry(
+            Uri.parse('https://ws.audioscrobbler.com/2.0/'),
+            body: params,
+          );
+          if (ok) {
+            _lastScrobblePerService['lastfm'] = DateTime.now();
+          } else {
+            anyFailure = true;
+          }
+        }
+      }
+    }
+
+    // 2. Libre.fm Scrobble
+    if (prefs.getBool(keyLibreFmEnabled) == true) {
+      final sessionKey = await _getSecureOrMigrate(keyLibreFmSessionKeySecure, keyLibreFmSessionKey);
+      if (sessionKey != null && sessionKey.isNotEmpty) {
         final params = <String, String>{
           'method': 'track.scrobble',
           'artist': artist,
@@ -214,22 +389,39 @@ class ScrobblerService {
           if (album.isNotEmpty) 'album': album,
           'duration': durationSec.toString(),
           'timestamp': (timestamp.millisecondsSinceEpoch ~/ 1000).toString(),
-          'api_key': apiKey,
           'sk': sessionKey,
+          'format': 'json',
         };
-        params['api_sig'] = _generateLastFmSignature(params, secret);
-        params['format'] = 'json';
-
-        try {
-          await _httpClient.post(
-            Uri.parse('https://ws.audioscrobbler.com/2.0/'),
-            body: params,
-          ).timeout(const Duration(seconds: 10));
-        } catch (_) {}
+        final ok = await _postWithRetry(
+          Uri.parse('https://libre.fm/2.0/'),
+          body: params,
+        );
+        if (!ok) anyFailure = true;
       }
     }
 
-    // ListenBrainz Single Listen Scrobble
+    // 3. Custom Webhook Scrobble
+    if (prefs.getBool(keyCustomWebhookEnabled) == true) {
+      final webhookUrl = prefs.getString(keyCustomWebhookUrl);
+      if (webhookUrl != null && webhookUrl.isNotEmpty) {
+        final ok = await _postWithRetry(
+          Uri.parse(webhookUrl),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'event': 'scrobble',
+            'artist': artist,
+            'track': track,
+            'album': album,
+            'durationSec': durationSec,
+            'timestamp': timestamp.toIso8601String(),
+            'artworkUrl': artworkUrl,
+          }),
+        );
+        if (!ok) anyFailure = true;
+      }
+    }
+
+    // 4. ListenBrainz Single Listen Scrobble
     if (prefs.getBool(keyListenBrainzEnabled) == true) {
       final token = await _getSecureOrMigrate(keyListenBrainzTokenSecure, keyListenBrainzToken);
       if (token != null && token.isNotEmpty) {
@@ -252,17 +444,68 @@ class ScrobblerService {
           ],
         };
 
-        try {
-          await _httpClient.post(
-            Uri.parse('https://api.listenbrainz.org/1/submit-listens'),
-            headers: {
-              'Authorization': 'Token $token',
-              'Content-Type': 'application/json',
-            },
-            body: jsonEncode(payload),
-          ).timeout(const Duration(seconds: 10));
-        } catch (_) {}
+        final ok = await _postWithRetry(
+          Uri.parse('https://api.listenbrainz.org/1/submit-listens'),
+          headers: {
+            'Authorization': 'Token $token',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode(payload),
+        );
+        if (!ok) anyFailure = true;
       }
+    }
+
+    if (anyFailure) {
+      await _enqueueOfflineScrobble(
+        artist: artist,
+        track: track,
+        album: album,
+        durationSec: durationSec,
+        timestamp: timestamp,
+      );
+    }
+  }
+
+  Future<void> flushOfflineQueue() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final queueJson = prefs.getString(_keyOfflineQueue);
+      if (queueJson == null || queueJson.isEmpty) return;
+
+      final List<dynamic> list = jsonDecode(queueJson);
+      final remaining = <Map<String, dynamic>>[];
+
+      for (final item in list) {
+        if (item is! Map<String, dynamic>) continue;
+        final artist = item['artist'] as String?;
+        final track = item['track'] as String?;
+        final album = item['album'] as String? ?? '';
+        final durationSec = item['durationSec'] as int? ?? 0;
+        final tsMillis = item['timestamp'] as int? ?? DateTime.now().millisecondsSinceEpoch;
+
+        if (artist != null && track != null) {
+          try {
+            await _submitScrobble(
+              artist: artist,
+              track: track,
+              album: album,
+              durationSec: durationSec,
+              timestamp: DateTime.fromMillisecondsSinceEpoch(tsMillis),
+            );
+          } catch (_) {
+            remaining.add(item);
+          }
+        }
+      }
+
+      if (remaining.isEmpty) {
+        await prefs.remove(_keyOfflineQueue);
+      } else {
+        await prefs.setString(_keyOfflineQueue, jsonEncode(remaining));
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to flush offline scrobble queue', error: e, stackTrace: st, category: 'Scrobbler');
     }
   }
 
@@ -278,3 +521,4 @@ class ScrobblerService {
     return md5.convert(utf8.encode(buffer.toString())).toString();
   }
 }
+
