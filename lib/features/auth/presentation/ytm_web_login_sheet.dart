@@ -10,6 +10,9 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 
 class YtmWebLoginSheet extends StatefulWidget {
+  static const String googleSignInUrl =
+      'https://accounts.google.com/ServiceLogin?service=youtube&passive=true&continue=https%3A%2F%2Fmusic.youtube.com%2F&hl=en';
+
   final String? initialUrl;
   final String? title;
   final bool isBrowseMode;
@@ -57,6 +60,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   Timer? _authPollTimer;
   bool _hadSuccessfulYtLoad = false;
 
+  static const String googleSignInUrl = YtmWebLoginSheet.googleSignInUrl;
+
   static bool _isCookieMismatchUrl(String u) => RegExp(
         r'CookieMismatch|/sorry|speedbump',
         caseSensitive: false,
@@ -86,7 +91,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   @override
   void initState() {
     super.initState();
-    _currentUrl = widget.initialUrl ?? 'https://music.youtube.com';
+    _currentUrl = widget.initialUrl ??
+        (widget.isBrowseMode ? 'https://music.youtube.com' : googleSignInUrl);
 
     final accountService = getIt<YtmAccountService>();
     if (accountService.isLoggedIn) {
@@ -229,9 +235,11 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     _cookieMismatchDebounce = Timer(const Duration(milliseconds: 700), () {
       if (!mounted) return;
       _mismatchAutoNavCount++;
+      final target =
+          widget.isBrowseMode ? 'https://music.youtube.com' : googleSignInUrl;
       debugPrint('[YtmWebLogin] Navigating past CookieMismatch '
-          '(attempt $_mismatchAutoNavCount/3) → music.youtube.com');
-      _navigateTo('https://music.youtube.com');
+          '(attempt $_mismatchAutoNavCount/3) → $target');
+      _navigateTo(target);
     });
   }
 
@@ -249,7 +257,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       _detectedCookies = null;
       _hadSuccessfulYtLoad = false;
       _mismatchAutoNavCount = 0;
-      _navigateTo('https://music.youtube.com');
+      final target =
+          widget.isBrowseMode ? 'https://music.youtube.com' : googleSignInUrl;
+      _navigateTo(target);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -869,6 +879,12 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                         onCreateWindow: (controller, createWindowAction) async {
                           final url = createWindowAction.request.url;
                           if (url != null) {
+                            final urlStr = url.toString();
+                            if (urlStr.startsWith('market://') ||
+                                urlStr.startsWith('intent://') ||
+                                urlStr.contains('play.google.com/store/apps/details')) {
+                              return false;
+                            }
                             await controller.loadUrl(
                                 urlRequest: URLRequest(url: url));
                           }
@@ -879,6 +895,23 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                           final uri = navigationAction.request.url;
                           if (uri == null) return NavigationActionPolicy.ALLOW;
                           final urlStr = uri.toString();
+
+                          // Prevent Google Play Store / market / intent deep links from opening
+                          if (urlStr.startsWith('market://') ||
+                              urlStr.startsWith('intent://') ||
+                              urlStr.contains('play.google.com/store/apps/details') ||
+                              (urlStr.contains('google.com/url') &&
+                                  urlStr.contains('play.google.com'))) {
+                            if (!widget.isBrowseMode) {
+                              controller.loadUrl(
+                                urlRequest: URLRequest(
+                                  url: WebUri(googleSignInUrl),
+                                ),
+                              );
+                            }
+                            return NavigationActionPolicy.CANCEL;
+                          }
+
                           if (!urlStr.startsWith('http://') &&
                               !urlStr.startsWith('https://') &&
                               !urlStr.startsWith('about:')) {

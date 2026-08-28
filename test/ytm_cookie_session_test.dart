@@ -1,6 +1,7 @@
 // test/ytm_cookie_session_test.dart
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/services/ytm_account_service.dart';
+import 'package:pulsr/features/auth/presentation/ytm_web_login_sheet.dart';
 
 void main() {
   group('YtmAccountService.looksLikeSignedInCookies', () {
@@ -164,6 +165,54 @@ void main() {
           isCookieMismatchUrl
               .hasMatch('https://music.youtube.com/playlist?list=LM'),
           isFalse);
+    });
+
+    test('googleSignInUrl points directly to Google Accounts ServiceLogin', () {
+      expect(
+        YtmWebLoginSheet.googleSignInUrl,
+        contains('accounts.google.com/ServiceLogin'),
+      );
+      expect(
+        YtmWebLoginSheet.googleSignInUrl,
+        contains('service=youtube'),
+      );
+      expect(
+        YtmWebLoginSheet.googleSignInUrl,
+        contains('music.youtube.com'),
+      );
+    });
+
+    test('matches Google Play Store and intent URLs for cancellation', () {
+      bool isPlayStoreOrIntentUrl(String u) =>
+          u.startsWith('market://') ||
+          u.startsWith('intent://') ||
+          u.contains('play.google.com/store/apps/details') ||
+          (u.contains('google.com/url') && u.contains('play.google.com'));
+
+      expect(
+        isPlayStoreOrIntentUrl(
+            'https://play.google.com/store/apps/details?id=com.google.android.apps.youtube.music'),
+        isTrue,
+      );
+      expect(
+        isPlayStoreOrIntentUrl(
+            'market://details?id=com.google.android.apps.youtube.music'),
+        isTrue,
+      );
+      expect(
+        isPlayStoreOrIntentUrl(
+            'intent://music.youtube.com/#Intent;package=com.google.android.apps.youtube.music;scheme=https;end'),
+        isTrue,
+      );
+      expect(
+        isPlayStoreOrIntentUrl('https://music.youtube.com'),
+        isFalse,
+      );
+      expect(
+        isPlayStoreOrIntentUrl(
+            'https://accounts.google.com/ServiceLogin?service=youtube'),
+        isFalse,
+      );
     });
   });
 

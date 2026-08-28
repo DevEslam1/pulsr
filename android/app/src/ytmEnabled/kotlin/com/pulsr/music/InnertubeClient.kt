@@ -623,10 +623,12 @@ internal class InnertubeClient(
             root.put("thirdParty", JSONObject().put("embedUrl", "https://www.youtube.com/watch?v=$videoId"))
         }
 
+        val hasPo = PoTokenManager.isReady || (!PoTokenManager.webViewBroken && !PoTokenManager.isLimitedMode && PoTokenManager.ensureReadySync())
+
         val playbackContext = JSONObject()
         val contentPlaybackContext = JSONObject().apply {
             put("html5Preference", "HTML5_PREF_WANTS")
-            if (!clientType.isWeb && PoTokenManager.isReady) {
+            if (!clientType.isWeb && hasPo) {
                 val poToken = PoTokenManager.poTokenForSync(videoId)
                 if (poToken.isNotEmpty()) {
                     put("poToken", poToken)
@@ -636,7 +638,7 @@ internal class InnertubeClient(
         playbackContext.put("contentPlaybackContext", contentPlaybackContext)
         root.put("playbackContext", playbackContext)
 
-        if (clientType.isWeb && PoTokenManager.isReady) {
+        if (clientType.isWeb && hasPo) {
             val dataSyncId = PoTokenManager.dataSyncId
             val poToken = if (cookieStore.isSessionValid() && dataSyncId.isNotEmpty()) {
                 PoTokenManager.accountPoTokenForSync(dataSyncId)

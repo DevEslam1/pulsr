@@ -78,8 +78,7 @@ internal class ResolutionStrategy(
 
         val hasPoToken = !limitedMode && poTokenManager.isReady && !poTokenManager.webViewBroken
         val isLoggedIn = cookieStore.isSessionValid()
-
-        val chain = baseChain.filter { client ->
+        val eligible = baseChain.filter { client ->
             val cap = ClientCapabilityMatrix.getCapability(client)
 
             // Operation check
@@ -89,12 +88,6 @@ internal class ResolutionStrategy(
                 Operation.BROWSE -> cap.supportsBrowse
             }
             if (!supportsOp) return@filter false
-
-            // PoToken requirement check
-            if (cap.requiresPoToken && !hasPoToken) {
-                Log.d(TAG, "Skipping client ${client.name}: requires poToken but unavailable/limitedMode")
-                return@filter false
-            }
 
             // Auth requirement check
             if (cap.requiresLogin && !isLoggedIn) {
@@ -111,6 +104,17 @@ internal class ResolutionStrategy(
             true
         }
 
+        // Partition: clients matching current poToken readiness first, secondary fallbacks at the end
+        val primary = eligible.filter { client ->
+            val cap = ClientCapabilityMatrix.getCapability(client)
+            !cap.requiresPoToken || hasPoToken
+        }
+        val secondary = eligible.filter { client ->
+            val cap = ClientCapabilityMatrix.getCapability(client)
+            cap.requiresPoToken && !hasPoToken
+        }
+
+        val chain = primary + secondary
         return chain.ifEmpty {
             // Absolute fallback to IOS_MUSIC / ANDROID_VR if all filtered out
             listOf(InnertubeClient.ClientType.IOS_MUSIC, InnertubeClient.ClientType.ANDROID_VR)
