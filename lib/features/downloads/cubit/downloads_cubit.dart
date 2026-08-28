@@ -172,6 +172,20 @@ class DownloadsCubit extends Cubit<DownloadsState> {
     }
   }
 
+  Future<void> resumeAllPaused() async {
+    final pausedTasks = state.tasks.values.where((t) => t.status == DownloadStatus.paused).toList();
+    for (final task in pausedTasks) {
+      await resumeDownload(task.videoId);
+    }
+  }
+
+  Future<void> retryAllFailed() async {
+    final failedTasks = state.tasks.values.where((t) => t.status == DownloadStatus.failed).toList();
+    for (final task in failedTasks) {
+      await retryDownload(task.videoId);
+    }
+  }
+
   Future<void> reorderQueue(List<String> orderedVideoIds) async {
     final useCase = _reorderDownloadsUseCase;
     if (useCase != null) {

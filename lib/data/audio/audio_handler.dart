@@ -575,6 +575,16 @@ class PulsrAudioHandler extends BaseAudioHandler
     await _equalizerManager.onAppPaused();
   }
 
+  Future<void> onAppResumed() async {
+    final song = currentSong;
+    if (song != null) {
+      final sr = (song.sampleRate != null && song.sampleRate! > 0)
+          ? song.sampleRate!.toDouble()
+          : 44100.0;
+      await AudioEffectsChannel().resyncForTrack(sr, channels: 2);
+    }
+  }
+
   Future<void> saveCurrentPositionImmediate() async {
     _savePositionDebounce?.cancel();
     if (_songs.isNotEmpty &&
@@ -930,6 +940,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         _memoryManager.onAppBackgrounded(inactivePlayer: _inactivePlayer);
       },
       onResume: () {
+        onAppResumed();
         if (_activePlayer.playing) {
           _smartPrefetch();
         }
@@ -1475,6 +1486,11 @@ class PulsrAudioHandler extends BaseAudioHandler
           _audioSessionIdSubject.add(currentSessionId);
         }
 
+        final nextSr = (nextSong.sampleRate != null && nextSong.sampleRate! > 0)
+            ? nextSong.sampleRate!.toDouble()
+            : 44100.0;
+        AudioEffectsChannel().resyncForTrack(nextSr, channels: 2).ignore();
+
         mediaItem.add(_songToMediaItem(nextSong, artUri));
         _repository.recordPlayHistory(nextSong.id);
         _broadcastState(_activePlayer.playbackEvent);
@@ -1674,6 +1690,11 @@ class PulsrAudioHandler extends BaseAudioHandler
     _lastGaplessIndex = _currentIndex;
 
     final song = _songs[_currentIndex];
+    final sr = (song.sampleRate != null && song.sampleRate! > 0)
+        ? song.sampleRate!.toDouble()
+        : 44100.0;
+    AudioEffectsChannel().resyncForTrack(sr, channels: 2).ignore();
+
     final fastArtUri =
         song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
     mediaItem.add(_songToMediaItem(song, fastArtUri));
@@ -1798,6 +1819,11 @@ class PulsrAudioHandler extends BaseAudioHandler
     _currentIndex = index;
     final song = _songs[index];
     final generation = _playGeneration;
+
+    final sr = (song.sampleRate != null && song.sampleRate! > 0)
+        ? song.sampleRate!.toDouble()
+        : 44100.0;
+    AudioEffectsChannel().resyncForTrack(sr, channels: 2).ignore();
 
     final fastArtUri =
         song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;

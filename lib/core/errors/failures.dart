@@ -2,6 +2,7 @@
 import 'package:fpdart/fpdart.dart';
 
 typedef Result<T> = Either<AppFailure, T>;
+typedef Failure = AppFailure;
 
 abstract class AppFailure {
   final String message;
@@ -60,3 +61,33 @@ class BackupFailure extends AppFailure {
 class DownloadFailure extends AppFailure {
   const DownloadFailure(super.message, [super.error]);
 }
+
+class AlreadyQueuedFailure extends DownloadFailure {
+  const AlreadyQueuedFailure(super.message, [super.error]);
+}
+
+class InsufficientStorageFailure extends StorageFailure {
+  final int? neededBytes;
+  final int? availableBytes;
+
+  const InsufficientStorageFailure(
+    String message, {
+    this.neededBytes,
+    this.availableBytes,
+    dynamic error,
+  }) : super(message, error);
+}
+
+class CorruptDownloadFailure extends DownloadFailure {
+  const CorruptDownloadFailure(super.message, [super.error]);
+}
+
+class FgsTimeoutFailure extends DownloadFailure {
+  const FgsTimeoutFailure(super.message, [super.error]);
+}
+
+class YtmFailure extends AppFailure {
+  final String? code;
+  const YtmFailure(super.message, [this.code, super.error]);
+}
+

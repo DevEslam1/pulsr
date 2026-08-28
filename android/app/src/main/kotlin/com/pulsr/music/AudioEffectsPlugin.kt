@@ -135,6 +135,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     // JNI Declarations
     private external fun nativeSetSampleRate(sampleRate: Double)
+    private external fun nativeResyncForTrack(sampleRate: Double, channels: Int)
+    private external fun nativeGetAppliedSampleRate(): Double
+    private external fun nativeGetLastAppliedGeneration(): Long
+    private external fun nativeGetPublishedGeneration(): Long
     private external fun nativeGetPipelineLatencyFrames(): Int
     private external fun nativeSetEqEnabled(enabled: Boolean)
     private external fun nativeSetEqBandCount(count: Int)
@@ -491,6 +495,36 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 "isBassBoostSupported" -> {
                     val supported = isEffectTypeSupported(AudioEffect.EFFECT_TYPE_BASS_BOOST)
                     result.success(supported)
+                }
+
+                "resyncForTrack" -> {
+                    val sampleRate = call.argument<Double>("sampleRate") ?: 44100.0
+                    val channels = call.argument<Int>("channels") ?: 2
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeResyncForTrack(sampleRate, channels)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeResyncForTrack failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                "getDspDebugStatus" -> {
+                    if (isNativeDspLoaded) {
+                        try {
+                            val status = mapOf(
+                                "appliedSampleRate" to nativeGetAppliedSampleRate(),
+                                "lastAppliedGeneration" to nativeGetLastAppliedGeneration(),
+                                "publishedGeneration" to nativeGetPublishedGeneration()
+                            )
+                            result.success(status)
+                        } catch (e: Exception) {
+                            result.success(null)
+                        }
+                    } else {
+                        result.success(null)
+                    }
                 }
 
                 "setDynamicsPreset" -> {

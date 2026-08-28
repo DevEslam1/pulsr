@@ -147,8 +147,10 @@ class AuthCubit extends Cubit<AuthState> {
         s.contains('socketexception')) {
       return 'Network error. Check your internet connection.';
     }
-    if (s.contains('apiexception') && s.contains('10')) {
-      return 'Google Sign-In needs SHA-1 fingerprint registered in Firebase Console. You can sign in with Email below!';
+    if ((s.contains('apiexception') && s.contains('10')) ||
+        s.contains('developer_error') ||
+        s.contains('statuscode: 10')) {
+      return 'Local build signing not authorized for Google Sign-In. You can sign in with Email below!';
     }
     return 'Sign-in failed. Please try again.';
   }

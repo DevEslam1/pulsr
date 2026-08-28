@@ -20,6 +20,11 @@ class DownloadsState {
   int get activeCount =>
       tasks.values.where((t) => t.status.isActive).length;
 
+  int get pausedCount =>
+      tasks.values.where((t) => t.status == DownloadStatus.paused).length;
+
+  bool get hasPausedTasks => pausedCount > 0;
+
   int get completedCount =>
       tasks.values.where((t) => t.status == DownloadStatus.complete).length;
 

@@ -34,6 +34,37 @@ class StreamPreResolver {
   /// Current video ID actively resolving in background, if any.
   String? get inFlightVideoId => _inFlightVideoId;
 
+  /// Called on startup, track change, connectivity change, and app resume.
+  /// Pre-resolves current item (if needed/stale) and next item without resolving whole queue.
+  void preResolveCurrentAndNext({
+    required List<SongsTableData> queue,
+    required int currentIndex,
+    required bool isShuffle,
+    List<int>? shuffleIndices,
+  }) {
+    if (_disposed || queue.isEmpty) return;
+
+    if (currentIndex >= 0 && currentIndex < queue.length) {
+      final currentSong = queue[currentIndex];
+      final curVid = currentSong.remoteId;
+      if (curVid != null && curVid.isNotEmpty) {
+        final cached = urlCache.get(curVid);
+        if (cached == null || cached.isStaleWhileRevalidate()) {
+          resolveUrl(curVid).then((stream) {
+            if (!_disposed) urlCache.putStream(stream);
+          }).catchError((_) {});
+        }
+      }
+    }
+
+    _planPreResolution(
+      queue: queue,
+      currentIndex: currentIndex,
+      isShuffle: isShuffle,
+      shuffleIndices: shuffleIndices,
+    );
+  }
+
   /// Called immediately when a track starts playing.
   void onTrackStarted({
     required List<SongsTableData> queue,

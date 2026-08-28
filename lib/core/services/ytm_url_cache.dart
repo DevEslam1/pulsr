@@ -25,10 +25,28 @@ class YtmUrlCacheEntry {
     this.stream,
   });
 
+  /// Total TTL in seconds.
+  int get ttlSeconds => expiresAt.difference(fetchedAt).inSeconds;
+
+  /// Age of this cache entry relative to [now].
+  Duration age([DateTime? now]) {
+    final current = now ?? DateTime.now();
+    return current.difference(fetchedAt);
+  }
+
   /// Checks if entry is expired relative to [now].
   bool isExpired([DateTime? now]) {
     final current = now ?? DateTime.now();
     return current.isAfter(expiresAt) || current.isAtSameMomentAs(expiresAt);
+  }
+
+  /// Stale-While-Revalidate window check: entry is valid but in the second half of its lifetime (age >= ttl / 2).
+  bool isStaleWhileRevalidate([DateTime? now]) {
+    final current = now ?? DateTime.now();
+    if (isExpired(current)) return false;
+    final totalLifetime = expiresAt.difference(fetchedAt);
+    final currentAge = current.difference(fetchedAt);
+    return currentAge >= (totalLifetime ~/ 2);
   }
 
   /// Calculates remaining lifetime duration.
@@ -62,9 +80,10 @@ class YtmUrlCacheEntry {
 /// Features:
 /// - Keyed by `videoId + quality` with max capacity ~200 entries
 /// - Default TTL of 4 hours (stream URLs live ~6 hours)
+/// - Stale-While-Revalidate (SWTR) support: fast return if age < ttl/2, background refresh if ttl/2 <= age < ttl
+/// - Dead URL circuit: immediate eviction & blacklisting of URLs reporting 403 / 408 / 416
 /// - Proactive expiry subtraction (5 min margin) if URL contains `expire` timestamp
 /// - Deterministic time injection via [Clock] for testing
-/// - Explicit single-track or full invalidation on HTTP 403 / 404
 @singleton
 class YtmUrlCache {
   static const int defaultCapacity = 200;
@@ -77,6 +96,9 @@ class YtmUrlCache {
 
   final LinkedHashMap<String, YtmUrlCacheEntry> _cache =
       LinkedHashMap<String, YtmUrlCacheEntry>();
+
+  // Dead URL circuit: URLs that returned HTTP 403/408/416 are never re-served
+  final Set<String> _deadUrls = <String>{};
 
   @factoryMethod
   YtmUrlCache()
@@ -92,16 +114,30 @@ class YtmUrlCache {
   String _buildKey(String videoId, String quality, [String? egressId]) =>
       '$videoId:${quality.toLowerCase()}:${egressId ?? "default"}';
 
-  /// Retrieves cached entry if present and not expired. Moves entry to MRU position.
-  YtmUrlCacheEntry? get(String videoId, {String quality = 'high', String? egressId}) {
+  /// Retrieves cached entry if present and not expired or dead. Moves entry to MRU position.
+  /// If [onStaleRevalidate] is provided and entry is in the Stale-While-Revalidate window (age >= ttl/2),
+  /// the cached entry is returned immediately and [onStaleRevalidate] is fired asynchronously.
+  YtmUrlCacheEntry? get(
+    String videoId, {
+    String quality = 'high',
+    String? egressId,
+    void Function(String videoId)? onStaleRevalidate,
+  }) {
     final key = _buildKey(videoId, quality, egressId);
     final entry = _cache[key];
     if (entry == null) return null;
 
     final now = _clock.now();
-    if (entry.isExpired(now)) {
+    if (entry.isExpired(now) || _deadUrls.contains(entry.url)) {
       _cache.remove(key);
       return null;
+    }
+
+    // Trigger SWTR background refresh if in the second half of lifetime
+    if (onStaleRevalidate != null && entry.isStaleWhileRevalidate(now)) {
+      try {
+        onStaleRevalidate(videoId);
+      } catch (_) {}
     }
 
     // Refresh LRU order (move to end)
@@ -111,13 +147,31 @@ class YtmUrlCache {
   }
 
   /// Returns valid cached URL string if available, null otherwise.
-  String? getUrl(String videoId, {String quality = 'high', String? egressId}) {
-    return get(videoId, quality: quality, egressId: egressId)?.url;
+  String? getUrl(
+    String videoId, {
+    String quality = 'high',
+    String? egressId,
+    void Function(String videoId)? onStaleRevalidate,
+  }) {
+    return get(videoId,
+            quality: quality,
+            egressId: egressId,
+            onStaleRevalidate: onStaleRevalidate)
+        ?.url;
   }
 
   /// Returns valid cached [YtmStream] if available, null otherwise.
-  YtmStream? getStream(String videoId, {String quality = 'high', String? egressId}) {
-    return get(videoId, quality: quality, egressId: egressId)?.toStream(quality: quality);
+  YtmStream? getStream(
+    String videoId, {
+    String quality = 'high',
+    String? egressId,
+    void Function(String videoId)? onStaleRevalidate,
+  }) {
+    return get(videoId,
+            quality: quality,
+            egressId: egressId,
+            onStaleRevalidate: onStaleRevalidate)
+        ?.toStream(quality: quality);
   }
 
   /// Checks if a valid, unexpired entry exists in cache.
@@ -136,6 +190,9 @@ class YtmUrlCache {
     String? cookies,
     YtmStream? stream,
   }) {
+    // If this URL was previously flagged dead, remove from dead list upon fresh explicit put
+    _deadUrls.remove(url);
+
     final key = _buildKey(videoId, quality, egressId);
     final now = _clock.now();
 
@@ -185,6 +242,17 @@ class YtmUrlCache {
     );
   }
 
+  /// Evicts and permanently blacklists a URL that returned HTTP 403 / 408 / 416.
+  void evictDeadUrl(String videoId, String? url) {
+    if (url != null && url.isNotEmpty) {
+      _deadUrls.add(url);
+      if (_deadUrls.length > 500) {
+        _deadUrls.remove(_deadUrls.first);
+      }
+    }
+    invalidate(videoId);
+  }
+
   /// Invalidates entry for [videoId]. If [quality] is specified, removes exact entry.
   /// If [quality] is omitted or null, invalidates all qualities for that video.
   void invalidate(String videoId, {String? quality, String? egressId}) {
@@ -208,11 +276,13 @@ class YtmUrlCache {
   /// Flushes all cached URLs when network connectivity or proxy egress changes.
   void flushOnEgressChange([String? newEgressId]) {
     _cache.clear();
+    _deadUrls.clear();
   }
 
-  /// Clears entire in-memory URL cache.
+  /// Clears entire in-memory URL cache and dead URL blacklist.
   void clear() {
     _cache.clear();
+    _deadUrls.clear();
   }
 
   /// Current number of entries in the cache.

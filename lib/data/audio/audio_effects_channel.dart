@@ -495,4 +495,30 @@ class AudioEffectsChannel {
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
     }
   }
+
+  /// Call whenever audio format changes or on session resume/track switch.
+  /// Forces native DSP generation bump, re-calculates all filter coefficients for [sampleRate],
+  /// and flushes stale audio filter state.
+  Future<void> resyncForTrack(double sampleRate, {int channels = 2}) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('resyncForTrack', {
+        'sampleRate': sampleRate,
+        'channels': channels,
+      });
+    } catch (e, st) {
+      ErrorLogger.log('Failed to resync DSP for track ($sampleRate Hz)',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+  }
+
+  /// Retrieves internal DSP status for assertions/testing.
+  Future<Map<String, dynamic>?> getDspDebugStatus() async {
+    if (!Platform.isAndroid) return null;
+    try {
+      return await _channel.invokeMapMethod<String, dynamic>('getDspDebugStatus');
+    } catch (_) {
+      return null;
+    }
+  }
 }

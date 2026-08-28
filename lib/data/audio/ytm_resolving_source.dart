@@ -64,6 +64,7 @@ class YtmResolvingSource extends StreamAudioSource {
   LockCachingAudioSource? _inner;
   Future<LockCachingAudioSource>? _pending;
   DateTime? _resolvedExpiresAt;
+  String? _lastResolvedUrl;
 
   static final YtmCacheManager _cacheManager = YtmCacheManager();
 
@@ -97,19 +98,20 @@ class YtmResolvingSource extends StreamAudioSource {
       } catch (byteErr) {
         final errStr = byteErr.toString().toLowerCase();
 
-        // Check if error represents a stale/forbidden stream URL (403/404/416)
+        // Check if error represents a stale/forbidden stream URL (403/404/416/408)
         final is403or404 = errStr.contains('403') ||
             errStr.contains('forbidden') ||
             errStr.contains('404') ||
+            errStr.contains('408') ||
             errStr.contains('416');
 
         debugPrint(
-            '[YtmResolvingSource] Byte stream error ($byteErr, isForbidden/Stale=$is403or404) for $videoId. Invalidating URL cache & retrying fresh resolution once...');
+            '[YtmResolvingSource] Byte stream error ($byteErr, isForbidden/Stale=$is403or404) for $videoId. Evicting dead URL & retrying fresh resolution once...');
         _inner = null;
         _pending = null;
 
-        // Invalidate URL cache for this video
-        _effectiveUrlCache?.invalidate(videoId);
+        // Evict and blacklist dead URL in cache for this video
+        _effectiveUrlCache?.evictDeadUrl(videoId, _lastResolvedUrl);
 
         try {
           await _deleteCacheFilesFor(videoId);
@@ -164,7 +166,20 @@ class YtmResolvingSource extends StreamAudioSource {
 
     // Check Task 2 in-memory URL cache first when not force refreshing
     if (!forceRefresh) {
-      final cachedEntry = _effectiveUrlCache?.get(videoId);
+      final cachedEntry = _effectiveUrlCache?.get(
+        videoId,
+        onStaleRevalidate: (vid) {
+          // Asynchronously trigger SWTR refresh without blocking current playback
+          resolve(forceRefresh: true).then((freshUrl) {
+            _effectiveUrlCache?.put(
+              vid,
+              freshUrl,
+              userAgent: effectiveUa,
+              cookies: effectiveCookies,
+            );
+          }).catchError((_) {});
+        },
+      );
       if (cachedEntry != null && !cachedEntry.isExpired()) {
         url = cachedEntry.url;
         effectiveUa = cachedEntry.userAgent ?? effectiveUa;
@@ -246,6 +261,7 @@ class YtmResolvingSource extends StreamAudioSource {
         headers: headers,
         cacheFile: cacheFile,
       );
+      _lastResolvedUrl = url;
       _inner = inner;
       try {
         _latency?.markStage(PlaybackStage.sourceSet);

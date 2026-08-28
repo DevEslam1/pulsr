@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:drift/drift.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/utils/backup_crypto.dart';
 import '../../core/utils/error_logger.dart';
 import '../../data/db/app_database.dart';
 import '../repositories/music_repository_interface.dart';
@@ -32,7 +33,7 @@ class ExportBackupUseCase {
 
   ExportBackupUseCase(this._repository);
 
-  Future<String> execute() async {
+  Future<String> execute({bool encrypt = false, String? passphrase}) async {
     // 1. Favorites
     final favoritesResult = await _repository.getFavorites();
     final favoritesSongs =
@@ -132,7 +133,15 @@ class ExportBackupUseCase {
       'excludedFolders': excludedFolders,
     };
 
-    return const JsonEncoder.withIndent('  ').convert(backupPayload);
+    final rawJson = const JsonEncoder.withIndent('  ').convert(backupPayload);
+    if (encrypt) {
+      final envelope = BackupCrypto.encryptBackup(
+        rawJson,
+        passphrase: passphrase ?? BackupCrypto.defaultAppSalt,
+      );
+      return const JsonEncoder.withIndent('  ').convert(envelope);
+    }
+    return rawJson;
   }
 }
 
@@ -163,7 +172,7 @@ class ImportBackupUseCase {
     return execute(file);
   }
 
-  Future<ImportResult> execute(String jsonString) async {
+  Future<ImportResult> execute(String jsonString, {String? passphrase}) async {
     // Cheap length check first (chars) to avoid double alloc for size check — prevents OOM on low RAM
     if (jsonString.length > maxBackupSizeBytes) {
       if (utf8.encode(jsonString).length > maxBackupSizeBytes) {
@@ -175,7 +184,7 @@ class ImportBackupUseCase {
           'Backup file exceeds maximum allowed size of 10 MB');
     }
 
-    final dynamic decoded;
+    dynamic decoded;
     try {
       decoded = jsonDecode(jsonString);
     } catch (e, st) {
@@ -187,6 +196,19 @@ class ImportBackupUseCase {
     if (decoded is! Map<String, dynamic>) {
       throw const FormatException(
           'Invalid backup payload: root object must be a JSON map');
+    }
+
+    // Version 2 Encrypted Backup Envelope handling ([S1])
+    if (decoded['version'] == 2 || decoded['format'] == BackupCrypto.formatV2) {
+      final decryptedPlaintext = BackupCrypto.decryptBackup(
+        decoded,
+        passphrase: passphrase ?? BackupCrypto.defaultAppSalt,
+      );
+      final innerDecoded = jsonDecode(decryptedPlaintext);
+      if (innerDecoded is! Map<String, dynamic>) {
+        throw const FormatException('Decrypted backup payload is not a valid JSON object');
+      }
+      decoded = innerDecoded;
     }
 
     final data = decoded;

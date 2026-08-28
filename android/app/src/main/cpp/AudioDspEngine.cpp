@@ -105,6 +105,18 @@ void AudioDspEngine::setSampleRate(double sampleRate) {
     }
 }
 
+void AudioDspEngine::resyncForTrack(double sampleRate, int channels) {
+    if (sampleRate < 8000.0) sampleRate = 8000.0;
+    if (sampleRate > 768000.0) sampleRate = 768000.0;
+    std::lock_guard<std::mutex> lock(publishMutex_);
+    auto current = currentParams_.load();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->generation = ++snapshotGeneration_;
+    updated->sampleRate = sampleRate;
+    updated->resetRequested = true; // flush stale filter history from previous track/session
+    currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(updated));
+}
+
 void AudioDspEngine::setActiveStages(uint32_t bitmask) {
     std::lock_guard<std::mutex> lock(publishMutex_);
     auto current = currentParams_.load();
@@ -122,7 +134,14 @@ uint32_t AudioDspEngine::getActiveStages() const {
 void AudioDspEngine::publishParams(std::shared_ptr<const DspParamSnapshot> snapshot) {
     if (!snapshot) return;
     std::lock_guard<std::mutex> lock(publishMutex_);
-    currentParams_.store(snapshot);
+    if (snapshot->generation <= lastAppliedGeneration_.load()) {
+        auto mutableSnap = std::make_shared<DspParamSnapshot>(*snapshot);
+        mutableSnap->generation = ++snapshotGeneration_;
+        currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(mutableSnap));
+    } else {
+        snapshotGeneration_.store(snapshot->generation);
+        currentParams_.store(snapshot);
+    }
 }
 
 std::shared_ptr<const DspParamSnapshot> AudioDspEngine::getParams() const {

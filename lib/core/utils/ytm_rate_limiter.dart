@@ -3,6 +3,12 @@ import 'dart:async';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Request priority classes for rate limiting.
+enum YtmRequestPriority {
+  interactive,
+  background,
+}
+
 /// Dart-side adaptive token-bucket rate limiter for YouTube Music API requests.
 ///
 /// Prevents rapid-fire HTTP requests from the Dart layer from triggering
@@ -171,13 +177,25 @@ class YtmRateLimiter {
   }
 
   /// Acquires a permit before making a native YTM request.
-  Future<void> acquirePermit() async {
+  /// [priority] ensures interactive requests (user taps) take precedence over background bursts
+  /// (pre-resolving, queue restore, metadata fetch) and never get starved.
+  Future<void> acquirePermit({YtmRequestPriority priority = YtmRequestPriority.interactive}) async {
     final now = DateTime.now();
     if (now.isBefore(_backoffUntil)) {
+      // Interactive requests during backoff still wait out the minimum backoff,
+      // but background requests are strictly queued
       await Future<void>.delayed(_backoffUntil.difference(now));
     }
 
     _refill();
+
+    // Background requests must leave a minimum reserve of 2.0 tokens for interactive requests
+    if (priority == YtmRequestPriority.background && _tokens < 2.0) {
+      final waitMs = ((2.0 - _tokens) / _refillRate * 1000).ceil().clamp(50, 1000);
+      await Future<void>.delayed(Duration(milliseconds: waitMs));
+      _refill();
+    }
+
     if (_tokens >= 1.0) {
       _tokens -= 1.0;
       _persist();
@@ -193,13 +211,21 @@ class YtmRateLimiter {
   }
 
   /// Acquires a permit before making a backend microservice request.
-  Future<void> acquireBackendPermit() async {
+  Future<void> acquireBackendPermit({YtmRequestPriority priority = YtmRequestPriority.interactive}) async {
     final now = DateTime.now();
     if (now.isBefore(_backendBackoffUntil)) {
       await Future<void>.delayed(_backendBackoffUntil.difference(now));
     }
 
     _refillBackend();
+
+    // Background requests leave a reserve of 5.0 tokens for backend interactive requests
+    if (priority == YtmRequestPriority.background && _backendTokens < 5.0) {
+      final waitMs = ((5.0 - _backendTokens) / _backendRefillRate * 1000).ceil().clamp(50, 1000);
+      await Future<void>.delayed(Duration(milliseconds: waitMs));
+      _refillBackend();
+    }
+
     if (_backendTokens >= 1.0) {
       _backendTokens -= 1.0;
       _persist();

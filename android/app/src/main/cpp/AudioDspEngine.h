@@ -62,6 +62,11 @@ public:
     AudioDspEngine();
     void setSampleRate(double sampleRate);
     double getSampleRate() const { return sampleRate_; }
+    double getAppliedSampleRate() const { return sampleRate_; }
+    uint64_t getLastAppliedGeneration() const { return lastAppliedGeneration_.load(); }
+    uint64_t getPublishedGeneration() const { return snapshotGeneration_.load(); }
+
+    void resyncForTrack(double sampleRate, int channels = 2);
 
     void setActiveStages(uint32_t bitmask);
     uint32_t getActiveStages() const;

@@ -3,16 +3,19 @@
 enum DownloadStatus {
   queued,
   downloading,
+  embedding,
   paused,
   failed,
   complete;
 
   bool get isTerminal => this == DownloadStatus.complete || this == DownloadStatus.failed;
-  bool get isActive => this == DownloadStatus.queued || this == DownloadStatus.downloading;
+  bool get isActive => this == DownloadStatus.queued || this == DownloadStatus.downloading || this == DownloadStatus.embedding;
   bool get canPause => this == DownloadStatus.downloading || this == DownloadStatus.queued;
   bool get canResume => this == DownloadStatus.paused;
   bool get canRetry => this == DownloadStatus.failed;
 }
+
+typedef DownloadTaskStatus = DownloadStatus;
 
 class DownloadTask {
   final String id;
@@ -24,6 +27,8 @@ class DownloadTask {
   final double? speedKbps;
   final int? etaSeconds;
   final String? filePath;
+  final String? tempFilePath;
+  final String? expectedChecksum;
   final String? format;
   final int? bitrate;
   final String? error;
@@ -40,6 +45,8 @@ class DownloadTask {
     this.speedKbps,
     this.etaSeconds,
     this.filePath,
+    this.tempFilePath,
+    this.expectedChecksum,
     this.format,
     this.bitrate,
     this.error,
@@ -57,6 +64,8 @@ class DownloadTask {
     double? speedKbps,
     int? etaSeconds,
     String? filePath,
+    String? tempFilePath,
+    String? expectedChecksum,
     String? format,
     int? bitrate,
     String? error,
@@ -73,6 +82,8 @@ class DownloadTask {
       speedKbps: speedKbps ?? this.speedKbps,
       etaSeconds: etaSeconds ?? this.etaSeconds,
       filePath: filePath ?? this.filePath,
+      tempFilePath: tempFilePath ?? this.tempFilePath,
+      expectedChecksum: expectedChecksum ?? this.expectedChecksum,
       format: format ?? this.format,
       bitrate: bitrate ?? this.bitrate,
       error: error ?? this.error,
@@ -92,6 +103,8 @@ class DownloadTask {
       'speedKbps': speedKbps,
       'etaSeconds': etaSeconds,
       'filePath': filePath,
+      'tempFilePath': tempFilePath,
+      'expectedChecksum': expectedChecksum,
       'format': format,
       'bitrate': bitrate,
       'error': error,
@@ -114,6 +127,8 @@ class DownloadTask {
       speedKbps: (json['speedKbps'] as num?)?.toDouble(),
       etaSeconds: json['etaSeconds'] as int?,
       filePath: json['filePath'] as String?,
+      tempFilePath: json['tempFilePath'] as String?,
+      expectedChecksum: json['expectedChecksum'] as String?,
       format: json['format'] as String?,
       bitrate: json['bitrate'] as int?,
       error: json['error'] as String?,

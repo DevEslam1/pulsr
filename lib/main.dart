@@ -234,6 +234,10 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
   void _autoScanOnStartup() {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
+      // Defer media scan and restore reconciliation by 2 seconds after first frame
+      // so first launch and relaunch render instantly without dropped frames or thread contention.
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
       try {
         final scanner = getIt<MediaScannerService>();
         await RestoreDetectionService.checkAndHandleRestore(scanner);

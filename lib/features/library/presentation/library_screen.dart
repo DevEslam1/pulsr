@@ -314,18 +314,20 @@ class _LibraryScreenState extends State<LibraryScreen>
           itemBuilder: (context, index) {
             final song = songs[index];
             final isSelected = state.selectedSongIds.contains(song.id);
-            return InkWell(
-              borderRadius: BorderRadius.circular(18),
-              onTap: () {
-                if (state.isMultiSelectMode) {
-                  cubit.toggleSongSelection(song.id);
-                } else {
-                  playerCubit.playSong(song, queue: songs);
-                }
-              },
-              onLongPress: () => cubit.toggleSongSelection(song.id),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            return RepaintBoundary(
+              key: ValueKey('song_grid_${song.id}'),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: () {
+                  if (state.isMultiSelectMode) {
+                    cubit.toggleSongSelection(song.id);
+                  } else {
+                    playerCubit.playSong(song, queue: songs);
+                  }
+                },
+                onLongPress: () => cubit.toggleSongSelection(song.id),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: Stack(
@@ -397,8 +399,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                   ),
                 ],
               ),
-            );
-          },
+            ),
+          );
+        },
         ),
       );
     }

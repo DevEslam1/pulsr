@@ -1,5 +1,6 @@
 import java.util.Properties
 import java.io.FileInputStream
+import java.util.zip.ZipFile
 
 plugins {
     id("com.android.application")
@@ -407,6 +408,39 @@ tasks.register("validateProdIsolation") {
         }
 
         println("[validateProdIsolation] PASSED: Prod isolation verified successfully across manifests, kotlin, res, assets, proguard, cpp, and jniLibs.")
+    }
+}
+
+tasks.register("verifyProdApkIsolation") {
+    group = "verification"
+    description = "Unzips and scans production release APK dex, so, and assets for forbidden GPL/YouTube terms."
+    doLast {
+        val forbiddenTerms = listOf("music.youtube.com", "NewPipeExtractor", "org.schabi.newpipe", "po_token")
+        val apkDir = file("build/app/outputs/flutter-apk")
+        val prodApk = apkDir.listFiles()?.firstOrNull { it.name.contains("prod") && it.name.endsWith(".apk") }
+        if (prodApk != null && prodApk.exists()) {
+            println("[verifyProdApkIsolation] Scanning APK: ${prodApk.name}...")
+            val zipFile = ZipFile(prodApk)
+            val entries = zipFile.entries()
+            while (entries.hasMoreElements()) {
+                val entry = entries.nextElement()
+                if (entry.name.endsWith(".dex") || entry.name.endsWith(".so") || entry.name.startsWith("assets/")) {
+                    val stream = zipFile.getInputStream(entry)
+                    val bytes = stream.readBytes()
+                    val text = String(bytes, Charsets.ISO_8859_1)
+                    for (term in forbiddenTerms) {
+                        if (text.contains(term)) {
+                            zipFile.close()
+                            throw GradleException("Forbidden GPL term '$term' detected inside production APK entry: ${entry.name}")
+                        }
+                    }
+                }
+            }
+            zipFile.close()
+            println("[verifyProdApkIsolation] PASSED: Production APK is 100% clean of all GPL/NewPipe references.")
+        } else {
+            println("[verifyProdApkIsolation] No prod APK found in $apkDir, skipping binary scan.")
+        }
     }
 }
 

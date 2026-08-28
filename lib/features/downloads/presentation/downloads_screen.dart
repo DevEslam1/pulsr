@@ -98,9 +98,50 @@ class DownloadsScreen extends StatelessWidget {
             },
             itemBuilder: (context, index) {
               if (index == 0) {
-                return StorageStatsHeader(
-                  key: const ValueKey('storage_stats_header'),
-                  stats: state.storageStats,
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    StorageStatsHeader(
+                      key: const ValueKey('storage_stats_header'),
+                      stats: state.storageStats,
+                    ),
+                    if (state.hasPausedTasks)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: p.accent.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: p.accent.withValues(alpha: 0.3)),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          child: Row(
+                            children: [
+                              Icon(Icons.info_outline_rounded, color: p.accent, size: 20),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  '${state.pausedCount} download${state.pausedCount > 1 ? "s" : ""} paused / interrupted',
+                                  style: TextStyle(color: p.textPrimary, fontSize: 13, fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () => context.read<DownloadsCubit>().resumeAllPaused(),
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  backgroundColor: p.accent,
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                ),
+                                child: const Text(
+                                  'Resume All',
+                                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700, fontSize: 12),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
                 );
               }
 

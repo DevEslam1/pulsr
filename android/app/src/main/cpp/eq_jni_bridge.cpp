@@ -16,6 +16,30 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSampleRate(
     AudioDspEngine::instance().setSampleRate(sampleRate);
 }
 
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeResyncForTrack(
+        JNIEnv* /* env */, jobject /* thiz */, jdouble sampleRate, jint channels) {
+    AudioDspEngine::instance().resyncForTrack(sampleRate, channels);
+}
+
+JNIEXPORT jdouble JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeGetAppliedSampleRate(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return AudioDspEngine::instance().getAppliedSampleRate();
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeGetLastAppliedGeneration(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return static_cast<jlong>(AudioDspEngine::instance().getLastAppliedGeneration());
+}
+
+JNIEXPORT jlong JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeGetPublishedGeneration(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return static_cast<jlong>(AudioDspEngine::instance().getPublishedGeneration());
+}
+
 JNIEXPORT jint JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeGetPipelineLatencyFrames(
         JNIEnv* /* env */, jobject /* thiz */) {

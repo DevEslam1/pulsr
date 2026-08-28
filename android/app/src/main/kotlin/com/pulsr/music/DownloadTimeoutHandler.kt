@@ -31,6 +31,17 @@ class DownloadTimeoutHandler(
 
         // 1. Flush state to persistence
         statePersistenceCallback?.invoke(activeDownloads)
+        if (context != null) {
+            try {
+                val prefs = context.getSharedPreferences("pulsr_download_timeouts", Context.MODE_PRIVATE)
+                prefs.edit().apply {
+                    putBoolean("has_timeout_occurred", true)
+                    putLong("last_timeout_timestamp", System.currentTimeMillis())
+                    putStringSet("timed_out_video_ids", videoIds.toSet())
+                    apply()
+                }
+            } catch (_: Exception) {}
+        }
 
         // 2. Validate .part files integrity (ensure no empty orphaned files)
         var cleanedCount = 0

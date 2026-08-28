@@ -538,9 +538,87 @@ void runSyntheticIrCacheBudgetTest() {
     std::cout << "  ✓ Synthetic IR LRU cache stays strictly under 64MB budget at all times." << std::endl;
 }
 
+void runApplyParamsStaleIrGuardTest() {
+    std::cout << "\n=== [TEST 14/14] [A1] ConvolutionReverb applyParams Stale IR Guard ===" << std::endl;
+    ConvolutionReverb reverb;
+    reverb.setSampleRate(48000.0);
+    reverb.setEnabled(true);
+
+    // Initial state: Room preset
+    auto irRoom = PreparedIr::createSynthetic(48000.0, static_cast<int>(ReverbPreset::Room), 0.5f);
+    ReverbParamSet params1;
+    params1.enabled = true;
+    params1.preset = static_cast<int>(ReverbPreset::Room);
+    params1.preparedIr = irRoom;
+    params1.wetDry = 0.5;
+    params1.damping = 0.5;
+    reverb.applyParams(params1);
+
+    assert(reverb.getPreparedIr() == irRoom);
+    assert(reverb.getPreset() == ReverbPreset::Room);
+
+    // Apply Cathedral preset with prewarmed preparedIr
+    auto irCathedral = PreparedIr::createSynthetic(48000.0, static_cast<int>(ReverbPreset::Cathedral), 0.5f);
+    ReverbParamSet params2;
+    params2.enabled = true;
+    params2.preset = static_cast<int>(ReverbPreset::Cathedral);
+    params2.preparedIr = irCathedral;
+    params2.wetDry = 0.5;
+    params2.damping = 0.5;
+    reverb.applyParams(params2);
+
+    assert(reverb.getPreparedIr() == irCathedral);
+    assert(reverb.getPreset() == ReverbPreset::Cathedral);
+    assert(irCathedral != irRoom);
+    std::cout << "  ✓ applyParams correctly updates IR when preset changes with prewarmed preparedIr." << std::endl;
+}
+
+void runResyncForTrackTest() {
+    std::cout << "\n=== [TEST 15/15] AudioDspEngine resyncForTrack Sample Rate & Generation Test ===" << std::endl;
+    auto& engine = AudioDspEngine::instance();
+    engine.setSampleRate(48000.0);
+
+    const uint64_t gen0 = engine.getPublishedGeneration();
+
+    // 1. Resync for 44.1kHz track
+    engine.resyncForTrack(44100.0, 2);
+    const uint64_t gen1 = engine.getPublishedGeneration();
+    assert(gen1 > gen0);
+
+    const int frames = 256;
+    std::vector<float> buffer(frames * 2, 0.5f);
+    int processed = engine.processInterleaved(buffer.data(), frames, 2);
+    assert(processed == frames);
+
+    assert(std::abs(engine.getAppliedSampleRate() - 44100.0) < 1e-3);
+    assert(engine.getLastAppliedGeneration() == gen1);
+
+    for (float sample : buffer) {
+        assert(!std::isnan(sample));
+        assert(!std::isinf(sample));
+    }
+
+    // 2. Resync for 96kHz Hi-Res track
+    engine.resyncForTrack(96000.0, 2);
+    const uint64_t gen2 = engine.getPublishedGeneration();
+    assert(gen2 > gen1);
+
+    processed = engine.processInterleaved(buffer.data(), frames, 2);
+    assert(processed == frames);
+    assert(std::abs(engine.getAppliedSampleRate() - 96000.0) < 1e-3);
+    assert(engine.getLastAppliedGeneration() == gen2);
+
+    for (float sample : buffer) {
+        assert(!std::isnan(sample));
+        assert(!std::isinf(sample));
+    }
+
+    std::cout << "  ✓ resyncForTrack seamlessly transitions 48k -> 44.1k -> 96k with matching applied SR & no artifacts." << std::endl;
+}
+
 int main() {
     std::cout << "====================================================" << std::endl;
-    std::cout << "  Pulsr Music Native DSP Full Test Suite (13/13)" << std::endl;
+    std::cout << "  Pulsr Music Native DSP Full Test Suite (15/15)" << std::endl;
     std::cout << "====================================================" << std::endl;
 
     runReverbRegressionTest();
@@ -556,6 +634,8 @@ int main() {
     runSnapshotRaceTest();
     runSyntheticIrCacheBudgetTest();
     runCustomIrBudgetTest();
+    runApplyParamsStaleIrGuardTest();
+    runResyncForTrackTest();
 
     std::cout << "\n====================================================" << std::endl;
     std::cout << "  [PASS] ALL NATIVE DSP SUITE TESTS PASSED 100%!" << std::endl;

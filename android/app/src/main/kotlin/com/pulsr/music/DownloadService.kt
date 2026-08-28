@@ -50,10 +50,15 @@ class DownloadService : Service() {
                 putExtra(EXTRA_VIDEO_ID, videoId)
                 putExtra(EXTRA_TITLE, title)
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                // ForegroundServiceStartNotAllowedException on Android 12+ background start
+                android.util.Log.w("DownloadService", "Foreground service start restricted: ${e.message}")
             }
         }
 

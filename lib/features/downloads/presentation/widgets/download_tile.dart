@@ -26,6 +26,11 @@ class DownloadTile extends StatelessWidget {
           p.accent,
           l10n.statusDownloading,
         ),
+      DownloadStatus.embedding => (
+          Icons.tag_rounded,
+          p.accent,
+          'Embedding tags…',
+        ),
       DownloadStatus.queued => (
           Icons.schedule_rounded,
           p.accent.withValues(alpha: 0.7),

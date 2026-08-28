@@ -450,8 +450,8 @@ void ConvolutionReverb::applyParams(const ReverbParamSet& params) {
     setPredelay(params.predelayMs);
     damping_ = std::clamp(params.damping, 0.0, 1.0);
 
-    // BUG-001: Audio-thread RT safety:
-    // If preparedIr is provided, apply it. If null, DO NOT call setPreset/updatePreparedIr!
+    // BUG-001 / [A1]: Audio-thread RT safety:
+    // If preparedIr is provided, apply it. If null, DO NOT allocate or lock cache on audio thread.
     if (params.preparedIr) {
         if (params.preparedIr != preparedIr_) {
             preparedIr_ = params.preparedIr;

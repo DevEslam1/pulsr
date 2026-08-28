@@ -9,6 +9,25 @@ import '../repositories/download_repository_interface.dart';
 /// prompt, drag-reorder queue, and priority support. Bounded concurrency (3)
 /// ensures bounded memory / bandwidth; Wi-Fi/metered guard is enforced per-task.
 /// Register via getIt manually or run build_runner to generate @singleton if desired.
+class BatchDownloadResult {
+  final int totalCount;
+  final int queuedCount;
+  final int skippedDuplicatesCount;
+  final List<String> taskIds;
+  final List<AppFailure> failures;
+
+  const BatchDownloadResult({
+    required this.totalCount,
+    required this.queuedCount,
+    required this.skippedDuplicatesCount,
+    required this.taskIds,
+    required this.failures,
+  });
+
+  bool get hasFailures => failures.isNotEmpty;
+  bool get allSucceeded => failures.isEmpty && skippedDuplicatesCount == 0;
+}
+
 class QueueDownloadsBatchUseCase {
   final IDownloadRepository _repository;
 
@@ -26,4 +45,37 @@ class QueueDownloadsBatchUseCase {
     }
     return results;
   }
+
+  Future<BatchDownloadResult> executeWithBatchResult(List<DownloadTask> tasks) async {
+    int queuedCount = 0;
+    int skippedDuplicatesCount = 0;
+    final taskIds = <String>[];
+    final failures = <AppFailure>[];
+
+    for (final task in tasks) {
+      final res = await _repository.queueDownload(task);
+      res.fold(
+        (failure) {
+          if (failure is AlreadyQueuedFailure) {
+            skippedDuplicatesCount++;
+          } else {
+            failures.add(failure);
+          }
+        },
+        (taskId) {
+          queuedCount++;
+          taskIds.add(taskId);
+        },
+      );
+    }
+
+    return BatchDownloadResult(
+      totalCount: tasks.length,
+      queuedCount: queuedCount,
+      skippedDuplicatesCount: skippedDuplicatesCount,
+      taskIds: taskIds,
+      failures: failures,
+    );
+  }
 }
+

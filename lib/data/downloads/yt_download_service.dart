@@ -215,7 +215,7 @@ class YtDownloadService {
       final quality = prefs.getString('setting_download_quality') ?? 'high';
       var stream = await _resolveDownloadStream(videoId, quality);
 
-      // Pre-download storage check (BUG-06)
+      // Pre-download storage check (BUG-06 & [D6])
       try {
         final freeBytes =
             await _downloadChannel.invokeMethod<int>('getFreeDiskSpace');
@@ -224,10 +224,14 @@ class YtDownloadService {
           final estDurationSec =
               stream.duration.inSeconds > 0 ? stream.duration.inSeconds : 240;
           final estimatedBytes =
-              (estDurationSec * estBitrate * 1000 ~/ 8) + (5 * 1024 * 1024);
+              ((estDurationSec * estBitrate * 1000 ~/ 8) * 1.2).toInt() + (5 * 1024 * 1024);
           if (freeBytes < estimatedBytes) {
-            return const Left(
-                DownloadFailure('Insufficient storage space for download'));
+            return Left(
+                InsufficientStorageFailure(
+                  'Insufficient storage space for download',
+                  neededBytes: estimatedBytes,
+                  availableBytes: freeBytes,
+                ));
           }
         }
       } catch (_) {}
@@ -294,7 +298,7 @@ class YtDownloadService {
       final tempSize = await temp.length();
       if (tempSize < 1024) {
         return const Left(
-            DownloadFailure('Downloaded audio file is corrupt or incomplete'));
+            CorruptDownloadFailure('Downloaded audio file is corrupt or incomplete'));
       }
 
       // 3. Tagging — artwork embed + tag standardization (TagEditorPlugin)
