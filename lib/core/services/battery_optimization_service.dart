@@ -31,6 +31,18 @@ class BatteryOptimizationService {
     }
   }
 
+  static Future<bool> openBatteryOptimizationSettings() async {
+    if (kIsWeb || !Platform.isAndroid) return true;
+    try {
+      final res = await _channel
+          .invokeMethod<bool>('openBatteryOptimizationSettings');
+      return res ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+
   static Future<String> getDeviceManufacturer() async {
     if (kIsWeb || !Platform.isAndroid) return '';
     try {

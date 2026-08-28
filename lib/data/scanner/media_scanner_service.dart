@@ -89,23 +89,31 @@ class MediaScannerService {
   ];
 
   static bool isSystemIgnoredPath(String filePath) {
-    final lower = filePath.toLowerCase().replaceAll('\\', '/');
+    final normalized = filePath.toLowerCase().replaceAll('\\', '/');
+    final segments = normalized.split('/').where((s) => s.isNotEmpty).toList();
+
+    // Check system ignored path patterns
     for (final pattern in systemIgnoredPathPatterns) {
-      if (lower.contains(pattern)) return true;
+      if (normalized.contains(pattern)) return true;
     }
-    final fileName = lower.split('/').lastOrNull ?? '';
-    if (fileName.startsWith('ptt-') ||
-        (fileName.startsWith('aud-') && fileName.length > 20)) {
-      if (lower.contains('whatsapp') || lower.contains('opus')) return true;
+
+    final fileName = segments.lastOrNull ?? '';
+
+    // WhatsApp audio/voice note prefixes
+    if (fileName.startsWith('ptt-') || (fileName.startsWith('aud-') && fileName.length > 20)) {
+      if (normalized.contains('whatsapp') || normalized.contains('com.whatsapp')) {
+        return true;
+      }
     }
-    // Ignore only known system dot folders — user dot folders like .my_collection are now allowed
-    final parts = lower.split('/');
+
+    // Ignore known system dot folders and markers
     const knownSystemDotFolders = {'.thumbnails', '.trash', '.cache', '.nomedia'};
-    if (parts.any((p) => knownSystemDotFolders.contains(p))) {
+    if (segments.any((p) => knownSystemDotFolders.contains(p))) {
       return true;
     }
     return false;
   }
+
 
   Future<int> scanDeviceLibrary({
     bool ignoreShortFiles = true,

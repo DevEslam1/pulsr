@@ -50,11 +50,16 @@ void Crossfeed::process(float* L, float* R, int frames) {
     if (!enabled_ || !L || !R || frames <= 0) return;
 
     for (int i = 0; i < frames; ++i) {
-        const float l = L[i];
-        const float r = R[i];
+        float l = L[i];
+        float r = R[i];
+        if (!std::isfinite(l)) l = 0.0f;
+        if (!std::isfinite(r)) r = 0.0f;
 
         lpL_ += lpCoeff_ * (l - lpL_);
         lpR_ += lpCoeff_ * (r - lpR_);
+
+        if (!std::isfinite(lpL_)) lpL_ = 0.0f;
+        if (!std::isfinite(lpR_)) lpR_ = 0.0f;
 
         const int rdIdx = (writeIdx_ - delaySamples_ + MAX_DELAY_SAMPLES) % MAX_DELAY_SAMPLES;
         const float delayedL = delayBufferL_[rdIdx];
@@ -73,11 +78,16 @@ void Crossfeed::processInterleaved(float* buffer, int frames) {
     if (!enabled_ || !buffer || frames <= 0) return;
 
     for (int i = 0; i < frames; ++i) {
-        const float l = buffer[i * 2];
-        const float r = buffer[i * 2 + 1];
+        float l = buffer[i * 2];
+        float r = buffer[i * 2 + 1];
+        if (!std::isfinite(l)) l = 0.0f;
+        if (!std::isfinite(r)) r = 0.0f;
 
         lpL_ += lpCoeff_ * (l - lpL_);
         lpR_ += lpCoeff_ * (r - lpR_);
+
+        if (!std::isfinite(lpL_)) lpL_ = 0.0f;
+        if (!std::isfinite(lpR_)) lpR_ = 0.0f;
 
         const int rdIdx = (writeIdx_ - delaySamples_ + MAX_DELAY_SAMPLES) % MAX_DELAY_SAMPLES;
         const float delayedL = delayBufferL_[rdIdx];
@@ -91,3 +101,4 @@ void Crossfeed::processInterleaved(float* buffer, int frames) {
         buffer[i * 2 + 1] = r + delayedL * feedLevel_;
     }
 }
+

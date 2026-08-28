@@ -72,10 +72,11 @@ class SongTile extends StatelessWidget {
                 onTap: onTap,
                 onLongPress: onLongPress,
                 child: Container(
-                  constraints: const BoxConstraints(minHeight: 58),
+                  constraints: const BoxConstraints(minHeight: 62),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
                       if (index != null)
                         SizedBox(
@@ -87,6 +88,7 @@ class SongTile extends StatelessWidget {
                                 color: isActive ? p.accent : p.textTertiary,
                                 fontWeight: FontWeight.w700,
                                 fontSize: isCompact ? 12 : 13,
+                                height: 1.2,
                                 fontFeatures: const [
                                   FontFeature.tabularFigures()
                                 ],
@@ -122,8 +124,8 @@ class SongTile extends StatelessWidget {
                                         decoration: BoxDecoration(
                                           color: Colors.black
                                               .withValues(alpha: 0.45),
-                                          borderRadius:
-                                              BorderRadius.circular(13),
+                                        borderRadius:
+                                            BorderRadius.circular(13),
                                         ),
                                         child: Center(
                                           child: NowPlayingIndicator(
@@ -139,6 +141,7 @@ class SongTile extends StatelessWidget {
                       Expanded(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
@@ -151,6 +154,7 @@ class SongTile extends StatelessWidget {
                                     ? FontWeight.w800
                                     : FontWeight.w600,
                                 fontSize: isCompact ? 13.5 : 14.5,
+                                height: 1.25,
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -172,6 +176,7 @@ class SongTile extends StatelessWidget {
                                     style: TextStyle(
                                       color: p.textSecondary,
                                       fontSize: isCompact ? 11.5 : 12.5,
+                                      height: 1.25,
                                     ),
                                   ),
                                 ),
@@ -180,6 +185,7 @@ class SongTile extends StatelessWidget {
                           ],
                         ),
                       ),
+
                       if (song.durationMs > 0) ...[
                         const SizedBox(width: 8),
                         Text(

@@ -1169,7 +1169,26 @@ class PulsrAudioHandler extends BaseAudioHandler
           cookies: cached.cookies
         );
       }
+
+      final preResolved = _streamPreResolver.urlCache.get(videoId, quality: quality);
+      if (preResolved != null && !preResolved.isExpired()) {
+        try {
+          _latencyTracker?.markStage(PlaybackStage.urlObtained);
+        } catch (_) {}
+        _streamCache[cacheKey] = (
+          url: preResolved.url,
+          userAgent: preResolved.userAgent,
+          cookies: preResolved.cookies,
+          expires: preResolved.expiresAt,
+        );
+        return (
+          url: preResolved.url,
+          userAgent: preResolved.userAgent,
+          cookies: preResolved.cookies,
+        );
+      }
     }
+
     try {
       _latencyTracker?.markStage(PlaybackStage.pluginEntered);
       _latencyTracker?.markStage(PlaybackStage.clientRequestSent);
@@ -1851,8 +1870,18 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (_songs.length > index + 2) {
       unawaited(_tripleBufferPipeline.prefetchAhead(_songs[index + 2]));
     }
+
+    // Trigger StreamPreResolver to pre-resolve stream URL for next track in queue (<300ms latency)
+    _streamPreResolver.onTrackStarted(
+      queue: _songs,
+      currentIndex: index,
+      isShuffle: playbackState.value.shuffleMode == AudioServiceShuffleMode.all,
+    );
+
+
     // Notify sleep timer of track completion for endOfTrack / afterNTracks modes (fixes silent never-fire)
     unawaited(_sleepTimerManager.onTrackCompleted());
+
   }
 
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {

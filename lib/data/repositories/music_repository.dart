@@ -986,73 +986,96 @@ class MusicRepository implements IMusicRepository {
     required List<ArtistsTableCompanion> artists,
   }) async {
     try {
+      // 1. Fetch existing songs mapping by lowercase normalized path
+      final existingSongs = await (_db.select(_db.songsTable)
+            ..where((t) => t.path.isNotNull() & t.path.equals('').not()))
+          .get();
+
+      final existingByPath = <String, SongsTableData>{};
+      for (final s in existingSongs) {
+        existingByPath[s.path.toLowerCase().replaceAll('\\', '/')] = s;
+      }
+
+      // 2. Align companions to existing rows by path to update in place and preserve metadata
+      final reconciledSongs = <SongsTableCompanion>[];
+      for (final companion in songs) {
+        final path = companion.path.value.toLowerCase().replaceAll('\\', '/');
+        final existing = existingByPath[path];
+
+        if (existing != null) {
+          // Preserve existing ID and all rich user/download metadata
+          reconciledSongs.add(
+            companion.copyWith(
+              id: Value(existing.id),
+              isDownloaded: Value(existing.isDownloaded),
+              remoteId: Value(existing.remoteId),
+              remoteArtworkUrl: Value(existing.remoteArtworkUrl),
+              isFavorite: Value(existing.isFavorite),
+              playCount: Value(existing.playCount),
+              lastPlayed: Value(existing.lastPlayed),
+              lastPositionMs: Value(existing.lastPositionMs),
+              source: Value(existing.source),
+            ),
+          );
+        } else {
+          reconciledSongs.add(companion);
+        }
+      }
+
+      // 3. Batch insert/update and deduplicate atomically in a single transaction
       await _db.transaction(() async {
         await _db.batch((batch) {
-          batch.insertAllOnConflictUpdate(_db.songsTable, songs);
+          batch.insertAllOnConflictUpdate(_db.songsTable, reconciledSongs);
           batch.insertAllOnConflictUpdate(_db.albumsTable, albums);
           batch.insertAllOnConflictUpdate(_db.artistsTable, artists);
         });
-      });
 
-      // Deduplicate by path after scanner batch-insert.
-      //
-      // The scanner uses MediaStore IDs as PKs, which differ from the IDs we
-      // assigned when the YTM row was first inserted.  When a downloaded song is
-      // rescanned MediaStore gives it a NEW id, and insertAllOnConflictUpdate
-      // inserts a second row (no conflict because primary key differs).
-      //
-      // Strategy: keep the row that carries the most metadata:
-      //   1. Prefer any row with is_downloaded = 1  (rich YTM metadata + artwork)
-      //   2. Otherwise keep the row with the smallest id (oldest/first indexed)
-      // All other duplicate-path rows are deleted, with their playlist/queue
-      // references re-pointed at the surviving row first.
-      try {
-        // Find paths that have more than one row.
-        final dupPaths = await _db.customSelect(
-          "SELECT lower(path) as lp FROM songs "
-          "WHERE path != '' AND path NOT LIKE 'ytmusic://%' "
-          "GROUP BY lower(path) HAVING COUNT(*) > 1",
-        ).get();
-
-        for (final row in dupPaths) {
-          final lp = row.data['lp'] as String;
-          // Pick surviving row: prefer isDownloaded=1, else MIN(id)
-          final candidates = await _db.customSelect(
-            "SELECT id, is_downloaded FROM songs "
-            "WHERE lower(path) = ? AND path != '' AND path NOT LIKE 'ytmusic://%' "
-            "ORDER BY is_downloaded DESC, id ASC",
-            variables: [Variable.withString(lp)],
+        // 4. Clean any remaining duplicate paths in the same transaction
+        try {
+          final dupPaths = await _db.customSelect(
+            "SELECT lower(path) as lp FROM songs "
+            "WHERE path != '' AND path NOT LIKE 'ytmusic://%' "
+            "GROUP BY lower(path) HAVING COUNT(*) > 1",
           ).get();
-          if (candidates.isEmpty) continue;
-          final survivingId = candidates.first.data['id'] as int;
 
-          // Delete all other rows for this path (safe — no FK children to worry
-          // about here because this runs before cleanupOrphanedSongs).
-          for (final c in candidates.skip(1)) {
-            final dupeId = c.data['id'] as int;
-            try {
-              await _db.customStatement(
-                'UPDATE playlist_entries SET song_id = ? WHERE song_id = ?',
-                [survivingId, dupeId],
-              );
-              await _db.customStatement(
-                'UPDATE queue_items SET song_id = ? WHERE song_id = ?',
-                [survivingId, dupeId],
-              );
-              await _db.customStatement(
-                'DELETE FROM songs WHERE id = ?',
-                [dupeId],
-              );
-            } catch (_) {}
+          for (final row in dupPaths) {
+            final lp = row.data['lp'] as String;
+            final candidates = await _db.customSelect(
+              "SELECT id, is_downloaded FROM songs "
+              "WHERE lower(path) = ? AND path != '' AND path NOT LIKE 'ytmusic://%' "
+              "ORDER BY is_downloaded DESC, id ASC",
+              variables: [Variable.withString(lp)],
+            ).get();
+            if (candidates.isEmpty) continue;
+            final survivingId = candidates.first.data['id'] as int;
+
+            for (final c in candidates.skip(1)) {
+              final dupeId = c.data['id'] as int;
+              try {
+                await _db.customStatement(
+                  'UPDATE playlist_entries SET song_id = ? WHERE song_id = ?',
+                  [survivingId, dupeId],
+                );
+                await _db.customStatement(
+                  'UPDATE queue_items SET song_id = ? WHERE song_id = ?',
+                  [survivingId, dupeId],
+                );
+                await _db.customStatement(
+                  'DELETE FROM songs WHERE id = ?',
+                  [dupeId],
+                );
+              } catch (_) {}
+            }
           }
-        }
-      } catch (_) {}
+        } catch (_) {}
+      });
 
       return const Right(null);
     } catch (e) {
       return Left(DatabaseFailure('Failed to sync scanned music', e));
     }
   }
+
 
   @override
   Future<Result<int>> cleanupOrphanedSongs(Set<int> scannedSongIds) async {

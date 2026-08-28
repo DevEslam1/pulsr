@@ -100,6 +100,7 @@ void ParametricEQ::applyParams(const EqParamSet& params) {
         bands_[i].enabled = p.enabled;
         bands_[i].solo = p.solo;
         bands_[i].mute = p.mute;
+        computeCoeffs(bands_[i], bands_[i].smoothedGainDb);
     }
 }
 
@@ -108,7 +109,14 @@ void ParametricEQ::reset() {
     std::memset(x2_, 0, sizeof(x2_));
     std::memset(y1_, 0, sizeof(y1_));
     std::memset(y2_, 0, sizeof(y2_));
+    smoothedPreampDb_ = targetPreampDb_;
+    preampLinear_ = std::pow(10.0, smoothedPreampDb_ / 20.0);
+    for (int i = 0; i < bandCount_; ++i) {
+        bands_[i].smoothedGainDb = bands_[i].targetGainDb;
+        computeCoeffs(bands_[i], bands_[i].smoothedGainDb);
+    }
 }
+
 
 void ParametricEQ::computeCoeffs(EQBandState& band, double gainDb) {
     // Check if bypass optimization applies
@@ -308,22 +316,37 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
             float* chPtr = buffer + ch;
             for (int f = 0; f < frames; ++f) {
                 const double x0 = static_cast<double>(*chPtr);
-                const double y0 = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+                if (!std::isfinite(x0)) {
+                    *chPtr = 0.0f;
+                    chPtr += channels;
+                    continue;
+                }
 
-                x2 = x1;
-                x1 = x0;
-                y2 = y1;
-                y1 = y0;
+                double y0 = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+
+                if (!std::isfinite(y0)) {
+                    // Filter instability/blowup detected — reset biquad state registers immediately
+                    x1 = 0.0;
+                    x2 = 0.0;
+                    y1 = 0.0;
+                    y2 = 0.0;
+                    y0 = x0; // Fallback to passthrough for corrupted frame
+                } else {
+                    x2 = x1;
+                    x1 = x0;
+                    y2 = y1;
+                    y1 = y0;
+                }
 
                 *chPtr = static_cast<float>(y0);
                 chPtr += channels;
             }
 
-            // Flush denormals
-            if (std::abs(y1) < 1e-25) y1 = 0.0;
-            if (std::abs(y2) < 1e-25) y2 = 0.0;
-            if (std::abs(x1) < 1e-25) x1 = 0.0;
-            if (std::abs(x2) < 1e-25) x2 = 0.0;
+            // Flush denormals & ensure state is strictly finite
+            if (std::abs(y1) < 1e-25 || !std::isfinite(y1)) y1 = 0.0;
+            if (std::abs(y2) < 1e-25 || !std::isfinite(y2)) y2 = 0.0;
+            if (std::abs(x1) < 1e-25 || !std::isfinite(x1)) x1 = 0.0;
+            if (std::abs(x2) < 1e-25 || !std::isfinite(x2)) x2 = 0.0;
 
             x1_[ch][b] = x1;
             x2_[ch][b] = x2;
@@ -332,3 +355,4 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
         }
     }
 }
+

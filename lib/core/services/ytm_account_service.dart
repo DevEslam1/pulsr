@@ -671,7 +671,9 @@ class YtmAccountService {
             await http.post(uri, headers: headers, body: body).timeout(timeout);
         if (res.statusCode == 429 || res.statusCode >= 500) {
           if (res.statusCode == 429) {
-            YtmRateLimiter.shared.onRateLimited();
+            final retryHeader = res.headers['retry-after'];
+            final retryAfter = int.tryParse(retryHeader ?? '');
+            YtmRateLimiter.shared.onRateLimited(retryAfter);
           }
           final backoffSec = (1 << attempt) + Random().nextInt(2);
           debugPrint(
@@ -680,8 +682,14 @@ class YtmAccountService {
             await Future.delayed(Duration(seconds: backoffSec));
             continue;
           }
+          if (res.statusCode == 429) {
+            throw const YtmException('RATE_LIMITED', 'YouTube Music rate limit reached');
+          } else {
+            throw YtmException('HTTP_${res.statusCode}', 'Server returned HTTP ${res.statusCode}');
+          }
         }
 
+        // Only record success for valid, non-rate-limited, non-5xx responses
         YtmRateLimiter.shared.onSuccess();
         return res;
       } on TimeoutException {
@@ -693,6 +701,7 @@ class YtmAccountService {
       }
     }
     throw const YtmException('YTM_TIMEOUT', 'Exceeded maximum retry attempts');
+
   }
 
   /// Fetches library playlists from YouTube Music.
