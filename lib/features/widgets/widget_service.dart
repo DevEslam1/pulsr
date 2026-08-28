@@ -82,7 +82,6 @@ class WidgetService {
       await HomeWidget.updateWidget(
         name: androidWidgetName,
         androidName: androidWidgetName,
-        qualifiedAndroidName: qualifiedAndroidName,
       );
     } catch (e, st) {
       ErrorLogger.log('Failed to update home screen widget state',
@@ -107,7 +106,6 @@ class WidgetService {
       await HomeWidget.updateWidget(
         name: androidWidgetName,
         androidName: androidWidgetName,
-        qualifiedAndroidName: qualifiedAndroidName,
       );
     } catch (_) {}
   }

@@ -33,6 +33,11 @@ import java.io.File
 
 class NowPlayingWidget : AppWidgetProvider() {
 
+    override fun onEnabled(context: Context) {
+        super.onEnabled(context)
+        scheduleDebouncedWidgetUpdate(context, 0L)
+    }
+
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
         if (action != null && action.startsWith("com.pulsr.music.widget.")) {
