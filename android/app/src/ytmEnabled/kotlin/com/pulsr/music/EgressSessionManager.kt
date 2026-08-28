@@ -163,12 +163,16 @@ class EgressSessionManager(
 
     private fun onEgressChanged() {
         val egress = currentEgressId
-        Log.i(TAG, "Egress changed to $egress; notifying ${listeners.size} listeners")
+        try {
+            Log.i(TAG, "Egress changed to $egress; notifying ${listeners.size} listeners")
+        } catch (_: Throwable) {}
         for (l in listeners) {
             try {
                 l.invoke(egress)
             } catch (t: Throwable) {
-                Log.w(TAG, "Listener error during egress change: ${t.message}")
+                try {
+                    Log.w(TAG, "Listener error during egress change: ${t.message}")
+                } catch (_: Throwable) {}
             }
         }
     }
