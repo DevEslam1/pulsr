@@ -82,6 +82,9 @@ class DownloadService : Service() {
 
     private var activeDownloads = mutableMapOf<String, Int>() // videoId -> progress 0..100
     private var foregroundStarted = false
+    private var lastNotificationTimeMs = 0L
+    private var lastEmittedAvgProgress = -1
+    private val sessionStartTimeMs = System.currentTimeMillis()
 
     override fun onCreate() {
         super.onCreate()
@@ -94,7 +97,7 @@ class DownloadService : Service() {
                 val vid = intent.getStringExtra(EXTRA_VIDEO_ID) ?: return START_NOT_STICKY
                 val title = intent.getStringExtra(EXTRA_TITLE) ?: "Downloading"
                 activeDownloads[vid] = 0
-                ensureForeground(title, 0)
+                ensureForeground(title, 0, force = true)
             }
             ACTION_UPDATE -> {
                 val vid = intent.getStringExtra(EXTRA_VIDEO_ID) ?: return START_NOT_STICKY
@@ -108,7 +111,16 @@ class DownloadService : Service() {
                 } else {
                     val display = if (activeDownloads.size == 1) title else "${activeDownloads.size} downloads"
                     val avg = if (activeDownloads.isNotEmpty()) activeDownloads.values.average().toInt() else 0
-                    ensureForeground(display, avg)
+                    val now = System.currentTimeMillis()
+
+                    // DL-25: Coalesce notification updates: only update if >=1s elapsed or progress delta >= 1%
+                    val timeDelta = now - lastNotificationTimeMs
+                    val progressDelta = Math.abs(avg - lastEmittedAvgProgress)
+                    if (timeDelta >= 1000L || progressDelta >= 1 || avg == 0 || avg == 100) {
+                        ensureForeground(display, avg)
+                        lastNotificationTimeMs = now
+                        lastEmittedAvgProgress = avg
+                    }
                 }
             }
             ACTION_PAUSE -> {
@@ -139,7 +151,7 @@ class DownloadService : Service() {
         return START_NOT_STICKY
     }
 
-    private fun ensureForeground(title: String, progress: Int) {
+    private fun ensureForeground(title: String, progress: Int, force: Boolean = false) {
         val n = notificationFor(title, progress)
         if (!foregroundStarted) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -153,6 +165,7 @@ class DownloadService : Service() {
                 .notify(NOTIFICATION_ID, n)
         }
     }
+
 
     private fun stopForegroundAndSelf() {
         stopForeground(STOP_FOREGROUND_REMOVE)

@@ -1,4 +1,6 @@
 // lib/domain/usecases/retry_download.dart
+// DL-14: Input validation guard.
+
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 import '../../core/errors/failures.dart';
@@ -10,6 +12,11 @@ class RetryDownloadUseCase {
 
   RetryDownloadUseCase(this._repository);
 
-  Future<Either<AppFailure, Unit>> call(String videoId) =>
-      _repository.retryDownload(videoId);
+  Future<Either<AppFailure, Unit>> call(String videoId) async {
+    if (videoId.trim().isEmpty) {
+      return const Left(ValidationFailure('Invalid video ID'));
+    }
+    return _repository.retryDownload(videoId);
+  }
 }
+

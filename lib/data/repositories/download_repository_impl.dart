@@ -1,4 +1,11 @@
 // lib/data/repositories/download_repository_impl.dart
+// DL-01: Reconcile interrupted tasks on boot.
+// DL-03: Safe method channel wrapper with FeatureDisabledFailure support.
+// DL-04: Storage preflight before queueing.
+// DL-06: Duplicate queue protection.
+// DL-09: Debounced and distinct download updates.
+// DL-15: Per-task action lock to prevent double-tap races.
+
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
@@ -29,6 +36,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   final Queue<String> _queue = Queue<String>();
   final Set<String> _activeVideoIds = {};
   final Set<String> _pausedVideoIds = {};
+  final Set<String> _inFlightActions = {}; // DL-15: Action lock per videoId
   final Map<String, Completer<void>> _activeCompleters = {};
   final StreamController<DownloadTask> _streamController =
       StreamController<DownloadTask>.broadcast();
@@ -54,6 +62,17 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     return _tasks.values.toList();
   }
 
+  /// DL-03: Safe invoker for native download channel
+  Future<T?> _safeInvoke<T>(String method, [dynamic arguments]) async {
+    try {
+      return await _downloadChannel.invokeMethod<T>(method, arguments);
+    } on MissingPluginException {
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   Future<Either<AppFailure, String>> queueDownload(DownloadTask task) async {
     final videoId = task.videoId;
@@ -61,59 +80,73 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       return const Left(DownloadFailure('Invalid video ID'));
     }
 
-    final existing = _tasks[videoId];
-    // Dedupe: if already downloading or queued, return existing id instead of double-writer
-    if (existing != null &&
-        (existing.status == DownloadStatus.downloading ||
-            existing.status == DownloadStatus.queued)) {
-      return Right(existing.id);
+    // DL-15: Prevent double-tap race conditions
+    if (_inFlightActions.contains(videoId)) {
+      final existing = _tasks[videoId];
+      if (existing != null) return Right(existing.id);
     }
-    if (existing != null && existing.status == DownloadStatus.complete) {
-      // Check if file still exists on disk — off main thread via async check
-      if (existing.filePath != null) {
-        try {
-          final exists = await File(existing.filePath!).exists();
-          if (exists) return Right(existing.id);
-        } catch (_) {}
-      }
-      // File missing → allow re-download (treat as failed)
-    }
+    _inFlightActions.add(videoId);
 
-    // Storage preflight with typed error (ENOSPC)
     try {
-      final freeBytes =
-          await _downloadChannel.invokeMethod<int>('getFreeDiskSpace') ?? 0;
-      if (freeBytes > 0 && freeBytes < 15 * 1024 * 1024) {
-        return const Left(
-            StorageFailure('Insufficient storage space for downloading audio'));
+      final existing = _tasks[videoId];
+      // DL-06: Dedupe if already active or queued
+      if (existing != null &&
+          (existing.status == DownloadStatus.downloading ||
+              existing.status == DownloadStatus.queued)) {
+        return Right(existing.id);
       }
-    } catch (_) {}
+      if (existing != null && existing.status == DownloadStatus.complete) {
+        if (existing.filePath != null) {
+          try {
+            final exists = await File(existing.filePath!).exists();
+            if (exists) return Right(existing.id);
+          } catch (_) {}
+        }
+      }
 
-    // Mirror sanitize done in YtDownloadService; ensures / \ : * ? etc not in paths
-    final queuedTask = task.copyWith(
-      status: DownloadStatus.queued,
-      progress: 0.0,
-      error: null,
-    );
+      // DL-04: Storage preflight with 1.1x safety factor + 5MB buffer
+      try {
+        final freeBytes = await _safeInvoke<int>('getFreeDiskSpace') ?? 0;
+        const estBitrateKbps = 160;
+        const estDurationSeconds = 240;
+        const safetyFactor = 1.1;
+        const neededBytes = (estDurationSeconds * (estBitrateKbps * 1000 ~/ 8) * safetyFactor) +
+            (5 * 1024 * 1024);
 
-    _pausedVideoIds.remove(videoId);
-    _updateTask(queuedTask);
+        if (freeBytes > 0 && freeBytes < neededBytes.toInt()) {
+          return Left(InsufficientStorageFailure(
+            'Insufficient storage space for downloading audio',
+            neededBytes: neededBytes.toInt(),
+            availableBytes: freeBytes,
+          ));
+        }
+      } catch (_) {}
 
-    if (!_activeVideoIds.contains(videoId) && !_queue.contains(videoId)) {
-      _queue.add(videoId);
-    }
+      final queuedTask = task.copyWith(
+        status: DownloadStatus.queued,
+        progress: 0.0,
+        error: null,
+      );
 
-    // Start foreground service for background guarantee (B-07)
-    try {
-      await _downloadChannel.invokeMethod('startDownloadForeground', {
+      _pausedVideoIds.remove(videoId);
+      _updateTask(queuedTask);
+
+      if (!_activeVideoIds.contains(videoId) && !_queue.contains(videoId)) {
+        _queue.add(videoId);
+      }
+
+      await _safeInvoke('startDownloadForeground', {
         'videoId': videoId,
         'title': task.title,
       });
-    } catch (_) {}
 
-    _processQueue();
-    return Right(task.id);
+      _processQueue();
+      return Right(task.id);
+    } finally {
+      _inFlightActions.remove(videoId);
+    }
   }
+
 
   @override
   Future<Either<AppFailure, Unit>> pauseDownload(String videoId) async {

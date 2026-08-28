@@ -1,4 +1,6 @@
 // lib/domain/usecases/reorder_downloads.dart
+// DL-14: Input validation guard.
+
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 
@@ -11,6 +13,11 @@ class ReorderDownloadsUseCase {
 
   ReorderDownloadsUseCase(this._repository);
 
-  Future<Either<AppFailure, Unit>> call(List<String> orderedVideoIds) =>
-      _repository.reorderQueue(orderedVideoIds);
+  Future<Either<AppFailure, Unit>> call(List<String> orderedVideoIds) async {
+    if (orderedVideoIds.isEmpty) {
+      return const Left(ValidationFailure('Ordered video IDs list cannot be empty'));
+    }
+    return _repository.reorderQueue(orderedVideoIds);
+  }
 }
+

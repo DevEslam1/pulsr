@@ -1,4 +1,6 @@
 // lib/domain/usecases/delete_download.dart
+// DL-14: Input validation guard.
+
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 import '../../core/errors/failures.dart';
@@ -10,6 +12,11 @@ class DeleteDownloadUseCase {
 
   DeleteDownloadUseCase(this._repository);
 
-  Future<Either<AppFailure, Unit>> call(String videoId) =>
-      _repository.deleteDownload(videoId);
+  Future<Either<AppFailure, Unit>> call(String videoId) async {
+    if (videoId.trim().isEmpty) {
+      return const Left(ValidationFailure('Invalid video ID'));
+    }
+    return _repository.deleteDownload(videoId);
+  }
 }
+

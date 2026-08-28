@@ -82,6 +82,23 @@ class CorruptDownloadFailure extends DownloadFailure {
   const CorruptDownloadFailure(super.message, [super.error]);
 }
 
+class FeatureDisabledFailure extends DownloadFailure {
+  const FeatureDisabledFailure(
+      [super.message = 'Unavailable in this build', super.error]);
+}
+
+class InvalidTransitionFailure extends DownloadFailure {
+  final String from;
+  final String to;
+
+  const InvalidTransitionFailure(this.from, this.to, [dynamic error])
+      : super('Invalid download status transition: $from -> $to', error);
+}
+
+class ValidationFailure extends AppFailure {
+  const ValidationFailure(super.message, [super.error]);
+}
+
 class FgsTimeoutFailure extends DownloadFailure {
   const FgsTimeoutFailure(super.message, [super.error]);
 }
@@ -90,4 +107,3 @@ class YtmFailure extends AppFailure {
   final String? code;
   const YtmFailure(super.message, [this.code, super.error]);
 }
-

@@ -25,6 +25,7 @@ import '../../core/widgets/cached_artwork.dart';
 import '../../core/services/xdm_backend_service.dart';
 import '../../core/services/ytm_account_service.dart';
 import '../../core/services/ytm_service.dart';
+import '../../core/utils/safe_filename.dart';
 
 /// Where a download currently is, for driving progress UI.
 enum YtDownloadStage {
@@ -316,18 +317,28 @@ class YtDownloadService {
       onProgress?.call(const YtDownloadProgress(YtDownloadStage.saving));
       ErrorLogger.addBreadcrumb('Download saving to MediaStore: $videoId',
           category: 'download', data: {'videoId': videoId});
-      final displayName =
-          '${_sanitize(song.artist)} - ${_sanitize(song.title)}.$ext';
-      final finalPath =
-          await _downloadChannel.invokeMethod<String>('saveToMusic', {
-        'sourcePath': temp.path,
-        'displayName': displayName,
-        'title': song.title,
-        'mimeType': stream.mimeType,
-      });
+      final displayName = SafeFilename.sanitize(
+        artist: song.artist,
+        title: song.title,
+        ext: ext,
+      );
+      String? finalPath;
+      try {
+        finalPath = await _downloadChannel.invokeMethod<String>('saveToMusic', {
+          'sourcePath': temp.path,
+          'displayName': displayName,
+          'title': song.title,
+          'mimeType': stream.mimeType,
+        });
+      } on MissingPluginException {
+        return const Left(FeatureDisabledFailure());
+      } catch (e) {
+        return Left(DownloadFailure('Failed to save to MediaStore: $e'));
+      }
       if (finalPath == null || finalPath.isEmpty) {
         return const Left(DownloadFailure('MediaStore did not return a path'));
       }
+
 
       onProgress?.call(const YtDownloadProgress(YtDownloadStage.indexing));
       ErrorLogger.addBreadcrumb('Download indexing: $videoId',

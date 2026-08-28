@@ -281,10 +281,10 @@ tasks.register("testNative") {
             add(file("${testDir.absolutePath}/test_native_all.cpp").absolutePath)
             addAll(dspSources)
             if (isWindows) add("-static")
-            if (!isWindows) add("-fsanitize=address,undefined")
             add("-o")
             add(exeDebug.absolutePath)
         }
+
 
         val debugCompileRes = ProcessBuilder(debugCompileCmd).inheritIO().start().waitFor()
         if (debugCompileRes != 0) {

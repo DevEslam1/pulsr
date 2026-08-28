@@ -1,17 +1,24 @@
+// lib/features/downloads/cubit/downloads_state.dart
+// DL-19: Typed failures and retryable classification.
+
 import 'package:flutter/foundation.dart';
+import '../../../core/errors/failures.dart';
 import '../../../domain/models/download_task.dart';
+import '../../../domain/models/retry_policy.dart';
 
 class DownloadsState {
   final Map<String, DownloadTask> tasks;
   final StorageStats storageStats;
   final bool isLoading;
   final String? errorMessage;
+  final AppFailure? failure;
 
   const DownloadsState({
     this.tasks = const {},
     this.storageStats = const StorageStats(),
     this.isLoading = false,
     this.errorMessage,
+    this.failure,
   });
 
   List<DownloadTask> get taskList => tasks.values.toList()
@@ -21,24 +28,30 @@ class DownloadsState {
       tasks.values.where((t) => t.status.isActive).length;
 
   int get pausedCount =>
-      tasks.values.where((t) => t.status == DownloadStatus.paused).length;
+      tasks.values.where((t) => t.status == DownloadStatus.paused || t.status == DownloadStatus.interrupted).length;
 
   bool get hasPausedTasks => pausedCount > 0;
 
   int get completedCount =>
       tasks.values.where((t) => t.status == DownloadStatus.complete).length;
 
+  bool get isErrorRetryable => failure != null
+      ? RetryPolicy.isRetryableError(failure!.message)
+      : RetryPolicy.isRetryableError(errorMessage);
+
   DownloadsState copyWith({
     Map<String, DownloadTask>? tasks,
     StorageStats? storageStats,
     bool? isLoading,
     String? errorMessage,
+    AppFailure? failure,
   }) {
     return DownloadsState(
       tasks: tasks ?? this.tasks,
       storageStats: storageStats ?? this.storageStats,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage,
+      failure: failure,
     );
   }
 
@@ -49,6 +62,7 @@ class DownloadsState {
           runtimeType == other.runtimeType &&
           isLoading == other.isLoading &&
           errorMessage == other.errorMessage &&
+          failure == other.failure &&
           storageStats == other.storageStats &&
           mapEquals(tasks, other.tasks);
 
@@ -58,5 +72,7 @@ class DownloadsState {
         storageStats,
         isLoading,
         errorMessage,
+        failure,
       );
 }
+

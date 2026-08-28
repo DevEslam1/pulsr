@@ -1,21 +1,86 @@
 // lib/domain/models/download_task.dart
+// DL-10: Sealed statuses & TransitionGuard matrix to prevent illegal state jumps.
+
+import 'package:fpdart/fpdart.dart';
+import '../../core/errors/failures.dart';
 
 enum DownloadStatus {
   queued,
   downloading,
   embedding,
   paused,
+  interrupted,
   failed,
   complete;
 
   bool get isTerminal => this == DownloadStatus.complete || this == DownloadStatus.failed;
   bool get isActive => this == DownloadStatus.queued || this == DownloadStatus.downloading || this == DownloadStatus.embedding;
   bool get canPause => this == DownloadStatus.downloading || this == DownloadStatus.queued;
-  bool get canResume => this == DownloadStatus.paused;
-  bool get canRetry => this == DownloadStatus.failed;
+  bool get canResume => this == DownloadStatus.paused || this == DownloadStatus.interrupted;
+  bool get canRetry => this == DownloadStatus.failed || this == DownloadStatus.interrupted;
+  bool get canPrioritize => this == DownloadStatus.queued || this == DownloadStatus.paused || this == DownloadStatus.interrupted;
+  bool get canCancel => !isTerminal;
+}
+
+/// DL-10: State transition matrix guard ensuring only valid lifecycle state jumps are allowed.
+class TransitionGuard {
+  static const Map<DownloadStatus, Set<DownloadStatus>> _allowedTransitions = {
+    DownloadStatus.queued: {
+      DownloadStatus.downloading,
+      DownloadStatus.paused,
+      DownloadStatus.interrupted,
+      DownloadStatus.failed,
+      DownloadStatus.complete, // direct transition if already cached
+    },
+    DownloadStatus.downloading: {
+      DownloadStatus.embedding,
+      DownloadStatus.paused,
+      DownloadStatus.interrupted,
+      DownloadStatus.failed,
+      DownloadStatus.complete,
+      DownloadStatus.queued, // reorder / prioritize
+    },
+    DownloadStatus.embedding: {
+      DownloadStatus.complete,
+      DownloadStatus.failed,
+      DownloadStatus.interrupted,
+    },
+    DownloadStatus.paused: {
+      DownloadStatus.queued,
+      DownloadStatus.downloading,
+      DownloadStatus.failed,
+      DownloadStatus.interrupted,
+    },
+    DownloadStatus.interrupted: {
+      DownloadStatus.queued,
+      DownloadStatus.downloading,
+      DownloadStatus.paused,
+      DownloadStatus.failed,
+    },
+    DownloadStatus.failed: {
+      DownloadStatus.queued,
+      DownloadStatus.downloading, // retry
+    },
+    DownloadStatus.complete: {
+      DownloadStatus.queued, // re-download after manual file delete
+    },
+  };
+
+  static bool canTransition(DownloadStatus from, DownloadStatus to) {
+    if (from == to) return true;
+    return _allowedTransitions[from]?.contains(to) ?? false;
+  }
+
+  static Either<InvalidTransitionFailure, Unit> validate(DownloadStatus from, DownloadStatus to) {
+    if (canTransition(from, to)) {
+      return const Right(unit);
+    }
+    return Left(InvalidTransitionFailure(from.name, to.name));
+  }
 }
 
 typedef DownloadTaskStatus = DownloadStatus;
+
 
 class DownloadTask {
   final String id;

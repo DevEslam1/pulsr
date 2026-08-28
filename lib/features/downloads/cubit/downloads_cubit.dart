@@ -1,4 +1,9 @@
 // lib/features/downloads/cubit/downloads_cubit.dart
+// DL-15: Per-taskId action mutex and debouncing to prevent duplicate jobs.
+// DL-16: Granular 100ms throttle on progress updates.
+// DL-18: Safe async continuations with if (isClosed) return guards.
+// DL-19: Typed failure mapping with retryable classification.
+
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
@@ -29,6 +34,7 @@ class DownloadsCubit extends Cubit<DownloadsState> {
 
   StreamSubscription<DownloadTask>? _downloadSub;
   final Map<String, int> _lastEmitTimeByVideoId = {};
+  final Set<String> _inFlightActions = {}; // DL-15: Mutex lock per task
 
   DownloadsCubit(
     this._queueDownloadUseCase,
@@ -57,6 +63,7 @@ class DownloadsCubit extends Cubit<DownloadsState> {
   Future<void> loadInitialTasks() async {
     try {
       final tasks = await _observeDownloadsUseCase.getAll();
+      if (isClosed) return;
       final taskMap = Map<String, DownloadTask>.unmodifiable({
         for (final t in tasks) t.videoId: t,
       });
@@ -75,9 +82,6 @@ class DownloadsCubit extends Cubit<DownloadsState> {
       final lastEmit = _lastEmitTimeByVideoId[task.videoId] ?? 0;
       final existingTask = state.tasks[task.videoId];
 
-      // Coalesce intermediate progress at ~10Hz (100ms) — prevents rebuild storms
-      // from 1000/s chunk callbacks (native parallel emits at ~80ms). Immediate on
-      // status transitions / terminal states so pause/complete feels instant.
       final isProgressOnly = existingTask != null &&
           existingTask.status == task.status &&
           task.status == DownloadStatus.downloading &&
@@ -104,6 +108,7 @@ class DownloadsCubit extends Cubit<DownloadsState> {
 
   Future<void> refreshStorageStats() async {
     final result = await _getStorageStatsUseCase();
+    if (isClosed) return;
     result.fold(
       (_) {},
       (stats) {
@@ -115,73 +120,121 @@ class DownloadsCubit extends Cubit<DownloadsState> {
   }
 
   Future<void> queueDownload(DownloadTask task) async {
-    final result = await _queueDownloadUseCase(task);
-    result.fold(
-      (failure) {
-        emit(state.copyWith(errorMessage: failure.message));
-      },
-      (_) {},
-    );
+    if (_inFlightActions.contains(task.videoId)) return;
+    _inFlightActions.add(task.videoId);
+
+    try {
+      final result = await _queueDownloadUseCase(task);
+      if (isClosed) return;
+      result.fold(
+        (failure) {
+          emit(state.copyWith(errorMessage: failure.message, failure: failure));
+        },
+        (_) {},
+      );
+    } finally {
+      _inFlightActions.remove(task.videoId);
+    }
   }
 
   Future<void> pauseDownload(String videoId) async {
-    final result = await _pauseDownloadUseCase(videoId);
-    result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
-      (_) {},
-    );
+    if (_inFlightActions.contains(videoId)) return;
+    _inFlightActions.add(videoId);
+
+    try {
+      final result = await _pauseDownloadUseCase(videoId);
+      if (isClosed) return;
+      result.fold(
+        (failure) => emit(state.copyWith(errorMessage: failure.message, failure: failure)),
+        (_) {},
+      );
+    } finally {
+      _inFlightActions.remove(videoId);
+    }
   }
 
   Future<void> resumeDownload(String videoId) async {
-    final result = await _resumeDownloadUseCase(videoId);
-    result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
-      (_) {},
-    );
+    if (_inFlightActions.contains(videoId)) return;
+    _inFlightActions.add(videoId);
+
+    try {
+      final result = await _resumeDownloadUseCase(videoId);
+      if (isClosed) return;
+      result.fold(
+        (failure) => emit(state.copyWith(errorMessage: failure.message, failure: failure)),
+        (_) {},
+      );
+    } finally {
+      _inFlightActions.remove(videoId);
+    }
   }
 
   Future<void> retryDownload(String videoId) async {
-    final result = await _retryDownloadUseCase(videoId);
-    result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
-      (_) {},
-    );
+    if (_inFlightActions.contains(videoId)) return;
+    _inFlightActions.add(videoId);
+
+    try {
+      final result = await _retryDownloadUseCase(videoId);
+      if (isClosed) return;
+      result.fold(
+        (failure) => emit(state.copyWith(errorMessage: failure.message, failure: failure)),
+        (_) {},
+      );
+    } finally {
+      _inFlightActions.remove(videoId);
+    }
   }
 
   Future<void> deleteDownload(String videoId) async {
-    final result = await _deleteDownloadUseCase(videoId);
-    result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
-      (_) {
-        final remaining = Map<String, DownloadTask>.from(state.tasks)
-          ..remove(videoId);
-        emit(state.copyWith(tasks: Map<String, DownloadTask>.unmodifiable(remaining)));
-        refreshStorageStats();
-      },
-    );
+    if (_inFlightActions.contains(videoId)) return;
+    _inFlightActions.add(videoId);
+
+    try {
+      final result = await _deleteDownloadUseCase(videoId);
+      if (isClosed) return;
+      result.fold(
+        (failure) => emit(state.copyWith(errorMessage: failure.message, failure: failure)),
+        (_) {
+          if (isClosed) return;
+          final remaining = Map<String, DownloadTask>.from(state.tasks)
+            ..remove(videoId);
+          emit(state.copyWith(tasks: Map<String, DownloadTask>.unmodifiable(remaining)));
+          refreshStorageStats();
+        },
+      );
+    } finally {
+      _inFlightActions.remove(videoId);
+    }
   }
 
   Future<void> prioritizeDownload(String videoId) async {
     final useCase = _prioritizeDownloadUseCase;
     if (useCase != null) {
       final result = await useCase(videoId);
+      if (isClosed) return;
       result.fold(
-        (failure) => emit(state.copyWith(errorMessage: failure.message)),
+        (failure) => emit(state.copyWith(errorMessage: failure.message, failure: failure)),
         (_) {},
       );
     }
   }
 
   Future<void> resumeAllPaused() async {
-    final pausedTasks = state.tasks.values.where((t) => t.status == DownloadStatus.paused).toList();
+    final pausedTasks = state.tasks.values
+        .where((t) => t.status == DownloadStatus.paused || t.status == DownloadStatus.interrupted)
+        .toList();
     for (final task in pausedTasks) {
+      if (isClosed) return;
       await resumeDownload(task.videoId);
     }
   }
 
   Future<void> retryAllFailed() async {
-    final failedTasks = state.tasks.values.where((t) => t.status == DownloadStatus.failed).toList();
+    final failedTasks = state.tasks.values
+        .where((t) => t.status == DownloadStatus.failed || t.status == DownloadStatus.interrupted)
+        .toList();
     for (final task in failedTasks) {
+      if (isClosed) return;
       await retryDownload(task.videoId);
     }
   }
@@ -190,8 +243,9 @@ class DownloadsCubit extends Cubit<DownloadsState> {
     final useCase = _reorderDownloadsUseCase;
     if (useCase != null) {
       final result = await useCase(orderedVideoIds);
+      if (isClosed) return;
       result.fold(
-        (failure) => emit(state.copyWith(errorMessage: failure.message)),
+        (failure) => emit(state.copyWith(errorMessage: failure.message, failure: failure)),
         (_) {},
       );
     }
@@ -201,6 +255,8 @@ class DownloadsCubit extends Cubit<DownloadsState> {
   Future<void> close() {
     _downloadSub?.cancel();
     _lastEmitTimeByVideoId.clear();
+    _inFlightActions.clear();
     return super.close();
   }
 }
+

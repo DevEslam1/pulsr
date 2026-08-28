@@ -7,6 +7,8 @@ import 'package:pulsr/features/ytm_search/cubit/ytm_download_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/core/errors/failures.dart';
+import 'package:pulsr/domain/models/download_task.dart';
+import 'package:pulsr/domain/repositories/download_repository_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockYtDownloadService extends Mock implements YtDownloadService {}
@@ -14,6 +16,9 @@ class MockYtDownloadService extends Mock implements YtDownloadService {}
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 class MockSongsTableData extends Mock implements SongsTableData {}
+
+class MockDownloadRepo extends Mock implements IDownloadRepository {}
+
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -169,20 +174,36 @@ void main() {
       expect(countAgain, 0);
     });
 
-    test('persisted running and queued download states reset to idle on init',
+    test('initializes download states from IDownloadRepository stream and query (DL-17)',
         () async {
-      SharedPreferences.setMockInitialValues({
-        'ytm_download_states':
-            '{"v1":{"status":"running"},"v2":{"status":"queued"},"v3":{"status":"done"}}',
-      });
-      final newCubit = YtmDownloadCubit(mockService, mockPlayerCubit);
-      // Wait for _loadPersistedState async execution
+      final mockRepo = MockDownloadRepo();
+      when(() => mockRepo.getAllDownloads()).thenAnswer((_) async => [
+            DownloadTask(
+              id: 't1',
+              videoId: 'v1',
+              title: 'Song 1',
+              artist: 'Artist 1',
+              createdAt: DateTime.now(),
+              status: DownloadStatus.downloading,
+            ),
+            DownloadTask(
+              id: 't2',
+              videoId: 'v2',
+              title: 'Song 2',
+              artist: 'Artist 2',
+              createdAt: DateTime.now(),
+              status: DownloadStatus.complete,
+            ),
+          ]);
+      when(() => mockRepo.observeDownloads()).thenAnswer((_) => const Stream.empty());
+
+      final newCubit = YtmDownloadCubit(mockService, mockPlayerCubit, mockRepo);
       await Future.delayed(const Duration(milliseconds: 50));
 
-      expect(newCubit.state.itemFor('v1').status, YtDownloadStatus.idle);
-      expect(newCubit.state.itemFor('v2').status, YtDownloadStatus.idle);
-      expect(newCubit.state.itemFor('v3').status, YtDownloadStatus.done);
+      expect(newCubit.state.itemFor('v1').status, YtDownloadStatus.running);
+      expect(newCubit.state.itemFor('v2').status, YtDownloadStatus.done);
       await newCubit.close();
     });
   });
 }
+

@@ -1,15 +1,50 @@
 // lib/features/downloads/presentation/downloads_screen.dart
+// DL-22: Dismissible × Reorderable conflict resolution & 5s soft-delete undo snackbar.
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../domain/models/download_task.dart';
 import '../../../../l10n/generated/app_localizations.dart';
 import '../cubit/downloads_cubit.dart';
 import '../cubit/downloads_state.dart';
 import 'widgets/download_tile.dart';
 import 'widgets/storage_stats_header.dart';
 
-class DownloadsScreen extends StatelessWidget {
+class DownloadsScreen extends StatefulWidget {
   const DownloadsScreen({super.key});
+
+  @override
+  State<DownloadsScreen> createState() => _DownloadsScreenState();
+}
+
+class _DownloadsScreenState extends State<DownloadsScreen> {
+  DownloadTask? _recentlyDeletedTask;
+
+  void _handleDelete(BuildContext context, DownloadTask task) {
+    HapticFeedback.mediumImpact();
+    final cubit = context.read<DownloadsCubit>();
+    _recentlyDeletedTask = task;
+    cubit.deleteDownload(task.videoId);
+
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Deleted "${task.title}"'),
+        duration: const Duration(seconds: 5),
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () {
+            if (_recentlyDeletedTask != null) {
+              cubit.queueDownload(_recentlyDeletedTask!);
+              _recentlyDeletedTask = null;
+            }
+          },
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -148,9 +183,44 @@ class DownloadsScreen extends StatelessWidget {
               final task = tasks[index - 1];
               return Padding(
                 key: ValueKey(task.videoId),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                child: DownloadTile(task: task),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                child: Dismissible(
+                  key: ValueKey('dismiss_${task.videoId}'),
+                  direction: DismissDirection.endToStart,
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 20),
+                    decoration: BoxDecoration(
+                      color: p.error,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+                  ),
+                  confirmDismiss: (direction) async {
+                    if (task.status.isActive) {
+                      return await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Cancel Download?'),
+                          content: Text('Are you sure you want to cancel and delete "${task.title}"?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(false),
+                              child: const Text('Keep'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.of(ctx).pop(true),
+                              child: Text('Delete', style: TextStyle(color: p.error)),
+                            ),
+                          ],
+                        ),
+                      ) ?? false;
+                    }
+                    return true;
+                  },
+                  onDismissed: (_) => _handleDelete(context, task),
+                  child: DownloadTile(task: task),
+                ),
               );
             },
           );
@@ -159,3 +229,4 @@ class DownloadsScreen extends StatelessWidget {
     );
   }
 }
+

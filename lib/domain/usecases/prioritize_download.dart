@@ -1,4 +1,6 @@
 // lib/domain/usecases/prioritize_download.dart
+// DL-14: Input validation guard.
+
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 
@@ -11,6 +13,11 @@ class PrioritizeDownloadUseCase {
 
   PrioritizeDownloadUseCase(this._repository);
 
-  Future<Either<AppFailure, Unit>> call(String videoId) =>
-      _repository.prioritizeDownload(videoId);
+  Future<Either<AppFailure, Unit>> call(String videoId) async {
+    if (videoId.trim().isEmpty) {
+      return const Left(ValidationFailure('Invalid video ID'));
+    }
+    return _repository.prioritizeDownload(videoId);
+  }
 }
+

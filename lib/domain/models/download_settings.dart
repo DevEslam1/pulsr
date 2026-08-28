@@ -1,8 +1,28 @@
 // lib/domain/models/download_settings.dart
+// DL-13: NetworkPolicy resolution rules for wifiOnly, cellular failover, and metered connections.
+
 import 'package:shared_preferences/shared_preferences.dart';
+
+enum NetworkPolicy {
+  wifiOnly,
+  allowCellularFailover,
+  alwaysAllow;
+
+  bool shouldAllowDownload({
+    required bool isWifi,
+    required bool isMetered,
+  }) {
+    return switch (this) {
+      NetworkPolicy.wifiOnly => isWifi,
+      NetworkPolicy.allowCellularFailover => isWifi || !isMetered,
+      NetworkPolicy.alwaysAllow => true,
+    };
+  }
+}
 
 class DownloadSettings {
   final bool wifiOnly;
+  final NetworkPolicy networkPolicy;
   final String quality; // high / medium / low
   final int maxConcurrent; // 1..5
   final String? downloadLocation; // SAF uri or null for default Music/
@@ -10,11 +30,13 @@ class DownloadSettings {
 
   const DownloadSettings({
     this.wifiOnly = false,
+    this.networkPolicy = NetworkPolicy.allowCellularFailover,
     this.quality = 'high',
     this.maxConcurrent = 3,
     this.downloadLocation,
     this.progressTimeoutWindowSeconds = 30,
   });
+
 
   factory DownloadSettings.defaultSettings() => const DownloadSettings();
 

@@ -1,11 +1,15 @@
 // lib/features/ytm_search/cubit/ytm_download_cubit.dart
+// DL-17: Single source of truth — thin viewer over shared repository stream.
+// DL-18: Guard all async continuations with if (isClosed) return.
+
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/di/injection.dart';
 import '../../../data/downloads/yt_download_service.dart';
 import '../../../data/db/app_database.dart';
+import '../../../domain/models/download_task.dart';
+import '../../../domain/repositories/download_repository_interface.dart';
 import '../../player/cubit/player_cubit.dart';
 
 enum YtDownloadStatus { idle, queued, running, done, failed, canceled }
@@ -16,6 +20,7 @@ class YtDownloadItem {
   final double? speedKbps;
   final int? etaSeconds;
   final String? error;
+
   const YtDownloadItem({
     this.status = YtDownloadStatus.idle,
     this.progress,
@@ -25,11 +30,14 @@ class YtDownloadItem {
   });
 
   Map<String, dynamic> toJson() => {'status': status.name, 'error': error};
+
   factory YtDownloadItem.fromJson(Map<String, dynamic> json) {
     final statusName = json['status'] as String? ?? 'idle';
     return YtDownloadItem(
-      status: YtDownloadStatus.values.firstWhere((e) => e.name == statusName,
-          orElse: () => YtDownloadStatus.idle),
+      status: YtDownloadStatus.values.firstWhere(
+        (e) => e.name == statusName,
+        orElse: () => YtDownloadStatus.idle,
+      ),
       error: json['error'] as String?,
     );
   }
@@ -37,50 +45,76 @@ class YtDownloadItem {
 
 class YtmDownloadState {
   final Map<String, YtDownloadItem> items;
+
   const YtmDownloadState({this.items = const {}});
+
   YtDownloadItem itemFor(String videoId) =>
       items[videoId] ?? const YtDownloadItem();
 }
 
 @singleton
 class YtmDownloadCubit extends Cubit<YtmDownloadState> {
-  static const String _prefKey = 'ytm_download_states';
   final YtDownloadService _service;
   final PlayerCubit _playerCubit;
+  final IDownloadRepository? _repository;
 
-  Timer? _saveDebounce; // ⚡ FIX: Debounce timer for I/O operations
+  StreamSubscription<DownloadTask>? _repoSub;
   final Map<String, int> _lastEmitTimeByVideoId = {};
 
-  YtmDownloadCubit(this._service, this._playerCubit)
-      : super(const YtmDownloadState()) {
-    _loadPersistedState();
+  YtmDownloadCubit(
+    this._service,
+    this._playerCubit, [
+    this._repository,
+  ]) : super(const YtmDownloadState()) {
+    _initSharedStream();
   }
 
-  Future<void> _loadPersistedState() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonStr = prefs.getString(_prefKey);
-      if (jsonStr != null && jsonStr.isNotEmpty) {
-        final rawMap = jsonDecode(jsonStr) as Map<String, dynamic>;
-        final restored = rawMap.map((k, v) {
-          final item = YtDownloadItem.fromJson(v as Map<String, dynamic>);
-          final cleanItem = (item.status == YtDownloadStatus.running ||
-                  item.status == YtDownloadStatus.queued)
-              ? const YtDownloadItem(status: YtDownloadStatus.idle)
-              : item;
-          return MapEntry(k, cleanItem);
-        });
-        if (!isClosed) emit(YtmDownloadState(items: restored));
-      }
-    } catch (_) {}
+  void _initSharedStream() {
+    final repo = _repository ?? (getIt.isRegistered<IDownloadRepository>() ? getIt<IDownloadRepository>() : null);
+    if (repo != null) {
+      repo.getAllDownloads().then((tasks) {
+        if (isClosed) return;
+        final initialMap = <String, YtDownloadItem>{};
+        for (final t in tasks) {
+          initialMap[t.videoId] = _mapTaskToItem(t);
+        }
+        if (initialMap.isNotEmpty && !isClosed) {
+          emit(YtmDownloadState(items: {...state.items, ...initialMap}));
+        }
+      }).catchError((_) {});
+
+      _repoSub = repo.observeDownloads().listen((task) {
+        if (isClosed) return;
+        final item = _mapTaskToItem(task);
+        _set(task.videoId, item);
+      });
+    }
   }
 
-  Future<void> _savePersistedState() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final mapToSave = state.items.map((k, v) => MapEntry(k, v.toJson()));
-      await prefs.setString(_prefKey, jsonEncode(mapToSave));
-    } catch (_) {}
+  YtDownloadItem _mapTaskToItem(DownloadTask task) {
+    return switch (task.status) {
+      DownloadStatus.queued => YtDownloadItem(
+          status: YtDownloadStatus.queued,
+          progress: task.progress,
+        ),
+      DownloadStatus.downloading || DownloadStatus.embedding => YtDownloadItem(
+          status: YtDownloadStatus.running,
+          progress: task.progress,
+          speedKbps: task.speedKbps,
+          etaSeconds: task.etaSeconds,
+        ),
+      DownloadStatus.complete => const YtDownloadItem(
+          status: YtDownloadStatus.done,
+          progress: 1.0,
+        ),
+      DownloadStatus.failed => YtDownloadItem(
+          status: YtDownloadStatus.failed,
+          error: task.error,
+        ),
+      DownloadStatus.paused || DownloadStatus.interrupted => const YtDownloadItem(
+          status: YtDownloadStatus.idle,
+        ),
+    };
   }
 
   void cancelDownload(String videoId) {
@@ -101,8 +135,7 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
       return;
     }
 
-    _set(videoId,
-        const YtDownloadItem(status: YtDownloadStatus.queued, progress: 0));
+    _set(videoId, const YtDownloadItem(status: YtDownloadStatus.queued, progress: 0));
 
     final result = await _service.download(song, onProgress: (p) {
       if (isClosed) return;
@@ -111,26 +144,22 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
         return;
       }
       _set(
-          videoId,
-          YtDownloadItem(
-            status: p.stage == YtDownloadStage.queued
-                ? YtDownloadStatus.queued
-                : YtDownloadStatus.running,
-            progress:
-                p.stage == YtDownloadStage.downloading ? p.fraction : null,
-            speedKbps:
-                p.stage == YtDownloadStage.downloading ? p.speedKbps : null,
-            etaSeconds:
-                p.stage == YtDownloadStage.downloading ? p.etaSeconds : null,
-          ));
+        videoId,
+        YtDownloadItem(
+          status: p.stage == YtDownloadStage.queued
+              ? YtDownloadStatus.queued
+              : YtDownloadStatus.running,
+          progress: p.stage == YtDownloadStage.downloading ? p.fraction : null,
+          speedKbps: p.stage == YtDownloadStage.downloading ? p.speedKbps : null,
+          etaSeconds: p.stage == YtDownloadStage.downloading ? p.etaSeconds : null,
+        ),
+      );
     });
 
     if (isClosed) return;
     if (result.isLeft()) {
-      final message =
-          result.getLeft().toNullable()?.message ?? 'Download failed';
-      _set(videoId,
-          YtDownloadItem(status: YtDownloadStatus.failed, error: message));
+      final message = result.getLeft().toNullable()?.message ?? 'Download failed';
+      _set(videoId, YtDownloadItem(status: YtDownloadStatus.failed, error: message));
       return;
     }
 
@@ -141,16 +170,11 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
     }
   }
 
-  /// Queues multiple songs for download in batch.
-  /// Downloads are processed concurrently according to the service limit (3 active).
-  /// Returns the number of songs newly queued.
   int downloadAll(Iterable<SongsTableData> songs) {
     int queuedCount = 0;
     for (final song in songs) {
       final videoId = song.remoteId;
       if (videoId == null || videoId.isEmpty) continue;
-
-      // Skip tracks that are already local on disk
       if (song.source == SongSource.local) continue;
 
       final current = state.itemFor(videoId);
@@ -181,41 +205,25 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
     final now = DateTime.now().millisecondsSinceEpoch;
     final lastEmit = _lastEmitTimeByVideoId[videoId] ?? 0;
 
-    // Throttle progress updates to at most 5 updates/sec (>= 200ms interval) per videoId.
-    // State transitions (e.g. idle -> queued -> running -> done/failed/canceled) and completion (progress >= 1.0)
-    // are emitted immediately without throttling.
     final currentItem = state.itemFor(videoId);
     final isIntermediateProgress = item.status == YtDownloadStatus.running &&
         currentItem.status == YtDownloadStatus.running &&
         item.progress != null &&
         item.progress! < 1.0;
 
-    if (isIntermediateProgress && (now - lastEmit < 200)) {
+    if (isIntermediateProgress && (now - lastEmit < 100)) {
       return;
     }
 
     _lastEmitTimeByVideoId[videoId] = now;
     emit(YtmDownloadState(items: {...state.items, videoId: item}));
-
-    // Persist only on terminal states to avoid disk churn during downloads
-    if (item.status == YtDownloadStatus.done ||
-        item.status == YtDownloadStatus.failed ||
-        item.status == YtDownloadStatus.canceled) {
-      _lastEmitTimeByVideoId.remove(videoId);
-      _saveDebounce?.cancel();
-      _saveDebounce = Timer(const Duration(milliseconds: 1500), () {
-        _saveDebounce = null;
-        _savePersistedState();
-      });
-    }
   }
 
   @override
   Future<void> close() {
-    _saveDebounce?.cancel();
-    _saveDebounce = null;
-    _savePersistedState();
+    _repoSub?.cancel();
     _lastEmitTimeByVideoId.clear();
     return super.close();
   }
 }
+

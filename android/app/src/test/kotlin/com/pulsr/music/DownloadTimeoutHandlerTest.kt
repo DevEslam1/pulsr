@@ -9,11 +9,7 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 
 /**
- * A10 (N-06): Flavor-agnostic unit tests for DownloadTimeoutHandler.
- * Verifies that when FGS dataSync hits the 6-hour timeout:
- * 1. Active task state and partial progress are flushed to persistence.
- * 2. Empty/corrupted .part files are purged, valid non-empty .part files are retained.
- * 3. Long queue simulation leaves zero orphaned or dangling files.
+ * A10 (N-06): Unit tests for DownloadTimeoutHandler (DL-24, DL-28).
  */
 class DownloadTimeoutHandlerTest {
 
@@ -61,6 +57,53 @@ class DownloadTimeoutHandlerTest {
 
         // Verify 0-byte orphan deleted
         assertFalse(zeroBytePartFile.exists())
+    }
+
+    @Test
+    fun testFgsBudgetEvaluationTracks6HourLimit() {
+        val handler = DownloadTimeoutHandler()
+        val startTime = 1000000L
+
+        // 1 hour in
+        val status1 = handler.evaluateBudget(startTime, startTime + (1L * 60 * 60 * 1000))
+        assertEquals(1L * 60 * 60 * 1000, status1.elapsedMs)
+        assertEquals(5L * 60 * 60 * 1000, status1.remainingMs)
+        assertFalse(status1.isExhausted)
+
+        // 6 hours in (exhausted)
+        val status6 = handler.evaluateBudget(startTime, startTime + (6L * 60 * 60 * 1000))
+        assertEquals(6L * 60 * 60 * 1000, status6.elapsedMs)
+        assertEquals(0L, status6.remainingMs)
+        assertTrue(status6.isExhausted)
+    }
+
+    @Test
+    fun testAdaptiveWatchdogKillsOnlyOnZeroBytesForTimeoutWindow() {
+        val handler = DownloadTimeoutHandler()
+
+        // Slow stream but alive (bytes transferred > 0) -> NOT stalled
+        val slowAlive = handler.isStreamStalled(
+            bytesReceivedSinceLastCheck = 1024,
+            idleDurationMs = 35000,
+            stallThresholdMs = 30000
+        )
+        assertFalse(slowAlive)
+
+        // Zero bytes and idle time >= 30s -> Stalled
+        val deadStream = handler.isStreamStalled(
+            bytesReceivedSinceLastCheck = 0,
+            idleDurationMs = 31000,
+            stallThresholdMs = 30000
+        )
+        assertTrue(deadStream)
+
+        // Zero bytes but idle time < 30s -> NOT yet stalled
+        val freshStream = handler.isStreamStalled(
+            bytesReceivedSinceLastCheck = 0,
+            idleDurationMs = 15000,
+            stallThresholdMs = 30000
+        )
+        assertFalse(freshStream)
     }
 
     @Test
