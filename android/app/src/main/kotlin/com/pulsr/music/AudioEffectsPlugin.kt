@@ -98,6 +98,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var monoMix = false
 
     private var isSincResamplerEnabled = true
+    private var resamplerInRate = 48000.0
+    private var resamplerOutRate = 48000.0
     private var dspPreference: String = "native" // "native", "oem", "auto"
     private var _oemWarningLogged = false
     private var isBitPerfectBypassActive = false
@@ -199,11 +201,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         if (isReverbEnabled) mask = mask or STAGE_REVERB
         if (abs(stereoBalance) > 0.001 || monoMix) mask = mask or STAGE_PANNER
         if (isLimiterEnabled) mask = mask or STAGE_LIMITER
-        // Sinc resampler only if actually needed (rate mismatch) — zero-cost when bypassed
-        if (isSincResamplerEnabled) {
-            // Check if resampler is actually needed: if inRate==outRate within 0.5 Hz, skip
-            // We keep enabled flag but mask only when ratio != 1 (native handles early return too)
-            // To save CPU, only include if we know rates differ; default include but native early-returns cheaply
+        // Sinc resampler only if actually needed (rate mismatch) — zero-cost zero-mask when bypassed
+        if (isSincResamplerEnabled && Math.abs(resamplerInRate - resamplerOutRate) > 1.0) {
             mask = mask or STAGE_RESAMPLER
         }
         activeDspStages = mask
@@ -917,16 +916,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         try {
                             nativeSetSincResamplerEnabled(enabled)
                         } catch (e: Exception) {
-                            Log.w(TAG, "nativeSetSincResamplerEnabled failed: ${e.message}")
-                        }
-                    }
-                    recalculateActiveStages()
-                    result.success(true)
-                }
-
                 "setSincResamplerRates" -> {
                     val inRate = call.argument<Double>("inRate") ?: 44100.0
                     val outRate = call.argument<Double>("outRate") ?: 48000.0
+                    resamplerInRate = inRate
+                    resamplerOutRate = outRate
                     if (isNativeDspLoaded) {
                         val key = "$inRate:$outRate"
                         if (lastNativeResamplerRates != key) {
@@ -938,6 +932,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             }
                         }
                     }
+                    recalculateActiveStages()
                     result.success(true)
                 }
 

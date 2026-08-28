@@ -140,19 +140,38 @@ void ParametricEQ::computeCoeffs(EQBandState& band, double gainDb) {
     const double cosW = std::cos(w0);
     const double sinW = std::sin(w0);
     const double A = std::pow(10.0, gainDb / 40.0);
-    const double alpha = sinW / (2.0 * std::max(band.q, 0.05));
+    const double q = std::max(band.q, 0.05);
+    const double alpha = sinW / (2.0 * q);
 
     double b0 = 1.0, b1 = 0.0, b2 = 0.0, a0 = 1.0, a1 = 0.0, a2 = 0.0;
 
     switch (band.type) {
-        case FilterType::Peaking:
-            b0 = 1.0 + alpha * A;
-            b1 = -2.0 * cosW;
-            b2 = 1.0 - alpha * A;
-            a0 = 1.0 + alpha / A;
-            a1 = -2.0 * cosW;
-            a2 = 1.0 - alpha / A;
+        case FilterType::Peaking: {
+            // Unconditionally stable Nyquist-Matched Digital Parametric EQ
+            const double G = std::pow(10.0, gainDb / 20.0);
+            const double Omega0 = std::tan(w0 * 0.5);
+            const double DeltaOmega = Omega0 / q;
+
+            if (gainDb >= 0.0) {
+                const double denom = 1.0 + DeltaOmega + Omega0 * Omega0;
+                b0 = (1.0 + G * DeltaOmega + Omega0 * Omega0) / denom;
+                b1 = (-2.0 * (1.0 - Omega0 * Omega0)) / denom;
+                b2 = (1.0 - G * DeltaOmega + Omega0 * Omega0) / denom;
+                a0 = 1.0;
+                a1 = (-2.0 * (1.0 - Omega0 * Omega0)) / denom;
+                a2 = (1.0 - DeltaOmega + Omega0 * Omega0) / denom;
+            } else {
+                const double Ginv = 1.0 / G;
+                const double denom = 1.0 + Ginv * DeltaOmega + Omega0 * Omega0;
+                b0 = (1.0 + DeltaOmega + Omega0 * Omega0) / denom;
+                b1 = (-2.0 * (1.0 - Omega0 * Omega0)) / denom;
+                b2 = (1.0 - DeltaOmega + Omega0 * Omega0) / denom;
+                a0 = 1.0;
+                a1 = (-2.0 * (1.0 - Omega0 * Omega0)) / denom;
+                a2 = (1.0 - Ginv * DeltaOmega + Omega0 * Omega0) / denom;
+            }
             break;
+        }
 
         case FilterType::LowShelf: {
             const double sqrtA = std::sqrt(A);

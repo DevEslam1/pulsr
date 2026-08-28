@@ -39,12 +39,12 @@ double calculateReplayGainVolume({
   final totalGainDb = (gainDb) + preampDb;
   var multiplier = math.pow(10.0, totalGainDb / 20.0).toDouble();
 
-  // Peak clipping prevention
-  if (peak != null && peak > 0.0) {
-    final maxGain = 1.0 / peak;
-    if (multiplier > maxGain) {
-      multiplier = maxGain;
-    }
+  // Peak clipping prevention with -0.5 dB inter-sample peak headroom
+  final effectivePeak = (peak != null && peak > 0.0) ? peak : 1.0;
+  final interSampleHeadroom = math.pow(10.0, -0.5 / 20.0).toDouble(); // ~0.944 (-0.5 dB)
+  final maxGain = interSampleHeadroom / effectivePeak;
+  if (multiplier > maxGain) {
+    multiplier = maxGain;
   }
 
   return (volume * multiplier).clamp(0.0, 1.0).toDouble();
@@ -103,16 +103,16 @@ void main() {
       expect(vol, closeTo(0.5, 0.01));
     });
 
-    test('Clipping prevention limits multiplier to 1.0 / peak', () {
-      // +6 dB multiplier would be 2.0, but peak is 0.8 -> maxGain = 1.25
+    test('Clipping prevention limits multiplier with -0.5 dB inter-sample headroom', () {
+      // +6 dB multiplier would be 2.0, but peak is 0.8 with -0.5 dB headroom (0.944) -> maxGain = 1.180
       final vol = calculateReplayGainVolume(
         volume: 0.5,
         mode: 'track',
         trackGain: 6.0206,
         trackPeak: 0.8,
       );
-      // Expected volume = 0.5 * 1.25 = 0.625
-      expect(vol, closeTo(0.625, 0.01));
+      // Expected volume = 0.5 * 1.180 = 0.590
+      expect(vol, closeTo(0.590, 0.01));
     });
   });
 }

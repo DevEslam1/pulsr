@@ -25,7 +25,7 @@ public:
     static constexpr int PARTITION_SIZE = 512;
     static constexpr int FFT_SIZE = PARTITION_SIZE * 2; // 1024
     static constexpr int MAX_PREDELAY_SAMPLES = 153600; // 153,600 samples max predelay capacity (R2)
-    static constexpr int MAX_PREALLOC_PARTITIONS = 2048;
+    static constexpr int MAX_PREALLOC_PARTITIONS = 4096;
 
     ConvolutionReverb();
     void setSampleRate(double sampleRate);

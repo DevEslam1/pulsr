@@ -34,7 +34,7 @@ android {
 
         externalNativeBuild {
             cmake {
-                cppFlags += listOf("-std=c++20", "-O3", "-ffast-math")
+                cppFlags += listOf("-std=c++20", "-O3")
             }
         }
     }
@@ -237,13 +237,12 @@ tasks.register("testNative") {
             "AudioDspEngine.cpp"
         ).map { file("${mainDir.absolutePath}/$it").absolutePath }
 
-        // 1. Build & Run (a): Parity Build with exact production flags (-O3 -ffast-math -std=c++20)
-        println("[testNative] Compiling parity build (-O3 -ffast-math -std=c++20)...")
+        // 1. Build & Run (a): Parity Build with exact production flags (-O3 -std=c++20)
+        println("[testNative] Compiling parity build (-O3 -std=c++20)...")
         val parityCompileCmd = mutableListOf(
             compiler,
             "-std=c++20",
             "-O3",
-            "-ffast-math",
             "-I", mainDir.absolutePath,
             file("${testDir.absolutePath}/test_native_all.cpp").absolutePath
         ).apply {

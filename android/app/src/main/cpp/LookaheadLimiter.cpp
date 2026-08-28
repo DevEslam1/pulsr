@@ -6,9 +6,9 @@
 // 24-tap polyphase sinc coefficients windowed with Blackman-Harris across 4 phases (6 taps per phase)
 const float LookaheadLimiter::polyphase4x_[INTERP_PHASES][TAPS_PER_PHASE] = {
     { 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f }, // Phase 0 (identity)
-    { -0.0345f, 0.1623f, 0.8841f, -0.0934f, 0.0212f, -0.0031f }, // Phase 1 (1/4)
-    { -0.0489f, 0.2882f, 0.6214f, 0.2882f, -0.0489f, 0.0000f },  // Phase 2 (2/4)
-    { -0.0031f, 0.0212f, -0.0934f, 0.8841f, 0.1623f, -0.0345f }  // Phase 3 (3/4)
+    { 0.0063f, -0.0984f, 0.8841f, 0.2642f, -0.0682f, 0.0120f }, // Phase 1 (1/4)
+    { 0.0152f, -0.1386f, 0.6234f, 0.6234f, -0.1386f, 0.0152f }, // Phase 2 (2/4)
+    { 0.0120f, -0.0682f, 0.2642f, 0.8841f, -0.0984f, 0.0063f }  // Phase 3 (3/4)
 };
 
 LookaheadLimiter::LookaheadLimiter() {
@@ -102,18 +102,26 @@ void LookaheadLimiter::process(float* L, float* R, int frames) {
             targetGain = threshold_ / maxPeak;
         }
 
-        // Fast zero-latency attack, exponential release
+        // Fast zero-latency attack, exponential release with snap-to-unity
         if (targetGain < envelope_) {
             envelope_ = targetGain;
         } else {
             envelope_ = releaseCoeff_ * envelope_ + (1.0f - releaseCoeff_) * targetGain;
+            if (envelope_ > 0.99999f) {
+                envelope_ = 1.0f;
+            }
         }
         if (!std::isfinite(envelope_) || envelope_ <= 0.0f) envelope_ = 1.0f;
 
         // Read delayed audio from lookahead buffer
         int readIdx = (writeIdx_ - lookaheadSamples_ + MAX_LOOKAHEAD_SAMPLES) % MAX_LOOKAHEAD_SAMPLES;
-        L[i] = delayBuf_[0][readIdx] * envelope_;
-        R[i] = delayBuf_[1][readIdx] * envelope_;
+        if (envelope_ == 1.0f) {
+            L[i] = delayBuf_[0][readIdx];
+            R[i] = delayBuf_[1][readIdx];
+        } else {
+            L[i] = delayBuf_[0][readIdx] * envelope_;
+            R[i] = delayBuf_[1][readIdx] * envelope_;
+        }
 
         writeIdx_ = (writeIdx_ + 1) % MAX_LOOKAHEAD_SAMPLES;
     }
@@ -144,11 +152,18 @@ void LookaheadLimiter::processMono(float* inOut, int frames) {
             envelope_ = targetGain;
         } else {
             envelope_ = releaseCoeff_ * envelope_ + (1.0f - releaseCoeff_) * targetGain;
+            if (envelope_ > 0.99999f) {
+                envelope_ = 1.0f;
+            }
         }
         if (!std::isfinite(envelope_) || envelope_ <= 0.0f) envelope_ = 1.0f;
 
         int readIdx = (writeIdx_ - lookaheadSamples_ + MAX_LOOKAHEAD_SAMPLES) % MAX_LOOKAHEAD_SAMPLES;
-        inOut[i] = delayBuf_[0][readIdx] * envelope_;
+        if (envelope_ == 1.0f) {
+            inOut[i] = delayBuf_[0][readIdx];
+        } else {
+            inOut[i] = delayBuf_[0][readIdx] * envelope_;
+        }
 
         writeIdx_ = (writeIdx_ + 1) % MAX_LOOKAHEAD_SAMPLES;
     }
@@ -185,12 +200,21 @@ void LookaheadLimiter::processInterleaved(float* buffer, int frames, int channel
             envelope_ = targetGain;
         } else {
             envelope_ = releaseCoeff_ * envelope_ + (1.0f - releaseCoeff_) * targetGain;
+            if (envelope_ > 0.99999f) {
+                envelope_ = 1.0f;
+            }
         }
         if (!std::isfinite(envelope_) || envelope_ <= 0.0f) envelope_ = 1.0f;
 
         int readIdx = (writeIdx_ - lookaheadSamples_ + MAX_LOOKAHEAD_SAMPLES) % MAX_LOOKAHEAD_SAMPLES;
-        for (int ch = 0; ch < channels; ++ch) {
-            buffer[i * channels + ch] = delayBuf_[ch][readIdx] * envelope_;
+        if (envelope_ == 1.0f) {
+            for (int ch = 0; ch < channels; ++ch) {
+                buffer[i * channels + ch] = delayBuf_[ch][readIdx];
+            }
+        } else {
+            for (int ch = 0; ch < channels; ++ch) {
+                buffer[i * channels + ch] = delayBuf_[ch][readIdx] * envelope_;
+            }
         }
 
         writeIdx_ = (writeIdx_ + 1) % MAX_LOOKAHEAD_SAMPLES;

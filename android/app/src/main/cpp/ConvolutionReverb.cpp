@@ -278,35 +278,56 @@ std::shared_ptr<const PreparedIr> PreparedIr::createCustom(
     std::vector<float> irR;
 
     if (frames > MAX_CUSTOM_TAPS) {
-        // Decimate to fit under 512 partitions with one-pole anti-aliasing lowpass (NEW-9)
+        // High-order windowed-sinc anti-aliasing decimation (>80dB stopband attenuation)
         actualFrames = MAX_CUSTOM_TAPS;
         irL.resize(actualFrames);
         irR.resize(actualFrames);
 
         const double step = static_cast<double>(frames) / static_cast<double>(actualFrames);
-        // Cutoff at targetNyquist * 0.45 = (0.5 / step) * 0.45 = 0.225 / step
-        const float fc = static_cast<float>(0.225 / step);
-        const float lpAlpha = std::clamp(1.0f - std::exp(-2.0f * static_cast<float>(M_PI) * fc), 0.001f, 0.999f);
+        const float fc = static_cast<float>(0.45 / step); // Normalized to input rate Nyquist
 
-        // Filter continuous stream before sampling
-        std::vector<float> filteredL(frames);
-        std::vector<float> filteredR(frames);
-        float lpStateL = 0.0f;
-        float lpStateR = 0.0f;
+        constexpr int FIR_TAPS = 63;
+        constexpr int HALF_FIR = FIR_TAPS / 2;
+        float firCoeffs[FIR_TAPS] = {};
+        double coeffSum = 0.0;
 
-        for (int i = 0; i < frames; ++i) {
-            const float l = irInterleaved[i * channels];
-            const float r = (channels > 1) ? irInterleaved[i * channels + 1] : l;
-            lpStateL += lpAlpha * (l - lpStateL);
-            lpStateR += lpAlpha * (r - lpStateR);
-            filteredL[i] = lpStateL;
-            filteredR[i] = lpStateR;
+        for (int k = 0; k < FIR_TAPS; ++k) {
+            const int n = k - HALF_FIR;
+            float sincVal = 1.0f;
+            if (n != 0) {
+                const float x = 2.0f * static_cast<float>(M_PI) * fc * static_cast<float>(n);
+                sincVal = std::sin(x) / x;
+            }
+            const double w = 2.0 * M_PI * k / (FIR_TAPS - 1);
+            const double win = 0.35875 - 0.48829 * std::cos(w) + 0.14128 * std::cos(2.0 * w) - 0.01168 * std::cos(3.0 * w);
+            firCoeffs[k] = static_cast<float>(2.0f * fc * sincVal * win);
+            coeffSum += firCoeffs[k];
+        }
+
+        if (std::abs(coeffSum) > 1e-6) {
+            const float invSum = static_cast<float>(1.0 / coeffSum);
+            for (int k = 0; k < FIR_TAPS; ++k) {
+                firCoeffs[k] *= invSum;
+            }
         }
 
         for (int i = 0; i < actualFrames; ++i) {
-            const int srcIdx = std::min(frames - 1, static_cast<int>(std::round(i * step)));
-            irL[i] = filteredL[srcIdx];
-            irR[i] = filteredR[srcIdx];
+            const double srcCenter = i * step;
+            const int centerIdx = static_cast<int>(std::round(srcCenter));
+
+            float sumL = 0.0f;
+            float sumR = 0.0f;
+
+            for (int k = 0; k < FIR_TAPS; ++k) {
+                const int sampleIdx = std::clamp(centerIdx + k - HALF_FIR, 0, frames - 1);
+                const float l = irInterleaved[sampleIdx * channels];
+                const float r = (channels > 1) ? irInterleaved[sampleIdx * channels + 1] : l;
+                sumL += l * firCoeffs[k];
+                sumR += r * firCoeffs[k];
+            }
+
+            irL[i] = sumL;
+            irR[i] = sumR;
         }
     } else {
         irL.resize(actualFrames);

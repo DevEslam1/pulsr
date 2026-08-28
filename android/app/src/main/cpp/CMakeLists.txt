@@ -4,7 +4,7 @@ project("pulsr_dsp")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_compile_options(-O3 -ffast-math -Wall -Wextra)
+add_compile_options(-O3 -Wall -Wextra)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_options(-fsanitize=address,undefined)

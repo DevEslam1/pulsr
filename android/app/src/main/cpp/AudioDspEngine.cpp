@@ -106,6 +106,7 @@ void AudioDspEngine::setSampleRate(double sampleRate) {
 }
 
 void AudioDspEngine::resyncForTrack(double sampleRate, int channels) {
+    (void)channels;
     if (sampleRate < 8000.0) sampleRate = 8000.0;
     if (sampleRate > 768000.0) sampleRate = 768000.0;
     std::lock_guard<std::mutex> lock(publishMutex_);
@@ -113,7 +114,7 @@ void AudioDspEngine::resyncForTrack(double sampleRate, int channels) {
     auto updated = std::make_shared<DspParamSnapshot>(*current);
     updated->generation = ++snapshotGeneration_;
     updated->sampleRate = sampleRate;
-    updated->resetRequested = true; // flush stale filter history from previous track/session
+    updated->resetRequested = false; // Do not wipe filter state on seamless track resync
     currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(updated));
 }
 
@@ -184,9 +185,9 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         }
 
         eq_.applyParams(snapshot->eq);
+        panner_.applyParams(snapshot->panner);
         crossfeed_.applyParams(snapshot->crossfeed);
         reverb_.applyParams(snapshot->reverb);
-        panner_.applyParams(snapshot->panner);
         resampler_.applyParams(snapshot->resampler);
         limiter_.applyParams(snapshot->limiter);
 
@@ -204,27 +205,27 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         eq_.processInterleaved(buffer, frames, channels);
     }
 
-    // 2. Crossfeed Stage (Stereo only)
-    if ((stages & STAGE_CROSSFEED) && channels == 2) {
-        crossfeed_.processInterleaved(buffer, frames);
-    }
-
-    // 3. Convolution Reverb Stage (Stereo only)
-    if ((stages & STAGE_REVERB) && channels == 2) {
-        reverb_.processInterleaved(buffer, frames, channels);
-    }
-
-    // 4. Spatial Panner & Balance (All channels)
+    // 2. Spatial Panner & Balance (All channels) — positioner before reverb for natural acoustics
     if (stages & STAGE_PANNER) {
         panner_.processInterleaved(buffer, frames, channels);
     }
 
+    // 3. Crossfeed Stage (Stereo only)
+    if ((stages & STAGE_CROSSFEED) && channels == 2) {
+        crossfeed_.processInterleaved(buffer, frames);
+    }
+
+    // 4. Convolution Reverb Stage (Stereo only)
+    if ((stages & STAGE_REVERB) && channels == 2) {
+        reverb_.processInterleaved(buffer, frames, channels);
+    }
+
     // 5. Polyphase Sinc Resampler (Fixed-frame streaming contract)
-    if (stages & STAGE_RESAMPLER) {
+    if ((stages & STAGE_RESAMPLER) && std::abs(resampler_.getRatio() - 1.0) > 1e-5) {
         resampler_.processInterleaved(buffer, frames, channels);
     }
 
-    // 6. Lookahead Limiter Stage (Multichannel / stereo / mono) - True-peak limiter is final
+    // 6. Lookahead Limiter Stage (Multichannel / stereo / mono) — true-peak limiter is final
     if (stages & STAGE_LIMITER) {
         limiter_.processInterleaved(buffer, frames, channels);
     }

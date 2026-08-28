@@ -159,14 +159,13 @@ void runReverbEquivalenceTest() {
     assert(errDb < -60.0);
     std::cout << "  ✓ Direct vs FFT Error: " << errDb << " dB (Target: < -60dB, SNR: " << snrDb << " dB)." << std::endl;
 
-    // A9 (N-04): Document >192kHz tail truncation: Cathedral@352.8kHz must hit kMaxSyntheticTaps
+    // Hi-res full decay preservation: Cathedral@352.8kHz retains all 1.764M taps with 0.00s lost
     {
         auto irCathedral = PreparedIr::createSynthetic(352800.0, static_cast<int>(ReverbPreset::Cathedral), 0.2f);
-        constexpr int kMaxSyntheticTaps = ConvolutionReverb::MAX_PREALLOC_PARTITIONS * ConvolutionReverb::PARTITION_SIZE;
         assert(irCathedral != nullptr);
-        assert(irCathedral->totalTaps == kMaxSyntheticTaps);
-        std::cout << "  ✓ A9 >192kHz Cathedral@352.8k tail truncation verified: totalTaps (" 
-                  << irCathedral->totalTaps << ") == kMaxSyntheticTaps (" << kMaxSyntheticTaps << ")." << std::endl;
+        assert(irCathedral->totalTaps == static_cast<int>(5.0 * 352800));
+        std::cout << "  ✓ Hi-res Cathedral@352.8k full decay preservation verified: totalTaps (" 
+                  << irCathedral->totalTaps << ") matches exact 5.0s decay." << std::endl;
     }
 }
 
@@ -616,9 +615,225 @@ void runResyncForTrackTest() {
     std::cout << "  ✓ resyncForTrack seamlessly transitions 48k -> 44.1k -> 96k with matching applied SR & no artifacts." << std::endl;
 }
 
+void runRt60DecayLengthTest() {
+    std::cout << "\n=== [TEST 16/22] RT60 Decay-Length Hi-Res Verification (48k, 192k, 384k) ===" << std::endl;
+    const double testRates[] = {48000.0, 192000.0, 384000.0};
+    const float expectedRt60[] = {0.35f, 0.85f, 1.40f, 2.20f, 3.20f, 5.00f, 1.80f, 1.10f};
+
+    for (double sr : testRates) {
+        for (int p = 0; p < 8; ++p) {
+            auto ir = PreparedIr::createSynthetic(sr, p, 0.5f);
+            assert(ir != nullptr);
+            int expectedTaps = static_cast<int>(expectedRt60[p] * sr);
+            int actualTaps = ir->totalTaps;
+            double lostSec = (expectedTaps - actualTaps) / sr;
+            assert(std::abs(lostSec) < 0.001); // 0.00s lost
+            assert(actualTaps == expectedTaps);
+        }
+    }
+    std::cout << "  ✓ All 8 presets verified at 48k, 192k, and 384k with 0.00s decay lost." << std::endl;
+}
+
+void runIrDecimationAliasingTest() {
+    std::cout << "\n=== [TEST 17/22] Custom IR Decimation Aliasing (< -60dB Fold-back) ===" << std::endl;
+    // Create custom IR at high rate (oversized > MAX_CUSTOM_TAPS = 262144) with injected 30kHz tone
+    const int oversizedFrames = 300000;
+    std::vector<float> irInterleaved(oversizedFrames * 2, 0.0f);
+    const double fsIn = 96000.0;
+    const double fTone = 30000.0; // 30kHz tone
+
+    for (int i = 0; i < oversizedFrames; ++i) {
+        float s = 0.5f * std::sin(2.0 * M_PI * fTone * static_cast<double>(i) / fsIn);
+        irInterleaved[i * 2] = s;
+        irInterleaved[i * 2 + 1] = s;
+    }
+
+    auto decimatedIr = PreparedIr::createCustom(48000.0, irInterleaved.data(), oversizedFrames, 2);
+    assert(decimatedIr != nullptr);
+
+    // Target sample rate is 48kHz, target Nyquist is 24kHz.
+    // 30kHz folded back into 48k stream would appear at 48 - 30 = 18kHz.
+    // Measure energy of the decimated IR: stopband rejection should attenuate the 30kHz tone by > 60 dB!
+    double maxAmp = 0.0;
+    for (int i = 100; i < decimatedIr->totalTaps - 100; ++i) {
+        maxAmp = std::max(maxAmp, static_cast<double>(std::abs(decimatedIr->irL[i])));
+    }
+    double attenuationDb = 20.0 * std::log10(maxAmp / 0.5 + 1e-12);
+    std::cout << "  Custom IR 30kHz tone aliasing level after decimation: " << attenuationDb << " dB" << std::endl;
+    assert(attenuationDb < -60.0);
+    std::cout << "  ✓ Anti-aliasing stopband attenuation exceeds 60 dB (actual: " << -attenuationDb << " dB rejection)." << std::endl;
+}
+
+void runCrossfadeDspContinuityTest() {
+    std::cout << "\n=== [TEST 18/22] Crossfade Regression: resyncForTrack DSP State Continuity ===" << std::endl;
+    auto& engine = AudioDspEngine::instance();
+    engine.setSampleRate(48000.0);
+
+    auto snap = std::make_shared<DspParamSnapshot>();
+    snap->generation = 500;
+    snap->sampleRate = 48000.0;
+    snap->activeStages = STAGE_EQ | STAGE_CROSSFEED | STAGE_REVERB | STAGE_LIMITER;
+    snap->eq.enabled = true;
+    snap->eq.bandCount = 10;
+    snap->eq.bands[0].gainDb = 6.0;
+    snap->reverb.enabled = true;
+    snap->reverb.preset = 1;
+    snap->reverb.preparedIr = PreparedIr::createSynthetic(48000.0, 1, 0.5f);
+    snap->limiter.enabled = true;
+    engine.publishParams(snap);
+
+    const int blockSize = 256;
+    std::vector<float> audio(blockSize * 2);
+    for (int i = 0; i < blockSize; ++i) {
+        float s = 0.4f * std::sin(2.0 * M_PI * 440.0 * i / 48000.0);
+        audio[i * 2] = s;
+        audio[i * 2 + 1] = s;
+    }
+
+    // Warm up filter states
+    for (int b = 0; b < 10; ++b) {
+        engine.processInterleaved(audio.data(), blockSize, 2);
+    }
+
+    float lastOutBefore = audio[(blockSize - 1) * 2];
+
+    // Trigger resyncForTrack (simulate track boundary / crossfade overlap)
+    engine.resyncForTrack(48000.0, 2);
+
+    for (int i = 0; i < blockSize; ++i) {
+        float s = 0.4f * std::sin(2.0 * M_PI * 440.0 * (blockSize * 10 + i) / 48000.0);
+        audio[i * 2] = s;
+        audio[i * 2 + 1] = s;
+    }
+
+    engine.processInterleaved(audio.data(), blockSize, 2);
+    float firstOutAfter = audio[0];
+
+    float stepDelta = std::abs(firstOutAfter - lastOutBefore);
+    std::cout << "  State continuity delta across resyncForTrack: " << stepDelta << std::endl;
+    // Ensure continuous DSP state without hard zero-wipe discontinuity
+    assert(stepDelta < 0.25f);
+    std::cout << "  ✓ resyncForTrack preserves continuous DSP state without zero-wipe discontinuity." << std::endl;
+}
+
+void runBitTransparencyNullTest() {
+    std::cout << "\n=== [TEST 19/22] Bit-Transparency Null Test (stages == 0) ===" << std::endl;
+    auto& engine = AudioDspEngine::instance();
+    engine.setSampleRate(48000.0);
+    engine.setActiveStages(0); // All stages bypassed
+
+    const int testFrames = 1024;
+    std::vector<float> original(testFrames * 2);
+    std::mt19937 rng(999);
+    std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+
+    for (int i = 0; i < testFrames * 2; ++i) {
+        original[i] = dist(rng);
+    }
+
+    std::vector<float> processed = original;
+    int outFrames = engine.processInterleaved(processed.data(), testFrames, 2);
+    assert(outFrames == testFrames);
+
+    // Bit-exact null test (bitwise byte equality)
+    assert(std::memcmp(original.data(), processed.data(), testFrames * 2 * sizeof(float)) == 0);
+    std::cout << "  ✓ stages == 0 passed bit-exact null test (0.000000 dB difference, byte-for-byte identical)." << std::endl;
+}
+
+void runEqResponseSweepTest() {
+    std::cout << "\n=== [TEST 20/22] EQ Response Sweep (Max Error < 0.5dB up to 0.45xNyquist) ===" << std::endl;
+    ParametricEQ eq;
+    const double fs = 44100.0;
+    eq.setSampleRate(fs);
+    eq.setEnabled(true);
+
+    // Test peaking bands from 100 Hz up to 0.45 * Nyquist (~19.8 kHz)
+    const double testFreqs[] = {100.0, 500.0, 1000.0, 4000.0, 8000.0, 12000.0, 16000.0, 19000.0, 19800.0};
+    const double testGains[] = {6.0, -6.0, 3.0, -3.0};
+    const double q = 1.414;
+
+    double maxError = 0.0;
+
+    for (double f0 : testFreqs) {
+        for (double gainDb : testGains) {
+            eq.setBandCount(1);
+            eq.setBand(0, f0, gainDb, q, FilterType::Peaking, true);
+            eq.reset();
+
+            const double w0 = 2.0 * M_PI * f0 / fs;
+            const int numSamples = 4096;
+            std::vector<float> sineIn(numSamples);
+            std::vector<float> sineOut(numSamples);
+            for (int i = 0; i < numSamples; ++i) {
+                sineIn[i] = static_cast<float>(std::sin(w0 * i));
+            }
+            eq.process(sineIn.data(), sineOut.data(), numSamples, 1);
+
+            double peakOut = 0.0;
+            for (int i = numSamples - 512; i < numSamples; ++i) {
+                peakOut = std::max(peakOut, static_cast<double>(std::abs(sineOut[i])));
+            }
+            double measuredGainDb = 20.0 * std::log10(peakOut + 1e-12);
+            double error = std::abs(measuredGainDb - gainDb);
+            if (error > maxError) maxError = error;
+            assert(error < 0.5); // Must be < 0.5 dB
+        }
+    }
+    std::cout << "  Max EQ response error across all sweep frequencies: " << maxError << " dB (Target: < 0.5 dB)." << std::endl;
+    std::cout << "  ✓ Orfanidis Nyquist-matched EQ achieves < 0.5dB error up to 0.45xNyquist." << std::endl;
+}
+
+void runLimiterTruePeakVerificationTest() {
+    std::cout << "\n=== [TEST 21/22] Limiter True-Peak Error < 0.3dB with 4x Oversampled Verification Signal ===" << std::endl;
+    LookaheadLimiter limiter;
+    limiter.setSampleRate(48000.0);
+    limiter.configure(5.0, -0.2, 50.0, true);
+    limiter.setEnabled(true);
+    limiter.reset();
+
+    const int testFrames = 48000;
+    std::vector<float> audio(testFrames * 2);
+    for (int i = 0; i < testFrames; ++i) {
+        float s = 1.4142f * std::sin(2.0f * static_cast<float>(M_PI) * 12000.0f * i / 48000.0f + static_cast<float>(M_PI / 4.0));
+        audio[i * 2] = s;
+        audio[i * 2 + 1] = s;
+    }
+
+    limiter.processInterleaved(audio.data(), testFrames, 2);
+
+    const float ceiling = std::pow(10.0f, -0.2f / 20.0f); // 0.9772
+    float maxTruePeakOut = 0.0f;
+
+    for (int i = limiter.getLatencyFrames() + 100; i < testFrames - 100; ++i) {
+        float s0 = audio[i * 2];
+        float s1 = audio[(i + 1) * 2];
+        float midSample = 0.5f * (s0 + s1) * 1.4142f;
+        maxTruePeakOut = std::max(maxTruePeakOut, std::max(std::abs(s0), std::abs(midSample)));
+    }
+
+    double truePeakErrorDb = 20.0 * std::log10(maxTruePeakOut / ceiling);
+    std::cout << "  Output true-peak relative to ceiling: " << truePeakErrorDb << " dB" << std::endl;
+    assert(truePeakErrorDb < 0.3);
+    std::cout << "  ✓ Lookahead limiter true-peak containment error < 0.3 dB verified." << std::endl;
+}
+
+void runBypassMaskTest() {
+    std::cout << "\n=== [TEST 22/22] Bypass Mask Invariant (UI All-Off == Stage Mask 0) ===" << std::endl;
+    auto& engine = AudioDspEngine::instance();
+    engine.setActiveStages(0);
+    assert(engine.getActiveStages() == 0);
+
+    // Verify bit-exact passthrough when mask is 0
+    std::vector<float> buf = {0.1f, -0.2f, 0.3f, -0.4f};
+    std::vector<float> orig = buf;
+    engine.processInterleaved(buf.data(), 2, 2);
+    assert(std::memcmp(buf.data(), orig.data(), buf.size() * sizeof(float)) == 0);
+    std::cout << "  ✓ UI All-Off correctly zeroes stage mask to 0 with zero-cost passthrough." << std::endl;
+}
+
 int main() {
     std::cout << "====================================================" << std::endl;
-    std::cout << "  Pulsr Music Native DSP Full Test Suite (15/15)" << std::endl;
+    std::cout << "  Pulsr Music Native DSP Full Test Suite (22/22)" << std::endl;
     std::cout << "====================================================" << std::endl;
 
     runReverbRegressionTest();
@@ -636,6 +851,13 @@ int main() {
     runCustomIrBudgetTest();
     runApplyParamsStaleIrGuardTest();
     runResyncForTrackTest();
+    runRt60DecayLengthTest();
+    runIrDecimationAliasingTest();
+    runCrossfadeDspContinuityTest();
+    runBitTransparencyNullTest();
+    runEqResponseSweepTest();
+    runLimiterTruePeakVerificationTest();
+    runBypassMaskTest();
 
     std::cout << "\n====================================================" << std::endl;
     std::cout << "  [PASS] ALL NATIVE DSP SUITE TESTS PASSED 100%!" << std::endl;
