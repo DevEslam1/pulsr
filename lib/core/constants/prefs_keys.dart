@@ -36,6 +36,7 @@ class PrefsKeys {
   static const String ytdlpBackendEnabled = 'setting_ytdlp_backend_enabled';
   static const String ytdlpBackendUrl = 'setting_ytdlp_backend_url';
   static const String ytdlpBackendToken = 'setting_ytdlp_backend_token';
+  static const String syncCookiesToBackend = 'setting_sync_cookies_to_backend';
   static const String extractorEngine = 'setting_extractor_engine';
   static const String languageCode = 'setting_language_code';
   static const String bitPerfectOutput = 'setting_bit_perfect_output';

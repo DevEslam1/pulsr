@@ -2618,6 +2618,18 @@ class SettingsScreen extends StatelessWidget {
                         isDense: true,
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    SwitchListTile.adaptive(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('Sync Account Cookies with Backend',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      subtitle: Text(
+                        'Allows the backend engine to resolve restricted streams using your logged-in YouTube account. Disabled by default.',
+                        style: TextStyle(fontSize: 11, color: p.textSecondary),
+                      ),
+                      value: liveState.syncCookiesToBackend,
+                      onChanged: (val) => cubit.setSyncCookiesToBackend(val),
+                    ),
                     const SizedBox(height: 14),
                     Row(
                       children: [
@@ -2639,6 +2651,31 @@ class SettingsScreen extends StatelessWidget {
                               : const Icon(Icons.speed_rounded, size: 16),
                           label: const Text('Test Connection'),
                         ),
+                        if (liveState.ytdlpBackendCircuitState != null) ...[
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: liveState.ytdlpBackendCircuitState ==
+                                      'closed'
+                                  ? p.success.withValues(alpha: 0.15)
+                                  : p.error.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              'Circuit: ${liveState.ytdlpBackendCircuitState!.toUpperCase()}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: liveState.ytdlpBackendCircuitState ==
+                                        'closed'
+                                    ? p.success
+                                    : p.error,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                     if (liveState.ytdlpBackendStatusMessage != null) ...[

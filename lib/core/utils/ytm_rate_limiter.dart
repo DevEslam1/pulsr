@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Dart-side adaptive token-bucket rate limiter for YouTube Music API requests.
 ///
 /// Prevents rapid-fire HTTP requests from the Dart layer from triggering
-/// YouTube's IP-level 429 rate limiting.
+/// YouTube's IP-level 429 rate limiting, and manages a separate bucket for the backend.
 class YtmRateLimiter {
   YtmRateLimiter._();
   static final YtmRateLimiter shared = YtmRateLimiter._();
@@ -15,8 +15,13 @@ class YtmRateLimiter {
   static const String _keyLastRefill = 'ytm_rate_limiter_last_refill';
   static const String _keyBackoffUntil = 'ytm_rate_limiter_backoff_until';
 
+  static const String _keyBackendTokens = 'ytm_rate_limiter_backend_tokens';
+  static const String _keyBackendLastRefill = 'ytm_rate_limiter_backend_last_refill';
+  static const String _keyBackendBackoffUntil = 'ytm_rate_limiter_backend_backoff_until';
+
   SharedPreferences? _prefs;
 
+  // Native YTM pacing bucket
   static const int _maxTokens = 8;
   static const double _refillRate = 4.0; // tokens per second
 
@@ -28,7 +33,18 @@ class YtmRateLimiter {
   int _adaptiveMultiplier = 1;
   DateTime _lastSuccess = DateTime.now();
 
+  // Dedicated Backend bucket (higher cap, 10/s refill, no client-side pacing floors)
+  static const int _backendMaxTokens = 30;
+  static const double _backendRefillRate = 10.0; // tokens per second
+
+  double _backendTokens = _backendMaxTokens.toDouble();
+  DateTime _backendLastRefill = DateTime.now();
+  DateTime _backendBackoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime _backendLastSuccess = DateTime.now();
+
   final Map<String, Future<dynamic>> _inFlightRequests = {};
+
+  DateTime get lastBackendSuccess => _backendLastSuccess;
 
   Duration get cooldownRemaining {
     final now = DateTime.now();
@@ -39,6 +55,16 @@ class YtmRateLimiter {
   }
 
   bool get isCoolingDown => cooldownRemaining > Duration.zero;
+
+  Duration get backendCooldownRemaining {
+    final now = DateTime.now();
+    if (_backendBackoffUntil.isAfter(now)) {
+      return _backendBackoffUntil.difference(now);
+    }
+    return Duration.zero;
+  }
+
+  bool get isBackendCoolingDown => backendCooldownRemaining > Duration.zero;
 
   Future<void> restore() async {
     try {
@@ -58,6 +84,22 @@ class YtmRateLimiter {
           _backoffUntil = deadline;
         }
       }
+
+      final savedBTokens = _prefs?.getDouble(_keyBackendTokens);
+      final savedBLastRefill = _prefs?.getInt(_keyBackendLastRefill);
+      final savedBBackoff = _prefs?.getInt(_keyBackendBackoffUntil);
+
+      if (savedBTokens != null && savedBLastRefill != null) {
+        _backendTokens = savedBTokens.clamp(0.0, _backendMaxTokens.toDouble());
+        _backendLastRefill = DateTime.fromMillisecondsSinceEpoch(savedBLastRefill);
+        _refillBackend();
+      }
+      if (savedBBackoff != null) {
+        final deadline = DateTime.fromMillisecondsSinceEpoch(savedBBackoff);
+        if (deadline.isAfter(DateTime.now())) {
+          _backendBackoffUntil = deadline;
+        }
+      }
     } catch (_) {}
   }
 
@@ -70,6 +112,13 @@ class YtmRateLimiter {
       _prefs!
           .setInt(_keyBackoffUntil, _backoffUntil.millisecondsSinceEpoch)
           .catchError((_) => false);
+      _prefs!.setDouble(_keyBackendTokens, _backendTokens).catchError((_) => false);
+      _prefs!
+          .setInt(_keyBackendLastRefill, _backendLastRefill.millisecondsSinceEpoch)
+          .catchError((_) => false);
+      _prefs!
+          .setInt(_keyBackendBackoffUntil, _backendBackoffUntil.millisecondsSinceEpoch)
+          .catchError((_) => false);
     } else {
       SharedPreferences.getInstance().then((p) {
         _prefs = p;
@@ -79,6 +128,13 @@ class YtmRateLimiter {
             .catchError((_) => false);
         p
             .setInt(_keyBackoffUntil, _backoffUntil.millisecondsSinceEpoch)
+            .catchError((_) => false);
+        p.setDouble(_keyBackendTokens, _backendTokens).catchError((_) => false);
+        p
+            .setInt(_keyBackendLastRefill, _backendLastRefill.millisecondsSinceEpoch)
+            .catchError((_) => false);
+        p
+            .setInt(_keyBackendBackoffUntil, _backendBackoffUntil.millisecondsSinceEpoch)
             .catchError((_) => false);
       }).catchError((_) {});
     }
@@ -106,10 +162,15 @@ class YtmRateLimiter {
     shared._lastRefill = DateTime.now();
     shared._backoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
     shared._adaptiveMultiplier = 1;
+
+    shared._backendTokens = _backendMaxTokens.toDouble();
+    shared._backendLastRefill = DateTime.now();
+    shared._backendBackoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
+
     shared._inFlightRequests.clear();
   }
 
-  /// Acquires a permit before making a request.
+  /// Acquires a permit before making a native YTM request.
   Future<void> acquirePermit() async {
     final now = DateTime.now();
     if (now.isBefore(_backoffUntil)) {
@@ -131,7 +192,28 @@ class YtmRateLimiter {
     _persist();
   }
 
-  /// Called when a 429 rate-limit response is received.
+  /// Acquires a permit before making a backend microservice request.
+  Future<void> acquireBackendPermit() async {
+    final now = DateTime.now();
+    if (now.isBefore(_backendBackoffUntil)) {
+      await Future<void>.delayed(_backendBackoffUntil.difference(now));
+    }
+
+    _refillBackend();
+    if (_backendTokens >= 1.0) {
+      _backendTokens -= 1.0;
+      _persist();
+      return;
+    }
+
+    final waitMs = ((1.0 - _backendTokens) / _backendRefillRate * 1000).ceil();
+    await Future<void>.delayed(Duration(milliseconds: waitMs));
+    _refillBackend();
+    _backendTokens = (_backendTokens - 1.0).clamp(0.0, _backendMaxTokens.toDouble());
+    _persist();
+  }
+
+  /// Called when a 429 rate-limit response is received from native YouTube.
   void onRateLimited([int? retryAfterSeconds]) {
     final now = DateTime.now();
     _adaptiveMultiplier = (_adaptiveMultiplier * 2).clamp(1, 16);
@@ -152,7 +234,17 @@ class YtmRateLimiter {
     _persist();
   }
 
-  /// Called on a successful request to reset backoff state.
+  /// Called when a 429 response is received from backend (honoring Retry-After).
+  void onBackendRateLimited([int? retryAfterSeconds]) {
+    final now = DateTime.now();
+    final seconds = (retryAfterSeconds != null && retryAfterSeconds > 0)
+        ? retryAfterSeconds
+        : 60;
+    _backendBackoffUntil = now.add(Duration(seconds: seconds));
+    _persist();
+  }
+
+  /// Called on a successful native request to reset backoff state.
   void onSuccess() {
     final now = DateTime.now();
     if (now.difference(_lastSuccess).inMinutes > 10) {
@@ -163,11 +255,26 @@ class YtmRateLimiter {
     _persist();
   }
 
+  /// Called on a successful backend request to reset backoff state.
+  void onBackendSuccess() {
+    _backendLastSuccess = DateTime.now();
+    _backendBackoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
+    _persist();
+  }
+
   void _refill() {
     final now = DateTime.now();
     final elapsed = now.difference(_lastRefill).inMilliseconds / 1000.0;
     _tokens =
         (_tokens + elapsed * _refillRate).clamp(0.0, _maxTokens.toDouble());
     _lastRefill = now;
+  }
+
+  void _refillBackend() {
+    final now = DateTime.now();
+    final elapsed = now.difference(_backendLastRefill).inMilliseconds / 1000.0;
+    _backendTokens =
+        (_backendTokens + elapsed * _backendRefillRate).clamp(0.0, _backendMaxTokens.toDouble());
+    _backendLastRefill = now;
   }
 }

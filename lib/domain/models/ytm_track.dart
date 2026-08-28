@@ -124,6 +124,7 @@ class YtmStream {
   final String? artworkUrl;
   final String? userAgent;
   final String? cookies;
+  final int? expiresAt;
 
   const YtmStream({
     required this.videoId,
@@ -137,9 +138,24 @@ class YtmStream {
     this.artworkUrl,
     this.userAgent,
     this.cookies,
+    this.expiresAt,
   });
 
   bool get isTaggable => container == 'm4a';
+
+  DateTime? get expiresAtDateTime =>
+      expiresAt != null ? DateTime.fromMillisecondsSinceEpoch(expiresAt!) : null;
+
+  bool get isExpired {
+    if (expiresAt == null) return false;
+    return DateTime.now().millisecondsSinceEpoch >= expiresAt!;
+  }
+
+  bool isExpiringSoon([Duration threshold = const Duration(minutes: 5)]) {
+    if (expiresAt == null) return false;
+    final deadline = DateTime.fromMillisecondsSinceEpoch(expiresAt!);
+    return DateTime.now().add(threshold).isAfter(deadline);
+  }
 
   static YtmStream? fromChannel(Map<Object?, Object?> map) {
     final videoId = map['videoId'] as String?;
@@ -160,6 +176,7 @@ class YtmStream {
           : null,
       userAgent: map['userAgent'] as String?,
       cookies: map['cookies'] as String?,
+      expiresAt: (map['expiresAt'] as num?)?.toInt(),
     );
   }
 

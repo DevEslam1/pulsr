@@ -17,9 +17,12 @@ import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../constants/channels.dart';
+import '../di/injection.dart';
 import '../errors/failures.dart';
 import '../utils/error_logger.dart';
 import '../widgets/cached_artwork.dart';
+import 'xdm_backend_service.dart';
+import 'ytm_account_service.dart';
 import 'ytm_service.dart';
 
 /// Where a download currently is, for driving progress UI.
@@ -204,7 +207,7 @@ class YtDownloadService {
       await _ytmService.ensurePoTokenReady();
 
       final quality = prefs.getString('setting_download_quality') ?? 'high';
-      var stream = await _ytmService.resolveStream(videoId, quality: quality);
+      var stream = await _resolveDownloadStream(videoId, quality);
 
       // Pre-download storage check (BUG-06)
       try {
@@ -382,6 +385,33 @@ class YtDownloadService {
     }
   }
 
+  Future<YtmStream> _resolveDownloadStream(String videoId, String quality) async {
+    // 1. Backend-first for downloads (Engine 3 as primary download engine)
+    try {
+      if (getIt.isRegistered<XdmBackendService>()) {
+        final xdm = getIt<XdmBackendService>();
+        if (await xdm.isEnabled()) {
+          final account = getIt.isRegistered<YtmAccountService>()
+              ? getIt<YtmAccountService>()
+              : null;
+          final backendStream = await xdm.resolveStream(
+            videoId,
+            quality: quality,
+            cookies: account?.cookies,
+          );
+          if (backendStream != null) {
+            return backendStream;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[YtDownloadService] Backend download resolve fallback: $e');
+    }
+
+    // 2. Native resolution fallback
+    return await _ytmService.resolveStream(videoId, quality: quality);
+  }
+
   Future<void> _downloadAudioWithRetry({
     required YtmStream stream,
     required String videoId,
@@ -390,6 +420,7 @@ class YtDownloadService {
     required _QueuedDownload task,
     required void Function(YtDownloadProgress)? onProgress,
   }) async {
+    var currentStream = stream;
     var currentUrl = stream.url;
     var currentUserAgent = stream.userAgent;
     var currentCookies = stream.cookies;
@@ -400,6 +431,16 @@ class YtDownloadService {
       try {
         if (task.isCanceled || _canceledVideoIds.contains(videoId)) {
           throw const DownloadFailure('Download canceled');
+        }
+
+        // Proactive stream re-resolution before expiration (expiresAt - 5 min)
+        if (currentStream.isExpiringSoon()) {
+          debugPrint(
+              '[YtDownloadService] Stream expiring soon for $videoId, proactively re-resolving...');
+          currentStream = await _resolveDownloadStream(videoId, quality);
+          currentUrl = currentStream.url;
+          currentUserAgent = currentStream.userAgent;
+          currentCookies = currentStream.cookies;
         }
 
         await _downloadFileResilient(
@@ -423,14 +464,13 @@ class YtDownloadService {
           rethrow;
         }
 
-        // Re-resolve stream URL with fresh token
+        // Transparent 403 / failure re-resolution via same engine chain
         await _ytmService.invalidatePoToken();
         await _ytmService.ensurePoTokenReady();
-        final freshStream =
-            await _ytmService.resolveStream(videoId, quality: quality);
-        currentUrl = freshStream.url;
-        currentUserAgent = freshStream.userAgent;
-        currentCookies = freshStream.cookies;
+        currentStream = await _resolveDownloadStream(videoId, quality);
+        currentUrl = currentStream.url;
+        currentUserAgent = currentStream.userAgent;
+        currentCookies = currentStream.cookies;
       }
     }
   }

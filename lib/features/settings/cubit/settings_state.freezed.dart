@@ -51,8 +51,12 @@ mixin _$SettingsState {
   bool get ytdlpBackendEnabled;
   String get ytdlpBackendUrl;
   String get ytdlpBackendToken;
+  bool get syncCookiesToBackend;
   bool get isTestingYtdlpBackend;
-  String? get ytdlpBackendStatusMessage; // Audiophile & Hi-Res Output
+  String? get ytdlpBackendStatusMessage;
+  String? get ytdlpBackendVersion;
+  int? get ytdlpBackendProxyCount;
+  String? get ytdlpBackendCircuitState; // Audiophile & Hi-Res Output
   bool get bitPerfectOutput;
   bool get bypassDspOnBitPerfect;
   AudioOutputInfo? get currentOutputDevice;
@@ -155,8 +159,12 @@ mixin _$SettingsState {
             (identical(other.ytdlpBackendEnabled, ytdlpBackendEnabled) || other.ytdlpBackendEnabled == ytdlpBackendEnabled) &&
             (identical(other.ytdlpBackendUrl, ytdlpBackendUrl) || other.ytdlpBackendUrl == ytdlpBackendUrl) &&
             (identical(other.ytdlpBackendToken, ytdlpBackendToken) || other.ytdlpBackendToken == ytdlpBackendToken) &&
+            (identical(other.syncCookiesToBackend, syncCookiesToBackend) || other.syncCookiesToBackend == syncCookiesToBackend) &&
             (identical(other.isTestingYtdlpBackend, isTestingYtdlpBackend) || other.isTestingYtdlpBackend == isTestingYtdlpBackend) &&
             (identical(other.ytdlpBackendStatusMessage, ytdlpBackendStatusMessage) || other.ytdlpBackendStatusMessage == ytdlpBackendStatusMessage) &&
+            (identical(other.ytdlpBackendVersion, ytdlpBackendVersion) || other.ytdlpBackendVersion == ytdlpBackendVersion) &&
+            (identical(other.ytdlpBackendProxyCount, ytdlpBackendProxyCount) || other.ytdlpBackendProxyCount == ytdlpBackendProxyCount) &&
+            (identical(other.ytdlpBackendCircuitState, ytdlpBackendCircuitState) || other.ytdlpBackendCircuitState == ytdlpBackendCircuitState) &&
             (identical(other.bitPerfectOutput, bitPerfectOutput) || other.bitPerfectOutput == bitPerfectOutput) &&
             (identical(other.bypassDspOnBitPerfect, bypassDspOnBitPerfect) || other.bypassDspOnBitPerfect == bypassDspOnBitPerfect) &&
             (identical(other.currentOutputDevice, currentOutputDevice) || other.currentOutputDevice == currentOutputDevice) &&
@@ -218,8 +226,12 @@ mixin _$SettingsState {
         ytdlpBackendEnabled,
         ytdlpBackendUrl,
         ytdlpBackendToken,
+        syncCookiesToBackend,
         isTestingYtdlpBackend,
         ytdlpBackendStatusMessage,
+        ytdlpBackendVersion,
+        ytdlpBackendProxyCount,
+        ytdlpBackendCircuitState,
         bitPerfectOutput,
         bypassDspOnBitPerfect,
         currentOutputDevice,
@@ -243,7 +255,7 @@ mixin _$SettingsState {
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled, dspPreference: $dspPreference)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, syncCookiesToBackend: $syncCookiesToBackend, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, ytdlpBackendVersion: $ytdlpBackendVersion, ytdlpBackendProxyCount: $ytdlpBackendProxyCount, ytdlpBackendCircuitState: $ytdlpBackendCircuitState, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled, dspPreference: $dspPreference)';
   }
 }
 
@@ -291,8 +303,12 @@ abstract mixin class $SettingsStateCopyWith<$Res> {
       bool ytdlpBackendEnabled,
       String ytdlpBackendUrl,
       String ytdlpBackendToken,
+      bool syncCookiesToBackend,
       bool isTestingYtdlpBackend,
       String? ytdlpBackendStatusMessage,
+      String? ytdlpBackendVersion,
+      int? ytdlpBackendProxyCount,
+      String? ytdlpBackendCircuitState,
       bool bitPerfectOutput,
       bool bypassDspOnBitPerfect,
       AudioOutputInfo? currentOutputDevice,
@@ -364,8 +380,12 @@ class _$SettingsStateCopyWithImpl<$Res>
     Object? ytdlpBackendEnabled = null,
     Object? ytdlpBackendUrl = null,
     Object? ytdlpBackendToken = null,
+    Object? syncCookiesToBackend = null,
     Object? isTestingYtdlpBackend = null,
     Object? ytdlpBackendStatusMessage = freezed,
+    Object? ytdlpBackendVersion = freezed,
+    Object? ytdlpBackendProxyCount = freezed,
+    Object? ytdlpBackendCircuitState = freezed,
     Object? bitPerfectOutput = null,
     Object? bypassDspOnBitPerfect = null,
     Object? currentOutputDevice = freezed,
@@ -535,6 +555,10 @@ class _$SettingsStateCopyWithImpl<$Res>
           ? _self.ytdlpBackendToken
           : ytdlpBackendToken // ignore: cast_nullable_to_non_nullable
               as String,
+      syncCookiesToBackend: null == syncCookiesToBackend
+          ? _self.syncCookiesToBackend
+          : syncCookiesToBackend // ignore: cast_nullable_to_non_nullable
+              as bool,
       isTestingYtdlpBackend: null == isTestingYtdlpBackend
           ? _self.isTestingYtdlpBackend
           : isTestingYtdlpBackend // ignore: cast_nullable_to_non_nullable
@@ -542,6 +566,18 @@ class _$SettingsStateCopyWithImpl<$Res>
       ytdlpBackendStatusMessage: freezed == ytdlpBackendStatusMessage
           ? _self.ytdlpBackendStatusMessage
           : ytdlpBackendStatusMessage // ignore: cast_nullable_to_non_nullable
+              as String?,
+      ytdlpBackendVersion: freezed == ytdlpBackendVersion
+          ? _self.ytdlpBackendVersion
+          : ytdlpBackendVersion // ignore: cast_nullable_to_non_nullable
+              as String?,
+      ytdlpBackendProxyCount: freezed == ytdlpBackendProxyCount
+          ? _self.ytdlpBackendProxyCount
+          : ytdlpBackendProxyCount // ignore: cast_nullable_to_non_nullable
+              as int?,
+      ytdlpBackendCircuitState: freezed == ytdlpBackendCircuitState
+          ? _self.ytdlpBackendCircuitState
+          : ytdlpBackendCircuitState // ignore: cast_nullable_to_non_nullable
               as String?,
       bitPerfectOutput: null == bitPerfectOutput
           ? _self.bitPerfectOutput
@@ -754,8 +790,12 @@ extension SettingsStatePatterns on SettingsState {
             bool ytdlpBackendEnabled,
             String ytdlpBackendUrl,
             String ytdlpBackendToken,
+            bool syncCookiesToBackend,
             bool isTestingYtdlpBackend,
             String? ytdlpBackendStatusMessage,
+            String? ytdlpBackendVersion,
+            int? ytdlpBackendProxyCount,
+            String? ytdlpBackendCircuitState,
             bool bitPerfectOutput,
             bool bypassDspOnBitPerfect,
             AudioOutputInfo? currentOutputDevice,
@@ -819,8 +859,12 @@ extension SettingsStatePatterns on SettingsState {
             _that.ytdlpBackendEnabled,
             _that.ytdlpBackendUrl,
             _that.ytdlpBackendToken,
+            _that.syncCookiesToBackend,
             _that.isTestingYtdlpBackend,
             _that.ytdlpBackendStatusMessage,
+            _that.ytdlpBackendVersion,
+            _that.ytdlpBackendProxyCount,
+            _that.ytdlpBackendCircuitState,
             _that.bitPerfectOutput,
             _that.bypassDspOnBitPerfect,
             _that.currentOutputDevice,
@@ -898,8 +942,12 @@ extension SettingsStatePatterns on SettingsState {
             bool ytdlpBackendEnabled,
             String ytdlpBackendUrl,
             String ytdlpBackendToken,
+            bool syncCookiesToBackend,
             bool isTestingYtdlpBackend,
             String? ytdlpBackendStatusMessage,
+            String? ytdlpBackendVersion,
+            int? ytdlpBackendProxyCount,
+            String? ytdlpBackendCircuitState,
             bool bitPerfectOutput,
             bool bypassDspOnBitPerfect,
             AudioOutputInfo? currentOutputDevice,
@@ -962,8 +1010,12 @@ extension SettingsStatePatterns on SettingsState {
             _that.ytdlpBackendEnabled,
             _that.ytdlpBackendUrl,
             _that.ytdlpBackendToken,
+            _that.syncCookiesToBackend,
             _that.isTestingYtdlpBackend,
             _that.ytdlpBackendStatusMessage,
+            _that.ytdlpBackendVersion,
+            _that.ytdlpBackendProxyCount,
+            _that.ytdlpBackendCircuitState,
             _that.bitPerfectOutput,
             _that.bypassDspOnBitPerfect,
             _that.currentOutputDevice,
@@ -1040,8 +1092,12 @@ extension SettingsStatePatterns on SettingsState {
             bool ytdlpBackendEnabled,
             String ytdlpBackendUrl,
             String ytdlpBackendToken,
+            bool syncCookiesToBackend,
             bool isTestingYtdlpBackend,
             String? ytdlpBackendStatusMessage,
+            String? ytdlpBackendVersion,
+            int? ytdlpBackendProxyCount,
+            String? ytdlpBackendCircuitState,
             bool bitPerfectOutput,
             bool bypassDspOnBitPerfect,
             AudioOutputInfo? currentOutputDevice,
@@ -1104,8 +1160,12 @@ extension SettingsStatePatterns on SettingsState {
             _that.ytdlpBackendEnabled,
             _that.ytdlpBackendUrl,
             _that.ytdlpBackendToken,
+            _that.syncCookiesToBackend,
             _that.isTestingYtdlpBackend,
             _that.ytdlpBackendStatusMessage,
+            _that.ytdlpBackendVersion,
+            _that.ytdlpBackendProxyCount,
+            _that.ytdlpBackendCircuitState,
             _that.bitPerfectOutput,
             _that.bypassDspOnBitPerfect,
             _that.currentOutputDevice,
@@ -1173,8 +1233,12 @@ class _SettingsState extends SettingsState {
       this.ytdlpBackendUrl =
           'https://xdm-backend-10763667121.europe-west1.run.app',
       this.ytdlpBackendToken = '',
+      this.syncCookiesToBackend = false,
       this.isTestingYtdlpBackend = false,
       this.ytdlpBackendStatusMessage,
+      this.ytdlpBackendVersion,
+      this.ytdlpBackendProxyCount,
+      this.ytdlpBackendCircuitState,
       this.bitPerfectOutput = false,
       this.bypassDspOnBitPerfect = true,
       this.currentOutputDevice,
@@ -1318,9 +1382,18 @@ class _SettingsState extends SettingsState {
   final String ytdlpBackendToken;
   @override
   @JsonKey()
+  final bool syncCookiesToBackend;
+  @override
+  @JsonKey()
   final bool isTestingYtdlpBackend;
   @override
   final String? ytdlpBackendStatusMessage;
+  @override
+  final String? ytdlpBackendVersion;
+  @override
+  final int? ytdlpBackendProxyCount;
+  @override
+  final String? ytdlpBackendCircuitState;
 // Audiophile & Hi-Res Output
   @override
   @JsonKey()
@@ -1460,8 +1533,12 @@ class _SettingsState extends SettingsState {
             (identical(other.ytdlpBackendEnabled, ytdlpBackendEnabled) || other.ytdlpBackendEnabled == ytdlpBackendEnabled) &&
             (identical(other.ytdlpBackendUrl, ytdlpBackendUrl) || other.ytdlpBackendUrl == ytdlpBackendUrl) &&
             (identical(other.ytdlpBackendToken, ytdlpBackendToken) || other.ytdlpBackendToken == ytdlpBackendToken) &&
+            (identical(other.syncCookiesToBackend, syncCookiesToBackend) || other.syncCookiesToBackend == syncCookiesToBackend) &&
             (identical(other.isTestingYtdlpBackend, isTestingYtdlpBackend) || other.isTestingYtdlpBackend == isTestingYtdlpBackend) &&
             (identical(other.ytdlpBackendStatusMessage, ytdlpBackendStatusMessage) || other.ytdlpBackendStatusMessage == ytdlpBackendStatusMessage) &&
+            (identical(other.ytdlpBackendVersion, ytdlpBackendVersion) || other.ytdlpBackendVersion == ytdlpBackendVersion) &&
+            (identical(other.ytdlpBackendProxyCount, ytdlpBackendProxyCount) || other.ytdlpBackendProxyCount == ytdlpBackendProxyCount) &&
+            (identical(other.ytdlpBackendCircuitState, ytdlpBackendCircuitState) || other.ytdlpBackendCircuitState == ytdlpBackendCircuitState) &&
             (identical(other.bitPerfectOutput, bitPerfectOutput) || other.bitPerfectOutput == bitPerfectOutput) &&
             (identical(other.bypassDspOnBitPerfect, bypassDspOnBitPerfect) || other.bypassDspOnBitPerfect == bypassDspOnBitPerfect) &&
             (identical(other.currentOutputDevice, currentOutputDevice) || other.currentOutputDevice == currentOutputDevice) &&
@@ -1523,8 +1600,12 @@ class _SettingsState extends SettingsState {
         ytdlpBackendEnabled,
         ytdlpBackendUrl,
         ytdlpBackendToken,
+        syncCookiesToBackend,
         isTestingYtdlpBackend,
         ytdlpBackendStatusMessage,
+        ytdlpBackendVersion,
+        ytdlpBackendProxyCount,
+        ytdlpBackendCircuitState,
         bitPerfectOutput,
         bypassDspOnBitPerfect,
         currentOutputDevice,
@@ -1548,7 +1629,7 @@ class _SettingsState extends SettingsState {
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled, dspPreference: $dspPreference)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, syncCookiesToBackend: $syncCookiesToBackend, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, ytdlpBackendVersion: $ytdlpBackendVersion, ytdlpBackendProxyCount: $ytdlpBackendProxyCount, ytdlpBackendCircuitState: $ytdlpBackendCircuitState, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled, dspPreference: $dspPreference)';
   }
 }
 
@@ -1598,8 +1679,12 @@ abstract mixin class _$SettingsStateCopyWith<$Res>
       bool ytdlpBackendEnabled,
       String ytdlpBackendUrl,
       String ytdlpBackendToken,
+      bool syncCookiesToBackend,
       bool isTestingYtdlpBackend,
       String? ytdlpBackendStatusMessage,
+      String? ytdlpBackendVersion,
+      int? ytdlpBackendProxyCount,
+      String? ytdlpBackendCircuitState,
       bool bitPerfectOutput,
       bool bypassDspOnBitPerfect,
       AudioOutputInfo? currentOutputDevice,
@@ -1671,8 +1756,12 @@ class __$SettingsStateCopyWithImpl<$Res>
     Object? ytdlpBackendEnabled = null,
     Object? ytdlpBackendUrl = null,
     Object? ytdlpBackendToken = null,
+    Object? syncCookiesToBackend = null,
     Object? isTestingYtdlpBackend = null,
     Object? ytdlpBackendStatusMessage = freezed,
+    Object? ytdlpBackendVersion = freezed,
+    Object? ytdlpBackendProxyCount = freezed,
+    Object? ytdlpBackendCircuitState = freezed,
     Object? bitPerfectOutput = null,
     Object? bypassDspOnBitPerfect = null,
     Object? currentOutputDevice = freezed,
@@ -1842,6 +1931,10 @@ class __$SettingsStateCopyWithImpl<$Res>
           ? _self.ytdlpBackendToken
           : ytdlpBackendToken // ignore: cast_nullable_to_non_nullable
               as String,
+      syncCookiesToBackend: null == syncCookiesToBackend
+          ? _self.syncCookiesToBackend
+          : syncCookiesToBackend // ignore: cast_nullable_to_non_nullable
+              as bool,
       isTestingYtdlpBackend: null == isTestingYtdlpBackend
           ? _self.isTestingYtdlpBackend
           : isTestingYtdlpBackend // ignore: cast_nullable_to_non_nullable
@@ -1849,6 +1942,18 @@ class __$SettingsStateCopyWithImpl<$Res>
       ytdlpBackendStatusMessage: freezed == ytdlpBackendStatusMessage
           ? _self.ytdlpBackendStatusMessage
           : ytdlpBackendStatusMessage // ignore: cast_nullable_to_non_nullable
+              as String?,
+      ytdlpBackendVersion: freezed == ytdlpBackendVersion
+          ? _self.ytdlpBackendVersion
+          : ytdlpBackendVersion // ignore: cast_nullable_to_non_nullable
+              as String?,
+      ytdlpBackendProxyCount: freezed == ytdlpBackendProxyCount
+          ? _self.ytdlpBackendProxyCount
+          : ytdlpBackendProxyCount // ignore: cast_nullable_to_non_nullable
+              as int?,
+      ytdlpBackendCircuitState: freezed == ytdlpBackendCircuitState
+          ? _self.ytdlpBackendCircuitState
+          : ytdlpBackendCircuitState // ignore: cast_nullable_to_non_nullable
               as String?,
       bitPerfectOutput: null == bitPerfectOutput
           ? _self.bitPerfectOutput

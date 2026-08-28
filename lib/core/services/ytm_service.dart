@@ -269,18 +269,7 @@ class YtmService {
       debugPrint('[YTM_SERVICE] Native search failed, trying fallbacks: $e');
     }
 
-    // 2. Try remote yt-dlp backend search
-    try {
-      if (getIt.isRegistered<XdmBackendService>()) {
-        final xdm = getIt<XdmBackendService>();
-        final xdmResults = await xdm.search(trimmed, limit: limit);
-        if (xdmResults.isNotEmpty) return xdmResults;
-      }
-    } catch (e) {
-      debugPrint('[YTM_SERVICE] Remote yt-dlp search fallback failed: $e');
-    }
-
-    // 3. Fallback: Innertube search
+    // 2. Fallback: Innertube search
     try {
       final innertubeResults = await _searchInnertube(trimmed, limit: limit);
       if (innertubeResults.isNotEmpty) return innertubeResults;
@@ -444,37 +433,48 @@ class YtmService {
         ? cleanUrlOrId
         : 'https://www.youtube.com/playlist?list=$cleanUrlOrId';
 
-    // 1. Try remote yt-dlp backend if enabled
+    // 1. Native Extractor
+    try {
+      final raw = await _guard(
+        () => _channel.invokeMethod<Map<Object?, Object?>>('getPlaylist', {
+          'url': cleanUrlOrId,
+          'limit': limit,
+        }),
+        timeout: const Duration(seconds: 40),
+      );
+
+      if (raw != null) {
+        final rawTracks = raw['tracks'] as List<Object?>?;
+        final parsed = _parseTracks(rawTracks);
+        if (parsed.isNotEmpty) return parsed;
+      }
+    } catch (e) {
+      debugPrint('[YTM_SERVICE] Native getPlaylist failed: $e');
+    }
+
+    // 2. Engine 3: Remote yt-dlp backend fallback if enabled
     try {
       if (getIt.isRegistered<XdmBackendService>()) {
         final xdm = getIt<XdmBackendService>();
-        final account = getIt.isRegistered<YtmAccountService>()
-            ? getIt<YtmAccountService>()
-            : null;
-        final playlistTracks = await xdm.getPlaylist(
-          resolvedUrl,
-          limit: limit,
-          cookies: account?.cookies,
-        );
-        if (playlistTracks.isNotEmpty) {
-          return playlistTracks;
+        if (await xdm.isEnabled()) {
+          final account = getIt.isRegistered<YtmAccountService>()
+              ? getIt<YtmAccountService>()
+              : null;
+          final playlistTracks = await xdm.getPlaylist(
+            resolvedUrl,
+            limit: limit,
+            cookies: account?.cookies,
+          );
+          if (playlistTracks.isNotEmpty) {
+            return playlistTracks;
+          }
         }
       }
     } catch (e) {
       debugPrint('[YTM_SERVICE] Remote yt-dlp playlist fallback: $e');
     }
 
-    final raw = await _guard(
-      () => _channel.invokeMethod<Map<Object?, Object?>>('getPlaylist', {
-        'url': cleanUrlOrId,
-        'limit': limit,
-      }),
-      timeout: const Duration(seconds: 40),
-    );
-
-    if (raw == null) return const [];
-    final rawTracks = raw['tracks'] as List<Object?>?;
-    return _parseTracks(rawTracks);
+    return const [];
   }
 
   List<YtmTrack> _parseTracks(List<Object?>? raw) {
@@ -489,24 +489,12 @@ class YtmService {
   }
 
   /// Resolves audio stream using multi-tier fallback:
-  /// (a) Remote yt-dlp backend -> (b) Direct authenticated account stream -> (c) Native multi-client extractor
+  /// (1) Direct authenticated account stream (if logged in)
+  /// (2) Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
+  /// (3) Engine 3: Remote yt-dlp backend (XdmBackendService)
   Future<YtmStream> resolveStream(String videoId,
       {String quality = 'high'}) async {
-    // 1. Try remote yt-dlp backend (XdmBackendService) if enabled
-    try {
-      if (getIt.isRegistered<XdmBackendService>()) {
-        final xdm = getIt<XdmBackendService>();
-        final remoteStream = await xdm.resolveStream(videoId, quality: quality);
-        if (remoteStream != null) {
-          return remoteStream;
-        }
-      }
-    } catch (e) {
-      debugPrint(
-          '[YTM_SERVICE] Remote yt-dlp backend stream resolution fallback: $e');
-    }
-
-    // 2. Try direct authenticated YouTube Music InnerTube Player API if logged in
+    // 1. Try direct authenticated YouTube Music InnerTube Player API if logged in
     try {
       if (getIt.isRegistered<YtmAccountService>()) {
         final account = getIt<YtmAccountService>();
@@ -525,20 +513,52 @@ class YtmService {
       debugPrint('[YTM_SERVICE] Direct account stream resolution fallback: $e');
     }
 
-    // 3. Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
-    final raw = await _guard(
-      () => _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
-        'videoId': videoId,
-        'quality': quality,
-      }),
-      timeout: _defaultResolveTimeout,
-    );
+    // 2. Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
+    try {
+      final raw = await _guard(
+        () => _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
+          'videoId': videoId,
+          'quality': quality,
+        }),
+        timeout: _defaultResolveTimeout,
+      );
 
-    final stream = raw == null ? null : YtmStream.fromChannel(raw);
-    if (stream == null) {
-      throw const YtmException('YTM_FAILED', 'No stream returned');
+      final stream = raw == null ? null : YtmStream.fromChannel(raw);
+      if (stream != null) {
+        return stream;
+      }
+    } catch (e) {
+      debugPrint('[YTM_SERVICE] Native stream resolution failed: $e');
+      if (e is YtmException && e.isAuth) rethrow;
     }
-    return stream;
+
+    // 3. Engine 3: Remote yt-dlp backend fallback if enabled and healthy
+    try {
+      if (getIt.isRegistered<XdmBackendService>()) {
+        final xdm = getIt<XdmBackendService>();
+        if (await xdm.isEnabled()) {
+          final account = getIt.isRegistered<YtmAccountService>()
+              ? getIt<YtmAccountService>()
+              : null;
+          final remoteStream = await xdm.resolveStream(
+            videoId,
+            quality: quality,
+            cookies: account?.cookies,
+          );
+          if (remoteStream != null) {
+            return remoteStream;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint(
+          '[YTM_SERVICE] Remote yt-dlp backend stream resolution fallback: $e');
+      if (e is YtmException && (e.isBotBlocked || e.code == 'RATE_LIMITED')) {
+        rethrow;
+      }
+    }
+
+    throw const YtmException('YTM_FAILED', 'No stream returned from any engine');
   }
 
   Future<T?> _guard<T>(

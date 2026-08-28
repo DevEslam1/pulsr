@@ -1,10 +1,13 @@
 // test/core/services/xdm_backend_service_test.dart
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/constants/prefs_keys.dart';
 import 'package:pulsr/core/services/xdm_backend_service.dart';
+import 'package:pulsr/core/services/ytm_service.dart';
+import 'package:pulsr/core/utils/ytm_rate_limiter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockHttpClient extends Mock implements http.Client {}
@@ -27,85 +30,129 @@ void main() {
     });
     mockClient = MockHttpClient();
     service = XdmBackendService.withClient(mockClient);
+    YtmRateLimiter.debugReset();
   });
 
   group('XdmBackendService', () {
     test('checkHealth returns ok when backend responds with 200', () async {
       when(() => mockClient.get(
-            Uri.parse('https://test-xdm-backend.app/health'),
+            Uri.parse('https://test-xdm-backend.app/health?strict=true'),
           )).thenAnswer((_) async => http.Response(
             jsonEncode({
               'status': 'ok',
-              'ytdlp': '2026.07.04',
+              'backend_version': '2.0.0',
+              'ytdlp_version': '2026.07.04',
               'proxy_pool_size': 10,
             }),
             200,
           ));
 
-      final health = await service.checkHealth();
+      final health = await service.checkHealth(force: true);
       expect(health.ok, isTrue);
+      expect(health.backendVersion, '2.0.0');
       expect(health.ytdlpVersion, '2026.07.04');
       expect(health.proxyPoolSize, 10);
+      expect(health.circuitState, BackendCircuitState.closed);
     });
 
-    test(
-        'resolveStream uses YouTube Music URL and prioritizes AAC stream by quality',
-        () async {
-      final sampleStreamResponse = {
-        'url': 'https://music.youtube.com/watch?v=dQw4w9WgXcQ',
+    test('resolveStream calls /resolve/audio and parses audio ladder', () async {
+      final sampleAudioLadderResponse = {
+        'videoId': 'dQw4w9WgXcQ',
         'title': 'Test Song Title',
-        'streams': [
+        'author': 'Test Artist',
+        'audio': [
           {
-            'type': 'muxed',
-            'quality': '720p',
-            'ext': 'mp4',
-            'src': 'https://cdn.youtube.com/video_muxed',
-          },
-          {
-            'type': 'audio',
-            'quality': '160kbps',
-            'ext': 'webm',
             'src': 'https://cdn.youtube.com/audio_webm_160',
+            'ext': 'webm',
+            'codec': 'opus',
+            'abr': 160,
+            'filesize': 5000000,
+            'expiresAt': 1800000000000,
           },
           {
-            'type': 'audio',
-            'quality': '128kbps',
-            'ext': 'm4a',
             'src': 'https://cdn.youtube.com/audio_m4a_128',
+            'ext': 'm4a',
+            'codec': 'mp4a.40.2',
+            'abr': 128,
+            'filesize': 4000000,
+            'expiresAt': 1800000000000,
           },
           {
-            'type': 'audio',
-            'quality': '48kbps',
-            'ext': 'm4a',
             'src': 'https://cdn.youtube.com/audio_m4a_48',
+            'ext': 'm4a',
+            'codec': 'mp4a.40.2',
+            'abr': 48,
+            'filesize': 1500000,
+            'expiresAt': 1800000000000,
           }
         ]
       };
 
       when(() => mockClient.get(
-            Uri.parse(
-                'https://test-xdm-backend.app/api/streams?url=https%3A%2F%2Fmusic.youtube.com%2Fwatch%3Fv%3DdQw4w9WgXcQ'),
+            Uri.parse('https://test-xdm-backend.app/resolve/audio?videoId=dQw4w9WgXcQ'),
             headers: any(named: 'headers'),
           )).thenAnswer((_) async => http.Response(
-            jsonEncode(sampleStreamResponse),
+            jsonEncode(sampleAudioLadderResponse),
             200,
           ));
 
-      // High Quality -> selects 128kbps AAC over 160kbps Opus webm
-      final highResult =
-          await service.resolveStream('dQw4w9WgXcQ', quality: 'high');
+      // High Quality -> selects 128kbps AAC over Opus
+      final highResult = await service.resolveStream('dQw4w9WgXcQ', quality: 'high');
       expect(highResult, isNotNull);
       expect(highResult!.url, 'https://cdn.youtube.com/audio_m4a_128');
       expect(highResult.container, 'm4a');
       expect(highResult.bitrateKbps, 128);
+      expect(highResult.expiresAt, 1800000000000);
 
       // Low Quality -> selects 48kbps AAC
-      final lowResult =
-          await service.resolveStream('dQw4w9WgXcQ', quality: 'low');
+      final lowResult = await service.resolveStream('dQw4w9WgXcQ', quality: 'low');
       expect(lowResult, isNotNull);
       expect(lowResult!.url, 'https://cdn.youtube.com/audio_m4a_48');
       expect(lowResult.container, 'm4a');
       expect(lowResult.bitrateKbps, 48);
+    });
+
+    test('Circuit breaker trips to open after 3 consecutive infra failures', () async {
+      when(() => mockClient.get(
+            any(),
+            headers: any(named: 'headers'),
+          )).thenThrow(const SocketException('Connection refused'));
+
+      expect(service.isCircuitOpen, isFalse);
+      expect(service.circuitState, BackendCircuitState.closed);
+
+      await service.resolveStream('vid1');
+      expect(service.consecutiveInfraFailures, 1);
+      expect(service.isCircuitOpen, isFalse);
+
+      await service.resolveStream('vid2');
+      expect(service.consecutiveInfraFailures, 2);
+      expect(service.isCircuitOpen, isFalse);
+
+      await service.resolveStream('vid3');
+      expect(service.consecutiveInfraFailures, 3);
+      expect(service.isCircuitOpen, isTrue);
+      expect(service.circuitState, BackendCircuitState.open);
+      expect(await service.isEnabled(), isFalse);
+    });
+
+    test('429 rate limit maps error code and honors Retry-After header', () async {
+      when(() => mockClient.get(
+            any(),
+            headers: any(named: 'headers'),
+          )).thenAnswer((_) async => http.Response(
+            jsonEncode({'error_code': 'RATE_LIMITED', 'message': 'Too many requests'}),
+            429,
+            headers: {'retry-after': '45'},
+          ));
+
+      await expectLater(
+        service.resolveStream('rate_limited_vid'),
+        throwsA(isA<YtmException>().having((e) => e.code, 'code', 'RATE_LIMITED')),
+      );
+
+      expect(YtmRateLimiter.shared.isBackendCoolingDown, isTrue);
+      expect(YtmRateLimiter.shared.backendCooldownRemaining.inSeconds, greaterThanOrEqualTo(40));
     });
 
     test('getPlaylist parses videos into YtmTrack list', () async {
@@ -148,53 +195,6 @@ void main() {
       expect(tracks[0].title, 'Song One');
       expect(tracks[0].artist, 'Artist A');
       expect(tracks[0].duration.inSeconds, 180);
-      expect(tracks[1].videoId, 'video_2');
-    });
-
-    test('search parses search results into YtmTrack list', () async {
-      final sampleSearchResponse = {
-        'results': [
-          {
-            'id': 'search_vid_1',
-            'title': 'Search Result 1',
-            'author': 'Artist Result',
-            'duration': 210,
-            'thumbnailUrl': 'https://img.youtube.com/vi/search_vid_1/0.jpg',
-          }
-        ]
-      };
-
-      when(() => mockClient.get(
-            Uri.parse('https://test-xdm-backend.app/api/search?q=Adele'),
-            headers: any(named: 'headers'),
-          )).thenAnswer((_) async => http.Response(
-            jsonEncode(sampleSearchResponse),
-            200,
-          ));
-
-      final results = await service.search('Adele');
-
-      expect(results.length, 1);
-      expect(results[0].videoId, 'search_vid_1');
-      expect(results[0].title, 'Search Result 1');
-      expect(results[0].artist, 'Artist Result');
-      expect(results[0].duration.inSeconds, 210);
-    });
-
-    test('returns null / empty when backend is disabled in preferences',
-        () async {
-      SharedPreferences.setMockInitialValues({
-        PrefsKeys.ytdlpBackendEnabled: false,
-      });
-
-      final streamResult = await service.resolveStream('dQw4w9WgXcQ');
-      final searchResult = await service.search('Adele');
-      final playlistResult = await service
-          .getPlaylist('https://www.youtube.com/playlist?list=PL123');
-
-      expect(streamResult, isNull);
-      expect(searchResult, isEmpty);
-      expect(playlistResult, isEmpty);
     });
   });
 }

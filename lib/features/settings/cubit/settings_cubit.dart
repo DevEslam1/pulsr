@@ -382,6 +382,8 @@ class SettingsCubit extends Cubit<SettingsState> {
             prefs.getString(PrefsKeys.ytdlpBackendUrl) ?? state.ytdlpBackendUrl,
         ytdlpBackendToken:
             xdmToken.isNotEmpty ? xdmToken : state.ytdlpBackendToken,
+        syncCookiesToBackend:
+            prefs.getBool(PrefsKeys.syncCookiesToBackend) ?? false,
         bitPerfectOutput:
             prefs.getBool(PrefsKeys.bitPerfectOutput) ?? state.bitPerfectOutput,
         bypassDspOnBitPerfect: prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ??
@@ -876,15 +878,24 @@ class SettingsCubit extends Cubit<SettingsState> {
     emit(state.copyWith(ytdlpBackendToken: cleanToken));
   }
 
+  Future<void> setSyncCookiesToBackend(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.syncCookiesToBackend, value);
+    emit(state.copyWith(syncCookiesToBackend: value));
+  }
+
   Future<void> testYtdlpBackend() async {
     emit(state.copyWith(
         isTestingYtdlpBackend: true, ytdlpBackendStatusMessage: null));
     try {
       final xdm = getIt<XdmBackendService>();
-      final health = await xdm.checkHealth();
+      final health = await xdm.checkHealth(force: true);
       emit(state.copyWith(
         isTestingYtdlpBackend: false,
         ytdlpBackendStatusMessage: health.message,
+        ytdlpBackendVersion: health.backendVersion,
+        ytdlpBackendProxyCount: health.proxyPoolSize,
+        ytdlpBackendCircuitState: health.circuitState.name,
       ));
     } catch (e) {
       emit(state.copyWith(

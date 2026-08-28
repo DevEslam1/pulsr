@@ -88,8 +88,12 @@ abstract class SettingsState with _$SettingsState {
     @Default('https://xdm-backend-10763667121.europe-west1.run.app')
     String ytdlpBackendUrl,
     @Default('') String ytdlpBackendToken,
+    @Default(false) bool syncCookiesToBackend,
     @Default(false) bool isTestingYtdlpBackend,
     String? ytdlpBackendStatusMessage,
+    String? ytdlpBackendVersion,
+    int? ytdlpBackendProxyCount,
+    String? ytdlpBackendCircuitState,
     // Audiophile & Hi-Res Output
     @Default(false) bool bitPerfectOutput,
     @Default(true) bool bypassDspOnBitPerfect,

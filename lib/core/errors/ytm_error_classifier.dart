@@ -18,9 +18,11 @@ enum YtmBlockSignal {
       case 'YTM_429':
         return YtmBlockSignal.rateLimited;
       case 'IP_BLOCKED':
+      case 'FORBIDDEN':
       case 'YTM_403':
         return YtmBlockSignal.ipBlocked;
       case 'BOT_CHALLENGE':
+      case 'BOT_CHECK':
       case 'YTM_BOT_BLOCKED':
       case 'YTM_RECAPTCHA':
       case 'RECAPTCHA_REQUIRED':
@@ -35,10 +37,12 @@ enum YtmBlockSignal {
       case 'YTM_GEO_BLOCKED':
         return YtmBlockSignal.geoBlocked;
       case 'SIGN_IN_REQUIRED':
+      case 'AGE_RESTRICTED':
       case 'LOGIN_REQUIRED':
       case 'YTM_AUTH':
         return YtmBlockSignal.signInRequired;
       case 'VIDEO_GONE':
+      case 'CONTENT_GONE':
       case 'YTM_UNAVAILABLE':
       case 'YTM_404':
         return YtmBlockSignal.videoGone;
@@ -250,10 +254,18 @@ class YtmErrorClassifier {
       return _mapSignal(YtmBlockSignal.videoGone, details, traceId);
     }
 
-    if (code == 'YTM_NETWORK' || code == 'YTM_TIMEOUT') {
+    if (code == 'YTM_NETWORK' || code == 'YTM_TIMEOUT' || code == 'RESOLVE_TIMEOUT') {
       return YtmErrorInfo(
         message: 'No connection. Check your network.',
         recoveryAction: YtmRecoveryAction.retryWithBackoff,
+        traceId: traceId,
+      );
+    }
+
+    if (code == 'EXTRACTOR_ERROR') {
+      return YtmErrorInfo(
+        message: 'Stream extraction failed. Switching route…',
+        recoveryAction: YtmRecoveryAction.rotateIdentity,
         traceId: traceId,
       );
     }
