@@ -198,6 +198,10 @@ configurations.all {
     }
 }
 
+tasks.matching { it.name.startsWith("package") && it.name.endsWith("UnitTestForUnitTest") }.configureEach {
+    mustRunAfter(tasks.matching { it.name.startsWith("copyFlutterAssets") })
+}
+
 tasks.register("testNative") {
     group = "verification"
     description = "Compiles and executes native C++ DSP test suite on host (both parity and debug/sanitizer builds)."

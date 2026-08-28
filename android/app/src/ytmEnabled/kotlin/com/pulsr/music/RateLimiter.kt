@@ -36,7 +36,11 @@ class RateLimiter(
     }
 
     class SystemClockImpl : Clock {
-        override fun elapsedRealtime(): Long = SystemClock.elapsedRealtime()
+        override fun elapsedRealtime(): Long = try {
+            SystemClock.elapsedRealtime()
+        } catch (_: Throwable) {
+            System.currentTimeMillis()
+        }
         override fun currentTimeMillis(): Long = System.currentTimeMillis()
         override fun sleep(millis: Long) = Thread.sleep(millis)
     }
@@ -213,6 +217,6 @@ class RateLimiter(
         private const val PREFS_NAME = "ytm_ratelimiter_prefs"
         private const val KEY_BACKOFF_UNTIL = "key_backoff_until"
 
-        val shared = RateLimiter()
+        val shared: RateLimiter by lazy { RateLimiter() }
     }
 }

@@ -7,12 +7,14 @@ import android.util.Log
  * Layer 3: Dynamic Resolution Strategy & Dual-Engine Fallback Chain.
  *
  * Orders client attempts per operation, skips ineligible clients based on capabilities,
- * and orchestrates dual-engine fallback (Native Innertube -> NewPipeExtractor).
+ * incorporates winning client persistence, and strips non-functional audio clients (like TV)
+ * from the fast path.
  */
 internal class ResolutionStrategy(
     private val context: Context,
     private val cookieStore: YtmCookieStore = YtmCookieStore.getInstance(context),
-    private val poTokenManager: PoTokenManager = PoTokenManager
+    private val poTokenManager: PoTokenManager = PoTokenManager,
+    private val winnerStore: ClientWinnerStore = ClientWinnerStore.getInstance(context)
 ) {
     enum class Operation {
         STREAM_RESOLVE,
@@ -23,17 +25,16 @@ internal class ResolutionStrategy(
     companion object {
         private const val TAG = "ResolutionStrategy"
 
-        // Default priority chains
+        // Optimized default stream chain for audio streaming:
+        // Stripped TVHTML5_SIMPLY_EMBEDDED_PLAYER (known 403 failure for audio)
         val DEFAULT_STREAM_CHAIN = listOf(
             InnertubeClient.ClientType.IOS_MUSIC,
             InnertubeClient.ClientType.ANDROID_MUSIC,
             InnertubeClient.ClientType.ANDROID_VR,
-            InnertubeClient.ClientType.ANDROID_CREATOR,
-            InnertubeClient.ClientType.TVHTML5_SIMPLY_EMBEDDED_PLAYER,
             InnertubeClient.ClientType.WEB_REMIX,
+            InnertubeClient.ClientType.ANDROID_CREATOR,
             InnertubeClient.ClientType.WEB_EMBEDDED_PLAYER,
-            InnertubeClient.ClientType.MWEB,
-            InnertubeClient.ClientType.ANDROID_TESTSUITE
+            InnertubeClient.ClientType.MWEB
         )
 
         val DEFAULT_SEARCH_CHAIN = listOf(
@@ -54,14 +55,23 @@ internal class ResolutionStrategy(
 
     /**
      * Builds an eligible sequence of clients for [op] skipping any clients with unmet requirements.
+     * For STREAM_RESOLVE, if a winning client was persisted for [trackType], it is placed at the front.
      */
     fun buildChain(
         op: Operation,
         limitedMode: Boolean = false,
-        hasJsEngine: Boolean = true
+        hasJsEngine: Boolean = true,
+        trackType: String = ClientWinnerStore.TRACK_TYPE_MUSIC
     ): List<InnertubeClient.ClientType> {
         val baseChain = when (op) {
-            Operation.STREAM_RESOLVE -> DEFAULT_STREAM_CHAIN
+            Operation.STREAM_RESOLVE -> {
+                val winner = winnerStore.getWinningClient(trackType)
+                if (winner != null && DEFAULT_STREAM_CHAIN.contains(winner)) {
+                    listOf(winner) + (DEFAULT_STREAM_CHAIN - winner)
+                } else {
+                    DEFAULT_STREAM_CHAIN
+                }
+            }
             Operation.SEARCH -> DEFAULT_SEARCH_CHAIN
             Operation.BROWSE -> DEFAULT_BROWSE_CHAIN
         }
@@ -102,7 +112,7 @@ internal class ResolutionStrategy(
         }
 
         return chain.ifEmpty {
-            // Absolute fallback to ANDROID_VR / IOS_MUSIC if all filtered out
+            // Absolute fallback to IOS_MUSIC / ANDROID_VR if all filtered out
             listOf(InnertubeClient.ClientType.IOS_MUSIC, InnertubeClient.ClientType.ANDROID_VR)
         }
     }

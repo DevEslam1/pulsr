@@ -30,6 +30,28 @@ object ProxyPool {
     private const val DEAD_TIMEOUT_MS = 15 * 60 * 1000L // 15 minutes
     private const val MAX_CONSECUTIVE_FAILURES = 3
 
+    private fun nowMs(): Long = try {
+        SystemClock.elapsedRealtime()
+    } catch (_: Throwable) {
+        System.currentTimeMillis()
+    }
+
+    private fun logI(tag: String, msg: String) {
+        try {
+            Log.i(tag, msg)
+        } catch (_: Throwable) {
+            println("[$tag] $msg")
+        }
+    }
+
+    private fun logW(tag: String, msg: String) {
+        try {
+            Log.w(tag, msg)
+        } catch (_: Throwable) {
+            System.err.println("[$tag] $msg")
+        }
+    }
+
     data class ProxyNode(
         val id: String,
         val type: Proxy.Type,
@@ -45,7 +67,7 @@ object ProxyPool {
         val isAlive: Boolean
             get() {
                 if (!isEnabled) return false
-                val now = SystemClock.elapsedRealtime()
+                val now = nowMs()
                 return now >= deadUntilTimestamp
             }
 
@@ -79,7 +101,7 @@ object ProxyPool {
         proxies.clear()
         proxies.addAll(list)
         activeProxyIndex = 0
-        Log.i(TAG, "Proxy pool updated with ${list.size} proxies")
+        logI(TAG, "Proxy pool updated with ${list.size} proxies")
     }
 
     fun getActiveProxy(targetUrl: String? = null): Proxy? {
@@ -121,8 +143,8 @@ object ProxyPool {
             failing.consecutiveFailures++
 
             if (failing.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-                failing.deadUntilTimestamp = SystemClock.elapsedRealtime() + DEAD_TIMEOUT_MS
-                Log.w(TAG, "Proxy ${failing.host}:${failing.port} tripped circuit breaker; disabled for 15m")
+                failing.deadUntilTimestamp = nowMs() + DEAD_TIMEOUT_MS
+                logW(TAG, "Proxy ${failing.host}:${failing.port} tripped circuit breaker; disabled for 15m")
             }
 
             if (autoRotateEnabled) {
@@ -132,7 +154,7 @@ object ProxyPool {
                 }
                 val newLabel = newActive?.let { "${it.type.name}:${it.host}:${it.port}" } ?: "DIRECT"
                 currentPathLabel = newLabel
-                Log.i(TAG, "Rotated proxy path to $newLabel")
+                logI(TAG, "Rotated proxy path to $newLabel")
                 onPathChangeListener?.invoke(newLabel)
             }
         }

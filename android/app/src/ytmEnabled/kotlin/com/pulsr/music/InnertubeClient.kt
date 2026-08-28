@@ -260,31 +260,99 @@ internal class InnertubeClient(
             }
         }
 
-        val overallDeadline = android.os.SystemClock.elapsedRealtime() + 25_000L
-        val fastTier = clientChain.take(3)
-        val slowTier = clientChain.drop(3)
+        val trackType = ClientWinnerStore.TRACK_TYPE_MUSIC
+        val winnerStore = ClientWinnerStore.getInstance(context)
 
-        val completionService = java.util.concurrent.ExecutorCompletionService<Map<String, Any?>?>(streamResolverPool)
-        for (client in fastTier) {
-            completionService.submit(java.util.concurrent.Callable { attemptClient(client) })
+        val candidate1 = clientChain.firstOrNull()
+        val candidate2 = clientChain.getOrNull(1)
+
+        val activeFutures = java.util.concurrent.CopyOnWriteArrayList<java.util.concurrent.Future<Pair<ClientType, Map<String, Any?>?>>>()
+
+        fun submitCandidate(client: ClientType): java.util.concurrent.Future<Pair<ClientType, Map<String, Any?>?>> {
+            val future = streamResolverPool.submit(java.util.concurrent.Callable {
+                val res = attemptClient(client)
+                client to res
+            })
+            activeFutures.add(future)
+            return future
         }
 
-        for (i in fastTier.indices) {
-            val remainingMs = overallDeadline - android.os.SystemClock.elapsedRealtime()
-            if (remainingMs <= 0) break
-            val pollMs = remainingMs.coerceAtMost(6000L)
+        if (candidate1 != null) {
+            submitCandidate(candidate1)
+        }
+
+        // Task 4: Wait up to HEDGE_DELAY_MS (350 ms) for candidate 1
+        val hedgeDeadline = android.os.SystemClock.elapsedRealtime() + HEDGE_DELAY_MS
+        while (android.os.SystemClock.elapsedRealtime() < hedgeDeadline) {
+            val done = activeFutures.firstOrNull { it.isDone }
+            if (done != null) {
+                try {
+                    val (client, res) = done.get()
+                    if (res != null) {
+                        for (f in activeFutures) { if (f != done) f.cancel(true) }
+                        winnerStore.recordWinningClient(trackType, client)
+                        return res
+                    } else {
+                        winnerStore.recordFailure(trackType, client)
+                        activeFutures.remove(done)
+                        break
+                    }
+                } catch (_: Throwable) {
+                    activeFutures.remove(done)
+                    break
+                }
+            }
             try {
-                val future = completionService.poll(pollMs, java.util.concurrent.TimeUnit.MILLISECONDS) ?: continue
-                val res = future.get()
-                if (res != null) return res
-            } catch (_: Throwable) {}
+                Thread.sleep(10L)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                break
+            }
         }
 
-        for (client in slowTier) {
-            val remainingMs = overallDeadline - android.os.SystemClock.elapsedRealtime()
-            if (remainingMs <= 0) break
+        // Task 4 Hedged race: launch candidate 2 if candidate 1 did not complete within 350ms
+        if (candidate2 != null && activeFutures.none { it.isDone }) {
+            submitCandidate(candidate2)
+        }
+
+        // Poll for either candidate 1 or candidate 2 to complete
+        val hedgeRaceDeadline = android.os.SystemClock.elapsedRealtime() + 6000L
+        while (android.os.SystemClock.elapsedRealtime() < hedgeRaceDeadline && activeFutures.isNotEmpty()) {
+            val doneList = activeFutures.filter { it.isDone }
+            for (done in doneList) {
+                try {
+                    val (client, res) = done.get()
+                    if (res != null) {
+                        for (f in activeFutures) { if (f != done) f.cancel(true) }
+                        winnerStore.recordWinningClient(trackType, client)
+                        return res
+                    } else {
+                        winnerStore.recordFailure(trackType, client)
+                        activeFutures.remove(done)
+                    }
+                } catch (_: Throwable) {
+                    activeFutures.remove(done)
+                }
+            }
+            if (activeFutures.isEmpty()) break
+            try {
+                Thread.sleep(15L)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                break
+            }
+        }
+
+        // Fallback: sequential check on remaining candidates in chain
+        val remainingClients = clientChain.drop(2)
+        for (client in remainingClients) {
             val res = attemptClient(client)
-            if (res != null) return res
+            if (res != null) {
+                winnerStore.recordWinningClient(trackType, client)
+                return res
+            } else {
+                winnerStore.recordFailure(trackType, client)
+            }
         }
 
         throw InnertubeException(
@@ -671,6 +739,7 @@ internal class InnertubeClient(
 
     companion object {
         private const val TAG = "InnertubeClient"
+        const val HEDGE_DELAY_MS = 350L
         var API_KEY: String = System.getProperty("YTM_API_KEY") ?: "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30"
         @Volatile
         private var _streamResolverPool: java.util.concurrent.ExecutorService? = null
