@@ -1,13 +1,14 @@
 package com.pulsr.music
 
 import android.content.Context
-import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.util.LruCache
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -17,27 +18,23 @@ import org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper
 import java.time.Instant
 
 /**
- * Phase 3 — Layer 3: Singleton PoToken Lifecycle Manager with Hardened VisitorData Binding.
+ * Phase 3 — Layer 3: Singleton PoToken Lifecycle Manager with Hardened VisitorData Binding
+ * and Persistent Store Integration.
  *
- * Features:
- * - Tokens strictly bound to parent visitorData; rotating visitorData flushes token cache atomically
- * - Pre-warms ONE offscreen BotGuard WebView on YTM entry
- * - Background refresh when remaining TTL < 20% while YTM screen is visible
- * - Limited mode gating: falls back to no-poToken clients if WebView/BotGuard fails
- * - Signal-triggered invalidation on BotChallenge / PoTokenInvalid
+ * Latency Optimization (Tasks 0 & 1):
+ * - Persists valid poTokens via [PoTokenStore] across app launches (eliminates 4-8s cold cost)
+ * - Pre-warms BotGuard WebView at app start behind ENABLE_YTM
+ * - Keeps the [PoTokenWebView] generator warm in memory after first init
+ * - Triggers non-blocking background refresh ~30 min before expiry
+ * - On mid-session 403 / BotChallenge: immediately triggers background refresh while current
+ *   playback falls back to unblocked or no-poToken clients, never blocking the audio stream.
  */
 object PoTokenManager {
     private const val TAG = "PoTokenManager"
-    private const val PREFS_NAME = "ytm_po_token_prefs"
-    private const val KEY_VISITOR_DATA = "ytm_visitor_data"
-    private const val KEY_INTEGRITY_TOKEN = "ytm_integrity_token"
-    private const val KEY_EXPIRY_INSTANT = "ytm_expiry_instant"
-    private const val KEY_LAST_STREAMING_TOKEN = "ytm_last_streaming_token"
-    private const val KEY_DATA_SYNC_ID = "ytm_data_sync_id"
 
     private const val LRU_CAPACITY = 64
     private const val TOKEN_TTL_SECONDS = 1800L // 30 minutes
-    private const val EXPIRING_SOON_MARGIN_SECONDS = 600L // 10 minutes
+    const val EXPIRING_SOON_MARGIN_SECONDS = PoTokenStore.REFRESH_MARGIN_SECONDS // 30 minutes
 
     @Volatile
     var visitorData: String = ""
@@ -74,7 +71,6 @@ object PoTokenManager {
     private var generator: PoTokenGenerator? = null
 
     private var appContext: Context? = null
-    private var prefs: SharedPreferences? = null
     private val stateMutex = Mutex()
     private var refreshInFlight: kotlinx.coroutines.Deferred<Boolean>? = null
 
@@ -87,19 +83,25 @@ object PoTokenManager {
 
     fun init(context: Context) {
         if (appContext == null) {
-            appContext = context.applicationContext
-            val p = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            prefs = p
-            visitorData = p.getString(KEY_VISITOR_DATA, "") ?: ""
-            integrityToken = p.getString(KEY_INTEGRITY_TOKEN, "") ?: ""
-            expiryInstant = p.getLong(KEY_EXPIRY_INSTANT, 0L)
-            streamingPoToken = p.getString(KEY_LAST_STREAMING_TOKEN, "") ?: ""
-            dataSyncId = p.getString(KEY_DATA_SYNC_ID, "") ?: ""
+            val app = context.applicationContext
+            appContext = app
+            val stored = PoTokenStore.loadTokenData(app)
+            if (stored.streamingPoToken.isNotEmpty() && stored.visitorData.isNotEmpty()) {
+                visitorData = stored.visitorData
+                integrityToken = stored.integrityToken
+                streamingPoToken = stored.streamingPoToken
+                dataSyncId = stored.dataSyncId
+                expiryInstant = stored.expiryInstant
+                synchronized(tokenLru) {
+                    tokenLru.put(visitorData, CachedToken(streamingPoToken, visitorData, stored.generatedAt))
+                }
+                Log.d(TAG, "Loaded valid poToken from persistent store (valid until epoch $expiryInstant)")
+            }
         }
     }
 
     val isReady: Boolean
-        get() = visitorData.isNotEmpty() && !isExpired()
+        get() = visitorData.isNotEmpty() && streamingPoToken.isNotEmpty() && !isExpired()
 
     fun isExpired(): Boolean {
         val now = Instant.now().epochSecond
@@ -108,23 +110,30 @@ object PoTokenManager {
 
     fun isExpiringSoon(): Boolean {
         val now = Instant.now().epochSecond
-        return expiryInstant - now < EXPIRING_SOON_MARGIN_SECONDS
+        return (expiryInstant - now) <= EXPIRING_SOON_MARGIN_SECONDS
     }
 
     fun isTtlCritical(): Boolean {
         val now = Instant.now().epochSecond
-        val totalLifetime = 12 * 3600L
+        val totalLifetime = PoTokenStore.DEFAULT_TTL_SECONDS
         val remaining = expiryInstant - now
         return remaining > 0 && remaining < (totalLifetime * 0.20)
     }
 
     /**
-     * Pre-warms BotGuard WebView in background before user initiates first request.
+     * Pre-warms BotGuard WebView in background at app launch before user initiates first request.
+     * Off the critical path: resolution uses stored token immediately without waiting for this.
      */
     fun preWarm(context: Context) {
         init(context)
-        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).async {
-            runCatching { ensureReady() }
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                if (isExpired() || isExpiringSoon() || generator == null) {
+                    ensureReady()
+                }
+            } catch (t: Throwable) {
+                Log.w(TAG, "Pre-warm failed non-fatally: ${t.message}")
+            }
         }
     }
 
@@ -133,14 +142,29 @@ object PoTokenManager {
      */
     fun checkAndRefreshVisibleScreen() {
         if (isTtlCritical() && !webViewBroken) {
-            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).async {
+            CoroutineScope(Dispatchers.IO).launch {
                 runCatching { ensureReady() }
             }
         }
     }
 
     /**
-     * Ensures attestation state is ready.
+     * Non-blocking background regeneration triggered on 403 or invalidation signal.
+     */
+    fun triggerBackgroundRefresh() {
+        val ctx = appContext ?: return
+        Log.i(TAG, "Triggering non-blocking background PoToken regeneration")
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                ensureReady()
+            } catch (t: Throwable) {
+                Log.e(TAG, "Background PoToken regeneration failed: ${t.message}", t)
+            }
+        }
+    }
+
+    /**
+     * Ensures attestation state and generator are ready.
      */
     suspend fun ensureReady(): Boolean = withContext(Dispatchers.IO) {
         if (webViewBroken) {
@@ -164,7 +188,7 @@ object PoTokenManager {
                 }
             }
 
-            val deferred = kotlinx.coroutines.CoroutineScope(Dispatchers.IO).async {
+            val deferred = CoroutineScope(Dispatchers.IO).async {
                 try {
                     refreshInternal()
                     true
@@ -197,10 +221,13 @@ object PoTokenManager {
 
     /**
      * Generates or retrieves cached poToken strictly bound to current [visitorData].
+     * Never blocks critical-path playback if a token is already cached or stored.
      */
     fun poTokenForSync(identifier: String): String {
         val currentVisitor = visitorData
         val now = Instant.now().epochSecond
+
+        // 1. In-memory LRU cache
         synchronized(tokenLru) {
             val cached = tokenLru.get(identifier)
             if (cached != null && cached.visitorDataBound == currentVisitor && (now - cached.timestamp) < TOKEN_TTL_SECONDS) {
@@ -208,6 +235,12 @@ object PoTokenManager {
             }
         }
 
+        // 2. Direct streaming poToken shortcut (fast path for player requests)
+        if (identifier == currentVisitor && streamingPoToken.isNotEmpty() && !isExpired()) {
+            return streamingPoToken
+        }
+
+        // 3. If WebView is broken, fallback to last streaming token
         if (webViewBroken) {
             synchronized(tokenLru) {
                 val fallback = tokenLru.get(identifier)?.token
@@ -217,17 +250,41 @@ object PoTokenManager {
             return ""
         }
 
+        // 4. Use existing warm generator if available
+        val gen = generator
+        if (gen != null && !gen.isExpired()) {
+            return try {
+                val minted = gen.generatePoToken(identifier)
+                synchronized(tokenLru) {
+                    tokenLru.put(identifier, CachedToken(minted, visitorData, Instant.now().epochSecond))
+                }
+                minted
+            } catch (t: Throwable) {
+                Log.w(TAG, "Minting poToken failed with warm generator: ${t.message}", t)
+                synchronized(tokenLru) {
+                    tokenLru.get(identifier)?.token ?: streamingPoToken
+                }
+            }
+        }
+
+        // 5. If we have a valid stored streaming token, return it and warm generator in background
+        if (streamingPoToken.isNotEmpty() && !isExpired()) {
+            triggerBackgroundRefresh()
+            return streamingPoToken
+        }
+
+        // 6. Cold path fallback: synchronous generation
         ensureReadySync()
 
-        val gen = generator
-        if (gen == null || gen.isExpired()) {
+        val activeGen = generator
+        if (activeGen == null || activeGen.isExpired()) {
             synchronized(tokenLru) {
                 return tokenLru.get(identifier)?.token ?: streamingPoToken
             }
         }
 
         return try {
-            val minted = gen.generatePoToken(identifier)
+            val minted = activeGen.generatePoToken(identifier)
             synchronized(tokenLru) {
                 tokenLru.put(identifier, CachedToken(minted, visitorData, Instant.now().epochSecond))
             }
@@ -251,7 +308,7 @@ object PoTokenManager {
             if (normalized == dataSyncId) return
             val old = dataSyncId
             dataSyncId = normalized
-            prefs?.edit()?.putString(KEY_DATA_SYNC_ID, normalized)?.apply()
+            appContext?.let { PoTokenStore.saveDataSyncId(it, normalized) }
             if (old.isNotEmpty()) tokenLru.remove(old)
             tokenLru.remove(normalized)
         }
@@ -266,7 +323,6 @@ object PoTokenManager {
     fun accountPoTokenForSync(dataSyncId: String): String {
         val id = dataSyncId.trim()
         if (id.isEmpty()) return ""
-        ensureReadySync()
         return poTokenForSync(id)
     }
 
@@ -283,12 +339,7 @@ object PoTokenManager {
         visitorData = ""
         streamingPoToken = ""
         oldGen?.let { Handler(Looper.getMainLooper()).post { it.close() } }
-        prefs?.edit()
-            ?.remove(KEY_EXPIRY_INSTANT)
-            ?.remove(KEY_DATA_SYNC_ID)
-            ?.remove(KEY_VISITOR_DATA)
-            ?.remove(KEY_LAST_STREAMING_TOKEN)
-            ?.apply()
+        appContext?.let { PoTokenStore.clear(it) }
         synchronized(tokenLru) {
             tokenLru.evictAll()
         }
@@ -331,25 +382,30 @@ object PoTokenManager {
         // 3. Mint the streaming poToken using visitorData
         val newStreamingToken = newGenerator.generatePoToken(newVisitorData)
 
-        // 4. Default 12 hour expiry with 10 min margin
-        val newExpiry = Instant.now().plusSeconds(12 * 3600 - EXPIRING_SOON_MARGIN_SECONDS).epochSecond
+        // 4. Default 12 hour expiry with 30 min margin
+        val now = Instant.now().epochSecond
+        val ttlSeconds = PoTokenStore.DEFAULT_TTL_SECONDS
+        val newExpiry = now + ttlSeconds
 
         visitorData = newVisitorData
         streamingPoToken = newStreamingToken
         expiryInstant = newExpiry
         generator = newGenerator
 
-        // 5. Persist to SharedPreferences
-        prefs?.edit()?.apply {
-            putString(KEY_VISITOR_DATA, newVisitorData)
-            putString(KEY_LAST_STREAMING_TOKEN, newStreamingToken)
-            putLong(KEY_EXPIRY_INSTANT, newExpiry)
-            apply()
-        }
+        // 5. Persist to secure store
+        PoTokenStore.saveTokenData(
+            context = ctx,
+            streamingPoToken = newStreamingToken,
+            visitorData = newVisitorData,
+            integrityToken = integrityToken,
+            dataSyncId = dataSyncId,
+            ttlSeconds = ttlSeconds,
+            generatedAt = now
+        )
 
         synchronized(tokenLru) {
             tokenLru.evictAll() // Flush old visitorData bindings
-            tokenLru.put(newVisitorData, CachedToken(newStreamingToken, newVisitorData, Instant.now().epochSecond))
+            tokenLru.put(newVisitorData, CachedToken(newStreamingToken, newVisitorData, now))
         }
 
         Log.i(TAG, "Successfully refreshed PoToken attestation. Valid until epoch $newExpiry")
