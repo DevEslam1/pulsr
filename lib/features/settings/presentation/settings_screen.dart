@@ -2348,120 +2348,127 @@ class SettingsScreen extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return Center(
+        return Align(
+          alignment: Alignment.bottomCenter,
           child: ConstrainedBox(
-            constraints: Adaptive.sheetConstraints(ctx),
+            constraints: BoxConstraints(
+              maxWidth: Adaptive.sheetConstraints(ctx).maxWidth,
+              maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+            ),
             child: Material(
               color: p.surfaceContainerHigh,
-              borderRadius: AppRadii.bottomSheetRadius,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
               clipBehavior: Clip.antiAlias,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: Container(
-                        width: 36,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: p.textTertiary.withValues(alpha: 0.3),
-                          borderRadius: BorderRadius.circular(2),
+              child: SafeArea(
+                top: false,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 36,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: p.textTertiary.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 14),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: p.accentContainer,
-                            borderRadius: BorderRadius.circular(10),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: p.accentContainer,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(Icons.language_rounded,
+                                color: p.accent, size: 22),
                           ),
-                          child: Icon(Icons.language_rounded,
-                              color: p.accent, size: 22),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'YouTube Music Web',
-                                style: TextStyle(
-                                  color: p.textPrimary,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 17,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'YouTube Music Web',
+                                  style: TextStyle(
+                                    color: p.textPrimary,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 17,
+                                  ),
                                 ),
-                              ),
-                              Text(
-                                'Select a page to open in the in-app browser',
-                                style: TextStyle(
-                                    color: p.textSecondary, fontSize: 12),
-                              ),
-                            ],
+                                Text(
+                                  'Select a page to open in the in-app browser',
+                                  style: TextStyle(
+                                      color: p.textSecondary, fontSize: 12),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _ytmWebOptionTile(
-                      ctx,
-                      icon: Icons.home_rounded,
-                      title: 'Home Page',
-                      subtitle:
-                          'Personalized recommendations, mixes & quick picks',
-                      url: 'https://music.youtube.com',
-                      p: p,
-                    ),
-                    _ytmWebOptionTile(
-                      ctx,
-                      icon: Icons.explore_rounded,
-                      title: 'Explore & Charts',
-                      subtitle:
-                          'Trending songs, top global charts & music videos',
-                      url: 'https://music.youtube.com/explore',
-                      p: p,
-                    ),
-                    _ytmWebOptionTile(
-                      ctx,
-                      icon: Icons.library_music_rounded,
-                      title: 'Your Library',
-                      subtitle:
-                          'Saved playlists, albums, songs & subscribed artists',
-                      url: 'https://music.youtube.com/library',
-                      p: p,
-                    ),
-                    _ytmWebOptionTile(
-                      ctx,
-                      icon: Icons.favorite_rounded,
-                      title: 'Liked Music',
-                      subtitle:
-                          'Thumbed-up songs synced with your Google account',
-                      url: 'https://music.youtube.com/playlist?list=LM',
-                      p: p,
-                    ),
-                    _ytmWebOptionTile(
-                      ctx,
-                      icon: Icons.fiber_new_rounded,
-                      title: 'New Releases',
-                      subtitle:
-                          'Latest album drops, EPs and trending single releases',
-                      url: 'https://music.youtube.com/new_releases',
-                      p: p,
-                    ),
-                    _ytmWebOptionTile(
-                      ctx,
-                      icon: Icons.history_rounded,
-                      title: 'Listening History',
-                      subtitle:
-                          'Recently played tracks and stations on your account',
-                      url: 'https://music.youtube.com/history',
-                      p: p,
-                    ),
-                  ],
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      _ytmWebOptionTile(
+                        ctx,
+                        icon: Icons.home_rounded,
+                        title: 'Home Page',
+                        subtitle:
+                            'Personalized recommendations, mixes & quick picks',
+                        url: 'https://music.youtube.com',
+                        p: p,
+                      ),
+                      _ytmWebOptionTile(
+                        ctx,
+                        icon: Icons.explore_rounded,
+                        title: 'Explore & Charts',
+                        subtitle:
+                            'Trending songs, top global charts & music videos',
+                        url: 'https://music.youtube.com/explore',
+                        p: p,
+                      ),
+                      _ytmWebOptionTile(
+                        ctx,
+                        icon: Icons.library_music_rounded,
+                        title: 'Your Library',
+                        subtitle:
+                            'Saved playlists, albums, songs & subscribed artists',
+                        url: 'https://music.youtube.com/library',
+                        p: p,
+                      ),
+                      _ytmWebOptionTile(
+                        ctx,
+                        icon: Icons.favorite_rounded,
+                        title: 'Liked Music',
+                        subtitle:
+                            'Thumbed-up songs synced with your Google account',
+                        url: 'https://music.youtube.com/playlist?list=LM',
+                        p: p,
+                      ),
+                      _ytmWebOptionTile(
+                        ctx,
+                        icon: Icons.fiber_new_rounded,
+                        title: 'New Releases',
+                        subtitle:
+                            'Latest album drops, EPs and trending single releases',
+                        url: 'https://music.youtube.com/new_releases',
+                        p: p,
+                      ),
+                      _ytmWebOptionTile(
+                        ctx,
+                        icon: Icons.history_rounded,
+                        title: 'Listening History',
+                        subtitle:
+                            'Recently played tracks and stations on your account',
+                        url: 'https://music.youtube.com/history',
+                        p: p,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

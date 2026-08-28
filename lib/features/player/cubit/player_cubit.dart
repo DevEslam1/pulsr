@@ -427,6 +427,7 @@ class PlayerCubit extends Cubit<PlayerState> {
               state.copyWith(
                 currentSong: resolvedSong,
                 duration: duration,
+                position: isSameSong ? state.position : Duration.zero,
                 errorMessage: null,
               ),
             );
@@ -516,13 +517,7 @@ class PlayerCubit extends Cubit<PlayerState> {
           }
         } catch (_) {}
       }
-      final effectivePos = isCompleted
-          ? Duration.zero
-          : (playbackState.position > Duration.zero
-              ? playbackState.position
-              : (state.position > Duration.zero
-                  ? state.position
-                  : playbackState.position));
+      final effectivePos = isCompleted ? Duration.zero : playbackState.position;
 
       emit(
         state.copyWith(

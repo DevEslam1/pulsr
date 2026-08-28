@@ -198,20 +198,26 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) {
-        return Center(
+        return Align(
+          alignment: Alignment.bottomCenter,
           child: ConstrainedBox(
-            constraints: Adaptive.sheetConstraints(ctx),
+            constraints: BoxConstraints(
+              maxWidth: Adaptive.sheetConstraints(ctx).maxWidth,
+              maxHeight: MediaQuery.of(ctx).size.height * 0.85,
+            ),
             child: Material(
               color: p.surfaceContainerHigh,
-              borderRadius: AppRadii.bottomSheetRadius,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
               clipBehavior: Clip.antiAlias,
-              child: Padding(
-                padding: EdgeInsets.only(
-                  left: 20,
-                  right: 20,
-                  top: 20,
-                  bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-                ),
+              child: SafeArea(
+                top: false,
+                child: Padding(
+                  padding: EdgeInsets.only(
+                    left: 20,
+                    right: 20,
+                    top: 20,
+                    bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+                  ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -415,9 +421,10 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
               ),
             ),
           ),
-        );
-      },
-    );
+        ),
+      );
+    },
+  );
   }
 
   @override

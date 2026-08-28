@@ -90,18 +90,30 @@ class AudioQualityInfo {
           : streamingQuality == YtmAudioQuality.medium
               ? 128
               : 256;
-      final kbps = explicitBitrateKbps ?? defaultKbps;
+      final kbps = explicitBitrateKbps ??
+          (song.bitrateKbps != null && song.bitrateKbps! > 0
+              ? song.bitrateKbps!
+              : defaultKbps);
+      final rawCodec = explicitFormat ?? song.codec ?? 'AAC';
+      final format = rawCodec.toUpperCase().contains('OPUS') ||
+              rawCodec.toUpperCase().contains('WEBM')
+          ? 'OPUS'
+          : 'AAC';
       final tier = kbps >= 160
           ? AudioQualityTier.highQuality
           : kbps >= 128
               ? AudioQualityTier.standardQuality
               : AudioQualityTier.compact;
       return AudioQualityInfo(
-        format: 'AAC',
-        codecName: 'YouTube Music Stream (AAC / Opus)',
+        format: format,
+        codecName: 'YouTube Music Stream ($format)',
         bitrateKbps: kbps,
-        sampleRate: '48.0 kHz',
-        bitDepth: '16-bit',
+        sampleRate: song.sampleRate != null && song.sampleRate! > 0
+            ? '${(song.sampleRate! / 1000).toStringAsFixed(1)} kHz'
+            : '48.0 kHz',
+        bitDepth: song.bitDepth != null && song.bitDepth! > 0
+            ? '${song.bitDepth}-bit'
+            : '16-bit',
         channels: 'Stereo (2.0)',
         tier: tier,
         tierLabel: kbps >= 160
@@ -109,7 +121,7 @@ class AudioQualityInfo {
             : kbps >= 128
                 ? 'Medium Quality Stream'
                 : 'Data Saver Stream',
-        shortBadgeLabel: 'AAC • ${kbps}k',
+        shortBadgeLabel: '$format • ${kbps}k',
         description: 'Online YouTube Music audio stream ($kbps kbps)',
         badgeColor: const Color(0xFFE11D48),
         icon: Icons.wifi_tethering_rounded,
