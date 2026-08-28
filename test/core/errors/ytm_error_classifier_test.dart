@@ -78,5 +78,23 @@ void main() {
       expect(
           infoCode.recoveryAction, equals(YtmRecoveryAction.rotatePath));
     });
+
+    test('adversarial non-collision tests: author and country names do not trigger spurious blocks', () {
+      // 1. Metadata containing "author" must not classify as signInRequired
+      final parseErrWithAuthor = Exception('JSON parse error at {"author": "The Midnight"}');
+      final info1 = YtmErrorClassifier.classify(parseErrWithAuthor);
+      expect(info1.signal, isNot(equals(YtmBlockSignal.signInRequired)));
+      expect(info1.recoveryAction, isNot(equals(YtmRecoveryAction.showLoginPrompt)));
+
+      // 2. Track name containing "Georgia" or "Country Road" must not classify as geoBlocked
+      final errWithGeorgia = Exception('Stream decode failed for "Midnight Train to Georgia"');
+      final info2 = YtmErrorClassifier.classify(errWithGeorgia);
+      expect(info2.signal, isNot(equals(YtmBlockSignal.geoBlocked)));
+      expect(info2.recoveryAction, isNot(equals(YtmRecoveryAction.skipToNextTrack)));
+
+      final errWithCountry = Exception('Failed rendering tile for Country Roads genre');
+      final info3 = YtmErrorClassifier.classify(errWithCountry);
+      expect(info3.signal, isNot(equals(YtmBlockSignal.geoBlocked)));
+    });
   });
 }

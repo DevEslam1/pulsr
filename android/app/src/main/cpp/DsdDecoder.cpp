@@ -13,28 +13,32 @@ DsdDecoder::DsdDecoder() {
 }
 
 void DsdDecoder::generateFilters() {
-    // Design 31-tap Halfband Lowpass Filter with Blackman-Harris window
+    // Stage 1 output sample rate is (44100 * dsdRate) / 8 = 352.8 kHz for DSD64
+    const double stage1Rate = (44100.0 * static_cast<double>(dsdRate_)) / 8.0;
+    // Anti-aliasing cutoff at 0.42 * targetRate_ (e.g. 20.16 kHz for 48kHz target rate)
+    const double cutoff = std::min(0.48, (0.42 * static_cast<double>(targetRate_)) / stage1Rate);
+
     double sum = 0.0;
-    for (int i = 0; i < HALFBAND_TAPS; ++i) {
-        int n = i - HALFBAND_HALF;
+    for (int i = 0; i < DECIMATION_TAPS; ++i) {
+        int n = i - DECIMATION_HALF;
         double val = 0.0;
         if (n == 0) {
-            val = 0.5;
-        } else if (n % 2 != 0) {
-            val = std::sin(M_PI * n * 0.5) / (M_PI * n);
+            val = 2.0 * cutoff;
+        } else {
+            val = std::sin(2.0 * M_PI * cutoff * n) / (M_PI * n);
         }
 
-        // Blackman-Harris window
-        double w = 2.0 * M_PI * i / (HALFBAND_TAPS - 1);
+        // 4-term Blackman-Harris window for > 92 dB stopband attenuation
+        double w = 2.0 * M_PI * i / (DECIMATION_TAPS - 1);
         double win = 0.35875 - 0.48829 * std::cos(w) + 0.14128 * std::cos(2.0 * w) - 0.01168 * std::cos(3.0 * w);
-        halfbandCoeffs_[i] = static_cast<float>(val * win);
-        sum += halfbandCoeffs_[i];
+        decimationCoeffs_[i] = static_cast<float>(val * win);
+        sum += decimationCoeffs_[i];
     }
 
     if (std::abs(sum) > 1e-6) {
         float invSum = static_cast<float>(1.0 / sum);
-        for (int i = 0; i < HALFBAND_TAPS; ++i) {
-            halfbandCoeffs_[i] *= invSum;
+        for (int i = 0; i < DECIMATION_TAPS; ++i) {
+            decimationCoeffs_[i] *= invSum;
         }
     }
 
@@ -139,18 +143,18 @@ int DsdDecoder::decodeDsdBytes(const uint8_t* dsdL, const uint8_t* dsdR, int byt
                 const float cicOutL = static_cast<float>(diffL) * (1.0f / 512.0f);
                 const float cicOutR = static_cast<float>(diffR) * (1.0f / 512.0f);
 
-                // --- STAGE 2: Halfband Filter ---
+                // --- STAGE 2: Anti-Aliasing Decimation Filter ---
                 stage2RingL_[stage2WriteIdx_] = cicOutL;
                 stage2RingR_[stage2WriteIdx_] = cicOutR;
-                stage2WriteIdx_ = (stage2WriteIdx_ + 1) % HALFBAND_TAPS;
+                stage2WriteIdx_ = (stage2WriteIdx_ + 1) % DECIMATION_TAPS;
 
-                float halfbandOutL = 0.0f;
-                float halfbandOutR = 0.0f;
+                float decimationOutL = 0.0f;
+                float decimationOutR = 0.0f;
 
-                for (int tap = 0; tap < HALFBAND_TAPS; ++tap) {
-                    int rIdx = (stage2WriteIdx_ - 1 - tap + HALFBAND_TAPS) % HALFBAND_TAPS;
-                    halfbandOutL += stage2RingL_[rIdx] * halfbandCoeffs_[tap];
-                    halfbandOutR += stage2RingR_[rIdx] * halfbandCoeffs_[tap];
+                for (int tap = 0; tap < DECIMATION_TAPS; ++tap) {
+                    int rIdx = (stage2WriteIdx_ - 1 - tap + DECIMATION_TAPS) % DECIMATION_TAPS;
+                    decimationOutL += stage2RingL_[rIdx] * decimationCoeffs_[tap];
+                    decimationOutR += stage2RingR_[rIdx] * decimationCoeffs_[tap];
                 }
 
                 // --- STAGE 3: Fractional Phase Accumulator to target rate ---
@@ -160,8 +164,8 @@ int DsdDecoder::decodeDsdBytes(const uint8_t* dsdL, const uint8_t* dsdR, int byt
 
                     // --- STAGE 4: 5Hz DC Blocker Highpass Filter ---
                     // y[n] = x[n] - x[n-1] + R * y[n-1]
-                    const float sL = halfbandOutL * headroomScale;
-                    const float sR = halfbandOutR * headroomScale;
+                    const float sL = decimationOutL * headroomScale;
+                    const float sR = decimationOutR * headroomScale;
 
                     const float dcOutL = sL - dcPrevInL_ + dcPole_ * dcPrevOutL_;
                     const float dcOutR = sR - dcPrevInR_ + dcPole_ * dcPrevOutR_;

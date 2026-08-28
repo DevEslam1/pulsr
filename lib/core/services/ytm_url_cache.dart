@@ -111,8 +111,8 @@ class YtmUrlCache {
       : _capacity = capacity,
         _ttl = ttl;
 
-  String _buildKey(String videoId, String quality, [String? egressId]) =>
-      '$videoId:${quality.toLowerCase()}:${egressId ?? "default"}';
+  String _buildKey(String videoId, String quality, [String? egressId, String? identityHash]) =>
+      '$videoId:${quality.toLowerCase()}:${egressId ?? "default"}:${identityHash ?? "guest"}';
 
   /// Retrieves cached entry if present and not expired or dead. Moves entry to MRU position.
   /// If [onStaleRevalidate] is provided and entry is in the Stale-While-Revalidate window (age >= ttl/2),
@@ -121,9 +121,10 @@ class YtmUrlCache {
     String videoId, {
     String quality = 'high',
     String? egressId,
+    String? identityHash,
     void Function(String videoId)? onStaleRevalidate,
   }) {
-    final key = _buildKey(videoId, quality, egressId);
+    final key = _buildKey(videoId, quality, egressId, identityHash);
     final entry = _cache[key];
     if (entry == null) return null;
 
@@ -185,6 +186,7 @@ class YtmUrlCache {
     String url, {
     String quality = 'high',
     String? egressId,
+    String? identityHash,
     DateTime? explicitExpiry,
     String? userAgent,
     String? cookies,
@@ -193,7 +195,7 @@ class YtmUrlCache {
     // If this URL was previously flagged dead, remove from dead list upon fresh explicit put
     _deadUrls.remove(url);
 
-    final key = _buildKey(videoId, quality, egressId);
+    final key = _buildKey(videoId, quality, egressId, identityHash);
     final now = _clock.now();
 
     // Determine expiration timestamp
@@ -229,12 +231,14 @@ class YtmUrlCache {
     YtmStream stream, {
     String quality = 'high',
     String? egressId,
+    String? identityHash,
   }) {
     put(
       stream.videoId,
       stream.url,
       quality: quality,
       egressId: egressId,
+      identityHash: identityHash,
       explicitExpiry: stream.expiresAtDateTime,
       userAgent: stream.userAgent,
       cookies: stream.cookies,

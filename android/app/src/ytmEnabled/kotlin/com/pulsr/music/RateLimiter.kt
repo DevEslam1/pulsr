@@ -46,11 +46,11 @@ class RateLimiter(
     }
 
     enum class Bucket(val maxTokens: Int, val refillPerSecond: Double, val minGapMs: Long) {
-        SEARCH(8, 2.0, 1500L),
-        BROWSE(10, 4.0, 500L),
-        PLAYER(10, 5.0, 200L),
-        STREAM(12, 6.0, 100L),
-        DOWNLOAD(6, 3.0, 300L)
+        SEARCH(3, 1.0, 1000L),
+        BROWSE(5, 2.0, 300L),
+        PLAYER(5, 2.0, 200L),
+        STREAM(12, 6.0, 50L),
+        DOWNLOAD(6, 3.0, 200L)
     }
 
     private class BucketState(val bucket: Bucket, var availableTokens: Double, var lastRefill: Long, var lastRequest: Long = 0L)
@@ -61,6 +61,7 @@ class RateLimiter(
     private val adaptiveMultiplier = AtomicInteger(1)
     private val lastSuccessTimestamp = AtomicLong(0L)
     private val consecutiveThrottles = AtomicInteger(0)
+    private val consecutiveSuccesses = AtomicInteger(0)
 
     private val lock = ReentrantLock()
     private val condition = lock.newCondition()
@@ -88,6 +89,7 @@ class RateLimiter(
     fun acquirePermit(bucket: Bucket = Bucket.PLAYER) {
         // 1. Global in-flight concurrency limiter
         globalSemaphore.acquire()
+        val startWait = clock.elapsedRealtime()
 
         while (true) {
             val now = clock.elapsedRealtime()
@@ -124,15 +126,19 @@ class RateLimiter(
                 // Refill bucket tokens
                 val elapsedSec = (now - state.lastRefill) / 1000.0
                 if (elapsedSec > 0) {
-                    state.availableTokens = min(bucket.maxTokens.toDouble(), state.availableTokens + (elapsedSec * bucket.refillPerSecond))
+                    val currentMultiplier = adaptiveMultiplier.get()
+                    val effectiveRefill = bucket.refillPerSecond / currentMultiplier.toDouble()
+                    state.availableTokens = min(bucket.maxTokens.toDouble(), state.availableTokens + (elapsedSec * effectiveRefill))
                     state.lastRefill = now
                 }
 
                 // Check respectful human pacing gap
                 if (respectfulMode && bucket.minGapMs > 0 && state.lastRequest > 0) {
                     val gapElapsed = now - state.lastRequest
-                    if (gapElapsed < bucket.minGapMs) {
-                        val waitGap = bucket.minGapMs - gapElapsed + (0..150).random()
+                    val currentMult = adaptiveMultiplier.get()
+                    val requiredGap = bucket.minGapMs * currentMult
+                    if (gapElapsed < requiredGap) {
+                        val waitGap = requiredGap - gapElapsed + (0..150).random()
                         try {
                             condition.await(waitGap, TimeUnit.MILLISECONDS)
                         } catch (_: InterruptedException) {
@@ -146,10 +152,15 @@ class RateLimiter(
                 if (state.availableTokens >= 1.0) {
                     state.availableTokens -= 1.0
                     state.lastRequest = now
+                    val waitTotal = clock.elapsedRealtime() - startWait
+                    if (waitTotal > 10) {
+                        YtmMetricsRegistry.record("rate_limiter.wait_${bucket.name.lowercase()}", waitTotal)
+                    }
                     return
                 }
 
-                val waitTimeMs = ((1.0 - state.availableTokens) / bucket.refillPerSecond * 1000.0).toLong().coerceIn(50L, 500L)
+                val waitTimeMs = ((1.0 - state.availableTokens) / (bucket.refillPerSecond / adaptiveMultiplier.get().toDouble()) * 1000.0)
+                    .toLong().coerceIn(50L, 500L)
                 try {
                     condition.await(waitTimeMs, TimeUnit.MILLISECONDS)
                 } catch (_: InterruptedException) {
@@ -171,6 +182,7 @@ class RateLimiter(
      */
     fun onRateLimited(retryAfterSeconds: Long? = null): Long {
         val count = consecutiveThrottles.incrementAndGet().coerceAtMost(10)
+        consecutiveSuccesses.set(0)
         val multiplier = adaptiveMultiplier.updateAndGet { (it * 2).coerceAtMost(16) }
 
         val delayMs = if (retryAfterSeconds != null && retryAfterSeconds > 0) {
@@ -195,16 +207,23 @@ class RateLimiter(
 
         // Drain tokens
         bucketStates.values.forEach { it.availableTokens = 0.0 }
+        YtmMetricsRegistry.record("rate_limiter.429_backoff", delayMs, isError = true)
         return delayMs
     }
 
     /**
-     * Resets throttle counter on successful response.
+     * AIMD Recovery: Additive Increase per 5 clean requests until back to baseline.
      */
     fun onSuccess() {
         consecutiveThrottles.set(0)
         lastSuccessTimestamp.set(clock.elapsedRealtime())
-        prefs?.edit()?.remove(KEY_BACKOFF_UNTIL)?.apply()
+        val successes = consecutiveSuccesses.incrementAndGet()
+        if (successes % 5 == 0 && adaptiveMultiplier.get() > 1) {
+            adaptiveMultiplier.decrementAndGet()
+        }
+        if (adaptiveMultiplier.get() == 1) {
+            prefs?.edit()?.remove(KEY_BACKOFF_UNTIL)?.apply()
+        }
     }
 
     fun getRemainingBackoffMs(): Long {

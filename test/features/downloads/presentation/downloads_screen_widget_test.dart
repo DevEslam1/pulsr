@@ -194,5 +194,37 @@ void main() {
       expect(find.text('Undo'), findsOneWidget);
       cubit.close();
     });
+
+    testWidgets('[B6] Two tasks sharing videoId at different qualities render simultaneously without key collision', (tester) async {
+      final flacTask = DownloadTask(
+        id: 'task_vid_123_flac',
+        videoId: 'vid_123',
+        title: 'Song (FLAC)',
+        artist: 'Artist',
+        status: DownloadStatus.complete,
+        progress: 1.0,
+        createdAt: DateTime(2026, 1, 1),
+      );
+
+      final opusTask = DownloadTask(
+        id: 'task_vid_123_opus',
+        videoId: 'vid_123',
+        title: 'Song (Opus)',
+        artist: 'Artist',
+        status: DownloadStatus.downloading,
+        progress: 0.5,
+        createdAt: DateTime(2026, 1, 2),
+      );
+
+      final cubit = createCubit([flacTask, opusTask]);
+      await tester.pumpWidget(createTestWidget(cubit));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(DownloadTile), findsNWidgets(2));
+      expect(find.text('Song (FLAC)'), findsOneWidget);
+      expect(find.text('Song (Opus)'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      cubit.close();
+    });
   });
 }

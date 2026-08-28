@@ -136,6 +136,14 @@ class ProxyPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             "getPathLabel" -> {
                 result.success(ProxyPool.currentPathLabel)
             }
+            "setPinnedIpFamily" -> {
+                val family = call.argument<String>("family")
+                ProxyManager.setPinnedIpFamily(family)
+                result.success(true)
+            }
+            "getPinnedIpFamily" -> {
+                result.success(ProxyManager.pinnedIpFamily)
+            }
             else -> result.notImplemented()
         }
     }

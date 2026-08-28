@@ -1,6 +1,10 @@
 // android/app/src/main/cpp/LookaheadLimiter.h
 #pragma once
 
+#if defined(__FAST_MATH__)
+#error "-ffast-math leaked into the DSP build — check CMake / gradle compiler flags"
+#endif
+
 #include "DspParams.h"
 #include <cmath>
 #include <algorithm>
@@ -27,8 +31,9 @@ public:
     void processMono(float* inOut, int frames);
     void processInterleaved(float* buffer, int frames, int channels = 2);
 
-private:
     float estimateTruePeak(const float* history);
+
+private:
 
     double sampleRate_ = 48000.0;
     double lookaheadMs_ = 5.0;
@@ -38,13 +43,16 @@ private:
     bool enabled_ = false;
 
     int lookaheadSamples_ = 240;
-    float threshold_ = 0.9772f; // pow(10, -0.2 / 20)
+    float threshold_ = 0.977237f; // pow(10, -0.2 / 20)
     float releaseCoeff_ = 0.9995f;
     float envelope_ = 1.0f;
 
     static constexpr int MAX_CHANNELS = 8;
     float delayBuf_[MAX_CHANNELS][MAX_LOOKAHEAD_SAMPLES] = {};
+    float gainBuf_[MAX_LOOKAHEAD_SAMPLES] = {};
     int writeIdx_ = 0;
+    float minGain_ = 1.0f;
+    int minGainAge_ = 0;
 
     // 4x oversampling polyphase interpolation table for true peak detection
     static const float polyphase4x_[INTERP_PHASES][TAPS_PER_PHASE];

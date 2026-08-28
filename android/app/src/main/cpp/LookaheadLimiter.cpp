@@ -20,6 +20,7 @@ void LookaheadLimiter::setSampleRate(double sampleRate) {
     if (sampleRate <= 0.0 || std::abs(sampleRate_ - sampleRate) < 1.0) return;
     sampleRate_ = sampleRate;
     configure(lookaheadMs_, thresholdDb_, releaseMs_, truePeakMode_);
+    reset();
 }
 
 void LookaheadLimiter::configure(double lookaheadMs, double thresholdDb, double releaseMs, bool truePeakMode) {
@@ -49,8 +50,11 @@ void LookaheadLimiter::applyParams(const LimiterParamSet& params) {
 
 void LookaheadLimiter::reset() {
     std::memset(delayBuf_, 0, sizeof(delayBuf_));
+    std::fill(std::begin(gainBuf_), std::end(gainBuf_), 1.0f);
     writeIdx_ = 0;
     envelope_ = 1.0f;
+    minGain_ = 1.0f;
+    minGainAge_ = 0;
 }
 
 float LookaheadLimiter::estimateTruePeak(const float* history) {
@@ -60,13 +64,25 @@ float LookaheadLimiter::estimateTruePeak(const float* history) {
         return peak;
     }
 
-    // Evaluate 4x oversampled polyphase sub-sample points
-    for (int phase = 1; phase < INTERP_PHASES; ++phase) {
+    if (sampleRate_ > 192000.0) {
+        // > 192kHz (e.g. 384kHz): 1x oversampling (Nyquist is >= 96kHz, intersample peaks negligible)
+        return peak;
+    } else if (sampleRate_ >= 96000.0) {
+        // 96kHz - 192kHz: 2x oversampling (evaluate phase 2 at midpoint 2/4 = 0.5)
         float subSample = 0.0f;
         for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
-            subSample += history[tap] * polyphase4x_[phase][tap];
+            subSample += history[tap] * polyphase4x_[2][tap];
         }
         peak = std::max(peak, std::abs(subSample));
+    } else {
+        // < 96kHz: 4x oversampling (evaluate phases 1, 2, 3)
+        for (int phase = 1; phase < INTERP_PHASES; ++phase) {
+            float subSample = 0.0f;
+            for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
+                subSample += history[tap] * polyphase4x_[phase][tap];
+            }
+            peak = std::max(peak, std::abs(subSample));
+        }
     }
 
     return peak;
@@ -75,6 +91,7 @@ float LookaheadLimiter::estimateTruePeak(const float* history) {
 void LookaheadLimiter::process(float* L, float* R, int frames) {
     if (!enabled_ || frames <= 0) return;
 
+    constexpr int kMask = MAX_LOOKAHEAD_SAMPLES - 1;
     float historyWindowL[TAPS_PER_PHASE] = {};
     float historyWindowR[TAPS_PER_PHASE] = {};
 
@@ -82,12 +99,12 @@ void LookaheadLimiter::process(float* L, float* R, int frames) {
         const float inL = L[i];
         const float inR = R[i];
 
-        delayBuf_[0][writeIdx_] = inL;
-        delayBuf_[1][writeIdx_] = inR;
+        delayBuf_[0][writeIdx_] = std::isfinite(inL) ? inL : 0.0f;
+        delayBuf_[1][writeIdx_] = std::isfinite(inR) ? inR : 0.0f;
 
         // Gather 6-tap history for true-peak interpolation
         for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
-            int histIdx = (writeIdx_ - (TAPS_PER_PHASE - 1 - tap) + MAX_LOOKAHEAD_SAMPLES) % MAX_LOOKAHEAD_SAMPLES;
+            int histIdx = (writeIdx_ - (TAPS_PER_PHASE - 1 - tap)) & kMask;
             historyWindowL[tap] = delayBuf_[0][histIdx];
             historyWindowR[tap] = delayBuf_[1][histIdx];
         }
@@ -96,13 +113,34 @@ void LookaheadLimiter::process(float* L, float* R, int frames) {
         const float peakR = estimateTruePeak(historyWindowR);
         const float maxPeak = std::max(peakL, peakR);
 
-        // Calculate required gain reduction factor
-        float targetGain = 1.0f;
+        // Calculate required instantaneous gain factor for incoming peak
+        float requiredGain = 1.0f;
         if (maxPeak > threshold_ && maxPeak > 1e-6f) {
-            targetGain = threshold_ / maxPeak;
+            requiredGain = threshold_ / maxPeak;
         }
 
-        // Fast zero-latency attack, exponential release with snap-to-unity
+        gainBuf_[writeIdx_] = requiredGain;
+
+        minGainAge_++;
+        if (requiredGain <= minGain_) {
+            minGain_ = requiredGain;
+            minGainAge_ = 0;
+        } else if (minGainAge_ >= lookaheadSamples_) {
+            minGain_ = requiredGain;
+            minGainAge_ = 0;
+            const int lookaheadN = std::min(lookaheadSamples_, MAX_LOOKAHEAD_SAMPLES - 1);
+            for (int k = 1; k <= lookaheadN; ++k) {
+                int prevIdx = (writeIdx_ - k) & kMask;
+                if (gainBuf_[prevIdx] <= minGain_) {
+                    minGain_ = gainBuf_[prevIdx];
+                    minGainAge_ = k;
+                }
+            }
+        }
+
+        float targetGain = minGain_;
+
+        // Instantaneous attack to target minimum gain, smooth exponential release when lookahead window clears
         if (targetGain < envelope_) {
             envelope_ = targetGain;
         } else {
@@ -114,7 +152,7 @@ void LookaheadLimiter::process(float* L, float* R, int frames) {
         if (!std::isfinite(envelope_) || envelope_ <= 0.0f) envelope_ = 1.0f;
 
         // Read delayed audio from lookahead buffer
-        int readIdx = (writeIdx_ - lookaheadSamples_ + MAX_LOOKAHEAD_SAMPLES) % MAX_LOOKAHEAD_SAMPLES;
+        int readIdx = (writeIdx_ - lookaheadSamples_) & kMask;
         if (envelope_ == 1.0f) {
             L[i] = delayBuf_[0][readIdx];
             R[i] = delayBuf_[1][readIdx];
@@ -123,13 +161,14 @@ void LookaheadLimiter::process(float* L, float* R, int frames) {
             R[i] = delayBuf_[1][readIdx] * envelope_;
         }
 
-        writeIdx_ = (writeIdx_ + 1) % MAX_LOOKAHEAD_SAMPLES;
+        writeIdx_ = (writeIdx_ + 1) & kMask;
     }
 }
 
 void LookaheadLimiter::processMono(float* inOut, int frames) {
     if (!enabled_ || frames <= 0) return;
 
+    constexpr int kMask = MAX_LOOKAHEAD_SAMPLES - 1;
     float historyWindow[TAPS_PER_PHASE] = {};
 
     for (int i = 0; i < frames; ++i) {
@@ -137,16 +176,37 @@ void LookaheadLimiter::processMono(float* inOut, int frames) {
         delayBuf_[0][writeIdx_] = std::isfinite(inSample) ? inSample : 0.0f;
 
         for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
-            int histIdx = (writeIdx_ - (TAPS_PER_PHASE - 1 - tap) + MAX_LOOKAHEAD_SAMPLES) % MAX_LOOKAHEAD_SAMPLES;
+            int histIdx = (writeIdx_ - (TAPS_PER_PHASE - 1 - tap)) & kMask;
             historyWindow[tap] = delayBuf_[0][histIdx];
         }
 
         const float peak = estimateTruePeak(historyWindow);
 
-        float targetGain = 1.0f;
+        float requiredGain = 1.0f;
         if (peak > threshold_ && peak > 1e-6f) {
-            targetGain = threshold_ / peak;
+            requiredGain = threshold_ / peak;
         }
+
+        gainBuf_[writeIdx_] = requiredGain;
+
+        minGainAge_++;
+        if (requiredGain <= minGain_) {
+            minGain_ = requiredGain;
+            minGainAge_ = 0;
+        } else if (minGainAge_ >= lookaheadSamples_) {
+            minGain_ = requiredGain;
+            minGainAge_ = 0;
+            const int lookaheadN = std::min(lookaheadSamples_, MAX_LOOKAHEAD_SAMPLES - 1);
+            for (int k = 1; k <= lookaheadN; ++k) {
+                int prevIdx = (writeIdx_ - k) & kMask;
+                if (gainBuf_[prevIdx] <= minGain_) {
+                    minGain_ = gainBuf_[prevIdx];
+                    minGainAge_ = k;
+                }
+            }
+        }
+
+        float targetGain = minGain_;
 
         if (targetGain < envelope_) {
             envelope_ = targetGain;
@@ -158,14 +218,14 @@ void LookaheadLimiter::processMono(float* inOut, int frames) {
         }
         if (!std::isfinite(envelope_) || envelope_ <= 0.0f) envelope_ = 1.0f;
 
-        int readIdx = (writeIdx_ - lookaheadSamples_ + MAX_LOOKAHEAD_SAMPLES) % MAX_LOOKAHEAD_SAMPLES;
+        int readIdx = (writeIdx_ - lookaheadSamples_) & kMask;
         if (envelope_ == 1.0f) {
             inOut[i] = delayBuf_[0][readIdx];
         } else {
             inOut[i] = delayBuf_[0][readIdx] * envelope_;
         }
 
-        writeIdx_ = (writeIdx_ + 1) % MAX_LOOKAHEAD_SAMPLES;
+        writeIdx_ = (writeIdx_ + 1) & kMask;
     }
 }
 
@@ -173,6 +233,7 @@ void LookaheadLimiter::processInterleaved(float* buffer, int frames, int channel
     if (!enabled_ || frames <= 0) return;
     channels = std::clamp(channels, 1, MAX_CHANNELS);
 
+    constexpr int kMask = MAX_LOOKAHEAD_SAMPLES - 1;
     float historyWindow[TAPS_PER_PHASE] = {};
 
     for (int i = 0; i < frames; ++i) {
@@ -183,7 +244,7 @@ void LookaheadLimiter::processInterleaved(float* buffer, int frames, int channel
             delayBuf_[ch][writeIdx_] = std::isfinite(inSample) ? inSample : 0.0f;
 
             for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
-                int histIdx = (writeIdx_ - (TAPS_PER_PHASE - 1 - tap) + MAX_LOOKAHEAD_SAMPLES) % MAX_LOOKAHEAD_SAMPLES;
+                int histIdx = (writeIdx_ - (TAPS_PER_PHASE - 1 - tap)) & kMask;
                 historyWindow[tap] = delayBuf_[ch][histIdx];
             }
 
@@ -191,10 +252,31 @@ void LookaheadLimiter::processInterleaved(float* buffer, int frames, int channel
             frameMaxPeak = std::max(frameMaxPeak, chPeak);
         }
 
-        float targetGain = 1.0f;
+        float requiredGain = 1.0f;
         if (frameMaxPeak > threshold_ && frameMaxPeak > 1e-6f) {
-            targetGain = threshold_ / frameMaxPeak;
+            requiredGain = threshold_ / frameMaxPeak;
         }
+
+        gainBuf_[writeIdx_] = requiredGain;
+
+        minGainAge_++;
+        if (requiredGain <= minGain_) {
+            minGain_ = requiredGain;
+            minGainAge_ = 0;
+        } else if (minGainAge_ >= lookaheadSamples_) {
+            minGain_ = requiredGain;
+            minGainAge_ = 0;
+            const int lookaheadN = std::min(lookaheadSamples_, MAX_LOOKAHEAD_SAMPLES - 1);
+            for (int k = 1; k <= lookaheadN; ++k) {
+                int prevIdx = (writeIdx_ - k) & kMask;
+                if (gainBuf_[prevIdx] <= minGain_) {
+                    minGain_ = gainBuf_[prevIdx];
+                    minGainAge_ = k;
+                }
+            }
+        }
+
+        float targetGain = minGain_;
 
         if (targetGain < envelope_) {
             envelope_ = targetGain;
@@ -206,7 +288,7 @@ void LookaheadLimiter::processInterleaved(float* buffer, int frames, int channel
         }
         if (!std::isfinite(envelope_) || envelope_ <= 0.0f) envelope_ = 1.0f;
 
-        int readIdx = (writeIdx_ - lookaheadSamples_ + MAX_LOOKAHEAD_SAMPLES) % MAX_LOOKAHEAD_SAMPLES;
+        int readIdx = (writeIdx_ - lookaheadSamples_) & kMask;
         if (envelope_ == 1.0f) {
             for (int ch = 0; ch < channels; ++ch) {
                 buffer[i * channels + ch] = delayBuf_[ch][readIdx];
@@ -217,7 +299,7 @@ void LookaheadLimiter::processInterleaved(float* buffer, int frames, int channel
             }
         }
 
-        writeIdx_ = (writeIdx_ + 1) % MAX_LOOKAHEAD_SAMPLES;
+        writeIdx_ = (writeIdx_ + 1) & kMask;
     }
 }
 

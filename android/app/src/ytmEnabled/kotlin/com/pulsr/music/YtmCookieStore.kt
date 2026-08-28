@@ -83,6 +83,35 @@ internal class YtmCookieStore private constructor(context: Context) {
                 // Read from native CookieManager if prefs are empty
                 readFromCookieManager()
             }
+            seedConsentCookieIfNeeded()
+        }
+    }
+
+    /**
+     * Seeds the standard Google/YouTube SOCS consent cookie if not present,
+     * ensuring search and browse operate without EU consent gate blocking.
+     */
+    fun seedConsentCookieIfNeeded() {
+        synchronized(lock) {
+            if (!cookies.containsKey("SOCS") && !cookies.containsKey("CONSENT")) {
+                val socsVal = "CAISNQgDEitib3FfaWRlbnRpdHlmcm9udGVuZHVpc2VydmVyXzIwMjMwODI5LjA4X3AwGgJlbiACGgYIgLCvpwY"
+                cookies["SOCS"] = socsVal
+                saveToPrefs()
+                syncToCookieManager("SOCS", socsVal)
+            }
+        }
+    }
+
+    /**
+     * Flushes a cookie value to Android WebView CookieManager across all YouTube domains.
+     */
+    fun syncToCookieManager(name: String, value: String) {
+        runCatching {
+            val cm = CookieManager.getInstance()
+            for (domain in DOMAINS) {
+                cm.setCookie(domain, "$name=$value; path=/; domain=.youtube.com; Secure; SameSite=None")
+            }
+            cm.flush()
         }
     }
 

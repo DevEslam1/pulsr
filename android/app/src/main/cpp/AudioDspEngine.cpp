@@ -26,7 +26,6 @@ void AudioDspEngine::setSampleRateInternal(double sampleRate) {
     eq_.setSampleRate(sampleRate_);
     crossfeed_.setSampleRate(sampleRate_);
     limiter_.setSampleRate(sampleRate_);
-    // Reverb sample rate and prewarmed IR are applied via reverb_.applyParams(snapshot->reverb)
     resampler_.setRates(sampleRate_, sampleRate_);
 }
 
@@ -109,12 +108,28 @@ void AudioDspEngine::resyncForTrack(double sampleRate, int channels) {
     (void)channels;
     if (sampleRate < 8000.0) sampleRate = 8000.0;
     if (sampleRate > 768000.0) sampleRate = 768000.0;
-    std::lock_guard<std::mutex> lock(publishMutex_);
+
     auto current = currentParams_.load();
+    const bool wasCustom = (current->reverb.preset == static_cast<int>(ReverbPreset::Custom));
+    std::shared_ptr<const PreparedIr> prewarmedIr = nullptr;
+    if (!wasCustom && current->reverb.enabled) {
+        prewarmedIr = PreparedIr::createSynthetic(
+            sampleRate,
+            current->reverb.preset,
+            static_cast<float>(current->reverb.damping));
+    }
+
+    std::lock_guard<std::mutex> lock(publishMutex_);
+    current = currentParams_.load();
     auto updated = std::make_shared<DspParamSnapshot>(*current);
     updated->generation = ++snapshotGeneration_;
     updated->sampleRate = sampleRate;
     updated->resetRequested = false; // Do not wipe filter state on seamless track resync
+
+    if (!wasCustom && current->reverb.enabled) {
+        updated->reverb.preparedIr = prewarmedIr;
+    }
+
     currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(updated));
 }
 
@@ -180,14 +195,16 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         if (snapshot->resetRequested) {
             resetInternal();
         }
+
+        reverb_.applyParams(snapshot->reverb);
         if (std::abs(snapshot->sampleRate - sampleRate_) > 0.5) {
             setSampleRateInternal(snapshot->sampleRate);
+            reverb_.setSampleRate(snapshot->sampleRate);
         }
 
         eq_.applyParams(snapshot->eq);
         panner_.applyParams(snapshot->panner);
         crossfeed_.applyParams(snapshot->crossfeed);
-        reverb_.applyParams(snapshot->reverb);
         resampler_.applyParams(snapshot->resampler);
         limiter_.applyParams(snapshot->limiter);
 

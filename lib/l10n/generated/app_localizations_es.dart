@@ -1196,6 +1196,26 @@ class AppLocalizationsEs extends AppLocalizations {
       'Sin espacio — libera almacenamiento y reintenta';
 
   @override
+  String get downloadErrorStorage =>
+      'Sin espacio — libera almacenamiento y reintenta';
+
+  @override
+  String get downloadErrorPermission =>
+      'Permiso de almacenamiento denegado. Concede el permiso en Configuración.';
+
+  @override
+  String get downloadErrorInterrupted =>
+      'Descarga interrumpida. Toca para reanudar.';
+
+  @override
+  String get downloadErrorDisabled =>
+      'Las descargas están deshabilitadas o no disponibles en esta versión.';
+
+  @override
+  String get downloadErrorTransition =>
+      'Transición de estado de descarga no válida.';
+
+  @override
   String get downloadErrorRateLimited => 'YouTube está ocupado. Enfriando…';
 
   @override

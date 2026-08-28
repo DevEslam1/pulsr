@@ -42,6 +42,8 @@ internal class InnertubeClient(
     private val rateLimiter: RateLimiter = RateLimiter.shared,
     private val resolutionStrategy: ResolutionStrategy = ResolutionStrategy(context, cookieStore, PoTokenManager)
 ) {
+    private val consecutiveBotBlocks = AtomicInteger(0)
+    private val lastBotBlockTimestamp = AtomicLong(0L)
     enum class ClientType(
         val clientName: String,
         val clientVersion: String,
@@ -192,11 +194,23 @@ internal class InnertubeClient(
                     Log.w(TAG, "[$traceId] Client ${client.name} returned status $status -> $parsedSignal")
                     if ((parsedSignal == YtmBlockSignal.BotChallenge || parsedSignal == YtmBlockSignal.PoTokenInvalid) &&
                         (client == ClientType.ANDROID_MUSIC || client == ClientType.WEB_REMIX)) {
+                        val now = System.currentTimeMillis()
+                        val lastBlock = lastBotBlockTimestamp.getAndSet(now)
+                        val count = if (now - lastBlock < 30_000L) consecutiveBotBlocks.incrementAndGet() else consecutiveBotBlocks.apply { set(1) }.get()
                         PoTokenManager.evictMintedTokens()
-                        PoTokenManager.triggerBackgroundRefresh()
+                        if (count >= 2) {
+                            Log.w(TAG, "[$traceId] Encountered $count consecutive bot blocks. Rotating identity and clearing cookies...")
+                            PoTokenManager.invalidate()
+                            FingerprintStore.resetFingerprint(context)
+                            YtmCookieStore.getInstance(context).clearCookies()
+                            consecutiveBotBlocks.set(0)
+                        } else {
+                            PoTokenManager.triggerBackgroundRefresh()
+                        }
                     }
                     return null
                 }
+                consecutiveBotBlocks.set(0)
 
                 val streamingData = playerJson.optJSONObject("streamingData")
                 val adaptiveFormats = streamingData?.optJSONArray("adaptiveFormats") ?: JSONArray()
@@ -242,6 +256,15 @@ internal class InnertubeClient(
 
                 val title = videoDetails?.optString("title") ?: ""
                 val author = videoDetails?.optString("author") ?: ""
+
+                // Pre-stream validation check: 1-byte ranged GET (fixes C-03)
+                val validateStart = System.currentTimeMillis()
+                val isValid = validateStreamUrl(selectedUrl)
+                YtmMetricsRegistry.record("stream.validate", System.currentTimeMillis() - validateStart, isError = !isValid)
+                if (!isValid) {
+                    Log.w(TAG, "[$traceId] Resolved URL for ${client.name} failed 1-byte pre-validation. Escalating ladder...")
+                    return null
+                }
 
                 Log.i(TAG, "[$traceId] Successfully resolved $videoId via ${client.name} (itag: ${selected.optInt("itag")}, bitrate: $selectedBitrate)")
                 YtmHttpClient.preConnect(selectedUrl)
@@ -407,6 +430,39 @@ internal class InnertubeClient(
             }.getOrNull()
         }
         return null
+    }
+
+    private val validatedUrls = ConcurrentHashMap<String, Long>()
+
+    private fun validateStreamUrl(url: String): Boolean {
+        val now = System.currentTimeMillis()
+        val lastVal = validatedUrls[url]
+        if (lastVal != null && (now - lastVal) < 300_000L) {
+            return true // Fast path: recently validated within 5 minutes
+        }
+
+        return try {
+            val req = okhttp3.Request.Builder()
+                .url(url)
+                .addHeader("Range", "bytes=0-0")
+                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/138.0.0.0 Safari/537.36")
+                .build()
+            val client = YtmHttpClient.okHttpClient.newBuilder()
+                .callTimeout(1200, TimeUnit.MILLISECONDS)
+                .readTimeout(1000, TimeUnit.MILLISECONDS)
+                .build()
+            client.newCall(req).execute().use { resp ->
+                val code = resp.code
+                val contentType = resp.header("Content-Type") ?: ""
+                val ok = (code in 200..206) && (contentType.startsWith("audio/") || contentType.startsWith("video/")) && !contentType.contains("text/html")
+                if (ok) {
+                    validatedUrls[url] = now
+                }
+                ok
+            }
+        } catch (_: Throwable) {
+            false
+        }
     }
 
     fun requestPlayer(videoId: String, clientType: ClientType): JSONObject {

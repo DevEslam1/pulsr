@@ -3,6 +3,7 @@
 
 #include "DspParams.h"
 #include "FftUtil.h"
+#include "SincResampler.h"
 #include <vector>
 #include <cmath>
 #include <memory>
@@ -25,7 +26,7 @@ public:
     static constexpr int PARTITION_SIZE = 512;
     static constexpr int FFT_SIZE = PARTITION_SIZE * 2; // 1024
     static constexpr int MAX_PREDELAY_SAMPLES = 153600; // 153,600 samples max predelay capacity (R2)
-    static constexpr int MAX_PREALLOC_PARTITIONS = 4096;
+    static constexpr int MAX_PREALLOC_PARTITIONS = 512;
 
     ConvolutionReverb();
     void setSampleRate(double sampleRate);
@@ -56,8 +57,10 @@ private:
     void preparePartitions();
     void ensurePredelayCapacity();
     void ensureScratchCapacity(int frames);
+    void processCore(const float* inL, const float* inR, float* outL, float* outR, int frames, float dryGain, float wetGain);
 
     double sampleRate_ = 48000.0;
+    double coreRate_ = 48000.0;
     ReverbPreset preset_ = ReverbPreset::Room;
     double targetWet_ = 0.20;
     double smoothedWet_ = 0.20;
@@ -66,6 +69,16 @@ private:
     float smoothedPredelaySamples_ = 0.0f;
     double damping_ = 0.5;
     bool enabled_ = false;
+
+    // Fixed-rate wet path resamplers for sample rates > 48kHz
+    SincResampler wetInResampler_;
+    SincResampler wetOutResampler_;
+    std::vector<float> resampleInL_;
+    std::vector<float> resampleInR_;
+    std::vector<float> resampleWetL_;
+    std::vector<float> resampleWetR_;
+    std::vector<float> resampleOutL_;
+    std::vector<float> resampleOutR_;
 
     // Prepared IR snapshot pointer
     std::shared_ptr<const PreparedIr> preparedIr_;

@@ -219,6 +219,10 @@ object PoTokenManager {
         }
     }
 
+    private val mintMutex = Mutex()
+    private val inFlightTokens = mutableMapOf<String, kotlinx.coroutines.Deferred<String>>()
+    private val mintLock = Any()
+
     /**
      * Generates or retrieves cached poToken strictly bound to current [visitorData].
      * Never blocks critical-path playback if a token is already cached or stored.
@@ -250,55 +254,103 @@ object PoTokenManager {
             return ""
         }
 
-        // 4. Use existing warm generator if available
-        val gen = generator
-        if (gen != null && !gen.isExpired()) {
+        // 4. Use existing warm generator if available with synchronized single-flight per identifier
+        val tokenKey = "$currentVisitor:$identifier"
+        synchronized(mintLock) {
+            // Re-check LRU inside lock
+            synchronized(tokenLru) {
+                val cached = tokenLru.get(identifier)
+                if (cached != null && cached.visitorDataBound == currentVisitor && (now - cached.timestamp) < TOKEN_TTL_SECONDS) {
+                    return cached.token
+                }
+            }
+
+            val gen = generator
+            if (gen != null && !gen.isExpired()) {
+                return try {
+                    val minted = gen.generatePoToken(identifier)
+                    synchronized(tokenLru) {
+                        tokenLru.put(identifier, CachedToken(minted, visitorData, Instant.now().epochSecond))
+                    }
+                    minted
+                } catch (t: Throwable) {
+                    Log.w(TAG, "Minting poToken failed with warm generator: ${t.message}", t)
+                    synchronized(tokenLru) {
+                        tokenLru.get(identifier)?.token ?: streamingPoToken
+                    }
+                }
+            }
+
+            // 5. If we have a valid stored streaming token, return it and warm generator in background
+            if (streamingPoToken.isNotEmpty() && !isExpired()) {
+                triggerBackgroundRefresh()
+                return streamingPoToken
+            }
+
+            // 6. Cold path fallback: synchronous generation
+            ensureReadySync()
+
+            val activeGen = generator
+            if (activeGen == null || activeGen.isExpired()) {
+                synchronized(tokenLru) {
+                    return tokenLru.get(identifier)?.token ?: streamingPoToken
+                }
+            }
+
             return try {
-                val minted = gen.generatePoToken(identifier)
+                val minted = activeGen.generatePoToken(identifier)
                 synchronized(tokenLru) {
                     tokenLru.put(identifier, CachedToken(minted, visitorData, Instant.now().epochSecond))
                 }
                 minted
             } catch (t: Throwable) {
-                Log.w(TAG, "Minting poToken failed with warm generator: ${t.message}", t)
+                Log.w(TAG, "Minting poToken failed for $identifier: ${t.message}", t)
                 synchronized(tokenLru) {
                     tokenLru.get(identifier)?.token ?: streamingPoToken
                 }
             }
         }
-
-        // 5. If we have a valid stored streaming token, return it and warm generator in background
-        if (streamingPoToken.isNotEmpty() && !isExpired()) {
-            triggerBackgroundRefresh()
-            return streamingPoToken
-        }
-
-        // 6. Cold path fallback: synchronous generation
-        ensureReadySync()
-
-        val activeGen = generator
-        if (activeGen == null || activeGen.isExpired()) {
-            synchronized(tokenLru) {
-                return tokenLru.get(identifier)?.token ?: streamingPoToken
-            }
-        }
-
-        return try {
-            val minted = activeGen.generatePoToken(identifier)
-            synchronized(tokenLru) {
-                tokenLru.put(identifier, CachedToken(minted, visitorData, Instant.now().epochSecond))
-            }
-            minted
-        } catch (t: Throwable) {
-            Log.w(TAG, "Minting poToken failed for $identifier: ${t.message}", t)
-            synchronized(tokenLru) {
-                tokenLru.get(identifier)?.token ?: streamingPoToken
-            }
-        }
     }
 
     suspend fun poTokenFor(identifier: String): String = withContext(Dispatchers.IO) {
-        poTokenForSync(identifier)
+        val currentVisitor = visitorData
+        val tokenKey = "$currentVisitor:$identifier"
+
+        // Check LRU cache first
+        val now = Instant.now().epochSecond
+        synchronized(tokenLru) {
+            val cached = tokenLru.get(identifier)
+            if (cached != null && cached.visitorDataBound == currentVisitor && (now - cached.timestamp) < TOKEN_TTL_SECONDS) {
+                return@withContext cached.token
+            }
+        }
+
+        if (identifier == currentVisitor && streamingPoToken.isNotEmpty() && !isExpired()) {
+            return@withContext streamingPoToken
+        }
+
+        // Single-flight via Deferred map
+        val deferred = mintMutex.withLock {
+            // Check cache again under lock
+            synchronized(tokenLru) {
+                val cached = tokenLru.get(identifier)
+                if (cached != null && cached.visitorDataBound == currentVisitor && (now - cached.timestamp) < TOKEN_TTL_SECONDS) {
+                    return@withContext cached.token
+                }
+            }
+
+            inFlightTokens[tokenKey] ?: CoroutineScope(Dispatchers.IO).async {
+                poTokenForSync(identifier)
+            }.also { inFlightTokens[tokenKey] = it }
+        }
+
+        try {
+            deferred.await()
+        } finally {
+            mintMutex.withLock {
+                inFlightTokens.remove(tokenKey)
+            }
+        }
     }
 
     fun setDataSyncId(id: String) {

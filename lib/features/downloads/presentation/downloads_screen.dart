@@ -126,7 +126,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
               if (key is ValueKey<String>) {
                 final id = key.value;
                 if (id == 'storage_stats_header') return 0;
-                final idx = tasks.indexWhere((t) => t.videoId == id);
+                final idx = tasks.indexWhere((t) => (t.id.isNotEmpty ? t.id : t.videoId) == id);
                 return idx >= 0 ? idx + 1 : null;
               }
               return null;
@@ -136,9 +136,12 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                 return Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    StorageStatsHeader(
-                      key: const ValueKey('storage_stats_header'),
-                      stats: state.storageStats,
+                    BlocSelector<DownloadsCubit, DownloadsState, StorageStats>(
+                      selector: (s) => s.storageStats,
+                      builder: (_, stats) => StorageStatsHeader(
+                        key: const ValueKey('storage_stats_header'),
+                        stats: stats,
+                      ),
                     ),
                     if (state.hasPausedTasks)
                       Padding(
@@ -181,11 +184,12 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
               }
 
               final task = tasks[index - 1];
+              final uniqueKey = task.id.isNotEmpty ? task.id : task.videoId;
               return Padding(
-                key: ValueKey(task.videoId),
+                key: ValueKey(uniqueKey),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                 child: Dismissible(
-                  key: ValueKey('dismiss_${task.videoId}'),
+                  key: ValueKey('dismiss_$uniqueKey'),
                   direction: DismissDirection.endToStart,
                   background: Container(
                     alignment: Alignment.centerRight,
@@ -219,7 +223,13 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                     return true;
                   },
                   onDismissed: (_) => _handleDelete(context, task),
-                  child: DownloadTile(task: task),
+                  child: BlocSelector<DownloadsCubit, DownloadsState, DownloadTask?>(
+                    selector: (s) => s.byId(uniqueKey),
+                    builder: (_, currentTask) {
+                      if (currentTask == null) return const SizedBox.shrink();
+                      return DownloadTile(task: currentTask);
+                    },
+                  ),
                 ),
               );
             },

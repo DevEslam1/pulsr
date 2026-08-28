@@ -272,6 +272,7 @@ class XdmBackendService {
     if (!await isEnabled()) return null;
 
     try {
+      // Paces calls to the user's remote yt-dlp microservice backend (separate from YouTube InnerTube traffic)
       await YtmRateLimiter.shared.acquireBackendPermit();
 
       final baseUrl = await _getBaseUrl();

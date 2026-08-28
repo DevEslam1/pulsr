@@ -58,15 +58,42 @@ class BackupFailure extends AppFailure {
   const BackupFailure(super.message, [super.error]);
 }
 
+enum DownloadFailureAction { retry, openSettings, freeSpace, resume, none }
+
 class DownloadFailure extends AppFailure {
-  const DownloadFailure(super.message, [super.error]);
+  final String l10nKey;
+  final DownloadFailureAction action;
+
+  const DownloadFailure(
+    super.message, [
+    super.error,
+    this.l10nKey = 'downloadErrorGeneric',
+    this.action = DownloadFailureAction.retry,
+  ]);
+}
+
+class GenericDownloadFailure extends DownloadFailure {
+  const GenericDownloadFailure(
+    super.message, [
+    super.error,
+    super.l10nKey = 'downloadErrorGeneric',
+    super.action = DownloadFailureAction.retry,
+  ]);
 }
 
 class AlreadyQueuedFailure extends DownloadFailure {
-  const AlreadyQueuedFailure(super.message, [super.error]);
+  const AlreadyQueuedFailure(
+    String message, [
+    dynamic error,
+  ]) : super(
+          message,
+          error,
+          'downloadErrorAlreadyQueued',
+          DownloadFailureAction.none,
+        );
 }
 
-class InsufficientStorageFailure extends StorageFailure {
+class InsufficientStorageFailure extends DownloadFailure {
   final int? neededBytes;
   final int? availableBytes;
 
@@ -75,16 +102,71 @@ class InsufficientStorageFailure extends StorageFailure {
     this.neededBytes,
     this.availableBytes,
     dynamic error,
-  }) : super(message, error);
+  }) : super(
+          message,
+          error,
+          'downloadErrorStorage',
+          DownloadFailureAction.freeSpace,
+        );
+}
+
+class PermissionDeniedFailure extends DownloadFailure {
+  const PermissionDeniedFailure(
+    String message, [
+    dynamic error,
+  ]) : super(
+          message,
+          error,
+          'downloadErrorPermission',
+          DownloadFailureAction.openSettings,
+        );
+}
+
+class InterruptedFailure extends DownloadFailure {
+  const InterruptedFailure(
+    String message, [
+    dynamic error,
+  ]) : super(
+          message,
+          error,
+          'downloadErrorInterrupted',
+          DownloadFailureAction.resume,
+        );
+}
+
+class NetworkFailure extends DownloadFailure {
+  const NetworkFailure(
+    String message, [
+    dynamic error,
+  ]) : super(
+          message,
+          error,
+          'downloadErrorNetwork',
+          DownloadFailureAction.retry,
+        );
 }
 
 class CorruptDownloadFailure extends DownloadFailure {
-  const CorruptDownloadFailure(super.message, [super.error]);
+  const CorruptDownloadFailure(
+    String message, [
+    dynamic error,
+  ]) : super(
+          message,
+          error,
+          'downloadErrorCorrupt',
+          DownloadFailureAction.retry,
+        );
 }
 
 class FeatureDisabledFailure extends DownloadFailure {
   const FeatureDisabledFailure(
-      [super.message = 'Unavailable in this build', super.error]);
+    [String message = 'Unavailable in this build', dynamic error]
+  ) : super(
+          message,
+          error,
+          'downloadErrorDisabled',
+          DownloadFailureAction.none,
+        );
 }
 
 class InvalidTransitionFailure extends DownloadFailure {
@@ -92,7 +174,12 @@ class InvalidTransitionFailure extends DownloadFailure {
   final String to;
 
   const InvalidTransitionFailure(this.from, this.to, [dynamic error])
-      : super('Invalid download status transition: $from -> $to', error);
+      : super(
+          'Invalid download status transition: $from -> $to',
+          error,
+          'downloadErrorTransition',
+          DownloadFailureAction.none,
+        );
 }
 
 class ValidationFailure extends AppFailure {
@@ -100,7 +187,15 @@ class ValidationFailure extends AppFailure {
 }
 
 class FgsTimeoutFailure extends DownloadFailure {
-  const FgsTimeoutFailure(super.message, [super.error]);
+  const FgsTimeoutFailure(
+    String message, [
+    dynamic error,
+  ]) : super(
+          message,
+          error,
+          'downloadErrorTimeout',
+          DownloadFailureAction.retry,
+        );
 }
 
 class YtmFailure extends AppFailure {

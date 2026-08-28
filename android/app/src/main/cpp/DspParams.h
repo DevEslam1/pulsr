@@ -73,6 +73,8 @@ struct PreparedIr {
     static size_t getSyntheticCacheBytes();
     static size_t getSyntheticCacheEntryCount();
     static void clearSyntheticCache();
+    static void setCacheBudgetBytes(size_t budgetBytes);
+    static size_t getCacheBudgetBytes();
     static uint64_t getCacheMutexLockCount();
     static void resetCacheMutexLockCount();
     size_t getEstimatedBytes() const {

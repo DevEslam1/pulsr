@@ -2302,6 +2302,36 @@ abstract class AppLocalizations {
   /// **'Storage full — free up space and retry'**
   String get downloadErrorNoSpace;
 
+  /// No description provided for @downloadErrorStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage full — free up space and retry'**
+  String get downloadErrorStorage;
+
+  /// No description provided for @downloadErrorPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage permission denied. Please grant permission in Settings.'**
+  String get downloadErrorPermission;
+
+  /// No description provided for @downloadErrorInterrupted.
+  ///
+  /// In en, this message translates to:
+  /// **'Download was interrupted. Tap to resume.'**
+  String get downloadErrorInterrupted;
+
+  /// No description provided for @downloadErrorDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloads are disabled or unavailable in this build.'**
+  String get downloadErrorDisabled;
+
+  /// No description provided for @downloadErrorTransition.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid download state transition.'**
+  String get downloadErrorTransition;
+
   /// No description provided for @downloadErrorRateLimited.
   ///
   /// In en, this message translates to:

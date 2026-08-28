@@ -18,7 +18,6 @@ import '../../domain/models/ytm_track.dart';
 import '../constants/channels.dart';
 import '../utils/error_logger.dart';
 import '../utils/lrc_parser.dart';
-import '../utils/ytm_rate_limiter.dart';
 import 'xdm_backend_service.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart'
     hide AndroidOptions;
@@ -43,11 +42,11 @@ class YtmAccountPlaylist {
       'https://music.youtube.com/playlist?list=$cleanPlaylistId';
 
   Map<String, dynamic> toJson() => {
-        'playlistId': playlistId,
-        'title': title,
-        'subtitle': subtitle,
-        'artworkUrl': artworkUrl,
-      };
+    'playlistId': playlistId,
+    'title': title,
+    'subtitle': subtitle,
+    'artworkUrl': artworkUrl,
+  };
 
   factory YtmAccountPlaylist.fromJson(Map<String, dynamic> json) =>
       YtmAccountPlaylist(
@@ -58,15 +57,13 @@ class YtmAccountPlaylist {
       );
 }
 
-enum SessionValidationResult {
-  valid,
-  invalid,
-  unknown,
-}
+enum SessionValidationResult { valid, invalid, unknown }
 
 @singleton
 class YtmAccountService {
   String? _cachedLikedSongsBrowseId;
+  static const MethodChannel _channel = MethodChannel('com.pulsr.music/ytm');
+
   /// Session cookies are full Google auth credentials — stored in
   /// Keystore/Keychain-backed secure storage, never as plaintext prefs. (BUG-023)
   static const String _cookieSecureKey = 'ytm_session_cookies_secure';
@@ -76,9 +73,7 @@ class YtmAccountService {
       encryptedSharedPreferences: true,
       resetOnError: true,
     ),
-    iOptions: IOSOptions(
-      accessibility: KeychainAccessibility.first_unlock,
-    ),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
   );
   static const String _accountNamePrefKey = 'ytm_account_name';
   static const String _accountAvatarPrefKey = 'ytm_account_avatar';
@@ -145,8 +140,9 @@ class YtmAccountService {
           _cookies = null;
         } else {
           final ytmService = getIt<YtmService>();
-          await ytmService
-              .syncCookies(_cookies!); // inject ONLY validated cookies
+          await ytmService.syncCookies(
+            _cookies!,
+          ); // inject ONLY validated cookies
           final dsid = _dataSyncId;
           if (dsid != null && dsid.isNotEmpty) {
             await ytmService.setDataSyncId(dsid);
@@ -163,8 +159,12 @@ class YtmAccountService {
       _isInitialized = true;
       loginState.value = isLoggedIn;
     } catch (e, st) {
-      ErrorLogger.log('Failed to initialize YtmAccountService',
-          error: e, stackTrace: st, category: 'YTM_ACCOUNT');
+      ErrorLogger.log(
+        'Failed to initialize YtmAccountService',
+        error: e,
+        stackTrace: st,
+        category: 'YTM_ACCOUNT',
+      );
     }
   }
 
@@ -222,8 +222,12 @@ class YtmAccountService {
       final secure = await _secureStorage.read(key: _cookieSecureKey);
       if (secure != null && secure.isNotEmpty) return secure;
     } catch (e, st) {
-      ErrorLogger.log('Failed to read cookies from secure storage',
-          error: e, stackTrace: st, category: 'YTM_ACCOUNT');
+      ErrorLogger.log(
+        'Failed to read cookies from secure storage',
+        error: e,
+        stackTrace: st,
+        category: 'YTM_ACCOUNT',
+      );
     }
     return null;
   }
@@ -233,8 +237,12 @@ class YtmAccountService {
     try {
       await _secureStorage.write(key: _cookieSecureKey, value: rawCookies);
     } catch (e, st) {
-      ErrorLogger.log('Failed to persist cookies to secure storage',
-          error: e, stackTrace: st, category: 'YTM_ACCOUNT');
+      ErrorLogger.log(
+        'Failed to persist cookies to secure storage',
+        error: e,
+        stackTrace: st,
+        category: 'YTM_ACCOUNT',
+      );
       _cookies = rawCookies;
     }
   }
@@ -265,9 +273,11 @@ class YtmAccountService {
     loginState.value = true;
 
     // Warm session in background & harvest any Set-Cookie headers
-    unawaited(_warmSession().catchError((e) {
-      debugPrint('[YTM_ACCOUNT] Session warming failed (non-fatal): $e');
-    }));
+    unawaited(
+      _warmSession().catchError((e) {
+        debugPrint('[YTM_ACCOUNT] Session warming failed (non-fatal): $e');
+      }),
+    );
     return true;
   }
 
@@ -350,7 +360,8 @@ class YtmAccountService {
         final json = jsonDecode(res.body) as Map<String, dynamic>;
         if (_isUnauthenticatedResponse(json)) {
           debugPrint(
-              '[YTM_ACCOUNT] Warmed session returned unauthenticated — keeping session, notifying expiry check');
+            '[YTM_ACCOUNT] Warmed session returned unauthenticated — keeping session, notifying expiry check',
+          );
           getIt<YtmService>().notifyAuthExpired();
           return;
         }
@@ -433,8 +444,9 @@ class YtmAccountService {
         }
         if (attr.startsWith('expires=')) {
           try {
-            final expires =
-                HttpDate.parse(segments[i].trim().substring(8).trim());
+            final expires = HttpDate.parse(
+              segments[i].trim().substring(8).trim(),
+            );
             if (expires.isBefore(DateTime.now())) {
               shouldDelete = true;
             }
@@ -473,8 +485,10 @@ class YtmAccountService {
   }
 
   /// Builds authenticated Innertube request headers with timestamped SAPISIDHASH, SAPISID3PHASH, or SAPISID1PHASH.
-  Map<String, String> _buildHeaders(
-      {String userAgent = '', String origin = 'https://music.youtube.com'}) {
+  Map<String, String> _buildHeaders({
+    String userAgent = '',
+    String origin = 'https://music.youtube.com',
+  }) {
     final defaultUa =
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36';
 
@@ -503,8 +517,10 @@ class YtmAccountService {
 
   /// Builds the proper Authorization header for YouTube / Google InnerTube requests.
   /// Supports SAPISID (SAPISIDHASH), __Secure-3PAPISID (SAPISID3PHASH), and __Secure-1PAPISID (SAPISID1PHASH).
-  static String? buildAuthorizationHeader(String cookies,
-      {String origin = 'https://music.youtube.com'}) {
+  static String? buildAuthorizationHeader(
+    String cookies, {
+    String origin = 'https://music.youtube.com',
+  }) {
     final timestamp =
         (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
 
@@ -558,7 +574,8 @@ class YtmAccountService {
       return null;
     }
 
-    final hasSapisid = valueOf('SAPISID') != null ||
+    final hasSapisid =
+        valueOf('SAPISID') != null ||
         valueOf('__Secure-3PAPISID') != null ||
         valueOf('__Secure-1PAPISID') != null;
     final hasPsid =
@@ -566,20 +583,23 @@ class YtmAccountService {
     return hasSapisid && hasPsid;
   }
 
-  Map<String, dynamic> _buildClientContext(String clientType,
-      [String? videoId]) {
+  Map<String, dynamic> _buildClientContext(
+    String clientType, [
+    String? videoId,
+  ]) {
     final clientMap = <String, dynamic>{
       'clientName': clientType,
       // Use the resolved client version for WEB_REMIX; explicit per-client
       // versions for the named mobile clients; fall back to WEB_REMIX version
       // rather than the stale '19.29.37' for anything else.
-      'clientVersion': clientType == 'WEB_REMIX'
-          ? _clientVersion
-          : clientType == 'ANDROID_MUSIC'
+      'clientVersion':
+          clientType == 'WEB_REMIX'
+              ? _clientVersion
+              : clientType == 'ANDROID_MUSIC'
               ? '8.32.50'
               : clientType == 'IOS_MUSIC'
-                  ? '8.32.1'
-                  : _clientVersion,
+              ? '8.32.1'
+              : _clientVersion,
       'hl': 'en',
       'gl': 'US',
     };
@@ -647,9 +667,10 @@ class YtmAccountService {
     if (clientType == 'WEB_EMBEDDED_PLAYER' ||
         clientType == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER') {
       contextJson['thirdParty'] = {
-        'embedUrl': (videoId != null && videoId.isNotEmpty)
-            ? 'https://www.youtube.com/watch?v=$videoId'
-            : 'https://www.youtube.com',
+        'embedUrl':
+            (videoId != null && videoId.isNotEmpty)
+                ? 'https://www.youtube.com/watch?v=$videoId'
+                : 'https://www.youtube.com',
       };
     }
 
@@ -664,33 +685,67 @@ class YtmAccountService {
     int baseTimeoutSeconds = 15,
   }) async {
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
+      final startTime = DateTime.now().millisecondsSinceEpoch;
       try {
-        await YtmRateLimiter.shared.acquirePermit();
+        try {
+          await _channel.invokeMethod<bool>('acquirePermit', {
+            'bucket': 'BROWSE',
+          });
+        } catch (_) {}
         final timeout = Duration(seconds: baseTimeoutSeconds + attempt * 5);
-        final res =
-            await http.post(uri, headers: headers, body: body).timeout(timeout);
+        final res = await http
+            .post(uri, headers: headers, body: body)
+            .timeout(timeout);
+        final elapsed = DateTime.now().millisecondsSinceEpoch - startTime;
+
         if (res.statusCode == 429 || res.statusCode >= 500) {
+          try {
+            await _channel.invokeMethod<bool>('recordMetric', {
+              'operation': 'account.post',
+              'latencyMs': elapsed,
+              'isError': true,
+            });
+          } catch (_) {}
+
           if (res.statusCode == 429) {
             final retryHeader = res.headers['retry-after'];
             final retryAfter = int.tryParse(retryHeader ?? '');
-            YtmRateLimiter.shared.onRateLimited(retryAfter);
+            try {
+              await _channel.invokeMethod<int>('onRateLimited', {
+                'retryAfter': retryAfter,
+              });
+            } catch (_) {}
           }
           final backoffSec = (1 << attempt) + Random().nextInt(2);
           debugPrint(
-              '[YTM_ACCOUNT] HTTP ${res.statusCode} encountered. Backing off for ${backoffSec}s (attempt ${attempt + 1}/$maxAttempts)');
+            '[YTM_ACCOUNT] HTTP ${res.statusCode} encountered. Backing off for ${backoffSec}s (attempt ${attempt + 1}/$maxAttempts)',
+          );
           if (attempt < maxAttempts - 1) {
             await Future.delayed(Duration(seconds: backoffSec));
             continue;
           }
           if (res.statusCode == 429) {
-            throw const YtmException('RATE_LIMITED', 'YouTube Music rate limit reached');
+            throw const YtmException(
+              'RATE_LIMITED',
+              'YouTube Music rate limit reached',
+            );
           } else {
-            throw YtmException('HTTP_${res.statusCode}', 'Server returned HTTP ${res.statusCode}');
+            throw YtmException(
+              'HTTP_${res.statusCode}',
+              'Server returned HTTP ${res.statusCode}',
+            );
           }
         }
 
         // Only record success for valid, non-rate-limited, non-5xx responses
-        YtmRateLimiter.shared.onSuccess();
+        try {
+          await _channel.invokeMethod<bool>('onSuccess');
+          await _channel.invokeMethod<bool>('recordMetric', {
+            'operation': 'account.post',
+            'latencyMs': elapsed,
+            'isError': false,
+          });
+        } catch (_) {}
         return res;
       } on TimeoutException {
         if (attempt == maxAttempts - 1) {
@@ -701,7 +756,6 @@ class YtmAccountService {
       }
     }
     throw const YtmException('YTM_TIMEOUT', 'Exceeded maximum retry attempts');
-
   }
 
   /// Fetches library playlists from YouTube Music.
@@ -734,7 +788,8 @@ class YtmAccountService {
           final json = jsonDecode(response.body) as Map<String, dynamic>;
           if (_isUnauthenticatedResponse(json)) {
             debugPrint(
-                '[YTM_ACCOUNT] Unauthenticated response detected on $bId');
+              '[YTM_ACCOUNT] Unauthenticated response detected on $bId',
+            );
             await logout();
             throw const YtmException('YTM_AUTH', 'Session expired');
           }
@@ -748,7 +803,8 @@ class YtmAccountService {
       } catch (e) {
         if (e is YtmException && e.isAuth) rethrow;
         debugPrint(
-            '[YTM_ACCOUNT] Failed fetching account playlists ($bId): $e');
+          '[YTM_ACCOUNT] Failed fetching account playlists ($bId): $e',
+        );
       }
     }
     return [];
@@ -770,14 +826,15 @@ class YtmAccountService {
     }
 
     final headers = _buildHeaders();
-    final orderedBrowseIds = {
-      if (_cachedLikedSongsBrowseId != null) _cachedLikedSongsBrowseId!,
-      'VLLM',
-      'FEmusic_liked_videos',
-      'FEmusic_liked_tracks',
-      'LM',
-      'VLSE',
-    }.toList();
+    final orderedBrowseIds =
+        {
+          if (_cachedLikedSongsBrowseId != null) _cachedLikedSongsBrowseId!,
+          'VLLM',
+          'FEmusic_liked_videos',
+          'FEmusic_liked_tracks',
+          'LM',
+          'VLSE',
+        }.toList();
 
     for (final bId in orderedBrowseIds) {
       try {
@@ -793,31 +850,36 @@ class YtmAccountService {
         );
 
         debugPrint(
-            '[YTM_ACCOUNT] Liked songs query $bId: HTTP ${response.statusCode}, body length=${response.body.length}');
+          '[YTM_ACCOUNT] Liked songs query $bId: HTTP ${response.statusCode}, body length=${response.body.length}',
+        );
 
         if (response.statusCode == 200) {
           final json = jsonDecode(response.body) as Map<String, dynamic>;
           if (_isUnauthenticatedResponse(json)) {
             debugPrint(
-                '[YTM_ACCOUNT] Liked songs returned unauthenticated on $bId, trying next candidate');
+              '[YTM_ACCOUNT] Liked songs returned unauthenticated on $bId, trying next candidate',
+            );
             continue;
           }
 
           _harvestSessionState(json);
           final tracks = _parseInnertubePlaylistTracks(json);
           debugPrint(
-              '[YTM_ACCOUNT] Liked songs query $bId parsed ${tracks.length} tracks'
-              ' (top-level keys: ${json.keys.take(8).join(', ')})');
+            '[YTM_ACCOUNT] Liked songs query $bId parsed ${tracks.length} tracks'
+            ' (top-level keys: ${json.keys.take(8).join(', ')})',
+          );
 
           if (tracks.isEmpty) {
             debugPrint(
-                '[YTM_ACCOUNT] Liked songs query $bId returned 0 tracks. RAW BODY:\n${response.body}');
+              '[YTM_ACCOUNT] Liked songs query $bId returned 0 tracks. RAW BODY:\n${response.body}',
+            );
             // YouTube Music frequently delivers the liked-songs list only via
             // continuation — the initial browse response is a header shell.
             final initToken = _extractContinuationToken(json);
             if (initToken != null && initToken.isNotEmpty) {
               debugPrint(
-                  '[YTM_ACCOUNT] Initial browse had 0 tracks but continuation found, fetching...');
+                '[YTM_ACCOUNT] Initial browse had 0 tracks but continuation found, fetching...',
+              );
               final contBody = jsonEncode({
                 'context': _buildClientContext('WEB_REMIX'),
                 'continuation': initToken,
@@ -832,12 +894,14 @@ class YtmAccountService {
                     jsonDecode(contRes.body) as Map<String, dynamic>;
                 final contTracks = _parseInnertubePlaylistTracks(contJson);
                 debugPrint(
-                    '[YTM_ACCOUNT] Browse initial continuation parsed ${contTracks.length} tracks');
+                  '[YTM_ACCOUNT] Browse initial continuation parsed ${contTracks.length} tracks',
+                );
                 if (contTracks.isNotEmpty) {
                   tracks.addAll(contTracks);
                 } else {
                   debugPrint(
-                      '[YTM_ACCOUNT] Continuation body returned 0 tracks. RAW:\n${contRes.body}');
+                    '[YTM_ACCOUNT] Continuation body returned 0 tracks. RAW:\n${contRes.body}',
+                  );
                 }
               }
             }
@@ -879,13 +943,15 @@ class YtmAccountService {
                 }
               } catch (e) {
                 debugPrint(
-                    '[YTM_ACCOUNT] Liked songs continuation error on page $pageCount: $e');
+                  '[YTM_ACCOUNT] Liked songs continuation error on page $pageCount: $e',
+                );
                 break;
               }
             }
             if (pageCount >= maxPages) {
               debugPrint(
-                  '[YTM_ACCOUNT] Hit max continuation pages ($maxPages)');
+                '[YTM_ACCOUNT] Hit max continuation pages ($maxPages)',
+              );
             }
 
             final seenIds = <String>{};
@@ -916,22 +982,26 @@ class YtmAccountService {
         });
         final response = await _postWithRetry(
           Uri.parse(
-              'https://music.youtube.com/youtubei/v1/next?prettyPrint=false&key=$_apiKey'),
+            'https://music.youtube.com/youtubei/v1/next?prettyPrint=false&key=$_apiKey',
+          ),
           headers: headers,
           body: body,
         );
         debugPrint(
-            '[YTM_ACCOUNT] Next endpoint query $pId: HTTP ${response.statusCode}, length=${response.body.length}');
+          '[YTM_ACCOUNT] Next endpoint query $pId: HTTP ${response.statusCode}, length=${response.body.length}',
+        );
         if (response.statusCode == 200) {
           final json = jsonDecode(response.body) as Map<String, dynamic>;
           final tracks = _parseInnertubePlaylistTracks(json);
           debugPrint(
-              '[YTM_ACCOUNT] Next endpoint query $pId parsed ${tracks.length} tracks');
+            '[YTM_ACCOUNT] Next endpoint query $pId parsed ${tracks.length} tracks',
+          );
           if (tracks.isNotEmpty) {
             return tracks.take(maxTracks).toList();
           } else {
             debugPrint(
-                '[YTM_ACCOUNT] Next endpoint $pId raw body:\n${response.body}');
+              '[YTM_ACCOUNT] Next endpoint $pId raw body:\n${response.body}',
+            );
           }
         }
       } catch (e) {
@@ -943,10 +1013,12 @@ class YtmAccountService {
     try {
       final playlists = await fetchAccountPlaylists();
       debugPrint(
-          '[YTM_ACCOUNT] Discovered ${playlists.length} account playlists for liked songs resolution');
+        '[YTM_ACCOUNT] Discovered ${playlists.length} account playlists for liked songs resolution',
+      );
       for (final p in playlists) {
         final lowerTitle = p.title.toLowerCase();
-        final isLiked = p.playlistId.contains('LM') ||
+        final isLiked =
+            p.playlistId.contains('LM') ||
             lowerTitle.contains('like') ||
             lowerTitle.contains('aimé') ||
             lowerTitle.contains('favori') ||
@@ -954,7 +1026,8 @@ class YtmAccountService {
             lowerTitle.contains('liebling');
         if (isLiked) {
           debugPrint(
-              '[YTM_ACCOUNT] Found Liked Music playlist in account: ${p.playlistId} (${p.title})');
+            '[YTM_ACCOUNT] Found Liked Music playlist in account: ${p.playlistId} (${p.title})',
+          );
           final candidateIds = [p.playlistId, 'VL${p.cleanPlaylistId}'];
           for (final cId in candidateIds) {
             final body = jsonEncode({
@@ -983,13 +1056,17 @@ class YtmAccountService {
     // Try Native Kotlin Innertube browse with full WebView cookie jar
     try {
       debugPrint(
-          '[YTM_ACCOUNT] Attempting Native Kotlin Innertube fallback for liked songs...');
+        '[YTM_ACCOUNT] Attempting Native Kotlin Innertube fallback for liked songs...',
+      );
       final ytmService = getIt<YtmService>();
-      final nativeTracks =
-          await ytmService.getPlaylistTracks('VLLM', limit: maxTracks);
+      final nativeTracks = await ytmService.getPlaylistTracks(
+        'VLLM',
+        limit: maxTracks,
+      );
       if (nativeTracks.isNotEmpty) {
         debugPrint(
-            '[YTM_ACCOUNT] Native Kotlin fallback returned ${nativeTracks.length} liked songs');
+          '[YTM_ACCOUNT] Native Kotlin fallback returned ${nativeTracks.length} liked songs',
+        );
         return nativeTracks.take(maxTracks).toList();
       }
     } catch (e) {
@@ -1000,7 +1077,8 @@ class YtmAccountService {
     // via the cookie pool and can access private playlists that InnerTube rejects.
     try {
       debugPrint(
-          '[YTM_ACCOUNT] Attempting XDM backend fallback for liked songs...');
+        '[YTM_ACCOUNT] Attempting XDM backend fallback for liked songs...',
+      );
       final xdm = getIt<XdmBackendService>();
       if (await xdm.isEnabled()) {
         var tracks = await xdm.getPlaylist(
@@ -1017,7 +1095,8 @@ class YtmAccountService {
         }
         if (tracks.isNotEmpty) {
           debugPrint(
-              '[YTM_ACCOUNT] XDM backend returned ${tracks.length} liked songs');
+            '[YTM_ACCOUNT] XDM backend returned ${tracks.length} liked songs',
+          );
           return tracks.take(maxTracks).toList();
         }
       }
@@ -1114,7 +1193,8 @@ class YtmAccountService {
 
       final nextRes = await _postWithRetry(
         Uri.parse(
-            'https://music.youtube.com/youtubei/v1/next?prettyPrint=false&key=$_apiKey'),
+          'https://music.youtube.com/youtubei/v1/next?prettyPrint=false&key=$_apiKey',
+        ),
         headers: headers,
         body: nextBody,
         baseTimeoutSeconds: 8,
@@ -1183,8 +1263,12 @@ class YtmAccountService {
               plainText = desc;
             }
             if (plainText.isNotEmpty) {
-              lines.addAll(LrcParser.parsePlainText(plainText,
-                  source: LyricsSource.ytmusic));
+              lines.addAll(
+                LrcParser.parsePlainText(
+                  plainText,
+                  source: LyricsSource.ytmusic,
+                ),
+              );
             }
             return;
           }
@@ -1213,20 +1297,27 @@ class YtmAccountService {
   /// 2. ANDROID client
   /// 3. IOS client
   /// 4. TVHTML5_SIMPLY_EMBEDDED_PLAYER
-  Future<YtmStream?> resolvePlayerStream(String videoId,
-      {String quality = 'high'}) async {
+  Future<YtmStream?> resolvePlayerStream(
+    String videoId, {
+    String quality = 'high',
+  }) async {
     try {
-      return await _resolvePlayerStreamInternal(videoId, quality: quality)
-          .timeout(const Duration(seconds: 25));
+      return await _resolvePlayerStreamInternal(
+        videoId,
+        quality: quality,
+      ).timeout(const Duration(seconds: 25));
     } on TimeoutException {
       debugPrint(
-          '[YTM_ACCOUNT] Global stream resolution timed out after 25s for $videoId');
+        '[YTM_ACCOUNT] Global stream resolution timed out after 25s for $videoId',
+      );
       return null;
     }
   }
 
-  Future<YtmStream?> _resolvePlayerStreamInternal(String videoId,
-      {String quality = 'high'}) async {
+  Future<YtmStream?> _resolvePlayerStreamInternal(
+    String videoId, {
+    String quality = 'high',
+  }) async {
     // BotGuard requires a poToken on WEB_REMIX player requests regardless of login.
     // Authenticated → the token must be content-bound to the account's datasyncId, sent WITH
     // the session cookies + SAPISIDHASH. Unauthenticated → a guest token bound to guest visitorData.
@@ -1268,80 +1359,86 @@ class YtmAccountService {
     // attributable to missing attestation vs rejected attestation.
     final hadPoToken = poToken != null && poToken.isNotEmpty;
 
-    final clientChain = isAuthenticated
-        ? [
-            'WEB_REMIX', // cookies + poToken → most reliable
-            'ANDROID_VR', // still works for some content unauthenticated
-            'ANDROID_MUSIC', // now needs cookies (sent below)
-            'IOS_MUSIC',
-            'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
-            'WEB_EMBEDDED_PLAYER',
-            'MWEB',
-            'ANDROID_CREATOR',
-            'ANDROID_TESTSUITE',
-          ]
-        : [
-            'ANDROID_VR',
-            'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
-            'WEB_REMIX',
-            'WEB_EMBEDDED_PLAYER',
-            'MWEB',
-            'ANDROID_MUSIC',
-            'IOS_MUSIC',
-            'ANDROID_CREATOR',
-            'ANDROID_TESTSUITE',
-          ];
+    final clientChain =
+        isAuthenticated
+            ? [
+              'WEB_REMIX', // cookies + poToken → most reliable
+              'ANDROID_VR', // still works for some content unauthenticated
+              'ANDROID_MUSIC', // now needs cookies (sent below)
+              'IOS_MUSIC',
+              'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
+              'WEB_EMBEDDED_PLAYER',
+              'MWEB',
+              'ANDROID_CREATOR',
+              'ANDROID_TESTSUITE',
+            ]
+            : [
+              'ANDROID_VR',
+              'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
+              'WEB_REMIX',
+              'WEB_EMBEDDED_PLAYER',
+              'MWEB',
+              'ANDROID_MUSIC',
+              'IOS_MUSIC',
+              'ANDROID_CREATOR',
+              'ANDROID_TESTSUITE',
+            ];
 
     for (final client in clientChain) {
       try {
-        final isWeb = client == 'WEB_REMIX' ||
+        final isWeb =
+            client == 'WEB_REMIX' ||
             client == 'WEB_EMBEDDED_PLAYER' ||
             client == 'MWEB' ||
             client == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER';
-        final endpointHost = (client == 'ANDROID_MUSIC' ||
-                client == 'IOS_MUSIC' ||
-                client == 'WEB_REMIX')
-            ? 'https://music.youtube.com'
-            : (client == 'MWEB'
-                ? 'https://m.youtube.com'
-                : 'https://www.youtube.com');
+        final endpointHost =
+            (client == 'ANDROID_MUSIC' ||
+                    client == 'IOS_MUSIC' ||
+                    client == 'WEB_REMIX')
+                ? 'https://music.youtube.com'
+                : (client == 'MWEB'
+                    ? 'https://m.youtube.com'
+                    : 'https://www.youtube.com');
 
         final headers = <String, String>{
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': _apiKey,
           'x-youtube-client-name': _clientNameIds[client] ?? '67',
-          'x-youtube-client-version': client == 'ANDROID_MUSIC'
-              ? '8.32.50'
-              : (client == 'IOS_MUSIC'
-                  ? '8.32.1'
-                  : (client == 'ANDROID_VR'
-                      ? '1.63.27'
-                      : (client == 'MWEB'
-                          ? '2.20260825.01.00'
-                          : (client == 'WEB_EMBEDDED_PLAYER'
-                              ? '1.20260825.01.00'
-                              : (client == 'ANDROID_CREATOR'
-                                  ? '24.45.100'
-                                  : (client == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER'
-                                      ? '2.0'
-                                      : (client == 'ANDROID_TESTSUITE'
-                                          ? '1.9'
-                                          : _clientVersion))))))),
-          'User-Agent': client == 'ANDROID_MUSIC'
-              ? 'com.google.android.apps.youtube.music/8.32.50 (Linux; U; Android 14; en_US) gzip'
-              : (client == 'IOS_MUSIC'
-                  ? 'com.google.ios.youtubemusic/8.32.1 (iPhone15,3; U; CPU iOS 18_0 like Mac OS X; en_US)'
-                  : (client == 'ANDROID_VR'
-                      ? 'com.google.android.apps.youtube.vr.oculus/1.63.27 (Linux; U; Android 12; en_US; Quest 2) gzip'
-                      : (client == 'ANDROID_CREATOR'
-                          ? 'com.google.android.apps.youtube.creator/24.45.100 (Linux; U; Android 13; en_US) gzip'
-                          : (client == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER'
-                              ? 'Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/4.0 Chrome/76.0.3809.146 TV Safari/537.36'
-                              : (client == 'ANDROID_TESTSUITE'
-                                  ? 'com.google.android.youtube/1.9 (Linux; U; Android 9; gzip)'
-                                  : (client == 'MWEB'
-                                      ? 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36'
-                                      : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36')))))),
+          'x-youtube-client-version':
+              client == 'ANDROID_MUSIC'
+                  ? '8.32.50'
+                  : (client == 'IOS_MUSIC'
+                      ? '8.32.1'
+                      : (client == 'ANDROID_VR'
+                          ? '1.63.27'
+                          : (client == 'MWEB'
+                              ? '2.20260825.01.00'
+                              : (client == 'WEB_EMBEDDED_PLAYER'
+                                  ? '1.20260825.01.00'
+                                  : (client == 'ANDROID_CREATOR'
+                                      ? '24.45.100'
+                                      : (client ==
+                                              'TVHTML5_SIMPLY_EMBEDDED_PLAYER'
+                                          ? '2.0'
+                                          : (client == 'ANDROID_TESTSUITE'
+                                              ? '1.9'
+                                              : _clientVersion))))))),
+          'User-Agent':
+              client == 'ANDROID_MUSIC'
+                  ? 'com.google.android.apps.youtube.music/8.32.50 (Linux; U; Android 14; en_US) gzip'
+                  : (client == 'IOS_MUSIC'
+                      ? 'com.google.ios.youtubemusic/8.32.1 (iPhone15,3; U; CPU iOS 18_0 like Mac OS X; en_US)'
+                      : (client == 'ANDROID_VR'
+                          ? 'com.google.android.apps.youtube.vr.oculus/1.63.27 (Linux; U; Android 12; en_US; Quest 2) gzip'
+                          : (client == 'ANDROID_CREATOR'
+                              ? 'com.google.android.apps.youtube.creator/24.45.100 (Linux; U; Android 13; en_US) gzip'
+                              : (client == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER'
+                                  ? 'Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/4.0 Chrome/76.0.3809.146 TV Safari/537.36'
+                                  : (client == 'ANDROID_TESTSUITE'
+                                      ? 'com.google.android.youtube/1.9 (Linux; U; Android 9; gzip)'
+                                      : (client == 'MWEB'
+                                          ? 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36'
+                                          : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36')))))),
         };
 
         if (visitorData != null && visitorData.isNotEmpty) {
@@ -1357,8 +1454,10 @@ class YtmAccountService {
           headers['x-goog-authuser'] = '0';
           if (_cookies != null && _cookies!.isNotEmpty) {
             headers['Cookie'] = _cookies!;
-            final authHeader =
-                buildAuthorizationHeader(_cookies!, origin: origin);
+            final authHeader = buildAuthorizationHeader(
+              _cookies!,
+              origin: origin,
+            );
             if (authHeader != null) {
               headers['Authorization'] = authHeader;
             }
@@ -1400,7 +1499,8 @@ class YtmAccountService {
 
         final response = await _postWithRetry(
           Uri.parse(
-              '$endpointHost/youtubei/v1/player?prettyPrint=false&key=$_apiKey'),
+            '$endpointHost/youtubei/v1/player?prettyPrint=false&key=$_apiKey',
+          ),
           headers: headers,
           body: body,
           baseTimeoutSeconds: 10,
@@ -1418,7 +1518,8 @@ class YtmAccountService {
             final statusReason =
                 playability?['reason'] as String? ?? 'no reason';
             debugPrint(
-                '[YTM_ACCOUNT] Client $client returned playability $status ($statusReason, poTokenAttached: $hadPoToken), falling back to next');
+              '[YTM_ACCOUNT] Client $client returned playability $status ($statusReason, poTokenAttached: $hadPoToken), falling back to next',
+            );
 
             // If WEB_REMIX (the client using auth cookies) returns LOGIN_REQUIRED,
             // check whether it's a genuine session expiry or just a bot challenge.
@@ -1433,17 +1534,21 @@ class YtmAccountService {
                   reason.contains('bot') || reason.contains('confirm');
               if (!isBotChallenge) {
                 debugPrint(
-                    '[YTM_ACCOUNT] Session expired detected on WEB_REMIX. Clearing cookies and notifying UI.');
+                  '[YTM_ACCOUNT] Session expired detected on WEB_REMIX. Clearing cookies and notifying UI.',
+                );
                 unawaited(logout());
                 try {
                   getIt<YtmService>().notifyAuthExpired();
                 } catch (_) {}
 
-                throw const YtmException('YTM_AUTH',
-                    'YouTube Music session expired. Please sign in again.');
+                throw const YtmException(
+                  'YTM_AUTH',
+                  'YouTube Music session expired. Please sign in again.',
+                );
               }
               debugPrint(
-                  '[YTM_ACCOUNT] WEB_REMIX bot challenge detected, trying next client without logout');
+                '[YTM_ACCOUNT] WEB_REMIX bot challenge detected, trying next client without logout',
+              );
             }
             continue;
           }
@@ -1466,35 +1571,48 @@ class YtmAccountService {
           }
 
           if (audioFormats.isNotEmpty) {
-            final m4a = audioFormats
-                .where((f) =>
-                    ((f.format['mimeType'] as String?) ?? '').contains('mp4'))
-                .toList();
+            final m4a =
+                audioFormats
+                    .where(
+                      (f) => ((f.format['mimeType'] as String?) ?? '').contains(
+                        'mp4',
+                      ),
+                    )
+                    .toList();
             final pool = m4a.isNotEmpty ? m4a : audioFormats;
 
             final selected = switch (quality.toLowerCase()) {
-              'low' => pool.reduce((a, b) =>
-                  ((a.format['bitrate'] as num?) ?? 0) <
-                          ((b.format['bitrate'] as num?) ?? 0)
-                      ? a
-                      : b),
-              'medium' => pool.reduce((a, b) =>
-                  (((a.format['bitrate'] as num?) ?? 128000) - 128000).abs() <
-                          (((b.format['bitrate'] as num?) ?? 128000) - 128000)
-                              .abs()
-                      ? a
-                      : b),
-              _ => pool.reduce((a, b) => ((a.format['bitrate'] as num?) ?? 0) >
-                      ((b.format['bitrate'] as num?) ?? 0)
-                  ? a
-                  : b),
+              'low' => pool.reduce(
+                (a, b) =>
+                    ((a.format['bitrate'] as num?) ?? 0) <
+                            ((b.format['bitrate'] as num?) ?? 0)
+                        ? a
+                        : b,
+              ),
+              'medium' => pool.reduce(
+                (a, b) =>
+                    (((a.format['bitrate'] as num?) ?? 128000) - 128000).abs() <
+                            (((b.format['bitrate'] as num?) ?? 128000) - 128000)
+                                .abs()
+                        ? a
+                        : b,
+              ),
+              _ => pool.reduce(
+                (a, b) =>
+                    ((a.format['bitrate'] as num?) ?? 0) >
+                            ((b.format['bitrate'] as num?) ?? 0)
+                        ? a
+                        : b,
+              ),
             };
 
             final mime = selected.format['mimeType'] as String? ?? 'audio/mp4';
             final bitrate =
                 (selected.format['bitrate'] as num?)?.toInt() ?? 128000;
-            final durationMs = int.tryParse(
-                    selected.format['approxDurationMs']?.toString() ?? '0') ??
+            final durationMs =
+                int.tryParse(
+                  selected.format['approxDurationMs']?.toString() ?? '0',
+                ) ??
                 0;
             final details = data['videoDetails'] as Map<String, dynamic>?;
 
@@ -1516,7 +1634,8 @@ class YtmAccountService {
             );
           } else {
             debugPrint(
-                '[YTM_ACCOUNT] Client $client returned status $status but no audio formats (adaptiveFormats: ${adaptive.length} total, streamingData: ${streamingData != null})');
+              '[YTM_ACCOUNT] Client $client returned status $status but no audio formats (adaptiveFormats: ${adaptive.length} total, streamingData: ${streamingData != null})',
+            );
           }
         }
       } catch (e) {
@@ -1524,7 +1643,8 @@ class YtmAccountService {
         // per-client resolution failure.
         if (e is YtmException && e.isAuth) rethrow;
         debugPrint(
-            '[YTM_ACCOUNT] Client $client resolution error for $videoId: $e');
+          '[YTM_ACCOUNT] Client $client resolution error for $videoId: $e',
+        );
       }
     }
     return null;
@@ -1589,8 +1709,9 @@ class YtmAccountService {
       }
       // Newer InnerTube format: continuationEndpoint.continuationCommand.token
       if (node.containsKey('continuationEndpoint')) {
-        final token = node['continuationEndpoint']?['continuationCommand']
-            ?['token'] as String?;
+        final token =
+            node['continuationEndpoint']?['continuationCommand']?['token']
+                as String?;
         if (token != null && token.isNotEmpty) return token;
       }
       if (node.containsKey('continuationCommand')) {
@@ -1633,11 +1754,13 @@ class YtmAccountService {
       _dataSyncId = dsid;
       _sessionHarvestDebounce?.cancel();
       _sessionHarvestDebounce = null;
-      SharedPreferences.getInstance().then((p) {
-        p.setString(_dataSyncIdPrefKey, dsid);
-      }).catchError((e) {
-        debugPrint('[YTM_ACCOUNT] Failed to persist dataSyncId: $e');
-      });
+      SharedPreferences.getInstance()
+          .then((p) {
+            p.setString(_dataSyncIdPrefKey, dsid);
+          })
+          .catchError((e) {
+            debugPrint('[YTM_ACCOUNT] Failed to persist dataSyncId: $e');
+          });
       getIt<YtmService>().setDataSyncId(dsid);
     }
     final rc = json['responseContext'];
@@ -1716,18 +1839,21 @@ class YtmAccountService {
               node['playlistPanelVideoRenderer'] as Map<String, dynamic>;
           final videoId = renderer['videoId'] as String?;
           final titleRuns = renderer['title']?['runs'] as List<dynamic>?;
-          final title = titleRuns?.isNotEmpty == true
-              ? titleRuns![0]['text'] as String? ?? 'Unknown Title'
-              : 'Unknown Title';
+          final title =
+              titleRuns?.isNotEmpty == true
+                  ? titleRuns![0]['text'] as String? ?? 'Unknown Title'
+                  : 'Unknown Title';
           final artistRuns =
               renderer['shortBylineText']?['runs'] as List<dynamic>?;
-          final artist = artistRuns?.isNotEmpty == true
-              ? artistRuns![0]['text'] as String? ?? 'Unknown Artist'
-              : 'Unknown Artist';
+          final artist =
+              artistRuns?.isNotEmpty == true
+                  ? artistRuns![0]['text'] as String? ?? 'Unknown Artist'
+                  : 'Unknown Artist';
           final lengthRuns = renderer['lengthText']?['runs'] as List<dynamic>?;
-          final lengthText = lengthRuns?.isNotEmpty == true
-              ? lengthRuns![0]['text'] as String?
-              : null;
+          final lengthText =
+              lengthRuns?.isNotEmpty == true
+                  ? lengthRuns![0]['text'] as String?
+                  : null;
           int durationMs = 0;
           if (lengthText != null) {
             final parts =
@@ -1740,77 +1866,88 @@ class YtmAccountService {
           }
           final thumbnails =
               renderer['thumbnail']?['thumbnails'] as List<dynamic>?;
-          final artwork = thumbnails?.isNotEmpty == true
-              ? thumbnails!.last['url'] as String?
-              : null;
+          final artwork =
+              thumbnails?.isNotEmpty == true
+                  ? thumbnails!.last['url'] as String?
+                  : null;
 
           if (videoId != null && videoId.length == 11) {
-            tracks.add(YtmTrack(
-              videoId: videoId,
-              title: title,
-              artist: artist,
-              duration: Duration(milliseconds: durationMs),
-              artworkUrl: artwork,
-            ));
+            tracks.add(
+              YtmTrack(
+                videoId: videoId,
+                title: title,
+                artist: artist,
+                duration: Duration(milliseconds: durationMs),
+                artworkUrl: artwork,
+              ),
+            );
           }
           return;
         } else if (node.containsKey('playlistVideoRenderer')) {
           final renderer =
               node['playlistVideoRenderer'] as Map<String, dynamic>;
           final videoId = renderer['videoId'] as String?;
-          final title = renderer['title']?['runs']?[0]?['text'] as String? ??
+          final title =
+              renderer['title']?['runs']?[0]?['text'] as String? ??
               'Unknown Title';
           final artist =
               renderer['shortBylineText']?['runs']?[0]?['text'] as String? ??
-                  'Unknown Artist';
+              'Unknown Artist';
           final lengthSeconds =
               int.tryParse(renderer['lengthSeconds']?.toString() ?? '0') ?? 0;
           final thumbnails =
               renderer['thumbnail']?['thumbnails'] as List<dynamic>?;
-          final artwork = thumbnails?.isNotEmpty == true
-              ? thumbnails!.last['url'] as String?
-              : null;
+          final artwork =
+              thumbnails?.isNotEmpty == true
+                  ? thumbnails!.last['url'] as String?
+                  : null;
 
           if (videoId != null && videoId.length == 11) {
-            tracks.add(YtmTrack(
-              videoId: videoId,
-              title: title,
-              artist: artist,
-              duration: Duration(seconds: lengthSeconds),
-              artworkUrl: artwork,
-            ));
+            tracks.add(
+              YtmTrack(
+                videoId: videoId,
+                title: title,
+                artist: artist,
+                duration: Duration(seconds: lengthSeconds),
+                artworkUrl: artwork,
+              ),
+            );
           }
           return;
         } else if (node.containsKey('musicTwoRowItemRenderer')) {
           final renderer =
               node['musicTwoRowItemRenderer'] as Map<String, dynamic>;
-          String? vid = renderer['navigationEndpoint']?['watchEndpoint']
-              ?['videoId'] as String?;
-          vid ??= renderer['thumbnailRenderer']?['musicThumbnailRenderer']
-              ?['navigationEndpoint']?['watchEndpoint']?['videoId'] as String?;
-          vid ??= renderer['thumbnailOverlay']
-                      ?['musicItemThumbnailOverlayRenderer']?['content']
-                  ?['musicPlayButtonRenderer']?['playNavigationEndpoint']
-              ?['watchEndpoint']?['videoId'] as String?;
-          vid ??= renderer['navigationEndpoint']?['watchPlaylistEndpoint']
-              ?['videoId'] as String?;
+          String? vid =
+              renderer['navigationEndpoint']?['watchEndpoint']?['videoId']
+                  as String?;
+          vid ??=
+              renderer['thumbnailRenderer']?['musicThumbnailRenderer']?['navigationEndpoint']?['watchEndpoint']?['videoId']
+                  as String?;
+          vid ??=
+              renderer['thumbnailOverlay']?['musicItemThumbnailOverlayRenderer']?['content']?['musicPlayButtonRenderer']?['playNavigationEndpoint']?['watchEndpoint']?['videoId']
+                  as String?;
+          vid ??=
+              renderer['navigationEndpoint']?['watchPlaylistEndpoint']?['videoId']
+                  as String?;
           vid ??= renderer['onTap']?['watchEndpoint']?['videoId'] as String?;
 
           if (vid != null && vid.length == 11) {
             final titleRuns = renderer['title']?['runs'] as List<dynamic>?;
-            final title = titleRuns?.isNotEmpty == true
-                ? titleRuns![0]['text'] as String? ?? 'Unknown Title'
-                : 'Unknown Title';
+            final title =
+                titleRuns?.isNotEmpty == true
+                    ? titleRuns![0]['text'] as String? ?? 'Unknown Title'
+                    : 'Unknown Title';
 
             String artist = 'Unknown Artist';
             int durationMs = 0;
 
             final subRuns = renderer['subtitle']?['runs'] as List<dynamic>?;
             if (subRuns != null && subRuns.isNotEmpty) {
-              final texts = subRuns
-                  .map((r) => r['text']?.toString().trim() ?? '')
-                  .where((t) => t.isNotEmpty && t != '•' && t != '·')
-                  .toList();
+              final texts =
+                  subRuns
+                      .map((r) => r['text']?.toString().trim() ?? '')
+                      .where((t) => t.isNotEmpty && t != '•' && t != '·')
+                      .toList();
 
               for (final t in texts) {
                 final parts = t.split(':').map((e) => int.tryParse(e)).toList();
@@ -1831,28 +1968,36 @@ class YtmAccountService {
             }
 
             String? artworkUrl;
-            final thumbRenderer = renderer['thumbnailRenderer']
-                    ?['musicThumbnailRenderer'] ??
+            final thumbRenderer =
+                renderer['thumbnailRenderer']?['musicThumbnailRenderer'] ??
                 renderer['thumbnail']?['musicThumbnailRenderer'];
-            final thumbs = (thumbRenderer?['thumbnail']?['thumbnails'] ??
-                renderer['thumbnail']?['thumbnails']) as List<dynamic>?;
+            final thumbs =
+                (thumbRenderer?['thumbnail']?['thumbnails'] ??
+                        renderer['thumbnail']?['thumbnails'])
+                    as List<dynamic>?;
             if (thumbs != null && thumbs.isNotEmpty) {
               artworkUrl = thumbs.last['url'] as String?;
               if (artworkUrl != null) {
-                artworkUrl =
-                    artworkUrl.replaceAll(RegExp(r'=w\d+-h\d+[^?]*'), '=s1200');
-                artworkUrl =
-                    artworkUrl.replaceAll(RegExp(r'=s\d+[^?]*'), '=s1200');
+                artworkUrl = artworkUrl.replaceAll(
+                  RegExp(r'=w\d+-h\d+[^?]*'),
+                  '=s1200',
+                );
+                artworkUrl = artworkUrl.replaceAll(
+                  RegExp(r'=s\d+[^?]*'),
+                  '=s1200',
+                );
               }
             }
 
-            tracks.add(YtmTrack(
-              videoId: vid,
-              title: title,
-              artist: artist,
-              duration: Duration(milliseconds: durationMs),
-              artworkUrl: artworkUrl,
-            ));
+            tracks.add(
+              YtmTrack(
+                videoId: vid,
+                title: title,
+                artist: artist,
+                duration: Duration(milliseconds: durationMs),
+                artworkUrl: artworkUrl,
+              ),
+            );
             return;
           }
         }
@@ -1876,20 +2021,23 @@ class YtmAccountService {
           renderer['playlistItemData'] as Map<String, dynamic>?;
       String? videoId = playlistItemData?['videoId'] as String?;
 
-      videoId ??= renderer['navigationEndpoint']?['watchEndpoint']?['videoId']
-          as String?;
-      videoId ??= renderer['overlay']?['musicItemThumbnailOverlayRenderer']
-              ?['content']?['musicPlayButtonRenderer']
-          ?['playNavigationEndpoint']?['watchEndpoint']?['videoId'] as String?;
-      videoId ??= renderer['doubleTapEndpoint']?['watchEndpoint']?['videoId']
-          as String?;
+      videoId ??=
+          renderer['navigationEndpoint']?['watchEndpoint']?['videoId']
+              as String?;
+      videoId ??=
+          renderer['overlay']?['musicItemThumbnailOverlayRenderer']?['content']?['musicPlayButtonRenderer']?['playNavigationEndpoint']?['watchEndpoint']?['videoId']
+              as String?;
+      videoId ??=
+          renderer['doubleTapEndpoint']?['watchEndpoint']?['videoId']
+              as String?;
 
       if (videoId == null || videoId.length != 11) {
         final flexColumns =
             renderer['flexColumns'] as List<dynamic>? ?? const [];
         for (final col in flexColumns) {
-          final runs = col['musicResponsiveListItemFlexColumnRenderer']?['text']
-              ?['runs'] as List<dynamic>?;
+          final runs =
+              col['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs']
+                  as List<dynamic>?;
           if (runs != null) {
             for (final r in runs) {
               final nav = r['navigationEndpoint'] as Map<String, dynamic>?;
@@ -1940,8 +2088,8 @@ class YtmAccountService {
 
       final flexColumns = renderer['flexColumns'] as List<dynamic>? ?? const [];
       if (flexColumns.isNotEmpty) {
-        final col0Runs = flexColumns[0]
-            ['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'];
+        final col0Runs =
+            flexColumns[0]['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'];
         if (col0Runs is List && col0Runs.isNotEmpty) {
           final t =
               col0Runs.map((r) => r['text']?.toString() ?? '').join('').trim();
@@ -1949,13 +2097,14 @@ class YtmAccountService {
         }
       }
       if (flexColumns.length > 1) {
-        final col1Runs = flexColumns[1]
-            ['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'];
+        final col1Runs =
+            flexColumns[1]['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'];
         if (col1Runs is List && col1Runs.isNotEmpty) {
-          final texts = col1Runs
-              .map((r) => r['text']?.toString().trim() ?? '')
-              .where((t) => t.isNotEmpty && t != '•' && t != '·')
-              .toList();
+          final texts =
+              col1Runs
+                  .map((r) => r['text']?.toString().trim() ?? '')
+                  .where((t) => t.isNotEmpty && t != '•' && t != '·')
+                  .toList();
           for (final t in texts) {
             if (t.toLowerCase() != 'song' &&
                 t.toLowerCase() != 'video' &&
@@ -1968,9 +2117,9 @@ class YtmAccountService {
 
       final fixedCols = renderer['fixedColumns'] as List<dynamic>? ?? const [];
       if (fixedCols.isNotEmpty) {
-        final durText = fixedCols[0]
-                ['musicResponsiveListItemFixedColumnRenderer']?['text']?['runs']
-            ?[0]?['text'] as String?;
+        final durText =
+            fixedCols[0]['musicResponsiveListItemFixedColumnRenderer']?['text']?['runs']?[0]?['text']
+                as String?;
         if (durText != null) {
           final parts =
               durText.split(':').map((e) => int.tryParse(e) ?? 0).toList();
@@ -1983,13 +2132,16 @@ class YtmAccountService {
       }
 
       String? artworkUrl;
-      final thumbnails = renderer['thumbnail']?['musicThumbnailRenderer']
-          ?['thumbnail']?['thumbnails'] as List<dynamic>?;
+      final thumbnails =
+          renderer['thumbnail']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails']
+              as List<dynamic>?;
       if (thumbnails != null && thumbnails.isNotEmpty) {
         artworkUrl = thumbnails.last['url'] as String?;
         if (artworkUrl != null) {
-          artworkUrl =
-              artworkUrl.replaceAll(RegExp(r'=w\d+-h\d+[^?]*'), '=s1200');
+          artworkUrl = artworkUrl.replaceAll(
+            RegExp(r'=w\d+-h\d+[^?]*'),
+            '=s1200',
+          );
           artworkUrl = artworkUrl.replaceAll(RegExp(r'=s\d+[^?]*'), '=s1200');
         }
       }
@@ -2035,12 +2187,12 @@ class YtmAccountService {
               final titleRuns = renderer['title']?['runs'] as List<dynamic>?;
               final title =
                   titleRuns?.map((r) => r['text']?.toString() ?? '').join() ??
-                      'Playlist';
+                  'Playlist';
 
               final subRuns = renderer['subtitle']?['runs'] as List<dynamic>?;
               final subtitle =
                   subRuns?.map((r) => r['text']?.toString() ?? '').join() ??
-                      'YouTube Music';
+                  'YouTube Music';
 
               String? artwork;
               final thumbRenderer =
@@ -2051,12 +2203,14 @@ class YtmAccountService {
                 artwork = thumbs.last['url'] as String?;
               }
 
-              results.add(YtmAccountPlaylist(
-                playlistId: cleanId,
-                title: title.isNotEmpty ? title : 'Playlist',
-                subtitle: subtitle,
-                artworkUrl: artwork,
-              ));
+              results.add(
+                YtmAccountPlaylist(
+                  playlistId: cleanId,
+                  title: title.isNotEmpty ? title : 'Playlist',
+                  subtitle: subtitle,
+                  artworkUrl: artwork,
+                ),
+              );
             }
           }
         }
@@ -2080,9 +2234,9 @@ class YtmAccountService {
               String title = 'Playlist';
               final flexCols = renderer['flexColumns'] as List<dynamic>?;
               if (flexCols != null && flexCols.isNotEmpty) {
-                final r = flexCols[0]
-                        ['musicResponsiveListItemFlexColumnRenderer']?['text']
-                    ?['runs'] as List<dynamic>?;
+                final r =
+                    flexCols[0]['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs']
+                        as List<dynamic>?;
                 if (r != null && r.isNotEmpty) {
                   title = r.map((e) => e['text']?.toString() ?? '').join();
                 }
@@ -2090,27 +2244,30 @@ class YtmAccountService {
 
               String subtitle = 'YouTube Music';
               if (flexCols != null && flexCols.length > 1) {
-                final r = flexCols[1]
-                        ['musicResponsiveListItemFlexColumnRenderer']?['text']
-                    ?['runs'] as List<dynamic>?;
+                final r =
+                    flexCols[1]['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs']
+                        as List<dynamic>?;
                 if (r != null && r.isNotEmpty) {
                   subtitle = r.map((e) => e['text']?.toString() ?? '').join();
                 }
               }
 
               String? artwork;
-              final thumbs = renderer['thumbnail']?['musicThumbnailRenderer']
-                  ?['thumbnail']?['thumbnails'] as List<dynamic>?;
+              final thumbs =
+                  renderer['thumbnail']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails']
+                      as List<dynamic>?;
               if (thumbs != null && thumbs.isNotEmpty) {
                 artwork = thumbs.last['url'] as String?;
               }
 
-              results.add(YtmAccountPlaylist(
-                playlistId: cleanId,
-                title: title,
-                subtitle: subtitle,
-                artworkUrl: artwork,
-              ));
+              results.add(
+                YtmAccountPlaylist(
+                  playlistId: cleanId,
+                  title: title,
+                  subtitle: subtitle,
+                  artworkUrl: artwork,
+                ),
+              );
             }
           }
         }

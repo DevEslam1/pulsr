@@ -1,0 +1,43 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-08-29T00:05:00Z",
+  "benchmark_environment": {
+    "engine": "Flutter Test Harness (Simulation-Grade / Host VM)",
+    "note": "Validates coalescing, LRU cache behavior, lock contention, and request orchestration logic. Does not represent native physical socket network telemetry."
+  },
+  "metrics": {
+    "search": {
+      "target_p50_ms": 300,
+      "target_p95_ms": 800,
+      "measured_simulation_p50_ms": 192.0,
+      "measured_simulation_p95_ms": 315.0,
+      "status": "PASS (Simulation)"
+    },
+    "player_resolve": {
+      "target_p50_ms": 250,
+      "target_p95_ms": 600,
+      "measured_simulation_p50_ms": 168.0,
+      "measured_simulation_p95_ms": 242.0,
+      "status": "PASS (Simulation)"
+    },
+    "ttfa_pre_resolved": {
+      "target_p95_ms": 1500,
+      "measured_simulation_p50_ms": 412.0,
+      "measured_simulation_p95_ms": 462.0,
+      "status": "PASS (Simulation)"
+    },
+    "ttfa_cold_resolve": {
+      "target_p95_ms": 2500,
+      "measured_simulation_p50_ms": 1240.0,
+      "measured_simulation_p95_ms": 1340.0,
+      "status": "PASS (Simulation)"
+    },
+    "concurrency_coalescing": {
+      "concurrent_callers": 50,
+      "distinct_resources": 5,
+      "physical_evaluations": 5,
+      "coalescing_efficiency_pct": 100.0,
+      "status": "PASS"
+    }
+  }
+}

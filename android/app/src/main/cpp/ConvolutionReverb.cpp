@@ -31,7 +31,7 @@ struct SyntheticCacheEntry {
     std::list<SyntheticCacheKey>::iterator lruIt;
 };
 
-static constexpr size_t SYNTHETIC_CACHE_BUDGET_BYTES = 64 * 1024 * 1024; // 64 MB (R1)
+static std::atomic<size_t> sSyntheticCacheBudgetBytes{64 * 1024 * 1024}; // 64 MB default (R1)
 static std::mutex sIrCacheMutex;
 static std::map<SyntheticCacheKey, SyntheticCacheEntry> sIrCacheMap;
 static std::list<SyntheticCacheKey> sIrCacheLruList;
@@ -54,6 +54,13 @@ static void pruneExpiredCustomIrsLocked() {
     }
 }
 
+struct CacheLockGuard {
+    std::lock_guard<std::mutex> lock;
+    CacheLockGuard(std::mutex& m) : lock(m) {
+        sCacheMutexLockCount.fetch_add(1, std::memory_order_relaxed);
+    }
+};
+
 uint64_t PreparedIr::getCacheMutexLockCount() {
     return sCacheMutexLockCount.load(std::memory_order_relaxed);
 }
@@ -62,12 +69,25 @@ void PreparedIr::resetCacheMutexLockCount() {
     sCacheMutexLockCount.store(0, std::memory_order_relaxed);
 }
 
-struct CacheLockGuard {
-    std::lock_guard<std::mutex> lock;
-    CacheLockGuard(std::mutex& m) : lock(m) {
-        sCacheMutexLockCount.fetch_add(1, std::memory_order_relaxed);
+void PreparedIr::setCacheBudgetBytes(size_t budgetBytes) {
+    sSyntheticCacheBudgetBytes.store(budgetBytes);
+    CacheLockGuard lock(sIrCacheMutex);
+    pruneExpiredCustomIrsLocked();
+    const size_t budget = sSyntheticCacheBudgetBytes.load();
+    while (sCurrentCacheBytes > budget && !sIrCacheLruList.empty()) {
+        const auto oldestKey = sIrCacheLruList.back();
+        auto mapIt = sIrCacheMap.find(oldestKey);
+        if (mapIt != sIrCacheMap.end()) {
+            sCurrentCacheBytes -= mapIt->second.byteSize;
+            sIrCacheMap.erase(mapIt);
+        }
+        sIrCacheLruList.pop_back();
     }
-};
+}
+
+size_t PreparedIr::getCacheBudgetBytes() {
+    return sSyntheticCacheBudgetBytes.load();
+}
 
 size_t PreparedIr::getSyntheticCacheBytes() {
     CacheLockGuard lock(sIrCacheMutex);
@@ -136,7 +156,8 @@ std::shared_ptr<const PreparedIr> PreparedIr::createSynthetic(
     auto preset = static_cast<ReverbPreset>(presetInt);
     if (preset == ReverbPreset::Custom) return nullptr;
 
-    const int srKey = static_cast<int>(std::round(sampleRate));
+    const double effectiveRate = std::min(sampleRate, 48000.0);
+    const int srKey = static_cast<int>(std::round(effectiveRate));
     const int dampKey = static_cast<int>(std::round(dampingFactor * 50.0f)); // Quantize * 50 (R1)
     const SyntheticCacheKey key{presetInt, srKey, dampKey};
 
@@ -169,19 +190,11 @@ std::shared_ptr<const PreparedIr> PreparedIr::createSynthetic(
     // Respect user damping as multiplier on preset damping (BUG-004)
     const float damp = std::clamp(presetDamp * dampingFactor * 2.0f, 0.05f, 0.95f);
 
-    int totalSamples = static_cast<int>(rt60 * sampleRate);
+    int totalSamples = static_cast<int>(rt60 * effectiveRate);
     if (totalSamples <= 0) return nullptr;
-    // Tail truncation note (A9/N-04): For sample rates >192kHz with long decay presets (e.g., Cathedral @352.8kHz = 1.76M taps, @768kHz = 3.84M taps),
-    // synthetic IRs are capped at kMaxSyntheticTaps (2048 partitions * 512 = 1,048,576 taps) to guarantee RT zero-allocation
-    // and bound memory usage under 64MB. The reverberant tail beyond ~2.97s (at 352.8kHz) is truncated, which is below the human
-    // perceptual audibility floor (-60dB RT60 decay).
+
     constexpr int kMaxSyntheticTaps = ConvolutionReverb::MAX_PREALLOC_PARTITIONS * ConvolutionReverb::PARTITION_SIZE;
     if (totalSamples > kMaxSyntheticTaps) {
-#if defined(__ANDROID__)
-        __android_log_print(ANDROID_LOG_INFO, "ConvolutionReverb",
-            "Synthetic IR for preset %d at %.0f Hz truncated from %d to %d taps (>192kHz cap)",
-            presetInt, sampleRate, totalSamples, kMaxSyntheticTaps);
-#endif
         totalSamples = kMaxSyntheticTaps;
     }
 
@@ -229,7 +242,7 @@ std::shared_ptr<const PreparedIr> PreparedIr::createSynthetic(
 
     auto created = create(irL.data(), irR.data(), totalSamples);
     if (created) {
-        const_cast<PreparedIr*>(created.get())->createdSampleRate = static_cast<int>(std::round(sampleRate));
+        const_cast<PreparedIr*>(created.get())->createdSampleRate = static_cast<int>(std::round(effectiveRate));
         const size_t entrySize = static_cast<size_t>(created->totalTaps) * 12 +
                                  static_cast<size_t>(created->numPartitions) * ConvolutionReverb::FFT_SIZE * 16;
         CacheLockGuard lock(sIrCacheMutex);
@@ -240,12 +253,13 @@ std::shared_ptr<const PreparedIr> PreparedIr::createSynthetic(
             return it->second.ir;
         }
 
-        // Evict oldest entries to satisfy 64MB budget (R1)
+        // Evict oldest entries to satisfy dynamic budget (R1)
         // Guard: single oversized entry must never breach budget (B-01)
-        if (entrySize > SYNTHETIC_CACHE_BUDGET_BYTES) {
-            return created; // usable but uncached — prevents 77MB Cathedral@352.8k / 169MB@768k from over-budgeting
+        const size_t budget = sSyntheticCacheBudgetBytes.load();
+        if (entrySize > budget) {
+            return created; // usable but uncached — prevents oversized IRs from over-budgeting
         }
-        while (sCurrentCacheBytes + entrySize > SYNTHETIC_CACHE_BUDGET_BYTES && !sIrCacheLruList.empty()) {
+        while (sCurrentCacheBytes + entrySize > budget && !sIrCacheLruList.empty()) {
             const auto oldestKey = sIrCacheLruList.back();
             auto mapIt = sIrCacheMap.find(oldestKey);
             if (mapIt != sIrCacheMap.end()) {
@@ -254,7 +268,7 @@ std::shared_ptr<const PreparedIr> PreparedIr::createSynthetic(
             }
             sIrCacheLruList.pop_back();
         }
-        if (sCurrentCacheBytes + entrySize > SYNTHETIC_CACHE_BUDGET_BYTES) {
+        if (sCurrentCacheBytes + entrySize > budget) {
             return created; // still over after evicting everything → return uncached
         }
 
@@ -344,10 +358,11 @@ std::shared_ptr<const PreparedIr> PreparedIr::createCustom(
     if (!created) return nullptr;
     const_cast<PreparedIr*>(created.get())->createdSampleRate = static_cast<int>(std::round(sampleRate));
 
-    // Apply 64MB budget & LRU eviction with Custom IR registry tracking (NEW-2)
+    // Apply dynamic budget & LRU eviction with Custom IR registry tracking (NEW-2)
     const size_t entrySize = static_cast<size_t>(created->totalTaps) * 12 +
                              static_cast<size_t>(created->numPartitions) * ConvolutionReverb::FFT_SIZE * 16;
-    if (entrySize > SYNTHETIC_CACHE_BUDGET_BYTES) {
+    const size_t budget = sSyntheticCacheBudgetBytes.load();
+    if (entrySize > budget) {
         return nullptr; // Exceeds entire budget
     }
 
@@ -356,7 +371,7 @@ std::shared_ptr<const PreparedIr> PreparedIr::createCustom(
         pruneExpiredCustomIrsLocked();
 
         // Evict synthetic LRU entries if needed
-        while (sCurrentCacheBytes + entrySize > SYNTHETIC_CACHE_BUDGET_BYTES && !sIrCacheLruList.empty()) {
+        while (sCurrentCacheBytes + entrySize > budget && !sIrCacheLruList.empty()) {
             const auto oldestKey = sIrCacheLruList.back();
             auto mapIt = sIrCacheMap.find(oldestKey);
             if (mapIt != sIrCacheMap.end()) {
@@ -366,7 +381,7 @@ std::shared_ptr<const PreparedIr> PreparedIr::createCustom(
             sIrCacheLruList.pop_back();
         }
 
-        if (sCurrentCacheBytes + entrySize > SYNTHETIC_CACHE_BUDGET_BYTES) {
+        if (sCurrentCacheBytes + entrySize > budget) {
             return nullptr; // Custom IRs currently alive exceed remaining budget
         }
 
@@ -408,7 +423,7 @@ ConvolutionReverb::ConvolutionReverb() {
 void ConvolutionReverb::ensurePredelayCapacity() {
     // Fixed max capacity (153,600) pre-allocated in constructor (Sr up to 768kHz * 0.200).
     // Real-time audio thread never re-allocates.
-    const int requiredCap = std::max(4096, static_cast<int>(sampleRate_ * 0.150) + 16);
+    const int requiredCap = std::max(4096, static_cast<int>(coreRate_ * 0.150) + 16);
     if (static_cast<int>(predelayRingL_.size()) < requiredCap) {
         predelayRingL_.assign(MAX_PREDELAY_SAMPLES, 0.0f);
         predelayRingR_.assign(MAX_PREDELAY_SAMPLES, 0.0f);
@@ -416,21 +431,41 @@ void ConvolutionReverb::ensurePredelayCapacity() {
 }
 
 void ConvolutionReverb::ensureScratchCapacity(int frames) {
-    if (static_cast<int>(scratchInL_.size()) < frames) {
-        scratchInL_.resize(frames, 0.0f);
-        scratchInR_.resize(frames, 0.0f);
-        scratchOutL_.resize(frames, 0.0f);
-        scratchOutR_.resize(frames, 0.0f);
+    const int req = std::max(frames, 8192);
+    if (static_cast<int>(scratchInL_.size()) < req) {
+        scratchInL_.resize(req, 0.0f);
+        scratchInR_.resize(req, 0.0f);
+        scratchOutL_.resize(req, 0.0f);
+        scratchOutR_.resize(req, 0.0f);
+        resampleInL_.resize(req, 0.0f);
+        resampleInR_.resize(req, 0.0f);
+        resampleWetL_.resize(req, 0.0f);
+        resampleWetR_.resize(req, 0.0f);
+        resampleOutL_.resize(req, 0.0f);
+        resampleOutR_.resize(req, 0.0f);
     }
 }
 
 void ConvolutionReverb::setSampleRate(double sampleRate) {
     if (sampleRate <= 0.0 || std::abs(sampleRate_ - sampleRate) < 1.0) return;
     sampleRate_ = sampleRate;
+    coreRate_ = std::min(sampleRate_, 48000.0);
     setPredelay(predelayMs_);
     ensurePredelayCapacity();
-    // A2 (B-05): Regenerate prepared IR for non-custom presets
-    if (preset_ != ReverbPreset::Custom) {
+
+    if (sampleRate_ > 48000.0) {
+        wetInResampler_.setRates(sampleRate_, coreRate_);
+        wetInResampler_.setEnabled(true);
+        wetOutResampler_.setRates(coreRate_, sampleRate_);
+        wetOutResampler_.setEnabled(true);
+    } else {
+        wetInResampler_.setEnabled(false);
+        wetOutResampler_.setEnabled(false);
+    }
+
+    // A2 (B-05): Regenerate prepared IR for non-custom presets if not matching effective core rate
+    if (preset_ != ReverbPreset::Custom &&
+        (!preparedIr_ || preparedIr_->createdSampleRate != static_cast<int>(std::round(coreRate_)))) {
         updatePreparedIr();
     }
 }
@@ -442,7 +477,8 @@ void ConvolutionReverb::setPreset(ReverbPreset preset) {
 
 void ConvolutionReverb::updatePreparedIr() {
     if (preset_ == ReverbPreset::Custom) return;
-    preparedIr_ = PreparedIr::createSynthetic(sampleRate_, static_cast<int>(preset_), static_cast<float>(damping_));
+    coreRate_ = std::min(sampleRate_, 48000.0);
+    preparedIr_ = PreparedIr::createSynthetic(coreRate_, static_cast<int>(preset_), static_cast<float>(damping_));
     preparePartitions();
 }
 
@@ -453,7 +489,7 @@ void ConvolutionReverb::setWetDry(double wet) {
 
 void ConvolutionReverb::setPredelay(double predelayMs) {
     predelayMs_ = std::clamp(predelayMs, 0.0, 150.0);
-    targetPredelaySamples_ = static_cast<float>(predelayMs_ * 0.001 * sampleRate_);
+    targetPredelaySamples_ = static_cast<float>(predelayMs_ * 0.001 * coreRate_);
 }
 
 void ConvolutionReverb::setDamping(double damping) {
@@ -520,28 +556,10 @@ void ConvolutionReverb::preparePartitions() {
             preparedIr_->numPartitions, MAX_PREALLOC_PARTITIONS);
 #endif
     }
-    const int numPartitions = effectivePartitions;
     if (static_cast<int>(inputHistoryFreqL_.size()) < MAX_PREALLOC_PARTITIONS) {
         inputHistoryFreqL_.resize(MAX_PREALLOC_PARTITIONS, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
         inputHistoryFreqR_.resize(MAX_PREALLOC_PARTITIONS, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
     }
-
-    for (int p = 0; p < numPartitions; ++p) {
-        std::fill(inputHistoryFreqL_[p].begin(), inputHistoryFreqL_[p].end(), FftUtil::Complex(0.0f, 0.0f));
-        std::fill(inputHistoryFreqR_[p].begin(), inputHistoryFreqR_[p].end(), FftUtil::Complex(0.0f, 0.0f));
-    }
-    historyHead_ = 0;
-
-    std::fill(prevBlockL_.begin(), prevBlockL_.end(), 0.0f);
-    std::fill(prevBlockR_.begin(), prevBlockR_.end(), 0.0f);
-    std::fill(inputBlockL_.begin(), inputBlockL_.end(), 0.0f);
-    std::fill(inputBlockR_.begin(), inputBlockR_.end(), 0.0f);
-    inputBlockPos_ = 0;
-
-    std::fill(fftWorkL_.begin(), fftWorkL_.end(), FftUtil::Complex(0.0f, 0.0f));
-    std::fill(fftWorkR_.begin(), fftWorkR_.end(), FftUtil::Complex(0.0f, 0.0f));
-    std::fill(accumFreqL_.begin(), accumFreqL_.end(), FftUtil::Complex(0.0f, 0.0f));
-    std::fill(accumFreqR_.begin(), accumFreqR_.end(), FftUtil::Complex(0.0f, 0.0f));
 }
 
 void ConvolutionReverb::reset() {
@@ -552,6 +570,9 @@ void ConvolutionReverb::reset() {
     predelayWritePos_ = 0;
     smoothedPredelaySamples_ = targetPredelaySamples_;
     smoothedWet_ = targetWet_;
+
+    wetInResampler_.reset();
+    wetOutResampler_.reset();
 
     if (!preparedIr_) return;
 
@@ -574,7 +595,7 @@ void ConvolutionReverb::reset() {
 }
 
 void ConvolutionReverb::process(const float* inL, const float* inR, float* outL, float* outR, int frames) {
-    if (!enabled_ || !preparedIr_ || preparedIr_->totalTaps == 0) {
+    if (!enabled_ || !preparedIr_ || preparedIr_->totalTaps == 0 || frames <= 0) {
         if (inL != outL) std::memcpy(outL, inL, frames * sizeof(float));
         if (inR != outR) std::memcpy(outR, inR, frames * sizeof(float));
         return;
@@ -585,6 +606,46 @@ void ConvolutionReverb::process(const float* inL, const float* inR, float* outL,
 
     const float dryGain = static_cast<float>(std::cos(smoothedWet_ * (M_PI / 2.0)));
     const float wetGain = static_cast<float>(std::sin(smoothedWet_ * (M_PI / 2.0)));
+
+    if (sampleRate_ <= 48000.0) {
+        processCore(inL, inR, outL, outR, frames, dryGain, wetGain);
+        return;
+    }
+
+    // High sample rates (>48kHz): stream pure wet reverberation path through 48kHz core
+    ensureScratchCapacity(frames * 4);
+
+    // 1. Resample wet input down to 48kHz core
+    const float* inPlanar[2] = { inL, inR };
+    float* inResampled[2] = { resampleInL_.data(), resampleInR_.data() };
+    int coreCapacity = static_cast<int>(resampleInL_.size());
+    int coreFrames = wetInResampler_.processPlanar(inPlanar, inResampled, frames, 2, coreCapacity);
+
+    // 2. Process core convolution at 48kHz with pure wet output (dryGain = 0, wetGain = 1)
+    if (coreFrames > 0) {
+        processCore(resampleInL_.data(), resampleInR_.data(), resampleWetL_.data(), resampleWetR_.data(), coreFrames, 0.0f, 1.0f);
+    }
+
+    // 3. Resample wet output back up to source sample rate
+    const float* wetPlanar[2] = { resampleWetL_.data(), resampleWetR_.data() };
+    float* outResampled[2] = { resampleOutL_.data(), resampleOutR_.data() };
+    int outWetFrames = wetOutResampler_.processPlanar(wetPlanar, outResampled, coreFrames, 2, frames);
+
+    // 4. Mix at native rate: native dry untouched + resampled pure wet reverberation
+    for (int i = 0; i < frames; ++i) {
+        float wetL = (i < outWetFrames) ? resampleOutL_[i] : 0.0f;
+        float wetR = (i < outWetFrames) ? resampleOutR_[i] : 0.0f;
+        outL[i] = inL[i] * dryGain + wetL * wetGain;
+        outR[i] = inR[i] * dryGain + wetR * wetGain;
+    }
+}
+
+void ConvolutionReverb::processCore(const float* inL, const float* inR, float* outL, float* outR, int frames, float dryGain, float wetGain) {
+    if (!enabled_ || !preparedIr_ || preparedIr_->totalTaps == 0 || frames <= 0) {
+        if (inL != outL) std::memcpy(outL, inL, frames * sizeof(float));
+        if (inR != outR) std::memcpy(outR, inR, frames * sizeof(float));
+        return;
+    }
 
     const int totalTaps = preparedIr_->totalTaps;
     const int predelayCap = static_cast<int>(predelayRingL_.size());

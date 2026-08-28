@@ -172,6 +172,41 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             "getLimitedMode" -> {
                 result.success(PoTokenManager.isLimitedMode)
             }
+            "acquirePermit" -> {
+                val bucketName = call.argument<String>("bucket") ?: "BROWSE"
+                val bucket = runCatching { RateLimiter.Bucket.valueOf(bucketName) }.getOrDefault(RateLimiter.Bucket.BROWSE)
+                runOffMainThread(result) {
+                    RateLimiter.shared.acquirePermit(bucket)
+                    true
+                }
+            }
+            "releasePermit" -> {
+                RateLimiter.shared.releasePermit()
+                result.success(true)
+            }
+            "onRateLimited" -> {
+                val retryAfter = call.argument<Number>("retryAfter")?.toLong()
+                val backoff = RateLimiter.shared.onRateLimited(retryAfter)
+                result.success(backoff)
+            }
+            "onSuccess" -> {
+                RateLimiter.shared.onSuccess()
+                result.success(true)
+            }
+            "getMetrics" -> {
+                result.success(YtmMetricsRegistry.snapshotAll())
+            }
+            "recordMetric" -> {
+                val operation = call.argument<String>("operation") ?: "unknown"
+                val latencyMs = (call.argument<Number>("latencyMs") ?: 0).toLong()
+                val isError = call.argument<Boolean>("isError") ?: false
+                YtmMetricsRegistry.record(operation, latencyMs, isError)
+                result.success(true)
+            }
+            "resetMetrics" -> {
+                YtmMetricsRegistry.resetAll()
+                result.success(true)
+            }
             "getPoTokenState" -> {
                 result.success(
                     mapOf(
@@ -700,7 +735,16 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         if (ctx != null) {
             val client = InnertubeClient(ctx)
             try {
-                return client.resolvePlayerStream(videoId, quality)
+                val res = client.resolvePlayerStream(videoId, quality)
+                val streamUrl = res["url"] as? String
+                if (streamUrl != null) {
+                    val uriHost = runCatching { java.net.URI(streamUrl).host }.getOrNull()
+                    if (uriHost != null) {
+                        val pinnedFamily = YtmHttpClient.resolvedIpFamilies[uriHost]
+                        ProxyManager.setPinnedIpFamily(pinnedFamily)
+                    }
+                }
+                return res
             } catch (e: Throwable) {
                 innertubeError = e
                 Log.w(TAG, "Native Innertube stream extraction failed for $videoId: ${e.message}. Attempting NewPipeExtractor fallback...")

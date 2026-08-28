@@ -18,7 +18,6 @@ import 'ytm_url_cache.dart';
 import '../../domain/models/ytm_track.dart';
 import '../telemetry/playback_latency_tracker.dart';
 import '../utils/error_logger.dart';
-import '../utils/ytm_rate_limiter.dart';
 
 import '../errors/ytm_error_classifier.dart';
 
@@ -31,10 +30,7 @@ class YtmException implements Exception {
   const YtmException(this.code, [this.details, this.traceId]);
 
   YtmBlockSignal? get signal =>
-      YtmErrorClassifier.classify(
-        details ?? code,
-        traceId,
-      ).signal;
+      YtmErrorClassifier.classify(details ?? code, traceId).signal;
 
   /// Retrying later may work; retrying the rest of the queue now will not.
   bool get isNetwork =>
@@ -147,8 +143,9 @@ class YtmService {
   /// Retrieves state of PoTokenManager.
   Future<Map<String, dynamic>?> getPoTokenState() async {
     try {
-      final state =
-          await _channel.invokeMethod<Map<Object?, Object?>>('getPoTokenState');
+      final state = await _channel.invokeMethod<Map<Object?, Object?>>(
+        'getPoTokenState',
+      );
       if (state == null) return null;
       return state.map((k, v) => MapEntry(k.toString(), v));
     } catch (_) {
@@ -176,8 +173,9 @@ class YtmService {
   /// mint against the correct account (e.g. restored from prefs at startup).
   Future<void> setDataSyncId(String dataSyncId) async {
     try {
-      await _channel
-          .invokeMethod<bool>('setDataSyncId', {'dataSyncId': dataSyncId});
+      await _channel.invokeMethod<bool>('setDataSyncId', {
+        'dataSyncId': dataSyncId,
+      });
     } catch (_) {}
   }
 
@@ -241,26 +239,45 @@ class YtmService {
     }
   }
 
+  final Map<String, Future<dynamic>> _inFlightCalls = {};
+
+  Future<T> _runCoalesced<T>(String key, Future<T> Function() call) async {
+    if (_inFlightCalls.containsKey(key)) {
+      return await (_inFlightCalls[key] as Future<T>);
+    }
+    final future = call();
+    _inFlightCalls[key] = future;
+    try {
+      return await future;
+    } finally {
+      _inFlightCalls.remove(key);
+    }
+  }
+
   Future<List<YtmTrack>> search(String query, {int limit = 30}) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return const [];
 
-    final raw = await _guard(
-      () => _channel.invokeMethod<List<Object?>>('search', {
-        'query': trimmed,
-        'limit': limit,
-        ..._localeArgs(),
-      }),
-      timeout: _defaultSearchTimeout,
-    );
+    return _runCoalesced('search:$trimmed:$limit', () async {
+      final raw = await _guard(
+        () => _channel.invokeMethod<List<Object?>>('search', {
+          'query': trimmed,
+          'limit': limit,
+          ..._localeArgs(),
+        }),
+        timeout: _defaultSearchTimeout,
+      );
 
-    return _parseTracks(raw);
+      return _parseTracks(raw);
+    });
   }
 
   /// Search with fallback: First tries native extractor, then falls back to
   /// Innertube search if the extractor returns empty or throws.
-  Future<List<YtmTrack>> searchWithFallback(String query,
-      {int limit = 30}) async {
+  Future<List<YtmTrack>> searchWithFallback(
+    String query, {
+    int limit = 30,
+  }) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return const [];
 
@@ -283,8 +300,10 @@ class YtmService {
     return const [];
   }
 
-  Future<List<YtmTrack>> _searchInnertube(String query,
-      {int limit = 30}) async {
+  Future<List<YtmTrack>> _searchInnertube(
+    String query, {
+    int limit = 30,
+  }) async {
     try {
       String apiKey = const String.fromEnvironment(
         'YTM_API_KEY',
@@ -299,7 +318,8 @@ class YtmService {
       // Log warning if default key is being used (should be overridden via --dart-define YTM_API_KEY)
       if (apiKey == 'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30') {
         debugPrint(
-            '[YTM_SERVICE] Warning: Using default YTM_API_KEY — override via --dart-define=YTM_API_KEY for production');
+          '[YTM_SERVICE] Warning: Using default YTM_API_KEY — override via --dart-define=YTM_API_KEY for production',
+        );
       }
 
       final body = jsonEncode({
@@ -330,8 +350,9 @@ class YtmService {
           final cookies = account.cookies;
           if (cookies != null && cookies.isNotEmpty) {
             headers['Cookie'] = cookies;
-            final authHeader =
-                YtmAccountService.buildAuthorizationHeader(cookies);
+            final authHeader = YtmAccountService.buildAuthorizationHeader(
+              cookies,
+            );
             if (authHeader != null) {
               headers['Authorization'] = authHeader;
             }
@@ -339,11 +360,11 @@ class YtmService {
         }
       }
 
-      await YtmRateLimiter.shared.acquirePermit();
       final response = await http
           .post(
             Uri.parse(
-                'https://music.youtube.com/youtubei/v1/search?prettyPrint=false&key=$apiKey'),
+              'https://music.youtube.com/youtubei/v1/search?prettyPrint=false&key=$apiKey',
+            ),
             headers: headers,
             body: body,
           )
@@ -356,8 +377,9 @@ class YtmService {
         void traverse(dynamic node) {
           if (node is Map<String, dynamic>) {
             if (node.containsKey('musicResponsiveListItemRenderer')) {
-              final r = node['musicResponsiveListItemRenderer']
-                  as Map<String, dynamic>;
+              final r =
+                  node['musicResponsiveListItemRenderer']
+                      as Map<String, dynamic>;
               final flexCols = r['flexColumns'] as List<dynamic>? ?? [];
               String? videoId;
               String title = 'Unknown Title';
@@ -367,9 +389,9 @@ class YtmService {
               videoId = pData?['videoId'] as String?;
 
               if (flexCols.isNotEmpty) {
-                final c0 = flexCols[0]
-                        ['musicResponsiveListItemFlexColumnRenderer']?['text']
-                    ?['runs'] as List<dynamic>?;
+                final c0 =
+                    flexCols[0]['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs']
+                        as List<dynamic>?;
                 if (c0 != null && c0.isNotEmpty) {
                   title = c0[0]['text'] as String? ?? title;
                   final nav =
@@ -378,21 +400,23 @@ class YtmService {
                 }
               }
               if (flexCols.length > 1) {
-                final c1 = flexCols[1]
-                        ['musicResponsiveListItemFlexColumnRenderer']?['text']
-                    ?['runs'] as List<dynamic>?;
+                final c1 =
+                    flexCols[1]['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs']
+                        as List<dynamic>?;
                 if (c1 != null && c1.isNotEmpty) {
                   artist = c1[0]['text'] as String? ?? artist;
                 }
               }
 
               if (videoId != null && videoId.length == 11) {
-                tracks.add(YtmTrack(
-                  videoId: videoId,
-                  title: title,
-                  artist: artist,
-                  duration: Duration.zero,
-                ));
+                tracks.add(
+                  YtmTrack(
+                    videoId: videoId,
+                    title: title,
+                    artist: artist,
+                    duration: Duration.zero,
+                  ),
+                );
               }
               return;
             }
@@ -425,21 +449,23 @@ class YtmService {
     return _parseTracks(raw);
   }
 
-  Future<List<YtmTrack>> getPlaylistTracks(String urlOrId,
-      {int limit = 100}) async {
+  Future<List<YtmTrack>> getPlaylistTracks(
+    String urlOrId, {
+    int limit = 100,
+  }) async {
     final cleanUrlOrId = switch (urlOrId.trim()) {
       'LM' ||
       'VLLM' ||
       'FEmusic_liked_videos' ||
       'FEmusic_liked_tracks' ||
-      'VLSE' =>
-        'LL',
+      'VLSE' => 'LL',
       _ => urlOrId.trim(),
     };
 
-    final resolvedUrl = cleanUrlOrId.startsWith('http')
-        ? cleanUrlOrId
-        : 'https://www.youtube.com/playlist?list=$cleanUrlOrId';
+    final resolvedUrl =
+        cleanUrlOrId.startsWith('http')
+            ? cleanUrlOrId
+            : 'https://www.youtube.com/playlist?list=$cleanUrlOrId';
 
     // 1. Native Extractor
     try {
@@ -465,9 +491,10 @@ class YtmService {
       if (getIt.isRegistered<XdmBackendService>()) {
         final xdm = getIt<XdmBackendService>();
         if (await xdm.isEnabled()) {
-          final account = getIt.isRegistered<YtmAccountService>()
-              ? getIt<YtmAccountService>()
-              : null;
+          final account =
+              getIt.isRegistered<YtmAccountService>()
+                  ? getIt<YtmAccountService>()
+                  : null;
           final playlistTracks = await xdm.getPlaylist(
             resolvedUrl,
             limit: limit,
@@ -505,8 +532,11 @@ class YtmService {
   /// (1) Direct authenticated account stream (if logged in)
   /// (2) Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
   /// (3) Engine 3: Remote yt-dlp backend (XdmBackendService)
-  Future<YtmStream> resolveStream(String videoId,
-      {String quality = 'high', bool forceRefresh = false}) async {
+  Future<YtmStream> resolveStream(
+    String videoId, {
+    String quality = 'high',
+    bool forceRefresh = false,
+  }) async {
     // Check Task 2 in-memory URL cache first
     final urlCache =
         getIt.isRegistered<YtmUrlCache>() ? getIt<YtmUrlCache>() : null;
@@ -520,116 +550,127 @@ class YtmService {
       }
     }
 
-    try {
-      _tracker?.markStage(PlaybackStage.pluginEntered);
-    } catch (_) {}
-    // 1. Try direct authenticated YouTube Music InnerTube Player API if logged in
-    try {
-      if (getIt.isRegistered<YtmAccountService>()) {
-        final account = getIt<YtmAccountService>();
-        if (account.isLoggedIn) {
-          try {
-            _tracker?.markStage(PlaybackStage.clientRequestSent);
-            _tracker?.markStage(PlaybackStage.poTokenNeeded);
-          } catch (_) {}
-          final directStream =
-              await account.resolvePlayerStream(videoId, quality: quality);
-          if (directStream != null) {
+    return _runCoalesced('resolve:$videoId:$quality', () async {
+      try {
+        _tracker?.markStage(PlaybackStage.pluginEntered);
+      } catch (_) {}
+      // 1. Try direct authenticated YouTube Music InnerTube Player API if logged in
+      try {
+        if (getIt.isRegistered<YtmAccountService>()) {
+          final account = getIt<YtmAccountService>();
+          if (account.isLoggedIn) {
             try {
-              _tracker?.markStage(PlaybackStage.urlObtained);
+              _tracker?.markStage(PlaybackStage.clientRequestSent);
+              _tracker?.markStage(PlaybackStage.poTokenNeeded);
             } catch (_) {}
-            urlCache?.put(
+            final directStream = await account.resolvePlayerStream(
               videoId,
-              directStream.url,
               quality: quality,
-              userAgent: directStream.userAgent,
-              cookies: directStream.cookies,
             );
-            return directStream;
+            if (directStream != null) {
+              try {
+                _tracker?.markStage(PlaybackStage.urlObtained);
+              } catch (_) {}
+              urlCache?.put(
+                videoId,
+                directStream.url,
+                quality: quality,
+                userAgent: directStream.userAgent,
+                cookies: directStream.cookies,
+              );
+              return directStream;
+            }
           }
         }
-      }
-    } catch (e) {
-      // A definitive session-expired verdict must surface to callers/UI,
-      // never silently downgrade to guest playback.
-      if (e is YtmException && e.isAuth) rethrow;
-      debugPrint('[YTM_SERVICE] Direct account stream resolution fallback: $e');
-    }
-
-    // 2. Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
-    try {
-      try {
-        _tracker?.markStage(PlaybackStage.clientRequestSent);
-        // Check poToken state heuristically: if we have a cached token, this is warm
-        _tracker?.markStage(PlaybackStage.poTokenNeeded);
-      } catch (_) {}
-      final raw = await _guard(
-        () => _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
-          'videoId': videoId,
-          'quality': quality,
-        }),
-        timeout: _defaultResolveTimeout,
-      );
-
-      final stream = raw == null ? null : YtmStream.fromChannel(raw);
-      if (stream != null) {
-        try {
-          _tracker?.markStage(PlaybackStage.urlObtained);
-        } catch (_) {}
-        urlCache?.put(
-          videoId,
-          stream.url,
-          quality: quality,
-          userAgent: stream.userAgent,
-          cookies: stream.cookies,
+      } catch (e) {
+        // A definitive session-expired verdict must surface to callers/UI,
+        // never silently downgrade to guest playback.
+        if (e is YtmException && e.isAuth) rethrow;
+        debugPrint(
+          '[YTM_SERVICE] Direct account stream resolution fallback: $e',
         );
-        return stream;
       }
-    } catch (e) {
-      debugPrint('[YTM_SERVICE] Native stream resolution failed: $e');
-      if (e is YtmException && e.isAuth) rethrow;
-    }
 
-    // 3. Engine 3: Remote yt-dlp backend fallback if enabled and healthy
-    try {
+      // 2. Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
       try {
-        _tracker?.markStage(PlaybackStage.clientRequestSent);
-      } catch (_) {}
-      if (getIt.isRegistered<XdmBackendService>()) {
-        final xdm = getIt<XdmBackendService>();
-        if (await xdm.isEnabled()) {
-          final account = getIt.isRegistered<YtmAccountService>()
-              ? getIt<YtmAccountService>()
-              : null;
-          final remoteStream = await xdm.resolveStream(
+        try {
+          _tracker?.markStage(PlaybackStage.clientRequestSent);
+          // Check poToken state heuristically: if we have a cached token, this is warm
+          _tracker?.markStage(PlaybackStage.poTokenNeeded);
+        } catch (_) {}
+        final raw = await _guard(
+          () => _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
+            'videoId': videoId,
+            'quality': quality,
+          }),
+          timeout: _defaultResolveTimeout,
+        );
+
+        final stream = raw == null ? null : YtmStream.fromChannel(raw);
+        if (stream != null) {
+          try {
+            _tracker?.markStage(PlaybackStage.urlObtained);
+          } catch (_) {}
+          urlCache?.put(
             videoId,
+            stream.url,
             quality: quality,
-            cookies: account?.cookies,
+            userAgent: stream.userAgent,
+            cookies: stream.cookies,
           );
-          if (remoteStream != null) {
-            try {
-              _tracker?.markStage(PlaybackStage.urlObtained);
-            } catch (_) {}
-            urlCache?.put(
+          return stream;
+        }
+      } catch (e) {
+        debugPrint('[YTM_SERVICE] Native stream resolution failed: $e');
+        if (e is YtmException && e.isAuth) rethrow;
+      }
+
+      // 3. Engine 3: Remote yt-dlp backend fallback if enabled and healthy
+      try {
+        try {
+          _tracker?.markStage(PlaybackStage.clientRequestSent);
+        } catch (_) {}
+        if (getIt.isRegistered<XdmBackendService>()) {
+          final xdm = getIt<XdmBackendService>();
+          if (await xdm.isEnabled()) {
+            final account =
+                getIt.isRegistered<YtmAccountService>()
+                    ? getIt<YtmAccountService>()
+                    : null;
+            final remoteStream = await xdm.resolveStream(
               videoId,
-              remoteStream.url,
               quality: quality,
-              userAgent: remoteStream.userAgent,
-              cookies: remoteStream.cookies,
+              cookies: account?.cookies,
             );
-            return remoteStream;
+            if (remoteStream != null) {
+              try {
+                _tracker?.markStage(PlaybackStage.urlObtained);
+              } catch (_) {}
+              urlCache?.put(
+                videoId,
+                remoteStream.url,
+                quality: quality,
+                userAgent: remoteStream.userAgent,
+                cookies: remoteStream.cookies,
+              );
+              return remoteStream;
+            }
           }
         }
+      } catch (e) {
+        debugPrint(
+          '[YTM_SERVICE] Remote yt-dlp backend stream resolution fallback: $e',
+        );
+        if (e is YtmException && (e.isBotBlocked || e.code == 'RATE_LIMITED')) {
+          rethrow;
+        }
       }
-    } catch (e) {
-      debugPrint(
-          '[YTM_SERVICE] Remote yt-dlp backend stream resolution fallback: $e');
-      if (e is YtmException && (e.isBotBlocked || e.code == 'RATE_LIMITED')) {
-        rethrow;
-      }
-    }
 
-    throw const YtmException('YTM_FAILED', 'No stream returned from any engine');
+      throw const YtmException(
+        'YTM_FAILED',
+        'No stream returned from any engine',
+      );
+    });
   }
 
   Future<T?> _guard<T>(
@@ -655,7 +696,8 @@ class YtmService {
         }
         await Future.delayed(Duration(milliseconds: 800 * (1 << attempt)));
       } on PlatformException catch (e) {
-        final isFatalCode = e.code == 'YTM_DISABLED' ||
+        final isFatalCode =
+            e.code == 'YTM_DISABLED' ||
             e.code == 'YTM_UNSUPPORTED' ||
             e.code == 'YTM_BOT_BLOCKED' ||
             e.code == 'YTM_RECAPTCHA' ||
@@ -663,8 +705,10 @@ class YtmService {
             e.code == 'YTM_AUTH';
 
         if (attempt == maxRetries || isFatalCode) {
-          ErrorLogger.log('YTM call failed: ${e.code} ${e.message}',
-              category: 'YTM');
+          ErrorLogger.log(
+            'YTM call failed: ${e.code} ${e.message}',
+            category: 'YTM',
+          );
           if (e.code == 'LOGIN_REQUIRED' || e.code == 'YTM_AUTH') {
             notifyAuthExpired();
           }

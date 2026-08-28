@@ -1203,6 +1203,23 @@ class AppLocalizationsAr extends AppLocalizations {
   String get downloadErrorNoSpace => 'التخزين ممتلئ — حرّر مساحة وأعد المحاولة';
 
   @override
+  String get downloadErrorStorage => 'التخزين ممتلئ — حرّر مساحة وأعد المحاولة';
+
+  @override
+  String get downloadErrorPermission =>
+      'تم رفض إذن التخزين. يرجى منح الإذن من الإعدادات.';
+
+  @override
+  String get downloadErrorInterrupted => 'انقطع التنزيل. انقر للاستئناف.';
+
+  @override
+  String get downloadErrorDisabled =>
+      'التنزيلات غير متوفرة أو معطلة في هذا الإصدار.';
+
+  @override
+  String get downloadErrorTransition => 'انتقال حالة عملية تنزيل غير صالح.';
+
+  @override
   String get downloadErrorRateLimited => 'يوتيوب مشغول. فترة تبريد…';
 
   @override

@@ -47,6 +47,13 @@ object ProxyManager {
     @Volatile
     private var bypassList: List<String> = listOf("localhost", "127.0.0.1")
 
+    @Volatile
+    var pinnedIpFamily: String? = null // "ipv4" or "ipv6"
+
+    fun setPinnedIpFamily(family: String?) {
+        pinnedIpFamily = family?.lowercase()?.trim()
+    }
+
     private var proxyAuthenticator: Authenticator? = null
     private val authLock = Any()
 

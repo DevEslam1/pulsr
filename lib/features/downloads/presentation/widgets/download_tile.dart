@@ -20,8 +20,9 @@ class DownloadTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final taskKey = task.id.isNotEmpty ? task.id : task.videoId;
     return BlocSelector<DownloadsCubit, DownloadsState, DownloadTask?>(
-      selector: (state) => state.tasks[task.videoId] ?? task,
+      selector: (state) => state.tasks[taskKey] ?? state.tasks[task.videoId] ?? task,
       builder: (context, currentTask) {
         final t = currentTask ?? task;
         final p = context.palette;

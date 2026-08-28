@@ -38,10 +38,10 @@ public:
 private:
     void generateFilters();
 
-    // Stage 2 Halfband FIR filter coefficients (symmetric, zero-every-second tap)
-    static constexpr int HALFBAND_TAPS = 31;
-    static constexpr int HALFBAND_HALF = HALFBAND_TAPS / 2;
-    float halfbandCoeffs_[HALFBAND_TAPS] = {};
+    // Stage 2 Anti-Aliasing Decimation FIR filter coefficients
+    static constexpr int DECIMATION_TAPS = 383;
+    static constexpr int DECIMATION_HALF = DECIMATION_TAPS / 2;
+    float decimationCoeffs_[DECIMATION_TAPS] = {};
 
     // CIC stage 1 integrators & combs (uint32_t for well-defined mod 2^32 wrap)
     struct CicState {
@@ -54,8 +54,8 @@ private:
     int cicCount_ = 0;
 
     // Stage 2 ring buffer
-    float stage2RingL_[HALFBAND_TAPS] = {};
-    float stage2RingR_[HALFBAND_TAPS] = {};
+    float stage2RingL_[DECIMATION_TAPS] = {};
+    float stage2RingR_[DECIMATION_TAPS] = {};
     int stage2WriteIdx_ = 0;
 
     // 5Hz DC blocker states

@@ -50,31 +50,35 @@ internal object YtmHttpClient {
         override fun lookup(hostname: String): List<InetAddress> {
             val now = System.currentTimeMillis()
             val cached = cache[hostname]
-            if (cached != null && (now - cached.second) < ttlMs && cached.first.isNotEmpty()) {
-                return cached.first
-            }
-
-            return try {
-                val addresses = Dns.SYSTEM.lookup(hostname)
-                if (addresses.isNotEmpty()) {
-                    cache[hostname] = addresses to now
-                }
-                addresses
-            } catch (e: UnknownHostException) {
-                // DoH fallback for YouTube & googlevideo domains
-                val dohResult = resolveDoH(hostname)
-                if (dohResult.isNotEmpty()) {
-                    cache[hostname] = dohResult to now
-                    dohResult
-                } else {
-                    // If cached entry exists even if stale, use it as disaster recovery
-                    if (cached != null && cached.first.isNotEmpty()) {
-                        Log.w(TAG, "System DNS failed for $hostname, using stale cached IP")
+            val addresses = if (cached != null && (now - cached.second) < ttlMs && cached.first.isNotEmpty()) {
+                cached.first
+            } else {
+                try {
+                    val sys = Dns.SYSTEM.lookup(hostname)
+                    if (sys.isNotEmpty()) {
+                        cache[hostname] = sys to now
+                    }
+                    sys
+                } catch (e: UnknownHostException) {
+                    val doh = resolveDoH(hostname)
+                    if (doh.isNotEmpty()) {
+                        cache[hostname] = doh to now
+                        doh
+                    } else if (cached != null && cached.first.isNotEmpty()) {
                         cached.first
                     } else {
                         throw e
                     }
                 }
+            }
+
+            val pinned = resolvedIpFamilies[hostname]
+            return if (pinned != null && addresses.size > 1) {
+                addresses.sortedByDescending { addr ->
+                    if (pinned == "ipv4") addr.address.size == 4 else addr.address.size == 16
+                }
+            } else {
+                addresses
             }
         }
 
@@ -124,7 +128,12 @@ internal object YtmHttpClient {
         }
     }
 
-    private val connectionPool = ConnectionPool(8, 5, TimeUnit.MINUTES)
+    private val connectionPool = ConnectionPool(10, 30, TimeUnit.SECONDS)
+    private val resolvedIpFamilies = ConcurrentHashMap<String, String>()
+
+    fun getPinnedIpFamily(host: String): String =
+        resolvedIpFamilies[host] ?: "unpinned"
+
     private val preConnectExecutor = Executors.newFixedThreadPool(2) { r ->
         Thread(r).apply {
             isDaemon = true
@@ -132,13 +141,53 @@ internal object YtmHttpClient {
         }
     }
 
+    class YtmEventListener : okhttp3.EventListener() {
+        private var dnsStart = 0L
+        private var connectStart = 0L
+
+        override fun dnsStart(call: okhttp3.Call, domainName: String) {
+            dnsStart = System.currentTimeMillis()
+        }
+
+        override fun dnsEnd(call: okhttp3.Call, domainName: String, inetAddressList: List<InetAddress>) {
+            val duration = System.currentTimeMillis() - dnsStart
+            YtmMetricsRegistry.record("dns.lookup", duration)
+            if (domainName.contains("googlevideo.com") && inetAddressList.isNotEmpty()) {
+                val family = if (inetAddressList.first().address.size == 4) "ipv4" else "ipv6"
+                resolvedIpFamilies[domainName] = family
+            }
+        }
+
+        override fun connectStart(call: okhttp3.Call, inetSocketAddress: java.net.InetSocketAddress, proxy: Proxy) {
+            connectStart = System.currentTimeMillis()
+        }
+
+        override fun connectEnd(
+            call: okhttp3.Call,
+            inetSocketAddress: java.net.InetSocketAddress,
+            proxy: Proxy,
+            protocol: okhttp3.Protocol?
+        ) {
+            val duration = System.currentTimeMillis() - connectStart
+            YtmMetricsRegistry.record("socket.connect", duration)
+        }
+    }
+
     val okHttpClient: OkHttpClient by lazy {
+        val dispatcher = okhttp3.Dispatcher().apply {
+            maxRequests = 32
+            maxRequestsPerHost = 6
+        }
+
         OkHttpClient.Builder()
             .connectionPool(connectionPool)
+            .dispatcher(dispatcher)
+            .eventListener(YtmEventListener())
             .dns(TtlDnsCache.instance)
-            .connectTimeout(12, TimeUnit.SECONDS)
-            .readTimeout(15, TimeUnit.SECONDS)
-            .writeTimeout(15, TimeUnit.SECONDS)
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(20, TimeUnit.SECONDS)
+            .writeTimeout(10, TimeUnit.SECONDS)
+            .retryOnConnectionFailure(true)
             .followRedirects(true)
             .followSslRedirects(true)
             .proxySelector(object : ProxySelector() {
@@ -166,7 +215,6 @@ internal object YtmHttpClient {
                 if (!host.contains("googlevideo.com") && !host.contains("youtube.com")) return@execute
 
                 Log.d(TAG, "Pre-connecting TLS socket to $host...")
-                // Perform lightweight HEAD request or DNS/Socket warm-up
                 val req = Request.Builder()
                     .url(url)
                     .head()
@@ -177,7 +225,6 @@ internal object YtmHttpClient {
                     Log.d(TAG, "Pre-connect to $host finished with code ${response.code} (socket placed in pool)")
                 }
             } catch (t: Throwable) {
-                // Non-fatal preconnect failure
                 Log.d(TAG, "Pre-connect failed non-fatally: ${t.message}")
             }
         }

@@ -52,6 +52,21 @@ internal class PoTokenWebView private constructor(
     init {
         configureWebView()
 
+        webView.webViewClient = object : android.webkit.WebViewClient() {
+            override fun onRenderProcessGone(view: WebView?, detail: android.webkit.RenderProcessGoneDetail?): Boolean {
+                val didCrash = detail?.didCrash() ?: false
+                Log.e(TAG, "WebView render process gone (crashed=$didCrash)")
+                val exception = BadWebViewException("WebView render process gone (crashed=$didCrash)")
+                closeAndCancelInitialization(exception)
+                popAllPoTokenFutures().forEach { (_, f) -> f.completeExceptionally(exception) }
+                return true
+            }
+
+            override fun onReceivedError(view: WebView?, errorCode: Int, description: String?, failingUrl: String?) {
+                Log.w(TAG, "WebView error ($errorCode): $description on $failingUrl")
+            }
+        }
+
         webView.webChromeClient = object : WebChromeClient() {
             override fun onConsoleMessage(m: ConsoleMessage): Boolean {
                 if (m.message().contains("Uncaught")) {
@@ -375,7 +390,7 @@ internal class PoTokenWebView private constructor(
             throw e.cause ?: e
         } catch (e: TimeoutException) {
             onTimeout()
-            throw PoTokenException("Timed out after ${timeoutSeconds}s $what")
+            throw PoTokenException.Timeout("Timed out after ${timeoutSeconds}s $what")
         }
     }
 }

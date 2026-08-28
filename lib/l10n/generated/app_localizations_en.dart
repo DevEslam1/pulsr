@@ -1191,6 +1191,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get downloadErrorNoSpace => 'Storage full — free up space and retry';
 
   @override
+  String get downloadErrorStorage => 'Storage full — free up space and retry';
+
+  @override
+  String get downloadErrorPermission =>
+      'Storage permission denied. Please grant permission in Settings.';
+
+  @override
+  String get downloadErrorInterrupted =>
+      'Download was interrupted. Tap to resume.';
+
+  @override
+  String get downloadErrorDisabled =>
+      'Downloads are disabled or unavailable in this build.';
+
+  @override
+  String get downloadErrorTransition => 'Invalid download state transition.';
+
+  @override
   String get downloadErrorRateLimited => 'YouTube is busy. Cooling down…';
 
   @override

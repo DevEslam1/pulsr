@@ -151,11 +151,8 @@ class YtmErrorClassifier {
       );
     }
 
-    // 6. Geo blocked
-    if (errStr.contains('country') ||
-        errStr.contains('region') ||
-        errStr.contains('geo_blocked') ||
-        errStr.contains('not available in your')) {
+    // 6. Geo blocked (strict boundaries to avoid matching "country" genre or "Georgia")
+    if (RegExp(r'\b(geo_blocked|geoblocked|not available in your country|blocked in your region)\b').hasMatch(errStr)) {
       return YtmErrorInfo(
         message: 'This track is restricted in your region.',
         recoveryAction: YtmRecoveryAction.skipToNextTrack,
@@ -185,10 +182,9 @@ class YtmErrorClassifier {
       );
     }
 
-    // 8. Sign in required
-    if (errStr.contains('login_required') ||
-        errStr.contains('unauthenticated') ||
-        errStr.contains('auth')) {
+    // 8. Sign in required (strict boundaries to avoid matching "author")
+    if (RegExp(r'\b(login_required|unauthenticated|sign_in_required|session_expired|authentication_required)\b').hasMatch(errStr) ||
+        RegExp(r'\bytm_auth\b').hasMatch(errStr)) {
       return YtmErrorInfo(
         message: 'YouTube session expired. Tap to reconnect.',
         recoveryAction: YtmRecoveryAction.showLoginPrompt,
@@ -223,34 +219,33 @@ class YtmErrorClassifier {
       return _mapSignal(explicitSignal, details, traceId);
     }
 
-    final detailLower = details?.toLowerCase() ?? '';
-    final combined = '$code $detailLower'.toLowerCase();
+    final codeLower = code.toLowerCase();
 
-    if (combined.contains('bot') || combined.contains('recaptcha') || combined.contains('not a bot')) {
+    if (codeLower.contains('bot') || codeLower.contains('recaptcha')) {
       return _mapSignal(YtmBlockSignal.botChallenge, details, traceId);
     }
-    if (combined.contains('429') || combined.contains('too many requests')) {
+    if (codeLower.contains('429') || codeLower.contains('rate_limit')) {
       return _mapSignal(YtmBlockSignal.rateLimited, details, traceId);
     }
-    if (combined.contains('potoken') || combined.contains('po_token')) {
+    if (codeLower.contains('potoken') || codeLower.contains('po_token')) {
       return _mapSignal(YtmBlockSignal.poTokenInvalid, details, traceId);
     }
-    if (combined.contains('country') || combined.contains('region') || combined.contains('geo')) {
+    if (codeLower.contains('geo') || codeLower.contains('region_blocked')) {
       return _mapSignal(YtmBlockSignal.geoBlocked, details, traceId);
     }
-    if (combined.contains('proxy') || combined.contains('407')) {
+    if (codeLower.contains('proxy') || codeLower.contains('407')) {
       return _mapSignal(YtmBlockSignal.ipBlocked, details, traceId);
     }
-    if (combined.contains('login_required') || combined.contains('auth') || combined.contains('unauthenticated')) {
+    if (codeLower.contains('login_required') || codeLower.contains('unauthenticated') || codeLower == 'ytm_auth') {
       return _mapSignal(YtmBlockSignal.signInRequired, details, traceId);
     }
-    if (combined.contains('403') || combined.contains('forbidden')) {
+    if (codeLower.contains('403') || codeLower.contains('forbidden')) {
       return _mapSignal(YtmBlockSignal.ipBlocked, details, traceId);
     }
-    if (combined.contains('400') || combined.contains('invalid argument')) {
+    if (codeLower.contains('400') || codeLower.contains('invalid_argument')) {
       return _mapSignal(YtmBlockSignal.clientDeprecated, details, traceId);
     }
-    if (combined.contains('404') || combined.contains('unavailable') || combined.contains('not found')) {
+    if (codeLower.contains('404') || codeLower.contains('unavailable') || codeLower.contains('not_found')) {
       return _mapSignal(YtmBlockSignal.videoGone, details, traceId);
     }
 
