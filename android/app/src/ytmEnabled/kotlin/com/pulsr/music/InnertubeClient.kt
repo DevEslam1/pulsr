@@ -3,6 +3,8 @@ package com.pulsr.music
 import android.content.Context
 import android.net.Uri
 import android.util.Log
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.IOException
@@ -240,6 +242,7 @@ internal class InnertubeClient(
                 val author = videoDetails?.optString("author") ?: ""
 
                 Log.i(TAG, "[$traceId] Successfully resolved $videoId via ${client.name} (itag: ${selected.optInt("itag")}, bitrate: $selectedBitrate)")
+                YtmHttpClient.preConnect(selectedUrl)
                 return mapOf(
                     "videoId" to videoId,
                     "url" to selectedUrl,
@@ -453,26 +456,19 @@ internal class InnertubeClient(
         for (attempt in 0 until maxRetries) {
             rateLimiter.acquirePermit(bucket)
 
-            var connection: HttpURLConnection? = null
             try {
-                val proxy = ProxyManager.getProxy(urlStr)
-                val url = URL(urlStr)
-                val rawConn = if (proxy != null) url.openConnection(proxy) else url.openConnection()
-                connection = (rawConn as HttpURLConnection).apply {
-                    requestMethod = "POST"
-                    connectTimeout = 15_000 + (attempt * 5_000)
-                    readTimeout = 20_000 + (attempt * 5_000)
-                    doOutput = true
-                    instanceFollowRedirects = true
-                }
-
-                // Headers tailored per client type & stable fingerprint
                 val fp = FingerprintStore.getFingerprint(context)
-                connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                connection.setRequestProperty("User-Agent", fp.buildUserAgent(clientType))
-                connection.setRequestProperty("X-Goog-Api-Key", API_KEY)
-                connection.setRequestProperty("x-youtube-client-name", clientType.clientNameId)
-                connection.setRequestProperty("x-youtube-client-version", clientType.effectiveClientVersion)
+                val mediaType = "application/json; charset=UTF-8".toMediaTypeOrNull()
+                val requestBody = body.toString().toRequestBody(mediaType)
+
+                val reqBuilder = okhttp3.Request.Builder()
+                    .url(urlStr)
+                    .post(requestBody)
+                    .header("Content-Type", "application/json; charset=UTF-8")
+                    .header("User-Agent", fp.buildUserAgent(clientType))
+                    .header("X-Goog-Api-Key", API_KEY)
+                    .header("x-youtube-client-name", clientType.clientNameId)
+                    .header("x-youtube-client-version", clientType.effectiveClientVersion)
 
                 // Attach visitorData if available
                 val authedWeb = clientType.isWeb && cookieStore.isSessionValid()
@@ -482,25 +478,25 @@ internal class InnertubeClient(
                     PoTokenManager.visitorData
                 }
                 if (visitorData.isNotEmpty()) {
-                    connection.setRequestProperty("X-Goog-Visitor-Id", visitorData)
+                    reqBuilder.header("X-Goog-Visitor-Id", visitorData)
                 }
 
                 if (clientType.isWeb) {
                     val origin = clientType.endpointHost
-                    connection.setRequestProperty("Origin", origin)
-                    connection.setRequestProperty("Referer", "$origin/")
-                    connection.setRequestProperty("X-Origin", origin)
-                    connection.setRequestProperty("x-origin", origin)
-                    connection.setRequestProperty("x-goog-authuser", "0")
+                    reqBuilder.header("Origin", origin)
+                    reqBuilder.header("Referer", "$origin/")
+                    reqBuilder.header("X-Origin", origin)
+                    reqBuilder.header("x-origin", origin)
+                    reqBuilder.header("x-goog-authuser", "0")
                 } else {
-                    connection.setRequestProperty("X-Origin", clientType.endpointHost)
+                    reqBuilder.header("X-Origin", clientType.endpointHost)
                 }
 
                 // Attach cookies and SAPISIDHASH for Web client requests
                 if (clientType.isWeb) {
                     val cookieHeader = cookieStore.getMergedCookieHeader()
                     if (!cookieHeader.isNullOrEmpty()) {
-                        connection.setRequestProperty("Cookie", cookieHeader)
+                        reqBuilder.header("Cookie", cookieHeader)
 
                         val sapisid = cookieStore.getCookie("SAPISID")
                         val sapisid3p = cookieStore.getCookie("__Secure-3PAPISID")
@@ -517,30 +513,27 @@ internal class InnertubeClient(
                         if (authType != null && token != null) {
                             val toHash = "$timestamp $token ${clientType.endpointHost}"
                             val hash = sha1Hex(toHash)
-                            connection.setRequestProperty("Authorization", "$authType ${timestamp}_$hash")
+                            reqBuilder.header("Authorization", "$authType ${timestamp}_$hash")
                         }
                     }
                 }
 
-                val bodyBytes = body.toString().toByteArray(StandardCharsets.UTF_8)
-                connection.outputStream.use { it.write(bodyBytes) }
-
-                val code = connection.responseCode
+                val response = YtmHttpClient.okHttpClient.newCall(reqBuilder.build()).execute()
+                val code = response.code
 
                 if (clientType.isWeb) {
-                    val setCookies = connection.headerFields.entries
-                        .filter { it.key.equals("Set-Cookie", ignoreCase = true) }
-                        .flatMap { it.value }
+                    val setCookies = response.headers("Set-Cookie")
                     if (setCookies.isNotEmpty()) {
                         cookieStore.ingestSetCookieHeaders(setCookies)
                     }
                 }
 
                 if (code == 429) {
-                    val retryAfter = connection.getHeaderField("Retry-After")?.toLongOrNull()
+                    val retryAfter = response.header("Retry-After")?.toLongOrNull()
                     val backoff = rateLimiter.onRateLimited(retryAfter)
                     ProxyManager.onPathFailed(urlStr)
                     Log.w(TAG, "[$traceId] Rate limited (429) on attempt $attempt. Backing off for ${backoff}ms")
+                    response.close()
                     Thread.sleep(backoff)
                     continue
                 }
@@ -551,19 +544,12 @@ internal class InnertubeClient(
 
                 if (code in 500..599) {
                     Log.w(TAG, "[$traceId] Server error ($code) on attempt $attempt. Retrying...")
+                    response.close()
                     Thread.sleep((1000L shl attempt) + (0..500).random())
                     continue
                 }
 
-                val stream: InputStream? = if (code in 200..299) connection.inputStream else connection.errorStream
-                val responseStr = stream?.let { raw ->
-                    val encoding = connection.getHeaderField("Content-Encoding")?.lowercase()
-                    val input = when (encoding) {
-                        "gzip" -> GZIPInputStream(raw)
-                        else -> raw
-                    }
-                    input.bufferedReader(StandardCharsets.UTF_8).use { it.readText() }
-                } ?: ""
+                val responseStr = response.body?.string() ?: ""
 
                 if (code !in 200..299) {
                     val signal = YtmBlockSignal.parse(code, responseStr)
@@ -599,7 +585,6 @@ internal class InnertubeClient(
                 lastError = e
                 Log.e(TAG, "[$traceId] Unexpected error in Innertube post: ${e.message}", e)
             } finally {
-                connection?.disconnect()
                 rateLimiter.releasePermit()
             }
         }

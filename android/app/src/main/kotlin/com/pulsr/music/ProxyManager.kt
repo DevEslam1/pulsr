@@ -102,9 +102,19 @@ object ProxyManager {
                 isEnabled = true
             )
             ProxyPool.setProxies(listOf(node))
+        } else if (!enabled) {
+            ProxyPool.setProxies(emptyList())
         }
 
-        Log.i(TAG, "Proxy configured: enabled=$enabled, type=$proxyType, host=${this.host}:${this.port}, hasAuth=${this.username.isNotEmpty()}")
+        logI(TAG, "Proxy configured: enabled=$enabled, type=$proxyType, host=${this.host}:${this.port}, hasAuth=${this.username.isNotEmpty()}")
+    }
+
+    private fun logI(tag: String, msg: String) {
+        try {
+            Log.i(tag, msg)
+        } catch (_: Throwable) {
+            println("[$tag] $msg")
+        }
     }
 
     /**
@@ -131,7 +141,11 @@ object ProxyManager {
     @Synchronized
     fun isBypassed(url: String?): Boolean {
         if (url == null) return false
-        val uriHost = runCatching { Uri.parse(url).host?.lowercase() }.getOrNull() ?: return false
+        val uriHost = runCatching { java.net.URI(url).host?.lowercase() }
+            .getOrNull()
+            ?: runCatching { Uri.parse(url).host?.lowercase() }
+            .getOrNull()
+            ?: return false
         for (pattern in bypassList) {
             if (pattern == uriHost) return true
             if (pattern.startsWith("*.") && uriHost.endsWith(pattern.substring(2))) return true

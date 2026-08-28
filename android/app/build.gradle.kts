@@ -181,6 +181,7 @@ dependencies {
     implementation("net.jthink:jaudiotagger:3.0.1")
     implementation("androidx.media:media:1.7.0")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 
     // GPL-3.0. Its presence is why Pulsr as a whole is GPL-3.0, and why it is
     // kept out of the prod (Play Store) variant. Pulls in Mozilla Rhino, which
