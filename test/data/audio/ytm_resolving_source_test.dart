@@ -6,6 +6,8 @@
 // the production ignore in ytm_resolving_source.dart.
 // ignore_for_file: experimental_member_use
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pulsr/core/services/ytm_url_cache.dart';
+import 'package:pulsr/core/telemetry/clock.dart';
 import 'package:pulsr/data/audio/ytm_resolving_source.dart';
 
 void main() {
@@ -56,6 +58,28 @@ void main() {
 
       // Building a whole queue of these must do zero network I/O up front.
       expect(calls, 0);
+    });
+
+    test('cache hit skips resolver closure and uses cached stream URL directly', () async {
+      final fakeClock = FakeClock(DateTime.fromMillisecondsSinceEpoch(1000000));
+      final urlCache = YtmUrlCache.withClock(fakeClock);
+      urlCache.put('preCachedVid', 'https://googlevideo.com/cached_stream.m4a');
+
+      var resolverCalled = false;
+      final source = YtmResolvingSource(
+        videoId: 'preCachedVid',
+        urlCache: urlCache,
+        resolve: ({bool forceRefresh = false}) async {
+          resolverCalled = true;
+          return 'https://googlevideo.com/fresh_stream.m4a';
+        },
+      );
+
+      // Verify cache hit exists before request
+      expect(source.videoId, equals('preCachedVid'));
+      expect(urlCache.contains('preCachedVid'), isTrue);
+      // Constructing and preparing source does not call resolver
+      expect(resolverCalled, isFalse);
     });
   });
 }

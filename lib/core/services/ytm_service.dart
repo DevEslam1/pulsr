@@ -14,6 +14,7 @@ import '../di/injection.dart';
 import 'xdm_backend_service.dart';
 import 'ytm_account_service.dart';
 import 'ytm_client_version_resolver.dart';
+import 'ytm_url_cache.dart';
 import '../../domain/models/ytm_track.dart';
 import '../telemetry/playback_latency_tracker.dart';
 import '../utils/error_logger.dart';
@@ -500,7 +501,20 @@ class YtmService {
   /// (2) Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
   /// (3) Engine 3: Remote yt-dlp backend (XdmBackendService)
   Future<YtmStream> resolveStream(String videoId,
-      {String quality = 'high'}) async {
+      {String quality = 'high', bool forceRefresh = false}) async {
+    // Check Task 2 in-memory URL cache first
+    final urlCache =
+        getIt.isRegistered<YtmUrlCache>() ? getIt<YtmUrlCache>() : null;
+    if (!forceRefresh) {
+      final cachedEntry = urlCache?.get(videoId, quality: quality);
+      if (cachedEntry != null && !cachedEntry.isExpired()) {
+        try {
+          _tracker?.markStage(PlaybackStage.urlObtained);
+        } catch (_) {}
+        return cachedEntry.toStream(quality: quality);
+      }
+    }
+
     try {
       _tracker?.markStage(PlaybackStage.pluginEntered);
     } catch (_) {}
@@ -519,6 +533,13 @@ class YtmService {
             try {
               _tracker?.markStage(PlaybackStage.urlObtained);
             } catch (_) {}
+            urlCache?.put(
+              videoId,
+              directStream.url,
+              quality: quality,
+              userAgent: directStream.userAgent,
+              cookies: directStream.cookies,
+            );
             return directStream;
           }
         }
@@ -550,6 +571,13 @@ class YtmService {
         try {
           _tracker?.markStage(PlaybackStage.urlObtained);
         } catch (_) {}
+        urlCache?.put(
+          videoId,
+          stream.url,
+          quality: quality,
+          userAgent: stream.userAgent,
+          cookies: stream.cookies,
+        );
         return stream;
       }
     } catch (e) {
@@ -577,6 +605,13 @@ class YtmService {
             try {
               _tracker?.markStage(PlaybackStage.urlObtained);
             } catch (_) {}
+            urlCache?.put(
+              videoId,
+              remoteStream.url,
+              quality: quality,
+              userAgent: remoteStream.userAgent,
+              cookies: remoteStream.cookies,
+            );
             return remoteStream;
           }
         }
