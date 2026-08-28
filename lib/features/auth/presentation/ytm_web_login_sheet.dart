@@ -88,6 +88,11 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   /// reload straight back to CookieMismatch forever.
   int _mismatchAutoNavCount = 0;
 
+  static const String mobileUserAgent =
+      'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36';
+  static const String desktopUserAgent =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36';
+
   @override
   void initState() {
     super.initState();
@@ -105,22 +110,14 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       });
     }
 
-    // Use a Chrome Mobile User-Agent that matches the platform.
-    // Google's sign-in flow blocks embedded WebViews detected via:
-    //  1. X-Requested-With header containing the app package name (suppressed below via requestedWithHeaderOriginAllowList: {})
-    //  2. Chromium Client Hints (sec-ch-ua) that expose the embedded context
-    //  3. useHybridComposition=true which exposes a different rendering pipeline fingerprint
-    //
-    // Chrome Mobile UA + useHybridComposition=false + empty requestedWithHeaderOriginAllowList
-    // is the combination that avoids all three detection vectors.
-    const userAgent =
-        'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36';
+    final isYtm = widget.isBrowseMode ||
+        _currentUrl.contains('music.youtube.com') ||
+        (_currentUrl.contains('youtube.com') &&
+            !_currentUrl.contains('accounts.youtube.com'));
+    final initialUa = isYtm ? desktopUserAgent : mobileUserAgent;
 
     _settings = InAppWebViewSettings(
-      userAgent: userAgent,
-      // useHybridComposition=false forces the WebView to use the full Chromium
-      // rendering pipeline. Hybrid mode exposes a different rendering fingerprint
-      // that Google detects and flags as "not secure". This is the primary fix.
+      userAgent: initialUa,
       useHybridComposition: false,
       javaScriptEnabled: true,
       javaScriptCanOpenWindowsAutomatically: true,
@@ -274,9 +271,17 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     }
   }
 
-  void _navigateTo(String url) {
+  Future<void> _navigateTo(String url) async {
     _pollIntervalSeconds = 2;
     _scheduleNextAuthPoll();
+    final isYtm = url.contains('music.youtube.com') ||
+        (url.contains('youtube.com') && !url.contains('accounts.youtube.com'));
+    final targetUa = isYtm ? desktopUserAgent : mobileUserAgent;
+    try {
+      await _webViewController?.setSettings(
+        settings: InAppWebViewSettings(userAgent: targetUa),
+      );
+    } catch (_) {}
     _webViewController?.loadUrl(
       urlRequest: URLRequest(url: WebUri(url)),
     );
@@ -903,11 +908,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                               (urlStr.contains('google.com/url') &&
                                   urlStr.contains('play.google.com'))) {
                             if (!widget.isBrowseMode) {
-                              controller.loadUrl(
-                                urlRequest: URLRequest(
-                                  url: WebUri(googleSignInUrl),
-                                ),
-                              );
+                              _navigateTo(googleSignInUrl);
+                            } else {
+                              _navigateTo('https://music.youtube.com');
                             }
                             return NavigationActionPolicy.CANCEL;
                           }
@@ -919,8 +922,21 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                           }
                           return NavigationActionPolicy.ALLOW;
                         },
-                        onLoadStart: (controller, url) {
+                        onLoadStart: (controller, url) async {
                           if (mounted) setState(() => _isLoading = true);
+                          final urlStr = url?.toString() ?? '';
+                          final isYtm = urlStr.contains('music.youtube.com') ||
+                              (urlStr.contains('youtube.com') &&
+                                  !urlStr.contains('accounts.youtube.com') &&
+                                  !_isAuthInProgressUrl(urlStr));
+                          final targetUa =
+                              isYtm ? desktopUserAgent : mobileUserAgent;
+                          try {
+                            await controller.setSettings(
+                              settings:
+                                  InAppWebViewSettings(userAgent: targetUa),
+                            );
+                          } catch (_) {}
                         },
                         onProgressChanged: (controller, progress) {
                           if (mounted) {
