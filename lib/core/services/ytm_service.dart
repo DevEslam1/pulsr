@@ -296,6 +296,11 @@ class YtmService {
         apiKey = resolver.apiKey;
         clientVersion = resolver.clientVersion;
       }
+      // Log warning if default key is being used (should be overridden via --dart-define YTM_API_KEY)
+      if (apiKey == 'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30') {
+        debugPrint(
+            '[YTM_SERVICE] Warning: Using default YTM_API_KEY — override via --dart-define=YTM_API_KEY for production');
+      }
 
       final body = jsonEncode({
         'context': {

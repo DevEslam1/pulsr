@@ -37,8 +37,9 @@ import '../../features/settings/presentation/scrobble_stats_screen.dart';
 import '../../features/settings/presentation/cloud_backup_dashboard_screen.dart';
 import '../../features/downloads/presentation/downloads_screen.dart';
 
-final GlobalKey<NavigatorState> rootNavigatorKey =
-    GlobalKey<NavigatorState>(debugLabel: 'root');
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
+  debugLabel: 'root',
+);
 
 GoRouter createRouter(MediaScannerService scannerService) {
   return GoRouter(
@@ -46,30 +47,41 @@ GoRouter createRouter(MediaScannerService scannerService) {
     initialLocation: '/splash',
     redirect: (context, state) {
       if (!AppConfig.ytmEnabled) {
-        const ytmPaths = {'/ytm-search', '/ytm-explore', '/downloads'};
-        if (ytmPaths.contains(state.uri.path)) return '/';
+        final path = state.uri.path;
+        if (path.startsWith('/ytm-search') ||
+            path.startsWith('/ytm-explore') ||
+            path.startsWith('/downloads')) {
+          return '/';
+        }
       }
       return null;
     },
-    errorBuilder: (context, state) => Scaffold(
-      appBar: AppBar(title: const Text('Page Not Found')),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.music_off_outlined, size: 64, color: Colors.grey),
-            const SizedBox(height: 16),
-            Text('No page found at ${state.uri}',
-                style: const TextStyle(fontSize: 16)),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => context.go('/'),
-              child: Text(context.l10n.navHome),
+    errorBuilder:
+        (context, state) => Scaffold(
+          appBar: AppBar(title: const Text('Page Not Found')),
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.music_off_outlined,
+                  size: 64,
+                  color: Colors.grey,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'No page found at ${state.uri}',
+                  style: const TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => context.go('/'),
+                  child: Text(context.l10n.navHome),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
-      ),
-    ),
     routes: [
       GoRoute(
         path: '/splash',
@@ -79,8 +91,9 @@ GoRouter createRouter(MediaScannerService scannerService) {
       GoRoute(
         path: '/onboarding',
         name: 'onboarding',
-        builder: (context, state) =>
-            OnboardingScreen(scannerService: scannerService),
+        builder:
+            (context, state) =>
+                OnboardingScreen(scannerService: scannerService),
       ),
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
@@ -93,9 +106,9 @@ GoRouter createRouter(MediaScannerService scannerService) {
               GoRoute(
                 path: '/',
                 name: 'home',
-                pageBuilder: (context, state) => const NoTransitionPage(
-                  child: HomeScreen(),
-                ),
+                pageBuilder:
+                    (context, state) =>
+                        const NoTransitionPage(child: HomeScreen()),
               ),
             ],
           ),
@@ -106,9 +119,9 @@ GoRouter createRouter(MediaScannerService scannerService) {
               GoRoute(
                 path: '/library',
                 name: 'library',
-                pageBuilder: (context, state) => const NoTransitionPage(
-                  child: LibraryScreen(),
-                ),
+                pageBuilder:
+                    (context, state) =>
+                        const NoTransitionPage(child: LibraryScreen()),
               ),
             ],
           ),
@@ -119,9 +132,9 @@ GoRouter createRouter(MediaScannerService scannerService) {
               GoRoute(
                 path: '/search',
                 name: 'search',
-                pageBuilder: (context, state) => const NoTransitionPage(
-                  child: SearchScreen(),
-                ),
+                pageBuilder:
+                    (context, state) =>
+                        const NoTransitionPage(child: SearchScreen()),
               ),
             ],
           ),
@@ -132,9 +145,9 @@ GoRouter createRouter(MediaScannerService scannerService) {
               GoRoute(
                 path: '/playlists',
                 name: 'playlists',
-                pageBuilder: (context, state) => const NoTransitionPage(
-                  child: PlaylistsScreen(),
-                ),
+                pageBuilder:
+                    (context, state) =>
+                        const NoTransitionPage(child: PlaylistsScreen()),
               ),
             ],
           ),
@@ -145,9 +158,9 @@ GoRouter createRouter(MediaScannerService scannerService) {
               GoRoute(
                 path: '/settings',
                 name: 'settings',
-                pageBuilder: (context, state) => const NoTransitionPage(
-                  child: SettingsScreen(),
-                ),
+                pageBuilder:
+                    (context, state) =>
+                        const NoTransitionPage(child: SettingsScreen()),
               ),
             ],
           ),
@@ -157,30 +170,39 @@ GoRouter createRouter(MediaScannerService scannerService) {
         path: '/now-playing',
         name: 'now-playing',
         parentNavigatorKey: rootNavigatorKey,
-        pageBuilder: (context, state) => CustomTransitionPage(
-          key: state.pageKey,
-          child: const NowPlayingScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            const begin = Offset(0.0, 1.0);
-            const end = Offset.zero;
-            const curve = Curves.easeOutCubic;
-            final tween =
-                Tween(begin: begin, end: end).chain(CurveTween(curve: curve));
-            return SlideTransition(
-              position: animation.drive(tween),
-              child: child,
-            );
-          },
-        ),
+        pageBuilder:
+            (context, state) => CustomTransitionPage(
+              key: state.pageKey,
+              child: const NowPlayingScreen(),
+              transitionsBuilder: (
+                context,
+                animation,
+                secondaryAnimation,
+                child,
+              ) {
+                const begin = Offset(0.0, 1.0);
+                const end = Offset.zero;
+                const curve = Curves.easeOutCubic;
+                final tween = Tween(
+                  begin: begin,
+                  end: end,
+                ).chain(CurveTween(curve: curve));
+                return SlideTransition(
+                  position: animation.drive(tween),
+                  child: child,
+                );
+              },
+            ),
       ),
       GoRoute(
         path: '/album',
         name: 'album',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) {
-          final album = state.extra is AlbumsTableData
-              ? state.extra as AlbumsTableData
-              : null;
+          final album =
+              state.extra is AlbumsTableData
+                  ? state.extra as AlbumsTableData
+                  : null;
           if (album == null) {
             return const Scaffold(body: Center(child: Text('Album not found')));
           }
@@ -192,12 +214,14 @@ GoRouter createRouter(MediaScannerService scannerService) {
         name: 'artist',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) {
-          final artist = state.extra is ArtistsTableData
-              ? state.extra as ArtistsTableData
-              : null;
+          final artist =
+              state.extra is ArtistsTableData
+                  ? state.extra as ArtistsTableData
+                  : null;
           if (artist == null) {
             return const Scaffold(
-                body: Center(child: Text('Artist not found')));
+              body: Center(child: Text('Artist not found')),
+            );
           }
           return ArtistDetailScreen(artist: artist);
         },
@@ -232,12 +256,14 @@ GoRouter createRouter(MediaScannerService scannerService) {
         name: 'playlist',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) {
-          final playlist = state.extra is PlaylistsTableData
-              ? state.extra as PlaylistsTableData
-              : null;
+          final playlist =
+              state.extra is PlaylistsTableData
+                  ? state.extra as PlaylistsTableData
+                  : null;
           if (playlist == null) {
             return const Scaffold(
-                body: Center(child: Text('Playlist not found')));
+              body: Center(child: Text('Playlist not found')),
+            );
           }
           return PlaylistDetailScreen(playlist: playlist);
         },
@@ -268,7 +294,8 @@ GoRouter createRouter(MediaScannerService scannerService) {
               state.extra is FolderItem ? state.extra as FolderItem : null;
           if (folder == null) {
             return const Scaffold(
-                body: Center(child: Text('Folder not found')));
+              body: Center(child: Text('Folder not found')),
+            );
           }
           return FolderDetailScreen(folder: folder);
         },
@@ -278,9 +305,10 @@ GoRouter createRouter(MediaScannerService scannerService) {
         name: 'tag-editor',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) {
-          final song = state.extra is SongsTableData
-              ? state.extra as SongsTableData
-              : null;
+          final song =
+              state.extra is SongsTableData
+                  ? state.extra as SongsTableData
+                  : null;
           if (song == null) {
             return const Scaffold(body: Center(child: Text('Song not found')));
           }
@@ -291,10 +319,11 @@ GoRouter createRouter(MediaScannerService scannerService) {
         path: '/proxy-settings',
         name: 'proxy-settings',
         parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => ProxySettingsScreen(
-          initialImportText:
-              state.extra is String ? state.extra as String : null,
-        ),
+        builder:
+            (context, state) => ProxySettingsScreen(
+              initialImportText:
+                  state.extra is String ? state.extra as String : null,
+            ),
       ),
       // Gated: only reachable in an ENABLE_YTM build. In prod this collection-if
       // is const-false, so the route and YtmSearchScreen tree-shake away.

@@ -15,6 +15,7 @@ import '../../../core/services/ytm_account_service.dart';
 import '../../../core/telemetry/playback_latency_tracker.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/lrc_parser.dart';
+import '../../../core/constants/audio_feature_info.dart';
 import '../../../data/audio/audio_handler.dart';
 import '../../../data/audio/equalizer_manager.dart';
 import '../../../data/db/app_database.dart';
@@ -205,13 +206,16 @@ class PlayerCubit extends Cubit<PlayerState> {
       final decoded = jsonDecode(raw);
       if (decoded is! Map<String, dynamic>) return;
       final data = decoded;
+      // Validate: reject oversized slots (DoS)
+      if (data.length > 3) return;
       for (final key in data.keys) {
         if (_queueRestorationDone) return;
         final slotIndex = int.tryParse(key);
         if (slotIndex == null || slotIndex < 0 || slotIndex > 2) continue;
         final slotData = data[key] as Map<String, dynamic>;
-        final songIds =
-            (slotData['songIds'] as List<dynamic>?)?.cast<int>() ?? [];
+        final rawIds = (slotData['songIds'] as List<dynamic>?) ?? [];
+        if (rawIds.length > _maxQueueSize) continue;
+        final songIds = rawIds.whereType<int>().toList();
         if (songIds.isEmpty) continue;
         final songsResult = await _repository.getSongsByIds(songIds);
         if (_queueRestorationDone) return;
@@ -540,7 +544,9 @@ class PlayerCubit extends Cubit<PlayerState> {
       }
     });
 
-    _positionSub = _audioHandler.positionStream.listen((pos) {
+    _positionSub = _audioHandler.positionStream
+        .distinct((a, b) => (a.inMilliseconds - b.inMilliseconds).abs() < 100)
+        .listen((pos) {
       emit(state.copyWith(position: pos));
       if (state.isPlaying) {
         _updateWidgetProgressThrottled();
@@ -686,8 +692,8 @@ class PlayerCubit extends Cubit<PlayerState> {
     List<SongsTableData> effectiveQueue;
     int effectiveIndex;
 
+    String? queueTruncationWarning;
     if (rawQueue.length > _maxQueueSize) {
-      // Center the 500-song window around the target song
       final halfWindow = _maxQueueSize ~/ 2;
       var start = targetIndex - halfWindow;
       if (start < 0) start = 0;
@@ -696,6 +702,8 @@ class PlayerCubit extends Cubit<PlayerState> {
       }
       effectiveQueue = rawQueue.sublist(start, start + _maxQueueSize);
       effectiveIndex = targetIndex - start;
+      queueTruncationWarning =
+          'Queue truncated to $_maxQueueSize (was ${rawQueue.length}) — tail dropped';
     } else {
       effectiveQueue = rawQueue;
       effectiveIndex = targetIndex;
@@ -716,7 +724,7 @@ class PlayerCubit extends Cubit<PlayerState> {
       currentSong: targetSong,
       position: startPos,
       duration: Duration(milliseconds: targetSong.durationMs),
-      errorMessage: null,
+      errorMessage: queueTruncationWarning,
     ));
     try {
       _latencyTracker?.markStage(PlaybackStage.resolutionRequested);
@@ -742,8 +750,7 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   Future<void> playNext(SongsTableData song) async {
     if (state.queue.length >= _maxQueueSize) {
-      ErrorLogger.log('Queue size limit reached ($_maxQueueSize)',
-          category: 'PlayerCubit');
+      emit(state.copyWith(errorMessage: 'Queue full ($_maxQueueSize) — cannot add more'));
       return;
     }
     await _audioHandler.insertNextInQueue(song);
@@ -762,8 +769,7 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   Future<void> addToQueue(SongsTableData song) async {
     if (state.queue.length >= _maxQueueSize) {
-      ErrorLogger.log('Queue size limit reached ($_maxQueueSize)',
-          category: 'PlayerCubit');
+      emit(state.copyWith(errorMessage: 'Queue full ($_maxQueueSize) — cannot add more'));
       return;
     }
     await _audioHandler.addToQueueEnd(song);
@@ -938,38 +944,73 @@ class PlayerCubit extends Cubit<PlayerState> {
     result.fold(
       (failure) => emit(state.copyWith(errorMessage: failure.message)),
       (isFav) {
+        // Propagate to queue so SongTile favorite stars update immediately
+        final updatedQueue = state.queue
+            .map((s) => s.id == songId ? s.copyWith(isFavorite: isFav) : s)
+            .toList();
+        // Also update slots
+        _queueSlots.updateAll((k, v) => _QueueSlotData(
+              songs: v.songs.map((s) => s.id == songId ? s.copyWith(isFavorite: isFav) : s).toList(),
+              currentIndex: v.currentIndex,
+              position: v.position,
+              speed: v.speed,
+            ));
         if (state.currentSong != null && state.currentSong!.id == songId) {
           emit(
             state.copyWith(
-              currentSong: state.currentSong!.copyWith(
-                isFavorite: isFav,
-              ),
+              currentSong: state.currentSong!.copyWith(isFavorite: isFav),
+              queue: updatedQueue,
               errorMessage: null,
             ),
           );
           _updateWidgetThrottled(force: true);
+        } else if (updatedQueue != state.queue) {
+          emit(state.copyWith(queue: updatedQueue, errorMessage: null));
         }
       },
     );
   }
 
+  String? _dspBlockedReason() {
+    final s = _settingsCubit?.state;
+    if (s == null) return null;
+    return AudioConflicts.dspBlockedByBitPerfect(
+      bitPerfectOutput: s.bitPerfectOutput,
+      bypassDspOnBitPerfect: s.bypassDspOnBitPerfect,
+      device: s.currentOutputDevice,
+    );
+  }
+
+  bool _guardDsp(String feature, {bool showError = true}) {
+    final reason = _dspBlockedReason();
+    if (reason != null) {
+      if (showError) emit(state.copyWith(errorMessage: '$feature blocked: $reason'));
+      return false;
+    }
+    return true;
+  }
+
   // Equalizer & Audio Effects
   Future<void> setEqualizerEnabled(bool enabled) async {
-    emit(state.copyWith(isEqEnabled: enabled));
+    if (enabled && !_guardDsp('EQ')) return;
+    emit(state.copyWith(isEqEnabled: enabled, errorMessage: null));
     await _audioHandler.setEqualizerEnabled(enabled);
   }
 
   Future<void> applyPreset(EqPreset preset) async {
+    if (!_guardDsp('Preset')) return;
     emit(state.copyWith(
       isEqEnabled: true,
       eqPreset: preset,
       selectedHeadphoneProfile: null,
+      errorMessage: null,
     ));
     await _audioHandler.setEqualizerEnabled(true);
     await _audioHandler.applyPreset(preset);
   }
 
   Future<void> applyHeadphoneProfile(HeadphoneProfile? profile) async {
+    if (profile != null && !_guardDsp('AutoEQ')) return;
     if (profile != null) {
       emit(state.copyWith(
         isEqEnabled: true,
@@ -979,6 +1020,7 @@ class PlayerCubit extends Cubit<PlayerState> {
           bassBoost: profile.bassBoost,
         ),
         selectedHeadphoneProfile: profile,
+        errorMessage: null,
       ));
       await _audioHandler.setEqualizerEnabled(true);
     } else {
@@ -991,6 +1033,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   }
 
   Future<void> setBandGain(int bandIndex, double gain) async {
+    if (gain.abs() > 0.1 && !_guardDsp('EQ Band')) return;
     final clamped = gain.clamp(-15.0, 15.0);
     final gains = List<double>.from(state.eqPreset.gains);
     if (bandIndex >= 0 && bandIndex < gains.length) {
@@ -1025,12 +1068,14 @@ class PlayerCubit extends Cubit<PlayerState> {
   }
 
   Future<void> setBassBoost(double amount) async {
+    if (amount > 0.01 && !_guardDsp('Bass Boost')) return;
     final clamped = amount.clamp(0.0, 1.0);
     emit(state.copyWith(
       eqPreset: EqPreset(
           name: state.eqPreset.name,
           gains: state.eqPreset.gains,
           bassBoost: clamped),
+      errorMessage: null,
     ));
     await _audioHandler.setBassBoost(clamped);
   }
@@ -1062,20 +1107,24 @@ class PlayerCubit extends Cubit<PlayerState> {
   }
 
   Future<void> setVirtualizerEnabled(bool enabled) async {
-    emit(state.copyWith(isVirtualizerEnabled: enabled));
+    if (enabled && !_guardDsp('Virtualizer')) return;
+    emit(state.copyWith(isVirtualizerEnabled: enabled, errorMessage: null));
     await _audioHandler.setVirtualizerEnabled(enabled);
   }
 
   Future<void> setVirtualizerStrength(double strength) async {
+    if (!_guardDsp('Virtualizer', showError: false)) return;
     emit(state.copyWith(virtualizerStrength: strength));
     await _audioHandler.setVirtualizerStrength(strength);
   }
 
   Future<void> setDynamicsPreset(DynamicsPreset preset, {bool? enabled}) async {
     final isEnabled = enabled ?? (preset != DynamicsPreset.off);
+    if (isEnabled && !_guardDsp('Dynamics')) return;
     emit(state.copyWith(
       dynamicsPreset: preset,
       isDynamicsEnabled: isEnabled,
+      errorMessage: null,
     ));
     await _audioHandler.setDynamicsPreset(preset, enabled: enabled);
   }
@@ -1089,39 +1138,45 @@ class PlayerCubit extends Cubit<PlayerState> {
   }
 
   Future<void> setVolumeBoost(double value) async {
+    if (value > 0.01 && !_guardDsp('Volume Boost')) return;
     // Gain staging: cap if combined with preamp > 6 dB
     final preampDb = state.selectedHeadphoneProfile?.preampGain ?? 0.0;
     var safeValue = value.clamp(0.0, 1.0);
     if ((preampDb + safeValue * 10.0) > 6.0) {
       safeValue = ((6.0 - preampDb) / 10.0).clamp(0.0, 1.0);
     }
-    emit(state.copyWith(volumeBoost: safeValue));
+    emit(state.copyWith(volumeBoost: safeValue, errorMessage: null));
     await _audioHandler.setVolumeBoost(safeValue);
   }
 
   Future<void> setSpatializerEnabled(bool enabled) async {
+    if (enabled && !_guardDsp('Spatializer')) return;
     await _audioHandler.setSpatializerEnabled(enabled);
-    emit(state.copyWith(isSpatializerEnabled: enabled));
+    emit(state.copyWith(isSpatializerEnabled: enabled, errorMessage: null));
   }
 
   // --- NATIVE DSP METHODS ---
 
   Future<void> setCrossfeed(bool enabled,
       {double? delayUs, double? feedDb}) async {
+    if (enabled && !_guardDsp('Crossfeed')) return;
     emit(state.copyWith(
       isCrossfeedEnabled: enabled,
       crossfeedDelayUs: delayUs ?? state.crossfeedDelayUs,
       crossfeedFeedDb: feedDb ?? state.crossfeedFeedDb,
+      errorMessage: null,
     ));
     await _audioHandler.setCrossfeed(enabled, delayUs: delayUs, feedDb: feedDb);
   }
 
   Future<void> setLookaheadLimiter(bool enabled,
       {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {
+    if (enabled && !_guardDsp('Limiter')) return;
     emit(state.copyWith(
       isLimiterEnabled: enabled,
       limiterThresholdDb: thresholdDb ?? state.limiterThresholdDb,
       limiterReleaseMs: releaseMs ?? state.limiterReleaseMs,
+      errorMessage: null,
     ));
     await _audioHandler.setLookaheadLimiter(enabled,
         thresholdDb: thresholdDb,
@@ -1130,10 +1185,12 @@ class PlayerCubit extends Cubit<PlayerState> {
   }
 
   Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {
+    if (enabled && !_guardDsp('Reverb')) return;
     emit(state.copyWith(
       isReverbEnabled: enabled,
       reverbPreset: preset ?? state.reverbPreset,
       reverbWetDry: wetDry ?? state.reverbWetDry,
+      errorMessage: null,
     ));
     await _audioHandler.setReverb(enabled, preset: preset, wetDry: wetDry);
   }
@@ -1147,17 +1204,20 @@ class PlayerCubit extends Cubit<PlayerState> {
   }
 
   Future<void> setStereoBalance(double balance) async {
+    if (balance.abs() > 0.01 && !_guardDsp('Stereo Balance', showError: false)) return;
     final clamped = balance.clamp(-1.0, 1.0);
     emit(state.copyWith(stereoBalance: clamped));
     await _audioHandler.setStereoBalance(clamped);
   }
 
   Future<void> setMonoMix(bool mono) async {
-    emit(state.copyWith(monoMix: mono));
+    if (mono && !_guardDsp('Mono Mix')) return;
+    emit(state.copyWith(monoMix: mono, errorMessage: null));
     await _audioHandler.setMonoMix(mono);
   }
 
   Future<void> setSincResampler(bool enabled) async {
+    if (enabled && !_guardDsp('Resampler', showError: false)) return;
     emit(state.copyWith(isSincResamplerEnabled: enabled));
     await _audioHandler.setSincResampler(enabled);
   }

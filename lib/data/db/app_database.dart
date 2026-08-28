@@ -26,7 +26,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   static Future<void> _createFtsTable(
       Future<void> Function(String) executeSql) async {
@@ -37,7 +37,7 @@ class AppDatabase extends _$AppDatabase {
     await executeSql(
         "CREATE TRIGGER IF NOT EXISTS songs_fts_delete AFTER DELETE ON songs BEGIN INSERT INTO songs_fts(songs_fts, rowid, title, artist, album) VALUES('delete', old.id, old.title, old.artist, old.album); END;");
     await executeSql(
-        "CREATE TRIGGER IF NOT EXISTS songs_fts_update AFTER UPDATE ON songs BEGIN INSERT INTO songs_fts(songs_fts, rowid, title, artist, album) VALUES('delete', old.id, old.title, old.artist, old.album); INSERT INTO songs_fts(rowid, title, artist, album) VALUES (new.id, new.title, new.artist, new.album); END;");
+        "CREATE TRIGGER IF NOT EXISTS songs_fts_update AFTER UPDATE OF title, artist, album ON songs BEGIN INSERT INTO songs_fts(songs_fts, rowid, title, artist, album) VALUES('delete', old.id, old.title, old.artist, old.album); INSERT INTO songs_fts(rowid, title, artist, album) VALUES (new.id, new.title, new.artist, new.album); END;");
   }
 
   static Future<void> _createIndexes(
@@ -52,6 +52,8 @@ class AppDatabase extends _$AppDatabase {
         'CREATE INDEX IF NOT EXISTS idx_songs_artist_id ON songs (artist_id);');
     await executeSql(
         'CREATE INDEX IF NOT EXISTS idx_songs_path ON songs (path);');
+    await executeSql(
+        'CREATE INDEX IF NOT EXISTS idx_songs_path_nocase ON songs (path COLLATE NOCASE) WHERE path != "" AND path NOT LIKE "ytmusic://%";');
     await executeSql(
         'CREATE INDEX IF NOT EXISTS idx_songs_genre ON songs (genre);');
     await executeSql(
@@ -158,15 +160,23 @@ class AppDatabase extends _$AppDatabase {
           }
           if (from < 9) {
             await _createFtsTable(customStatement);
-            // Backfill existing rows
             try {
               await customStatement(
                   "INSERT INTO songs_fts(songs_fts) VALUES('rebuild');");
             } catch (_) {}
           }
-          // Must run after every addColumn above: several indexes cover columns a
-          // later branch introduces, so creating them mid-ladder fails on an older
-          // database. Every statement is IF NOT EXISTS, so re-running is free.
+          if (from < 10) {
+            // Add NOCASE path index for duplicate prevention (10/10 hardening)
+            try {
+              await customStatement(
+                  'CREATE INDEX IF NOT EXISTS idx_songs_path_nocase ON songs (path COLLATE NOCASE) WHERE path != "" AND path NOT LIKE "ytmusic://%";');
+            } catch (_) {}
+            // FTS rebuild is cheap and fixes any corrupt trigger from v9
+            try {
+              await customStatement(
+                  "INSERT INTO songs_fts(songs_fts) VALUES('rebuild');");
+            } catch (_) {}
+          }
           await _createIndexes(customStatement);
           await _createRemoteSourceIndexes(customStatement);
         },

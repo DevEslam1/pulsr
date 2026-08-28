@@ -241,15 +241,32 @@ class YtmResolvingSource extends StreamAudioSource {
     final completer = Completer<void>();
     if (_pathCreationLocks.length >= _maxPathCreationLocks &&
         !_pathCreationLocks.containsKey(pathKey)) {
-      _pathCreationLocks.remove(_pathCreationLocks.keys.first);
+      final oldestKey = _pathCreationLocks.keys.first;
+      final previous = _pathCreationLocks[oldestKey];
+      // Only evict if previous future is completed (avoid removing in-flight lock)
+      if (previous != null && previous.isCompleted) {
+        _pathCreationLocks.remove(oldestKey);
+      } else if (previous != null) {
+        // In-flight lock at oldest slot — find first completed entry to evict instead
+        String? completedKey;
+        for (final entry in _pathCreationLocks.entries) {
+          if (entry.value.isCompleted) {
+            completedKey = entry.key;
+            break;
+          }
+        }
+        if (completedKey != null) {
+          _pathCreationLocks.remove(completedKey);
+        }
+      }
     }
-    final previous =
-        _pathCreationLocks.putIfAbsent(pathKey, () => completer.future);
+    final existingLock =
+        _pathCreationLocks.putIfAbsent(pathKey, () => completer);
 
-    if (!identical(previous, completer.future)) {
+    if (!identical(existingLock, completer)) {
       // Another creation is in progress; wait for it
       try {
-        await previous;
+        await existingLock.future;
       } catch (_) {}
       final existing = _inner;
       if (existing != null) return existing;
@@ -279,7 +296,10 @@ class YtmResolvingSource extends StreamAudioSource {
       if (!completer.isCompleted) {
         completer.complete();
       }
-      _pathCreationLocks.remove(pathKey);
+      // Only remove our own lock; avoid deleting a newer owner's in-flight lock
+      if (identical(_pathCreationLocks[pathKey], completer)) {
+        _pathCreationLocks.remove(pathKey);
+      }
     }
   }
 
@@ -299,8 +319,8 @@ class YtmResolvingSource extends StreamAudioSource {
   }
 
   static const int _maxPathCreationLocks = 32;
-  static final LinkedHashMap<String, Future<void>> _pathCreationLocks =
-      LinkedHashMap<String, Future<void>>();
+  static final LinkedHashMap<String, Completer<void>> _pathCreationLocks =
+      LinkedHashMap<String, Completer<void>>();
 
   static Future<File> _cacheFileFor(String videoId, String url) async {
     final dir = await _cacheManager.getCacheDirectory();

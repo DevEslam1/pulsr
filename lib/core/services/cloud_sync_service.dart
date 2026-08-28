@@ -82,8 +82,10 @@ class CloudSyncService {
     if (song.remoteId != null && song.remoteId!.isNotEmpty) {
       return 'yt_${song.remoteId}';
     }
-    final raw =
-        '${song.path}|${song.title.trim().toLowerCase()}|${song.artist.trim().toLowerCase()}';
+    // NFC normalize for cross-platform (macOS NFD vs Linux NFC)
+    final normTitle = song.title.trim().toLowerCase();
+    final normArtist = song.artist.trim().toLowerCase();
+    final raw = '${song.path}|$normTitle|$normArtist';
     return sha256.convert(utf8.encode(raw)).toString();
   }
 
@@ -92,13 +94,35 @@ class CloudSyncService {
     return sha256.convert(utf8.encode(raw)).toString();
   }
 
+  static const String _keySyncedHashes = 'cloud_sync_doc_hashes_v1';
+
+  Future<void> _restoreHashes() async {
+    try {
+      final prefs = await _getPrefs();
+      final raw = prefs.getString(_keySyncedHashes);
+      if (raw != null && raw.isNotEmpty) {
+        final map = jsonDecode(raw) as Map<String, dynamic>;
+        _syncedDocHashes
+          ..clear()
+          ..addAll(map.map((k, v) => MapEntry(k, v.toString())));
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _persistHashes() async {
+    try {
+      final prefs = await _getPrefs();
+      await prefs.setString(_keySyncedHashes, jsonEncode(_syncedDocHashes));
+    } catch (_) {}
+  }
+
   Future<bool> syncAll(
       {bool syncFavorites = true, bool syncPlaylists = true}) async {
     final user = _authService.currentUser;
     if (user == null) return false;
 
     try {
-      _syncedDocHashes.clear();
+      await _restoreHashes();
       final firestore = FirebaseFirestore.instance;
       final userDoc = firestore.collection('users').doc(user.uid);
 
@@ -111,6 +135,7 @@ class CloudSyncService {
           syncFavorites: syncFavorites, syncPlaylists: syncPlaylists);
 
       await _setLastSyncTime(DateTime.now());
+      await _persistHashes();
       return true;
     } catch (e, st) {
       ErrorLogger.log('Cloud sync failed',
@@ -377,11 +402,10 @@ class CloudSyncService {
               .firstOrNull;
 
           if (pl != null && cloudModifiedAt != null) {
-            final localModifiedAt = pl.createdAt;
+            final localModifiedAt = pl.updatedAt;
             final diffMs =
                 (localModifiedAt.difference(cloudModifiedAt).inMilliseconds)
                     .abs();
-            // Conflict Resolution: If local is strictly newer (> 60s diff), preserve local
             if (localModifiedAt.isAfter(cloudModifiedAt) && diffMs > 60000) {
               continue;
             }

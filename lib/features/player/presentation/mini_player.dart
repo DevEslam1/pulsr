@@ -180,7 +180,7 @@ class MiniPlayer extends StatelessWidget {
   }
 }
 
-class _MiniPlayerProgressBar extends StatelessWidget {
+class _MiniPlayerProgressBar extends StatefulWidget {
   final Duration duration;
   final Color activeAccent;
   final Color hairlineColor;
@@ -194,6 +194,19 @@ class _MiniPlayerProgressBar extends StatelessWidget {
   });
 
   @override
+  State<_MiniPlayerProgressBar> createState() => _MiniPlayerProgressBarState();
+}
+
+class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar> {
+  DateTime _lastSeek = DateTime.fromMillisecondsSinceEpoch(0);
+  void _throttledSeek(Duration pos) {
+    final now = DateTime.now();
+    if (now.difference(_lastSeek).inMilliseconds < 100) return;
+    _lastSeek = now;
+    widget.onSeek(pos);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Directionality(
       textDirection: TextDirection.ltr,
@@ -203,28 +216,28 @@ class _MiniPlayerProgressBar extends StatelessWidget {
           return BlocSelector<PlayerCubit, PlayerState, Duration>(
             selector: (s) => s.position,
             builder: (context, position) {
-              final progress = duration.inMilliseconds > 0
-                  ? (position.inMilliseconds / duration.inMilliseconds)
+              final progress = widget.duration.inMilliseconds > 0
+                  ? (position.inMilliseconds / widget.duration.inMilliseconds)
                       .clamp(0.0, 1.0)
                   : 0.0;
 
               return GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTapDown: (details) {
-                  if (trackWidth > 0 && duration.inMilliseconds > 0) {
+                  if (trackWidth > 0 && widget.duration.inMilliseconds > 0) {
                     final ratio =
                         (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
-                    final seekMs = (duration.inMilliseconds * ratio).round();
-                    onSeek(Duration(milliseconds: seekMs));
+                    final seekMs = (widget.duration.inMilliseconds * ratio).round();
+                    _throttledSeek(Duration(milliseconds: seekMs));
                   }
                 },
                 onHorizontalDragStart: (_) {},
                 onHorizontalDragUpdate: (details) {
-                  if (trackWidth > 0 && duration.inMilliseconds > 0) {
+                  if (trackWidth > 0 && widget.duration.inMilliseconds > 0) {
                     final ratio =
                         (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
-                    final seekMs = (duration.inMilliseconds * ratio).round();
-                    onSeek(Duration(milliseconds: seekMs));
+                    final seekMs = (widget.duration.inMilliseconds * ratio).round();
+                    _throttledSeek(Duration(milliseconds: seekMs));
                   }
                 },
                 child: SizedBox(
@@ -235,7 +248,7 @@ class _MiniPlayerProgressBar extends StatelessWidget {
                     children: [
                       Positioned.fill(
                         child: ColoredBox(
-                            color: hairlineColor.withValues(alpha: 0.35)),
+                            color: widget.hairlineColor.withValues(alpha: 0.35)),
                       ),
                       Align(
                         alignment: Alignment.centerLeft,
@@ -247,13 +260,13 @@ class _MiniPlayerProgressBar extends StatelessWidget {
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
-                                  activeAccent.withValues(alpha: 0.7),
-                                  activeAccent,
+                                  widget.activeAccent.withValues(alpha: 0.7),
+                                  widget.activeAccent,
                                 ],
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: activeAccent.withValues(alpha: 0.45),
+                                  color: widget.activeAccent.withValues(alpha: 0.45),
                                   blurRadius: 4,
                                 ),
                               ],

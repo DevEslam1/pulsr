@@ -593,7 +593,11 @@ class ScrobblerService {
       }
     }
 
-    if (anyFailure) {
+    // Fix double-enqueue: only enqueue once via anyFailure. Per-service throttles already enqueued.
+    // If per-service throttle enqueued, don't double-enqueue.
+    final hadThrottleEnqueue = prefs.getBool(keyLastFmEnabled) == true &&
+        !_canScrobbleService('lastfm');
+    if (anyFailure && !hadThrottleEnqueue) {
       await _enqueueOfflineScrobble(
         artist: artist,
         track: track,
@@ -601,7 +605,7 @@ class ScrobblerService {
         durationSec: durationSec,
         timestamp: timestamp,
       );
-    } else {
+    } else if (!anyFailure) {
       await prefs.setString('last_scrobble_key', dedupKey);
       await prefs.setInt('last_scrobble_time', now);
       await prefs.setInt('last_scrobbled_timestamp', now);

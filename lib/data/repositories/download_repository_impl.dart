@@ -14,6 +14,7 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
+import 'package:mutex/mutex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/channels.dart';
@@ -31,6 +32,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   static const int _maxConcurrent = 3;
 
   final YtDownloadService _ytDownloadService;
+  final Mutex _queueMutex = Mutex();
 
   final Map<String, DownloadTask> _tasks = {};
   final Queue<String> _queue = Queue<String>();
@@ -40,6 +42,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   final Map<String, Completer<void>> _activeCompleters = {};
   final StreamController<DownloadTask> _streamController =
       StreamController<DownloadTask>.broadcast();
+
 
   Timer? _saveDebounce;
   final Map<String, int> _lastProgressEmitMs = {};
@@ -180,6 +183,11 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       return const Left(DownloadFailure('Task not found'));
     }
 
+    // Fix C2: Prevent double-queueing or duplicate downloads if already queued or active
+    if (_queue.contains(videoId) || _activeVideoIds.contains(videoId)) {
+      return const Right(unit);
+    }
+
     _pausedVideoIds.remove(videoId);
     final queuedTask = task.copyWith(status: DownloadStatus.queued, error: null);
     _updateTask(queuedTask);
@@ -282,23 +290,22 @@ class DownloadRepositoryImpl implements IDownloadRepository {
 
   @override
   Future<Either<AppFailure, Unit>> reorderQueue(List<String> orderedVideoIds) async {
-    final currentQueued = _queue.toSet();
-    _queue.clear();
-    for (final vid in orderedVideoIds) {
-      if (currentQueued.contains(vid)) {
-        _queue.add(vid);
+    return _queueMutex.protect(() async {
+      final newQueue = Queue<String>();
+      for (final vid in orderedVideoIds) {
+        if (_queue.contains(vid)) newQueue.add(vid);
       }
-    }
-    // Add any missing queued tasks back to the end
-    for (final vid in currentQueued) {
-      if (!_queue.contains(vid)) {
-        _queue.add(vid);
+      // Add any queued items not in the ordered list
+      for (final vid in _queue) {
+        if (!newQueue.contains(vid)) newQueue.add(vid);
       }
-    }
-    _schedulePersist();
-    _processQueue();
-    return const Right(unit);
+      _queue.clear();
+      _queue.addAll(newQueue);
+      _schedulePersist();
+      return const Right(unit);
+    });
   }
+
 
   @override
   Future<Either<AppFailure, Unit>> prioritizeDownload(String videoId) async {
@@ -500,27 +507,30 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   }
 
   void _processQueue() {
-    while (_activeVideoIds.length < _maxConcurrent && _queue.isNotEmpty) {
-      final videoId = _queue.removeFirst();
+    _queueMutex.protect(() async {
+      while (_activeVideoIds.length < _maxConcurrent && _queue.isNotEmpty) {
+        final videoId = _queue.removeFirst();
 
-      if (_pausedVideoIds.contains(videoId)) {
-        continue;
+        if (_pausedVideoIds.contains(videoId)) {
+          continue;
+        }
+
+        final task = _tasks[videoId];
+        if (task == null || task.status == DownloadStatus.complete) {
+          continue;
+        }
+
+        _activeVideoIds.add(videoId);
+        _executeTask(task);
       }
-
-      final task = _tasks[videoId];
-      if (task == null || task.status == DownloadStatus.complete) {
-        continue;
+      if (_activeVideoIds.isEmpty && _queue.isEmpty) {
+        try {
+          _downloadChannel.invokeMethod('stopDownloadForeground');
+        } catch (_) {}
       }
-
-      _activeVideoIds.add(videoId);
-      _executeTask(task);
-    }
-    if (_activeVideoIds.isEmpty && _queue.isEmpty) {
-      try {
-        _downloadChannel.invokeMethod('stopDownloadForeground');
-      } catch (_) {}
-    }
+    });
   }
+
 
   Future<void> _executeTask(DownloadTask task) async {
     final videoId = task.videoId;

@@ -1,6 +1,7 @@
 // lib/core/utils/ytm_rate_limiter.dart
 import 'dart:async';
 import 'dart:math';
+import 'package:mutex/mutex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Request priority classes for rate limiting.
@@ -33,7 +34,8 @@ class YtmRateLimiter {
 
   double _tokens = _maxTokens.toDouble();
   DateTime _lastRefill = DateTime.now();
-  final _random = Random();
+  final _random = Random.secure();
+  final _mutex = Mutex();
 
   DateTime _backoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
   int _adaptiveMultiplier = 1;
@@ -180,63 +182,67 @@ class YtmRateLimiter {
   /// [priority] ensures interactive requests (user taps) take precedence over background bursts
   /// (pre-resolving, queue restore, metadata fetch) and never get starved.
   Future<void> acquirePermit({YtmRequestPriority priority = YtmRequestPriority.interactive}) async {
-    final now = DateTime.now();
-    if (now.isBefore(_backoffUntil)) {
-      // Interactive requests during backoff still wait out the minimum backoff,
-      // but background requests are strictly queued
-      await Future<void>.delayed(_backoffUntil.difference(now));
-    }
+    await _mutex.protect(() async {
+      final now = DateTime.now();
+      if (now.isBefore(_backoffUntil)) {
+        // Interactive requests during backoff still wait out the minimum backoff,
+        // but background requests are strictly queued
+        await Future<void>.delayed(_backoffUntil.difference(now));
+      }
 
-    _refill();
+      _refill();
 
-    // Background requests must leave a minimum reserve of 2.0 tokens for interactive requests
-    if (priority == YtmRequestPriority.background && _tokens < 2.0) {
-      final waitMs = ((2.0 - _tokens) / _refillRate * 1000).ceil().clamp(50, 1000);
+      // Background requests must leave a minimum reserve of 2.0 tokens for interactive requests
+      if (priority == YtmRequestPriority.background && _tokens < 2.0) {
+        final waitMs = ((2.0 - _tokens) / _refillRate * 1000).ceil().clamp(50, 1000);
+        await Future<void>.delayed(Duration(milliseconds: waitMs));
+        _refill();
+      }
+
+      if (_tokens >= 1.0) {
+        _tokens -= 1.0;
+        _persist();
+        return;
+      }
+
+      // Wait for the next token to become available
+      final waitMs = ((1.0 - _tokens) / _refillRate * 1000).ceil();
       await Future<void>.delayed(Duration(milliseconds: waitMs));
       _refill();
-    }
-
-    if (_tokens >= 1.0) {
-      _tokens -= 1.0;
+      _tokens = (_tokens - 1.0).clamp(0.0, _maxTokens.toDouble());
       _persist();
-      return;
-    }
-
-    // Wait for the next token to become available
-    final waitMs = ((1.0 - _tokens) / _refillRate * 1000).ceil();
-    await Future<void>.delayed(Duration(milliseconds: waitMs));
-    _refill();
-    _tokens = (_tokens - 1.0).clamp(0.0, _maxTokens.toDouble());
-    _persist();
+    });
   }
 
   /// Acquires a permit before making a backend microservice request.
   Future<void> acquireBackendPermit({YtmRequestPriority priority = YtmRequestPriority.interactive}) async {
-    final now = DateTime.now();
-    if (now.isBefore(_backendBackoffUntil)) {
-      await Future<void>.delayed(_backendBackoffUntil.difference(now));
-    }
+    await _mutex.protect(() async {
+      final now = DateTime.now();
+      if (now.isBefore(_backendBackoffUntil)) {
+        await Future<void>.delayed(_backendBackoffUntil.difference(now));
+      }
 
-    _refillBackend();
+      _refillBackend();
 
-    // Background requests leave a reserve of 5.0 tokens for backend interactive requests
-    if (priority == YtmRequestPriority.background && _backendTokens < 5.0) {
-      final waitMs = ((5.0 - _backendTokens) / _backendRefillRate * 1000).ceil().clamp(50, 1000);
+      // Background requests leave a reserve of 5.0 tokens for backend interactive requests
+      if (priority == YtmRequestPriority.background && _backendTokens < 5.0) {
+        final waitMs = ((5.0 - _backendTokens) / _backendRefillRate * 1000).ceil().clamp(50, 1000);
+        await Future<void>.delayed(Duration(milliseconds: waitMs));
+        _refillBackend();
+      }
+
+      if (_backendTokens >= 1.0) {
+        _backendTokens -= 1.0;
+        _persist();
+        return;
+      }
+
+      final waitMs = ((1.0 - _backendTokens) / _backendRefillRate * 1000).ceil();
       await Future<void>.delayed(Duration(milliseconds: waitMs));
       _refillBackend();
-    }
-
-    if (_backendTokens >= 1.0) {
-      _backendTokens -= 1.0;
+      _backendTokens = (_backendTokens - 1.0).clamp(0.0, _backendMaxTokens.toDouble());
       _persist();
-      return;
-    }
-
-    final waitMs = ((1.0 - _backendTokens) / _backendRefillRate * 1000).ceil();
-    await Future<void>.delayed(Duration(milliseconds: waitMs));
-    _refillBackend();
-    _backendTokens = (_backendTokens - 1.0).clamp(0.0, _backendMaxTokens.toDouble());
-    _persist();
+    });
   }
 
   /// Called when a 429 rate-limit response is received from native YouTube.

@@ -536,7 +536,6 @@ class _RuleCardState extends State<_RuleCard> {
                         borderSide: BorderSide.none),
                   ),
                   items: SmartRuleField.values
-                      .where((f) => f != SmartRuleField.bpm)
                       .map((f) {
                     return DropdownMenuItem(
                       value: f,

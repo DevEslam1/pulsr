@@ -88,6 +88,21 @@ class DownloadTimeoutHandler(
             }
         }
 
+        // 3. Post delayed resumption intent to DownloadService (Fix C6)
+        if (context != null && videoIds.isNotEmpty()) {
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                try {
+                    for (vid in videoIds) {
+                        val intent = android.content.Intent(context, DownloadService::class.java).apply {
+                            action = DownloadService.ACTION_RESUME
+                            putExtra(DownloadService.EXTRA_VIDEO_ID, vid)
+                        }
+                        context.startService(intent)
+                    }
+                } catch (_: Exception) {}
+            }, 30_000L)
+        }
+
         return TimeoutReport(
             activeTasksCount = activeDownloads.size,
             flushedVideoIds = videoIds,
@@ -96,3 +111,4 @@ class DownloadTimeoutHandler(
         )
     }
 }
+

@@ -43,10 +43,26 @@ class YtDownloadItem {
   }
 }
 
+class BatchResult {
+  final int totalCount;
+  final int queuedCount;
+  final int failureCount;
+
+  const BatchResult({
+    required this.totalCount,
+    required this.queuedCount,
+    required this.failureCount,
+  });
+
+  bool get hasFailures => failureCount > 0;
+  bool get allSucceeded => failureCount == 0;
+}
+
 class YtmDownloadState {
   final Map<String, YtDownloadItem> items;
 
   const YtmDownloadState({this.items = const {}});
+
 
   YtDownloadItem itemFor(String videoId) =>
       items[videoId] ?? const YtDownloadItem();
@@ -170,8 +186,13 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
     }
   }
 
-  int downloadAll(Iterable<SongsTableData> songs) {
+  int downloadAll(Iterable<SongsTableData> songs, {void Function(BatchResult)? onCompleted}) {
+
     int queuedCount = 0;
+    int failureCount = 0;
+    final total = songs.length;
+    final futures = <Future<void>>[];
+
     for (final song in songs) {
       final videoId = song.remoteId;
       if (videoId == null || videoId.isEmpty) continue;
@@ -186,11 +207,33 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
         continue;
       }
 
-      download(song);
       queuedCount++;
+      futures.add(download(song).catchError((e) {
+        failureCount++;
+      }));
     }
+
+    if (futures.isNotEmpty) {
+      Future.wait(futures).then((_) {
+        if (!isClosed) {
+          onCompleted?.call(BatchResult(
+            totalCount: total,
+            queuedCount: queuedCount,
+            failureCount: failureCount,
+          ));
+        }
+      }).catchError((_) {});
+    } else {
+      onCompleted?.call(BatchResult(
+        totalCount: total,
+        queuedCount: 0,
+        failureCount: 0,
+      ));
+    }
+
     return queuedCount;
   }
+
 
   static const int _maxThrottleEntries = 200;
 

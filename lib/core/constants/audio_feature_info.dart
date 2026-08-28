@@ -1,0 +1,231 @@
+// lib/core/constants/audio_feature_info.dart
+// Central registry: every audio feature exposes user-facing info + conflict rules.
+// Single source of truth for “show the user info on every feature and prevent him to select 2 thing cannot work together”.
+
+import '../../domain/models/audio_output_info.dart';
+
+/// Human-readable info for one toggle/slider/card.
+class AudioFeatureInfo {
+  final String id;
+  final String title;
+  final String subtitle;
+  final String description;
+  final String? conflictsWith; // e.g. "Bit-Perfect bypass", "Gapless"
+  final String? whyDisabledReason; // shown when disabled due to conflict
+
+  const AudioFeatureInfo({
+    required this.id,
+    required this.title,
+    required this.subtitle,
+    required this.description,
+    this.conflictsWith,
+    this.whyDisabledReason,
+  });
+}
+
+/// All audio features in the app. Used by UI to render an Ⓘ button next to each control.
+class AudioFeatureRegistry {
+  static const bitPerfect = AudioFeatureInfo(
+    id: 'bitPerfect',
+    title: 'Bit-Perfect USB Pass-Through',
+    subtitle: 'Direct hardware streaming to USB / wired DAC',
+    description:
+        'Bypasses Android AudioFlinger resampler and sends the file\'s exact samples (e.g. 96 kHz / 24-bit) straight to the DAC via AudioMixerAttributes (API 34) for USB, or via direct/offload for wired. No software volume or DSP is applied. Requires Android 14+ for USB, or a wired device that advertises FLOAT/24-bit & hi-res rates. Bluetooth is NEVER bit-perfect (SBC/AAC/LDAC transcode).',
+    conflictsWith: 'All DSP when “Bypass DSP” is ON',
+  );
+
+  static const bypassDsp = AudioFeatureInfo(
+    id: 'bypassDsp',
+    title: 'Bypass DSP in Bit-Perfect Mode',
+    subtitle: 'Uncolored, pure bitstream to DAC',
+    description:
+        'When ON, entering Bit-Perfect immediately disables EQ, Virtualizer, Dynamics, Crossfeed, Limiter, Reverb, Stereo Panner and Sinc Resampler (native mask = 0). Volume is locked to hardware DAC. Turn OFF if you want EQ + bit-perfect (not true bit-perfect, but some DACs tolerate it).',
+  );
+
+  static const equalizer = AudioFeatureInfo(
+    id: 'equalizer',
+    title: '10 / 32-Band Parametric EQ',
+    subtitle: '±15 dB per band, Q=1.414, flat by default',
+    description:
+        'Native C++ biquad cascade (32 bands max, 8 channels). Uses single bulk JNI hop (≈1 ms) with zero-cost bypass when disabled. Interpolates AutoEQ profiles log-frequency wise. Cannot be active with Bit-Perfect bypass (would re-sample and alter bits).',
+    conflictsWith: 'Bit-Perfect bypass',
+  );
+
+  static const bassBoost = AudioFeatureInfo(
+    id: 'bassBoost',
+    title: 'Bass Enhancer',
+    subtitle: 'Shelving low-end gain (part of EQ engine)',
+    description:
+        'Adds a low-shelf lift below ~150 Hz via the native EQ biquad chain. Shares the same processing stage as the graphic EQ, so it is disabled while Bit-Perfect bypass is active. Keep moderate to avoid masking detail.',
+    conflictsWith: 'Bit-Perfect bypass',
+  );
+
+  static const crossfeed = AudioFeatureInfo(
+    id: 'crossfeed',
+    title: 'Headphone Crossfeed',
+    subtitle: '200–700 µs delay, –15 to –6 dB bleed',
+    description:
+        'Chu Moy / Linkwitz blend that makes headphones sound like speakers (reduces hard L/R separation). Adds ~0.05 ms latency. Disabled during Bit-Perfect.',
+    conflictsWith: 'Bit-Perfect bypass',
+  );
+
+  static const limiter = AudioFeatureInfo(
+    id: 'limiter',
+    title: 'Lookahead Brickwall Limiter',
+    subtitle: 'True-peak, 0.5–20 ms lookahead',
+    description:
+        'Adaptive true-peak limiter with 4× oversample. Protects against clipping when EQ boosts. Adds ~5 ms latency. Final stage before DAC. Disabled during Bit-Perfect.',
+    conflictsWith: 'Bit-Perfect bypass',
+  );
+
+  static const reverb = AudioFeatureInfo(
+    id: 'reverb',
+    title: 'Convolution Reverb',
+    subtitle: 'Studio / Hall / Plate / Custom IR',
+    description:
+        'Partitioned convolution (512-frames) with synthetic IRs (RT60 0.35–5 s) or custom impulse. Largest latency (~10 ms). IR synthesis runs off main thread. Disabled during Bit-Perfect.',
+    conflictsWith: 'Bit-Perfect bypass',
+  );
+
+  static const panner = AudioFeatureInfo(
+    id: 'panner',
+    title: 'Stereo Balance & Mono Mix',
+    subtitle: '–1.0 Left … +1.0 Right, mono collapse',
+    description:
+        'Constant-power panner + mono downmix (L+R / 2). Useful for hearing asymmetry. Collapses soundstage when mono ON. Disabled during Bit-Perfect.',
+    conflictsWith: 'Bit-Perfect bypass',
+  );
+
+  static const resampler = AudioFeatureInfo(
+    id: 'resampler',
+    title: 'Polyphase Sinc Resampler',
+    subtitle: '32 phases × 32 taps, auto 44.1→48 kHz',
+    description:
+        'High-quality sinc interpolation when track rate ≠ device rate. Auto-bypasses when rates match (zero CPU). Disabled during Bit-Perfect (direct 1:1 stream).',
+    conflictsWith: 'Bit-Perfect bypass / Direct',
+  );
+
+  static const virtualizer = AudioFeatureInfo(
+    id: 'virtualizer',
+    title: 'Soundstage Widening (Virtualizer)',
+    subtitle: 'Android Virtualizer stereo expansion',
+    description:
+        'Expands stereo field via AudioEffect Virtualizer (0–1000 mB). On devices with Hardware Spatializer, Spatializer takes precedence and Virtualizer is bypassed. Disabled during Bit-Perfect.',
+    conflictsWith: 'Bit-Perfect bypass, Hardware Spatializer',
+  );
+
+  static const spatializer = AudioFeatureInfo(
+    id: 'spatializer',
+    title: 'Hardware Spatializer',
+    subtitle: 'Android Spatializer API + head tracking',
+    description:
+        'Uses AudioManager.spatializer when available (Android 12L+). Provides true spatial audio if device supports it; otherwise emulates via Virtualizer. Mutually managed with Virtualizer.',
+  );
+
+  static const dynamics = AudioFeatureInfo(
+    id: 'dynamics',
+    title: 'Studio Dynamics & MBC',
+    subtitle: '3-band MBC + limiter presets',
+    description:
+        'DynamicsProcessing multiband compressor (Studio Punch / Warm Analog / Vocal Focus / Night Leveller / Bass Tightener). Controls transients and loudness. Disabled during Bit-Perfect.',
+    conflictsWith: 'Bit-Perfect bypass',
+  );
+
+  static const gapless = AudioFeatureInfo(
+    id: 'gapless',
+    title: 'Gapless Playback',
+    subtitle: 'ConcatenatingAudioSource, zero gap',
+    description:
+        'Joins consecutive tracks sample-accurate with no silence. Ideal for live albums. Mutually exclusive with Crossfade — enabling one forces the other OFF.',
+    conflictsWith: 'Crossfade (>0 s)',
+  );
+
+  static const crossfade = AudioFeatureInfo(
+    id: 'crossfade',
+    title: 'Crossfade',
+    subtitle: '0–12 s overlapping dual-player fade',
+    description:
+        'Fades out current track while fading in next via dual ExoPlayer. Requires disabling Gapless (cannot be gapless and crossfading simultaneously).',
+    conflictsWith: 'Gapless',
+  );
+
+  static const replayGain = AudioFeatureInfo(
+    id: 'replayGain',
+    title: 'ReplayGain Normalization',
+    subtitle: 'EBU R128 track/album/auto',
+    description:
+        'Software volume leveling based on Track/Album Gain tags. Applies multiplier with 0.5 dB inter-sample headroom. Conflicts with Bit-Perfect bypass (software gain would alter bits). Set to Off for true exclusive.',
+    conflictsWith: 'Bit-Perfect bypass',
+  );
+
+  static const oem = AudioFeatureInfo(
+    id: 'oem',
+    title: 'OEM Audio Warning',
+    subtitle: 'Dolby / Dirac / SoundAlive double-processing',
+    description:
+        'System-level effects (Dolby Atmos, Xiaomi Sound, Dirac) run outside the app. Running Pulsr DSP on top causes double-EQ and clipping. Use DSP Preference = Native or disable system effects for cleanest sound.',
+  );
+
+  static const volumeBoost = AudioFeatureInfo(
+    id: 'volumeBoost',
+    title: 'Volume Boost',
+    subtitle: 'LoudnessEnhancer +10 dB',
+    description:
+        'Hardware LoudnessEnhancer gain (0–1000 mB). Capped at +6 dB combined with headphone preamp to avoid clipping. Disabled during Bit-Perfect bypass (hardware DAC volume only).',
+    conflictsWith: 'Bit-Perfect bypass',
+  );
+}
+
+/// Pure-logic conflict checker. Returns null if allowed, otherwise a human reason why the action must be blocked.
+class AudioConflicts {
+  /// Bit-perfect bypass disables all native DSP, virtualizer and software gain.
+  static String? dspBlockedByBitPerfect({
+    required bool bitPerfectOutput,
+    required bool bypassDspOnBitPerfect,
+    required AudioOutputInfo? device,
+  }) {
+    final active = bitPerfectOutput && bypassDspOnBitPerfect && (device?.isBitPerfectActive == true || (bitPerfectOutput && (device?.isUsbDac == true || device?.isDirectSupported == true)));
+    if (!active) return null;
+    // When armed but not yet active (e.g. waiting for USB), still warn but allow? We block to prevent surprise.
+    return 'Disabled: Bit-Perfect bypass is ON — this DSP would alter the exclusive bitstream. Turn off Bit-Perfect or disable “Bypass DSP” to enable.';
+  }
+
+  static String? bitPerfectBlockedReason(AudioOutputInfo? device) {
+    if (device == null) return null;
+    if (device.isBluetooth) return 'Cannot enable: Bluetooth transcodes (SBC/AAC/LDAC) — bit-perfect only on USB or wired direct DAC.';
+    if (device.bitPerfectFailureReason == 'requires_android_14_for_usb' || device.bitPerfectFailureReason == 'requires_android_14') {
+      return 'Requires Android 14+ for USB bit-perfect. Wired direct may still work if device advertises hi-res rates.';
+    }
+    if (device.bitPerfectFailureReason == 'wired_direct_not_supported') return 'Wired device does not advertise direct hi-res support (no FLOAT/24-bit).';
+    return null;
+  }
+
+  static String? gaplessBlockedByCrossfade(double crossfadeSeconds) {
+    if (crossfadeSeconds > 0.01) return 'Disabled: Crossfade is ${crossfadeSeconds.toStringAsFixed(1)} s — gapless requires 0 s. Set Crossfade to 0 to enable gapless.';
+    return null;
+  }
+
+  static String? crossfadeBlockedByGapless(bool gaplessEnabled) {
+    if (gaplessEnabled) return 'Disabled: Gapless is ON — crossfade needs gapless OFF. Disable Gapless to enable crossfade.';
+    return null;
+  }
+
+  static String? replayGainBlockedByBitPerfect({
+    required bool bitPerfectOutput,
+    required bool bypassDspOnBitPerfect,
+    required AudioOutputInfo? device,
+  }) =>
+      dspBlockedByBitPerfect(bitPerfectOutput: bitPerfectOutput, bypassDspOnBitPerfect: bypassDspOnBitPerfect, device: device);
+
+  static String? oemDoubleProcessingWarning({required bool hasOemAudio, required bool anyDspEnabled}) {
+    if (hasOemAudio && anyDspEnabled) return 'Warning: System Dolby/Dirac is active — running Pulsr DSP on top causes double-processing. Prefer DSP Preference = Native and disable system effects.';
+    return null;
+  }
+
+  static String? volumeBoostClippingWarning(double volumeBoost, double preampDb) {
+    final total = preampDb + volumeBoost * 10.0;
+    if (total > 6.0) return 'Clipping risk: EQ preamp (${preampDb.toStringAsFixed(1)} dB) + boost (+${(volumeBoost * 10).toStringAsFixed(1)} dB) = +${total.toStringAsFixed(1)} dB > 6 dB headroom.';
+    if (volumeBoost > 0.6) return 'High boost may cause distortion or hearing fatigue.';
+    return null;
+  }
+}

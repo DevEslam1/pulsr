@@ -58,6 +58,8 @@ Future<void> main() async {
   } catch (e, st) {
     ErrorLogger.log('AppConfig.validateConfiguration error',
         error: e, stackTrace: st, category: 'Startup');
+    // Fail-fast for prod misconfig (Play Store compliance) — don't continue with invalid env
+    if (e is StateError && e.message.contains('CRITICAL')) rethrow;
   }
 
   ErrorLogger.onCrashReported = (error, stackTrace, category) {
@@ -164,17 +166,15 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
 
   @override
   void didHaveMemoryPressure() {
-    // Trim artwork and stream caches on GC pressure (LOG-14 14MB/59MB)
     try {
       getIt<ArtworkCacheManager>().clearAllCache();
     } catch (_) {}
     try {
-      // ignore: avoid_dynamic_calls
-      (getIt.get<ArtworkLruCache>() as dynamic)?.trimForMemoryPressure();
-    } catch (_) {
-      // Fallback direct trim
-      try { ArtworkLruCache().trimForMemoryPressure(); } catch (_) {}
-    }
+      final cache = getIt.isRegistered<ArtworkLruCache>()
+          ? getIt<ArtworkLruCache>()
+          : null;
+      cache?.trimForMemoryPressure();
+    } catch (_) {}
   }
 
   /// Surfaces a re-login prompt when the YouTube Music session dies mid-use

@@ -28,6 +28,7 @@ import '../../player/presentation/widgets/equalizer_sheet.dart';
 import '../../sheets/sleep_timer_sheet.dart';
 import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
+import '../../../core/constants/audio_feature_info.dart';
 import 'hidden_folders_screen.dart';
 import 'widgets/backup_section.dart';
 import 'widgets/battery_optimization_card.dart';
@@ -39,11 +40,23 @@ class SettingsScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
 
-    return BlocBuilder<SettingsCubit, SettingsState>(
-      builder: (context, state) {
-        final cubit = context.read<SettingsCubit>();
+    return BlocListener<SettingsCubit, SettingsState>(
+      listenWhen: (prev, curr) => prev.errorMessage != curr.errorMessage && curr.errorMessage != null,
+      listener: (ctx, state) {
+        final msg = state.errorMessage;
+        if (msg != null && msg.isNotEmpty) {
+          ScaffoldMessenger.maybeOf(ctx)?.showSnackBar(
+            SnackBar(content: Text(msg), backgroundColor: Theme.of(ctx).colorScheme.error, behavior: SnackBarBehavior.floating),
+          );
+          // clear after showing
+          ctx.read<SettingsCubit>().clearError();
+        }
+      },
+      child: BlocBuilder<SettingsCubit, SettingsState>(
+        builder: (context, state) {
+          final cubit = context.read<SettingsCubit>();
 
-        return Scaffold(
+          return Scaffold(
           appBar: AppBar(title: Text(context.l10n.settings)),
           body: Center(
             child: ConstrainedBox(
@@ -106,7 +119,11 @@ class SettingsScreen extends StatelessWidget {
                         context.l10n.gaplessPlayback,
                         context.l10n.gaplessSubtitle,
                         value: state.gaplessPlayback,
+                        featureInfo: AudioFeatureRegistry.gapless,
+                        disabledReason: null,
                         onChanged: cubit.setGapless),
+                    if (state.crossfadeSeconds > 0.01 && state.gaplessPlayback)
+                      _conflictBanner(context, 'Gapless and Crossfade cannot be ON together. Crossfade will be auto-disabled.'),
                     _divider(p),
                     _switchTile(
                         context,
@@ -132,26 +149,42 @@ class SettingsScreen extends StatelessWidget {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(context.l10n.crossfade,
-                                  style: TextStyle(
-                                      color: p.textPrimary,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 14)),
+                              Row(
+                                children: [
+                                  Text(context.l10n.crossfade,
+                                      style: TextStyle(
+                                          color: p.textPrimary,
+                                          fontWeight: FontWeight.w700,
+                                          fontSize: 14)),
+                                  const SizedBox(width: 6),
+                                  IconButton(
+                                    icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary),
+                                    visualDensity: VisualDensity.compact,
+                                    tooltip: 'About Crossfade',
+                                    onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.crossfade, conflictReason: state.gaplessPlayback ? AudioConflicts.crossfadeBlockedByGapless(state.gaplessPlayback) : null),
+                                  ),
+                                ],
+                              ),
                               Container(
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 3),
                                 decoration: BoxDecoration(
-                                    color: p.accentContainer,
+                                    color: state.gaplessPlayback ? p.surface : p.accentContainer,
                                     borderRadius: BorderRadius.circular(8)),
                                 child: Text(
                                     '${state.crossfadeSeconds.toStringAsFixed(1)}s',
                                     style: TextStyle(
-                                        color: p.accent,
+                                        color: state.gaplessPlayback ? p.textTertiary : p.accent,
                                         fontWeight: FontWeight.w800,
                                         fontSize: 12)),
                               ),
                             ],
                           ),
+                          if (state.gaplessPlayback)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 6),
+                              child: Text(AudioConflicts.crossfadeBlockedByGapless(true)!, style: TextStyle(color: p.error, fontSize: 11, fontWeight: FontWeight.w600)),
+                            ),
                           Slider(
                               value: state.crossfadeSeconds,
                               min: 0,
@@ -279,14 +312,26 @@ class SettingsScreen extends StatelessWidget {
                         ),
                       ),
                     ),
-                    _switchTile(
-                      context,
-                      Icons.album_rounded,
-                      'Bit-Perfect USB Pass-Through',
-                      'Direct hardware streaming to USB DACs (bypasses Android OS resampler on Android 14+)',
-                      value: state.bitPerfectOutput,
-                      onChanged: cubit.setBitPerfectOutput,
-                    ),
+                    Builder(builder: (ctx) {
+                      final bpBlock = AudioConflicts.bitPerfectBlockedReason(state.currentOutputDevice);
+                      return Column(
+                        children: [
+                          if (bpBlock != null) _conflictBanner(context, bpBlock),
+                          _switchTile(
+                            context,
+                            Icons.album_rounded,
+                            'Bit-Perfect USB Pass-Through',
+                            state.currentOutputDevice?.isBluetooth == true
+                                ? 'Unavailable: Bluetooth transcodes — use USB / wired DAC'
+                                : 'Direct hardware streaming to USB / wired DACs (bypasses Android resampler)',
+                            value: state.bitPerfectOutput,
+                            featureInfo: AudioFeatureRegistry.bitPerfect,
+                            disabledReason: bpBlock,
+                            onChanged: bpBlock != null ? (v) {} : cubit.setBitPerfectOutput,
+                          ),
+                        ],
+                      );
+                    }),
                     _divider(p),
                     _switchTile(
                       context,
@@ -294,11 +339,18 @@ class SettingsScreen extends StatelessWidget {
                       'Bypass DSP in Bit-Perfect Mode',
                       'Bypasses Equalizer and virtualizer for an uncolored, pure audio bitstream to the DAC',
                       value: state.bypassDspOnBitPerfect,
+                      featureInfo: AudioFeatureRegistry.bypassDsp,
                       onChanged: cubit.setBypassDspOnBitPerfect,
                     ),
                     _divider(p),
                     // ReplayGain / Loudness Normalization Suite
-                    Padding(
+                    Builder(builder: (cntx) {
+                      final rgBlocked = AudioConflicts.replayGainBlockedByBitPerfect(
+                        bitPerfectOutput: state.bitPerfectOutput,
+                        bypassDspOnBitPerfect: state.bypassDspOnBitPerfect,
+                        device: state.currentOutputDevice,
+                      );
+                      return Padding(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -306,26 +358,37 @@ class SettingsScreen extends StatelessWidget {
                           Row(
                             children: [
                               Icon(Icons.volume_up_rounded,
-                                  color: p.accent, size: 20),
+                                  color: rgBlocked != null ? p.textTertiary : p.accent, size: 20),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      'ReplayGain Loudness Normalization',
-                                      style: TextStyle(
-                                        color: p.textPrimary,
-                                        fontWeight: FontWeight.w700,
-                                        fontSize: 14,
-                                      ),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: Text(
+                                            'ReplayGain Loudness Normalization',
+                                            style: TextStyle(
+                                              color: rgBlocked != null ? p.textTertiary : p.textPrimary,
+                                              fontWeight: FontWeight.w700,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ),
+                                        IconButton(
+                                          icon: Icon(Icons.info_outline_rounded, size: 18, color: p.textTertiary),
+                                          visualDensity: VisualDensity.compact,
+                                          onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.replayGain, conflictReason: rgBlocked),
+                                        ),
+                                      ],
                                     ),
-                                    const SizedBox(height: 2),
                                     Text(
-                                      'EBU R128 automatic volume leveling across diverse track masters',
+                                      rgBlocked ?? 'EBU R128 automatic volume leveling across diverse track masters',
                                       style: TextStyle(
-                                        color: p.textSecondary,
+                                        color: rgBlocked != null ? p.error : p.textSecondary,
                                         fontSize: 12,
+                                        fontWeight: rgBlocked != null ? FontWeight.w600 : FontWeight.normal,
                                       ),
                                     ),
                                   ],
@@ -333,6 +396,7 @@ class SettingsScreen extends StatelessWidget {
                               ),
                             ],
                           ),
+                          if (rgBlocked != null) _conflictBanner(context, rgBlocked),
                           const SizedBox(height: 12),
                           SizedBox(
                             width: double.infinity,
@@ -375,14 +439,19 @@ class SettingsScreen extends StatelessWidget {
                                 ),
                               ],
                               selected: {state.replayGainMode},
-                              onSelectionChanged: (selected) {
+                              onSelectionChanged: rgBlocked != null ? null : (selected) {
                                 if (selected.isNotEmpty) {
                                   cubit.setReplayGainMode(selected.first);
                                 }
                               },
                             ),
                           ),
-                          if (state.replayGainMode != ReplayGainMode.off) ...[
+                          if (rgBlocked != null)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8),
+                              child: Text('Disable Bit-Perfect bypass to adjust ReplayGain.', style: TextStyle(color: p.textTertiary, fontSize: 11)),
+                            ),
+                          if (rgBlocked == null && state.replayGainMode != ReplayGainMode.off) ...[
                             const SizedBox(height: 14),
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -439,7 +508,8 @@ class SettingsScreen extends StatelessWidget {
                           ],
                         ],
                       ),
-                    ),
+                    );
+                    }),
                     const BatteryOptimizationCard(),
                   ]),
                   _section(context, context.l10n.themeAndAppearance, [
@@ -899,6 +969,7 @@ class SettingsScreen extends StatelessWidget {
           ),
         );
       },
+      ),
     );
   }
 
@@ -948,37 +1019,161 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  void _showFeatureInfo(BuildContext context, AudioFeatureInfo info, {String? conflictReason}) {
+    final p = context.palette;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: p.surface,
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(color: p.accentContainer, borderRadius: BorderRadius.circular(8)),
+              child: Icon(Icons.info_outline_rounded, color: p.accent, size: 18),
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Text(info.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(info.subtitle, style: TextStyle(color: p.textSecondary, fontWeight: FontWeight.w600, fontSize: 12)),
+              const SizedBox(height: 10),
+              Text(info.description, style: TextStyle(color: p.textPrimary, fontSize: 13, height: 1.4)),
+              if (info.conflictsWith != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.amber.withValues(alpha: 0.4))),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text('Conflicts with: ${info.conflictsWith}', style: TextStyle(color: p.textSecondary, fontSize: 11, fontWeight: FontWeight.w600))),
+                    ],
+                  ),
+                ),
+              ],
+              if (conflictReason != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: p.error.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10), border: Border.all(color: p.error.withValues(alpha: 0.4))),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.block_rounded, color: p.error, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(conflictReason, style: TextStyle(color: p.error, fontSize: 11, fontWeight: FontWeight.w600))),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Got it'))],
+      ),
+    );
+  }
+
+  Widget _conflictBanner(BuildContext context, String reason) {
+    final p = context.palette;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(color: p.error.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10), border: Border.all(color: p.error.withValues(alpha: 0.3))),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.block_rounded, color: p.error, size: 16),
+          const SizedBox(width: 8),
+          Expanded(child: Text(reason, style: TextStyle(color: p.error, fontSize: 11, fontWeight: FontWeight.w600))),
+        ],
+      ),
+    );
+  }
+
   Widget _navTile(
       BuildContext context, IconData icon, String title, String subtitle,
-      {Widget? trailing, VoidCallback? onTap}) {
+      {Widget? trailing, VoidCallback? onTap, AudioFeatureInfo? featureInfo, String? disabledReason}) {
     final p = context.palette;
-    return ListTile(
-      leading: _iconBox(context, icon),
-      title: Text(title,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-      subtitle: Text(subtitle,
-          style: TextStyle(color: p.textSecondary, fontSize: 12)),
-      trailing: trailing ??
-          Icon(Icons.chevron_right_rounded, color: p.textTertiary, size: 20),
-      onTap: onTap,
+    final isDisabled = disabledReason != null && onTap == null;
+    return Opacity(
+      opacity: isDisabled ? 0.55 : 1.0,
+      child: ListTile(
+        leading: _iconBox(context, icon),
+        title: Row(
+          children: [
+            Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14))),
+            if (featureInfo != null)
+              IconButton(
+                icon: Icon(Icons.info_outline_rounded, size: 18, color: p.textTertiary),
+                tooltip: 'About $title',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _showFeatureInfo(context, featureInfo, conflictReason: disabledReason),
+              ),
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(subtitle, style: TextStyle(color: p.textSecondary, fontSize: 12)),
+            if (disabledReason != null) ...[
+              const SizedBox(height: 4),
+              Text(disabledReason, style: TextStyle(color: p.error, fontSize: 11, fontWeight: FontWeight.w600)),
+            ],
+          ],
+        ),
+        trailing: trailing ??
+            Icon(Icons.chevron_right_rounded, color: p.textTertiary, size: 20),
+        onTap: disabledReason != null && onTap == null ? () => _showFeatureInfo(context, featureInfo ?? AudioFeatureRegistry.equalizer, conflictReason: disabledReason) : onTap,
+      ),
     );
   }
 
   Widget _switchTile(
       BuildContext context, IconData icon, String title, String subtitle,
-      {required bool value, required ValueChanged<bool> onChanged}) {
+      {required bool value, required ValueChanged<bool> onChanged, AudioFeatureInfo? featureInfo, String? disabledReason}) {
     final p = context.palette;
-    return ListTile(
-      leading: _iconBox(context, icon),
-      title: Text(title,
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-      subtitle: Text(subtitle,
-          style: TextStyle(color: p.textSecondary, fontSize: 12)),
-      trailing: Switch.adaptive(
-          value: value,
-          activeTrackColor: p.accent,
-          activeThumbColor: Colors.white,
-          onChanged: onChanged),
+    final isDisabled = disabledReason != null;
+    return Opacity(
+      opacity: isDisabled ? 0.55 : 1.0,
+      child: ListTile(
+        leading: _iconBox(context, icon),
+        title: Row(
+          children: [
+            Expanded(child: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14))),
+            if (featureInfo != null)
+              IconButton(
+                icon: Icon(Icons.info_outline_rounded, size: 18, color: p.textTertiary),
+                tooltip: 'About $title',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => _showFeatureInfo(context, featureInfo, conflictReason: disabledReason),
+              ),
+          ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(subtitle, style: TextStyle(color: p.textSecondary, fontSize: 12)),
+            if (disabledReason != null) ...[
+              const SizedBox(height: 4),
+              Text(disabledReason, style: TextStyle(color: p.error, fontSize: 11, fontWeight: FontWeight.w600)),
+            ],
+          ],
+        ),
+        trailing: Switch.adaptive(
+            value: value,
+            activeTrackColor: p.accent,
+            activeThumbColor: Colors.white,
+            onChanged: isDisabled ? null : onChanged),
+      ),
     );
   }
 

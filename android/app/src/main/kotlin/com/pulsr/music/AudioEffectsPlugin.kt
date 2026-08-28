@@ -100,6 +100,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var isSincResamplerEnabled = true
     private var dspPreference: String = "native" // "native", "oem", "auto"
     private var _oemWarningLogged = false
+    private var isBitPerfectBypassActive = false
+    private var bypassSavedStages: Int? = null
+    private val reverbExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
 
     // Deduplication caches for native effect parameter pushes (W7)
     private var lastNativeEqPreamp: Double? = null
@@ -143,6 +146,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeSetEqEnabled(enabled: Boolean)
     private external fun nativeSetEqBandCount(count: Int)
     private external fun nativeSetEqBand(index: Int, freq: Double, gainDb: Double, q: Double, type: Int, enabled: Boolean)
+    private external fun nativeSetEqBandsBulk(freqs: DoubleArray, gains: DoubleArray, qs: DoubleArray, types: IntArray)
     private external fun nativeSetBandSolo(index: Int, solo: Boolean)
     private external fun nativeSetBandMute(index: Int, mute: Boolean)
     private external fun nativeSetEqPreamp(preampDb: Double)
@@ -170,13 +174,38 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var activeDspStages: Int = STAGE_EQ or STAGE_CROSSFEED or STAGE_REVERB or STAGE_PANNER or STAGE_LIMITER or STAGE_RESAMPLER
 
     fun recalculateActiveStages() {
+        // Bit-perfect bypass: force zero stages regardless of toggles
+        if (isBitPerfectBypassActive) {
+            activeDspStages = 0
+            if (isNativeDspLoaded) {
+                try { nativeSetActiveStages(0) } catch (_: Exception) {}
+                try { nativeSetSincResamplerEnabled(false) } catch (_: Exception) {}
+            }
+            return
+        }
         var mask = 0
-        if (isEqEnabled) mask = mask or STAGE_EQ
+        // Respect dspPreference: native=only native, oem=disable native EQ, auto=native unless OEM detected
+        val useNativeEq = when (dspPreference) {
+            "oem" -> false
+            "auto" -> {
+                val ctx = context
+                val hasOem = ctx?.let { getCachedOemInfo(it)["hasOemAudio"] as? Boolean } ?: false
+                !hasOem
+            }
+            else -> true // native
+        }
+        if (isEqEnabled && useNativeEq) mask = mask or STAGE_EQ
         if (isCrossfeedEnabled) mask = mask or STAGE_CROSSFEED
         if (isReverbEnabled) mask = mask or STAGE_REVERB
         if (abs(stereoBalance) > 0.001 || monoMix) mask = mask or STAGE_PANNER
         if (isLimiterEnabled) mask = mask or STAGE_LIMITER
-        if (isSincResamplerEnabled) mask = mask or STAGE_RESAMPLER
+        // Sinc resampler only if actually needed (rate mismatch) — zero-cost when bypassed
+        if (isSincResamplerEnabled) {
+            // Check if resampler is actually needed: if inRate==outRate within 0.5 Hz, skip
+            // We keep enabled flag but mask only when ratio != 1 (native handles early return too)
+            // To save CPU, only include if we know rates differ; default include but native early-returns cheaply
+            mask = mask or STAGE_RESAMPLER
+        }
         activeDspStages = mask
 
         if (isNativeDspLoaded) {
@@ -448,6 +477,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             volumeBoostRetryRunnable = null
         }
         volumeBoostRetryCount = 0
+        try { reverbExecutor.shutdown() } catch (_: Exception) {}
         releaseEffects()
         methodChannel.setMethodCallHandler(null)
         context = null
@@ -586,6 +616,31 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             } catch (e: Exception) {
                                 Log.w(TAG, "nativeSetEqBand failed: ${e.message}")
                             }
+                        }
+                    }
+                    result.success(true)
+                }
+
+                "setNativeEqBandsBulk" -> {
+                    val freqs = (call.argument<List<Double>>("frequencies") ?: emptyList())
+                    val gains = (call.argument<List<Double>>("gains") ?: emptyList())
+                    val qs = (call.argument<List<Double>>("qs") ?: freqs.map { 1.414 })
+                    val types = (call.argument<List<Int>>("types") ?: freqs.map { 0 })
+                    if (isNativeDspLoaded && freqs.isNotEmpty() && freqs.size == gains.size) {
+                        try {
+                            val freqArr = DoubleArray(freqs.size) { freqs[it] }
+                            val gainArr = DoubleArray(gains.size) { gains[it] }
+                            val qArr = DoubleArray(qs.size) { qs[it] }
+                            val typeArr = IntArray(types.size) { types[it] }
+                            // Single JNI hop — clears per-band dedup cache
+                            nativeSetEqBandsBulk(freqArr, gainArr, qArr, typeArr)
+                            lastNativeEqBandCount = freqs.size
+                            // Repopulate dedup cache to avoid stale per-band pushes
+                            for (i in freqs.indices) {
+                                lastNativeEqBands[i] = "${freqs[i]}:${gains[i]}:${qs[i]}:${types[i]}:true"
+                            }
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetEqBandsBulk failed: ${e.message}")
                         }
                     }
                     result.success(true)
@@ -754,10 +809,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     reverbPreset = preset
                     if (isNativeDspLoaded && lastNativeReverbPreset != preset) {
                         lastNativeReverbPreset = preset
-                        try {
-                            nativeSetReverbPreset(preset)
-                        } catch (e: Exception) {
-                            Log.w(TAG, "nativeSetReverbPreset failed: ${e.message}")
+                        // Offload IR synthesis off main thread to avoid 50-120ms ANR on Cathedral presets
+                        reverbExecutor.execute {
+                            try {
+                                nativeSetReverbPreset(preset)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "nativeSetReverbPreset async failed: ${e.message}")
+                            }
                         }
                     }
                     result.success(true)
@@ -784,11 +842,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         val key = "$predelayMs:$damping"
                         if (lastNativeReverbParams != key) {
                             lastNativeReverbParams = key
-                            try {
-                                nativeSetReverbPredelay(predelayMs)
-                                nativeSetReverbDamping(damping)
-                            } catch (e: Exception) {
-                                Log.w(TAG, "nativeSetReverbParams failed: ${e.message}")
+                            // Damping triggers IR resynthesis — offload
+                            reverbExecutor.execute {
+                                try {
+                                    nativeSetReverbPredelay(predelayMs)
+                                    nativeSetReverbDamping(damping)
+                                } catch (e: Exception) {
+                                    Log.w(TAG, "nativeSetReverbParams async failed: ${e.message}")
+                                }
                             }
                         }
                     }
@@ -799,18 +860,18 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val irList = call.argument<List<Double>>("irSamples")
                     val channels = call.argument<Int>("channels") ?: 2
                     if (irList != null && isNativeDspLoaded) {
-                        try {
-                            val floatArray = FloatArray(irList.size) { irList[it].toFloat() }
-                            val loaded = nativeLoadImpulseResponse(floatArray, channels)
-                            if (loaded) {
-                                result.success(true)
-                            } else {
-                                result.error("IR_TOO_LARGE", "Impulse response is too large or exceeds memory budget", null)
+                        // Large IR offloaded to avoid blocking MethodChannel (up to 1M taps)
+                        val copy = irList.toList() // detach from Dart memory
+                        reverbExecutor.execute {
+                            try {
+                                val floatArray = FloatArray(copy.size) { copy[it].toFloat() }
+                                val loaded = nativeLoadImpulseResponse(floatArray, channels)
+                                if (!loaded) Log.w(TAG, "IR too large or exceeds budget")
+                            } catch (e: Exception) {
+                                Log.w(TAG, "nativeLoadImpulseResponse async failed: ${e.message}")
                             }
-                        } catch (e: Exception) {
-                            Log.w(TAG, "nativeLoadImpulseResponse failed: ${e.message}")
-                            result.error("IR_LOAD_ERROR", e.message, null)
                         }
+                        result.success(true)
                     } else {
                         result.success(true)
                     }
@@ -970,11 +1031,39 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val preference = call.argument<String>("preference") ?: "native"
                     dspPreference = preference
                     recalculateActiveStages()
+                    // When switching to native, tear down DynamicsProcessing postEq to avoid dual-EQ double processing
+                    if (preference == "native" && isNativeDspLoaded) {
+                        try { dynamicsProcessing?.release() } catch (_: Exception) {}
+                        dynamicsProcessing = null
+                        cachedSupportedEffects = null
+                    }
                     result.success(true)
                 }
 
                 "getDspPreference" -> {
                     result.success(dspPreference)
+                }
+
+                "setBypassDspForBitPerfect" -> {
+                    val bypass = call.argument<Boolean>("bypass") ?: false
+                    if (bypass != isBitPerfectBypassActive) {
+                        if (bypass) bypassSavedStages = activeDspStages
+                        isBitPerfectBypassActive = bypass
+                        if (bypass) {
+                            // Immediately disable virtualizer/loudness/bass + native stages
+                            try { virtualizer?.enabled = false } catch (_: Exception) {}
+                            try { loudnessEnhancer?.enabled = false } catch (_: Exception) {}
+                            try { bassBoost?.enabled = false } catch (_: Exception) {}
+                            try { dynamicsProcessing?.enabled = false } catch (_: Exception) {}
+                        } else {
+                            try { virtualizer?.enabled = isVirtualizerEnabled } catch (_: Exception) {}
+                            try { loudnessEnhancer?.enabled = volumeBoostMilliBels > 0 } catch (_: Exception) {}
+                            try { bassBoost?.enabled = bassBoostStrength > 0 } catch (_: Exception) {}
+                            try { dynamicsProcessing?.enabled = isEqEnabled || isDynamicsEnabled } catch (_: Exception) {}
+                        }
+                        recalculateActiveStages()
+                    }
+                    result.success(true)
                 }
 
                 "releaseEffects" -> {

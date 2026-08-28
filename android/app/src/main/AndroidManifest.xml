@@ -129,7 +129,9 @@
         
         <service android:name="com.ryanheise.audioservice.AudioService"
             android:foregroundServiceType="mediaPlayback"
-            android:exported="true" tools:ignore="Instantiatable">
+            android:exported="true"
+            android:permission="android.permission.MEDIA_CONTENT_CONTROL"
+            tools:ignore="Instantiatable">
             <intent-filter>
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
@@ -182,5 +184,6 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <package android:name="com.google.android.gms" />
     </queries>
 </manifest>

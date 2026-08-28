@@ -82,6 +82,47 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetEqBand(
 }
 
 JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetEqBandsBulk(
+        JNIEnv* env, jobject /* thiz */,
+        jdoubleArray jFreqs, jdoubleArray jGains, jdoubleArray jQs, jintArray jTypes) {
+    if (!jFreqs || !jGains) return;
+    jsize freqLen = env->GetArrayLength(jFreqs);
+    jsize gainLen = env->GetArrayLength(jGains);
+    jsize count = freqLen < gainLen ? freqLen : gainLen;
+    if (count <= 0 || count > EqParamSet::MAX_BANDS) return;
+
+    jdouble* freqs = env->GetDoubleArrayElements(jFreqs, nullptr);
+    jdouble* gains = env->GetDoubleArrayElements(jGains, nullptr);
+    jdouble* qs = jQs ? env->GetDoubleArrayElements(jQs, nullptr) : nullptr;
+    jint* types = jTypes ? env->GetIntArrayElements(jTypes, nullptr) : nullptr;
+    if (!freqs || !gains) {
+        if (freqs) env->ReleaseDoubleArrayElements(jFreqs, freqs, JNI_ABORT);
+        if (gains) env->ReleaseDoubleArrayElements(jGains, gains, JNI_ABORT);
+        if (qs && jQs) env->ReleaseDoubleArrayElements(jQs, qs, JNI_ABORT);
+        if (types && jTypes) env->ReleaseIntArrayElements(jTypes, types, JNI_ABORT);
+        return;
+    }
+
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->eq.bandCount = static_cast<int>(count);
+    for (int i = 0; i < count; ++i) {
+        updated->eq.bands[i].frequency = freqs[i];
+        updated->eq.bands[i].gainDb = gains[i];
+        updated->eq.bands[i].q = qs ? qs[i] : 1.414;
+        updated->eq.bands[i].type = types ? static_cast<FilterType>(types[i]) : FilterType::Peaking;
+        updated->eq.bands[i].enabled = true;
+    }
+    // Single atomic publish — 1 generation bump vs 32
+    AudioDspEngine::instance().publishParams(updated);
+
+    env->ReleaseDoubleArrayElements(jFreqs, freqs, JNI_ABORT);
+    env->ReleaseDoubleArrayElements(jGains, gains, JNI_ABORT);
+    if (qs && jQs) env->ReleaseDoubleArrayElements(jQs, qs, JNI_ABORT);
+    if (types && jTypes) env->ReleaseIntArrayElements(jTypes, types, JNI_ABORT);
+}
+
+JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetBandSolo(
         JNIEnv* /* env */, jobject /* thiz */, jint index, jboolean solo) {
     if (index < 0 || index >= EqParamSet::MAX_BANDS) return;

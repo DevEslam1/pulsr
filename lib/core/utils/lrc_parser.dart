@@ -19,7 +19,7 @@ class LrcParser {
     final lines = lrcContent.split(RegExp(r'\r?\n'));
     final List<LyricsLine> result = [];
 
-    // Match tags like [01:23.45] or [01:23.456] or [01:23.4] or [01:23] or [120:00.00]
+    // Match tags like [01:23.45] etc. Seconds 00-59 enforced post-parse.
     final RegExp timeExp = RegExp(r'\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]');
 
     for (final line in lines) {
@@ -36,6 +36,7 @@ class LrcParser {
       for (final match in matches) {
         final minutes = int.parse(match.group(1)!);
         final seconds = int.parse(match.group(2)!);
+        if (seconds >= 60) continue; // reject invalid LRC timestamps
         final fractionStr = match.group(3) ?? '0';
         final milliseconds =
             int.parse(fractionStr.padRight(3, '0').substring(0, 3));
@@ -123,13 +124,15 @@ class LrcParser {
     return null;
   }
 
-  /// Attempts to fetch embedded lyrics via platform channel.
+  /// Attempts to fetch embedded lyrics via platform channel with timeout guard.
   static Future<String?> getEmbeddedLyrics(String audioFilePath) async {
     try {
-      final String? lyrics = await _lyricsChannel.invokeMethod<String>(
-        'getEmbeddedLyrics',
-        {'filePath': audioFilePath},
-      );
+      final String? lyrics = await _lyricsChannel
+          .invokeMethod<String>(
+            'getEmbeddedLyrics',
+            {'filePath': audioFilePath},
+          )
+          .timeout(const Duration(seconds: 4), onTimeout: () => null);
       if (lyrics != null && lyrics.trim().isNotEmpty) {
         return lyrics.trim();
       }
@@ -234,6 +237,11 @@ class LrcParser {
       final evictedKey = _lyricsCache.keys.first;
       _lyricsCache.remove(evictedKey);
       _negativeCacheTimes.remove(evictedKey);
+    }
+    // Bound negative cache growth: prune oldest if >100
+    if (_negativeCacheTimes.length > 100) {
+      final oldest = _negativeCacheTimes.keys.first;
+      _negativeCacheTimes.remove(oldest);
     }
     _lyricsCache[cacheKey] = resolved;
     if (resolved == null) {

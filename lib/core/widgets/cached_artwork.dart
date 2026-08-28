@@ -1,4 +1,5 @@
 // lib/core/widgets/cached_artwork.dart
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -166,6 +167,8 @@ class _CachedArtworkState extends State<CachedArtwork> {
     if (uri == null || !uri.isScheme('https')) return null;
     HttpClientRequest? request;
     try {
+      // Respects proxy via AppHttpOverrides.global — getIt<HttpClient> is created
+      // through AppHttpOverrides.createHttpClient so findProxy/authenticateProxy are applied.
       request = await getIt<HttpClient>().getUrl(uri).timeout(const Duration(seconds: 8));
       var response = await request.close().timeout(const Duration(seconds: 8));
 
@@ -174,6 +177,7 @@ class _CachedArtworkState extends State<CachedArtwork> {
         await response.drain<void>();
         final fallbackUri = Uri.tryParse(url);
         if (fallbackUri != null) {
+          // Also respects proxy via AppHttpOverrides.global
           request = await getIt<HttpClient>().getUrl(fallbackUri).timeout(const Duration(seconds: 8));
           response = await request.close().timeout(const Duration(seconds: 8));
         }
@@ -199,17 +203,24 @@ class _CachedArtworkState extends State<CachedArtwork> {
 
     // 1. Check in-memory LRU cache
     if (_cache.containsKey(key)) {
-      setState(() {
-        _cachedBytes = _cache.get(key);
-      });
+      if (!mounted || token != _loadToken) return;
+      final memBytes = _cache.get(key);
+      // Guard: only set state when mounted and bytes are valid
+      if (memBytes != null && memBytes.isNotEmpty) {
+        setState(() {
+          _cachedBytes = memBytes;
+        });
+      }
       return;
     }
 
     // 2. Check persistent disk cache
     final diskBytes = await ArtworkCacheManager().get(key);
     if (diskBytes != null && diskBytes.isNotEmpty) {
+      if (!mounted || token != _loadToken) return;
+      // Guard ArtworkLruCache.put with non-empty check (cache caps at 50MB/200 entries)
+      _cache.put(key, diskBytes);
       if (mounted && token == _loadToken) {
-        _cache.put(key, diskBytes);
         setState(() {
           _cachedBytes = diskBytes;
         });
@@ -247,22 +258,25 @@ class _CachedArtworkState extends State<CachedArtwork> {
       );
     }
 
-    pending.then((bytes) {
+    unawaited(pending.then((bytes) {
+      if (!mounted || token != _loadToken) return;
+      // Guard ArtworkLruCache.put: only cache valid non-empty artwork
+      if (bytes != null && bytes.isNotEmpty) {
+        _cache.put(key, bytes);
+      }
       if (mounted && token == _loadToken) {
-        if (bytes != null && bytes.isNotEmpty) {
-          _cache.put(key, bytes);
-        }
         setState(() {
           _cachedBytes = bytes;
         });
       }
     }).catchError((_) {
+      if (!mounted || token != _loadToken) return;
       if (mounted && token == _loadToken) {
         setState(() {
           _cachedBytes = null;
         });
       }
-    });
+    }));
   }
 
   @override
@@ -286,7 +300,8 @@ class _CachedArtworkState extends State<CachedArtwork> {
           icon: widget.fallbackIcon,
         );
 
-        final decodeDim = (effectiveSize * 1.5).clamp(80, 800).round();
+        final dpr = MediaQuery.of(context).devicePixelRatio;
+        final decodeDim = (effectiveSize * dpr).clamp(80, 600).round();
 
         final content = _cachedBytes != null
             ? Image.memory(

@@ -306,28 +306,33 @@ class EqualizerManager {
     currentPreset = currentPreset.copyWith(gains: interpolated);
 
     if (Platform.isAndroid) {
-      // Batch native calls to avoid 32 sequential JNI hops (150-300ms jank)
-      await _effectsChannel.setNativeEqBandCount(targetFreqs.length);
-      // Use batched gains where available, with native fallback
+      // Single bulk JNI hop (was 32 hops, 150-300ms jank) + fallback for legacy 10-band path
+      try {
+        await _effectsChannel.setNativeEqBandsBulk(
+          frequencies: targetFreqs,
+          gains: currentPreset.gains,
+        );
+      } catch (_) {
+        await _effectsChannel.setNativeEqBandCount(targetFreqs.length);
+        final futures = <Future>[];
+        for (int i = 0; i < targetFreqs.length; i++) {
+          futures.add(_effectsChannel.setNativeEqBand(
+            i,
+            targetFreqs[i],
+            currentPreset.gains[i],
+            1.414,
+          ));
+          if (futures.length >= 8) {
+            await Future.wait(futures);
+            futures.clear();
+          }
+        }
+        if (futures.isNotEmpty) await Future.wait(futures);
+      }
       if (!enabled) {
         await _effectsChannel.setEqBands(targetFreqs);
         await _effectsChannel.setEqBandGains(currentPreset.gains);
       }
-      // Parallelize native band updates with concurrency limit to reduce UI jank
-      final futures = <Future>[];
-      for (int i = 0; i < targetFreqs.length; i++) {
-        futures.add(_effectsChannel.setNativeEqBand(
-          i,
-          targetFreqs[i],
-          currentPreset.gains[i],
-          1.414,
-        ));
-        if (futures.length >= 8) {
-          await Future.wait(futures);
-          futures.clear();
-        }
-      }
-      if (futures.isNotEmpty) await Future.wait(futures);
     }
     _debouncedSavePreferences();
   }
@@ -408,6 +413,20 @@ class EqualizerManager {
     if (!isEnabled) return;
     final targetFreqs = is32BandMode ? custom32Frequencies : customFrequencies;
     if (Platform.isAndroid) {
+      // Prefer bulk path — single generation publish, zero per-band JNI overhead
+      try {
+        await _effectsChannel.setNativeEqBandsBulk(
+          frequencies: targetFreqs,
+          gains: currentPreset.gains,
+        );
+        if (!is32BandMode) {
+          // Keep legacy 10-band DynamicsProcessing in sync only for 10-band mode
+          await _effectsChannel.setEqBands(targetFreqs);
+          await _effectsChannel.setEqBandGains(currentPreset.gains);
+        }
+        return;
+      } catch (_) {}
+      // Fallback to legacy per-band if bulk unavailable (old APK)
       if (is32BandMode) {
         await _effectsChannel.setNativeEqBandCount(targetFreqs.length);
         final futures = <Future>[];
@@ -753,6 +772,26 @@ class EqualizerManager {
       await _effectsChannel.setSincResamplerEnabled(enabled);
     }
     _debouncedSavePreferences();
+  }
+
+  Future<void> setBypassDspForBitPerfect(bool bypass) async {
+    if (Platform.isAndroid) {
+      await _effectsChannel.setBypassDspForBitPerfect(bypass);
+    }
+  }
+
+  Future<int> syncNativeLatency(double sampleRate) async {
+    if (!Platform.isAndroid) return 0;
+    try {
+      final frames = await _effectsChannel.getPipelineLatencyFrames();
+      // Update resampler rates if needed for auto-disable check
+      if (isSincResamplerEnabled) {
+        await _effectsChannel.setSincResamplerRates(sampleRate, sampleRate);
+      }
+      return frames;
+    } catch (_) {
+      return 0;
+    }
   }
 
   static final Map<String, EqPreset> _genreEqMap = {

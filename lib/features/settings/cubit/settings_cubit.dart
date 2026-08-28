@@ -18,6 +18,7 @@ import '../../../core/utils/error_logger.dart';
 import '../../../data/audio/audio_effects_channel.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 import '../../../domain/models/audio_output_info.dart';
+import '../../../core/constants/audio_feature_info.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
 import 'settings_state.dart';
 
@@ -274,17 +275,8 @@ class SettingsCubit extends Cubit<SettingsState> {
       final proxyPort = prefs.getInt(_keyProxyPort) ?? 8080;
       final proxyUsername = prefs.getString(_keyProxyUsername) ?? '';
 
-      if (proxyPassword.isEmpty) {
-        final legacyPassword = prefs.getString(_keyProxyPassword) ?? '';
-        if (legacyPassword.isNotEmpty) {
-          proxyPassword = legacyPassword;
-          try {
-            await _secureStorage.write(
-                key: _keyProxyPasswordSecure, value: legacyPassword);
-            await prefs.remove(_keyProxyPassword);
-          } catch (_) {}
-        }
-      }
+      // Legacy proxy password migration already handled above (lines 164-186)
+      // No second migration needed.
 
       if (xdmToken.isEmpty) {
         final legacyToken =
@@ -397,7 +389,8 @@ class SettingsCubit extends Cubit<SettingsState> {
             prefs.getDouble(PrefsKeys.crossfeedFeedDb) ?? state.crossfeedFeedDb,
         limiterEnabled: prefs.getBool(PrefsKeys.lookaheadLimiterEnabled) ??
             state.limiterEnabled,
-        limiterLookaheadMs: state.limiterLookaheadMs,
+        limiterLookaheadMs: prefs.getDouble('setting_lookahead_limiter_lookahead_ms') ??
+            state.limiterLookaheadMs,
         limiterThresholdDb:
             prefs.getDouble(PrefsKeys.lookaheadLimiterThresholdDb) ??
                 state.limiterThresholdDb,
@@ -443,14 +436,38 @@ class SettingsCubit extends Cubit<SettingsState> {
   }
 
   Future<void> setGapless(bool value) async {
-    emit(state.copyWith(gaplessPlayback: value));
+    // Prevent gapless + crossfade together — auto-disable crossfade and inform user
+    if (value && state.crossfadeSeconds > 0.01) {
+      emit(state.copyWith(
+        gaplessPlayback: true,
+        crossfadeSeconds: 0.0,
+        errorMessage: AudioConflicts.gaplessBlockedByCrossfade(state.crossfadeSeconds) ?? 'Crossfade disabled: gapless requires 0 s.',
+      ));
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_keyGapless, true);
+      await prefs.setDouble(_keyCrossfade, 0.0);
+      return;
+    }
+    emit(state.copyWith(gaplessPlayback: value, errorMessage: null));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyGapless, value);
   }
 
   Future<void> setCrossfade(double seconds) async {
     final clamped = seconds.clamp(0.0, 12.0);
-    emit(state.copyWith(crossfadeSeconds: clamped));
+    if (clamped > 0.01 && state.gaplessPlayback) {
+      // Crossfade needs gapless OFF — auto-disable gapless
+      emit(state.copyWith(
+        crossfadeSeconds: clamped,
+        gaplessPlayback: false,
+        errorMessage: AudioConflicts.crossfadeBlockedByGapless(true) ?? 'Gapless disabled: crossfade requires gapless OFF.',
+      ));
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(_keyCrossfade, clamped);
+      await prefs.setBool(_keyGapless, false);
+      return;
+    }
+    emit(state.copyWith(crossfadeSeconds: clamped, errorMessage: null));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(_keyCrossfade, clamped);
   }
@@ -503,7 +520,12 @@ class SettingsCubit extends Cubit<SettingsState> {
   }
 
   Future<void> setCustomAccentColor(Color color) async {
-    final colorVal = color.toARGB32();
+    int colorVal;
+    try {
+      colorVal = (color as dynamic).toARGB32() as int;
+    } catch (_) {
+      colorVal = color.toARGB32();
+    }
     emit(state.copyWith(customAccentColorValue: colorVal));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_keyCustomAccent, colorVal);
@@ -547,7 +569,18 @@ class SettingsCubit extends Cubit<SettingsState> {
   }
 
   Future<void> setReplayGainMode(ReplayGainMode mode) async {
-    emit(state.copyWith(replayGainMode: mode));
+    if (mode != ReplayGainMode.off) {
+      final blocked = AudioConflicts.replayGainBlockedByBitPerfect(
+        bitPerfectOutput: state.bitPerfectOutput,
+        bypassDspOnBitPerfect: state.bypassDspOnBitPerfect,
+        device: state.currentOutputDevice,
+      );
+      if (blocked != null) {
+        emit(state.copyWith(errorMessage: blocked));
+        return;
+      }
+    }
+    emit(state.copyWith(replayGainMode: mode, errorMessage: null));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyReplayGainMode, mode.name);
   }
@@ -593,10 +626,10 @@ class SettingsCubit extends Cubit<SettingsState> {
   // --- Proxy Settings Actions ---
 
   Future<void> setProxyEnabled(bool enabled) async {
-    final updated = state.copyWith(proxyEnabled: enabled);
-    emit(updated);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyProxyEnabled, enabled);
+    final updated = state.copyWith(proxyEnabled: enabled);
+    emit(updated);
     await _syncProxySettings(activeProxyConfig.copyWith(enabled: enabled));
   }
 
@@ -923,15 +956,38 @@ class SettingsCubit extends Cubit<SettingsState> {
   }
 
   Future<void> setBitPerfectOutput(bool enabled) async {
+    if (enabled) {
+      final block = AudioConflicts.bitPerfectBlockedReason(state.currentOutputDevice);
+      if (block != null) {
+        emit(state.copyWith(errorMessage: block));
+        return;
+      }
+    }
     emit(state.copyWith(
       bitPerfectOutput: enabled,
       currentOutputDevice: state.currentOutputDevice?.copyWith(
         isBitPerfectActive: enabled,
       ),
+      errorMessage: null,
     ));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.bitPerfectOutput, enabled);
     await _hiResAudioService.setBitPerfectMode(enabled);
+    // Wire bypass: when bit-perfect enabled and user wants bypass, force DSP off via native
+    if (enabled && state.bypassDspOnBitPerfect) {
+      try {
+        await AudioEffectsChannel().setBypassDspForBitPerfect(true);
+      } catch (_) {}
+      // Also force ReplayGain off — software gain breaks bit-perfect
+      if (state.replayGainMode != ReplayGainMode.off) {
+        emit(state.copyWith(replayGainMode: ReplayGainMode.off, errorMessage: 'ReplayGain disabled: not compatible with Bit-Perfect bypass.'));
+        await prefs.setString(_keyReplayGainMode, ReplayGainMode.off.name);
+      }
+    } else if (!enabled) {
+      try {
+        await AudioEffectsChannel().setBypassDspForBitPerfect(false);
+      } catch (_) {}
+    }
     await refreshOutputDevice();
   }
 
@@ -939,6 +995,13 @@ class SettingsCubit extends Cubit<SettingsState> {
     emit(state.copyWith(bypassDspOnBitPerfect: enabled));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.bypassDspOnBitPerfect, enabled);
+    // Apply immediately if bit-perfect is currently active
+    if (state.bitPerfectOutput) {
+      try {
+        await AudioEffectsChannel().setBypassDspForBitPerfect(enabled);
+      } catch (_) {}
+      await refreshOutputDevice();
+    }
   }
 
   Future<void> selectOutputDevice(int deviceId) async {
@@ -1033,6 +1096,26 @@ class SettingsCubit extends Cubit<SettingsState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyDspPreference, preference);
     await AudioEffectsChannel().setDspPreference(preference);
+  }
+
+  Future<void> setLookaheadLimiter(bool enabled,
+      {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {
+    final newEnabled = enabled;
+    final newThreshold = thresholdDb ?? state.limiterThresholdDb;
+    final newRelease = releaseMs ?? state.limiterReleaseMs;
+    final newLookahead = lookaheadMs ?? state.limiterLookaheadMs;
+    emit(state.copyWith(
+      limiterEnabled: newEnabled,
+      limiterThresholdDb: newThreshold,
+      limiterReleaseMs: newRelease,
+      limiterLookaheadMs: newLookahead,
+    ));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(PrefsKeys.lookaheadLimiterEnabled, newEnabled);
+    await prefs.setDouble(PrefsKeys.lookaheadLimiterThresholdDb, newThreshold);
+    await prefs.setDouble(PrefsKeys.lookaheadLimiterReleaseMs, newRelease);
+    await prefs.setDouble(
+        'setting_lookahead_limiter_lookahead_ms', newLookahead);
   }
 
   @override

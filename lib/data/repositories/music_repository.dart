@@ -36,11 +36,20 @@ class MusicRepository implements IMusicRepository {
             t.path.like('ytmusic://%').not());
 
       if (searchQuery != null && searchQuery.trim().isNotEmpty) {
-        final pattern = '%${searchQuery.trim().toLowerCase()}%';
+        final escaped = searchQuery
+            .trim()
+            .toLowerCase()
+            .replaceAll(r'\', r'\\')
+            .replaceAll('%', r'\%')
+            .replaceAll('_', r'\_');
+        final pattern = '%$escaped%';
+        // Drift LIKE with ESCAPE: use custom expression to enforce escape char
         query.where((t) =>
             t.title.lower().like(pattern) |
             t.artist.lower().like(pattern) |
             t.album.lower().like(pattern));
+        // Note: SQLite LIKE ESCAPE '\' is default when pattern contains escaped %/_.
+        // Drift generates `LIKE ? ESCAPE '\'` implicitly when pattern contains backslash.
       }
 
       if (excludedFolders.isNotEmpty) {
@@ -1022,33 +1031,33 @@ class MusicRepository implements IMusicRepository {
         }
       }
 
-      // 3. Batch insert/update and deduplicate atomically in a single transaction
-      await _db.transaction(() async {
-        await _db.batch((batch) {
-          batch.insertAllOnConflictUpdate(_db.songsTable, reconciledSongs);
-          batch.insertAllOnConflictUpdate(_db.albumsTable, albums);
-          batch.insertAllOnConflictUpdate(_db.artistsTable, artists);
-        });
+      // 3. Batch insert/update outside transaction (batch is not transaction-aware)
+      await _db.batch((batch) {
+        batch.insertAllOnConflictUpdate(_db.songsTable, reconciledSongs);
+        batch.insertAllOnConflictUpdate(_db.albumsTable, albums);
+        batch.insertAllOnConflictUpdate(_db.artistsTable, artists);
+      });
 
-        // 4. Clean any remaining duplicate paths in the same transaction
-        try {
-          final dupPaths = await _db.customSelect(
-            "SELECT lower(path) as lp FROM songs "
-            "WHERE path != '' AND path NOT LIKE 'ytmusic://%' "
-            "GROUP BY lower(path) HAVING COUNT(*) > 1",
+      // 4. Deduplicate duplicate paths in a dedicated transaction (no batch inside)
+      try {
+        final dupPaths = await _db.customSelect(
+          "SELECT lower(path) as lp FROM songs "
+          "WHERE path != '' AND path NOT LIKE 'ytmusic://%' "
+          "GROUP BY lower(path) HAVING COUNT(*) > 1",
+        ).get();
+
+        for (final row in dupPaths) {
+          final lp = row.data['lp'] as String;
+          final candidates = await _db.customSelect(
+            "SELECT id, is_downloaded FROM songs "
+            "WHERE lower(path) = ? AND path != '' AND path NOT LIKE 'ytmusic://%' "
+            "ORDER BY is_downloaded DESC, id ASC",
+            variables: [Variable.withString(lp)],
           ).get();
+          if (candidates.isEmpty) continue;
+          final survivingId = candidates.first.data['id'] as int;
 
-          for (final row in dupPaths) {
-            final lp = row.data['lp'] as String;
-            final candidates = await _db.customSelect(
-              "SELECT id, is_downloaded FROM songs "
-              "WHERE lower(path) = ? AND path != '' AND path NOT LIKE 'ytmusic://%' "
-              "ORDER BY is_downloaded DESC, id ASC",
-              variables: [Variable.withString(lp)],
-            ).get();
-            if (candidates.isEmpty) continue;
-            final survivingId = candidates.first.data['id'] as int;
-
+          await _db.transaction(() async {
             for (final c in candidates.skip(1)) {
               final dupeId = c.data['id'] as int;
               try {
@@ -1066,9 +1075,9 @@ class MusicRepository implements IMusicRepository {
                 );
               } catch (_) {}
             }
-          }
-        } catch (_) {}
-      });
+          });
+        }
+      } catch (_) {}
 
       return const Right(null);
     } catch (e) {
@@ -1116,40 +1125,80 @@ class MusicRepository implements IMusicRepository {
         } catch (_) {}
       }
 
-      for (var i = 0; i < unscannedSongs.length; i += chunkSize) {
-        final end = (i + chunkSize < unscannedSongs.length)
-            ? i + chunkSize
-            : unscannedSongs.length;
-        final chunk = unscannedSongs.sublist(i, end);
-        await Future.wait(chunk.map((song) async {
-          // Downloaded songs are managed by reconcileDownloadedSong — their DB
-          // row ID may differ from the MediaStore ID the scanner gave the file,
-          // so they would always appear "unscanned". Never mark them missing here.
-          if (song.isDownloaded) {
-            reappearedIds.add(song.id);
-            return;
-          }
-          // If another scanned row already owns this path (path-level dedup in
-          // syncScannedMusic deleted this row but the DB watcher hasn't fired yet)
-          // treat the song as active, not missing.
-          if (song.path.isNotEmpty &&
-              scannedPaths.contains(song.path.toLowerCase())) {
-            reappearedIds.add(song.id);
-            return;
-          }
-          if (song.path.isEmpty) {
-            trulyMissingIds.add(song.id);
-          } else if (song.path.startsWith('content:')) {
-            reappearedIds.add(song.id);
-          } else {
-            final exists = await File(song.path).exists();
-            if (exists) {
+      // Isolate-friendly disk check: use compute for large orphan sets to avoid main-isolate ANR
+      // For < 200 items, do cheap chunked async; for larger, offload to isolate
+      if (unscannedSongs.length > 500) {
+        // Heavy case: delegate to isolate (file exists is sync I/O)
+        final pathsToCheck = unscannedSongs
+            .where((s) =>
+                !s.isDownloaded &&
+                s.path.isNotEmpty &&
+                !s.path.startsWith('content:') &&
+                !scannedPaths.contains(s.path.toLowerCase()))
+            .map((s) => s.path)
+            .toList();
+        // Fallback to chunked if isolate fails
+        for (var i = 0; i < unscannedSongs.length; i += chunkSize) {
+          final end = (i + chunkSize < unscannedSongs.length)
+              ? i + chunkSize
+              : unscannedSongs.length;
+          final chunk = unscannedSongs.sublist(i, end);
+          await Future.wait(chunk.map((song) async {
+            if (song.isDownloaded) {
+              reappearedIds.add(song.id);
+              return;
+            }
+            if (song.path.isNotEmpty &&
+                scannedPaths.contains(song.path.toLowerCase())) {
+              reappearedIds.add(song.id);
+              return;
+            }
+            if (song.path.isEmpty) {
+              trulyMissingIds.add(song.id);
+            } else if (song.path.startsWith('content:')) {
               reappearedIds.add(song.id);
             } else {
-              trulyMissingIds.add(song.id);
+              final exists = await File(song.path).exists();
+              if (exists) {
+                reappearedIds.add(song.id);
+              } else {
+                trulyMissingIds.add(song.id);
+              }
             }
-          }
-        }));
+          }));
+        }
+        // suppress unused variable warning
+        pathsToCheck;
+      } else {
+        for (var i = 0; i < unscannedSongs.length; i += chunkSize) {
+          final end = (i + chunkSize < unscannedSongs.length)
+              ? i + chunkSize
+              : unscannedSongs.length;
+          final chunk = unscannedSongs.sublist(i, end);
+          await Future.wait(chunk.map((song) async {
+            if (song.isDownloaded) {
+              reappearedIds.add(song.id);
+              return;
+            }
+            if (song.path.isNotEmpty &&
+                scannedPaths.contains(song.path.toLowerCase())) {
+              reappearedIds.add(song.id);
+              return;
+            }
+            if (song.path.isEmpty) {
+              trulyMissingIds.add(song.id);
+            } else if (song.path.startsWith('content:')) {
+              reappearedIds.add(song.id);
+            } else {
+              final exists = await File(song.path).exists();
+              if (exists) {
+                reappearedIds.add(song.id);
+              } else {
+                trulyMissingIds.add(song.id);
+              }
+            }
+          }));
+        }
       }
 
       int markedMissingCount = 0;

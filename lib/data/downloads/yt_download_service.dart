@@ -837,6 +837,7 @@ class YtDownloadService {
     void Function(YtDownloadProgress)? onProgress, {
     String? userAgent,
     String? cookies,
+    int depth = 0,
   }) async {
     final stopwatch = Stopwatch()..start();
     final partFile = File('${dest.path}.part');
@@ -885,9 +886,13 @@ class YtDownloadService {
         try {
           await partFile.delete();
         } catch (_) {}
-        // Retry fresh without Range (recurse once)
+        // Retry fresh without Range (recurse once) — guard depth ≤1 to avoid infinite recursion
+        if (depth >= 1) {
+          throw const DownloadFailure(
+              'Server ignored Range header repeatedly — aborting resume retry');
+        }
         return _downloadSequential(uri, dest, task, onProgress,
-            userAgent: userAgent, cookies: cookies);
+            userAgent: userAgent, cookies: cookies, depth: depth + 1);
       }
       if (response.statusCode != HttpStatus.partialContent) {
         await response.drain<void>();
@@ -1107,3 +1112,4 @@ class YtDownloadService {
     return truncated.isEmpty ? 'Unknown' : truncated;
   }
 }
+

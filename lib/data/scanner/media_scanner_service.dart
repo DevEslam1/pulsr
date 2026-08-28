@@ -44,9 +44,23 @@ class MediaScannerService {
     if (Platform.isAndroid) {
       final audioStatus = await Permission.audio.request();
       if (audioStatus.isGranted) return true;
-      if (!audioStatus.isPermanentlyDenied) {
-        final storageStatus = await Permission.storage.request();
-        return storageStatus.isGranted;
+      if (audioStatus.isPermanentlyDenied) {
+        return false; // Caller should show openAppSettings rationale
+      }
+      // Only request legacy storage on Android <=12; on 13+ it is auto-denied and triggers Play warning
+      try {
+        final sdkInt = (await const MethodChannel(PulsrChannels.audioEffects)
+                .invokeMethod<int>('getSdkInt')) ??
+            33;
+        if (sdkInt <= 32 && !audioStatus.isPermanentlyDenied) {
+          final storageStatus = await Permission.storage.request();
+          return storageStatus.isGranted;
+        }
+      } catch (_) {
+        if (!audioStatus.isPermanentlyDenied) {
+          final storageStatus = await Permission.storage.request();
+          return storageStatus.isGranted;
+        }
       }
       return false;
     } else if (Platform.isIOS) {
@@ -56,18 +70,17 @@ class MediaScannerService {
     return true;
   }
 
+  bool get shouldShowPermissionRationaleSync => false; // use Permission.audio.shouldShowRequestRationale via caller if needed
+
   static const List<String> systemIgnoredPathPatterns = [
-    // WhatsApp
     '/whatsapp/media/whatsapp voice notes/',
     '/whatsapp/media/whatsapp audio/',
     '/android/media/com.whatsapp/',
     '/com.whatsapp.w4b/',
-    // Telegram
     '/telegram/telegram audio/',
     '/telegram/telegram voice/',
     '/android/media/org.telegram.messenger/',
     '/android/media/org.telegram.plus/',
-    // Call & Voice recordings
     '/recordings/',
     '/callrecordings/',
     '/call_recordings/',
@@ -79,7 +92,6 @@ class MediaScannerService {
     '/audio_recorder/',
     '/miui/sound_recorder/',
     '/samsung/voicerecorder/',
-    // System tones & cache
     '/ringtones/',
     '/notifications/',
     '/alarms/',
@@ -92,7 +104,6 @@ class MediaScannerService {
     final normalized = filePath.toLowerCase().replaceAll('\\', '/');
     final segments = normalized.split('/').where((s) => s.isNotEmpty).toList();
 
-    // Check system ignored path patterns
     for (final pattern in systemIgnoredPathPatterns) {
       if (normalized.contains(pattern)) return true;
     }
@@ -279,7 +290,7 @@ class MediaScannerService {
     }
   }
 
-  /// Batch enriches audio quality for multiple songs, processing in batches of 10 concurrently.
+  /// Batch enriches audio quality sequentially to avoid MethodChannel flood.
   Future<void> enrichAudioQualityBatch(
     List<SongsTableData> songs, {
     void Function(int processed, int total)? onProgress,
@@ -297,11 +308,9 @@ class MediaScannerService {
     final total = eligible.length;
     int processed = 0;
 
-    for (int i = 0; i < eligible.length; i += 10) {
-      final batch = eligible.sublist(i, (i + 10).clamp(0, eligible.length));
-      await Future.wait(
-          batch.map((song) => enrichAudioQuality(song.id, song.path)));
-      processed += batch.length;
+    for (final song in eligible) {
+      await enrichAudioQuality(song.id, song.path);
+      processed++;
       onProgress?.call(processed, total);
     }
   }
@@ -310,7 +319,14 @@ class MediaScannerService {
   /// Standard PCM sample peak misses peaks occurring between samples during DAC reconstruction.
   static double computeTruePeak(List<int> samples, {int bitDepth = 16}) {
     if (samples.isEmpty) return 0.0;
-    final maxInt = (1 << (bitDepth - 1)).toDouble();
+    double maxInt;
+    if (bitDepth >= 32) {
+      maxInt = 2147483648.0;
+    } else if (bitDepth == 24) {
+      maxInt = 8388608.0;
+    } else {
+      maxInt = (1 << (bitDepth - 1)).toDouble();
+    }
     double maxTruePeak = 0.0;
 
     for (int i = 0; i < samples.length - 1; i++) {

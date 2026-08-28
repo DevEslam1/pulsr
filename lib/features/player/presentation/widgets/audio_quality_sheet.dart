@@ -7,6 +7,7 @@ import '../../../../core/utils/formatters.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../domain/models/audio_output_info.dart';
 import '../../../../domain/models/audio_quality_info.dart';
+import '../../../../core/constants/audio_feature_info.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 
@@ -634,7 +635,8 @@ class AudioQualitySheet extends StatelessWidget {
   ) {
     final isUsbDac = outputDevice?.isUsbDac == true;
     final isBitPerfectEnabled = cubit?.state.bitPerfectOutput == true;
-    final isBitPerfectActive = isBitPerfectEnabled && isUsbDac;
+    final blockedReason = AudioConflicts.bitPerfectBlockedReason(outputDevice);
+    final isBitPerfectActive = isBitPerfectEnabled && (outputDevice?.isBitPerfectActive == true);
     final currentTarget =
         isBitPerfectActive ? 0 : (outputDevice?.targetBitDepth ?? 0);
 
@@ -801,19 +803,45 @@ class AudioQualitySheet extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 2),
-                    Text(
-                      isBitPerfectEnabled
-                          ? (isUsbDac
-                              ? 'Hardware direct pass-through active on USB DAC'
-                              : 'Pass-through armed • Engages automatically when USB DAC is connected')
-                          : 'Bypasses Android mixer & DSP for bit-matched output (Requires USB DAC & Android 14+)',
-                      style: TextStyle(
-                        color: isBitPerfectEnabled
-                            ? p.textPrimary.withValues(alpha: 0.85)
-                            : p.textSecondary,
-                        fontSize: 11,
-                        height: 1.25,
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            blockedReason != null && !isBitPerfectEnabled
+                                ? blockedReason
+                                : (isBitPerfectEnabled
+                                    ? (isBitPerfectActive
+                                        ? 'Hardware direct pass-through active${isUsbDac ? " on USB DAC" : " (wired direct)"}'
+                                        : 'Pass-through armed • Engages automatically when capable DAC is connected')
+                                    : 'Bypasses Android mixer & DSP for bit-matched output (USB needs Android 14+, wired needs direct)'),
+                            style: TextStyle(
+                              color: blockedReason != null && !isBitPerfectEnabled
+                                  ? p.error
+                                  : (isBitPerfectEnabled
+                                      ? p.textPrimary.withValues(alpha: 0.85)
+                                      : p.textSecondary),
+                              fontSize: 11,
+                              height: 1.25,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary),
+                          visualDensity: VisualDensity.compact,
+                          tooltip: 'About Bit-Perfect',
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (ctx) => AlertDialog(
+                                backgroundColor: p.surface,
+                                title: const Text('Bit-Perfect Mode'),
+                                content: Text(AudioFeatureRegistry.bitPerfect.description, style: TextStyle(color: p.textPrimary, fontSize: 13)),
+                                actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Got it'))],
+                              ),
+                            );
+                          },
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -822,10 +850,16 @@ class AudioQualitySheet extends StatelessWidget {
                 value: isBitPerfectEnabled,
                 activeTrackColor: goldAccent,
                 activeThumbColor: Colors.white,
-                onChanged: (val) {
-                  HapticFeedback.selectionClick();
-                  cubit?.setBitPerfectOutput(val);
-                },
+                onChanged: (blockedReason != null && !isBitPerfectEnabled)
+                    ? null
+                    : (val) {
+                        if (blockedReason != null && val) {
+                          ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(content: Text(blockedReason), backgroundColor: p.error));
+                          return;
+                        }
+                        HapticFeedback.selectionClick();
+                        cubit?.setBitPerfectOutput(val);
+                      },
               ),
             ],
           ),

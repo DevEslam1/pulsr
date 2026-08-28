@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
@@ -146,6 +147,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
 
   bool _batchTrackEdited = false;
   bool _batchCommentEdited = false;
+  bool _batchLyricsEdited = false;
   void updateTrackNumber(String val) {
     if (isClosed) return;
     if (state.isBatchMode) _batchTrackEdited = true;
@@ -160,6 +162,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
 
   void updateLyrics(String val) {
     if (isClosed) return;
+    if (state.isBatchMode) _batchLyricsEdited = true;
     emit(state.copyWith(lyrics: val));
   }
 
@@ -332,8 +335,9 @@ class TagEditorCubit extends Cubit<TagEditorState> {
                       ? state.year
                       : (s.year?.toString() ?? '')),
               'trackNumber': _batchTrackEdited ? state.trackNumber : (s.trackNumber?.toString() ?? ''),
-              'comment': _batchCommentEdited ? state.comment : '',
-              'lyrics': '',
+              // Preserve original per-song comment/lyrics when not batch-edited (null keeps native tag intact)
+              'comment': _batchCommentEdited ? state.comment : null,
+              'lyrics': _batchLyricsEdited ? state.lyrics : null,
               'artworkPath': state.newArtworkPath,
               'removeArtwork': state.removeArtwork,
             });

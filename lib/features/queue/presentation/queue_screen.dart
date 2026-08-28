@@ -7,8 +7,10 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
+import '../../../core/di/injection.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../domain/repositories/music_repository_interface.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
 
@@ -47,7 +49,43 @@ class QueueScreen extends StatelessWidget {
                     final name = await showDialog<String>(context: context, builder: (c) => AlertDialog(title: const Text('Save as playlist'), content: TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Playlist name'), autofocus: true), actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(c, nameCtrl.text.trim()), child: const Text('Save'))]));
                     if (name != null && name.isNotEmpty) {
                       if (!context.mounted) break;
-                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Queue saved as "$name" (${state.queue.length} tracks)')));
+                      try {
+                        final repo = getIt<IMusicRepository>();
+                        final createRes = await repo.createPlaylist(name);
+                        await createRes.fold(
+                          (failure) async {
+                            if (!context.mounted) return;
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Failed to create playlist: ${failure.message}')),
+                            );
+                          },
+                          (playlistId) async {
+                            final ids = state.queue.map((s) => s.id).toList();
+                            if (ids.isEmpty) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Queue saved as "$name" (0 tracks)')),
+                              );
+                              return;
+                            }
+                            final addRes = await repo.addSongsToPlaylist(playlistId, ids);
+                            if (!context.mounted) return;
+                            addRes.fold(
+                              (failure) => ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Failed to add songs: ${failure.message}')),
+                              ),
+                              (_) => ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Queue saved as "$name" (${state.queue.length} tracks)')),
+                              ),
+                            );
+                          },
+                        );
+                      } catch (e) {
+                        if (!context.mounted) break;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error saving playlist: $e')),
+                        );
+                      }
                     }
                     break;
                 }

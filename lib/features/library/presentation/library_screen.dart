@@ -103,7 +103,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                             isScrollControlled: true,
                             backgroundColor: Colors.transparent,
                             builder: (_) =>
-                                AddToPlaylistSheet(song: selected.first),
+                                AddToPlaylistSheet(song: selected.first, songs: selected),
                           );
                         }
                       },

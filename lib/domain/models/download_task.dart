@@ -20,7 +20,16 @@ enum DownloadStatus {
   bool get canRetry => this == DownloadStatus.failed || this == DownloadStatus.interrupted;
   bool get canPrioritize => this == DownloadStatus.queued || this == DownloadStatus.paused || this == DownloadStatus.interrupted;
   bool get canCancel => !isTerminal;
+
+  static DownloadStatus? fromString(String? raw) {
+    if (raw == null) return null;
+    for (final s in DownloadStatus.values) {
+      if (s.name == raw) return s;
+    }
+    return null;
+  }
 }
+
 
 /// DL-10: State transition matrix guard ensuring only valid lifecycle state jumps are allowed.
 class TransitionGuard {
@@ -179,15 +188,18 @@ class DownloadTask {
   }
 
   factory DownloadTask.fromJson(Map<String, dynamic> json) {
+    final statusStr = json['status'] as String?;
+    final parsedStatus = DownloadStatus.fromString(statusStr);
+    if (parsedStatus == null) {
+      throw FormatException('Invalid or missing DownloadStatus: $statusStr');
+    }
+
     return DownloadTask(
       id: json['id'] as String? ?? json['videoId'] as String? ?? '',
       videoId: json['videoId'] as String? ?? '',
       title: json['title'] as String? ?? 'Unknown Title',
       artist: json['artist'] as String? ?? 'Unknown Artist',
-      status: DownloadStatus.values.firstWhere(
-        (e) => e.name == json['status'],
-        orElse: () => DownloadStatus.failed,
-      ),
+      status: parsedStatus,
       progress: (json['progress'] as num?)?.toDouble() ?? 0.0,
       speedKbps: (json['speedKbps'] as num?)?.toDouble(),
       etaSeconds: json['etaSeconds'] as int?,
@@ -203,6 +215,7 @@ class DownloadTask {
       artworkUrl: json['artworkUrl'] as String?,
     );
   }
+
 
   @override
   bool operator ==(Object other) =>

@@ -22,26 +22,26 @@ class YtmCacheManager {
     return dir;
   }
 
-  String getHashForVideoId(String videoId) {
-    return sha256.convert(utf8.encode(videoId)).toString();
+  String getHashForVideoId(String videoId, {String? quality}) {
+    final key = quality != null ? '$videoId-$quality' : videoId;
+    return sha256.convert(utf8.encode(key)).toString();
   }
 
-  /// Returns the cached audio file for [videoId] if it exists on disk and is non-empty (>100KB).
-  Future<File?> getCachedAudioFile(String videoId) async {
+  /// Returns the cached audio file for [videoId] if it exists on disk and is non-empty (>50KB).
+  Future<File?> getCachedAudioFile(String videoId, {String? quality}) async {
     try {
       final dir = await getCacheDirectory();
-      final hash = getHashForVideoId(videoId);
-      for (final ext in const ['m4a', 'webm']) {
-        final f = File(p.join(dir.path, '$hash.$ext'));
-        if (await f.exists()) {
-          final len = await f.length();
-          if (len > 100 * 1024) {
-            // Minimum 100KB for valid audio stream
-            // Update last modified time for LRU
-            try {
-              await f.setLastModified(DateTime.now());
-            } catch (_) {}
-            return f;
+      final hash = getHashForVideoId(videoId, quality: quality);
+      // Try quality-specific hash first, fallback to legacy hash for back-compat
+      final hashes = quality != null ? [hash, getHashForVideoId(videoId)] : [hash];
+      for (final h in hashes) {
+        for (final ext in const ['m4a', 'webm']) {
+          final f = File(p.join(dir.path, '$h.$ext'));
+          if (await f.exists()) {
+            final len = await f.length();
+            if (len > 50 * 1024) {
+              return f;
+            }
           }
         }
       }

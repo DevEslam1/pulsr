@@ -64,6 +64,13 @@ class AudioOutputInfo {
   final int? nativeSampleRate;
   final int? nativeFramesPerBuffer;
 
+  // Extended for exclusive-for-all
+  final bool isDirectSupported;
+  final bool isOffloadSupported;
+  final String? bitPerfectFailureReason;
+  final String activeDeviceType; // usb/wired/bt/builtin/hdmi
+  final bool isBluetooth;
+
   const AudioOutputInfo({
     required this.deviceName,
     required this.isUsbDac,
@@ -77,6 +84,11 @@ class AudioOutputInfo {
     this.targetBitDepth = 0,
     this.nativeSampleRate,
     this.nativeFramesPerBuffer,
+    this.isDirectSupported = false,
+    this.isOffloadSupported = false,
+    this.bitPerfectFailureReason,
+    this.activeDeviceType = 'builtin',
+    this.isBluetooth = false,
   });
 
   factory AudioOutputInfo.fromMap(Map<dynamic, dynamic> map) {
@@ -110,6 +122,11 @@ class AudioOutputInfo {
       targetBitDepth: (map['targetBitDepth'] as num?)?.toInt() ?? 0,
       nativeSampleRate: (map['nativeSampleRate'] as num?)?.toInt(),
       nativeFramesPerBuffer: (map['nativeFramesPerBuffer'] as num?)?.toInt(),
+      isDirectSupported: (map['isDirectSupported'] as bool?) ?? false,
+      isOffloadSupported: (map['isOffloadSupported'] as bool?) ?? false,
+      bitPerfectFailureReason: map['bitPerfectFailureReason'] as String?,
+      activeDeviceType: (map['activeDeviceType'] as String?) ?? 'builtin',
+      isBluetooth: (map['isBluetooth'] as bool?) ?? false,
     );
   }
 
@@ -125,6 +142,13 @@ class AudioOutputInfo {
       'availableDevices': availableDevices.map((d) => d.toMap()).toList(),
       'targetSampleRate': targetSampleRate,
       'targetBitDepth': targetBitDepth,
+      'nativeSampleRate': nativeSampleRate,
+      'nativeFramesPerBuffer': nativeFramesPerBuffer,
+      'isDirectSupported': isDirectSupported,
+      'isOffloadSupported': isOffloadSupported,
+      'bitPerfectFailureReason': bitPerfectFailureReason,
+      'activeDeviceType': activeDeviceType,
+      'isBluetooth': isBluetooth,
     };
   }
 
@@ -139,6 +163,13 @@ class AudioOutputInfo {
     List<AudioDeviceEntry>? availableDevices,
     int? targetSampleRate,
     int? targetBitDepth,
+    int? nativeSampleRate,
+    int? nativeFramesPerBuffer,
+    bool? isDirectSupported,
+    bool? isOffloadSupported,
+    String? bitPerfectFailureReason,
+    String? activeDeviceType,
+    bool? isBluetooth,
   }) {
     return AudioOutputInfo(
       deviceName: deviceName ?? this.deviceName,
@@ -152,6 +183,13 @@ class AudioOutputInfo {
       availableDevices: availableDevices ?? this.availableDevices,
       targetSampleRate: targetSampleRate ?? this.targetSampleRate,
       targetBitDepth: targetBitDepth ?? this.targetBitDepth,
+      nativeSampleRate: nativeSampleRate ?? this.nativeSampleRate,
+      nativeFramesPerBuffer: nativeFramesPerBuffer ?? this.nativeFramesPerBuffer,
+      isDirectSupported: isDirectSupported ?? this.isDirectSupported,
+      isOffloadSupported: isOffloadSupported ?? this.isOffloadSupported,
+      bitPerfectFailureReason: bitPerfectFailureReason ?? this.bitPerfectFailureReason,
+      activeDeviceType: activeDeviceType ?? this.activeDeviceType,
+      isBluetooth: isBluetooth ?? this.isBluetooth,
     );
   }
 

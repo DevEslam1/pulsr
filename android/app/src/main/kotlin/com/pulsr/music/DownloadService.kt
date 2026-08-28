@@ -154,17 +154,23 @@ class DownloadService : Service() {
     private fun ensureForeground(title: String, progress: Int, force: Boolean = false) {
         val n = notificationFor(title, progress)
         if (!foregroundStarted) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                startForeground(NOTIFICATION_ID, n, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-            } else {
-                startForeground(NOTIFICATION_ID, n)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    startForeground(NOTIFICATION_ID, n, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+                } else {
+                    startForeground(NOTIFICATION_ID, n)
+                }
+                foregroundStarted = true
+            } catch (e: Exception) {
+                // ForegroundServiceStartNotAllowedException on Android 14+ (API 34+) if started while backgrounded
+                android.util.Log.w("DownloadService", "Foreground service start restricted: ${e.message}")
             }
-            foregroundStarted = true
         } else {
             (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
                 .notify(NOTIFICATION_ID, n)
         }
     }
+
 
 
     private fun stopForegroundAndSelf() {

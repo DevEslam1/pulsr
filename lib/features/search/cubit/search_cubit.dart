@@ -154,7 +154,8 @@ class SearchCubit extends Cubit<SearchState> {
   }
 
   // LRU bounded cache to prevent unbounded 10k retention (was Expando leak)
-  static final LinkedHashMap<int, ({String title, String artist, String album})> _normCache = LinkedHashMap();
+  // Instance field (not static) to avoid cross-instance leak and ensure proper dispose per Cubit
+  final LinkedHashMap<int, ({String title, String artist, String album})> _normCache = LinkedHashMap();
   static const int _normCacheMax = 1000;
 
   List<SongsTableData> _filterWithFuzzy(
@@ -180,13 +181,15 @@ class SearchCubit extends Cubit<SearchState> {
       final album = norm.album;
 
       bool matchesField(String text) {
-        if (text.contains(q)) return true;
+        final cleanText = text.replaceAll(RegExp(r"[^\w\s]"), "");
+        final cleanQ = q.replaceAll(RegExp(r"[^\w\s]"), "");
+        if (cleanText.contains(cleanQ)) return true;
         // Skip Levenshtein distance check for queries < 3 chars
-        if (q.length < 3) return false;
-        if (_levenshtein(text, q) <= 2) return true;
-        // Word-level fuzzy match
-        for (final word in text.split(RegExp(r'\s+'))) {
-          if (word.length >= 3 && _levenshtein(word, q) <= 2) return true;
+        if (cleanQ.length < 3) return false;
+        if (_levenshtein(cleanText, cleanQ) <= 2) return true;
+        // Word-level fuzzy match (punctuation stripped before split)
+        for (final word in cleanText.split(RegExp(r'\s+'))) {
+          if (word.length >= 3 && _levenshtein(word, cleanQ) <= 2) return true;
         }
         return false;
       }
@@ -206,6 +209,8 @@ class SearchCubit extends Cubit<SearchState> {
   }
 
   static int _levenshtein(String a, String b) {
+    a = a.replaceAll(RegExp(r"[^\w\s]"), "");
+    b = b.replaceAll(RegExp(r"[^\w\s]"), "");
     if (a.length > 200 || b.length > 200) return 999;
     if (a == b) return 0;
     if (a.isEmpty) return b.length;

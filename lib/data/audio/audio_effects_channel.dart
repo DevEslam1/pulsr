@@ -251,6 +251,27 @@ class AudioEffectsChannel {
     }
   }
 
+  /// Bulk update for all bands in a single JNI hop (reduces 32 hops -> 1).
+  Future<void> setNativeEqBandsBulk({
+    required List<double> frequencies,
+    required List<double> gains,
+    List<double>? qs,
+    List<int>? types,
+  }) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('setNativeEqBandsBulk', {
+        'frequencies': frequencies,
+        'gains': gains,
+        'qs': qs ?? List<double>.filled(frequencies.length, 1.414),
+        'types': types ?? List<int>.filled(frequencies.length, 0),
+      });
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set native EQ bands bulk',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+  }
+
   Future<void> setNativeEqBandCount(int count) async {
     if (!Platform.isAndroid) return;
     try {
@@ -267,6 +288,17 @@ class AudioEffectsChannel {
       await _channel.invokeMethod('setNativeEqEnabled', {'enabled': enabled});
     } catch (e, st) {
       ErrorLogger.log('Failed to set native EQ enabled ($enabled)',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+  }
+
+  /// Unified bypass for all DSP stages when bit-perfect is active.
+  Future<void> setBypassDspForBitPerfect(bool bypass) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('setBypassDspForBitPerfect', {'bypass': bypass});
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set bypass DSP for bit-perfect ($bypass)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
     }
   }

@@ -219,10 +219,13 @@ class PulsrAudioHandler extends BaseAudioHandler
       final leA = AndroidLoudnessEnhancer();
       final leB = AndroidLoudnessEnhancer();
 
+      // Adaptive buffer: Hi-Res aware to avoid 44MB*2 OOM (192kHz×30s)
+      // Selected at start; runtime per-track adjust handled via setAndroidLoadControl (ExoPlayer) if needed.
+      // We start conservative and let _applyAdaptiveBufferForSong tighten further for Hi-Res.
       final loadConfig = AudioLoadConfiguration(
         androidLoadControl: AndroidLoadControl(
-          minBufferDuration: const Duration(seconds: 5),
-          maxBufferDuration: const Duration(seconds: 30),
+          minBufferDuration: const Duration(seconds: 3),
+          maxBufferDuration: const Duration(seconds: 12),
           bufferForPlaybackDuration: const Duration(milliseconds: 1000),
           bufferForPlaybackAfterRebufferDuration:
               const Duration(milliseconds: 1500),
@@ -385,18 +388,19 @@ class PulsrAudioHandler extends BaseAudioHandler
       _equalizerManager.selectedHeadphoneProfile;
   Duration get crossfadeDuration => _crossfadeManager.duration;
 
+  bool _switchingEngine = false;
   void setCrossfadeDuration(Duration duration) {
+    if (_switchingEngine) return;
     final wasGapless = _gaplessMode;
     _crossfadeManager.duration = duration;
     final isGapless = _gaplessMode;
-    // Only switch live engine if playback is actively running.
-    // When paused/stopped at startup, the engine changes passively without auto-starting playback.
     if (wasGapless != isGapless &&
         _songs.isNotEmpty &&
         _currentIndex >= 0 &&
         _currentIndex < _songs.length &&
         _activePlayer.playing) {
-      unawaited(_switchPlaybackEngine(toGapless: isGapless));
+      _switchingEngine = true;
+      unawaited(_switchPlaybackEngine(toGapless: isGapless).whenComplete(() => _switchingEngine = false));
     }
   }
 
@@ -528,7 +532,12 @@ class PulsrAudioHandler extends BaseAudioHandler
     _sleepTimerManager.startSleepTimer(
       duration,
       fadeOut: fadeOut,
-      onTimerExpired: () async => pause(),
+      onTimerExpired: () async {
+        if (_crossfadeManager.isCrossfading) {
+          await _inactivePlayer.pause();
+        }
+        await pause();
+      },
       getActivePlayer: () => _activePlayer,
     );
   }
@@ -581,6 +590,23 @@ class PulsrAudioHandler extends BaseAudioHandler
       final sr = (song.sampleRate != null && song.sampleRate! > 0)
           ? song.sampleRate!.toDouble()
           : 44100.0;
+      await AudioEffectsChannel().resyncForTrack(sr, channels: 2);
+      // Refresh native latency for lyrics sync after resampler re-init
+      try {
+        final frames = await _equalizerManager.syncNativeLatency(sr);
+        _dspPipeline.updateNativeLatency(frames: frames, sampleRate: sr);
+      } catch (_) {}
+    }
+  }
+
+  /// Applies bit-perfect bypass state to DSP pipeline (call from SettingsCubit).
+  Future<void> applyBitPerfectBypass(bool bypass) async {
+    _dspPipeline.updateState(bitPerfectBypass: bypass);
+    await _equalizerManager.setBypassDspForBitPerfect(bypass);
+    if (bypass) {
+      // Re-sync to flush filter history when entering exclusive
+      final song = currentSong;
+      final sr = (song?.sampleRate != null && song!.sampleRate! > 0) ? song.sampleRate!.toDouble() : 48000.0;
       await AudioEffectsChannel().resyncForTrack(sr, channels: 2);
     }
   }

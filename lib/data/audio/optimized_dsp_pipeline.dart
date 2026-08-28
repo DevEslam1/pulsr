@@ -22,6 +22,11 @@ class OptimizedDspPipeline {
   double balance = 0.0;
   bool monoMix = false;
   bool limiterEnabled = false;
+  bool isBitPerfectBypass = false;
+
+  /// Last measured native pipeline latency in frames (from AudioDspEngine.getPipelineLatencyFrames).
+  int _nativeLatencyFrames = 0;
+  double _nativeSampleRate = 48000.0;
 
   /// Pipeline execution order optimized for minimal latency and acoustic correctness:
   /// 1. Parametric EQ (10-32 bands)
@@ -60,11 +65,32 @@ class OptimizedDspPipeline {
   }
 
   /// Calculates total estimated DSP processing latency in milliseconds.
+  /// When bit-perfect bypass is active, latency is zero (direct passthrough).
+  /// Otherwise uses measured native latency if available, falling back to static estimates.
   double calculateTotalEstimatedLatencyMs() {
+    if (isBitPerfectBypass) return 0.0;
+    if (_nativeLatencyFrames > 0) {
+      return (_nativeLatencyFrames / _nativeSampleRate) * 1000.0;
+    }
     return getActiveStages().fold<double>(
       0.0,
       (sum, stage) => sum + stage.estimatedLatencyMs,
     );
+  }
+
+  /// Updates measured native latency from C++ engine (call after each setActiveStages).
+  void updateNativeLatency({required int frames, double sampleRate = 48000.0}) {
+    _nativeLatencyFrames = frames;
+    _nativeSampleRate = sampleRate > 0 ? sampleRate : 48000.0;
+  }
+
+  /// Returns compensated position for lyrics/seek sync.
+  Duration getCompensatedPosition(Duration rawPosition) {
+    if (isBitPerfectBypass || _nativeLatencyFrames <= 0) return rawPosition;
+    final latencyMs = (_nativeLatencyFrames / _nativeSampleRate) * 1000.0;
+    final latency = Duration(microseconds: (latencyMs * 1000).round());
+    if (rawPosition <= latency) return Duration.zero;
+    return rawPosition - latency;
   }
 
   /// Updates pipeline state from active settings.
@@ -75,6 +101,7 @@ class OptimizedDspPipeline {
     double? stereoBalance,
     bool? isMonoMix,
     bool? isLimiterEnabled,
+    bool? bitPerfectBypass,
   }) {
     if (isEqEnabled != null) eqEnabled = isEqEnabled;
     if (isCrossfeedEnabled != null) crossfeedEnabled = isCrossfeedEnabled;
@@ -82,5 +109,6 @@ class OptimizedDspPipeline {
     if (stereoBalance != null) balance = stereoBalance;
     if (isMonoMix != null) monoMix = isMonoMix;
     if (isLimiterEnabled != null) limiterEnabled = isLimiterEnabled;
+    if (bitPerfectBypass != null) isBitPerfectBypass = bitPerfectBypass;
   }
 }
