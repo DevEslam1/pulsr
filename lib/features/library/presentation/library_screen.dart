@@ -411,7 +411,6 @@ class _LibraryScreenState extends State<LibraryScreen>
           ListView.builder(
             physics: const AlwaysScrollableScrollPhysics(),
             controller: _songsScrollController,
-            itemExtent: songs.length > 500 ? 58.0 : null,
             padding:
                 const EdgeInsets.only(bottom: 160, top: 8, left: 4, right: 4),
             itemCount: songs.length,
