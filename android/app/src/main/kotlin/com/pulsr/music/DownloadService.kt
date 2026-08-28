@@ -31,6 +31,8 @@ class DownloadService : Service() {
         private const val NOTIFICATION_ID = 9401
         const val ACTION_START = "com.pulsr.music.download.START"
         const val ACTION_UPDATE = "com.pulsr.music.download.UPDATE"
+        const val ACTION_PAUSE = "com.pulsr.music.download.PAUSE"
+        const val ACTION_RESUME = "com.pulsr.music.download.RESUME"
         const val ACTION_CANCEL = "com.pulsr.music.download.CANCEL"
         const val ACTION_STOP = "com.pulsr.music.download.STOP"
 
@@ -40,6 +42,7 @@ class DownloadService : Service() {
 
         private const val REQUEST_CODE_OPEN = 1001
         private const val REQUEST_CODE_CANCEL = 1002
+        private const val REQUEST_CODE_PAUSE = 1003
 
         fun start(context: Context, videoId: String, title: String) {
             val intent = Intent(context, DownloadService::class.java).apply {
@@ -103,6 +106,16 @@ class DownloadService : Service() {
                     ensureForeground(display, avg)
                 }
             }
+            ACTION_PAUSE -> {
+                val vid = intent.getStringExtra(EXTRA_VIDEO_ID)
+                if (vid != null) activeDownloads.remove(vid)
+                if (activeDownloads.isEmpty()) stopForegroundAndSelf() else {
+                    val n = notificationFor(activeDownloads.keys.firstOrNull() ?: "Downloads",
+                        activeDownloads.values.firstOrNull() ?: 0)
+                    (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                        .notify(NOTIFICATION_ID, n)
+                }
+            }
             ACTION_CANCEL -> {
                 val vid = intent.getStringExtra(EXTRA_VIDEO_ID)
                 if (vid != null) activeDownloads.remove(vid)
@@ -148,11 +161,19 @@ class DownloadService : Service() {
             PendingIntent.getActivity(this, REQUEST_CODE_OPEN, base,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         }
+        val currentVid = activeDownloads.keys.firstOrNull()
         val cancelIntent = Intent(this, DownloadService::class.java).apply {
             action = ACTION_CANCEL
-            putExtra(EXTRA_VIDEO_ID, activeDownloads.keys.firstOrNull())
+            putExtra(EXTRA_VIDEO_ID, currentVid)
         }
         val cancelPending = PendingIntent.getService(this, REQUEST_CODE_CANCEL, cancelIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
+        val pauseIntent = Intent(this, DownloadService::class.java).apply {
+            action = ACTION_PAUSE
+            putExtra(EXTRA_VIDEO_ID, currentVid)
+        }
+        val pausePending = PendingIntent.getService(this, REQUEST_CODE_PAUSE, pauseIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
@@ -163,6 +184,7 @@ class DownloadService : Service() {
             .setOnlyAlertOnce(true)
             .setProgress(100, progress, progress == 0)
             .setContentIntent(openIntent)
+            .addAction(android.R.drawable.ic_media_pause, "Pause", pausePending)
             .addAction(android.R.drawable.ic_delete, "Cancel", cancelPending)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)

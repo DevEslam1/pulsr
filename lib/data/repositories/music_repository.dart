@@ -993,13 +993,61 @@ class MusicRepository implements IMusicRepository {
           batch.insertAllOnConflictUpdate(_db.artistsTable, artists);
         });
       });
-      // FIX: Deduplicate by file path after scan — prevents downloaded song appearing twice when scanner
-      // inserts a new row for a path already owned by a reconciled YTM row. Keep the downloaded/isDownloaded or lowest id.
+
+      // Deduplicate by path after scanner batch-insert.
+      //
+      // The scanner uses MediaStore IDs as PKs, which differ from the IDs we
+      // assigned when the YTM row was first inserted.  When a downloaded song is
+      // rescanned MediaStore gives it a NEW id, and insertAllOnConflictUpdate
+      // inserts a second row (no conflict because primary key differs).
+      //
+      // Strategy: keep the row that carries the most metadata:
+      //   1. Prefer any row with is_downloaded = 1  (rich YTM metadata + artwork)
+      //   2. Otherwise keep the row with the smallest id (oldest/first indexed)
+      // All other duplicate-path rows are deleted, with their playlist/queue
+      // references re-pointed at the surviving row first.
       try {
-        await _db.customStatement(
-          "DELETE FROM songs WHERE id NOT IN (SELECT MIN(id) FROM songs WHERE path != '' AND path NOT LIKE 'ytmusic://%' GROUP BY lower(path)) AND path != '' AND path NOT LIKE 'ytmusic://%' AND lower(path) IN (SELECT lower(path) FROM songs WHERE path != '' AND path NOT LIKE 'ytmusic://%' GROUP BY lower(path) HAVING COUNT(*) > 1);",
-        );
+        // Find paths that have more than one row.
+        final dupPaths = await _db.customSelect(
+          "SELECT lower(path) as lp FROM songs "
+          "WHERE path != '' AND path NOT LIKE 'ytmusic://%' "
+          "GROUP BY lower(path) HAVING COUNT(*) > 1",
+        ).get();
+
+        for (final row in dupPaths) {
+          final lp = row.data['lp'] as String;
+          // Pick surviving row: prefer isDownloaded=1, else MIN(id)
+          final candidates = await _db.customSelect(
+            "SELECT id, is_downloaded FROM songs "
+            "WHERE lower(path) = ? AND path != '' AND path NOT LIKE 'ytmusic://%' "
+            "ORDER BY is_downloaded DESC, id ASC",
+            variables: [Variable.withString(lp)],
+          ).get();
+          if (candidates.isEmpty) continue;
+          final survivingId = candidates.first.data['id'] as int;
+
+          // Delete all other rows for this path (safe — no FK children to worry
+          // about here because this runs before cleanupOrphanedSongs).
+          for (final c in candidates.skip(1)) {
+            final dupeId = c.data['id'] as int;
+            try {
+              await _db.customStatement(
+                'UPDATE playlist_entries SET song_id = ? WHERE song_id = ?',
+                [survivingId, dupeId],
+              );
+              await _db.customStatement(
+                'UPDATE queue_items SET song_id = ? WHERE song_id = ?',
+                [survivingId, dupeId],
+              );
+              await _db.customStatement(
+                'DELETE FROM songs WHERE id = ?',
+                [dupeId],
+              );
+            } catch (_) {}
+          }
+        }
       } catch (_) {}
+
       return const Right(null);
     } catch (e) {
       return Left(DatabaseFailure('Failed to sync scanned music', e));
@@ -1027,12 +1075,45 @@ class MusicRepository implements IMusicRepository {
       final reappearedIds = <int>[];
       const chunkSize = 16;
 
+      // Build a fast lookup of every file path covered by the current scan so
+      // we can skip orphan-marking for songs whose file is still on disk but was
+      // given a different MediaStore ID (common after downloading a YTM track).
+      // Also: never mark a downloaded song as missing — its row is managed by
+      // reconcileDownloadedSong and may legitimately have an ID not in scannedSongIds.
+      final scannedPaths = <String>{};
+      // Fetch the actual file paths for all scannedSongIds in one query to build the set.
+      if (scannedSongIds.isNotEmpty) {
+        try {
+          final scannedRows = await (_db.select(_db.songsTable)
+                ..where((t) => t.id.isIn(scannedSongIds)))
+              .get();
+          for (final r in scannedRows) {
+            if (r.path.isNotEmpty) scannedPaths.add(r.path.toLowerCase());
+          }
+        } catch (_) {}
+      }
+
       for (var i = 0; i < unscannedSongs.length; i += chunkSize) {
         final end = (i + chunkSize < unscannedSongs.length)
             ? i + chunkSize
             : unscannedSongs.length;
         final chunk = unscannedSongs.sublist(i, end);
         await Future.wait(chunk.map((song) async {
+          // Downloaded songs are managed by reconcileDownloadedSong — their DB
+          // row ID may differ from the MediaStore ID the scanner gave the file,
+          // so they would always appear "unscanned". Never mark them missing here.
+          if (song.isDownloaded) {
+            reappearedIds.add(song.id);
+            return;
+          }
+          // If another scanned row already owns this path (path-level dedup in
+          // syncScannedMusic deleted this row but the DB watcher hasn't fired yet)
+          // treat the song as active, not missing.
+          if (song.path.isNotEmpty &&
+              scannedPaths.contains(song.path.toLowerCase())) {
+            reappearedIds.add(song.id);
+            return;
+          }
           if (song.path.isEmpty) {
             trulyMissingIds.add(song.id);
           } else if (song.path.startsWith('content:')) {

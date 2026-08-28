@@ -239,7 +239,9 @@ class _LibraryScreenState extends State<LibraryScreen>
     final libraryCubit = context.read<LibraryCubit>();
     final count = await settingsCubit.rescanLibrary();
     if (context.mounted) {
-      await libraryCubit.init();
+      // Use refresh() instead of init() to avoid re-emitting preferences state
+      // which caused a double-emit / overlapping list render on pull-to-refresh.
+      await libraryCubit.refresh();
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

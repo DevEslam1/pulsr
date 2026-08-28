@@ -132,12 +132,29 @@ class DownloadTile extends StatelessWidget {
                         case 'retry':
                           cubit.retryDownload(task.videoId);
                           break;
+                        case 'prioritize':
+                          cubit.prioritizeDownload(task.videoId);
+                          break;
                         case 'delete':
                           cubit.deleteDownload(task.videoId);
                           break;
                       }
                     },
                     itemBuilder: (context) => [
+                      if (task.status == DownloadStatus.queued ||
+                          task.status == DownloadStatus.paused)
+                        PopupMenuItem(
+                          value: 'prioritize',
+                          child: Row(
+                            children: [
+                              Icon(Icons.vertical_align_top_rounded,
+                                  size: 18, color: p.accent),
+                              const SizedBox(width: 10),
+                              Text('Download Next',
+                                  style: TextStyle(color: p.accent)),
+                            ],
+                          ),
+                        ),
                       if (task.status.canPause)
                         PopupMenuItem(
                           value: 'pause',

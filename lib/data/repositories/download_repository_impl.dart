@@ -11,7 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/channels.dart';
 import '../../core/errors/failures.dart';
-import '../../core/services/yt_download_service.dart';
+import '../downloads/yt_download_service.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/models/download_task.dart';
 import '../../domain/models/ytm_track.dart';
@@ -242,6 +242,46 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     try {
       await _downloadChannel.invokeMethod('stopDownloadForeground');
     } catch (_) {}
+    _schedulePersist();
+    _processQueue();
+    return const Right(unit);
+  }
+
+  @override
+  Future<Either<AppFailure, Unit>> reorderQueue(List<String> orderedVideoIds) async {
+    final currentQueued = _queue.toSet();
+    _queue.clear();
+    for (final vid in orderedVideoIds) {
+      if (currentQueued.contains(vid)) {
+        _queue.add(vid);
+      }
+    }
+    // Add any missing queued tasks back to the end
+    for (final vid in currentQueued) {
+      if (!_queue.contains(vid)) {
+        _queue.add(vid);
+      }
+    }
+    _schedulePersist();
+    _processQueue();
+    return const Right(unit);
+  }
+
+  @override
+  Future<Either<AppFailure, Unit>> prioritizeDownload(String videoId) async {
+    if (!_tasks.containsKey(videoId)) {
+      return const Left(DownloadFailure('Task not found'));
+    }
+    final task = _tasks[videoId]!;
+    if (task.status != DownloadStatus.queued) {
+      // If paused or failed, move to queued first
+      if (task.status == DownloadStatus.paused || task.status == DownloadStatus.failed) {
+        await resumeDownload(videoId);
+      }
+    }
+    // Move to front of queue
+    _queue.remove(videoId);
+    _queue.addFirst(videoId);
     _schedulePersist();
     _processQueue();
     return const Right(unit);

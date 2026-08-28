@@ -12,6 +12,8 @@ import 'package:pulsr/domain/usecases/pause_download.dart';
 import 'package:pulsr/domain/usecases/queue_download.dart';
 import 'package:pulsr/domain/usecases/resume_download.dart';
 import 'package:pulsr/domain/usecases/retry_download.dart';
+import 'package:pulsr/domain/usecases/prioritize_download.dart';
+import 'package:pulsr/domain/usecases/reorder_downloads.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_cubit.dart';
 
 class MockQueueDownloadUseCase extends Mock implements QueueDownloadUseCase {}
@@ -30,6 +32,12 @@ class MockObserveDownloadsUseCase extends Mock
 class MockGetDownloadStorageStatsUseCase extends Mock
     implements GetDownloadStorageStatsUseCase {}
 
+class MockReorderDownloadsUseCase extends Mock
+    implements ReorderDownloadsUseCase {}
+
+class MockPrioritizeDownloadUseCase extends Mock
+    implements PrioritizeDownloadUseCase {}
+
 void main() {
   late MockQueueDownloadUseCase mockQueue;
   late MockPauseDownloadUseCase mockPause;
@@ -38,6 +46,8 @@ void main() {
   late MockDeleteDownloadUseCase mockDelete;
   late MockObserveDownloadsUseCase mockObserve;
   late MockGetDownloadStorageStatsUseCase mockStorageStats;
+  late MockReorderDownloadsUseCase mockReorder;
+  late MockPrioritizeDownloadUseCase mockPrioritize;
   late StreamController<DownloadTask> downloadStreamController;
 
   final testTask = DownloadTask(
@@ -56,6 +66,8 @@ void main() {
     mockDelete = MockDeleteDownloadUseCase();
     mockObserve = MockObserveDownloadsUseCase();
     mockStorageStats = MockGetDownloadStorageStatsUseCase();
+    mockReorder = MockReorderDownloadsUseCase();
+    mockPrioritize = MockPrioritizeDownloadUseCase();
     downloadStreamController = StreamController<DownloadTask>.broadcast();
 
     when(() => mockObserve.call())
@@ -83,6 +95,8 @@ void main() {
       mockDelete,
       mockObserve,
       mockStorageStats,
+      mockReorder,
+      mockPrioritize,
     );
   }
 
@@ -177,6 +191,30 @@ void main() {
       await Future.delayed(const Duration(milliseconds: 50));
 
       expect(cubit.state.tasks['vid_123']?.status, DownloadStatus.complete);
+      cubit.close();
+    });
+
+    test('prioritizeDownload calls usecase with videoId', () async {
+      when(() => mockPrioritize.call('vid_123'))
+          .thenAnswer((_) async => const Right(unit));
+
+      final cubit = buildCubit();
+      await Future.delayed(const Duration(milliseconds: 50));
+      await cubit.prioritizeDownload('vid_123');
+
+      verify(() => mockPrioritize.call('vid_123')).called(1);
+      cubit.close();
+    });
+
+    test('reorderQueue calls usecase with ordered videoIds', () async {
+      when(() => mockReorder.call(['vid_2', 'vid_1']))
+          .thenAnswer((_) async => const Right(unit));
+
+      final cubit = buildCubit();
+      await Future.delayed(const Duration(milliseconds: 50));
+      await cubit.reorderQueue(['vid_2', 'vid_1']);
+
+      verify(() => mockReorder.call(['vid_2', 'vid_1'])).called(1);
       cubit.close();
     });
   });

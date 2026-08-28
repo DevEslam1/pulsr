@@ -11,6 +11,8 @@ import '../../../domain/usecases/pause_download.dart';
 import '../../../domain/usecases/queue_download.dart';
 import '../../../domain/usecases/resume_download.dart';
 import '../../../domain/usecases/retry_download.dart';
+import '../../../domain/usecases/prioritize_download.dart';
+import '../../../domain/usecases/reorder_downloads.dart';
 import 'downloads_state.dart';
 
 @singleton
@@ -22,6 +24,8 @@ class DownloadsCubit extends Cubit<DownloadsState> {
   final DeleteDownloadUseCase _deleteDownloadUseCase;
   final ObserveDownloadsUseCase _observeDownloadsUseCase;
   final GetDownloadStorageStatsUseCase _getStorageStatsUseCase;
+  final ReorderDownloadsUseCase? _reorderDownloadsUseCase;
+  final PrioritizeDownloadUseCase? _prioritizeDownloadUseCase;
 
   StreamSubscription<DownloadTask>? _downloadSub;
   final Map<String, int> _lastEmitTimeByVideoId = {};
@@ -33,8 +37,10 @@ class DownloadsCubit extends Cubit<DownloadsState> {
     this._retryDownloadUseCase,
     this._deleteDownloadUseCase,
     this._observeDownloadsUseCase,
-    this._getStorageStatsUseCase,
-  ) : super(const DownloadsState()) {
+    this._getStorageStatsUseCase, [
+    this._reorderDownloadsUseCase,
+    this._prioritizeDownloadUseCase,
+  ]) : super(const DownloadsState()) {
     _init();
   }
 
@@ -43,7 +49,9 @@ class DownloadsCubit extends Cubit<DownloadsState> {
     await loadInitialTasks();
     await refreshStorageStats();
     _subscribeToDownloadUpdates();
-    emit(state.copyWith(isLoading: false));
+    if (!isClosed) {
+      emit(state.copyWith(isLoading: false));
+    }
   }
 
   Future<void> loadInitialTasks() async {
@@ -151,6 +159,28 @@ class DownloadsCubit extends Cubit<DownloadsState> {
         refreshStorageStats();
       },
     );
+  }
+
+  Future<void> prioritizeDownload(String videoId) async {
+    final useCase = _prioritizeDownloadUseCase;
+    if (useCase != null) {
+      final result = await useCase(videoId);
+      result.fold(
+        (failure) => emit(state.copyWith(errorMessage: failure.message)),
+        (_) {},
+      );
+    }
+  }
+
+  Future<void> reorderQueue(List<String> orderedVideoIds) async {
+    final useCase = _reorderDownloadsUseCase;
+    if (useCase != null) {
+      final result = await useCase(orderedVideoIds);
+      result.fold(
+        (failure) => emit(state.copyWith(errorMessage: failure.message)),
+        (_) {},
+      );
+    }
   }
 
   @override

@@ -811,9 +811,13 @@ class PulsrAudioHandler extends BaseAudioHandler
         player.androidAudioSessionIdStream.listen(
           (sessionId) {
             if (sessionId != null && isTargetActive()) {
-              AudioEffectsChannel().setAudioSessionId(sessionId);
               _currentAudioSessionId = sessionId;
               _audioSessionIdSubject.add(sessionId);
+              // Re-attach EQ + all active effects to this session. ExoPlayer
+              // allocates a fresh session on every stop()+setAudioSource(), so
+              // effects applied to the old session are silently lost and need
+              // to be reapplied here instead of just forwarding the id.
+              unawaited(_equalizerManager.reapplyToSession(sessionId));
             }
           },
           onError: (e, st) {
@@ -1122,7 +1126,10 @@ class PulsrAudioHandler extends BaseAudioHandler
       throw const YtmException('YTM_UNAVAILABLE', 'Missing video id');
     }
 
-    final prefs = await SharedPreferences.getInstance();
+    // Use the already-initialised prefs cache; fall back to async init only if
+    // somehow null (e.g. very first call before _initPrefs completes).
+    if (_cachedPrefs == null) await _initPrefs();
+    final prefs = _cachedPrefs!;
     final offlineOnly = prefs.getBool('setting_offline_only_mode') ?? false;
     if (offlineOnly) {
       throw const YtmException(
@@ -1904,7 +1911,8 @@ class PulsrAudioHandler extends BaseAudioHandler
       final sessionId = _activePlayer.androidAudioSessionId;
       if (sessionId != null && sessionId > 0) {
         _currentAudioSessionId = sessionId;
-        unawaited(AudioEffectsChannel().setAudioSessionId(sessionId));
+        _audioSessionIdSubject.add(sessionId);
+        unawaited(_equalizerManager.reapplyToSession(sessionId));
       }
       _consecutiveFailures = 0;
       _repository.recordPlayHistory(song.id);
@@ -1992,7 +2000,8 @@ class PulsrAudioHandler extends BaseAudioHandler
     final sessionId = _activePlayer.androidAudioSessionId;
     if (sessionId != null && sessionId > 0) {
       _currentAudioSessionId = sessionId;
-      unawaited(AudioEffectsChannel().setAudioSessionId(sessionId));
+      _audioSessionIdSubject.add(sessionId);
+      unawaited(_equalizerManager.reapplyToSession(sessionId));
     }
   }
 
@@ -2095,7 +2104,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     // The crossfade engine draws its own random order from _getNextIndex, so no
     // native reshuffle is needed there.
     playbackState.add(playbackState.value.copyWith(shuffleMode: shuffleMode));
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
     await prefs.setString('shuffle_mode',
         shuffleMode == AudioServiceShuffleMode.all ? 'all' : 'none');
   }
@@ -2114,7 +2123,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     await _playerB.setLoopMode(loopMode);
 
     playbackState.add(playbackState.value.copyWith(repeatMode: repeatMode));
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
     await prefs.setString('repeat_mode', repeatMode.name);
   }
 

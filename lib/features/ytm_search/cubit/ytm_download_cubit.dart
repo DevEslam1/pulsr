@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../core/services/yt_download_service.dart';
+import '../../../data/downloads/yt_download_service.dart';
 import '../../../data/db/app_database.dart';
 import '../../player/cubit/player_cubit.dart';
 

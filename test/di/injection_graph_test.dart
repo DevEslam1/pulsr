@@ -55,4 +55,79 @@ void main() {
       expect(generated, contains('networkModule.httpClient'));
     });
   });
+
+  group('Clean Architecture Layer Boundaries', () {
+    test('domain layer has zero imports of features layer', () {
+      final domainDir = Directory('lib/domain');
+      if (!domainDir.existsSync()) return;
+
+      final domainFiles = domainDir
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.dart') && !f.path.contains('.freezed.') && !f.path.contains('.g.'));
+
+      for (final file in domainFiles) {
+        final content = file.readAsStringSync();
+        final importLines = content
+            .split('\n')
+            .where((l) => l.trim().startsWith('import '))
+            .toList();
+
+        for (final line in importLines) {
+          expect(line.contains('features/'), isFalse,
+              reason: 'Domain violation in ${file.path}: imports features layer ($line)');
+        }
+      }
+    });
+
+    test('data layer has zero imports of features layer', () {
+      final dataDir = Directory('lib/data');
+      if (!dataDir.existsSync()) return;
+
+      final dataFiles = dataDir
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((f) => f.path.endsWith('.dart') && !f.path.contains('.freezed.') && !f.path.contains('.g.'));
+
+      for (final file in dataFiles) {
+        final content = file.readAsStringSync();
+        final importLines = content
+            .split('\n')
+            .where((l) => l.trim().startsWith('import '))
+            .toList();
+
+        for (final line in importLines) {
+          expect(line.contains('features/'), isFalse,
+              reason: 'Data layer violation in ${file.path}: imports presentation/feature ($line)');
+        }
+      }
+    });
+
+    test('core layer services have zero imports of features layer', () {
+      final coreServicesDir = Directory('lib/core/services');
+      if (!coreServicesDir.existsSync()) return;
+
+      final coreFiles = coreServicesDir
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((f) =>
+              f.path.endsWith('.dart') &&
+              !f.path.contains('file_intent_handler.dart') &&
+              !f.path.contains('.freezed.') &&
+              !f.path.contains('.g.'));
+
+      for (final file in coreFiles) {
+        final content = file.readAsStringSync();
+        final importLines = content
+            .split('\n')
+            .where((l) => l.trim().startsWith('import '))
+            .toList();
+
+        for (final line in importLines) {
+          expect(line.contains('features/'), isFalse,
+              reason: 'Core layer violation in ${file.path}: imports presentation/feature ($line)');
+        }
+      }
+    });
+  });
 }

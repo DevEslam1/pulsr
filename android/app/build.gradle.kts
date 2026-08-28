@@ -19,10 +19,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    testOptions {
-        unitTests.isReturnDefaultValues = true
-    }
-
     defaultConfig {
         applicationId = "com.pulsr.music"
         // You can update the following values to match your application needs.

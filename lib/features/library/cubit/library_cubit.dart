@@ -37,6 +37,7 @@ class LibraryCubit extends Cubit<LibraryState> {
   StreamSubscription? _genresSub;
   StreamSubscription? _yearsSub;
   StreamSubscription? _favoritesSub;
+  bool _initialized = false;
 
   LibraryCubit({
     required GetSongsUseCase getSongsUseCase,
@@ -65,29 +66,50 @@ class LibraryCubit extends Cubit<LibraryState> {
   }
 
   Future<void> init() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedSortBy = prefs.getString('library_sort_by') ?? 'title';
-      final savedAscending = prefs.getBool('library_sort_ascending') ?? true;
-      final savedViewMode = prefs.getString('library_view_mode') == 'grid'
-          ? LibraryViewMode.grid
-          : LibraryViewMode.list;
+    // Guard against repeated calls (e.g. from pull-to-refresh) re-reading prefs
+    // and double-emitting state which causes library screen overlap.
+    final firstRun = !_initialized;
+    _initialized = true;
 
-      if (!isClosed) {
-        emit(state.copyWith(
-          sortBy: savedSortBy,
-          ascending: savedAscending,
-          viewMode: savedViewMode,
-        ));
+    if (firstRun) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final savedSortBy = prefs.getString('library_sort_by') ?? 'title';
+        final savedAscending = prefs.getBool('library_sort_ascending') ?? true;
+        final savedViewMode = prefs.getString('library_view_mode') == 'grid'
+            ? LibraryViewMode.grid
+            : LibraryViewMode.list;
+
+        if (!isClosed) {
+          emit(state.copyWith(
+            sortBy: savedSortBy,
+            ascending: savedAscending,
+            viewMode: savedViewMode,
+          ));
+        }
+      } catch (e, st) {
+        ErrorLogger.log(
+            'Failed to load library preferences from SharedPreferences',
+            error: e,
+            stackTrace: st,
+            category: 'LibraryCubit');
       }
-    } catch (e, st) {
-      ErrorLogger.log(
-          'Failed to load library preferences from SharedPreferences',
-          error: e,
-          stackTrace: st,
-          category: 'LibraryCubit');
     }
 
+    await _subscribeSongs();
+    if (isClosed) return;
+    _subscribeAlbums();
+    _subscribeArtists();
+    _subscribeGenres();
+    _subscribeYears();
+    _subscribeFavorites();
+    loadFolders();
+  }
+
+  /// Refreshes all data streams without re-reading stored preferences or
+  /// emitting a preference-state update. Use this for pull-to-refresh to
+  /// avoid the double-emit / overlap caused by calling init() again.
+  Future<void> refresh() async {
     await _subscribeSongs();
     if (isClosed) return;
     _subscribeAlbums();

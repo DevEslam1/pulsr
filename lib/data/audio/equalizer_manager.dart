@@ -802,6 +802,91 @@ class EqualizerManager {
     return false;
   }
 
+  /// Re-attaches all active effects to a new [sessionId] that ExoPlayer
+  /// creates after `stop()` + `setAudioSource()`. This is called every time
+  /// the player establishes a new audio session (e.g. on every track change
+  /// when using `playSongAt`, or after restoring from a background kill).
+  ///
+  /// Unlike [_restorePreferences] this does NOT reload prefs from disk — it
+  /// uses the already-live in-memory state, making it safe to call on the
+  /// hot path without any I/O.
+  Future<void> reapplyToSession(int sessionId) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _effectsChannel.setAudioSessionId(sessionId);
+
+      // Nothing to do if no effects are active.
+      final anyActive = isEnabled ||
+          isVirtualizerEnabled ||
+          isDynamicsEnabled ||
+          isSpatializerEnabled ||
+          isCrossfeedEnabled ||
+          isLimiterEnabled ||
+          isReverbEnabled ||
+          volumeBoost > 0 ||
+          currentPreset.bassBoost > 0 ||
+          stereoBalance != 0.0 ||
+          monoMix;
+      if (!anyActive) return;
+
+      final futures = <Future>[];
+
+      if (isEnabled) {
+        await applyCurrentPreset();
+        futures.add(_effectsChannel.setEqEnabled(true));
+        futures.add(_effectsChannel.setNativeEqEnabled(true));
+      }
+      if (currentPreset.bassBoost > 0) {
+        futures.add(setBassBoost(currentPreset.bassBoost));
+      }
+      if (volumeBoost > 0) futures.add(setVolumeBoost(volumeBoost));
+      if (isVirtualizerEnabled) {
+        futures.add(_effectsChannel.setVirtualizerEnabled(true));
+        futures.add(
+            _effectsChannel.setVirtualizerStrength(virtualizerStrength));
+      }
+      if (isSpatializerEnabled) {
+        futures.add(_effectsChannel.setSpatializerEnabled(true));
+      }
+      if (isCrossfeedEnabled) {
+        futures.add(_effectsChannel.setCrossfeedParams(
+            crossfeedDelayUs, crossfeedFeedDb));
+        futures.add(_effectsChannel.setCrossfeedEnabled(true));
+      }
+      if (isLimiterEnabled) {
+        futures.add(_effectsChannel.setLimiterParams(
+            limiterLookaheadMs, limiterThresholdDb, limiterReleaseMs));
+        futures.add(_effectsChannel.setLimiterEnabled(true));
+      }
+      if (isReverbEnabled) {
+        futures.add(_effectsChannel.setReverbPreset(reverbPreset));
+        futures.add(_effectsChannel.setReverbWetDry(reverbWetDry));
+        futures.add(_effectsChannel.setReverbEnabled(true));
+      }
+      if (stereoBalance != 0.0) {
+        futures.add(_effectsChannel.setStereoBalance(stereoBalance));
+      }
+      if (monoMix) futures.add(_effectsChannel.setMonoMix(true));
+
+      if (futures.isNotEmpty) await Future.wait(futures);
+
+      // Dynamics last — triggers recalculateActiveStages which may disable OEM
+      // engine; apply last to prevent intermediate dropout. No delay needed here
+      // because the session is already stable by the time reapplyToSession is
+      // called (unlike cold-start where AudioTrack is still opening).
+      if (isDynamicsEnabled && !_isDynamicsBypassed) {
+        await _effectsChannel.setDynamicsPreset(dynamicsPreset, true);
+      }
+    } catch (e, st) {
+      ErrorLogger.log(
+        'reapplyToSession($sessionId) failed',
+        error: e,
+        stackTrace: st,
+        category: 'EqualizerManager',
+      );
+    }
+  }
+
   void dispose() {
     _saveDebounce?.cancel();
     _saveDebounce = null;
