@@ -129,5 +129,12 @@ void main() {
         }
       }
     });
+
+    test('YtDownloadService must live in data/downloads (A5/N-01)', () {
+      expect(File('lib/core/services/yt_download_service.dart').existsSync(), isFalse,
+          reason: 'YtDownloadService duplicate/legacy file in core/services must be removed (N-01)');
+      expect(File('lib/data/downloads/yt_download_service.dart').existsSync(), isTrue,
+          reason: 'YtDownloadService canonical location is lib/data/downloads/yt_download_service.dart');
+    });
   });
 }

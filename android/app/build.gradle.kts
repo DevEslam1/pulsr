@@ -123,6 +123,8 @@ android {
                 if (isCI && isProdOrYtmBuild) {
                     throw GradleException("Release keystore file missing in key.properties for release build on CI!")
                 }
+                // Note (N-03): Local release builds using debug signing will fail Google Sign-In with DEVELOPER_ERROR (code 10)
+                // because the debug keystore SHA-1 does not match the registered production OAuth client.
                 logger.warn("WARNING: Release keystore file not found in key.properties. Falling back to debug signing config for local dev release build.")
             }
             signingConfig = if (hasKeystore) releaseConfig else signingConfigs.getByName("debug")

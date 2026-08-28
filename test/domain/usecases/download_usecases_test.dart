@@ -9,7 +9,9 @@ import 'package:pulsr/domain/usecases/delete_download.dart';
 import 'package:pulsr/domain/usecases/get_download_storage_stats.dart';
 import 'package:pulsr/domain/usecases/observe_downloads.dart';
 import 'package:pulsr/domain/usecases/pause_download.dart';
+import 'package:pulsr/domain/usecases/prioritize_download.dart';
 import 'package:pulsr/domain/usecases/queue_download.dart';
+import 'package:pulsr/domain/usecases/reorder_downloads.dart';
 import 'package:pulsr/domain/usecases/resume_download.dart';
 import 'package:pulsr/domain/usecases/retry_download.dart';
 
@@ -24,6 +26,8 @@ void main() {
   late DeleteDownloadUseCase deleteUseCase;
   late ObserveDownloadsUseCase observeUseCase;
   late GetDownloadStorageStatsUseCase storageStatsUseCase;
+  late PrioritizeDownloadUseCase prioritizeUseCase;
+  late ReorderDownloadsUseCase reorderUseCase;
 
   final testTask = DownloadTask(
     id: 'test_id_1',
@@ -42,6 +46,8 @@ void main() {
     deleteUseCase = DeleteDownloadUseCase(mockRepo);
     observeUseCase = ObserveDownloadsUseCase(mockRepo);
     storageStatsUseCase = GetDownloadStorageStatsUseCase(mockRepo);
+    prioritizeUseCase = PrioritizeDownloadUseCase(mockRepo);
+    reorderUseCase = ReorderDownloadsUseCase(mockRepo);
   });
 
   group('Download UseCases', () {
@@ -88,6 +94,25 @@ void main() {
       final result = await deleteUseCase('vid_123');
       expect(result, const Right(unit));
       verify(() => mockRepo.deleteDownload('vid_123')).called(1);
+    });
+
+    test('PrioritizeDownloadUseCase delegates to repository', () async {
+      when(() => mockRepo.prioritizeDownload('vid_123'))
+          .thenAnswer((_) async => const Right(unit));
+
+      final result = await prioritizeUseCase('vid_123');
+      expect(result, const Right(unit));
+      verify(() => mockRepo.prioritizeDownload('vid_123')).called(1);
+    });
+
+    test('ReorderDownloadsUseCase delegates to repository', () async {
+      const ids = ['vid_1', 'vid_2', 'vid_3'];
+      when(() => mockRepo.reorderQueue(ids))
+          .thenAnswer((_) async => const Right(unit));
+
+      final result = await reorderUseCase(ids);
+      expect(result, const Right(unit));
+      verify(() => mockRepo.reorderQueue(ids)).called(1);
     });
 
     test('ObserveDownloadsUseCase provides stream from repository', () async {

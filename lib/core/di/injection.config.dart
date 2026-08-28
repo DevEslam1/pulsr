@@ -34,7 +34,7 @@ import 'package:pulsr/core/services/scrobbler_service.dart' as _i629;
 import 'package:pulsr/core/services/settings_profiles_service.dart' as _i461;
 import 'package:pulsr/core/services/theme_scheduler_service.dart' as _i991;
 import 'package:pulsr/core/services/xdm_backend_service.dart' as _i1031;
-import 'package:pulsr/core/services/yt_download_service.dart' as _i742;
+import 'package:pulsr/data/downloads/yt_download_service.dart' as _i742;
 import 'package:pulsr/core/services/ytm_account_service.dart' as _i631;
 import 'package:pulsr/core/services/ytm_browse_service.dart' as _i222;
 import 'package:pulsr/core/services/ytm_cache_manager.dart' as _i498;
