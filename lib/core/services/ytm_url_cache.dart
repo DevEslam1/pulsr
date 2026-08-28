@@ -78,10 +78,11 @@ class YtmUrlCache {
   final LinkedHashMap<String, YtmUrlCacheEntry> _cache =
       LinkedHashMap<String, YtmUrlCacheEntry>();
 
-  YtmUrlCache({Clock? clock, int capacity = defaultCapacity, Duration ttl = defaultTtl})
-      : _clock = clock ?? SystemClock(),
-        _capacity = capacity,
-        _ttl = ttl;
+  @factoryMethod
+  YtmUrlCache()
+      : _clock = const SystemClock(),
+        _capacity = defaultCapacity,
+        _ttl = defaultTtl;
 
   @visibleForTesting
   YtmUrlCache.withClock(this._clock, {int capacity = defaultCapacity, Duration ttl = defaultTtl})

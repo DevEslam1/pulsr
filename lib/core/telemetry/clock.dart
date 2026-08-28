@@ -1,11 +1,14 @@
-// lib/core/telemetry/clock.dart
+import 'package:injectable/injectable.dart';
+
 /// Abstract clock for testable time measurement.
 abstract class Clock {
   DateTime now();
 }
 
 /// System clock using real wall time.
+@LazySingleton(as: Clock)
 class SystemClock implements Clock {
+  const SystemClock();
   @override
   DateTime now() => DateTime.now();
 }

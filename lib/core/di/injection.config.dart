@@ -129,6 +129,7 @@ extension GetItInjectableX on _i174.GetIt {
       () => _i391.YtmService(),
       dispose: (i) => i.dispose(),
     );
+    gh.singleton<_i492.YtmUrlCache>(() => _i492.YtmUrlCache());
     gh.singleton<_i401.DynamicThemeCubit>(() => _i401.DynamicThemeCubit());
     gh.singleton<_i682.AppDatabase>(() => _i682.AppDatabase());
     gh.singleton<_i265.PlaylistExportUseCase>(
@@ -136,6 +137,8 @@ extension GetItInjectableX on _i174.GetIt {
     gh.lazySingleton<_i558.FlutterSecureStorage>(
         () => storageModule.secureStorage);
     gh.lazySingleton<_i722.HiResAudioService>(() => _i722.HiResAudioService());
+    gh.lazySingleton<_i626.PlaybackLatencyTracker>(
+        () => _i626.PlaybackLatencyTracker());
     gh.lazySingleton<_i42.WidgetService>(() => _i42.WidgetService());
     gh.singleton<_i632.ISmartPlaylistEngine>(
         () => _i399.SmartPlaylistEngine(gh<_i682.AppDatabase>()));
@@ -145,22 +148,13 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i519.Client>(),
           gh<_i558.FlutterSecureStorage>(),
         ));
+    gh.lazySingleton<_i621.Clock>(() => const _i621.SystemClock());
     gh.singleton<_i320.IMusicRepository>(
         () => _i626.MusicRepository(gh<_i682.AppDatabase>()));
     gh.factory<_i171.YtmSearchCubit>(
         () => _i171.YtmSearchCubit(service: gh<_i391.YtmService>()));
     gh.singleton<_i621.LrclibService>(
         () => _i621.LrclibService(client: gh<_i497.HttpClient>()));
-    gh.singleton<_i626.PlaybackLatencyTracker>(
-        () => _i626.PlaybackLatencyTracker(
-              clock: gh<_i621.Clock>(),
-              enableDebugPrint: gh<bool>(),
-            ));
-    gh.singleton<_i492.YtmUrlCache>(() => _i492.YtmUrlCache(
-          clock: gh<_i621.Clock>(),
-          capacity: gh<int>(),
-          ttl: gh<Duration>(),
-        ));
     gh.singleton<_i483.MediaScannerService>(
         () => _i483.MediaScannerService(gh<_i320.IMusicRepository>()));
     gh.singleton<_i545.ExportBackupUseCase>(

@@ -102,11 +102,12 @@ class _Session {
 /// Emits Sentry transaction with child spans when DSN is configured,
 /// otherwise falls back to breadcrumbs via [ErrorLogger]. Always emits
 /// one debug summary line per play.
-@singleton
+@lazySingleton
 class PlaybackLatencyTracker {
-  PlaybackLatencyTracker({Clock? clock, bool? enableDebugPrint})
-      : _clock = clock ?? SystemClock(),
-        _enableDebugPrint = enableDebugPrint ?? true;
+  @factoryMethod
+  PlaybackLatencyTracker()
+      : _clock = const SystemClock(),
+        _enableDebugPrint = true;
 
   @visibleForTesting
   PlaybackLatencyTracker.withClock(this._clock) : _enableDebugPrint = false;
