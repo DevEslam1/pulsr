@@ -49,9 +49,11 @@ import 'features/widgets/widget_service.dart';
 import 'features/ytm_search/cubit/ytm_download_cubit.dart';
 import 'domain/repositories/download_repository_interface.dart';
 import 'features/downloads/cubit/downloads_cubit.dart';
+import 'core/bloc/app_bloc_observer.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  Bloc.observer = AppBlocObserver();
   HttpOverrides.global = AppHttpOverrides.instance;
   try {
     AppConfig.validateConfiguration();

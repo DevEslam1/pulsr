@@ -1213,6 +1213,22 @@ class AppLocalizationsEs extends AppLocalizations {
       'Modo solo Wi-Fi activo. Conéctate al Wi-Fi para descargar.';
 
   @override
+  String get downloadErrorAlreadyQueued =>
+      'Esta canción ya está en la cola de descarga.';
+
+  @override
+  String get downloadErrorCorrupt =>
+      'El archivo descargado estaba dañado o incompleto. Vuelve a intentarlo.';
+
+  @override
+  String get downloadErrorInvalidTransition =>
+      'Transición de estado de descarga no válida.';
+
+  @override
+  String get downloadErrorTimeout =>
+      'Se agotó el tiempo de descarga. Vuelve a intentarlo.';
+
+  @override
   String get dspEnginePreference => 'Preferencia de motor DSP';
 
   @override

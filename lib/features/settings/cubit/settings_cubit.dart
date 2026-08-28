@@ -103,6 +103,7 @@ class SettingsCubit extends Cubit<SettingsState> {
                 : HiResAudioService()),
         super(const SettingsState()) {
     _deviceSub = _hiResAudioService.outputDeviceStream.listen((device) {
+      if (isClosed) return;
       final savedSampleRate = state.currentOutputDevice?.targetSampleRate ?? 0;
       final savedBitDepth = state.currentOutputDevice?.targetBitDepth ?? 0;
       emit(state.copyWith(
@@ -412,7 +413,7 @@ class SettingsCubit extends Cubit<SettingsState> {
       );
 
       _proxyPassword = proxyPassword;
-      emit(newState);
+      if (!isClosed) emit(newState);
       await AudioEffectsChannel().setDspPreference(newState.dspPreference);
       if (newState.bitPerfectOutput) {
         await _hiResAudioService.setBitPerfectMode(true);
@@ -1078,6 +1079,7 @@ class SettingsCubit extends Cubit<SettingsState> {
             : 0;
     final isBitPerfect = state.bitPerfectOutput;
 
+    if (isClosed) return;
     emit(state.copyWith(
       currentOutputDevice: info.copyWith(
         targetSampleRate: info.targetSampleRate != 0

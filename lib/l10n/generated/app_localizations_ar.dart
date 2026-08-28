@@ -1219,6 +1219,21 @@ class AppLocalizationsAr extends AppLocalizations {
   String get downloadWifiOnly => 'وضع Wi-Fi فقط نشط. اتصل بالشبكة للتنزيل.';
 
   @override
+  String get downloadErrorAlreadyQueued =>
+      'هذه الأغنية موجودة بالفعل في قائمة التنزيل.';
+
+  @override
+  String get downloadErrorCorrupt =>
+      'الملف الذي تم تنزيله تالف أو غير مكتمل. يرجى إعادة المحاولة.';
+
+  @override
+  String get downloadErrorInvalidTransition =>
+      'انتقال حالة عملية تنزيل غير صالح.';
+
+  @override
+  String get downloadErrorTimeout => 'انتهت مهلة التنزيل. يرجى إعادة المحاولة.';
+
+  @override
   String get dspEnginePreference => 'تفضيل محرك معالجة الصوت (DSP)';
 
   @override

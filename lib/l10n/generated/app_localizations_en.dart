@@ -1208,6 +1208,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'Wi-Fi Only Mode is active. Connect to Wi-Fi to download.';
 
   @override
+  String get downloadErrorAlreadyQueued =>
+      'This song is already in the download queue.';
+
+  @override
+  String get downloadErrorCorrupt =>
+      'Downloaded file was corrupted or incomplete. Please retry.';
+
+  @override
+  String get downloadErrorInvalidTransition =>
+      'Invalid download state transition.';
+
+  @override
+  String get downloadErrorTimeout => 'Download timed out. Please retry.';
+
+  @override
   String get dspEnginePreference => 'DSP Engine Preference';
 
   @override

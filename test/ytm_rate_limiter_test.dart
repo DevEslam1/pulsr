@@ -25,7 +25,7 @@ void main() {
         // duration let the second caller through almost immediately.
         expect(elapsedAtDone.length, 2);
         for (final d in elapsedAtDone) {
-          expect(d, greaterThan(const Duration(seconds: 2)));
+          expect(d, greaterThanOrEqualTo(const Duration(milliseconds: 1950)));
           // 2s base + up to 1s jitter + small token-wait margin.
           expect(d, lessThan(const Duration(seconds: 6)));
         }

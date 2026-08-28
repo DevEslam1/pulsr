@@ -1103,13 +1103,5 @@ class YtDownloadService {
 
     return '$base.$ext';
   }
-
-  static String _sanitize(String value, [String? ext]) {
-    final cleaned = value.replaceAll(RegExp(r'[\\/:*?"<>|\x00-\x1F]'), '_').trim();
-    final maxLen = ext != null ? (120 - ext.length - 1).clamp(20, 120) : 120;
-    final truncated =
-        cleaned.length > maxLen ? cleaned.substring(0, maxLen) : cleaned;
-    return truncated.isEmpty ? 'Unknown' : truncated;
-  }
 }
 

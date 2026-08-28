@@ -141,6 +141,7 @@ class PlaylistCubit extends Cubit<PlaylistState> {
     _loadOnlineCache();
 
     _playlistsSub = _playlistUseCases.watchPlaylists().listen((result) {
+      if (isClosed) return;
       result.fold(
         (failure) => emit(state.copyWith(errorMessage: failure.message)),
         (playlists) {
@@ -289,6 +290,7 @@ class PlaylistCubit extends Cubit<PlaylistState> {
     _playlistSongsSub?.cancel();
     _playlistSongsSub =
         _playlistUseCases.watchPlaylistSongs(playlistId).listen((result) {
+      if (isClosed) return;
       result.fold(
         (failure) => emit(state.copyWith(errorMessage: failure.message)),
         (songs) => emit(
@@ -301,6 +303,7 @@ class PlaylistCubit extends Cubit<PlaylistState> {
       {bool isSmart = false, String? criteria}) async {
     final result = await _playlistUseCases.createPlaylist(name,
         isSmart: isSmart, smartCriteria: criteria);
+    if (isClosed) return;
     result.fold(
       (failure) => emit(state.copyWith(errorMessage: failure.message)),
       (_) => null,
@@ -309,6 +312,7 @@ class PlaylistCubit extends Cubit<PlaylistState> {
 
   Future<void> renamePlaylist(int playlistId, String newName) async {
     final result = await _playlistUseCases.renamePlaylist(playlistId, newName);
+    if (isClosed) return;
     result.fold(
       (failure) => emit(state.copyWith(errorMessage: failure.message)),
       (_) => null,
@@ -322,6 +326,7 @@ class PlaylistCubit extends Cubit<PlaylistState> {
       ..remove(playlistId);
     emit(state.copyWith(smartPlaylistCounts: updatedCounts));
     final result = await _playlistUseCases.deletePlaylist(playlistId);
+    if (isClosed) return;
     result.fold(
       (failure) => emit(state.copyWith(errorMessage: failure.message)),
       (_) => null,
@@ -331,6 +336,7 @@ class PlaylistCubit extends Cubit<PlaylistState> {
   Future<void> addSongToPlaylist(int playlistId, int songId) async {
     final result =
         await _playlistUseCases.addSongToPlaylist(playlistId, songId);
+    if (isClosed) return;
     result.fold(
       (failure) => emit(state.copyWith(errorMessage: failure.message)),
       (_) => null,
@@ -340,6 +346,7 @@ class PlaylistCubit extends Cubit<PlaylistState> {
   Future<void> addSongsToPlaylist(int playlistId, List<int> songIds) async {
     final result =
         await _playlistUseCases.addSongsToPlaylist(playlistId, songIds);
+    if (isClosed) return;
     result.fold(
       (failure) => emit(state.copyWith(errorMessage: failure.message)),
       (_) => null,
@@ -349,6 +356,7 @@ class PlaylistCubit extends Cubit<PlaylistState> {
   Future<void> removeSongFromPlaylist(int playlistId, int songId) async {
     final result =
         await _playlistUseCases.removeSongFromPlaylist(playlistId, songId);
+    if (isClosed) return;
     result.fold(
       (failure) => emit(state.copyWith(errorMessage: failure.message)),
       (_) => null,

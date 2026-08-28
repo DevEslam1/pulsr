@@ -6,6 +6,7 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 import '../../../core/di/injection.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../data/downloads/yt_download_service.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/download_task.dart';
@@ -97,12 +98,16 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
         if (initialMap.isNotEmpty && !isClosed) {
           emit(YtmDownloadState(items: {...state.items, ...initialMap}));
         }
-      }).catchError((_) {});
+      }).catchError((e, st) {
+        ErrorLogger.log('YtmDownloadCubit getAllDownloads failed', error: e, stackTrace: st, category: 'YtmDownloadCubit');
+      });
 
       _repoSub = repo.observeDownloads().listen((task) {
         if (isClosed) return;
         final item = _mapTaskToItem(task);
         _set(task.videoId, item);
+      }, onError: (e, st) {
+        ErrorLogger.log('YtmDownloadCubit observeDownloads error', error: e, stackTrace: st, category: 'YtmDownloadCubit');
       });
     }
   }
@@ -222,7 +227,9 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
             failureCount: failureCount,
           ));
         }
-      }).catchError((_) {});
+      }).catchError((e, st) {
+        ErrorLogger.log('Batch download in YtmDownloadCubit failed', error: e, stackTrace: st, category: 'YtmDownloadCubit');
+      });
     } else {
       onCompleted?.call(BatchResult(
         totalCount: total,

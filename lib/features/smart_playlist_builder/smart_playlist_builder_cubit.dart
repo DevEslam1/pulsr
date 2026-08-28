@@ -87,9 +87,11 @@ class SmartPlaylistBuilderCubit extends Cubit<SmartPlaylistBuilderState> {
     _previewSub?.cancel();
     _previewSub = _engine.watchCriteria(state.criteria).listen(
       (songs) {
+        if (isClosed) return;
         emit(state.copyWith(previewSongs: songs));
       },
       onError: (_) {
+        if (isClosed) return;
         emit(state.copyWith(previewSongs: []));
       },
     );
@@ -110,7 +112,9 @@ class SmartPlaylistBuilderCubit extends Cubit<SmartPlaylistBuilderState> {
         name,
         state.criteria.toJsonString(),
       );
-      emit(state.copyWith(isSubmitting: false));
+      if (!isClosed) {
+        emit(state.copyWith(isSubmitting: false));
+      }
       return res.isRight();
     } else {
       final res = await _playlistUseCases.createPlaylist(
@@ -118,7 +122,9 @@ class SmartPlaylistBuilderCubit extends Cubit<SmartPlaylistBuilderState> {
         isSmart: true,
         smartCriteria: state.criteria.toJsonString(),
       );
-      emit(state.copyWith(isSubmitting: false));
+      if (!isClosed) {
+        emit(state.copyWith(isSubmitting: false));
+      }
       return res.isRight();
     }
   }

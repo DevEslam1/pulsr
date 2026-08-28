@@ -3,12 +3,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/constants/prefs_keys.dart';
 import '../../../core/di/injection.dart';
-import '../../../core/router/app_router.dart';
 import '../../../core/services/lrclib_service.dart';
 import '../../../core/services/scrobbler_service.dart';
 import '../../../core/services/ytm_account_service.dart';
@@ -303,8 +301,7 @@ class PlayerCubit extends Cubit<PlayerState> {
             break;
           case 'open':
           case 'main':
-            final ctx = rootNavigatorKey.currentContext;
-            if (ctx != null) GoRouter.of(ctx).go('/now-playing');
+            emit(state.copyWith(isExpanded: true));
             break;
         }
       }

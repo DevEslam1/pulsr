@@ -64,7 +64,7 @@ import 'app_localizations_es.dart';
 /// property.
 abstract class AppLocalizations {
   AppLocalizations(String locale)
-      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -87,17 +87,17 @@ abstract class AppLocalizations {
   /// of delegates is preferred or required.
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
       <LocalizationsDelegate<dynamic>>[
-    delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-  ];
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('ar'),
     Locale('en'),
-    Locale('es')
+    Locale('es'),
   ];
 
   /// No description provided for @appTitle.
@@ -2332,6 +2332,30 @@ abstract class AppLocalizations {
   /// **'Wi-Fi Only Mode is active. Connect to Wi-Fi to download.'**
   String get downloadWifiOnly;
 
+  /// No description provided for @downloadErrorAlreadyQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'This song is already in the download queue.'**
+  String get downloadErrorAlreadyQueued;
+
+  /// No description provided for @downloadErrorCorrupt.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded file was corrupted or incomplete. Please retry.'**
+  String get downloadErrorCorrupt;
+
+  /// No description provided for @downloadErrorInvalidTransition.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid download state transition.'**
+  String get downloadErrorInvalidTransition;
+
+  /// No description provided for @downloadErrorTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Download timed out. Please retry.'**
+  String get downloadErrorTimeout;
+
   /// No description provided for @dspEnginePreference.
   ///
   /// In en, this message translates to:
@@ -2392,8 +2416,9 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
   }
 
   throw FlutterError(
-      'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
-      'an issue with the localizations generation tool. Please file an issue '
-      'on GitHub with a reproducible sample app and the gen-l10n configuration '
-      'that was used.');
+    'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.',
+  );
 }

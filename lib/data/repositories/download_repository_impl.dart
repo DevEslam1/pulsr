@@ -38,12 +38,12 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   final Queue<String> _queue = Queue<String>();
   final Set<String> _activeVideoIds = {};
   final Set<String> _pausedVideoIds = {};
-  final Set<String> _inFlightActions = {}; // DL-15: Action lock per videoId
+  final Map<String, Mutex> _taskLocks = {}; // DL-15: Serialized action lock per videoId
   final Map<String, Completer<void>> _activeCompleters = {};
   final StreamController<DownloadTask> _streamController =
       StreamController<DownloadTask>.broadcast();
 
-
+  Future<void>? _bootReconciliationFuture;
   Timer? _saveDebounce;
   final Map<String, int> _lastProgressEmitMs = {};
 
@@ -54,7 +54,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   DownloadRepositoryImpl(
     this._ytDownloadService,
   ) {
-    reconcileOnBoot();
+    _bootReconciliationFuture = reconcileOnBoot();
   }
 
   @override
@@ -62,6 +62,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
 
   @override
   Future<List<DownloadTask>> getAllDownloads() async {
+    await (_bootReconciliationFuture ?? Future.value());
     return _tasks.values.toList();
   }
 
@@ -83,26 +84,25 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       return const Left(DownloadFailure('Invalid video ID'));
     }
 
-    // DL-15: Prevent double-tap race conditions
-    if (_inFlightActions.contains(videoId)) {
+    final lock = _taskLocks.putIfAbsent(videoId, () => Mutex());
+    return await lock.protect(() async {
       final existing = _tasks[videoId];
-      if (existing != null) return Right(existing.id);
-    }
-    _inFlightActions.add(videoId);
-
-    try {
-      final existing = _tasks[videoId];
-      // DL-06: Dedupe if already active or queued
+      // DL-06: Dedupe if already active, queued, or paused
       if (existing != null &&
           (existing.status == DownloadStatus.downloading ||
-              existing.status == DownloadStatus.queued)) {
-        return Right(existing.id);
+              existing.status == DownloadStatus.queued ||
+              existing.status == DownloadStatus.embedding ||
+              existing.status == DownloadStatus.paused ||
+              existing.status == DownloadStatus.interrupted)) {
+        return const Left(AlreadyQueuedFailure('Task is already queued or active'));
       }
       if (existing != null && existing.status == DownloadStatus.complete) {
         if (existing.filePath != null) {
           try {
             final exists = await File(existing.filePath!).exists();
-            if (exists) return Right(existing.id);
+            if (exists) {
+              return const Left(AlreadyQueuedFailure('Task is already downloaded and complete'));
+            }
           } catch (_) {}
         }
       }
@@ -145,147 +145,151 @@ class DownloadRepositoryImpl implements IDownloadRepository {
 
       _processQueue();
       return Right(task.id);
-    } finally {
-      _inFlightActions.remove(videoId);
-    }
+    });
   }
-
 
   @override
   Future<Either<AppFailure, Unit>> pauseDownload(String videoId) async {
-    final task = _tasks[videoId];
-    if (task == null) {
-      return const Left(DownloadFailure('Task not found'));
-    }
-
-    _pausedVideoIds.add(videoId);
-    _queue.remove(videoId);
-
-    if (_activeVideoIds.contains(videoId)) {
-      _ytDownloadService.cancel(videoId);
-      // Await active completer briefly so that appended .part resume logic sees stable state
-      final c = _activeCompleters[videoId];
-      if (c != null) {
-        try {
-          await c.future.timeout(const Duration(seconds: 2));
-        } catch (_) {}
+    final lock = _taskLocks.putIfAbsent(videoId, () => Mutex());
+    return await lock.protect(() async {
+      final task = _tasks[videoId];
+      if (task == null) {
+        return const Left(DownloadFailure('Task not found'));
       }
-    }
 
-    _updateTask(task.copyWith(status: DownloadStatus.paused));
-    return const Right(unit);
+      _pausedVideoIds.add(videoId);
+      _queue.remove(videoId);
+
+      if (_activeVideoIds.contains(videoId)) {
+        _ytDownloadService.cancel(videoId);
+        final c = _activeCompleters[videoId];
+        if (c != null) {
+          try {
+            await c.future.timeout(const Duration(seconds: 2));
+          } catch (_) {}
+        }
+      }
+
+      _updateTask(task.copyWith(status: DownloadStatus.paused));
+      return const Right(unit);
+    });
   }
 
   @override
   Future<Either<AppFailure, Unit>> resumeDownload(String videoId) async {
-    final task = _tasks[videoId];
-    if (task == null) {
-      return const Left(DownloadFailure('Task not found'));
-    }
+    final lock = _taskLocks.putIfAbsent(videoId, () => Mutex());
+    return await lock.protect(() async {
+      final task = _tasks[videoId];
+      if (task == null) {
+        return const Left(DownloadFailure('Task not found'));
+      }
 
-    // Fix C2: Prevent double-queueing or duplicate downloads if already queued or active
-    if (_queue.contains(videoId) || _activeVideoIds.contains(videoId)) {
+      if (_queue.contains(videoId) || _activeVideoIds.contains(videoId)) {
+        return const Right(unit);
+      }
+
+      _pausedVideoIds.remove(videoId);
+      final queuedTask = task.copyWith(status: DownloadStatus.queued, error: null);
+      _updateTask(queuedTask);
+
+      if (!_activeVideoIds.contains(videoId) && !_queue.contains(videoId)) {
+        _queue.add(videoId);
+      }
+
+      try {
+        await _downloadChannel.invokeMethod('startDownloadForeground', {
+          'videoId': videoId,
+          'title': task.title,
+        });
+      } catch (_) {}
+
+      _processQueue();
       return const Right(unit);
-    }
-
-    _pausedVideoIds.remove(videoId);
-    final queuedTask = task.copyWith(status: DownloadStatus.queued, error: null);
-    _updateTask(queuedTask);
-
-    if (!_activeVideoIds.contains(videoId) && !_queue.contains(videoId)) {
-      _queue.add(videoId);
-    }
-
-    // Stream URL may be expired (~6h); YtDownloadService re-resolves on retry inside _downloadAudioWithRetry
-    try {
-      await _downloadChannel.invokeMethod('startDownloadForeground', {
-        'videoId': videoId,
-        'title': task.title,
-      });
-    } catch (_) {}
-
-    _processQueue();
-    return const Right(unit);
+    });
   }
 
   @override
   Future<Either<AppFailure, Unit>> retryDownload(String videoId) async {
-    final task = _tasks[videoId];
-    if (task == null) {
-      return const Left(DownloadFailure('Task not found'));
-    }
+    final lock = _taskLocks.putIfAbsent(videoId, () => Mutex());
+    return await lock.protect(() async {
+      final task = _tasks[videoId];
+      if (task == null) {
+        return const Left(DownloadFailure('Task not found'));
+      }
 
-    return (await queueDownload(task.copyWith(
-      status: DownloadStatus.queued,
-      progress: 0.0,
-      error: null,
-    ))).fold(
-      (f) => Left(f),
-      (_) => const Right(unit),
-    );
+      return (await queueDownload(task.copyWith(
+        status: DownloadStatus.queued,
+        progress: 0.0,
+        error: null,
+      ))).fold(
+        (f) => Left(f),
+        (_) => const Right(unit),
+      );
+    });
   }
 
   @override
   Future<Either<AppFailure, Unit>> deleteDownload(String videoId) async {
-    final task = _tasks[videoId];
-    _pausedVideoIds.remove(videoId);
-    _queue.remove(videoId);
+    final lock = _taskLocks.putIfAbsent(videoId, () => Mutex());
+    final result = await lock.protect(() async {
+      final task = _tasks[videoId];
+      _pausedVideoIds.remove(videoId);
+      _queue.remove(videoId);
 
-    // Delete-while-downloading race: cancel → await job completion → then delete
-    if (_activeVideoIds.contains(videoId)) {
-      _ytDownloadService.cancel(videoId);
-      final completer = _activeCompleters[videoId];
-      if (completer != null && !completer.isCompleted) {
+      if (_activeVideoIds.contains(videoId)) {
+        _ytDownloadService.cancel(videoId);
+        final completer = _activeCompleters[videoId];
+        if (completer != null && !completer.isCompleted) {
+          try {
+            await completer.future.timeout(const Duration(seconds: 5));
+          } catch (_) {}
+        }
+        _activeVideoIds.remove(videoId);
+        _activeCompleters.remove(videoId);
+      }
+
+      try {
+        await _ytDownloadService.cleanOrphanPartFiles(activePartNames: {});
+      } catch (_) {}
+      if (task?.filePath != null) {
         try {
-          await completer.future.timeout(const Duration(seconds: 5));
+          final f = File(task!.filePath!);
+          if (await f.exists()) {
+            await f.delete();
+          }
+        } catch (_) {}
+        try {
+          final part = File('${task!.filePath!}.part');
+          if (await part.exists()) await part.delete();
         } catch (_) {}
       }
-      _activeVideoIds.remove(videoId);
-      _activeCompleters.remove(videoId);
-    }
-
-    // Also remove any .part files
-    try {
-      // Clean possible temp .part leftover via service helper
-      await _ytDownloadService.cleanOrphanPartFiles(
-          activePartNames: {}); // will sweep all ytdl_ parts older than 10min; for immediate delete, also delete ytdl_videoId.*
-    } catch (_) {}
-    if (task?.filePath != null) {
       try {
-        final f = File(task!.filePath!);
-        if (await f.exists()) {
-          await f.delete();
-        }
-      } catch (_) {}
-      // Try .part variant too
-      try {
-        final part = File('${task!.filePath!}.part');
-        if (await part.exists()) await part.delete();
-      } catch (_) {}
-    }
-    // Delete temp dir variant ytdl_videoId.*
-    try {
-      final dir = await _getTempDir();
-      if (dir != null) {
-        final prefix = 'ytdl_$videoId';
-        await for (final e in dir.list()) {
-          if (e is File && e.path.contains(prefix)) {
-            try {
-              await e.delete();
-            } catch (_) {}
+        final dir = await _getTempDir();
+        if (dir != null) {
+          final prefix = 'ytdl_$videoId';
+          await for (final e in dir.list()) {
+            if (e is File && e.path.contains(prefix)) {
+              try {
+                await e.delete();
+              } catch (_) {}
+            }
           }
         }
-      }
-    } catch (_) {}
+      } catch (_) {}
 
-    _tasks.remove(videoId);
-    _cachedStorageStats = null; // Invalidate storage cache
-    try {
-      await _downloadChannel.invokeMethod('stopDownloadForeground');
-    } catch (_) {}
-    _schedulePersist();
-    _processQueue();
-    return const Right(unit);
+      _tasks.remove(videoId);
+      _cachedStorageStats = null;
+      try {
+        await _downloadChannel.invokeMethod('stopDownloadForeground');
+      } catch (_) {}
+      _schedulePersist();
+      _processQueue();
+      return const Right<AppFailure, Unit>(unit);
+    });
+    if (!lock.isLocked) {
+      _taskLocks.remove(videoId);
+    }
+    return result;
   }
 
   @override
@@ -309,29 +313,29 @@ class DownloadRepositoryImpl implements IDownloadRepository {
 
   @override
   Future<Either<AppFailure, Unit>> prioritizeDownload(String videoId) async {
-    if (!_tasks.containsKey(videoId)) {
-      return const Left(DownloadFailure('Task not found'));
-    }
-    final task = _tasks[videoId]!;
-    if (task.status != DownloadStatus.queued) {
-      // If paused or failed, move to queued first
-      if (task.status == DownloadStatus.paused || task.status == DownloadStatus.failed) {
-        await resumeDownload(videoId);
+    final lock = _taskLocks.putIfAbsent(videoId, () => Mutex());
+    return await lock.protect(() async {
+      if (!_tasks.containsKey(videoId)) {
+        return const Left(DownloadFailure('Task not found'));
       }
-    }
-    // Move to front of queue
-    _queue.remove(videoId);
-    _queue.addFirst(videoId);
-    _schedulePersist();
-    _processQueue();
-    return const Right(unit);
+      final task = _tasks[videoId]!;
+      if (task.status != DownloadStatus.queued) {
+        if (task.status == DownloadStatus.paused ||
+            task.status == DownloadStatus.failed ||
+            task.status == DownloadStatus.interrupted) {
+          await resumeDownload(videoId);
+        }
+      }
+      _queue.remove(videoId);
+      _queue.addFirst(videoId);
+      _schedulePersist();
+      _processQueue();
+      return const Right(unit);
+    });
   }
 
   Future<Directory?> _getTempDir() async {
     try {
-      // path_provider getTemporaryDirectory equivalent via dart:io? Use Directory.systemTemp? Fallback to manual.
-      // We delegate to native plugin would be better; but try path_provider channel indirectly via File.
-      // For now, try to locate via File('${Directory.systemTemp.path}').exists
       return Directory.systemTemp;
     } catch (_) {
       return null;
@@ -365,7 +369,6 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         totalUsedBytes = sizes.fold(0, (a, b) => a + b);
         final existingCount = sizes.where((s) => s > 0).length;
         if (existingCount > 0) completedCount = existingCount;
-        // Self-heal: externally deleted files reconciled (mark failed) — also update tasks map
         for (int i = 0; i < files.length; i++) {
           if (sizes[i] == 0) {
             final vid = _tasks.values
@@ -410,7 +413,6 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           final task = DownloadTask.fromJson(item as Map<String, dynamic>);
           if (task.status == DownloadStatus.downloading ||
               task.status == DownloadStatus.queued) {
-            // Restore interrupted downloads as paused on startup (process death reconciliation)
             _tasks[task.videoId] = task.copyWith(status: DownloadStatus.paused);
           } else if (task.status == DownloadStatus.complete) {
             if (task.filePath != null && !File(task.filePath!).existsSync()) {
@@ -424,19 +426,17 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           }
         }
       }
-      // Collect active part names to not delete paused downloads' partials
       final activeNames = _tasks.values.where((t) => t.status == DownloadStatus.paused).map((t) => 'ytdl_${t.videoId}.part').toSet();
       await _ytDownloadService.cleanOrphanPartFiles(activePartNames: activeNames.isNotEmpty ? activeNames : null);
-      // Enqueue paused tasks for resumption? Keep paused state; user taps resume re-resolves URL (expiry handled)
     } catch (e) {
       ErrorLogger.log('DownloadRepository reconcileOnBoot failed', error: e);
     }
   }
 
-  // Throttle coalescing ~100ms (was 250) — per-tile ValueNotifier would be ideal, but this prevents rebuild storms from 1000/s chunk callbacks
+  // Throttle coalescing ~200ms with instant flush on terminal states
   Timer? _throttleFlushTimer;
   DownloadTask? _pendingThrottledTask;
-  static const _throttleMs = 100;
+  static const _throttleMs = 200;
 
   void _updateTask(DownloadTask task) {
     _tasks[task.videoId] = task;
@@ -446,16 +446,32 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     final isIntermediateProgress = task.status == DownloadStatus.downloading &&
         task.progress > 0.0 &&
         task.progress < 1.0;
-    final isTerminal = task.status == DownloadStatus.complete || task.status == DownloadStatus.failed || task.status == DownloadStatus.paused;
+    final isTerminal = task.status == DownloadStatus.complete ||
+        task.status == DownloadStatus.failed ||
+        task.status == DownloadStatus.paused ||
+        task.status == DownloadStatus.interrupted;
 
-    if (isIntermediateProgress && (now - lastEmit < _throttleMs) && !isTerminal) {
+    if (isTerminal) {
+      if (_pendingThrottledTask != null && _pendingThrottledTask!.videoId == task.videoId) {
+        _throttleFlushTimer?.cancel();
+        _pendingThrottledTask = null;
+      }
+      _lastProgressEmitMs.remove(task.videoId);
+      if (!_streamController.isClosed) {
+        _streamController.add(task);
+      }
+      _pushFgsProgress(task);
+      _schedulePersist();
+      return;
+    }
+
+    if (isIntermediateProgress && (now - lastEmit < _throttleMs)) {
       _pendingThrottledTask = task;
       _throttleFlushTimer?.cancel();
       _throttleFlushTimer = Timer(const Duration(milliseconds: _throttleMs), () {
         if (_pendingThrottledTask != null && _pendingThrottledTask!.videoId == task.videoId) {
           _lastProgressEmitMs[task.videoId] = DateTime.now().millisecondsSinceEpoch;
           if (!_streamController.isClosed) _streamController.add(_pendingThrottledTask!);
-          // FGS progress update throttled same interval
           _pushFgsProgress(_pendingThrottledTask!);
           _pendingThrottledTask = null;
         }
