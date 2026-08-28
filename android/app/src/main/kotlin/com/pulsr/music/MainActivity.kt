@@ -86,13 +86,12 @@ class MainActivity : AudioServiceActivity() {
 
     private fun isYouTubeUri(uri: Uri): Boolean {
         val host = uri.host?.lowercase() ?: ""
-        return host == "music.youtube.com" || host == "youtube.com" || host == "www.youtube.com" ||
-            host == "m.youtube.com" || host == "youtu.be"
+        return host.endsWith("youtu.be") || host.endsWith("youtube.com")
     }
 
     private fun isYouTubeUrl(text: String): Boolean {
         val lower = text.lowercase()
-        return lower.contains("music.youtube.com") || lower.contains("youtube.com") || lower.contains("youtu.be")
+        return lower.contains("youtu.be") || lower.contains("youtube.com")
     }
 
     private fun handleAudioIntent(intent: Intent?, fromColdStart: Boolean) {

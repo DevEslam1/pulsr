@@ -14,13 +14,35 @@ class PulsrBottomNavBar extends StatelessWidget {
     required this.onTap,
   });
 
-  List<({IconData activeIcon, IconData icon, String label})> _getItems(BuildContext context) => [
-    (icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: context.l10n.navHome),
-    (icon: Icons.library_music_outlined, activeIcon: Icons.library_music_rounded, label: context.l10n.navLibrary),
-    (icon: Icons.search_rounded, activeIcon: Icons.search_rounded, label: context.l10n.navSearch),
-    (icon: Icons.queue_music_outlined, activeIcon: Icons.queue_music_rounded, label: context.l10n.navPlaylists),
-    (icon: Icons.settings_outlined, activeIcon: Icons.settings_rounded, label: context.l10n.navSettings),
-  ];
+  List<({IconData activeIcon, IconData icon, String label})> _getItems(
+          BuildContext context) =>
+      [
+        (
+          icon: Icons.home_outlined,
+          activeIcon: Icons.home_rounded,
+          label: context.l10n.navHome
+        ),
+        (
+          icon: Icons.library_music_outlined,
+          activeIcon: Icons.library_music_rounded,
+          label: context.l10n.navLibrary
+        ),
+        (
+          icon: Icons.search_rounded,
+          activeIcon: Icons.search_rounded,
+          label: context.l10n.navSearch
+        ),
+        (
+          icon: Icons.queue_music_outlined,
+          activeIcon: Icons.queue_music_rounded,
+          label: context.l10n.navPlaylists
+        ),
+        (
+          icon: Icons.settings_outlined,
+          activeIcon: Icons.settings_rounded,
+          label: context.l10n.navSettings
+        ),
+      ];
 
   @override
   Widget build(BuildContext context) {
@@ -131,7 +153,9 @@ class _NavTabItem extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10.5,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                color: isSelected ? p.accent : p.textTertiary.withValues(alpha: 0.8),
+                color: isSelected
+                    ? p.accent
+                    : p.textTertiary.withValues(alpha: 0.8),
                 letterSpacing: 0.15,
                 fontFamily: Theme.of(context).textTheme.bodySmall?.fontFamily,
               ),

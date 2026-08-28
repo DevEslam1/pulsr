@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/data/db/app_database.dart';
@@ -45,11 +45,13 @@ void main() {
         throwsA(isA<FormatException>()),
       );
       expect(
-        () => importUseCase.execute(jsonEncode({'version': '1', 'favorites': []})),
+        () => importUseCase
+            .execute(jsonEncode({'version': '1', 'favorites': []})),
         throwsA(isA<FormatException>()),
       );
       expect(
-        () => importUseCase.execute(jsonEncode({'version': 0, 'favorites': []})),
+        () =>
+            importUseCase.execute(jsonEncode({'version': 0, 'favorites': []})),
         throwsA(isA<FormatException>()),
       );
     });
@@ -69,7 +71,9 @@ void main() {
       final payload = {
         'version': 1,
         'playlists': [
-          {'songPaths': ['/music/song1.mp3']},
+          {
+            'songPaths': ['/music/song1.mp3']
+          },
         ],
       };
       expect(

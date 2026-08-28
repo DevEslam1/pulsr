@@ -11,7 +11,8 @@ class AppShell extends StatelessWidget {
   const AppShell({super.key, required this.navigationShell});
 
   void _onTapNav(int index) {
-    navigationShell.goBranch(index, initialLocation: index == navigationShell.currentIndex);
+    navigationShell.goBranch(index,
+        initialLocation: index == navigationShell.currentIndex);
   }
 
   void _openNowPlaying(BuildContext context) {
@@ -20,17 +21,34 @@ class AppShell extends StatelessWidget {
 
   static const _destinations = [
     (icon: Icons.home_outlined, selected: Icons.home_rounded, label: 'Home'),
-    (icon: Icons.library_music_outlined, selected: Icons.library_music_rounded, label: 'Library'),
-    (icon: Icons.search_rounded, selected: Icons.search_rounded, label: 'Search'),
-    (icon: Icons.queue_music_outlined, selected: Icons.queue_music_rounded, label: 'Playlists'),
-    (icon: Icons.settings_outlined, selected: Icons.settings_rounded, label: 'Settings'),
+    (
+      icon: Icons.library_music_outlined,
+      selected: Icons.library_music_rounded,
+      label: 'Library'
+    ),
+    (
+      icon: Icons.search_rounded,
+      selected: Icons.search_rounded,
+      label: 'Search'
+    ),
+    (
+      icon: Icons.queue_music_outlined,
+      selected: Icons.queue_music_rounded,
+      label: 'Playlists'
+    ),
+    (
+      icon: Icons.settings_outlined,
+      selected: Icons.settings_rounded,
+      label: 'Settings'
+    ),
   ];
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
     final isTablet = Adaptive.isTablet(context);
-    final extendedRail = Adaptive.widthOf(context) >= Adaptive.railExtendedBreakpoint;
+    final extendedRail =
+        Adaptive.widthOf(context) >= Adaptive.railExtendedBreakpoint;
 
     final content = Stack(
       children: [
@@ -70,11 +88,16 @@ class AppShell extends StatelessWidget {
               child: Column(
                 children: [
                   Padding(
-                    padding: EdgeInsets.fromLTRB(extendedRail ? 22 : 0, 26, extendedRail ? 22 : 0, 22),
+                    padding: EdgeInsets.fromLTRB(
+                        extendedRail ? 22 : 0, 26, extendedRail ? 22 : 0, 22),
                     child: extendedRail
                         ? Row(
                             children: [
-                              PulsrLogo(size: 32, color: p.accent, glowColor: p.glow, animate: false),
+                              PulsrLogo(
+                                  size: 32,
+                                  color: p.accent,
+                                  glowColor: p.glow,
+                                  animate: false),
                               const SizedBox(width: 12),
                               Text(
                                 'PULSR',
@@ -87,7 +110,11 @@ class AppShell extends StatelessWidget {
                               ),
                             ],
                           )
-                        : PulsrLogo(size: 32, color: p.accent, glowColor: p.glow, animate: false),
+                        : PulsrLogo(
+                            size: 32,
+                            color: p.accent,
+                            glowColor: p.glow,
+                            animate: false),
                   ),
                   Expanded(
                     child: NavigationRail(

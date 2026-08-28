@@ -71,7 +71,8 @@ class YtmTrack {
         videoId: json['videoId'] as String? ?? '',
         title: json['title'] as String? ?? 'Unknown Title',
         artist: json['artist'] as String? ?? 'Unknown Artist',
-        duration: Duration(milliseconds: (json['durationMs'] as num?)?.toInt() ?? 0),
+        duration:
+            Duration(milliseconds: (json['durationMs'] as num?)?.toInt() ?? 0),
         artworkUrl: json['artworkUrl'] as String?,
       );
 
@@ -87,7 +88,8 @@ class YtmTrack {
       artist: (map['artist'] as String?)?.trim().isNotEmpty == true
           ? (map['artist'] as String).trim()
           : 'Unknown Artist',
-      duration: Duration(milliseconds: (map['durationMs'] as num?)?.toInt() ?? 0),
+      duration:
+          Duration(milliseconds: (map['durationMs'] as num?)?.toInt() ?? 0),
       artworkUrl: (map['artworkUrl'] as String?)?.trim().isNotEmpty == true
           ? (map['artworkUrl'] as String).trim()
           : null,
@@ -149,7 +151,8 @@ class YtmStream {
       mimeType: (map['mimeType'] as String?) ?? 'audio/mp4',
       container: (map['container'] as String?) ?? '',
       bitrateKbps: (map['bitrateKbps'] as num?)?.toInt() ?? 0,
-      duration: Duration(milliseconds: (map['durationMs'] as num?)?.toInt() ?? 0),
+      duration:
+          Duration(milliseconds: (map['durationMs'] as num?)?.toInt() ?? 0),
       title: (map['title'] as String?) ?? '',
       artist: (map['artist'] as String?) ?? 'Unknown Artist',
       artworkUrl: (map['artworkUrl'] as String?)?.trim().isNotEmpty == true

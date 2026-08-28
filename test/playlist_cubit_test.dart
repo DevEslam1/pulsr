@@ -34,7 +34,8 @@ void main() {
       await cubit.createPlaylist('Chill Vibrations');
       await Future.delayed(const Duration(milliseconds: 50));
 
-      expect(cubit.state.playlists.any((p) => p.name == 'Chill Vibrations'), isTrue);
+      expect(cubit.state.playlists.any((p) => p.name == 'Chill Vibrations'),
+          isTrue);
 
       await cubit.close();
     });
@@ -47,7 +48,8 @@ void main() {
       );
       await db.into(db.songsTable).insert(song);
 
-      final playlistId = (await repo.createPlaylist('Test List')).getOrElse((_) => -1);
+      final playlistId =
+          (await repo.createPlaylist('Test List')).getOrElse((_) => -1);
       final cubit = PlaylistCubit(playlistUseCases: playlistUseCases);
 
       await cubit.addSongToPlaylist(playlistId, 101);
@@ -66,7 +68,8 @@ void main() {
     });
 
     test('Deletes playlist', () async {
-      final playlistId = (await repo.createPlaylist('To Delete')).getOrElse((_) => -1);
+      final playlistId =
+          (await repo.createPlaylist('To Delete')).getOrElse((_) => -1);
       final cubit = PlaylistCubit(playlistUseCases: playlistUseCases);
 
       await Future.delayed(const Duration(milliseconds: 50));

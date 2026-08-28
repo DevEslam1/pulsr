@@ -29,7 +29,8 @@ FILE "audiobook.mp3" MP3
 
       expect(chapters[1].index, equals(2));
       expect(chapters[1].title, equals('Chapter 1 - Into The Woods'));
-      expect(chapters[1].start, equals(const Duration(minutes: 4, seconds: 30)));
+      expect(
+          chapters[1].start, equals(const Duration(minutes: 4, seconds: 30)));
       expect(chapters[1].end, isNotNull);
 
       expect(chapters[2].index, equals(3));

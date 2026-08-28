@@ -11,10 +11,12 @@ import '../utils/lrc_parser.dart';
 class LrclibService {
   final HttpClient _client;
 
-  LrclibService({HttpClient? client}) : _client = client ?? (HttpClient()..connectionTimeout = const Duration(seconds: 4));
+  LrclibService({HttpClient? client})
+      : _client = client ??
+            (HttpClient()..connectionTimeout = const Duration(seconds: 4));
 
   void dispose() {
-    _client.close(force: true);
+    _client.close(force: false);
   }
 
   Future<LyricsResult?> fetchLyrics({
@@ -39,7 +41,8 @@ class LrclibService {
 
     // Fallback to fuzzy search on LRCLIB
     result = await _trySearchLyrics(
-      query: '${cleanTrack.isNotEmpty ? cleanTrack : trackName} ${cleanArtist.isNotEmpty ? cleanArtist : artistName}',
+      query:
+          '${cleanTrack.isNotEmpty ? cleanTrack : trackName} ${cleanArtist.isNotEmpty ? cleanArtist : artistName}',
     );
 
     return result;
@@ -51,16 +54,28 @@ class LrclibService {
       cleaned = cleaned.split('|').first;
     }
     cleaned = cleaned
-        .replaceAll(RegExp(r'\s*[\(\[\{].*?(official|video|audio|mv|lyrics|feat|ft\.|remix|version|hq|hd|حفل|كليب|فيديو|موسيقى|جلسة|لايف|بث).*?[\)\]\}]', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\s*-\s*(official|video|audio|mv|lyrics|فيديو|كليب|حفل).*', caseSensitive: false), '')
-        .replaceAll(RegExp(r'\s*(حفل|مهرجان|جلسة|فيديو كليب).*', caseSensitive: false), '')
+        .replaceAll(
+            RegExp(
+                r'\s*[\(\[\{].*?(official|video|audio|mv|lyrics|feat|ft\.|remix|version|hq|hd|حفل|كليب|فيديو|موسيقى|جلسة|لايف|بث).*?[\)\]\}]',
+                caseSensitive: false),
+            '')
+        .replaceAll(
+            RegExp(r'\s*-\s*(official|video|audio|mv|lyrics|فيديو|كليب|حفل).*',
+                caseSensitive: false),
+            '')
+        .replaceAll(
+            RegExp(r'\s*(حفل|مهرجان|جلسة|فيديو كليب).*', caseSensitive: false),
+            '')
         .trim();
     return cleaned;
   }
 
   String _cleanArtist(String artist) {
     return artist
-        .replaceAll(RegExp(r'\s*[\(\[\{].*?(topic|vevo).*?[\)\]\}]', caseSensitive: false), '')
+        .replaceAll(
+            RegExp(r'\s*[\(\[\{].*?(topic|vevo).*?[\)\]\}]',
+                caseSensitive: false),
+            '')
         .replaceAll(RegExp(r'\s*-\s*Topic', caseSensitive: false), '')
         .trim();
   }
@@ -85,8 +100,10 @@ class LrclibService {
 
       final uri = Uri.https('lrclib.net', '/api/get', queryParams);
       final request = await _client.getUrl(uri);
-      request.headers.set(HttpHeaders.userAgentHeader, 'PulsrMusic/${AppConfig.appVersion} (music player)');
-      final response = await request.close().timeout(const Duration(seconds: 4));
+      request.headers.set(HttpHeaders.userAgentHeader,
+          'PulsrMusic/${AppConfig.appVersion} (music player)');
+      final response =
+          await request.close().timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {
         final responseBody = await response.transform(utf8.decoder).join();
@@ -103,8 +120,10 @@ class LrclibService {
     try {
       final uri = Uri.https('lrclib.net', '/api/search', {'q': query});
       final request = await _client.getUrl(uri);
-      request.headers.set(HttpHeaders.userAgentHeader, 'PulsrMusic/${AppConfig.appVersion} (music player)');
-      final response = await request.close().timeout(const Duration(seconds: 4));
+      request.headers.set(HttpHeaders.userAgentHeader,
+          'PulsrMusic/${AppConfig.appVersion} (music player)');
+      final response =
+          await request.close().timeout(const Duration(seconds: 4));
 
       if (response.statusCode == 200) {
         final responseBody = await response.transform(utf8.decoder).join();
@@ -136,7 +155,8 @@ class LrclibService {
     }
 
     if (plainLyrics != null && plainLyrics.trim().isNotEmpty) {
-      final lines = LrcParser.parsePlainText(plainLyrics, source: LyricsSource.lrclib);
+      final lines =
+          LrcParser.parsePlainText(plainLyrics, source: LyricsSource.lrclib);
       if (lines.isNotEmpty) {
         return LyricsResult(lines: lines, source: LyricsSource.lrclib);
       }

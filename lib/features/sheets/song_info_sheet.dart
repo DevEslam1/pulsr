@@ -45,7 +45,9 @@ class SongInfoSheet extends StatelessWidget {
 
     try {
       if (Platform.isAndroid) {
-        final canWrite = await channel.invokeMethod<bool>('checkWriteSettingsPermission') ?? true;
+        final canWrite =
+            await channel.invokeMethod<bool>('checkWriteSettingsPermission') ??
+                true;
         if (!canWrite) {
           if (!context.mounted) return;
           final proceed = await showDialog<bool>(
@@ -89,7 +91,8 @@ class SongInfoSheet extends StatelessWidget {
       if (e.code == 'PERMISSION_DENIED') {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Permission required to change system settings'),
+            content:
+                const Text('Permission required to change system settings'),
             action: SnackBarAction(
               label: 'Settings',
               onPressed: () {
@@ -146,15 +149,18 @@ class SongInfoSheet extends StatelessWidget {
                 const SizedBox(height: 12),
                 ListTile(
                   leading: Icon(Icons.ring_volume_rounded, color: p.accent),
-                  title: Text(context.l10n.phoneRingtone, style: TextStyle(color: p.textPrimary)),
+                  title: Text(context.l10n.phoneRingtone,
+                      style: TextStyle(color: p.textPrimary)),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
                     _setRingtone(context, 'ringtone');
                   },
                 ),
                 ListTile(
-                  leading: Icon(Icons.notifications_active_rounded, color: p.accent),
-                  title: Text(context.l10n.notificationSound, style: TextStyle(color: p.textPrimary)),
+                  leading:
+                      Icon(Icons.notifications_active_rounded, color: p.accent),
+                  title: Text(context.l10n.notificationSound,
+                      style: TextStyle(color: p.textPrimary)),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
                     _setRingtone(context, 'notification');
@@ -162,7 +168,8 @@ class SongInfoSheet extends StatelessWidget {
                 ),
                 ListTile(
                   leading: Icon(Icons.alarm_rounded, color: p.accent),
-                  title: Text(context.l10n.alarmSound, style: TextStyle(color: p.textPrimary)),
+                  title: Text(context.l10n.alarmSound,
+                      style: TextStyle(color: p.textPrimary)),
                   onTap: () {
                     Navigator.of(sheetContext).pop();
                     _setRingtone(context, 'alarm');
@@ -227,7 +234,10 @@ class SongInfoSheet extends StatelessWidget {
                               song.title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
                                     fontWeight: FontWeight.w800,
                                     color: p.textPrimary,
                                   ),
@@ -237,7 +247,8 @@ class SongInfoSheet extends StatelessWidget {
                               song.artist,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: TextStyle(color: p.textSecondary, fontSize: 13),
+                              style: TextStyle(
+                                  color: p.textSecondary, fontSize: 13),
                             ),
                           ],
                         ),
@@ -265,15 +276,24 @@ class SongInfoSheet extends StatelessWidget {
                                   color: p.textSecondary,
                                 ),
                               ),
-                              AudioQualityBadge(song: song, activeColor: p.accent, compact: true),
+                              AudioQualityBadge(
+                                  song: song,
+                                  activeColor: p.accent,
+                                  compact: true),
                             ],
                           ),
                           const SizedBox(height: 8),
-                          _buildInfoRow(context.l10n.audioFormat, quality.format, p),
+                          _buildInfoRow(
+                              context.l10n.audioFormat, quality.format, p),
                           if (quality.bitrateKbps != null)
-                            _buildInfoRow(context.l10n.bitrate, '${quality.bitrateKbps} kbps (${quality.tierLabel})', p),
-                          _buildInfoRow(context.l10n.sampleRate, '${quality.bitDepth} / ${quality.sampleRate}', p),
-                          _buildInfoRow(context.l10n.channels, quality.channels, p),
+                            _buildInfoRow(
+                                context.l10n.bitrate,
+                                '${quality.bitrateKbps} kbps (${quality.tierLabel})',
+                                p),
+                          _buildInfoRow(context.l10n.sampleRate,
+                              '${quality.bitDepth} / ${quality.sampleRate}', p),
+                          _buildInfoRow(
+                              context.l10n.channels, quality.channels, p),
                           const SizedBox(height: 6),
                           Divider(color: p.hairline),
                           const SizedBox(height: 6),
@@ -282,11 +302,19 @@ class SongInfoSheet extends StatelessWidget {
                     },
                   ),
                   _buildInfoRow(context.l10n.album, song.album, p),
-                  _buildInfoRow(context.l10n.duration, Formatters.formatDuration(Duration(milliseconds: song.durationMs)), p),
+                  _buildInfoRow(
+                      context.l10n.duration,
+                      Formatters.formatDuration(
+                          Duration(milliseconds: song.durationMs)),
+                      p),
                   _buildInfoRow(context.l10n.filePath, song.path, p),
-                  _buildInfoRow(context.l10n.playCount, context.l10n.playCountTimes(song.playCount), p),
+                  _buildInfoRow(context.l10n.playCount,
+                      context.l10n.playCountTimes(song.playCount), p),
                   if (song.fileSize != null)
-                    _buildInfoRow(context.l10n.fileSize, '${(song.fileSize! / (1024 * 1024)).toStringAsFixed(2)} MB', p),
+                    _buildInfoRow(
+                        context.l10n.fileSize,
+                        '${(song.fileSize! / (1024 * 1024)).toStringAsFixed(2)} MB',
+                        p),
                   const SizedBox(height: 20),
                   Row(
                     children: [
@@ -300,10 +328,13 @@ class SongInfoSheet extends StatelessWidget {
                             side: BorderSide(color: p.hairline),
                           ),
                           onPressed: () => _shareSong(context),
-                          icon: Icon(Icons.share_rounded, size: 20, color: p.textPrimary),
+                          icon: Icon(Icons.share_rounded,
+                              size: 20, color: p.textPrimary),
                           label: Text(
                             context.l10n.share,
-                            style: TextStyle(fontWeight: FontWeight.w600, color: p.textPrimary),
+                            style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: p.textPrimary),
                           ),
                         ),
                       ),
@@ -319,10 +350,13 @@ class SongInfoSheet extends StatelessWidget {
                               side: BorderSide(color: p.hairline),
                             ),
                             onPressed: () => _showRingtoneOptions(context),
-                            icon: Icon(Icons.ring_volume_rounded, size: 20, color: p.textPrimary),
+                            icon: Icon(Icons.ring_volume_rounded,
+                                size: 20, color: p.textPrimary),
                             label: Text(
                               context.l10n.ringtone,
-                              style: TextStyle(fontWeight: FontWeight.w600, color: p.textPrimary),
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: p.textPrimary),
                             ),
                           ),
                         ),
@@ -349,7 +383,8 @@ class SongInfoSheet extends StatelessWidget {
                         icon: const Icon(Icons.edit_note_rounded, size: 20),
                         label: Text(
                           context.l10n.editTags,
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w700, fontSize: 15),
                         ),
                       ),
                     ),
@@ -372,14 +407,20 @@ class SongInfoSheet extends StatelessWidget {
             width: 110,
             child: Text(
               label,
-              style: TextStyle(color: p.textSecondary, fontSize: 13, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                  color: p.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               value,
-              style: TextStyle(color: p.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                  color: p.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600),
             ),
           ),
         ],

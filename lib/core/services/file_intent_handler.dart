@@ -20,13 +20,15 @@ import 'ytm_service.dart';
 
 @singleton
 class FileIntentHandler {
-  static const MethodChannel _channel =
-      MethodChannel(PulsrChannels.fileOpener);
+  static const MethodChannel _channel = MethodChannel(PulsrChannels.fileOpener);
   static int _tempIdCounter = 0;
   static int _getNextTempId() {
     final rand = math.Random().nextInt(1 << 16);
-    return (DateTime.now().millisecondsSinceEpoch * -1) - (++_tempIdCounter * 65536) - rand;
+    return (DateTime.now().millisecondsSinceEpoch * -1) -
+        (++_tempIdCounter * 65536) -
+        rand;
   }
+
   final IMusicRepository _repository;
   final PlayerCubit _playerCubit;
 
@@ -69,7 +71,8 @@ class FileIntentHandler {
     }
 
     final youTubeShort =
-        RegExp(r'(?:https?:\/\/)?(?:www\.)?youtu\.be\/([a-zA-Z0-9_-]{11})').firstMatch(trimmed);
+        RegExp(r'(?:https?:\/\/)?(?:www\.)?youtu\.be\/([a-zA-Z0-9_-]{11})')
+            .firstMatch(trimmed);
     if (youTubeShort != null) return youTubeShort.group(1);
 
     final youTubeLong = RegExp(
@@ -156,7 +159,7 @@ class FileIntentHandler {
       }
 
       // 1. Check if it's a PLAYABLE audio file FIRST (fast-path)
-      if (AudioFormats.isPlayableExtension(cleanPath)) {
+      if (AudioFormats.isSupportedExtension(cleanPath)) {
         // Proceed directly to audio handling below
       } else {
         // 2. Only check for proxy/text files if NOT audio

@@ -80,12 +80,16 @@ class TagEditorState {
       trackNumber: trackNumber ?? this.trackNumber,
       comment: comment ?? this.comment,
       lyrics: lyrics ?? this.lyrics,
-      artworkBytes: clearArtworkBytes ? null : (artworkBytes ?? this.artworkBytes),
-      newArtworkPath: clearNewArtworkPath ? null : (newArtworkPath ?? this.newArtworkPath),
+      artworkBytes:
+          clearArtworkBytes ? null : (artworkBytes ?? this.artworkBytes),
+      newArtworkPath:
+          clearNewArtworkPath ? null : (newArtworkPath ?? this.newArtworkPath),
       removeArtwork: removeArtwork ?? this.removeArtwork,
       isAutoFetching: isAutoFetching ?? this.isAutoFetching,
-      batchProgress: clearBatchProgress ? null : (batchProgress ?? this.batchProgress),
-      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      batchProgress:
+          clearBatchProgress ? null : (batchProgress ?? this.batchProgress),
+      errorMessage:
+          clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
     );
   }
 }

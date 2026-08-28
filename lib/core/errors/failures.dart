@@ -60,4 +60,3 @@ class BackupFailure extends AppFailure {
 class DownloadFailure extends AppFailure {
   const DownloadFailure(super.message, [super.error]);
 }
-

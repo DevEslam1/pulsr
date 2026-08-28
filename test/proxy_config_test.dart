@@ -8,7 +8,8 @@ void main() {
       const config = ProxyConfig();
       expect(config.enabled, false);
       expect(config.isValid, false);
-      expect(config.toFindProxyString(Uri.parse('https://music.youtube.com')), 'DIRECT');
+      expect(config.toFindProxyString(Uri.parse('https://music.youtube.com')),
+          'DIRECT');
     });
 
     test('valid HTTP proxy formats properly for HttpClient.findProxy', () {
@@ -53,8 +54,10 @@ void main() {
       expect(config.isBypassed(Uri.parse('https://api.internal.net/v1')), true);
       expect(config.isBypassed(Uri.parse('https://music.youtube.com')), false);
 
-      expect(config.toFindProxyString(Uri.parse('http://localhost:3000')), 'DIRECT');
-      expect(config.toFindProxyString(Uri.parse('https://music.youtube.com')), 'PROXY 127.0.0.1:8080; DIRECT');
+      expect(config.toFindProxyString(Uri.parse('http://localhost:3000')),
+          'DIRECT');
+      expect(config.toFindProxyString(Uri.parse('https://music.youtube.com')),
+          'PROXY 127.0.0.1:8080; DIRECT');
     });
 
     test('serialization to and from Map preserves all fields', () {
@@ -106,7 +109,8 @@ void main() {
     });
 
     test('parses URL format with socks5 scheme', () {
-      final entry = ProxyEntry.parse('socks5://qmyizdto:secret123@198.105.121.200:6462');
+      final entry =
+          ProxyEntry.parse('socks5://qmyizdto:secret123@198.105.121.200:6462');
       expect(entry, isNotNull);
       expect(entry!.host, '198.105.121.200');
       expect(entry.port, 6462);
@@ -115,7 +119,9 @@ void main() {
       expect(entry.type, AppProxyType.socks5);
     });
 
-    test('parseList handles multi-line proxy text blocks with comments and duplicates', () {
+    test(
+        'parseList handles multi-line proxy text blocks with comments and duplicates',
+        () {
       const rawText = '''
 # Proxy list comment
 31.59.20.176:6754:qmyizdto:n5fui7pyec1q

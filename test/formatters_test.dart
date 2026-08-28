@@ -12,9 +12,15 @@ void main() {
 
     test('formatDuration formats standard mm:ss durations', () {
       expect(Formatters.formatDuration(const Duration(seconds: 45)), '0:45');
-      expect(Formatters.formatDuration(const Duration(minutes: 3, seconds: 5)), '3:05');
-      expect(Formatters.formatDuration(const Duration(minutes: 12, seconds: 34)), '12:34');
-      expect(Formatters.formatDuration(const Duration(hours: 1, minutes: 2, seconds: 3)), '62:03');
+      expect(Formatters.formatDuration(const Duration(minutes: 3, seconds: 5)),
+          '3:05');
+      expect(
+          Formatters.formatDuration(const Duration(minutes: 12, seconds: 34)),
+          '12:34');
+      expect(
+          Formatters.formatDuration(
+              const Duration(hours: 1, minutes: 2, seconds: 3)),
+          '62:03');
     });
 
     test('formatDurationMs handles null, negative, and positive ms', () {

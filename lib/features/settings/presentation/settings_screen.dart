@@ -47,9 +47,14 @@ class SettingsScreen extends StatelessWidget {
           appBar: AppBar(title: Text(context.l10n.settings)),
           body: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 760), // readable on tablets
+              constraints:
+                  const BoxConstraints(maxWidth: 760), // readable on tablets
               child: ListView(
-                padding: EdgeInsets.only(bottom: 160, top: 8, left: Adaptive.pagePadding(context), right: Adaptive.pagePadding(context)),
+                padding: EdgeInsets.only(
+                    bottom: 160,
+                    top: 8,
+                    left: Adaptive.pagePadding(context),
+                    right: Adaptive.pagePadding(context)),
                 children: [
                   _buildCloudSyncCard(context),
                   _section(context, context.l10n.audioAndPlayback, [
@@ -70,17 +75,54 @@ class SettingsScreen extends StatelessWidget {
                           : null,
                     ),
                     _divider(p),
-                    _navTile(context, Icons.timer_outlined, context.l10n.sleepTimer, context.l10n.sleepTimerSubtitle,
-                        onTap: () => showModalBottomSheet(context: context, useRootNavigator: true, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (_) => const SleepTimerSheet())),
+                    _navTile(
+                      context,
+                      Icons.settings_input_composite_rounded,
+                      context.l10n.dspEnginePreference,
+                      switch (state.dspPreference) {
+                        'oem' => context.l10n.dspEngineOem,
+                        'auto' => context.l10n.dspEngineAuto,
+                        _ => context.l10n.dspEngineNative,
+                      },
+                      onTap: () => _showDspPreferencePickerSheet(
+                          context, cubit, state.dspPreference),
+                    ),
                     _divider(p),
-                    _switchTile(context, Icons.graphic_eq_rounded, context.l10n.gaplessPlayback, context.l10n.gaplessSubtitle,
-                        value: state.gaplessPlayback, onChanged: cubit.setGapless),
+                    _navTile(
+                        context,
+                        Icons.timer_outlined,
+                        context.l10n.sleepTimer,
+                        context.l10n.sleepTimerSubtitle,
+                        onTap: () => showModalBottomSheet(
+                            context: context,
+                            useRootNavigator: true,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (_) => const SleepTimerSheet())),
                     _divider(p),
-                    _switchTile(context, Icons.play_circle_outline_rounded, context.l10n.resumeAfterInterruption, context.l10n.resumeAfterInterruptionSubtitle,
-                        value: state.resumeAfterInterruption, onChanged: cubit.setResumeAfterInterruption),
+                    _switchTile(
+                        context,
+                        Icons.graphic_eq_rounded,
+                        context.l10n.gaplessPlayback,
+                        context.l10n.gaplessSubtitle,
+                        value: state.gaplessPlayback,
+                        onChanged: cubit.setGapless),
                     _divider(p),
-                    _switchTile(context, Icons.waves_rounded, context.l10n.waveformSeekBar, context.l10n.waveformSeekBarSubtitle,
-                        value: state.waveformSeekBarEnabled, onChanged: cubit.setWaveformSeekBar),
+                    _switchTile(
+                        context,
+                        Icons.play_circle_outline_rounded,
+                        context.l10n.resumeAfterInterruption,
+                        context.l10n.resumeAfterInterruptionSubtitle,
+                        value: state.resumeAfterInterruption,
+                        onChanged: cubit.setResumeAfterInterruption),
+                    _divider(p),
+                    _switchTile(
+                        context,
+                        Icons.waves_rounded,
+                        context.l10n.waveformSeekBar,
+                        context.l10n.waveformSeekBarSubtitle,
+                        value: state.waveformSeekBarEnabled,
+                        onChanged: cubit.setWaveformSeekBar),
                     _divider(p),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
@@ -90,16 +132,32 @@ class SettingsScreen extends StatelessWidget {
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text(context.l10n.crossfade, style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14)),
+                              Text(context.l10n.crossfade,
+                                  style: TextStyle(
+                                      color: p.textPrimary,
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 14)),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(color: p.accentContainer, borderRadius: BorderRadius.circular(8)),
-                                child: Text('${state.crossfadeSeconds.toStringAsFixed(1)}s',
-                                    style: TextStyle(color: p.accent, fontWeight: FontWeight.w800, fontSize: 12)),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                    color: p.accentContainer,
+                                    borderRadius: BorderRadius.circular(8)),
+                                child: Text(
+                                    '${state.crossfadeSeconds.toStringAsFixed(1)}s',
+                                    style: TextStyle(
+                                        color: p.accent,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 12)),
                               ),
                             ],
                           ),
-                          Slider(value: state.crossfadeSeconds, min: 0, max: 12, divisions: 24, onChanged: cubit.setCrossfade),
+                          Slider(
+                              value: state.crossfadeSeconds,
+                              min: 0,
+                              max: 12,
+                              divisions: 24,
+                              onChanged: cubit.setCrossfade),
                         ],
                       ),
                     ),
@@ -113,7 +171,8 @@ class SettingsScreen extends StatelessWidget {
                         child: InkWell(
                           borderRadius: BorderRadius.circular(14),
                           onTap: () {
-                            final playerState = context.read<PlayerCubit>().state;
+                            final playerState =
+                                context.read<PlayerCubit>().state;
                             final currentSong = playerState.currentSong ??
                                 const SongsTableData(
                                   id: 0,
@@ -129,16 +188,19 @@ class SettingsScreen extends StatelessWidget {
                                   playCount: 0,
                                   lastPositionMs: 0,
                                 );
-                            AudioQualitySheet.show(context, currentSong, p.accent);
+                            AudioQualitySheet.show(
+                                context, currentSong, p.accent);
                           },
                           child: Container(
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                color: state.currentOutputDevice?.isUsbDac == true
-                                    ? const Color(0xFFFFD700).withValues(alpha: 0.5)
-                                    : p.hairline,
+                                color:
+                                    state.currentOutputDevice?.isUsbDac == true
+                                        ? const Color(0xFFFFD700)
+                                            .withValues(alpha: 0.5)
+                                        : p.hairline,
                               ),
                             ),
                             child: Column(
@@ -147,18 +209,22 @@ class SettingsScreen extends StatelessWidget {
                                 Row(
                                   children: [
                                     Icon(
-                                      state.currentOutputDevice?.isUsbDac == true
+                                      state.currentOutputDevice?.isUsbDac ==
+                                              true
                                           ? Icons.usb_rounded
                                           : Icons.headphones_rounded,
-                                      color: state.currentOutputDevice?.isUsbDac == true
-                                          ? const Color(0xFFFFD700)
-                                          : p.accent,
+                                      color:
+                                          state.currentOutputDevice?.isUsbDac ==
+                                                  true
+                                              ? const Color(0xFFFFD700)
+                                              : p.accent,
                                       size: 18,
                                     ),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
-                                        state.currentOutputDevice?.deviceName ?? 'Audio Output Device',
+                                        state.currentOutputDevice?.deviceName ??
+                                            'Audio Output Device',
                                         style: TextStyle(
                                           color: p.textPrimary,
                                           fontWeight: FontWeight.w800,
@@ -168,13 +234,20 @@ class SettingsScreen extends StatelessWidget {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    if (state.currentOutputDevice?.isBitPerfectActive == true)
+                                    if (state.currentOutputDevice
+                                            ?.isBitPerfectActive ==
+                                        true)
                                       Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(
-                                          color: const Color(0xFFFFD700).withValues(alpha: 0.15),
-                                          borderRadius: BorderRadius.circular(6),
-                                          border: Border.all(color: const Color(0xFFFFD700).withValues(alpha: 0.6)),
+                                          color: const Color(0xFFFFD700)
+                                              .withValues(alpha: 0.15),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                          border: Border.all(
+                                              color: const Color(0xFFFFD700)
+                                                  .withValues(alpha: 0.6)),
                                         ),
                                         child: const Text(
                                           'BIT-PERFECT',
@@ -187,7 +260,8 @@ class SettingsScreen extends StatelessWidget {
                                         ),
                                       ),
                                     const SizedBox(width: 6),
-                                    Icon(Icons.tune_rounded, size: 16, color: p.textSecondary),
+                                    Icon(Icons.tune_rounded,
+                                        size: 16, color: p.textSecondary),
                                   ],
                                 ),
                                 const SizedBox(height: 4),
@@ -231,7 +305,8 @@ class SettingsScreen extends StatelessWidget {
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.volume_up_rounded, color: p.accent, size: 20),
+                              Icon(Icons.volume_up_rounded,
+                                  color: p.accent, size: 20),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Column(
@@ -272,19 +347,31 @@ class SettingsScreen extends StatelessWidget {
                               segments: const [
                                 ButtonSegment(
                                   value: ReplayGainMode.off,
-                                  label: Text('Off', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                                  label: Text('Off',
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700)),
                                 ),
                                 ButtonSegment(
                                   value: ReplayGainMode.track,
-                                  label: Text('Track', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                                  label: Text('Track',
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700)),
                                 ),
                                 ButtonSegment(
                                   value: ReplayGainMode.album,
-                                  label: Text('Album', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                                  label: Text('Album',
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700)),
                                 ),
                                 ButtonSegment(
                                   value: ReplayGainMode.auto,
-                                  label: Text('Auto', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                                  label: Text('Auto',
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700)),
                                 ),
                               ],
                               selected: {state.replayGainMode},
@@ -302,11 +389,17 @@ class SettingsScreen extends StatelessWidget {
                               children: [
                                 Text(
                                   'Preamp (With RG tag)',
-                                  style: TextStyle(color: p.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
+                                  style: TextStyle(
+                                      color: p.textPrimary,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600),
                                 ),
                                 Text(
                                   '${state.replayGainPreampWithRg >= 0 ? '+' : ''}${state.replayGainPreampWithRg.toStringAsFixed(1)} dB',
-                                  style: TextStyle(color: p.accent, fontSize: 12, fontWeight: FontWeight.w800),
+                                  style: TextStyle(
+                                      color: p.accent,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800),
                                 ),
                               ],
                             ),
@@ -322,11 +415,17 @@ class SettingsScreen extends StatelessWidget {
                               children: [
                                 Text(
                                   'Preamp (Without RG tag fallback)',
-                                  style: TextStyle(color: p.textPrimary, fontSize: 13, fontWeight: FontWeight.w600),
+                                  style: TextStyle(
+                                      color: p.textPrimary,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600),
                                 ),
                                 Text(
                                   '${state.replayGainPreampWithoutRg >= 0 ? '+' : ''}${state.replayGainPreampWithoutRg.toStringAsFixed(1)} dB',
-                                  style: TextStyle(color: p.accent, fontSize: 12, fontWeight: FontWeight.w800),
+                                  style: TextStyle(
+                                      color: p.accent,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w800),
                                 ),
                               ],
                             ),
@@ -363,9 +462,13 @@ class SettingsScreen extends StatelessWidget {
                                 context.l10n.systemDefault,
                                 maxLines: 1,
                                 softWrap: false,
-                                style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(fontWeight: FontWeight.w700),
                               ),
-                              icon: const Icon(Icons.brightness_auto_rounded, size: 15),
+                              icon: const Icon(Icons.brightness_auto_rounded,
+                                  size: 15),
                             ),
                             ButtonSegment(
                               value: AppThemeMode.light,
@@ -373,9 +476,13 @@ class SettingsScreen extends StatelessWidget {
                                 context.l10n.themeLight,
                                 maxLines: 1,
                                 softWrap: false,
-                                style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(fontWeight: FontWeight.w700),
                               ),
-                              icon: const Icon(Icons.light_mode_rounded, size: 15),
+                              icon: const Icon(Icons.light_mode_rounded,
+                                  size: 15),
                             ),
                             ButtonSegment(
                               value: AppThemeMode.dark,
@@ -383,9 +490,13 @@ class SettingsScreen extends StatelessWidget {
                                 context.l10n.themeDark,
                                 maxLines: 1,
                                 softWrap: false,
-                                style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(fontWeight: FontWeight.w700),
                               ),
-                              icon: const Icon(Icons.dark_mode_rounded, size: 15),
+                              icon:
+                                  const Icon(Icons.dark_mode_rounded, size: 15),
                             ),
                             ButtonSegment(
                               value: AppThemeMode.amoled,
@@ -393,13 +504,18 @@ class SettingsScreen extends StatelessWidget {
                                 'AMOLED',
                                 maxLines: 1,
                                 softWrap: false,
-                                style: Theme.of(context).textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(fontWeight: FontWeight.w700),
                               ),
-                              icon: const Icon(Icons.contrast_rounded, size: 15),
+                              icon:
+                                  const Icon(Icons.contrast_rounded, size: 15),
                             ),
                           ],
                           selected: {state.themeMode},
-                          onSelectionChanged: (sel) => cubit.setThemeMode(sel.first),
+                          onSelectionChanged: (sel) =>
+                              cubit.setThemeMode(sel.first),
                         ),
                       ),
                     ),
@@ -408,38 +524,57 @@ class SettingsScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(context.l10n.accentColor, style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14)),
+                          Text(context.l10n.accentColor,
+                              style: TextStyle(
+                                  color: p.textPrimary,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14)),
                           const SizedBox(height: 12),
                           SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
                             physics: const BouncingScrollPhysics(),
                             child: Row(
                               children: AppColors.customAccents.map((color) {
-                                final isSelected = state.customAccentColorValue == color.toARGB32();
+                                final isSelected =
+                                    state.customAccentColorValue ==
+                                        color.toARGB32();
                                 return Padding(
                                   padding: const EdgeInsets.only(right: 12),
                                   child: GestureDetector(
-                                    onTap: () => cubit.setCustomAccentColor(color),
+                                    onTap: () =>
+                                        cubit.setCustomAccentColor(color),
                                     child: AnimatedContainer(
-                                      duration: const Duration(milliseconds: 200),
+                                      duration:
+                                          const Duration(milliseconds: 200),
                                       width: 42,
                                       height: 42,
                                       decoration: BoxDecoration(
                                         color: color,
                                         shape: BoxShape.circle,
                                         border: Border.all(
-                                          color: isSelected ? p.textPrimary : Colors.transparent,
+                                          color: isSelected
+                                              ? p.textPrimary
+                                              : Colors.transparent,
                                           width: 2.5,
                                         ),
                                         boxShadow: isSelected
-                                            ? [BoxShadow(color: color.withValues(alpha: 0.5), blurRadius: 12, spreadRadius: 1)]
+                                            ? [
+                                                BoxShadow(
+                                                    color: color.withValues(
+                                                        alpha: 0.5),
+                                                    blurRadius: 12,
+                                                    spreadRadius: 1)
+                                              ]
                                             : null,
                                       ),
                                       child: isSelected
                                           ? Icon(
                                               Icons.check_rounded,
                                               size: 20,
-                                              color: color.computeLuminance() > 0.5 ? Colors.black : Colors.white,
+                                              color:
+                                                  color.computeLuminance() > 0.5
+                                                      ? Colors.black
+                                                      : Colors.white,
                                             )
                                           : null,
                                     ),
@@ -452,46 +587,116 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ),
                     _divider(p),
-                    _navTile(context, Icons.art_track_rounded, context.l10n.nowPlayingTheme, _getThemeModeTitle(state.playerThemeMode),
-                        onTap: () => _showThemePickerSheet(context, cubit, state.playerThemeMode)),
+                    _navTile(
+                        context,
+                        Icons.art_track_rounded,
+                        context.l10n.nowPlayingTheme,
+                        _getThemeModeTitle(state.playerThemeMode),
+                        onTap: () => _showThemePickerSheet(
+                            context, cubit, state.playerThemeMode)),
                     _divider(p),
-                    _navTile(context, Icons.graphic_eq_rounded, context.l10n.visualizerStyle, _getVisualizerStyleTitle(state.visualizerStyle),
-                        onTap: () => _showVisualizerStylePickerSheet(context, cubit, state.visualizerStyle)),
+                    _navTile(
+                        context,
+                        Icons.graphic_eq_rounded,
+                        context.l10n.visualizerStyle,
+                        _getVisualizerStyleTitle(state.visualizerStyle),
+                        onTap: () => _showVisualizerStylePickerSheet(
+                            context, cubit, state.visualizerStyle)),
                     _divider(p),
-                    _navTile(context, Icons.palette_outlined, context.l10n.colorSource, _getColorSourceTitle(state.themeColorSource),
-                        onTap: () => _showColorSourcePickerSheet(context, cubit, state.themeColorSource)),
+                    _navTile(
+                        context,
+                        Icons.palette_outlined,
+                        context.l10n.colorSource,
+                        _getColorSourceTitle(state.themeColorSource),
+                        onTap: () => _showColorSourcePickerSheet(
+                            context, cubit, state.themeColorSource)),
                     _divider(p),
-                    _navTile(context, Icons.language_rounded, context.l10n.language, _getLanguageTitle(state.languageCode, context.l10n),
-                        onTap: () => _showLanguagePickerSheet(context, cubit, state.languageCode)),
+                    _navTile(
+                        context,
+                        Icons.language_rounded,
+                        context.l10n.language,
+                        _getLanguageTitle(state.languageCode, context.l10n),
+                        onTap: () => _showLanguagePickerSheet(
+                            context, cubit, state.languageCode)),
                   ]),
                   _section(context, context.l10n.gestures, [
-                    _navTile(context, Icons.swipe_left_rounded, context.l10n.miniPlayerSwipeLeft, _getMiniPlayerSwipeTitle(state.miniPlayerSwipeLeft),
-                        onTap: () => _showMiniPlayerSwipePickerSheet(context, cubit, isLeft: true, currentAction: state.miniPlayerSwipeLeft)),
+                    _navTile(
+                        context,
+                        Icons.swipe_left_rounded,
+                        context.l10n.miniPlayerSwipeLeft,
+                        _getMiniPlayerSwipeTitle(state.miniPlayerSwipeLeft),
+                        onTap: () => _showMiniPlayerSwipePickerSheet(
+                            context, cubit,
+                            isLeft: true,
+                            currentAction: state.miniPlayerSwipeLeft)),
                     _divider(p),
-                    _navTile(context, Icons.swipe_right_rounded, context.l10n.miniPlayerSwipeRight, _getMiniPlayerSwipeTitle(state.miniPlayerSwipeRight),
-                        onTap: () => _showMiniPlayerSwipePickerSheet(context, cubit, isLeft: false, currentAction: state.miniPlayerSwipeRight)),
+                    _navTile(
+                        context,
+                        Icons.swipe_right_rounded,
+                        context.l10n.miniPlayerSwipeRight,
+                        _getMiniPlayerSwipeTitle(state.miniPlayerSwipeRight),
+                        onTap: () => _showMiniPlayerSwipePickerSheet(
+                            context, cubit,
+                            isLeft: false,
+                            currentAction: state.miniPlayerSwipeRight)),
                     _divider(p),
-                    _navTile(context, Icons.touch_app_rounded, context.l10n.nowPlayingDoubleTap, _getNowPlayingDoubleTapTitle(state.nowPlayingDoubleTap),
-                        onTap: () => _showNowPlayingDoubleTapPickerSheet(context, cubit, state.nowPlayingDoubleTap)),
+                    _navTile(
+                        context,
+                        Icons.touch_app_rounded,
+                        context.l10n.nowPlayingDoubleTap,
+                        _getNowPlayingDoubleTapTitle(state.nowPlayingDoubleTap),
+                        onTap: () => _showNowPlayingDoubleTapPickerSheet(
+                            context, cubit, state.nowPlayingDoubleTap)),
                     _divider(p),
-                    _navTile(context, Icons.gesture_rounded, context.l10n.artworkSwipe, _getNowPlayingArtworkSwipeTitle(state.nowPlayingArtworkSwipe),
-                        onTap: () => _showNowPlayingArtworkSwipePickerSheet(context, cubit, state.nowPlayingArtworkSwipe)),
+                    _navTile(
+                        context,
+                        Icons.gesture_rounded,
+                        context.l10n.artworkSwipe,
+                        _getNowPlayingArtworkSwipeTitle(
+                            state.nowPlayingArtworkSwipe),
+                        onTap: () => _showNowPlayingArtworkSwipePickerSheet(
+                            context, cubit, state.nowPlayingArtworkSwipe)),
                   ]),
                   _section(context, context.l10n.libraryAndScanning, [
-                    _navTile(context, Icons.folder_off_rounded, context.l10n.hiddenAndExcludedFolders,
-                        state.autoHideSystemMedia ? 'Auto-filtering voice memos • Custom paths' : 'Manage excluded directories',
-                        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HiddenFoldersScreen()))),
+                    _navTile(
+                        context,
+                        Icons.folder_off_rounded,
+                        context.l10n.hiddenAndExcludedFolders,
+                        state.autoHideSystemMedia
+                            ? 'Auto-filtering voice memos • Custom paths'
+                            : 'Manage excluded directories',
+                        onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                                builder: (_) => const HiddenFoldersScreen()))),
                     _divider(p),
-                    _navTile(context, Icons.refresh_rounded,
-                        state.isScanning ? 'Scanning storage…' : context.l10n.rescanLibrary,
-                        state.scanResultCount != null ? 'Last scan: ${state.scanResultCount} tracks' : 'Scan device storage for audio',
+                    _navTile(
+                        context,
+                        Icons.refresh_rounded,
+                        state.isScanning
+                            ? 'Scanning storage…'
+                            : context.l10n.rescanLibrary,
+                        state.scanResultCount != null
+                            ? 'Last scan: ${state.scanResultCount} tracks'
+                            : 'Scan device storage for audio',
                         trailing: state.isScanning
-                            ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: p.accent))
+                            ? SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                    strokeWidth: 2, color: p.accent))
                             : null,
-                        onTap: state.isScanning ? () {} : () => cubit.rescanLibrary()),
+                        onTap: state.isScanning
+                            ? () {}
+                            : () => cubit.rescanLibrary()),
                     _divider(p),
-                    _navTile(context, Icons.filter_list_rounded, context.l10n.shortAudioFilter, context.l10n.ignoreFilesUnder(state.minDurationSec),
-                        onTap: () => _showDurationFilterDialog(context, cubit, state.minDurationSec)),
+                    _navTile(
+                        context,
+                        Icons.filter_list_rounded,
+                        context.l10n.shortAudioFilter,
+                        context.l10n.ignoreFilesUnder(state.minDurationSec),
+                        onTap: () => _showDurationFilterDialog(
+                            context, cubit, state.minDurationSec)),
                   ]),
                   if (AppConfig.ytmEnabled)
                     _section(context, context.l10n.youtubeMusicAndOnline, [
@@ -507,11 +712,13 @@ class SettingsScreen extends StatelessWidget {
                                 context.l10n.connectYtmAccount,
                                 context.l10n.connectYtmSubtitle,
                                 onTap: () async {
-                                  final ok = await YtmWebLoginSheet.show(context);
+                                  final ok =
+                                      await YtmWebLoginSheet.show(context);
                                   if (ok == true && context.mounted) {
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text(context.l10n.ytmConnected),
+                                        content:
+                                            Text(context.l10n.ytmConnected),
                                       ),
                                     );
                                   }
@@ -539,42 +746,67 @@ class SettingsScreen extends StatelessWidget {
                         onTap: () => _showYtmWebOptionsSheet(context),
                       ),
                       _divider(p),
-                      _switchTile(context, Icons.cloud_off_rounded, context.l10n.offlineOnlyMode,
+                      _switchTile(
+                          context,
+                          Icons.cloud_off_rounded,
+                          context.l10n.offlineOnlyMode,
                           context.l10n.offlineOnlySubtitle,
-                          value: state.offlineOnlyMode, onChanged: cubit.setOfflineOnlyMode),
+                          value: state.offlineOnlyMode,
+                          onChanged: cubit.setOfflineOnlyMode),
                       if (!state.offlineOnlyMode) ...[
                         _divider(p),
-                        _switchTile(context, Icons.wifi_rounded, context.l10n.wifiOnlyMode,
+                        _switchTile(
+                            context,
+                            Icons.wifi_rounded,
+                            context.l10n.wifiOnlyMode,
                             context.l10n.wifiOnlySubtitle,
-                            value: state.wifiOnlyMode, onChanged: cubit.setWifiOnlyMode),
+                            value: state.wifiOnlyMode,
+                            onChanged: cubit.setWifiOnlyMode),
                         _divider(p),
-                        _navTile(context, Icons.travel_explore_rounded, context.l10n.searchYtm,
+                        _navTile(
+                            context,
+                            Icons.travel_explore_rounded,
+                            context.l10n.searchYtm,
                             context.l10n.searchYtmSubtitle,
                             onTap: () => context.push('/ytm-search')),
                         _divider(p),
-                        _navTile(context, Icons.wifi_tethering_rounded, context.l10n.streamingQuality,
+                        _navTile(
+                            context,
+                            Icons.wifi_tethering_rounded,
+                            context.l10n.streamingQuality,
                             _getQualityTitle(state.streamingQuality),
-                            onTap: () => _showQualityPickerSheet(context, cubit, isStreaming: true, currentQuality: state.streamingQuality)),
+                            onTap: () => _showQualityPickerSheet(context, cubit,
+                                isStreaming: true,
+                                currentQuality: state.streamingQuality)),
                         _divider(p),
-                        _navTile(context, Icons.downloading_rounded, context.l10n.downloadQuality,
+                        _navTile(
+                            context,
+                            Icons.downloading_rounded,
+                            context.l10n.downloadQuality,
                             _getQualityTitle(state.downloadQuality),
-                            onTap: () => _showQualityPickerSheet(context, cubit, isStreaming: false, currentQuality: state.downloadQuality)),
+                            onTap: () => _showQualityPickerSheet(context, cubit,
+                                isStreaming: false,
+                                currentQuality: state.downloadQuality)),
                         _divider(p),
                         _navTile(
                           context,
                           Icons.precision_manufacturing_rounded,
                           context.l10n.extractionEngine,
                           _getExtractorEngineTitle(state.extractorEngine),
-                          onTap: () => _showExtractorEnginePickerSheet(context, cubit, currentEngine: state.extractorEngine),
+                          onTap: () => _showExtractorEnginePickerSheet(
+                              context, cubit,
+                              currentEngine: state.extractorEngine),
                         ),
-                        if (state.extractorEngine != ExtractorEngine.onDevice) ...[
+                        if (state.extractorEngine !=
+                            ExtractorEngine.onDevice) ...[
                           _divider(p),
                           _navTile(
                             context,
                             Icons.dns_rounded,
                             context.l10n.ytdlpConfig,
                             state.ytdlpBackendUrl,
-                            onTap: () => _showYtdlpConfigDialog(context, cubit, state),
+                            onTap: () =>
+                                _showYtdlpConfigDialog(context, cubit, state),
                           ),
                         ],
                         _divider(p),
@@ -598,7 +830,8 @@ class SettingsScreen extends StatelessWidget {
                                     shape: BoxShape.circle,
                                   ),
                                 ),
-                              Icon(Icons.chevron_right_rounded, color: p.textTertiary, size: 20),
+                              Icon(Icons.chevron_right_rounded,
+                                  color: p.textTertiary, size: 20),
                             ],
                           ),
                           onTap: () => context.push('/proxy-settings'),
@@ -627,7 +860,8 @@ class SettingsScreen extends StatelessWidget {
                                   shape: BoxShape.circle,
                                 ),
                               ),
-                            Icon(Icons.chevron_right_rounded, color: p.textTertiary, size: 20),
+                            Icon(Icons.chevron_right_rounded,
+                                color: p.textTertiary, size: 20),
                           ],
                         ),
                         onTap: () => context.push('/proxy-settings'),
@@ -647,10 +881,17 @@ class SettingsScreen extends StatelessWidget {
                       onTap: () => _showScrobblerSettingsModal(context),
                     ),
                     _divider(p),
-                    _navTile(context, Icons.security_rounded, context.l10n.privacyGuarantee, context.l10n.privacyGuaranteeSubtitle, onTap: () {}),
+                    _navTile(
+                        context,
+                        Icons.security_rounded,
+                        context.l10n.privacyGuarantee,
+                        context.l10n.privacyGuaranteeSubtitle,
+                        onTap: () {}),
                   ]),
                   _section(context, context.l10n.about, [
-                    _navTile(context, Icons.info_outline_rounded, context.l10n.appTitle, context.l10n.aboutAppSubtitle, onTap: () {}),
+                    _navTile(context, Icons.info_outline_rounded,
+                        context.l10n.appTitle, context.l10n.aboutAppSubtitle,
+                        onTap: () {}),
                   ]),
                 ],
               ),
@@ -671,7 +912,11 @@ class SettingsScreen extends StatelessWidget {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(6, 0, 0, 10),
-            child: Text(title.toUpperCase(), style: Theme.of(context).textTheme.labelSmall?.copyWith(color: p.textTertiary)),
+            child: Text(title.toUpperCase(),
+                style: Theme.of(context)
+                    .textTheme
+                    .labelSmall
+                    ?.copyWith(color: p.textTertiary)),
           ),
           Material(
             color: p.surfaceContainer,
@@ -687,12 +932,14 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _divider(PulsrPalette p) => Divider(height: 1, indent: 68, color: p.hairline);
+  Widget _divider(PulsrPalette p) =>
+      Divider(height: 1, indent: 68, color: p.hairline);
 
   Widget _iconBox(BuildContext context, IconData icon) {
     final p = context.palette;
     return Container(
-      width: 38, height: 38,
+      width: 38,
+      height: 38,
       decoration: BoxDecoration(
         color: p.accentContainer,
         borderRadius: BorderRadius.circular(11),
@@ -701,30 +948,42 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  Widget _navTile(BuildContext context, IconData icon, String title, String subtitle,
+  Widget _navTile(
+      BuildContext context, IconData icon, String title, String subtitle,
       {Widget? trailing, VoidCallback? onTap}) {
     final p = context.palette;
     return ListTile(
       leading: _iconBox(context, icon),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-      subtitle: Text(subtitle, style: TextStyle(color: p.textSecondary, fontSize: 12)),
-      trailing: trailing ?? Icon(Icons.chevron_right_rounded, color: p.textTertiary, size: 20),
+      title: Text(title,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+      subtitle: Text(subtitle,
+          style: TextStyle(color: p.textSecondary, fontSize: 12)),
+      trailing: trailing ??
+          Icon(Icons.chevron_right_rounded, color: p.textTertiary, size: 20),
       onTap: onTap,
     );
   }
 
-  Widget _switchTile(BuildContext context, IconData icon, String title, String subtitle,
+  Widget _switchTile(
+      BuildContext context, IconData icon, String title, String subtitle,
       {required bool value, required ValueChanged<bool> onChanged}) {
     final p = context.palette;
     return ListTile(
       leading: _iconBox(context, icon),
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
-      subtitle: Text(subtitle, style: TextStyle(color: p.textSecondary, fontSize: 12)),
-      trailing: Switch.adaptive(value: value, activeTrackColor: p.accent, activeThumbColor: Colors.white, onChanged: onChanged),
+      title: Text(title,
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+      subtitle: Text(subtitle,
+          style: TextStyle(color: p.textSecondary, fontSize: 12)),
+      trailing: Switch.adaptive(
+          value: value,
+          activeTrackColor: p.accent,
+          activeThumbColor: Colors.white,
+          onChanged: onChanged),
     );
   }
 
-  void _showDurationFilterDialog(BuildContext context, SettingsCubit cubit, int currentSec) {
+  void _showDurationFilterDialog(
+      BuildContext context, SettingsCubit cubit, int currentSec) {
     int selected = currentSec;
     final primaryColor = Theme.of(context).colorScheme.primary;
     showDialog(
@@ -736,7 +995,8 @@ class SettingsScreen extends StatelessWidget {
           builder: (context, setDialogState) => Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('Exclude tracks under $selected seconds (filters voice notes):'),
+              Text(
+                  'Exclude tracks under $selected seconds (filters voice notes):'),
               const SizedBox(height: 12),
               Slider(
                 value: selected.toDouble(),
@@ -752,7 +1012,9 @@ class SettingsScreen extends StatelessWidget {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(context.l10n.cancel)),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(context.l10n.cancel)),
           ElevatedButton(
             onPressed: () {
               cubit.setMinDuration(selected);
@@ -807,6 +1069,58 @@ class SettingsScreen extends StatelessWidget {
     }
   }
 
+  void _showDspPreferencePickerSheet(
+      BuildContext context, SettingsCubit cubit, String currentPref) {
+    final p = context.palette;
+    final options = [
+      ('native', context.l10n.dspEngineNative, '64-bit float, zero-latency real-time native DSP'),
+      ('oem', context.l10n.dspEngineOem, 'System / vendor-level sound effects (Dolby, Dirac, etc.)'),
+      ('auto', context.l10n.dspEngineAuto, 'Automatically bypass OEM sound effects when DSP active'),
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: p.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: AppRadii.bottomSheetRadius,
+      ),
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                context.l10n.dspEnginePreference,
+                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              ...options.map((opt) {
+                final isSelected = currentPref == opt.$1;
+                return ListTile(
+                  title: Text(opt.$2,
+                      style: TextStyle(
+                          fontWeight:
+                              isSelected ? FontWeight.bold : FontWeight.normal)),
+                  subtitle: Text(opt.$3,
+                      style: TextStyle(color: p.textSecondary, fontSize: 12)),
+                  trailing: isSelected
+                      ? Icon(Icons.check_circle, color: p.accent)
+                      : null,
+                  onTap: () {
+                    cubit.setDspPreference(opt.$1);
+                    Navigator.pop(sheetContext);
+                  },
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   void _showThemePickerSheet(
     BuildContext context,
     SettingsCubit cubit,
@@ -814,10 +1128,13 @@ class SettingsScreen extends StatelessWidget {
   ) {
     final primaryColor = Theme.of(context).colorScheme.primary;
     final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
+    final cardColor =
+        Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
     final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? context.palette.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
+    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
+        context.palette.textPrimary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
+        context.palette.textSecondary;
 
     final themes = [
       (
@@ -835,7 +1152,8 @@ class SettingsScreen extends StatelessWidget {
       (
         mode: PlayerThemeMode.circle,
         title: 'Vinyl Circle',
-        subtitle: 'Centered circular artwork with continuous spinning animation',
+        subtitle:
+            'Centered circular artwork with continuous spinning animation',
         icon: Icons.album_rounded,
       ),
       (
@@ -847,25 +1165,29 @@ class SettingsScreen extends StatelessWidget {
       (
         mode: PlayerThemeMode.vinyl,
         title: 'Vinyl Turntable Studio',
-        subtitle: 'True vinyl record with realistic grooves, center label & tonearm',
+        subtitle:
+            'True vinyl record with realistic grooves, center label & tonearm',
         icon: Icons.album_rounded,
       ),
       (
         mode: PlayerThemeMode.cassette,
         title: 'Retro Cassette Deck',
-        subtitle: 'Vintage cassette tape with spinning spools & magnetic tape counter',
+        subtitle:
+            'Vintage cassette tape with spinning spools & magnetic tape counter',
         icon: Icons.radio_rounded,
       ),
       (
         mode: PlayerThemeMode.waveform,
         title: 'Full-Bleed Waveform',
-        subtitle: 'Full screen audio-reactive glowing waveform visualizer backdrop',
+        subtitle:
+            'Full screen audio-reactive glowing waveform visualizer backdrop',
         icon: Icons.waves_rounded,
       ),
       (
         mode: PlayerThemeMode.lyricsFocus,
         title: 'Karaoke Lyrics Immersion',
-        subtitle: 'Magnified synchronized lyrics-first karaoke player interface',
+        subtitle:
+            'Magnified synchronized lyrics-first karaoke player interface',
         icon: Icons.mic_rounded,
       ),
     ];
@@ -899,7 +1221,9 @@ class SettingsScreen extends StatelessWidget {
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: Material(
-                  color: isSelected ? primaryColor.withValues(alpha: 0.12) : cardColor,
+                  color: isSelected
+                      ? primaryColor.withValues(alpha: 0.12)
+                      : cardColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                     side: BorderSide(
@@ -960,16 +1284,39 @@ class SettingsScreen extends StatelessWidget {
   ) {
     final primaryColor = Theme.of(context).colorScheme.primary;
     final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
+    final cardColor =
+        Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
     final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? context.palette.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
+    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
+        context.palette.textPrimary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
+        context.palette.textSecondary;
 
     final languages = [
-      (code: 'system', name: 'System Default', nativeName: 'الافتراضي للنظام / Predeterminado', flag: Icons.settings_suggest_rounded),
-      (code: 'en', name: 'English', nativeName: 'English (US/UK)', flag: Icons.language_rounded),
-      (code: 'ar', name: 'العربية', nativeName: 'Arabic (RTL)', flag: Icons.translate_rounded),
-      (code: 'es', name: 'Español', nativeName: 'Spanish', flag: Icons.public_rounded),
+      (
+        code: 'system',
+        name: 'System Default',
+        nativeName: 'الافتراضي للنظام / Predeterminado',
+        flag: Icons.settings_suggest_rounded
+      ),
+      (
+        code: 'en',
+        name: 'English',
+        nativeName: 'English (US/UK)',
+        flag: Icons.language_rounded
+      ),
+      (
+        code: 'ar',
+        name: 'العربية',
+        nativeName: 'Arabic (RTL)',
+        flag: Icons.translate_rounded
+      ),
+      (
+        code: 'es',
+        name: 'Español',
+        nativeName: 'Spanish',
+        flag: Icons.public_rounded
+      ),
     ];
 
     showModalBottomSheet(
@@ -1001,7 +1348,9 @@ class SettingsScreen extends StatelessWidget {
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: Material(
-                  color: isSelected ? primaryColor.withValues(alpha: 0.12) : cardColor,
+                  color: isSelected
+                      ? primaryColor.withValues(alpha: 0.12)
+                      : cardColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                     side: BorderSide(
@@ -1060,22 +1409,27 @@ class SettingsScreen extends StatelessWidget {
   ) {
     final primaryColor = Theme.of(context).colorScheme.primary;
     final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
+    final cardColor =
+        Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
     final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? context.palette.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
+    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
+        context.palette.textPrimary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
+        context.palette.textSecondary;
 
     final sources = [
       (
         source: ThemeColorSource.system,
         title: 'Material You (Wallpaper)',
-        subtitle: 'Follow the system wallpaper palette on Android 12+ • falls back to album art on older devices',
+        subtitle:
+            'Follow the system wallpaper palette on Android 12+ • falls back to album art on older devices',
         icon: Icons.wallpaper_rounded,
       ),
       (
         source: ThemeColorSource.artwork,
         title: 'Album Artwork',
-        subtitle: 'Adapt colors from the current track\'s album art (changes per song)',
+        subtitle:
+            'Adapt colors from the current track\'s album art (changes per song)',
         icon: Icons.album_rounded,
       ),
       (
@@ -1115,7 +1469,9 @@ class SettingsScreen extends StatelessWidget {
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: Material(
-                  color: isSelected ? primaryColor.withValues(alpha: 0.12) : cardColor,
+                  color: isSelected
+                      ? primaryColor.withValues(alpha: 0.12)
+                      : cardColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                     side: BorderSide(
@@ -1163,28 +1519,34 @@ class SettingsScreen extends StatelessWidget {
   ) {
     final primaryColor = Theme.of(context).colorScheme.primary;
     final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
+    final cardColor =
+        Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
     final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? context.palette.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
+    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
+        context.palette.textPrimary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
+        context.palette.textSecondary;
 
     final styles = [
       (
         style: VisualizerStyle.bar,
         title: 'BAR',
-        subtitle: 'Classic vertical frequency bars with smooth height animation',
+        subtitle:
+            'Classic vertical frequency bars with smooth height animation',
         icon: Icons.bar_chart_rounded,
       ),
       (
         style: VisualizerStyle.wave,
         title: 'WAVE',
-        subtitle: 'Smooth continuous Bézier waveform line with ambient gradient fill',
+        subtitle:
+            'Smooth continuous Bézier waveform line with ambient gradient fill',
         icon: Icons.waves_rounded,
       ),
       (
         style: VisualizerStyle.circular,
         title: 'CIRCULAR',
-        subtitle: 'Futuristic radial frequency bars surrounding album centerpiece',
+        subtitle:
+            'Futuristic radial frequency bars surrounding album centerpiece',
         icon: Icons.motion_photos_on_rounded,
       ),
       (
@@ -1224,7 +1586,9 @@ class SettingsScreen extends StatelessWidget {
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: Material(
-                  color: isSelected ? primaryColor.withValues(alpha: 0.12) : cardColor,
+                  color: isSelected
+                      ? primaryColor.withValues(alpha: 0.12)
+                      : cardColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                     side: BorderSide(
@@ -1306,10 +1670,13 @@ class SettingsScreen extends StatelessWidget {
   }) {
     final primaryColor = Theme.of(context).colorScheme.primary;
     final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
+    final cardColor =
+        Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
     final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? context.palette.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
+    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
+        context.palette.textPrimary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
+        context.palette.textSecondary;
 
     final options = [
       (
@@ -1354,8 +1721,11 @@ class SettingsScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Text(
-                isLeft ? 'MiniPlayer Swipe Left Action' : 'MiniPlayer Swipe Right Action',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                isLeft
+                    ? 'MiniPlayer Swipe Left Action'
+                    : 'MiniPlayer Swipe Right Action',
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
               ),
             ),
             const SizedBox(height: 12),
@@ -1364,7 +1734,9 @@ class SettingsScreen extends StatelessWidget {
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: Material(
-                  color: isSelected ? primaryColor.withValues(alpha: 0.12) : cardColor,
+                  color: isSelected
+                      ? primaryColor.withValues(alpha: 0.12)
+                      : cardColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                     side: BorderSide(
@@ -1373,10 +1745,17 @@ class SettingsScreen extends StatelessWidget {
                     ),
                   ),
                   child: ListTile(
-                    leading: Icon(opt.icon, color: isSelected ? primaryColor : textSecondary),
-                    title: Text(opt.title, style: TextStyle(fontWeight: FontWeight.w700, color: isSelected ? primaryColor : textPrimary)),
-                    subtitle: Text(opt.subtitle, style: TextStyle(fontSize: 12, color: textSecondary)),
-                    trailing: isSelected ? Icon(Icons.check_circle_rounded, color: primaryColor) : null,
+                    leading: Icon(opt.icon,
+                        color: isSelected ? primaryColor : textSecondary),
+                    title: Text(opt.title,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: isSelected ? primaryColor : textPrimary)),
+                    subtitle: Text(opt.subtitle,
+                        style: TextStyle(fontSize: 12, color: textSecondary)),
+                    trailing: isSelected
+                        ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                        : null,
                     onTap: () {
                       if (isLeft) {
                         cubit.setMiniPlayerSwipeLeft(opt.action);
@@ -1402,10 +1781,13 @@ class SettingsScreen extends StatelessWidget {
   ) {
     final primaryColor = Theme.of(context).colorScheme.primary;
     final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
+    final cardColor =
+        Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
     final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? context.palette.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
+    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
+        context.palette.textPrimary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
+        context.palette.textSecondary;
 
     final options = [
       (
@@ -1454,7 +1836,9 @@ class SettingsScreen extends StatelessWidget {
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: Material(
-                  color: isSelected ? primaryColor.withValues(alpha: 0.12) : cardColor,
+                  color: isSelected
+                      ? primaryColor.withValues(alpha: 0.12)
+                      : cardColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                     side: BorderSide(
@@ -1463,10 +1847,17 @@ class SettingsScreen extends StatelessWidget {
                     ),
                   ),
                   child: ListTile(
-                    leading: Icon(opt.icon, color: isSelected ? primaryColor : textSecondary),
-                    title: Text(opt.title, style: TextStyle(fontWeight: FontWeight.w700, color: isSelected ? primaryColor : textPrimary)),
-                    subtitle: Text(opt.subtitle, style: TextStyle(fontSize: 12, color: textSecondary)),
-                    trailing: isSelected ? Icon(Icons.check_circle_rounded, color: primaryColor) : null,
+                    leading: Icon(opt.icon,
+                        color: isSelected ? primaryColor : textSecondary),
+                    title: Text(opt.title,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: isSelected ? primaryColor : textPrimary)),
+                    subtitle: Text(opt.subtitle,
+                        style: TextStyle(fontSize: 12, color: textSecondary)),
+                    trailing: isSelected
+                        ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                        : null,
                     onTap: () {
                       cubit.setNowPlayingDoubleTap(opt.action);
                       Navigator.pop(ctx);
@@ -1488,10 +1879,13 @@ class SettingsScreen extends StatelessWidget {
   ) {
     final primaryColor = Theme.of(context).colorScheme.primary;
     final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
+    final cardColor =
+        Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
     final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? context.palette.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
+    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
+        context.palette.textPrimary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
+        context.palette.textSecondary;
 
     final options = [
       (
@@ -1534,7 +1928,9 @@ class SettingsScreen extends StatelessWidget {
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: Material(
-                  color: isSelected ? primaryColor.withValues(alpha: 0.12) : cardColor,
+                  color: isSelected
+                      ? primaryColor.withValues(alpha: 0.12)
+                      : cardColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                     side: BorderSide(
@@ -1543,10 +1939,17 @@ class SettingsScreen extends StatelessWidget {
                     ),
                   ),
                   child: ListTile(
-                    leading: Icon(opt.icon, color: isSelected ? primaryColor : textSecondary),
-                    title: Text(opt.title, style: TextStyle(fontWeight: FontWeight.w700, color: isSelected ? primaryColor : textPrimary)),
-                    subtitle: Text(opt.subtitle, style: TextStyle(fontSize: 12, color: textSecondary)),
-                    trailing: isSelected ? Icon(Icons.check_circle_rounded, color: primaryColor) : null,
+                    leading: Icon(opt.icon,
+                        color: isSelected ? primaryColor : textSecondary),
+                    title: Text(opt.title,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: isSelected ? primaryColor : textPrimary)),
+                    subtitle: Text(opt.subtitle,
+                        style: TextStyle(fontSize: 12, color: textSecondary)),
+                    trailing: isSelected
+                        ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                        : null,
                     onTap: () {
                       cubit.setNowPlayingArtworkSwipe(opt.action);
                       Navigator.pop(ctx);
@@ -1590,28 +1993,34 @@ class SettingsScreen extends StatelessWidget {
   }) {
     final primaryColor = Theme.of(context).colorScheme.primary;
     final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
+    final cardColor =
+        Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
     final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? context.palette.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
+    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
+        context.palette.textPrimary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
+        context.palette.textSecondary;
 
     final options = [
       (
         engine: ExtractorEngine.auto,
         title: 'Auto (Recommended)',
-        subtitle: 'Uses remote yt-dlp backend with automatic fallback to on-device extractor',
+        subtitle:
+            'Uses remote yt-dlp backend with automatic fallback to on-device extractor',
         icon: Icons.auto_mode_rounded,
       ),
       (
         engine: ExtractorEngine.remoteYtdlp,
         title: 'Remote yt-dlp Backend',
-        subtitle: 'Resolves via cloud server with proxy pool & cookie rotation to prevent bot bans',
+        subtitle:
+            'Resolves via cloud server with proxy pool & cookie rotation to prevent bot bans',
         icon: Icons.cloud_done_rounded,
       ),
       (
         engine: ExtractorEngine.onDevice,
         title: 'On-Device Extractor',
-        subtitle: 'Extracts directly on your device via NewPipe / InnerTube (no remote server)',
+        subtitle:
+            'Extracts directly on your device via NewPipe / InnerTube (no remote server)',
         icon: Icons.phone_android_rounded,
       ),
     ];
@@ -1642,7 +2051,9 @@ class SettingsScreen extends StatelessWidget {
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: Material(
-                  color: isSelected ? primaryColor.withValues(alpha: 0.12) : cardColor,
+                  color: isSelected
+                      ? primaryColor.withValues(alpha: 0.12)
+                      : cardColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                     side: BorderSide(
@@ -1651,10 +2062,17 @@ class SettingsScreen extends StatelessWidget {
                     ),
                   ),
                   child: ListTile(
-                    leading: Icon(opt.icon, color: isSelected ? primaryColor : textSecondary),
-                    title: Text(opt.title, style: TextStyle(fontWeight: FontWeight.w700, color: isSelected ? primaryColor : textPrimary)),
-                    subtitle: Text(opt.subtitle, style: TextStyle(fontSize: 12, color: textSecondary)),
-                    trailing: isSelected ? Icon(Icons.check_circle_rounded, color: primaryColor) : null,
+                    leading: Icon(opt.icon,
+                        color: isSelected ? primaryColor : textSecondary),
+                    title: Text(opt.title,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: isSelected ? primaryColor : textPrimary)),
+                    subtitle: Text(opt.subtitle,
+                        style: TextStyle(fontSize: 12, color: textSecondary)),
+                    trailing: isSelected
+                        ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                        : null,
                     onTap: () {
                       cubit.setExtractorEngine(opt.engine);
                       Navigator.pop(ctx);
@@ -1677,10 +2095,13 @@ class SettingsScreen extends StatelessWidget {
   }) {
     final primaryColor = Theme.of(context).colorScheme.primary;
     final surfaceColor = Theme.of(context).colorScheme.surface;
-    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
+    final cardColor =
+        Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
     final outlineColor = Theme.of(context).colorScheme.outline;
-    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ?? context.palette.textPrimary;
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
+    final textPrimary = Theme.of(context).textTheme.bodyLarge?.color ??
+        context.palette.textPrimary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
+        context.palette.textSecondary;
 
     final options = [
       (
@@ -1725,8 +2146,11 @@ class SettingsScreen extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Text(
-                isStreaming ? 'Streaming Audio Quality' : 'Download Audio Quality',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                isStreaming
+                    ? 'Streaming Audio Quality'
+                    : 'Download Audio Quality',
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
               ),
             ),
             const SizedBox(height: 12),
@@ -1735,7 +2159,9 @@ class SettingsScreen extends StatelessWidget {
               return Container(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: Material(
-                  color: isSelected ? primaryColor.withValues(alpha: 0.12) : cardColor,
+                  color: isSelected
+                      ? primaryColor.withValues(alpha: 0.12)
+                      : cardColor,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                     side: BorderSide(
@@ -1744,10 +2170,17 @@ class SettingsScreen extends StatelessWidget {
                     ),
                   ),
                   child: ListTile(
-                    leading: Icon(opt.icon, color: isSelected ? primaryColor : textSecondary),
-                    title: Text(opt.title, style: TextStyle(fontWeight: FontWeight.w700, color: isSelected ? primaryColor : textPrimary)),
-                    subtitle: Text(opt.subtitle, style: TextStyle(fontSize: 12, color: textSecondary)),
-                    trailing: isSelected ? Icon(Icons.check_circle_rounded, color: primaryColor) : null,
+                    leading: Icon(opt.icon,
+                        color: isSelected ? primaryColor : textSecondary),
+                    title: Text(opt.title,
+                        style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            color: isSelected ? primaryColor : textPrimary)),
+                    subtitle: Text(opt.subtitle,
+                        style: TextStyle(fontSize: 12, color: textSecondary)),
+                    trailing: isSelected
+                        ? Icon(Icons.check_circle_rounded, color: primaryColor)
+                        : null,
                     onTap: () {
                       if (isStreaming) {
                         cubit.setStreamingQuality(opt.quality);
@@ -1808,7 +2241,9 @@ class SettingsScreen extends StatelessWidget {
                     width: 46,
                     height: 46,
                     decoration: BoxDecoration(
-                      color: user != null ? p.accent.withValues(alpha: 0.15) : p.surface,
+                      color: user != null
+                          ? p.accent.withValues(alpha: 0.15)
+                          : p.surface,
                       shape: BoxShape.circle,
                       border: Border.all(color: p.hairline),
                     ),
@@ -1817,10 +2252,15 @@ class SettingsScreen extends StatelessWidget {
                             child: Image.network(
                               user!.photoURL!,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => Icon(Icons.person_rounded, color: p.accent),
+                              errorBuilder: (_, __, ___) =>
+                                  Icon(Icons.person_rounded, color: p.accent),
                             ),
                           )
-                        : Icon(user != null ? Icons.person_rounded : Icons.cloud_outlined, color: p.accent),
+                        : Icon(
+                            user != null
+                                ? Icons.person_rounded
+                                : Icons.cloud_outlined,
+                            color: p.accent),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -1828,7 +2268,9 @@ class SettingsScreen extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          user?.displayName ?? user?.email ?? context.l10n.cloudSync,
+                          user?.displayName ??
+                              user?.email ??
+                              context.l10n.cloudSync,
                           style: TextStyle(
                             color: p.textPrimary,
                             fontSize: 15,
@@ -1854,22 +2296,31 @@ class SettingsScreen extends StatelessWidget {
                       style: FilledButton.styleFrom(
                         backgroundColor: p.accent,
                         foregroundColor: p.onAccent,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
                       ),
-                      child: Text(context.l10n.signIn, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                      child: Text(context.l10n.signIn,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 13)),
                     ),
                   ] else ...[
                     IconButton(
                       tooltip: context.l10n.syncNow,
                       icon: isSyncing
-                          ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: p.accent))
+                          ? SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: p.accent))
                           : Icon(Icons.sync_rounded, color: p.accent),
                       onPressed: isSyncing ? null : () => authCubit.syncNow(),
                     ),
                     IconButton(
                       tooltip: context.l10n.signOut,
-                      icon: Icon(Icons.logout_rounded, color: p.textTertiary, size: 20),
+                      icon: Icon(Icons.logout_rounded,
+                          color: p.textTertiary, size: 20),
                       onPressed: () => authCubit.signOut(),
                     ),
                   ],
@@ -1929,7 +2380,8 @@ class SettingsScreen extends StatelessWidget {
                             color: p.accentContainer,
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Icon(Icons.language_rounded, color: p.accent, size: 22),
+                          child: Icon(Icons.language_rounded,
+                              color: p.accent, size: 22),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
@@ -1946,7 +2398,8 @@ class SettingsScreen extends StatelessWidget {
                               ),
                               Text(
                                 'Select a page to open in the in-app browser',
-                                style: TextStyle(color: p.textSecondary, fontSize: 12),
+                                style: TextStyle(
+                                    color: p.textSecondary, fontSize: 12),
                               ),
                             ],
                           ),
@@ -1958,7 +2411,8 @@ class SettingsScreen extends StatelessWidget {
                       ctx,
                       icon: Icons.home_rounded,
                       title: 'Home Page',
-                      subtitle: 'Personalized recommendations, mixes & quick picks',
+                      subtitle:
+                          'Personalized recommendations, mixes & quick picks',
                       url: 'https://music.youtube.com',
                       p: p,
                     ),
@@ -1966,7 +2420,8 @@ class SettingsScreen extends StatelessWidget {
                       ctx,
                       icon: Icons.explore_rounded,
                       title: 'Explore & Charts',
-                      subtitle: 'Trending songs, top global charts & music videos',
+                      subtitle:
+                          'Trending songs, top global charts & music videos',
                       url: 'https://music.youtube.com/explore',
                       p: p,
                     ),
@@ -1974,7 +2429,8 @@ class SettingsScreen extends StatelessWidget {
                       ctx,
                       icon: Icons.library_music_rounded,
                       title: 'Your Library',
-                      subtitle: 'Saved playlists, albums, songs & subscribed artists',
+                      subtitle:
+                          'Saved playlists, albums, songs & subscribed artists',
                       url: 'https://music.youtube.com/library',
                       p: p,
                     ),
@@ -1982,7 +2438,8 @@ class SettingsScreen extends StatelessWidget {
                       ctx,
                       icon: Icons.favorite_rounded,
                       title: 'Liked Music',
-                      subtitle: 'Thumbed-up songs synced with your Google account',
+                      subtitle:
+                          'Thumbed-up songs synced with your Google account',
                       url: 'https://music.youtube.com/playlist?list=LM',
                       p: p,
                     ),
@@ -1990,7 +2447,8 @@ class SettingsScreen extends StatelessWidget {
                       ctx,
                       icon: Icons.fiber_new_rounded,
                       title: 'New Releases',
-                      subtitle: 'Latest album drops, EPs and trending single releases',
+                      subtitle:
+                          'Latest album drops, EPs and trending single releases',
                       url: 'https://music.youtube.com/new_releases',
                       p: p,
                     ),
@@ -1998,7 +2456,8 @@ class SettingsScreen extends StatelessWidget {
                       ctx,
                       icon: Icons.history_rounded,
                       title: 'Listening History',
-                      subtitle: 'Recently played tracks and stations on your account',
+                      subtitle:
+                          'Recently played tracks and stations on your account',
                       url: 'https://music.youtube.com/history',
                       p: p,
                     ),
@@ -2036,13 +2495,15 @@ class SettingsScreen extends StatelessWidget {
         ),
         title: Text(
           title,
-          style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w600, fontSize: 14),
+          style: TextStyle(
+              color: p.textPrimary, fontWeight: FontWeight.w600, fontSize: 14),
         ),
         subtitle: Text(
           subtitle,
           style: TextStyle(color: p.textSecondary, fontSize: 11.5),
         ),
-        trailing: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: p.textTertiary),
+        trailing: Icon(Icons.arrow_forward_ios_rounded,
+            size: 14, color: p.textTertiary),
         onTap: () {
           Navigator.pop(context);
           YtmWebLoginSheet.show(
@@ -2063,7 +2524,8 @@ class SettingsScreen extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: p.surfaceContainerHigh,
-        title: Text(context.l10n.ytmAccount, style: TextStyle(color: p.textPrimary)),
+        title: Text(context.l10n.ytmAccount,
+            style: TextStyle(color: p.textPrimary)),
         content: Text(
           'Connected as: ${account.accountName ?? "User"}\n\nManage your YouTube Music account or disconnect from this device.',
           style: TextStyle(color: p.textSecondary),
@@ -2078,11 +2540,13 @@ class SettingsScreen extends StatelessWidget {
               );
             },
             icon: Icon(Icons.language_rounded, size: 18, color: p.accent),
-            label: Text(context.l10n.openWebPlayer, style: TextStyle(color: p.accent)),
+            label: Text(context.l10n.openWebPlayer,
+                style: TextStyle(color: p.accent)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(context.l10n.cancel, style: TextStyle(color: p.textSecondary)),
+            child: Text(context.l10n.cancel,
+                style: TextStyle(color: p.textSecondary)),
           ),
           FilledButton(
             onPressed: () async {
@@ -2090,7 +2554,8 @@ class SettingsScreen extends StatelessWidget {
               if (ctx.mounted) Navigator.pop(ctx);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Disconnected from YouTube Music')),
+                  const SnackBar(
+                      content: Text('Disconnected from YouTube Music')),
                 );
               }
             },
@@ -2102,9 +2567,11 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
-  void _showYtdlpConfigDialog(BuildContext context, SettingsCubit cubit, SettingsState state) {
+  void _showYtdlpConfigDialog(
+      BuildContext context, SettingsCubit cubit, SettingsState state) {
     final urlController = TextEditingController(text: state.ytdlpBackendUrl);
-    final tokenController = TextEditingController(text: state.ytdlpBackendToken);
+    final tokenController =
+        TextEditingController(text: state.ytdlpBackendToken);
 
     showDialog(
       context: context,
@@ -2159,11 +2626,16 @@ class SettingsScreen extends StatelessWidget {
                               ? null
                               : () {
                                   cubit.setYtdlpBackendUrl(urlController.text);
-                                  cubit.setYtdlpBackendToken(tokenController.text);
+                                  cubit.setYtdlpBackendToken(
+                                      tokenController.text);
                                   cubit.testYtdlpBackend();
                                 },
                           icon: liveState.isTestingYtdlpBackend
-                              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2))
                               : const Icon(Icons.speed_rounded, size: 16),
                           label: const Text('Test Connection'),
                         ),
@@ -2181,7 +2653,8 @@ class SettingsScreen extends StatelessWidget {
                           liveState.ytdlpBackendStatusMessage!,
                           style: TextStyle(
                             fontSize: 12,
-                            color: liveState.ytdlpBackendStatusMessage!.startsWith('Connected')
+                            color: liveState.ytdlpBackendStatusMessage!
+                                    .startsWith('Connected')
                                 ? p.success
                                 : p.error,
                             fontWeight: FontWeight.w600,
@@ -2203,7 +2676,8 @@ class SettingsScreen extends StatelessWidget {
                     cubit.setYtdlpBackendToken(tokenController.text);
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('yt-dlp backend settings saved')),
+                      const SnackBar(
+                          content: Text('yt-dlp backend settings saved')),
                     );
                   },
                   child: Text(context.l10n.save),
@@ -2224,7 +2698,8 @@ class _CacheSection extends StatefulWidget {
   State<_CacheSection> createState() => _CacheSectionState();
 }
 
-class _CacheSectionState extends State<_CacheSection> with WidgetsBindingObserver {
+class _CacheSectionState extends State<_CacheSection>
+    with WidgetsBindingObserver {
   int _artCacheSizeBytes = 0;
   int _streamCacheSizeBytes = 0;
   bool _isLoading = true;
@@ -2277,21 +2752,28 @@ class _CacheSectionState extends State<_CacheSection> with WidgetsBindingObserve
     return Column(
       children: [
         ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           leading: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: p.accent.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(Icons.photo_size_select_actual_rounded, color: p.accent, size: 22),
+            child: Icon(Icons.photo_size_select_actual_rounded,
+                color: p.accent, size: 22),
           ),
           title: Text(
             'Artwork Cache',
-            style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14.5),
+            style: TextStyle(
+                color: p.textPrimary,
+                fontWeight: FontWeight.w700,
+                fontSize: 14.5),
           ),
           subtitle: Text(
-            _isLoading ? 'Calculating…' : '${_formatSize(_artCacheSizeBytes)} used of $maxMb MB max',
+            _isLoading
+                ? 'Calculating…'
+                : '${_formatSize(_artCacheSizeBytes)} used of $maxMb MB max',
             style: TextStyle(color: p.textSecondary, fontSize: 12.5),
           ),
           trailing: TextButton.icon(
@@ -2306,7 +2788,8 @@ class _CacheSectionState extends State<_CacheSection> with WidgetsBindingObserve
               await _refreshCacheSize();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Artwork cache cleared successfully')),
+                  const SnackBar(
+                      content: Text('Artwork cache cleared successfully')),
                 );
               }
             },
@@ -2314,21 +2797,28 @@ class _CacheSectionState extends State<_CacheSection> with WidgetsBindingObserve
         ),
         Divider(height: 1, color: p.hairline),
         ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           leading: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: Colors.redAccent.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.cloud_download_rounded, color: Colors.redAccent, size: 22),
+            child: const Icon(Icons.cloud_download_rounded,
+                color: Colors.redAccent, size: 22),
           ),
           title: Text(
             'YouTube Stream Disk Cache',
-            style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14.5),
+            style: TextStyle(
+                color: p.textPrimary,
+                fontWeight: FontWeight.w700,
+                fontSize: 14.5),
           ),
           subtitle: Text(
-            _isLoading ? 'Calculating…' : '${_formatSize(_streamCacheSizeBytes)} cached for zero-latency replay',
+            _isLoading
+                ? 'Calculating…'
+                : '${_formatSize(_streamCacheSizeBytes)} cached for zero-latency replay',
             style: TextStyle(color: p.textSecondary, fontSize: 12.5),
           ),
           trailing: TextButton.icon(
@@ -2343,7 +2833,8 @@ class _CacheSectionState extends State<_CacheSection> with WidgetsBindingObserve
               await _refreshCacheSize();
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Stream cache cleared successfully')),
+                  const SnackBar(
+                      content: Text('Stream cache cleared successfully')),
                 );
               }
             },
@@ -2351,31 +2842,38 @@ class _CacheSectionState extends State<_CacheSection> with WidgetsBindingObserve
         ),
         Divider(height: 1, color: p.hairline),
         ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
           leading: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
               color: p.surfaceContainerHigh,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(Icons.disc_full_rounded, color: p.textSecondary, size: 22),
+            child:
+                Icon(Icons.disc_full_rounded, color: p.textSecondary, size: 22),
           ),
           title: Text(
             'Maximum Artwork Cache Limit',
-            style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14.5),
+            style: TextStyle(
+                color: p.textPrimary,
+                fontWeight: FontWeight.w700,
+                fontSize: 14.5),
           ),
           subtitle: Text(
             '$maxMb MB • Auto-evicts oldest artworks when full',
             style: TextStyle(color: p.textSecondary, fontSize: 12.5),
           ),
-          trailing: Icon(Icons.arrow_forward_ios_rounded, size: 14, color: p.textTertiary),
+          trailing: Icon(Icons.arrow_forward_ios_rounded,
+              size: 14, color: p.textTertiary),
           onTap: () => _showMaxCacheLimitPicker(context, manager),
         ),
       ],
     );
   }
 
-  void _showMaxCacheLimitPicker(BuildContext context, ArtworkCacheManager manager) {
+  void _showMaxCacheLimitPicker(
+      BuildContext context, ArtworkCacheManager manager) {
     final p = context.palette;
     final options = [50, 100, 250, 500];
 
@@ -2393,20 +2891,31 @@ class _CacheSectionState extends State<_CacheSection> with WidgetsBindingObserve
             children: [
               Text(
                 'Maximum Cache Size',
-                style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w800, fontSize: 16),
+                style: TextStyle(
+                    color: p.textPrimary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16),
               ),
               const SizedBox(height: 12),
               for (final mb in options)
                 ListTile(
                   leading: Icon(
-                    manager.maxCacheSizeMb == mb ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded,
-                    color: manager.maxCacheSizeMb == mb ? p.accent : p.textTertiary,
+                    manager.maxCacheSizeMb == mb
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_off_rounded,
+                    color: manager.maxCacheSizeMb == mb
+                        ? p.accent
+                        : p.textTertiary,
                   ),
                   title: Text(
                     '$mb MB',
                     style: TextStyle(
-                      color: manager.maxCacheSizeMb == mb ? p.accent : p.textPrimary,
-                      fontWeight: manager.maxCacheSizeMb == mb ? FontWeight.w700 : FontWeight.w500,
+                      color: manager.maxCacheSizeMb == mb
+                          ? p.accent
+                          : p.textPrimary,
+                      fontWeight: manager.maxCacheSizeMb == mb
+                          ? FontWeight.w700
+                          : FontWeight.w500,
                     ),
                   ),
                   onTap: () async {
@@ -2469,10 +2978,18 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
     String lastFmSec = '';
     String lastFmSession = '';
     try {
-      lbToken = await secureStorage.read(key: ScrobblerService.keyListenBrainzTokenSecure) ?? '';
-      lastFmKey = await secureStorage.read(key: ScrobblerService.keyLastFmApiKeySecure) ?? '';
-      lastFmSec = await secureStorage.read(key: ScrobblerService.keyLastFmSecretSecure) ?? '';
-      lastFmSession = await secureStorage.read(key: ScrobblerService.keyLastFmSessionKeySecure) ?? '';
+      lbToken = await secureStorage.read(
+              key: ScrobblerService.keyListenBrainzTokenSecure) ??
+          '';
+      lastFmKey = await secureStorage.read(
+              key: ScrobblerService.keyLastFmApiKeySecure) ??
+          '';
+      lastFmSec = await secureStorage.read(
+              key: ScrobblerService.keyLastFmSecretSecure) ??
+          '';
+      lastFmSession = await secureStorage.read(
+              key: ScrobblerService.keyLastFmSessionKeySecure) ??
+          '';
     } catch (_) {}
     if (lbToken.isEmpty) {
       lbToken = prefs.getString(ScrobblerService.keyListenBrainzToken) ?? '';
@@ -2484,13 +3001,16 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
       lastFmSec = prefs.getString(ScrobblerService.keyLastFmSecret) ?? '';
     }
     if (lastFmSession.isEmpty) {
-      lastFmSession = prefs.getString(ScrobblerService.keyLastFmSessionKey) ?? '';
+      lastFmSession =
+          prefs.getString(ScrobblerService.keyLastFmSessionKey) ?? '';
     }
     setState(() {
-      _listenBrainzEnabled = prefs.getBool(ScrobblerService.keyListenBrainzEnabled) ?? false;
+      _listenBrainzEnabled =
+          prefs.getBool(ScrobblerService.keyListenBrainzEnabled) ?? false;
       _listenBrainzTokenController.text = lbToken;
 
-      _lastFmEnabled = prefs.getBool(ScrobblerService.keyLastFmEnabled) ?? false;
+      _lastFmEnabled =
+          prefs.getBool(ScrobblerService.keyLastFmEnabled) ?? false;
       _lastFmApiKeyController.text = lastFmKey;
       _lastFmSecretController.text = lastFmSec;
       _lastFmSessionKeyController.text = lastFmSession;
@@ -2501,12 +3021,15 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
   Future<void> _saveScrobblerPrefs() async {
     final prefs = await SharedPreferences.getInstance();
     const secureStorage = FlutterSecureStorage();
-    await prefs.setBool(ScrobblerService.keyListenBrainzEnabled, _listenBrainzEnabled);
+    await prefs.setBool(
+        ScrobblerService.keyListenBrainzEnabled, _listenBrainzEnabled);
     final lbToken = _listenBrainzTokenController.text.trim();
     if (lbToken.isNotEmpty) {
-      await secureStorage.write(key: ScrobblerService.keyListenBrainzTokenSecure, value: lbToken);
+      await secureStorage.write(
+          key: ScrobblerService.keyListenBrainzTokenSecure, value: lbToken);
     } else {
-      await secureStorage.delete(key: ScrobblerService.keyListenBrainzTokenSecure);
+      await secureStorage.delete(
+          key: ScrobblerService.keyListenBrainzTokenSecure);
     }
     await prefs.remove(ScrobblerService.keyListenBrainzToken);
 
@@ -2516,19 +3039,24 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
     final lastFmSession = _lastFmSessionKeyController.text.trim();
 
     if (lastFmKey.isNotEmpty) {
-      await secureStorage.write(key: ScrobblerService.keyLastFmApiKeySecure, value: lastFmKey);
+      await secureStorage.write(
+          key: ScrobblerService.keyLastFmApiKeySecure, value: lastFmKey);
     } else {
       await secureStorage.delete(key: ScrobblerService.keyLastFmApiKeySecure);
     }
     if (lastFmSec.isNotEmpty) {
-      await secureStorage.write(key: ScrobblerService.keyLastFmSecretSecure, value: lastFmSec);
+      await secureStorage.write(
+          key: ScrobblerService.keyLastFmSecretSecure, value: lastFmSec);
     } else {
       await secureStorage.delete(key: ScrobblerService.keyLastFmSecretSecure);
     }
     if (lastFmSession.isNotEmpty) {
-      await secureStorage.write(key: ScrobblerService.keyLastFmSessionKeySecure, value: lastFmSession);
+      await secureStorage.write(
+          key: ScrobblerService.keyLastFmSessionKeySecure,
+          value: lastFmSession);
     } else {
-      await secureStorage.delete(key: ScrobblerService.keyLastFmSessionKeySecure);
+      await secureStorage.delete(
+          key: ScrobblerService.keyLastFmSessionKeySecure);
     }
     await prefs.remove(ScrobblerService.keyLastFmApiKey);
     await prefs.remove(ScrobblerService.keyLastFmSecret);
@@ -2591,11 +3119,15 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
             const SizedBox(height: 16),
             Text(
               'ListenBrainz REST Scrobbler',
-              style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14),
+              style: TextStyle(
+                  color: p.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14),
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text('Enable ListenBrainz', style: TextStyle(color: p.textPrimary, fontSize: 14)),
+              title: Text('Enable ListenBrainz',
+                  style: TextStyle(color: p.textPrimary, fontSize: 14)),
               value: _listenBrainzEnabled,
               activeThumbColor: p.accent,
               onChanged: (val) => setState(() => _listenBrainzEnabled = val),
@@ -2608,7 +3140,8 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
                   labelText: 'User Token',
                   hintText: 'Enter ListenBrainz User Token',
                   labelStyle: TextStyle(color: p.textSecondary),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   isDense: true,
                 ),
               ),
@@ -2617,11 +3150,15 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
             const SizedBox(height: 8),
             Text(
               'Last.fm REST Scrobbler',
-              style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 14),
+              style: TextStyle(
+                  color: p.textPrimary,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14),
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text('Enable Last.fm Direct Scrobbling', style: TextStyle(color: p.textPrimary, fontSize: 14)),
+              title: Text('Enable Last.fm Direct Scrobbling',
+                  style: TextStyle(color: p.textPrimary, fontSize: 14)),
               value: _lastFmEnabled,
               activeThumbColor: p.accent,
               onChanged: (val) => setState(() => _lastFmEnabled = val),
@@ -2633,7 +3170,8 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
                 decoration: InputDecoration(
                   labelText: 'Last.fm API Key',
                   labelStyle: TextStyle(color: p.textSecondary),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   isDense: true,
                 ),
               ),
@@ -2644,7 +3182,8 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
                 decoration: InputDecoration(
                   labelText: 'Last.fm Shared Secret',
                   labelStyle: TextStyle(color: p.textSecondary),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   isDense: true,
                 ),
               ),
@@ -2655,7 +3194,8 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
                 decoration: InputDecoration(
                   labelText: 'Last.fm Session Key (sk)',
                   labelStyle: TextStyle(color: p.textSecondary),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                  border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   isDense: true,
                 ),
               ),
@@ -2667,10 +3207,13 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: p.accent,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
                 ),
                 onPressed: _saveScrobblerPrefs,
-                child: const Text('Save Settings', style: TextStyle(fontWeight: FontWeight.w700, color: Colors.black)),
+                child: const Text('Save Settings',
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700, color: Colors.black)),
               ),
             ),
           ],
@@ -2679,4 +3222,3 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
     );
   }
 }
-

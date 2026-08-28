@@ -25,7 +25,8 @@ class PlaylistSuggestionsService {
     // 1. Heavy Rotation (Top played)
     final topPlayed = List<SongsTableData>.from(allSongs)
       ..sort((a, b) => b.playCount.compareTo(a.playCount));
-    final heavyRotation = topPlayed.where((s) => s.playCount > 0).take(25).toList();
+    final heavyRotation =
+        topPlayed.where((s) => s.playCount > 0).take(25).toList();
     if (heavyRotation.isNotEmpty) {
       suggestions.add(PlaylistSuggestion(
         title: 'Heavy Rotation Mix',
@@ -35,7 +36,10 @@ class PlaylistSuggestionsService {
     }
 
     // 2. Rediscover & Forgotten Favorites
-    final forgotten = allSongs.where((s) => s.isFavorite && (s.playCount < 3)).take(20).toList();
+    final forgotten = allSongs
+        .where((s) => s.isFavorite && (s.playCount < 3))
+        .take(20)
+        .toList();
     if (forgotten.isNotEmpty) {
       suggestions.add(PlaylistSuggestion(
         title: 'Forgotten Favorites',
@@ -46,7 +50,10 @@ class PlaylistSuggestionsService {
 
     // 3. Audiophile Master Lossless Mix
     final audiophile = allSongs
-        .where((s) => s.codec == 'FLAC' || s.codec == 'ALAC' || (s.bitDepth != null && s.bitDepth! >= 24))
+        .where((s) =>
+            s.codec == 'FLAC' ||
+            s.codec == 'ALAC' ||
+            (s.bitDepth != null && s.bitDepth! >= 24))
         .take(30)
         .toList();
     if (audiophile.isNotEmpty) {

@@ -1,0 +1,13 @@
+# NewPipeExtractor & Rhino ProGuard Rules (dev flavor only)
+-keep class org.mozilla.javascript.** { *; }
+-keep class org.mozilla.classfile.** { *; }
+-dontwarn org.mozilla.javascript.**
+-keep class org.schabi.newpipe.extractor.** { *; }
+-dontwarn org.schabi.newpipe.extractor.**
+-keep class com.grack.nanojson.** { *; }
+-dontwarn com.grack.nanojson.**
+-keep class org.jsoup.** { *; }
+-dontwarn org.jsoup.**
+-dontwarn javax.script.**
+-dontwarn java.beans.**
+-dontwarn org.mozilla.javascript.tools.**

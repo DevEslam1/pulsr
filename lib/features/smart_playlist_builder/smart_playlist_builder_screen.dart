@@ -38,7 +38,8 @@ class _SmartPlaylistBuilderView extends StatefulWidget {
   const _SmartPlaylistBuilderView();
 
   @override
-  State<_SmartPlaylistBuilderView> createState() => _SmartPlaylistBuilderViewState();
+  State<_SmartPlaylistBuilderView> createState() =>
+      _SmartPlaylistBuilderViewState();
 }
 
 class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
@@ -50,7 +51,8 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
     super.initState();
     final state = context.read<SmartPlaylistBuilderCubit>().state;
     _nameController = TextEditingController(text: state.name);
-    _limitController = TextEditingController(text: state.criteria.limit?.toString() ?? '');
+    _limitController =
+        TextEditingController(text: state.criteria.limit?.toString() ?? '');
   }
 
   @override
@@ -84,8 +86,11 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                 Icon(Icons.auto_awesome_rounded, color: p.accent, size: 22),
                 const SizedBox(width: 8),
                 Text(
-                  state.isEditing ? context.l10n.editPlaylist : context.l10n.createSmartPlaylist,
-                  style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                  state.isEditing
+                      ? context.l10n.editPlaylist
+                      : context.l10n.createSmartPlaylist,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, fontSize: 18),
                 ),
               ],
             ),
@@ -103,12 +108,14 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
                     ? SizedBox(
                         width: 16,
                         height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: p.accent),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: p.accent),
                       )
                     : Icon(Icons.check_rounded, color: p.accent),
                 label: Text(
                   context.l10n.save,
-                  style: TextStyle(color: p.accent, fontWeight: FontWeight.bold),
+                  style:
+                      TextStyle(color: p.accent, fontWeight: FontWeight.bold),
                 ),
               ),
             ],
@@ -117,271 +124,345 @@ class _SmartPlaylistBuilderViewState extends State<_SmartPlaylistBuilderView> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 720),
               child: ListView(
-                padding: EdgeInsets.fromLTRB(context.pagePadding, 12, context.pagePadding, 160),
+                padding: EdgeInsets.fromLTRB(
+                    context.pagePadding, 12, context.pagePadding, 160),
                 children: [
-              // Playlist Name Card
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: p.surfaceContainer,
-                  borderRadius: AppRadii.cardRadius,
-                  border: Border.all(color: p.hairline),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('PLAYLIST NAME', style: TextStyle(color: p.textSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _nameController,
-                      onChanged: cubit.updateName,
-                      decoration: InputDecoration(
-                        hintText: 'e.g. 80s Rock Hits, Heavy Rotation...',
-                        filled: true,
-                        fillColor: p.surfaceContainerHigh,
-                        border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(12)), borderSide: BorderSide.none),
+                  // Playlist Name Card
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: p.surfaceContainer,
+                      borderRadius: AppRadii.cardRadius,
+                      border: Border.all(color: p.hairline),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('PLAYLIST NAME',
+                            style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.1)),
+                        const SizedBox(height: 8),
+                        TextField(
+                          controller: _nameController,
+                          onChanged: cubit.updateName,
+                          decoration: InputDecoration(
+                            hintText: 'e.g. 80s Rock Hits, Heavy Rotation...',
+                            filled: true,
+                            fillColor: p.surfaceContainerHigh,
+                            border: const OutlineInputBorder(
+                                borderRadius:
+                                    BorderRadius.all(Radius.circular(12)),
+                                borderSide: BorderSide.none),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Match Logic Toggle
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: p.surfaceContainer,
+                      borderRadius: AppRadii.cardRadius,
+                      border: Border.all(color: p.hairline),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('MATCH LOGIC',
+                            style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.1)),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ChoiceChip(
+                                label: const Center(
+                                    child: Text('Match ALL Rules (AND)')),
+                                selected: state.criteria.matchAll,
+                                selectedColor: p.accent.withValues(alpha: 0.25),
+                                labelStyle: TextStyle(
+                                  color: state.criteria.matchAll
+                                      ? p.accent
+                                      : p.textSecondary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                onSelected: (_) => cubit.toggleMatchAll(true),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ChoiceChip(
+                                label: const Center(
+                                    child: Text('Match ANY Rule (OR)')),
+                                selected: !state.criteria.matchAll,
+                                selectedColor: p.accent.withValues(alpha: 0.25),
+                                labelStyle: TextStyle(
+                                  color: !state.criteria.matchAll
+                                      ? p.accent
+                                      : p.textSecondary,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                onSelected: (_) => cubit.toggleMatchAll(false),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Rules Section
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('RULES',
+                          style: TextStyle(
+                              color: p.textSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.1)),
+                      TextButton.icon(
+                        onPressed: () {
+                          cubit.addRule(const SmartRule(
+                            field: SmartRuleField.genre,
+                            operator: SmartOperator.contains,
+                            value: '',
+                          ));
+                        },
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: const Text('Add Rule'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+
+                  ...List.generate(state.criteria.rules.length, (index) {
+                    final rule = state.criteria.rules[index];
+                    return _RuleCard(
+                      rule: rule,
+                      onChanged: (updated) => cubit.updateRule(index, updated),
+                      onDelete: () => cubit.removeRule(index),
+                    );
+                  }),
+
+                  const SizedBox(height: 16),
+
+                  // Options Card (Limit & Sorting)
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: p.surfaceContainer,
+                      borderRadius: AppRadii.cardRadius,
+                      border: Border.all(color: p.hairline),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('SORTING & LIMIT',
+                            style: TextStyle(
+                                color: p.textSecondary,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.1)),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Sort Field',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: p.textSecondary)),
+                                  const SizedBox(height: 4),
+                                  DropdownButtonFormField<String>(
+                                    initialValue:
+                                        state.criteria.sortBy ?? 'title',
+                                    decoration: InputDecoration(
+                                      filled: true,
+                                      fillColor: p.surface,
+                                      contentPadding: EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 8),
+                                      border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.all(
+                                              Radius.circular(10)),
+                                          borderSide: BorderSide.none),
+                                    ),
+                                    items: const [
+                                      DropdownMenuItem(
+                                          value: 'title', child: Text('Title')),
+                                      DropdownMenuItem(
+                                          value: 'dateAdded',
+                                          child: Text('Date Added')),
+                                      DropdownMenuItem(
+                                          value: 'playCount',
+                                          child: Text('Play Count')),
+                                      DropdownMenuItem(
+                                          value: 'lastPlayed',
+                                          child: Text('Last Played')),
+                                      DropdownMenuItem(
+                                          value: 'durationMs',
+                                          child: Text('Duration')),
+                                      DropdownMenuItem(
+                                          value: 'year', child: Text('Year')),
+                                    ],
+                                    onChanged: (val) => cubit.setSortBy(val),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text('Track Limit',
+                                      style: TextStyle(
+                                          fontSize: 12,
+                                          color: p.textSecondary)),
+                                  const SizedBox(height: 4),
+                                  TextField(
+                                    controller: _limitController,
+                                    keyboardType: TextInputType.number,
+                                    onChanged: (val) {
+                                      final num = int.tryParse(val.trim());
+                                      cubit.setLimit(num);
+                                    },
+                                    decoration: InputDecoration(
+                                      hintText: 'Unlimited',
+                                      filled: true,
+                                      fillColor: p.surface,
+                                      contentPadding: EdgeInsets.symmetric(
+                                          horizontal: 12, vertical: 8),
+                                      border: OutlineInputBorder(
+                                          borderRadius: BorderRadius.all(
+                                              Radius.circular(10)),
+                                          borderSide: BorderSide.none),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  // Live Match Preview Section
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('MATCHING TRACKS PREVIEW',
+                          style: TextStyle(
+                              color: p.textSecondary,
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.1)),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: p.accent.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${state.previewSongs.length} tracks',
+                          style: TextStyle(
+                              color: p.accent,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  if (state.previewSongs.isEmpty)
+                    Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: p.surfaceContainer.withValues(alpha: 0.5),
+                        borderRadius: AppRadii.cardRadius,
+                        border: Border.all(
+                            color: p.hairline.withValues(alpha: 0.5)),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'No tracks match the selected rules.',
+                          style:
+                              TextStyle(color: p.textSecondary, fontSize: 13),
+                        ),
+                      ),
+                    )
+                  else
+                    Material(
+                      color: p.surfaceContainer,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: AppRadii.cardRadius,
+                        side: BorderSide(color: p.hairline),
+                      ),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxHeight: 260),
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: state.previewSongs.length,
+                          separatorBuilder: (_, __) =>
+                              Divider(height: 1, color: p.hairline),
+                          itemBuilder: (context, index) {
+                            final song = state.previewSongs[index];
+                            return ListTile(
+                              dense: true,
+                              leading: CachedArtwork(
+                                id: song.id,
+                                remoteUrl: song.remoteArtworkUrl,
+                                type: ArtworkType.AUDIO,
+                                size: 36,
+                                borderRadius: 8,
+                              ),
+                              title: Text(song.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 13,
+                                      color: p.textPrimary)),
+                              subtitle: Text(
+                                '${song.artist} • ${Formatters.formatDuration(Duration(milliseconds: song.durationMs))}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                    color: p.textSecondary, fontSize: 11),
+                              ),
+                            );
+                          },
+                        ),
                       ),
                     ),
-                  ],
-                ),
-              ),
 
-              const SizedBox(height: 16),
-
-              // Match Logic Toggle
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: p.surfaceContainer,
-                  borderRadius: AppRadii.cardRadius,
-                  border: Border.all(color: p.hairline),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('MATCH LOGIC', style: TextStyle(color: p.textSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ChoiceChip(
-                            label: const Center(child: Text('Match ALL Rules (AND)')),
-                            selected: state.criteria.matchAll,
-                            selectedColor: p.accent.withValues(alpha: 0.25),
-                            labelStyle: TextStyle(
-                              color: state.criteria.matchAll ? p.accent : p.textSecondary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            onSelected: (_) => cubit.toggleMatchAll(true),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ChoiceChip(
-                            label: const Center(child: Text('Match ANY Rule (OR)')),
-                            selected: !state.criteria.matchAll,
-                            selectedColor: p.accent.withValues(alpha: 0.25),
-                            labelStyle: TextStyle(
-                              color: !state.criteria.matchAll ? p.accent : p.textSecondary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            onSelected: (_) => cubit.toggleMatchAll(false),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 16),
-
-              // Rules Section
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('RULES', style: TextStyle(color: p.textSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
-                  TextButton.icon(
-                    onPressed: () {
-                      cubit.addRule(const SmartRule(
-                        field: SmartRuleField.genre,
-                        operator: SmartOperator.contains,
-                        value: '',
-                      ));
-                    },
-                    icon: const Icon(Icons.add_rounded, size: 18),
-                    label: const Text('Add Rule'),
-                  ),
+                  const SizedBox(height: 40),
                 ],
               ),
-              const SizedBox(height: 4),
-
-              ...List.generate(state.criteria.rules.length, (index) {
-                final rule = state.criteria.rules[index];
-                return _RuleCard(
-                  rule: rule,
-                  onChanged: (updated) => cubit.updateRule(index, updated),
-                  onDelete: () => cubit.removeRule(index),
-                );
-              }),
-
-              const SizedBox(height: 16),
-
-              // Options Card (Limit & Sorting)
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: p.surfaceContainer,
-                  borderRadius: AppRadii.cardRadius,
-                  border: Border.all(color: p.hairline),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('SORTING & LIMIT', style: TextStyle(color: p.textSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Sort Field', style: TextStyle(fontSize: 12, color: p.textSecondary)),
-                              const SizedBox(height: 4),
-                              DropdownButtonFormField<String>(
-                                initialValue: state.criteria.sortBy ?? 'title',
-                                decoration: InputDecoration(
-                                  filled: true,
-                                  fillColor: p.surface,
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10)), borderSide: BorderSide.none),
-                                ),
-                                items: const [
-                                  DropdownMenuItem(value: 'title', child: Text('Title')),
-                                  DropdownMenuItem(value: 'dateAdded', child: Text('Date Added')),
-                                  DropdownMenuItem(value: 'playCount', child: Text('Play Count')),
-                                  DropdownMenuItem(value: 'lastPlayed', child: Text('Last Played')),
-                                  DropdownMenuItem(value: 'durationMs', child: Text('Duration')),
-                                  DropdownMenuItem(value: 'year', child: Text('Year')),
-                                ],
-                                onChanged: (val) => cubit.setSortBy(val),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text('Track Limit', style: TextStyle(fontSize: 12, color: p.textSecondary)),
-                              const SizedBox(height: 4),
-                              TextField(
-                                controller: _limitController,
-                                keyboardType: TextInputType.number,
-                                onChanged: (val) {
-                                  final num = int.tryParse(val.trim());
-                                  cubit.setLimit(num);
-                                },
-                                decoration: InputDecoration(
-                                  hintText: 'Unlimited',
-                                  filled: true,
-                                  fillColor: p.surface,
-                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(10)), borderSide: BorderSide.none),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Live Match Preview Section
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text('MATCHING TRACKS PREVIEW', style: TextStyle(color: p.textSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.1)),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: p.accent.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${state.previewSongs.length} tracks',
-                      style: TextStyle(color: p.accent, fontWeight: FontWeight.bold, fontSize: 12),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-
-              if (state.previewSongs.isEmpty)
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: p.surfaceContainer.withValues(alpha: 0.5),
-                    borderRadius: AppRadii.cardRadius,
-                    border: Border.all(color: p.hairline.withValues(alpha: 0.5)),
-                  ),
-                  child: Center(
-                    child: Text(
-                      'No tracks match the selected rules.',
-                      style: TextStyle(color: p.textSecondary, fontSize: 13),
-                    ),
-                  ),
-                )
-              else
-                Material(
-                  color: p.surfaceContainer,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: AppRadii.cardRadius,
-                    side: BorderSide(color: p.hairline),
-                  ),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 260),
-                    child: ListView.separated(
-                      shrinkWrap: true,
-                      itemCount: state.previewSongs.length,
-                      separatorBuilder: (_, __) => Divider(height: 1, color: p.hairline),
-                      itemBuilder: (context, index) {
-                        final song = state.previewSongs[index];
-                        return ListTile(
-                          dense: true,
-                          leading: CachedArtwork(
-                            id: song.id,
-                            remoteUrl: song.remoteArtworkUrl,
-                            type: ArtworkType.AUDIO,
-                            size: 36,
-                            borderRadius: 8,
-                          ),
-                          title: Text(song.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: p.textPrimary)),
-                          subtitle: Text(
-                            '${song.artist} • ${Formatters.formatDuration(Duration(milliseconds: song.durationMs))}',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: p.textSecondary, fontSize: 11),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-
-              const SizedBox(height: 40),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
-  },
-);
   }
 }
 
@@ -412,7 +493,8 @@ class _RuleCardState extends State<_RuleCard> {
   @override
   void didUpdateWidget(covariant _RuleCard oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.rule.value != widget.rule.value && _valueController.text != widget.rule.value) {
+    if (oldWidget.rule.value != widget.rule.value &&
+        _valueController.text != widget.rule.value) {
       _valueController.text = widget.rule.value;
     }
   }
@@ -447,13 +529,20 @@ class _RuleCardState extends State<_RuleCard> {
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: p.surfaceContainerHigh,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8)), borderSide: BorderSide.none),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    border: const OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(8)),
+                        borderSide: BorderSide.none),
                   ),
-                  items: SmartRuleField.values.where((f) => f != SmartRuleField.bpm).map((f) {
+                  items: SmartRuleField.values
+                      .where((f) => f != SmartRuleField.bpm)
+                      .map((f) {
                     return DropdownMenuItem(
                       value: f,
-                      child: Text(f.label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      child: Text(f.label,
+                          style: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600)),
                     );
                   }).toList(),
                   onChanged: (f) {
@@ -473,13 +562,18 @@ class _RuleCardState extends State<_RuleCard> {
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: p.surfaceContainerHigh,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                    border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8)), borderSide: BorderSide.none),
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                    border: const OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(8)),
+                        borderSide: BorderSide.none),
                   ),
                   items: SmartOperator.values.map((o) {
                     return DropdownMenuItem(
                       value: o,
-                      child: Text(o.label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                      child: Text(o.label,
+                          style: const TextStyle(
+                              fontSize: 13, fontWeight: FontWeight.w600)),
                     );
                   }).toList(),
                   onChanged: (o) {
@@ -499,14 +593,21 @@ class _RuleCardState extends State<_RuleCard> {
           const SizedBox(height: 8),
 
           // Value Input
-          if (widget.rule.field == SmartRuleField.isFavorite || widget.rule.field == SmartRuleField.isLossless)
+          if (widget.rule.field == SmartRuleField.isFavorite ||
+              widget.rule.field == SmartRuleField.isLossless)
             DropdownButtonFormField<String>(
-              initialValue: widget.rule.value.toLowerCase() == 'true' || widget.rule.value == '1' ? 'true' : 'false',
+              initialValue: widget.rule.value.toLowerCase() == 'true' ||
+                      widget.rule.value == '1'
+                  ? 'true'
+                  : 'false',
               decoration: InputDecoration(
                 filled: true,
                 fillColor: p.surfaceContainerHigh,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8)), borderSide: BorderSide.none),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                border: const OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(8)),
+                    borderSide: BorderSide.none),
               ),
               items: const [
                 DropdownMenuItem(value: 'true', child: Text('Yes (True)')),
@@ -532,11 +633,15 @@ class _RuleCardState extends State<_RuleCard> {
                   ? TextInputType.number
                   : TextInputType.text,
               decoration: InputDecoration(
-                hintText: _getHintForField(widget.rule.field, widget.rule.operator),
+                hintText:
+                    _getHintForField(widget.rule.field, widget.rule.operator),
                 filled: true,
                 fillColor: p.surfaceContainerHigh,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                border: const OutlineInputBorder(borderRadius: BorderRadius.all(Radius.circular(8)), borderSide: BorderSide.none),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                border: const OutlineInputBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(8)),
+                    borderSide: BorderSide.none),
               ),
             ),
         ],

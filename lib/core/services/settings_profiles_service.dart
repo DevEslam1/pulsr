@@ -41,7 +41,8 @@ class SettingsProfile {
         'playerTheme': playerTheme,
       };
 
-  factory SettingsProfile.fromJson(Map<String, dynamic> json) => SettingsProfile(
+  factory SettingsProfile.fromJson(Map<String, dynamic> json) =>
+      SettingsProfile(
         id: json['id'] as String,
         name: json['name'] as String,
         type: ProfileType.values.firstWhere(
@@ -107,10 +108,13 @@ class SettingsProfilesService {
       final jsonStr = prefs.getString(_keyProfiles);
       if (jsonStr != null) {
         final list = json.decode(jsonStr) as List<dynamic>;
-        return list.map((e) => SettingsProfile.fromJson(e as Map<String, dynamic>)).toList();
+        return list
+            .map((e) => SettingsProfile.fromJson(e as Map<String, dynamic>))
+            .toList();
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to load settings profiles', error: e, stackTrace: st, category: 'SettingsProfilesService');
+      ErrorLogger.log('Failed to load settings profiles',
+          error: e, stackTrace: st, category: 'SettingsProfilesService');
     }
     return SettingsProfile.defaultProfiles;
   }
@@ -125,7 +129,8 @@ class SettingsProfilesService {
       updated.add(profile);
     }
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyProfiles, json.encode(updated.map((p) => p.toJson()).toList()));
+    await prefs.setString(
+        _keyProfiles, json.encode(updated.map((p) => p.toJson()).toList()));
   }
 
   Future<void> deleteProfile(String profileId) async {
@@ -133,6 +138,7 @@ class SettingsProfilesService {
     final updated = List<SettingsProfile>.from(list);
     updated.removeWhere((p) => p.id == profileId);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyProfiles, json.encode(updated.map((p) => p.toJson()).toList()));
+    await prefs.setString(
+        _keyProfiles, json.encode(updated.map((p) => p.toJson()).toList()));
   }
 }

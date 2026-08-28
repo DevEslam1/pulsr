@@ -42,7 +42,8 @@ class AudioQualityInfo {
 
   /// The audio rendering pipeline configuration based on source format and bit-depth.
   String get renderEngineDescription {
-    if (tier == AudioQualityTier.hiResLossless || tier == AudioQualityTier.lossless) {
+    if (tier == AudioQualityTier.hiResLossless ||
+        tier == AudioQualityTier.lossless) {
       return 'ExoPlayer Media3 • 32-bit Float PCM';
     } else if (format == 'AAC' || codecName.contains('AAC')) {
       return 'ExoPlayer Media3 • Hardware Offload (AAC / DSP)';
@@ -81,7 +82,9 @@ class AudioQualityInfo {
     final path = song.path.toLowerCase();
 
     // YouTube Music online streaming track
-    if (song.source == SongSource.youtube || song.source == 'youtube' || path.startsWith('ytmusic://')) {
+    if (song.source == SongSource.youtube ||
+        song.source == 'youtube' ||
+        path.startsWith('ytmusic://')) {
       final defaultKbps = streamingQuality == YtmAudioQuality.low
           ? 64
           : streamingQuality == YtmAudioQuality.medium
@@ -130,7 +133,10 @@ class AudioQualityInfo {
 
     // Calculate bitrate if fileSize and durationMs are available
     int? calculatedBitrate = explicitBitrateKbps ?? song.bitrateKbps;
-    if (calculatedBitrate == null && song.fileSize != null && song.fileSize! > 0 && song.durationMs > 0) {
+    if (calculatedBitrate == null &&
+        song.fileSize != null &&
+        song.fileSize! > 0 &&
+        song.durationMs > 0) {
       final seconds = song.durationMs / 1000.0;
       final bits = song.fileSize! * 8.0;
       calculatedBitrate = (bits / seconds / 1000.0).round();
@@ -138,7 +144,8 @@ class AudioQualityInfo {
 
     // When a real codec string is known, gate format on it so a mislabeled
     // extension (e.g. a 128k MP3 renamed to .flac) cannot fake a higher tier.
-    bool codecIs(String needle) => realCodec != null && realCodec.contains(needle);
+    bool codecIs(String needle) =>
+        realCodec != null && realCodec.contains(needle);
     final bool isFlac = realCodec != null ? codecIs('flac') : ext == 'flac';
     final bool isWav = realCodec != null
         ? (codecIs('wav') || codecIs('riff') || codecIs('pcm'))
@@ -162,11 +169,21 @@ class AudioQualityInfo {
             // header is available to trust.
             (!hasRealHeader &&
                 ((calculatedBitrate != null && calculatedBitrate >= 1411) ||
-                    RegExp(r'(?:^|[\s_\-\.\/])24bit(?:$|[\s_\-\.\/])', caseSensitive: false).hasMatch(path) ||
-                    RegExp(r'(?:^|[\s_\-\.\/])hi-?res(?:$|[\s_\-\.\/])', caseSensitive: false).hasMatch(path) ||
-                    RegExp(r'(?:^|[\s_\-\.\/])master(?:$|[\s_\-\.\/])', caseSensitive: false).hasMatch(path) ||
-                    RegExp(r'[\s_\-\.\/]96k(?:hz)?[\s_\-\.\/]', caseSensitive: false).hasMatch(path) ||
-                    RegExp(r'[\s_\-\.\/]192k(?:hz)?[\s_\-\.\/]', caseSensitive: false).hasMatch(path))));
+                    RegExp(r'(?:^|[\s_\-\.\/])24bit(?:$|[\s_\-\.\/])',
+                            caseSensitive: false)
+                        .hasMatch(path) ||
+                    RegExp(r'(?:^|[\s_\-\.\/])hi-?res(?:$|[\s_\-\.\/])',
+                            caseSensitive: false)
+                        .hasMatch(path) ||
+                    RegExp(r'(?:^|[\s_\-\.\/])master(?:$|[\s_\-\.\/])',
+                            caseSensitive: false)
+                        .hasMatch(path) ||
+                    RegExp(r'[\s_\-\.\/]96k(?:hz)?[\s_\-\.\/]',
+                            caseSensitive: false)
+                        .hasMatch(path) ||
+                    RegExp(r'[\s_\-\.\/]192k(?:hz)?[\s_\-\.\/]',
+                            caseSensitive: false)
+                        .hasMatch(path))));
 
     final AudioQualityTier tier;
     final String tierLabel;
@@ -196,10 +213,12 @@ class AudioQualityInfo {
       description = '1-bit High Density Studio Master audio stream';
       badgeColor = const Color(0xFFFFB800);
       icon = Icons.stars_rounded;
-      sampleRate = explicitSampleRate != null ? resolvedSampleRate : '2.8 MHz / 5.6 MHz';
+      sampleRate =
+          explicitSampleRate != null ? resolvedSampleRate : '2.8 MHz / 5.6 MHz';
       bitDepth = '1-bit DSD';
     } else if (isHiRes) {
-      formatLabel = isFlac ? 'FLAC' : (isWav ? 'WAV' : (explicitFormat ?? 'HI-RES'));
+      formatLabel =
+          isFlac ? 'FLAC' : (isWav ? 'WAV' : (explicitFormat ?? 'HI-RES'));
       codecName = isFlac
           ? 'Free Lossless Audio Codec (Hi-Res)'
           : (isWav ? 'Waveform Audio File (Hi-Res PCM)' : 'Lossless Audio');
@@ -208,22 +227,27 @@ class AudioQualityInfo {
       shortBadgeLabel = calculatedBitrate != null
           ? '$formatLabel • ${calculatedBitrate}k'
           : '$formatLabel • HI-RES';
-      description = 'Studio Master 24-bit • Up to 192 kHz lossless bit-perfect stream';
+      description =
+          'Studio Master 24-bit • Up to 192 kHz lossless bit-perfect stream';
       badgeColor = const Color(0xFFFFB800); // Gold Shimmer
       icon = Icons.workspace_premium_rounded;
       sampleRate = resolvedSampleRate;
       bitDepth = resolvedBitDepth;
     } else if (isLosslessFormat) {
-      formatLabel = isFlac ? 'FLAC' : (isWav ? 'WAV' : (isAlac ? 'ALAC' : 'AIFF'));
+      formatLabel =
+          isFlac ? 'FLAC' : (isWav ? 'WAV' : (isAlac ? 'ALAC' : 'AIFF'));
       codecName = isFlac
           ? 'Free Lossless Audio Codec (Lossless)'
-          : (isWav ? 'Pulse-Code Modulation (Uncompressed)' : 'Apple Lossless Audio');
+          : (isWav
+              ? 'Pulse-Code Modulation (Uncompressed)'
+              : 'Apple Lossless Audio');
       tier = AudioQualityTier.lossless;
       tierLabel = 'Lossless Audio';
       shortBadgeLabel = calculatedBitrate != null
           ? '$formatLabel • ${calculatedBitrate}k'
           : '$formatLabel • LOSSLESS';
-      description = 'CD Quality 16-bit / 44.1 kHz • Exact bit-perfect reproduction';
+      description =
+          'CD Quality 16-bit / 44.1 kHz • Exact bit-perfect reproduction';
       badgeColor = const Color(0xFF00F2FF); // Electric Cyan
       icon = Icons.diamond_rounded;
       sampleRate = resolvedSampleRate;
@@ -234,8 +258,11 @@ class AudioQualityInfo {
       tier = (calculatedBitrate ?? 256) >= 256
           ? AudioQualityTier.highQuality
           : AudioQualityTier.standardQuality;
-      tierLabel = tier == AudioQualityTier.highQuality ? 'High Quality AAC' : 'Standard AAC';
-      shortBadgeLabel = calculatedBitrate != null ? 'AAC • ${calculatedBitrate}k' : 'AAC HQ';
+      tierLabel = tier == AudioQualityTier.highQuality
+          ? 'High Quality AAC'
+          : 'Standard AAC';
+      shortBadgeLabel =
+          calculatedBitrate != null ? 'AAC • ${calculatedBitrate}k' : 'AAC HQ';
       description = 'High Efficiency perceptual audio compression';
       badgeColor = const Color(0xFF38BDF8);
       icon = Icons.high_quality_rounded;
@@ -248,7 +275,9 @@ class AudioQualityInfo {
           ? AudioQualityTier.highQuality
           : AudioQualityTier.standardQuality;
       tierLabel = '$formatLabel HQ Audio';
-      shortBadgeLabel = calculatedBitrate != null ? '$formatLabel • ${calculatedBitrate}k' : formatLabel;
+      shortBadgeLabel = calculatedBitrate != null
+          ? '$formatLabel • ${calculatedBitrate}k'
+          : formatLabel;
       description = 'Modern high-performance variable bitrate audio codec';
       badgeColor = const Color(0xFF818CF8);
       icon = Icons.graphic_eq_rounded;

@@ -1,6 +1,29 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pulsr/core/constants/app_colors.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
+
+double _relativeLuminance(Color color) {
+  double channelLuminance(double value) {
+    return value <= 0.04045
+        ? value / 12.92
+        : math.pow((value + 0.055) / 1.055, 2.4).toDouble();
+  }
+
+  final r = channelLuminance(color.r);
+  final g = channelLuminance(color.g);
+  final b = channelLuminance(color.b);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+double _contrastRatio(Color c1, Color c2) {
+  final l1 = _relativeLuminance(c1);
+  final l2 = _relativeLuminance(c2);
+  final lighter = math.max(l1, l2);
+  final darker = math.min(l1, l2);
+  return (lighter + 0.05) / (darker + 0.05);
+}
 
 void main() {
   group('Theme Palette and Accent Variations', () {
@@ -12,11 +35,24 @@ void main() {
       'Monokai Magenta': const Color(0xFFFF007F),
     };
 
+    test('WCAG 2.1 AA Contrast: lightTextSecondary against lightBackground >= 4.5:1 (BUG-024)', () {
+      final ratioBg = _contrastRatio(AppColors.lightTextSecondary, AppColors.lightBackground);
+      final ratioSurface = _contrastRatio(AppColors.lightTextSecondary, AppColors.lightSurface);
+      
+      expect(ratioBg, greaterThanOrEqualTo(4.5),
+          reason: 'lightTextSecondary must meet WCAG AA normal text contrast (4.5:1) on lightBackground');
+      expect(ratioSurface, greaterThanOrEqualTo(4.5),
+          reason: 'lightTextSecondary must meet WCAG AA normal text contrast (4.5:1) on lightSurface');
+    });
+
     for (final entry in accents.entries) {
       test('Theme builds valid palette for ${entry.key}', () {
-        final darkTheme = AuraTheme.customTheme(entry.value, brightness: Brightness.dark);
-        final lightTheme = AuraTheme.customTheme(entry.value, brightness: Brightness.light);
-        final amoledTheme = AuraTheme.customTheme(entry.value, brightness: Brightness.dark, isAmoled: true);
+        final darkTheme =
+            AuraTheme.customTheme(entry.value, brightness: Brightness.dark);
+        final lightTheme =
+            AuraTheme.customTheme(entry.value, brightness: Brightness.light);
+        final amoledTheme = AuraTheme.customTheme(entry.value,
+            brightness: Brightness.dark, isAmoled: true);
 
         final darkPalette = darkTheme.extension<PulsrPalette>();
         final lightPalette = lightTheme.extension<PulsrPalette>();
@@ -32,9 +68,11 @@ void main() {
       });
     }
 
-    testWidgets('Renders mini player and card across all 5 accent themes', (tester) async {
+    testWidgets('Renders mini player and card across all 5 accent themes',
+        (tester) async {
       for (final entry in accents.entries) {
-        final theme = AuraTheme.customTheme(entry.value, brightness: Brightness.dark);
+        final theme =
+            AuraTheme.customTheme(entry.value, brightness: Brightness.dark);
 
         await tester.pumpWidget(
           MaterialApp(

@@ -103,7 +103,8 @@ class YtmOnlineState {
       likedError: clearLikedError ? null : (likedError ?? this.likedError),
       likedTracks: likedTracks ?? this.likedTracks,
       accountStatus: accountStatus ?? this.accountStatus,
-      accountError: clearAccountError ? null : (accountError ?? this.accountError),
+      accountError:
+          clearAccountError ? null : (accountError ?? this.accountError),
       accountPlaylists: accountPlaylists ?? this.accountPlaylists,
       customStatus: customStatus ?? this.customStatus,
       customError: clearCustomError ? null : (customError ?? this.customError),
@@ -155,8 +156,12 @@ class PlaylistCubit extends Cubit<PlaylistState> {
 
     // Auto-update online playlists & liked songs in background on every restart
     if (AppConfig.ytmEnabled) {
-      getIt<YtmAccountService>().loginState.removeListener(_onYtmLoginStateChanged);
-      getIt<YtmAccountService>().loginState.addListener(_onYtmLoginStateChanged);
+      getIt<YtmAccountService>()
+          .loginState
+          .removeListener(_onYtmLoginStateChanged);
+      getIt<YtmAccountService>()
+          .loginState
+          .addListener(_onYtmLoginStateChanged);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Future.delayed(const Duration(seconds: 2), () {
           if (!isClosed) {
@@ -182,24 +187,33 @@ class PlaylistCubit extends Cubit<PlaylistState> {
         final likedTracks = (data['likedTracks'] as List<dynamic>? ?? [])
             .map((t) => YtmTrack.fromJson(t as Map<String, dynamic>))
             .toList();
-        final accountPlaylists = (data['accountPlaylists'] as List<dynamic>? ?? [])
+        final accountPlaylists = (data['accountPlaylists'] as List<dynamic>? ??
+                [])
             .map((p) => YtmAccountPlaylist.fromJson(p as Map<String, dynamic>))
             .toList();
-        final customPlaylists = (data['customPlaylists'] as List<dynamic>? ?? [])
+        final customPlaylists = (data['customPlaylists'] as List<dynamic>? ??
+                [])
             .map((p) => OnlinePlaylistEntry.fromJson(p as Map<String, dynamic>))
             .toList();
 
         ytmOnline.value = ytmOnline.value.copyWith(
           likedTracks: likedTracks,
-          likedStatus: likedTracks.isNotEmpty ? YtmFetchStatus.done : YtmFetchStatus.idle,
+          likedStatus: likedTracks.isNotEmpty
+              ? YtmFetchStatus.done
+              : YtmFetchStatus.idle,
           accountPlaylists: accountPlaylists,
-          accountStatus: accountPlaylists.isNotEmpty ? YtmFetchStatus.done : YtmFetchStatus.idle,
+          accountStatus: accountPlaylists.isNotEmpty
+              ? YtmFetchStatus.done
+              : YtmFetchStatus.idle,
           customPlaylists: customPlaylists,
-          customStatus: customPlaylists.isNotEmpty ? YtmFetchStatus.done : YtmFetchStatus.idle,
+          customStatus: customPlaylists.isNotEmpty
+              ? YtmFetchStatus.done
+              : YtmFetchStatus.idle,
         );
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to load online playlist cache', error: e, stackTrace: st, category: 'PlaylistCubit');
+      ErrorLogger.log('Failed to load online playlist cache',
+          error: e, stackTrace: st, category: 'PlaylistCubit');
     }
   }
 
@@ -207,13 +221,17 @@ class PlaylistCubit extends Cubit<PlaylistState> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final data = {
-        'likedTracks': ytmOnline.value.likedTracks.map((t) => t.toJson()).toList(),
-        'accountPlaylists': ytmOnline.value.accountPlaylists.map((p) => p.toJson()).toList(),
-        'customPlaylists': ytmOnline.value.customPlaylists.map((p) => p.toJson()).toList(),
+        'likedTracks':
+            ytmOnline.value.likedTracks.map((t) => t.toJson()).toList(),
+        'accountPlaylists':
+            ytmOnline.value.accountPlaylists.map((p) => p.toJson()).toList(),
+        'customPlaylists':
+            ytmOnline.value.customPlaylists.map((p) => p.toJson()).toList(),
       };
       await prefs.setString(_onlineCacheKey, jsonEncode(data));
     } catch (e, st) {
-      ErrorLogger.log('Failed to save online playlist cache', error: e, stackTrace: st, category: 'PlaylistCubit');
+      ErrorLogger.log('Failed to save online playlist cache',
+          error: e, stackTrace: st, category: 'PlaylistCubit');
     }
   }
 
@@ -229,7 +247,8 @@ class PlaylistCubit extends Cubit<PlaylistState> {
         }
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to check or seed default smart playlists', error: e, stackTrace: st, category: 'PlaylistCubit');
+      ErrorLogger.log('Failed to check or seed default smart playlists',
+          error: e, stackTrace: st, category: 'PlaylistCubit');
     }
   }
 
@@ -239,9 +258,11 @@ class PlaylistCubit extends Cubit<PlaylistState> {
       if (playlist.isSmart && playlist.smartCriteria != null) {
         currentSmartIds.add(playlist.id);
         if (!_smartSubscriptions.containsKey(playlist.id)) {
-          final criteria = SmartCriteria.fromJsonString(playlist.smartCriteria!);
-          _smartSubscriptions[playlist.id] =
-              _playlistUseCases.watchSmartPlaylistSongs(criteria).listen((songs) {
+          final criteria =
+              SmartCriteria.fromJsonString(playlist.smartCriteria!);
+          _smartSubscriptions[playlist.id] = _playlistUseCases
+              .watchSmartPlaylistSongs(criteria)
+              .listen((songs) {
             if (isClosed) return;
             final updatedCounts = Map<int, int>.from(state.smartPlaylistCounts);
             updatedCounts[playlist.id] = songs.length;
@@ -251,7 +272,9 @@ class PlaylistCubit extends Cubit<PlaylistState> {
       }
     }
     // Remove subscriptions for deleted smart playlists
-    final staleIds = _smartSubscriptions.keys.where((id) => !currentSmartIds.contains(id)).toList();
+    final staleIds = _smartSubscriptions.keys
+        .where((id) => !currentSmartIds.contains(id))
+        .toList();
     for (final id in staleIds) {
       _smartSubscriptions[id]?.cancel();
       _smartSubscriptions.remove(id);
@@ -264,16 +287,20 @@ class PlaylistCubit extends Cubit<PlaylistState> {
 
   void loadPlaylistSongs(int playlistId) {
     _playlistSongsSub?.cancel();
-    _playlistSongsSub = _playlistUseCases.watchPlaylistSongs(playlistId).listen((result) {
+    _playlistSongsSub =
+        _playlistUseCases.watchPlaylistSongs(playlistId).listen((result) {
       result.fold(
         (failure) => emit(state.copyWith(errorMessage: failure.message)),
-        (songs) => emit(state.copyWith(currentPlaylistSongs: songs, errorMessage: null)),
+        (songs) => emit(
+            state.copyWith(currentPlaylistSongs: songs, errorMessage: null)),
       );
     });
   }
 
-  Future<void> createPlaylist(String name, {bool isSmart = false, String? criteria}) async {
-    final result = await _playlistUseCases.createPlaylist(name, isSmart: isSmart, smartCriteria: criteria);
+  Future<void> createPlaylist(String name,
+      {bool isSmart = false, String? criteria}) async {
+    final result = await _playlistUseCases.createPlaylist(name,
+        isSmart: isSmart, smartCriteria: criteria);
     result.fold(
       (failure) => emit(state.copyWith(errorMessage: failure.message)),
       (_) => null,
@@ -291,7 +318,8 @@ class PlaylistCubit extends Cubit<PlaylistState> {
   Future<void> deletePlaylist(int playlistId) async {
     _smartSubscriptions[playlistId]?.cancel();
     _smartSubscriptions.remove(playlistId);
-    final updatedCounts = Map<int, int>.from(state.smartPlaylistCounts)..remove(playlistId);
+    final updatedCounts = Map<int, int>.from(state.smartPlaylistCounts)
+      ..remove(playlistId);
     emit(state.copyWith(smartPlaylistCounts: updatedCounts));
     final result = await _playlistUseCases.deletePlaylist(playlistId);
     result.fold(
@@ -301,7 +329,8 @@ class PlaylistCubit extends Cubit<PlaylistState> {
   }
 
   Future<void> addSongToPlaylist(int playlistId, int songId) async {
-    final result = await _playlistUseCases.addSongToPlaylist(playlistId, songId);
+    final result =
+        await _playlistUseCases.addSongToPlaylist(playlistId, songId);
     result.fold(
       (failure) => emit(state.copyWith(errorMessage: failure.message)),
       (_) => null,
@@ -309,7 +338,8 @@ class PlaylistCubit extends Cubit<PlaylistState> {
   }
 
   Future<void> addSongsToPlaylist(int playlistId, List<int> songIds) async {
-    final result = await _playlistUseCases.addSongsToPlaylist(playlistId, songIds);
+    final result =
+        await _playlistUseCases.addSongsToPlaylist(playlistId, songIds);
     result.fold(
       (failure) => emit(state.copyWith(errorMessage: failure.message)),
       (_) => null,
@@ -317,7 +347,8 @@ class PlaylistCubit extends Cubit<PlaylistState> {
   }
 
   Future<void> removeSongFromPlaylist(int playlistId, int songId) async {
-    final result = await _playlistUseCases.removeSongFromPlaylist(playlistId, songId);
+    final result =
+        await _playlistUseCases.removeSongFromPlaylist(playlistId, songId);
     result.fold(
       (failure) => emit(state.copyWith(errorMessage: failure.message)),
       (_) => null,
@@ -369,7 +400,8 @@ class PlaylistCubit extends Cubit<PlaylistState> {
     try {
       final tracks = await account.fetchLikedSongs();
       ytmOnline.value = ytmOnline.value.copyWith(
-        likedStatus: tracks.isNotEmpty ? YtmFetchStatus.done : YtmFetchStatus.error,
+        likedStatus:
+            tracks.isNotEmpty ? YtmFetchStatus.done : YtmFetchStatus.error,
         likedTracks: tracks,
         likedError: tracks.isEmpty
             ? 'No liked songs found. Try re-logging into YouTube Music.'
@@ -482,7 +514,9 @@ class PlaylistCubit extends Cubit<PlaylistState> {
         tracks: tracks,
       );
 
-      final updated = List<OnlinePlaylistEntry>.from(ytmOnline.value.customPlaylists)..add(entry);
+      final updated =
+          List<OnlinePlaylistEntry>.from(ytmOnline.value.customPlaylists)
+            ..add(entry);
       ytmOnline.value = ytmOnline.value.copyWith(
         customStatus: YtmFetchStatus.done,
         customPlaylists: updated,
@@ -499,7 +533,8 @@ class PlaylistCubit extends Cubit<PlaylistState> {
 
   /// Removes a previously fetched custom online playlist.
   void removeCustomPlaylist(String id) {
-    final updated = ytmOnline.value.customPlaylists.where((p) => p.id != id).toList();
+    final updated =
+        ytmOnline.value.customPlaylists.where((p) => p.id != id).toList();
     ytmOnline.value = ytmOnline.value.copyWith(customPlaylists: updated);
     _saveOnlineCache();
   }
@@ -514,7 +549,9 @@ class PlaylistCubit extends Cubit<PlaylistState> {
   Future<void> close() {
     if (AppConfig.ytmEnabled) {
       try {
-        getIt<YtmAccountService>().loginState.removeListener(_onYtmLoginStateChanged);
+        getIt<YtmAccountService>()
+            .loginState
+            .removeListener(_onYtmLoginStateChanged);
       } catch (_) {}
     }
     ytmOnline.dispose();

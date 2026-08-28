@@ -1,5 +1,7 @@
+// android/app/src/main/cpp/Crossfeed.h
 #pragma once
 
+#include "DspParams.h"
 #include <cmath>
 #include <algorithm>
 
@@ -13,18 +15,24 @@ public:
 
     Crossfeed();
     void setSampleRate(double sampleRate);
-    void configure(double delayUs, double feedDb);
+    void configure(double delayUs, double feedDb, double fcut = 650.0);
     void setEnabled(bool enabled);
     bool isEnabled() const { return enabled_; }
+    void applyParams(const CrossfeedParamSet& params);
     void reset();
+
+    double getFcut() const { return fcut_; }
+    double getFeedDb() const { return feedDb_; }
+    double getDelayUs() const { return delayUs_; }
 
     void process(float* L, float* R, int frames);
     void processInterleaved(float* buffer, int frames);
 
 private:
     double sampleRate_ = 48000.0;
-    double delayUs_ = 350.0;     // Typical 300 - 500 us
-    double feedDb_ = -9.0;       // Typical -6 to -12 dB
+    double delayUs_ = 350.0;
+    double feedDb_ = -9.0;
+    double fcut_ = 650.0;
     int delaySamples_ = 17;
     float feedLevel_ = 0.3548f;
     float lpCoeff_ = 0.087f;

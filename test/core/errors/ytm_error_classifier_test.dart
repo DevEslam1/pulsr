@@ -14,34 +14,38 @@ void main() {
     });
 
     test('classifies bot blocked errors correctly', () {
-      const botEx = YtmException('YTM_BOT_BLOCKED', 'Sign in to confirm that you are not a bot');
+      const botEx = YtmException(
+          'YTM_BOT_BLOCKED', 'Sign in to confirm that you are not a bot');
       final info = YtmErrorClassifier.classify(botEx);
 
-      expect(info.message, contains('YouTube is busy'));
-      expect(info.recoveryAction, equals(YtmRecoveryAction.refreshPoTokenAndRetry));
+      expect(info.signal, equals(YtmBlockSignal.botChallenge));
+      expect(info.recoveryAction,
+          equals(YtmRecoveryAction.invalidatePoTokenAndRetry));
     });
 
     test('classifies recaptcha challenges correctly', () {
       const recaptchaEx = YtmException('YTM_RECAPTCHA', 'Captcha required');
       final info = YtmErrorClassifier.classify(recaptchaEx);
 
-      expect(info.message, contains('verification'));
-      expect(info.recoveryAction, equals(YtmRecoveryAction.invalidatePoTokenAndRetry));
+      expect(info.signal, equals(YtmBlockSignal.botChallenge));
+      expect(info.recoveryAction,
+          equals(YtmRecoveryAction.invalidatePoTokenAndRetry));
     });
 
     test('classifies session expired / auth errors correctly', () {
       const authEx = YtmException('YTM_AUTH', 'Session expired');
       final info = YtmErrorClassifier.classify(authEx);
 
-      expect(info.message, contains('session expired'));
+      expect(info.signal, equals(YtmBlockSignal.signInRequired));
       expect(info.recoveryAction, equals(YtmRecoveryAction.showLoginPrompt));
     });
 
     test('classifies unavailable tracks correctly', () {
-      const unavailEx = YtmException('YTM_UNAVAILABLE', 'Video is private or deleted');
+      const unavailEx =
+          YtmException('YTM_UNAVAILABLE', 'Video is private or deleted');
       final info = YtmErrorClassifier.classify(unavailEx);
 
-      expect(info.message, contains('unavailable'));
+      expect(info.signal, equals(YtmBlockSignal.videoGone));
       expect(info.recoveryAction, equals(YtmRecoveryAction.skipToNextTrack));
     });
 
@@ -57,20 +61,22 @@ void main() {
       final forbiddenErr = Exception('HTTP Status Error: 403');
       final info = YtmErrorClassifier.classify(forbiddenErr);
 
-      expect(info.message, contains('blocked this stream'));
-      expect(info.recoveryAction, equals(YtmRecoveryAction.skipToNextTrack));
+      expect(info.signal, equals(YtmBlockSignal.ipBlocked));
+      expect(info.recoveryAction, equals(YtmRecoveryAction.rotatePath));
     });
 
     test('classifies 407 Proxy Authentication errors correctly', () {
-      final proxyErr = Exception('curl: (7) CONNECT tunnel failed, response 407');
+      final proxyErr =
+          Exception('curl: (7) CONNECT tunnel failed, response 407');
       final info = YtmErrorClassifier.classify(proxyErr);
 
-      expect(info.message, contains('proxy authentication'));
-      expect(info.recoveryAction, equals(YtmRecoveryAction.skipToNextTrack));
+      expect(info.signal, equals(YtmBlockSignal.ipBlocked));
+      expect(info.recoveryAction, equals(YtmRecoveryAction.rotatePath));
 
       const proxyEx = YtmException('YTM_PROXY_AUTH');
       final infoCode = YtmErrorClassifier.classify(proxyEx);
-      expect(infoCode.recoveryAction, equals(YtmRecoveryAction.skipToNextTrack));
+      expect(
+          infoCode.recoveryAction, equals(YtmRecoveryAction.rotatePath));
     });
   });
 }

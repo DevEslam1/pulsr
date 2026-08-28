@@ -45,9 +45,8 @@ class CardPlayerTheme extends StatelessWidget {
     final cardBgColor = isDark
         ? const Color(0xFF141828).withValues(alpha: 0.78)
         : Colors.white.withValues(alpha: 0.92);
-    final cardBorderColor = isDark
-        ? Colors.white.withValues(alpha: 0.15)
-        : p.hairline;
+    final cardBorderColor =
+        isDark ? Colors.white.withValues(alpha: 0.15) : p.hairline;
     final textTitleColor = isDark ? Colors.white : p.textPrimary;
     final textSubtitleColor = isDark ? Colors.white70 : p.textSecondary;
     final iconActionColor = isDark ? Colors.white70 : p.textSecondary;
@@ -95,13 +94,16 @@ class CardPlayerTheme extends StatelessWidget {
             children: [
               // Top Bar
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     IconButton(
-                      icon: Icon(Icons.keyboard_arrow_down_rounded, size: 32, color: textTitleColor),
-                      onPressed: () => context.canPop() ? context.pop() : context.go('/'),
+                      icon: Icon(Icons.keyboard_arrow_down_rounded,
+                          size: 32, color: textTitleColor),
+                      onPressed: () =>
+                          context.canPop() ? context.pop() : context.go('/'),
                     ),
                     Column(
                       children: [
@@ -110,13 +112,18 @@ class CardPlayerTheme extends StatelessWidget {
                           children: [
                             WaveformLogo(
                               size: 16,
-                              color: state.isPlaying ? activeColor : textSubtitleColor,
+                              color: state.isPlaying
+                                  ? activeColor
+                                  : textSubtitleColor,
                               animate: state.isPlaying,
                             ),
                             const SizedBox(width: 6),
                             Text(
                               context.l10n.nowPlaying.toUpperCase(),
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
                                     fontSize: 10,
                                     letterSpacing: 1.2,
                                     fontWeight: FontWeight.w800,
@@ -128,15 +135,17 @@ class CardPlayerTheme extends StatelessWidget {
                         const SizedBox(height: 2),
                         Text(
                           song?.album ?? context.l10n.navLibrary,
-                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                color: textTitleColor,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: textTitleColor,
+                                  ),
                         ),
                       ],
                     ),
                     IconButton(
-                      icon: Icon(Icons.more_vert_rounded, color: textTitleColor),
+                      icon:
+                          Icon(Icons.more_vert_rounded, color: textTitleColor),
                       onPressed: () {
                         if (song != null) {
                           showModalBottomSheet(
@@ -154,7 +163,8 @@ class CardPlayerTheme extends StatelessWidget {
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final isTwoPane = context.isTwoPane || constraints.maxWidth >= 680;
+                    final isTwoPane =
+                        context.isTwoPane || constraints.maxWidth >= 680;
 
                     final centerDisplay = GestureDetector(
                       onTap: () => cubit.toggleLyricsVisibility(),
@@ -171,7 +181,8 @@ class CardPlayerTheme extends StatelessWidget {
                         }
                       },
                       onHorizontalDragEnd: (details) {
-                        if (settingsState.nowPlayingArtworkSwipe == NowPlayingArtworkSwipeAction.nextPrev &&
+                        if (settingsState.nowPlayingArtworkSwipe ==
+                                NowPlayingArtworkSwipeAction.nextPrev &&
                             details.primaryVelocity != null) {
                           if (details.primaryVelocity! < -200) {
                             cubit.next();
@@ -192,7 +203,8 @@ class CardPlayerTheme extends StatelessWidget {
                                 source: state.lyricsSource,
                               )
                             : state.isQueueVisible
-                                ? const NowPlayingQueueView(key: ValueKey('queue_view'))
+                                ? const NowPlayingQueueView(
+                                    key: ValueKey('queue_view'))
                                 : Center(
                                     key: const ValueKey('artwork_card'),
                                     child: ConstrainedBox(
@@ -206,16 +218,22 @@ class CardPlayerTheme extends StatelessWidget {
                                           tag: 'now_playing_art_full',
                                           child: Container(
                                             decoration: BoxDecoration(
-                                              borderRadius: BorderRadius.circular(28),
+                                              borderRadius:
+                                                  BorderRadius.circular(28),
                                               boxShadow: [
                                                 BoxShadow(
-                                                  color: Colors.black.withValues(alpha: isDark ? 0.6 : 0.2),
+                                                  color: Colors.black
+                                                      .withValues(
+                                                          alpha: isDark
+                                                              ? 0.6
+                                                              : 0.2),
                                                   blurRadius: 30,
                                                   spreadRadius: 4,
                                                   offset: const Offset(0, 12),
                                                 ),
                                                 BoxShadow(
-                                                  color: activeColor.withValues(alpha: 0.3),
+                                                  color: activeColor.withValues(
+                                                      alpha: 0.3),
                                                   blurRadius: 24,
                                                   spreadRadius: -2,
                                                   offset: const Offset(0, 8),
@@ -225,7 +243,8 @@ class CardPlayerTheme extends StatelessWidget {
                                             child: song != null
                                                 ? CachedArtwork(
                                                     id: song.id,
-                                                    remoteUrl: song.remoteArtworkUrl,
+                                                    remoteUrl:
+                                                        song.remoteArtworkUrl,
                                                     type: ArtworkType.AUDIO,
                                                     size: 340,
                                                     borderRadius: 28,
@@ -233,12 +252,16 @@ class CardPlayerTheme extends StatelessWidget {
                                                 : Container(
                                                     decoration: BoxDecoration(
                                                       color: p.surfaceContainer,
-                                                      borderRadius: BorderRadius.circular(28),
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                              28),
                                                     ),
                                                     child: Icon(
                                                       Icons.music_note_rounded,
                                                       size: 96,
-                                                      color: textSubtitleColor.withValues(alpha: 0.4),
+                                                      color: textSubtitleColor
+                                                          .withValues(
+                                                              alpha: 0.4),
                                                     ),
                                                   ),
                                           ),
@@ -249,18 +272,25 @@ class CardPlayerTheme extends StatelessWidget {
                       ),
                     );
 
-                    final visualizer = (settingsState.visualizerStyle != VisualizerStyle.off && !state.isLyricsVisible && !state.isQueueVisible)
-                        ? Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 2),
-                            child: AudioVisualizer(
-                              style: settingsState.visualizerStyle,
-                              color: activeColor,
-                              height: settingsState.visualizerStyle == VisualizerStyle.circular ? 70 : 46,
-                              isPlaying: state.isPlaying,
-                              audioSessionId: state.audioSessionId,
-                            ),
-                          )
-                        : const SizedBox.shrink();
+                    final visualizer =
+                        (settingsState.visualizerStyle != VisualizerStyle.off &&
+                                !state.isLyricsVisible &&
+                                !state.isQueueVisible)
+                            ? Padding(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 24, vertical: 2),
+                                child: AudioVisualizer(
+                                  style: settingsState.visualizerStyle,
+                                  color: activeColor,
+                                  height: settingsState.visualizerStyle ==
+                                          VisualizerStyle.circular
+                                      ? 70
+                                      : 46,
+                                  isPlaying: state.isPlaying,
+                                  audioSessionId: state.audioSessionId,
+                                ),
+                              )
+                            : const SizedBox.shrink();
 
                     final bottomGlassCard = GlassContainer(
                       borderRadius: BorderRadius.circular(28),
@@ -282,32 +312,44 @@ class CardPlayerTheme extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      song?.title ?? context.l10n.noTrackSelected,
+                                      song?.title ??
+                                          context.l10n.noTrackSelected,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .headlineSmall
+                                          ?.copyWith(
                                             fontWeight: FontWeight.w900,
                                             color: textTitleColor,
                                           ),
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      song?.artist ?? context.l10n.unknownArtist,
+                                      song?.artist ??
+                                          context.l10n.unknownArtist,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .titleMedium
+                                          ?.copyWith(
                                             color: textSubtitleColor,
                                             fontWeight: FontWeight.w600,
                                           ),
                                     ),
                                     if (song != null) ...[
                                       const SizedBox(height: 6),
-                                      AudioQualityBadge(song: song, activeColor: activeColor),
+                                      AudioQualityBadge(
+                                          song: song, activeColor: activeColor),
                                     ],
                                   ],
                                 ),
                               ),
-                              if (song != null && (song.source == SongSource.youtube || (song.remoteId != null && song.remoteId!.isNotEmpty))) ...[
+                              if (song != null &&
+                                  (song.source == SongSource.youtube ||
+                                      (song.remoteId != null &&
+                                          song.remoteId!.isNotEmpty))) ...[
                                 YtmDownloadButton(
                                   song: song,
                                   activeColor: activeColor,
@@ -372,13 +414,16 @@ class CardPlayerTheme extends StatelessWidget {
                               IconButton(
                                 icon: Icon(
                                   Icons.settings_input_component_rounded,
-                                  color: settingsState.currentOutputDevice?.isUsbDac == true
+                                  color: settingsState
+                                              .currentOutputDevice?.isUsbDac ==
+                                          true
                                       ? const Color(0xFFFFD700)
                                       : iconActionColor,
                                 ),
                                 onPressed: () {
                                   if (song != null) {
-                                    AudioQualitySheet.show(context, song, activeColor);
+                                    AudioQualitySheet.show(
+                                        context, song, activeColor);
                                   }
                                 },
                                 tooltip: 'Audio Output & DAC',
@@ -386,7 +431,9 @@ class CardPlayerTheme extends StatelessWidget {
                               IconButton(
                                 icon: Icon(
                                   Icons.equalizer_rounded,
-                                  color: state.isEqEnabled ? activeColor : iconActionColor,
+                                  color: state.isEqEnabled
+                                      ? activeColor
+                                      : iconActionColor,
                                 ),
                                 onPressed: () {
                                   showModalBottomSheet(
@@ -399,7 +446,8 @@ class CardPlayerTheme extends StatelessWidget {
                                 tooltip: context.l10n.equalizer,
                               ),
                               IconButton(
-                                icon: Icon(Icons.speed_rounded, color: iconActionColor),
+                                icon: Icon(Icons.speed_rounded,
+                                    color: iconActionColor),
                                 onPressed: () {
                                   showModalBottomSheet(
                                     context: context,
@@ -411,7 +459,9 @@ class CardPlayerTheme extends StatelessWidget {
                               IconButton(
                                 icon: Icon(
                                   Icons.lyrics_rounded,
-                                  color: state.isLyricsVisible ? activeColor : iconActionColor,
+                                  color: state.isLyricsVisible
+                                      ? activeColor
+                                      : iconActionColor,
                                 ),
                                 onPressed: () => cubit.toggleLyricsVisibility(),
                                 tooltip: context.l10n.lyrics,
@@ -419,7 +469,9 @@ class CardPlayerTheme extends StatelessWidget {
                               IconButton(
                                 icon: Icon(
                                   Icons.timer_outlined,
-                                  color: state.sleepTimerRemaining != null ? activeColor : iconActionColor,
+                                  color: state.sleepTimerRemaining != null
+                                      ? activeColor
+                                      : iconActionColor,
                                 ),
                                 onPressed: () {
                                   showModalBottomSheet(
@@ -433,7 +485,8 @@ class CardPlayerTheme extends StatelessWidget {
                                 tooltip: context.l10n.sleepTimer,
                               ),
                               IconButton(
-                                icon: Icon(Icons.playlist_add_rounded, color: iconActionColor),
+                                icon: Icon(Icons.playlist_add_rounded,
+                                    color: iconActionColor),
                                 onPressed: () {
                                   if (song != null) {
                                     showModalBottomSheet(
@@ -441,7 +494,8 @@ class CardPlayerTheme extends StatelessWidget {
                                       useRootNavigator: true,
                                       isScrollControlled: true,
                                       backgroundColor: Colors.transparent,
-                                      builder: (_) => AddToPlaylistSheet(song: song),
+                                      builder: (_) =>
+                                          AddToPlaylistSheet(song: song),
                                     );
                                   }
                                 },
@@ -450,7 +504,9 @@ class CardPlayerTheme extends StatelessWidget {
                               IconButton(
                                 icon: Icon(
                                   Icons.queue_music_rounded,
-                                  color: state.isQueueVisible ? activeColor : iconActionColor,
+                                  color: state.isQueueVisible
+                                      ? activeColor
+                                      : iconActionColor,
                                 ),
                                 onPressed: () => cubit.toggleQueueVisibility(),
                                 tooltip: context.l10n.queue,
@@ -463,7 +519,8 @@ class CardPlayerTheme extends StatelessWidget {
 
                     if (isTwoPane) {
                       return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
@@ -493,13 +550,15 @@ class CardPlayerTheme extends StatelessWidget {
                       children: [
                         Expanded(
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 24, vertical: 8),
                             child: centerDisplay,
                           ),
                         ),
                         visualizer,
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
                           child: bottomGlassCard,
                         ),
                       ],

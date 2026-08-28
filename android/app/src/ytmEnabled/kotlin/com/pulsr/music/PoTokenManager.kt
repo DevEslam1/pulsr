@@ -17,11 +17,14 @@ import org.schabi.newpipe.extractor.services.youtube.YoutubeParsingHelper
 import java.time.Instant
 
 /**
- * Singleton PoToken Lifecycle Manager.
+ * Phase 3 — Layer 3: Singleton PoToken Lifecycle Manager with Hardened VisitorData Binding.
  *
- * Persists and proactively refreshes BotGuard proof-of-origin tokens (poToken, visitorData, integrityToken).
- * Manages an LRU cache for minted per-video tokens (64 entries, 30 min TTL) and degrades gracefully
- * to stale cached tokens if the system WebView encounters a critical failure.
+ * Features:
+ * - Tokens strictly bound to parent visitorData; rotating visitorData flushes token cache atomically
+ * - Pre-warms ONE offscreen BotGuard WebView on YTM entry
+ * - Background refresh when remaining TTL < 20% while YTM screen is visible
+ * - Limited mode gating: falls back to no-poToken clients if WebView/BotGuard fails
+ * - Signal-triggered invalidation on BotChallenge / PoTokenInvalid
  */
 object PoTokenManager {
     private const val TAG = "PoTokenManager"
@@ -52,20 +55,10 @@ object PoTokenManager {
     var streamingPoToken: String = ""
         private set
 
-    /**
-     * Raw `datasyncId` of the currently authenticated account (e.g. "userSessionId||" or
-     * "delegated||user"). Empty when logged out. Used as the poToken content-binding for
-     * authenticated `WEB_REMIX` player requests.
-     */
     @Volatile
     var dataSyncId: String = ""
         private set
 
-    /**
-     * `visitorData` harvested from an authenticated Innertube response. Sent in the client context
-     * for authenticated `WEB_REMIX` requests (the account-bound poToken binds to [dataSyncId], not
-     * this). Non-persisted: re-harvested from the first authed response each session.
-     */
     @Volatile
     var sessionVisitorData: String = ""
         private set
@@ -74,15 +67,22 @@ object PoTokenManager {
     var webViewBroken: Boolean = false
         private set
 
+    val isLimitedMode: Boolean
+        get() = webViewBroken || (isExpired() && visitorData.isEmpty())
+
     @Volatile
     private var generator: PoTokenGenerator? = null
 
     private var appContext: Context? = null
     private var prefs: SharedPreferences? = null
-    private val stateMutex = kotlinx.coroutines.sync.Mutex()
+    private val stateMutex = Mutex()
     private var refreshInFlight: kotlinx.coroutines.Deferred<Boolean>? = null
 
-    private data class CachedToken(val token: String, val timestamp: Long)
+    private data class CachedToken(
+        val token: String,
+        val visitorDataBound: String,
+        val timestamp: Long
+    )
     private val tokenLru = LruCache<String, CachedToken>(LRU_CAPACITY)
 
     fun init(context: Context) {
@@ -111,9 +111,36 @@ object PoTokenManager {
         return expiryInstant - now < EXPIRING_SOON_MARGIN_SECONDS
     }
 
+    fun isTtlCritical(): Boolean {
+        val now = Instant.now().epochSecond
+        val totalLifetime = 12 * 3600L
+        val remaining = expiryInstant - now
+        return remaining > 0 && remaining < (totalLifetime * 0.20)
+    }
+
     /**
-     * Ensures attestation state is ready. Loads cached values, or runs BotGuard VM in WebView
-     * if expired or missing. Deduplicates in-flight refreshes to prevent thundering herd.
+     * Pre-warms BotGuard WebView in background before user initiates first request.
+     */
+    fun preWarm(context: Context) {
+        init(context)
+        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).async {
+            runCatching { ensureReady() }
+        }
+    }
+
+    /**
+     * Triggered periodically when a YTM screen is visible to refresh when TTL < 20%.
+     */
+    fun checkAndRefreshVisibleScreen() {
+        if (isTtlCritical() && !webViewBroken) {
+            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).async {
+                runCatching { ensureReady() }
+            }
+        }
+    }
+
+    /**
+     * Ensures attestation state is ready.
      */
     suspend fun ensureReady(): Boolean = withContext(Dispatchers.IO) {
         if (webViewBroken) {
@@ -159,9 +186,6 @@ object PoTokenManager {
         }
     }
 
-    /**
-     * Synchronous variant for NewPipe extractor thread callbacks.
-     */
     fun ensureReadySync(): Boolean {
         if (webViewBroken) return visitorData.isNotEmpty()
         if (isReady && !isExpiringSoon() && generator != null) return true
@@ -172,20 +196,14 @@ object PoTokenManager {
     }
 
     /**
-     * Generates or retrieves a cached poToken for [identifier] (either videoId or visitorData).
-     */
-    suspend fun poTokenFor(identifier: String): String = withContext(Dispatchers.IO) {
-        poTokenForSync(identifier)
-    }
-
-    /**
-     * Thread-safe synchronous resolution with LRU cache.
+     * Generates or retrieves cached poToken strictly bound to current [visitorData].
      */
     fun poTokenForSync(identifier: String): String {
+        val currentVisitor = visitorData
         val now = Instant.now().epochSecond
         synchronized(tokenLru) {
             val cached = tokenLru.get(identifier)
-            if (cached != null && (now - cached.timestamp) < TOKEN_TTL_SECONDS) {
+            if (cached != null && cached.visitorDataBound == currentVisitor && (now - cached.timestamp) < TOKEN_TTL_SECONDS) {
                 return cached.token
             }
         }
@@ -211,9 +229,7 @@ object PoTokenManager {
         return try {
             val minted = gen.generatePoToken(identifier)
             synchronized(tokenLru) {
-                // Stamp AFTER minting: WebView generation can take seconds, so
-                // using the pre-mint clock would silently shorten the TTL.
-                tokenLru.put(identifier, CachedToken(minted, Instant.now().epochSecond))
+                tokenLru.put(identifier, CachedToken(minted, visitorData, Instant.now().epochSecond))
             }
             minted
         } catch (t: Throwable) {
@@ -224,11 +240,10 @@ object PoTokenManager {
         }
     }
 
-    /**
-     * Records the raw [id] `datasyncId` of the authenticated account. Blank input is ignored so
-     * an empty harvest never wipes a good value (use [invalidate] to clear on logout). When the
-     * value changes, evicts the stale account-bound token(s) so the next request re-mints.
-     */
+    suspend fun poTokenFor(identifier: String): String = withContext(Dispatchers.IO) {
+        poTokenForSync(identifier)
+    }
+
     fun setDataSyncId(id: String) {
         val normalized = id.trim()
         if (normalized.isEmpty()) return
@@ -242,19 +257,12 @@ object PoTokenManager {
         }
     }
 
-    /**
-     * Records the `visitorData` [v] harvested from an authenticated response. Blank input ignored.
-     */
     fun setSessionVisitorData(v: String) {
         val normalized = v.trim()
         if (normalized.isEmpty()) return
         sessionVisitorData = normalized
     }
 
-    /**
-     * Returns a poToken bound to the account [dataSyncId] for authenticated `WEB_REMIX` player
-     * requests. Reuses the LRU-cached [poTokenForSync] minting keyed on the raw dataSyncId.
-     */
     fun accountPoTokenForSync(dataSyncId: String): String {
         val id = dataSyncId.trim()
         if (id.isEmpty()) return ""
@@ -263,7 +271,8 @@ object PoTokenManager {
     }
 
     /**
-     * Forces full cache invalidation and triggers re-attestation on the next request.
+     * Invalidation on BotChallenge or PoTokenInvalid:
+     * Drops all tokens, visitorData, and generator so next call mints a completely fresh set.
      */
     fun invalidate() {
         val oldGen = generator
@@ -271,20 +280,20 @@ object PoTokenManager {
         expiryInstant = 0L
         dataSyncId = ""
         sessionVisitorData = ""
+        visitorData = ""
+        streamingPoToken = ""
         oldGen?.let { Handler(Looper.getMainLooper()).post { it.close() } }
-        prefs?.edit()?.remove(KEY_EXPIRY_INSTANT)?.remove(KEY_DATA_SYNC_ID)?.apply()
+        prefs?.edit()
+            ?.remove(KEY_EXPIRY_INSTANT)
+            ?.remove(KEY_DATA_SYNC_ID)
+            ?.remove(KEY_VISITOR_DATA)
+            ?.remove(KEY_LAST_STREAMING_TOKEN)
+            ?.apply()
         synchronized(tokenLru) {
             tokenLru.evictAll()
         }
     }
 
-    /**
-     * Evicts only the minted per-identifier tokens, keeping the WebView
-     * attestation (generator + visitorData + integrity token) alive. Used when
-     * YouTube bot-gates a resolution cycle: re-minting per-video tokens against
-     * the existing attestation is cheap, whereas a full [invalidate] forces a
-     * multi-second BotGuard WebView re-run every cycle while flagged.
-     */
     fun evictMintedTokens() {
         synchronized(tokenLru) {
             tokenLru.evictAll()
@@ -319,10 +328,10 @@ object PoTokenManager {
         // 2. Instantiate offscreen BotGuard generator
         val newGenerator = PoTokenWebView.newPoTokenGenerator(ctx)
 
-        // 3. Mint the streaming poToken using visitorData (must be first)
+        // 3. Mint the streaming poToken using visitorData
         val newStreamingToken = newGenerator.generatePoToken(newVisitorData)
 
-        // 4. Default 12 hour expiry with 10 min margin if not explicitly parsed
+        // 4. Default 12 hour expiry with 10 min margin
         val newExpiry = Instant.now().plusSeconds(12 * 3600 - EXPIRING_SOON_MARGIN_SECONDS).epochSecond
 
         visitorData = newVisitorData
@@ -339,7 +348,8 @@ object PoTokenManager {
         }
 
         synchronized(tokenLru) {
-            tokenLru.put(newVisitorData, CachedToken(newStreamingToken, Instant.now().epochSecond))
+            tokenLru.evictAll() // Flush old visitorData bindings
+            tokenLru.put(newVisitorData, CachedToken(newStreamingToken, newVisitorData, Instant.now().epochSecond))
         }
 
         Log.i(TAG, "Successfully refreshed PoToken attestation. Valid until epoch $newExpiry")

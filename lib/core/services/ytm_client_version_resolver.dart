@@ -61,31 +61,31 @@ class YtmClientVersionResolver {
 
   Future<void> refresh() async {
     try {
-      final response = await http
-          .get(
-            Uri.parse('https://music.youtube.com'),
-            headers: {
-              'User-Agent':
-                  'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
-              'Accept-Language': 'en-US,en;q=0.9',
-            },
-          )
-          .timeout(const Duration(seconds: 10));
+      final response = await http.get(
+        Uri.parse('https://music.youtube.com'),
+        headers: {
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+      ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final body = response.body;
 
         // 1. Extract clientVersion
-        final versionMatch = RegExp(r'"INNERTUBE_CONTEXT_CLIENT_VERSION":\s*"([^"]+)"')
-                .firstMatch(body) ??
-            RegExp(r'"clientVersion":\s*"([^"]+)"').firstMatch(body) ??
-            RegExp(r'"INNERTUBE_CLIENT_VERSION":\s*"([^"]+)"').firstMatch(body);
+        final versionMatch =
+            RegExp(r'"INNERTUBE_CONTEXT_CLIENT_VERSION":\s*"([^"]+)"')
+                    .firstMatch(body) ??
+                RegExp(r'"clientVersion":\s*"([^"]+)"').firstMatch(body) ??
+                RegExp(r'"INNERTUBE_CLIENT_VERSION":\s*"([^"]+)"')
+                    .firstMatch(body);
 
         // 2. Extract apiKey
-        final apiKeyMatch = RegExp(r'"INNERTUBE_API_KEY":\s*"([^"]+)"')
-                .firstMatch(body) ??
-            RegExp(r'"innertubeApiKey":\s*"([^"]+)"').firstMatch(body) ??
-            RegExp(r'key=([a-zA-Z0-9_-]{39})').firstMatch(body);
+        final apiKeyMatch =
+            RegExp(r'"INNERTUBE_API_KEY":\s*"([^"]+)"').firstMatch(body) ??
+                RegExp(r'"innertubeApiKey":\s*"([^"]+)"').firstMatch(body) ??
+                RegExp(r'key=([a-zA-Z0-9_-]{39})').firstMatch(body);
 
         final prefs = await SharedPreferences.getInstance();
 
@@ -94,7 +94,8 @@ class YtmClientVersionResolver {
           if (resolvedVersion.isNotEmpty) {
             _clientVersion = resolvedVersion;
             await prefs.setString(_prefKeyClientVersion, resolvedVersion);
-            debugPrint('[YTM_VERSION] Resolved Innertube clientVersion: $_clientVersion');
+            debugPrint(
+                '[YTM_VERSION] Resolved Innertube clientVersion: $_clientVersion');
           }
         }
 
@@ -107,10 +108,12 @@ class YtmClientVersionResolver {
           }
         }
 
-        await prefs.setInt(_prefKeyLastFetchTime, DateTime.now().millisecondsSinceEpoch);
+        await prefs.setInt(
+            _prefKeyLastFetchTime, DateTime.now().millisecondsSinceEpoch);
       }
     } catch (e) {
-      debugPrint('[YTM_VERSION] Dynamic client version fetch failed (using cached/fallback): $e');
+      debugPrint(
+          '[YTM_VERSION] Dynamic client version fetch failed (using cached/fallback): $e');
     }
   }
 }

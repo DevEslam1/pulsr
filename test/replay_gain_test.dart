@@ -1,7 +1,8 @@
 import 'dart:math' as math;
 import 'package:flutter_test/flutter_test.dart';
 
-double calculateReplayGainMultiplier(double? replayGainDb, {double baseVolume = 1.0}) {
+double calculateReplayGainMultiplier(double? replayGainDb,
+    {double baseVolume = 1.0}) {
   if (replayGainDb == null || replayGainDb == 0.0) return baseVolume;
   final mult = math.pow(10.0, replayGainDb / 20.0);
   return (baseVolume * mult).clamp(0.0, 1.0).toDouble();

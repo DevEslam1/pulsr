@@ -19,7 +19,7 @@ import java.io.FileOutputStream
 /**
  * Copies an already-downloaded audio file into the public Music/ collection via
  * MediaStore and returns its final on-disk path. Deliberately free of any
- * YouTube/NewPipe reference so it can live in src/main and ship in every flavor.
+ * external proprietary reference so it can live in src/main and ship in every flavor.
  * Modeled on RingtonePlugin's MediaStore insert.
  */
 class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {

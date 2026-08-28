@@ -18,11 +18,16 @@ import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/repositories/music_repository_interface.dart';
 
 class MockMusicRepository extends Mock implements IMusicRepository {}
+
 class MockToggleFavoriteUseCase extends Mock implements ToggleFavoriteUseCase {}
+
 class MockMediaScannerService extends Mock implements MediaScannerService {}
+
 class MockWidgetService extends Mock implements WidgetService {}
 
-class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler implements PulsrAudioHandler {
+class TestPulsrAudioHandler extends BaseAudioHandler
+    with QueueHandler, SeekHandler
+    implements PulsrAudioHandler {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 
@@ -39,6 +44,7 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   Future<void> setVolume(double volume) async {
     _vol = volume;
   }
+
   bool eqEnabled = false;
   EqPreset currentEqPreset = EqPreset.defaultPresets.first;
   Duration? sleepTimerDuration;
@@ -56,7 +62,8 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   @override
   Stream<Duration> get positionStream => _positionController.stream;
 
-  final StreamController<Duration> _positionController = StreamController<Duration>.broadcast();
+  final StreamController<Duration> _positionController =
+      StreamController<Duration>.broadcast();
 
   @override
   void setCrossfadeDuration(Duration d) {
@@ -107,7 +114,8 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   Future<void> setVirtualizerStrength(double strength) async {}
 
   @override
-  Future<void> setDynamicsPreset(DynamicsPreset preset, {bool? enabled}) async {}
+  Future<void> setDynamicsPreset(DynamicsPreset preset,
+      {bool? enabled}) async {}
 
   @override
   Future<void> applyHeadphoneProfile(HeadphoneProfile? profile) async {}
@@ -172,9 +180,11 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   List<String> get detectedOemEngines => const [];
 
   @override
-  Future<void> setCrossfeed(bool enabled, {double? delayUs, double? feedDb}) async {}
+  Future<void> setCrossfeed(bool enabled,
+      {double? delayUs, double? feedDb}) async {}
   @override
-  Future<void> setLookaheadLimiter(bool enabled, {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {}
+  Future<void> setLookaheadLimiter(bool enabled,
+      {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {}
   @override
   Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {}
   @override
@@ -226,7 +236,8 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   Future<void> removeQueueItemAt(int index) async {}
 
   @override
-  Future<void> loadQueue(List<SongsTableData> songs, {int initialIndex = 0, Duration? initialPosition}) async {}
+  Future<void> loadQueue(List<SongsTableData> songs,
+      {int initialIndex = 0, Duration? initialPosition}) async {}
 
   @override
   Stream<Duration?> get sleepTimerRemainingStream => const Stream.empty();
@@ -281,7 +292,8 @@ void main() {
       cubit.close();
     });
 
-    test('equalizer enabling and preset apply updates state and audio handler', () async {
+    test('equalizer enabling and preset apply updates state and audio handler',
+        () async {
       final cubit = PlayerCubit(
         audioHandler: testAudioHandler,
         repository: mockRepository,
@@ -292,7 +304,8 @@ void main() {
       expect(cubit.state.isEqEnabled, true);
       expect(testAudioHandler.eqEnabled, true);
 
-      const rockPreset = EqPreset(name: 'Rock', gains: [4.5, 2.5, -1.0, 2.0, 4.0], bassBoost: 0.2);
+      const rockPreset = EqPreset(
+          name: 'Rock', gains: [4.5, 2.5, -1.0, 2.0, 4.0], bassBoost: 0.2);
       await cubit.applyPreset(rockPreset);
       expect(cubit.state.eqPreset.name, 'Rock');
       expect(testAudioHandler.currentEqPreset.name, 'Rock');
@@ -349,7 +362,8 @@ void main() {
 
       await settingsCubit.setCrossfade(6.0);
       await pumpEventQueue();
-      expect(testAudioHandler.currentCrossfadeDuration, const Duration(seconds: 6));
+      expect(testAudioHandler.currentCrossfadeDuration,
+          const Duration(seconds: 6));
 
       cubit.close();
       await settingsCubit.close();
@@ -393,18 +407,22 @@ void main() {
       );
       await Future<void>.delayed(const Duration(milliseconds: 10));
 
-      testAudioHandler._positionController.add(const Duration(milliseconds: 100));
+      testAudioHandler._positionController
+          .add(const Duration(milliseconds: 100));
       await Future<void>.delayed(const Duration(milliseconds: 10));
       expect(cubit.state.position, const Duration(milliseconds: 100));
 
-      testAudioHandler._positionController.add(const Duration(milliseconds: 300));
+      testAudioHandler._positionController
+          .add(const Duration(milliseconds: 300));
       await Future<void>.delayed(const Duration(milliseconds: 10));
       expect(cubit.state.position, const Duration(milliseconds: 300));
 
       cubit.close();
     });
 
-    test('playSong centers 500-song queue window around target song beyond index 500', () async {
+    test(
+        'playSong centers 500-song queue window around target song beyond index 500',
+        () async {
       final cubit = PlayerCubit(
         audioHandler: testAudioHandler,
         repository: mockRepository,

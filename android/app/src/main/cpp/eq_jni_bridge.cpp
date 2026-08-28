@@ -1,3 +1,4 @@
+// android/app/src/main/cpp/eq_jni_bridge.cpp
 #include <jni.h>
 #include <android/log.h>
 #include <vector>
@@ -15,108 +16,246 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSampleRate(
     AudioDspEngine::instance().setSampleRate(sampleRate);
 }
 
+JNIEXPORT jint JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeGetPipelineLatencyFrames(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return static_cast<jint>(AudioDspEngine::instance().getPipelineLatencyFrames());
+}
+
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetEqEnabled(
         JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
-    AudioDspEngine::instance().eq().setEnabled(enabled);
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->eq.enabled = enabled;
+    AudioDspEngine::instance().publishParams(updated);
 }
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetEqBandCount(
         JNIEnv* /* env */, jobject /* thiz */, jint count) {
-    AudioDspEngine::instance().eq().setBandCount(count);
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->eq.bandCount = std::clamp(static_cast<int>(count), 1, EqParamSet::MAX_BANDS);
+    AudioDspEngine::instance().publishParams(updated);
 }
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetEqBand(
         JNIEnv* /* env */, jobject /* thiz */,
         jint index, jdouble freq, jdouble gainDb, jdouble q, jint type, jboolean enabled) {
-    AudioDspEngine::instance().eq().setBand(
-            index, freq, gainDb, q, static_cast<FilterType>(type), enabled);
+    if (index < 0 || index >= EqParamSet::MAX_BANDS) return;
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    if (index >= updated->eq.bandCount) updated->eq.bandCount = index + 1;
+
+    updated->eq.bands[index].frequency = freq;
+    updated->eq.bands[index].gainDb = gainDb;
+    updated->eq.bands[index].q = q;
+    updated->eq.bands[index].type = static_cast<FilterType>(type);
+    updated->eq.bands[index].enabled = enabled;
+    AudioDspEngine::instance().publishParams(updated);
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetBandSolo(
+        JNIEnv* /* env */, jobject /* thiz */, jint index, jboolean solo) {
+    if (index < 0 || index >= EqParamSet::MAX_BANDS) return;
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->eq.bands[index].solo = solo;
+    AudioDspEngine::instance().publishParams(updated);
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetBandMute(
+        JNIEnv* /* env */, jobject /* thiz */, jint index, jboolean mute) {
+    if (index < 0 || index >= EqParamSet::MAX_BANDS) return;
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->eq.bands[index].mute = mute;
+    AudioDspEngine::instance().publishParams(updated);
 }
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetEqPreamp(
         JNIEnv* /* env */, jobject /* thiz */, jdouble preampDb) {
-    AudioDspEngine::instance().eq().setPreamp(preampDb);
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->eq.preampDb = preampDb;
+    AudioDspEngine::instance().publishParams(updated);
 }
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetCrossfeedEnabled(
         JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
-    AudioDspEngine::instance().crossfeed().setEnabled(enabled);
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->crossfeed.enabled = enabled;
+    AudioDspEngine::instance().publishParams(updated);
 }
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetCrossfeedParams(
         JNIEnv* /* env */, jobject /* thiz */, jdouble delayUs, jdouble feedDb) {
-    AudioDspEngine::instance().crossfeed().configure(delayUs, feedDb);
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->crossfeed.delayUs = delayUs;
+    updated->crossfeed.feedDb = feedDb;
+    AudioDspEngine::instance().publishParams(updated);
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetCrossfeedFcut(
+        JNIEnv* /* env */, jobject /* thiz */, jdouble fcut) {
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->crossfeed.fcut = fcut;
+    AudioDspEngine::instance().publishParams(updated);
 }
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetLimiterEnabled(
         JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
-    AudioDspEngine::instance().limiter().setEnabled(enabled);
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->limiter.enabled = enabled;
+    AudioDspEngine::instance().publishParams(updated);
 }
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetLimiterParams(
         JNIEnv* /* env */, jobject /* thiz */, jdouble lookaheadMs, jdouble thresholdDb, jdouble releaseMs) {
-    AudioDspEngine::instance().limiter().configure(lookaheadMs, thresholdDb, releaseMs);
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->limiter.lookaheadMs = lookaheadMs;
+    updated->limiter.thresholdDb = thresholdDb;
+    updated->limiter.releaseMs = releaseMs;
+    AudioDspEngine::instance().publishParams(updated);
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetLimiterTruePeak(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean truePeak) {
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->limiter.truePeakMode = truePeak;
+    AudioDspEngine::instance().publishParams(updated);
 }
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReverbEnabled(
         JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
-    AudioDspEngine::instance().reverb().setEnabled(enabled);
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->reverb.enabled = enabled;
+    if (enabled && !updated->reverb.preparedIr && updated->reverb.preset != static_cast<int>(ReverbPreset::Custom)) {
+        updated->reverb.preparedIr = PreparedIr::createSynthetic(
+            current->sampleRate, updated->reverb.preset, static_cast<float>(updated->reverb.damping));
+    }
+    AudioDspEngine::instance().publishParams(updated);
 }
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReverbPreset(
         JNIEnv* /* env */, jobject /* thiz */, jint preset) {
-    AudioDspEngine::instance().reverb().setPreset(static_cast<ReverbPreset>(preset));
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->reverb.preset = preset;
+    updated->reverb.preparedIr = PreparedIr::createSynthetic(
+        current->sampleRate, preset, static_cast<float>(current->reverb.damping));
+    AudioDspEngine::instance().publishParams(updated);
 }
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReverbWetDry(
         JNIEnv* /* env */, jobject /* thiz */, jfloat wetRatio) {
-    AudioDspEngine::instance().reverb().setWetDry(wetRatio);
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->reverb.wetDry = static_cast<double>(wetRatio);
+    AudioDspEngine::instance().publishParams(updated);
 }
 
 JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReverbPredelay(
+        JNIEnv* /* env */, jobject /* thiz */, jdouble predelayMs) {
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->reverb.predelayMs = predelayMs;
+    AudioDspEngine::instance().publishParams(updated);
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetReverbDamping(
+        JNIEnv* /* env */, jobject /* thiz */, jdouble damping) {
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->reverb.damping = damping;
+    if (updated->reverb.preset != static_cast<int>(ReverbPreset::Custom)) {
+        updated->reverb.preparedIr = PreparedIr::createSynthetic(
+            current->sampleRate, updated->reverb.preset, static_cast<float>(damping));
+    }
+    AudioDspEngine::instance().publishParams(updated);
+}
+
+JNIEXPORT jboolean JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadImpulseResponse(
-        JNIEnv* env, jobject /* thiz */, jfloatArray irSamples) {
-    if (!irSamples) return;
+        JNIEnv* env, jobject /* thiz */, jfloatArray irSamples, jint channels) {
+    if (!irSamples) return JNI_FALSE;
     jsize len = env->GetArrayLength(irSamples);
     jfloat* data = env->GetFloatArrayElements(irSamples, nullptr);
-    if (data) {
-        AudioDspEngine::instance().reverb().loadCustomIR(data, len);
-        env->ReleaseFloatArrayElements(irSamples, data, JNI_ABORT);
+    if (!data) return JNI_FALSE;
+
+    int frames = (channels > 0) ? (len / channels) : len;
+    auto current = AudioDspEngine::instance().getParams();
+    auto customIr = PreparedIr::createCustom(current->sampleRate, data, frames, channels);
+    env->ReleaseFloatArrayElements(irSamples, data, JNI_ABORT);
+
+    if (customIr) {
+        auto updated = std::make_shared<DspParamSnapshot>(*current);
+        updated->reverb.preset = static_cast<int>(ReverbPreset::Custom);
+        updated->reverb.preparedIr = customIr;
+        AudioDspEngine::instance().publishParams(updated);
+        return JNI_TRUE;
     }
+    return JNI_FALSE;
 }
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetStereoBalance(
         JNIEnv* /* env */, jobject /* thiz */, jdouble balance) {
-    AudioDspEngine::instance().panner().setBalance(balance);
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->panner.balance = balance;
+    AudioDspEngine::instance().publishParams(updated);
 }
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetMonoMix(
         JNIEnv* /* env */, jobject /* thiz */, jboolean mono) {
-    AudioDspEngine::instance().panner().setMono(mono);
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->panner.monoMix = mono;
+    AudioDspEngine::instance().publishParams(updated);
 }
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSincResamplerEnabled(
         JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
-    AudioDspEngine::instance().resampler().setEnabled(enabled);
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->resampler.enabled = enabled;
+    AudioDspEngine::instance().publishParams(updated);
 }
 
 JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSincResamplerRates(
         JNIEnv* /* env */, jobject /* thiz */, jdouble inRate, jdouble outRate) {
-    AudioDspEngine::instance().resampler().setRates(inRate, outRate);
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->resampler.inRate = inRate;
+    updated->resampler.outRate = outRate;
+    AudioDspEngine::instance().publishParams(updated);
 }
 
 JNIEXPORT jint JNICALL
@@ -132,7 +271,7 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeProcessAudio(
     jfloat* data = env->GetFloatArrayElements(buffer, nullptr);
     if (!data) return 0;
     int outFrames = AudioDspEngine::instance().processInterleaved(data, frames, channels);
-    env->ReleaseFloatArrayElements(buffer, data, 0); // 0 = commit back to Java array
+    env->ReleaseFloatArrayElements(buffer, data, 0); // commit back to Java array
     return static_cast<jint>(outFrames);
 }
 
@@ -150,16 +289,15 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
         return nullptr;
     }
 
-    auto dsdBitOrder = (bitOrder == 1) ? DsdDecoder::DsdBitOrder::LSB_FIRST : DsdDecoder::DsdBitOrder::MSB_FIRST;
-    AudioDspEngine::instance().dsdDecoder().configure(
+    auto dsdBitOrder = (bitOrder == 0) ? DsdDecoder::DsdBitOrder::LSB_FIRST : DsdDecoder::DsdBitOrder::MSB_FIRST;
+    auto& dsd = AudioDspEngine::instance().dsdDecoder();
+    dsd.configure(
             static_cast<DsdDecoder::DsdRate>(dsdRate), targetPcmSampleRate, dsdBitOrder);
 
-    int dsdSampleRate = (dsdRate == 64) ? 2822400 : ((dsdRate == 128) ? 5644800 : 11289600);
-    int decimationRatio = (targetPcmSampleRate > 0) ? std::max(1, dsdSampleRate / targetPcmSampleRate) : 16;
-    int maxOutFrames = (byteCount * 8 / decimationRatio) + 64;
+    int maxOutFrames = dsd.getExpectedPcmFrames(byteCount);
     std::vector<float> pcmOut(maxOutFrames * 2);
 
-    int actualFrames = AudioDspEngine::instance().dsdDecoder().decodeDsdBytes(
+    int actualFrames = dsd.decodeDsdBytes(
             reinterpret_cast<const uint8_t*>(lData),
             reinterpret_cast<const uint8_t*>(rData),
             byteCount,

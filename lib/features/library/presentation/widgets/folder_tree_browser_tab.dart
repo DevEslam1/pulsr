@@ -36,7 +36,8 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
         // Determine all unique folders
         final folders = <String>{};
         for (final song in songs) {
-          if (!song.path.startsWith('ytmusic://') && !song.path.startsWith('content://')) {
+          if (!song.path.startsWith('ytmusic://') &&
+              !song.path.startsWith('content://')) {
             final dir = p_path.dirname(song.path);
             if (dir.isNotEmpty && dir != '.') folders.add(dir);
           }
@@ -48,8 +49,11 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
         }
 
         final currentDir = _currentPath ?? '';
-        final childSongs = songs.where((s) => p_path.dirname(s.path) == currentDir).toList();
-        final childFolders = folders.where((f) => f != currentDir && f.startsWith(currentDir)).toList();
+        final childSongs =
+            songs.where((s) => p_path.dirname(s.path) == currentDir).toList();
+        final childFolders = folders
+            .where((f) => f != currentDir && f.startsWith(currentDir))
+            .toList();
 
         // Breadcrumb parts
         final breadcrumbs = p_path.split(currentDir);
@@ -64,22 +68,27 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: breadcrumbs.length,
-                separatorBuilder: (_, __) => Icon(Icons.chevron_right_rounded, size: 18, color: p.textSecondary),
+                separatorBuilder: (_, __) => Icon(Icons.chevron_right_rounded,
+                    size: 18, color: p.textSecondary),
                 itemBuilder: (context, index) {
                   final crumbPath = p_path.joinAll(breadcrumbs.take(index + 1));
                   final isLast = index == breadcrumbs.length - 1;
 
                   return Center(
                     child: InkWell(
-                      onTap: isLast ? null : () => setState(() => _currentPath = crumbPath),
+                      onTap: isLast
+                          ? null
+                          : () => setState(() => _currentPath = crumbPath),
                       borderRadius: BorderRadius.circular(8),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 4),
                         child: Text(
                           breadcrumbs[index],
                           style: TextStyle(
                             color: isLast ? p.primary : p.textSecondary,
-                            fontWeight: isLast ? FontWeight.bold : FontWeight.normal,
+                            fontWeight:
+                                isLast ? FontWeight.bold : FontWeight.normal,
                             fontSize: 13,
                           ),
                         ),
@@ -98,8 +107,12 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                   // Parent folder button
                   if (breadcrumbs.length > 1) ...[
                     ListTile(
-                      leading: Icon(Icons.arrow_upward_rounded, color: p.primary),
-                      title: Text('Parent Directory', style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w600)),
+                      leading:
+                          Icon(Icons.arrow_upward_rounded, color: p.primary),
+                      title: Text('Parent Directory',
+                          style: TextStyle(
+                              color: p.textPrimary,
+                              fontWeight: FontWeight.w600)),
                       onTap: () {
                         setState(() {
                           _currentPath = p_path.dirname(currentDir);
@@ -115,9 +128,11 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                       leading: Icon(Icons.folder_rounded, color: p.primary),
                       title: Text(
                         p_path.basename(sub),
-                        style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w600),
+                        style: TextStyle(
+                            color: p.textPrimary, fontWeight: FontWeight.w600),
                       ),
-                      trailing: Icon(Icons.chevron_right_rounded, color: p.textSecondary),
+                      trailing: Icon(Icons.chevron_right_rounded,
+                          color: p.textSecondary),
                       onTap: () => setState(() => _currentPath = sub),
                     ),
                   ],
@@ -127,7 +142,9 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                     SongTile(
                       song: childSongs[i],
                       onTap: () {
-                        context.read<PlayerCubit>().playSong(childSongs[i], queue: childSongs);
+                        context
+                            .read<PlayerCubit>()
+                            .playSong(childSongs[i], queue: childSongs);
                       },
                     ),
                   ],
@@ -136,7 +153,8 @@ class _FolderTreeBrowserTabState extends State<FolderTreeBrowserTab> {
                     Padding(
                       padding: const EdgeInsets.all(32.0),
                       child: Center(
-                        child: Text('Folder is empty', style: TextStyle(color: p.textSecondary)),
+                        child: Text('Folder is empty',
+                            style: TextStyle(color: p.textSecondary)),
                       ),
                     ),
                 ],

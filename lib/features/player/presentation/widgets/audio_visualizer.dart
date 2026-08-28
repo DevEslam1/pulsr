@@ -46,8 +46,10 @@ class AudioVisualizer extends StatefulWidget {
 
 class _AudioVisualizerState extends State<AudioVisualizer>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
-  static const MethodChannel _methodChannel = MethodChannel(PulsrChannels.visualizer);
-  static const EventChannel _eventChannel = EventChannel(PulsrChannels.visualizerStream);
+  static const MethodChannel _methodChannel =
+      MethodChannel(PulsrChannels.visualizer);
+  static const EventChannel _eventChannel =
+      EventChannel(PulsrChannels.visualizerStream);
 
   StreamSubscription? _subscription;
   late AnimationController _animController;
@@ -93,7 +95,8 @@ class _AudioVisualizerState extends State<AudioVisualizer>
         _startAnimation();
         _restartNativeStream();
       }
-    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive) {
       _stopAnimation();
       _stopNativeStream();
     }
@@ -105,7 +108,8 @@ class _AudioVisualizerState extends State<AudioVisualizer>
     if (oldWidget.audioSessionId != widget.audioSessionId) {
       _restartNativeStream();
     }
-    if (oldWidget.isPlaying != widget.isPlaying || oldWidget.style != widget.style) {
+    if (oldWidget.isPlaying != widget.isPlaying ||
+        oldWidget.style != widget.style) {
       if (widget.isPlaying && widget.style != VisualizerStyle.off) {
         _startAnimation();
         _restartNativeStream();
@@ -138,14 +142,16 @@ class _AudioVisualizerState extends State<AudioVisualizer>
         _subscribeToStream();
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to init visualizer', error: e, stackTrace: st, category: 'Visualizer');
+      ErrorLogger.log('Failed to init visualizer',
+          error: e, stackTrace: st, category: 'Visualizer');
     }
   }
 
   void _subscribeToStream() {
     _subscription?.cancel();
     final sessionId = widget.audioSessionId ?? 0;
-    _methodChannel.invokeMethod('setAudioSessionId', {'audioSessionId': sessionId}).catchError((_) {});
+    _methodChannel.invokeMethod(
+        'setAudioSessionId', {'audioSessionId': sessionId}).catchError((_) {});
 
     _subscription = _eventChannel.receiveBroadcastStream().listen(
       (dynamic event) {
@@ -168,7 +174,9 @@ class _AudioVisualizerState extends State<AudioVisualizer>
   void _restartNativeStream() {
     _subscription?.cancel();
     _subscription = null;
-    if (Platform.isAndroid && widget.style != VisualizerStyle.off && widget.isPlaying) {
+    if (Platform.isAndroid &&
+        widget.style != VisualizerStyle.off &&
+        widget.isPlaying) {
       _subscribeToStream();
     }
   }
@@ -192,7 +200,8 @@ class _AudioVisualizerState extends State<AudioVisualizer>
       for (int i = 0; i < _numBands; i++) {
         final phase = i * 0.25 + seedOffset;
         final wave1 = math.sin(t * (3.5 + (seed.abs() % 4) * 0.1) + phase);
-        final wave2 = math.cos(t * (2.1 + (seed.abs() % 3) * 0.1) + phase * 1.5);
+        final wave2 =
+            math.cos(t * (2.1 + (seed.abs() % 3) * 0.1) + phase * 1.5);
         final sim = ((wave1 + wave2) / 4.0 + 0.35).clamp(0.05, 0.85);
         _targetData[i] = sim;
       }
@@ -252,13 +261,20 @@ class _AudioVisualizerState extends State<AudioVisualizer>
             return CustomPaint(
               size: Size(widget.width, widget.height),
               painter: switch (widget.style) {
-                VisualizerStyle.bar => _BarVisualizerPainter(data: data, color: activeColor),
-                VisualizerStyle.wave => _WaveVisualizerPainter(data: data, color: activeColor),
-                VisualizerStyle.circular => _CircularVisualizerPainter(data: data, color: activeColor),
-                VisualizerStyle.particles => _ParticlesVisualizerPainter(data: data, color: activeColor),
-                VisualizerStyle.terrain3D => _Terrain3DVisualizerPainter(data: data, color: activeColor),
-                VisualizerStyle.albumArtReactive => _AlbumArtReactivePainter(data: data, color: activeColor),
-                VisualizerStyle.custom => _CustomJsonVisualizerPainter(data: data, color: activeColor),
+                VisualizerStyle.bar =>
+                  _BarVisualizerPainter(data: data, color: activeColor),
+                VisualizerStyle.wave =>
+                  _WaveVisualizerPainter(data: data, color: activeColor),
+                VisualizerStyle.circular =>
+                  _CircularVisualizerPainter(data: data, color: activeColor),
+                VisualizerStyle.particles =>
+                  _ParticlesVisualizerPainter(data: data, color: activeColor),
+                VisualizerStyle.terrain3D =>
+                  _Terrain3DVisualizerPainter(data: data, color: activeColor),
+                VisualizerStyle.albumArtReactive =>
+                  _AlbumArtReactivePainter(data: data, color: activeColor),
+                VisualizerStyle.custom =>
+                  _CustomJsonVisualizerPainter(data: data, color: activeColor),
                 VisualizerStyle.off => null,
               },
             );
@@ -425,7 +441,8 @@ class _CircularVisualizerPainter extends CustomPainter {
       final endX = center.dx + (baseRadius + barLength) * math.cos(angle);
       final endY = center.dy + (baseRadius + barLength) * math.sin(angle);
 
-      paint.color = color.withValues(alpha: (0.4 + magnitude * 0.6).clamp(0.0, 1.0));
+      paint.color =
+          color.withValues(alpha: (0.4 + magnitude * 0.6).clamp(0.0, 1.0));
       canvas.drawLine(Offset(startX, startY), Offset(endX, endY), paint);
     }
   }
@@ -516,13 +533,15 @@ class _AlbumArtReactivePainter extends CustomPainter {
     if (data.isEmpty) return;
 
     final center = Offset(size.width / 2, size.height / 2);
-    final bassMag = (data.take(4).fold<double>(0, (s, e) => s + e) / 4.0).clamp(0.0, 1.0);
+    final bassMag =
+        (data.take(4).fold<double>(0, (s, e) => s + e) / 4.0).clamp(0.0, 1.0);
 
     final glowPaint = Paint()
       ..color = color.withValues(alpha: (bassMag * 0.4).clamp(0.0, 0.6))
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 24);
 
-    canvas.drawCircle(center, (size.width / 4) * (1.0 + bassMag * 0.2), glowPaint);
+    canvas.drawCircle(
+        center, (size.width / 4) * (1.0 + bassMag * 0.2), glowPaint);
   }
 
   @override
@@ -552,5 +571,6 @@ class _CustomJsonVisualizerPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _CustomJsonVisualizerPainter oldDelegate) => true;
+  bool shouldRepaint(covariant _CustomJsonVisualizerPainter oldDelegate) =>
+      true;
 }

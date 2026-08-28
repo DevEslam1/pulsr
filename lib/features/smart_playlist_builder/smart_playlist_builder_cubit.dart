@@ -3,14 +3,14 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 import '../../data/db/app_database.dart';
-import '../../data/repositories/smart_playlist_engine.dart';
 import '../../domain/models/smart_playlist_criteria.dart';
+import '../../domain/repositories/smart_playlist_engine_interface.dart';
 import '../../domain/usecases/playlist_usecases.dart';
 import 'smart_playlist_builder_state.dart';
 
 @injectable
 class SmartPlaylistBuilderCubit extends Cubit<SmartPlaylistBuilderState> {
-  final SmartPlaylistEngine _engine;
+  final ISmartPlaylistEngine _engine;
   final PlaylistUseCases _playlistUseCases;
   StreamSubscription? _previewSub;
 

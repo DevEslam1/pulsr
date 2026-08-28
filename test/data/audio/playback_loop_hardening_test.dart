@@ -18,9 +18,12 @@ import 'package:pulsr/domain/usecases/toggle_favorite_usecase.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 
 class MockMusicRepository extends Mock implements IMusicRepository {}
+
 class MockToggleFavoriteUseCase extends Mock implements ToggleFavoriteUseCase {}
 
-class StubPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler implements PulsrAudioHandler {
+class StubPulsrAudioHandler extends BaseAudioHandler
+    with QueueHandler, SeekHandler
+    implements PulsrAudioHandler {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 
@@ -37,6 +40,7 @@ class StubPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   Future<void> setVolume(double volume) async {
     _vol = volume;
   }
+
   @override
   bool get isEqualizerEnabled => false;
   @override
@@ -91,8 +95,10 @@ class StubPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   Duration get crossfadeDuration => Duration.zero;
   @override
   Stream<Duration> get positionStream => _positionController.stream;
-  final StreamController<Duration> _positionController = StreamController<Duration>.broadcast();
-  final StreamController<String> _errorController = StreamController<String>.broadcast();
+  final StreamController<Duration> _positionController =
+      StreamController<Duration>.broadcast();
+  final StreamController<String> _errorController =
+      StreamController<String>.broadcast();
   @override
   Stream<String> get errorStream => _errorController.stream;
 
@@ -115,7 +121,8 @@ class StubPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   @override
   Future<void> setVirtualizerStrength(double strength) async {}
   @override
-  Future<void> setDynamicsPreset(DynamicsPreset preset, {bool? enabled}) async {}
+  Future<void> setDynamicsPreset(DynamicsPreset preset,
+      {bool? enabled}) async {}
   @override
   Future<void> applyHeadphoneProfile(HeadphoneProfile? profile) async {}
   @override
@@ -123,9 +130,11 @@ class StubPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   @override
   Future<void> setVolumeBoost(double value) async {}
   @override
-  Future<void> setCrossfeed(bool enabled, {double? delayUs, double? feedDb}) async {}
+  Future<void> setCrossfeed(bool enabled,
+      {double? delayUs, double? feedDb}) async {}
   @override
-  Future<void> setLookaheadLimiter(bool enabled, {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {}
+  Future<void> setLookaheadLimiter(bool enabled,
+      {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {}
   @override
   Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {}
   @override
@@ -165,7 +174,8 @@ class StubPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   @override
   Future<void> removeQueueItemAt(int index) async {}
   @override
-  Future<void> loadQueue(List<SongsTableData> songs, {int initialIndex = 0, Duration? initialPosition}) async {}
+  Future<void> loadQueue(List<SongsTableData> songs,
+      {int initialIndex = 0, Duration? initialPosition}) async {}
   @override
   Stream<Duration?> get sleepTimerRemainingStream => const Stream.empty();
   @override
@@ -185,12 +195,15 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('YtmResolvingSource Hardening Tests', () {
-    test('invokes onError callback when resolve throws YtmException (bot blocked)', () async {
+    test(
+        'invokes onError callback when resolve throws YtmException (bot blocked)',
+        () async {
       Object? capturedError;
       final source = YtmResolvingSource(
         videoId: 'video_bot_1',
         resolve: ({bool forceRefresh = false}) async {
-          throw const YtmException('YTM_BOT_BLOCKED', 'Bot detection triggered');
+          throw const YtmException(
+              'YTM_BOT_BLOCKED', 'Bot detection triggered');
         },
         onError: (err) {
           capturedError = err;
@@ -263,9 +276,12 @@ void main() {
       mockToggleFavoriteUseCase = MockToggleFavoriteUseCase();
       stubAudioHandler = StubPulsrAudioHandler();
 
-      when(() => mockRepository.getSongById(101)).thenAnswer((_) async => Right(songA));
-      when(() => mockRepository.getSongById(102)).thenAnswer((_) async => Right(songB));
-      when(() => mockRepository.getSongsByIds(any())).thenAnswer((_) async => Right([songA, songB]));
+      when(() => mockRepository.getSongById(101))
+          .thenAnswer((_) async => Right(songA));
+      when(() => mockRepository.getSongById(102))
+          .thenAnswer((_) async => Right(songB));
+      when(() => mockRepository.getSongsByIds(any()))
+          .thenAnswer((_) async => Right([songA, songB]));
 
       cubit = PlayerCubit(
         audioHandler: stubAudioHandler,
@@ -279,7 +295,9 @@ void main() {
       stubAudioHandler.dispose();
     });
 
-    test('errorStream events from audio handler update PlayerState errorMessage', () async {
+    test(
+        'errorStream events from audio handler update PlayerState errorMessage',
+        () async {
       expect(cubit.state.errorMessage, isNull);
 
       stubAudioHandler._errorController.add('YouTube is busy. Retrying…');
@@ -288,12 +306,16 @@ void main() {
       expect(cubit.state.errorMessage, 'YouTube is busy. Retrying…');
     });
 
-    test('stale async mediaItem resolution does not overwrite newly selected song', () async {
+    test(
+        'stale async mediaItem resolution does not overwrite newly selected song',
+        () async {
       final slowCompleter = Completer<Either<AppFailure, SongsTableData?>>();
-      when(() => mockRepository.getSongById(101)).thenAnswer((_) => slowCompleter.future);
+      when(() => mockRepository.getSongById(101))
+          .thenAnswer((_) => slowCompleter.future);
 
       // 1. Emit mediaItem for song 101 (initiates slow DB lookup)
-      stubAudioHandler.mediaItem.add(const MediaItem(id: '101', title: 'Slow Song'));
+      stubAudioHandler.mediaItem
+          .add(const MediaItem(id: '101', title: 'Slow Song'));
       await pumpEventQueue();
 
       // 2. User immediately clicks song 102
@@ -309,11 +331,15 @@ void main() {
       expect(cubit.state.currentSong?.title, 'Local Track 2');
     });
 
-    test('saveCurrentPositionImmediate completes asynchronously without errors', () async {
-      await expectLater(stubAudioHandler.saveCurrentPositionImmediate(), completes);
+    test('saveCurrentPositionImmediate completes asynchronously without errors',
+        () async {
+      await expectLater(
+          stubAudioHandler.saveCurrentPositionImmediate(), completes);
     });
 
-    test('bounded concurrency pool processes large task lists without unbounded spawning', () async {
+    test(
+        'bounded concurrency pool processes large task lists without unbounded spawning',
+        () async {
       int active = 0;
       int maxSimultaneous = 0;
       final completed = <int>[];

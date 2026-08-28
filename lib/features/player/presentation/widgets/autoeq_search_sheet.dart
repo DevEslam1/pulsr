@@ -91,11 +91,13 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
             style: TextStyle(color: p.textPrimary, fontSize: 14),
             decoration: InputDecoration(
               hintText: 'Search headphones (Sony, Sennheiser, Apple...)',
-              hintStyle: TextStyle(color: p.textSecondary.withValues(alpha: 0.6)),
+              hintStyle:
+                  TextStyle(color: p.textSecondary.withValues(alpha: 0.6)),
               prefixIcon: Icon(Icons.search, color: p.primary),
               filled: true,
               fillColor: p.surfaceCard,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(16),
                 borderSide: BorderSide.none,
@@ -118,17 +120,21 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
                         separatorBuilder: (_, __) => const SizedBox(height: 8),
                         itemBuilder: (context, index) {
                           final item = _results[index];
-                          final isSelected = widget.equalizerManager.selectedHeadphoneProfile?.name == item.name;
+                          final isSelected = widget.equalizerManager
+                                  .selectedHeadphoneProfile?.name ==
+                              item.name;
 
                           return InkWell(
                             onTap: () async {
                               final profile = item.toHeadphoneProfile();
-                              await widget.equalizerManager.setHeadphoneProfile(profile);
+                              await widget.equalizerManager
+                                  .setHeadphoneProfile(profile);
                               if (context.mounted) {
                                 Navigator.pop(context);
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    content: Text('Applied ${item.name} profile'),
+                                    content:
+                                        Text('Applied ${item.name} profile'),
                                     duration: const Duration(seconds: 2),
                                   ),
                                 );
@@ -143,9 +149,7 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
                                     : p.surfaceCard,
                                 borderRadius: BorderRadius.circular(16),
                                 border: Border.all(
-                                  color: isSelected
-                                      ? p.primary
-                                      : p.surfaceCard,
+                                  color: isSelected ? p.primary : p.surfaceCard,
                                   width: 1.5,
                                 ),
                               ),
@@ -157,12 +161,14 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
                                       color: p.primary.withValues(alpha: 0.12),
                                       shape: BoxShape.circle,
                                     ),
-                                    child: Icon(Icons.headphones_rounded, color: p.primary, size: 20),
+                                    child: Icon(Icons.headphones_rounded,
+                                        color: p.primary, size: 20),
                                   ),
                                   const SizedBox(width: 14),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           item.name,
@@ -184,7 +190,8 @@ class _AutoEqSearchSheetState extends State<AutoEqSearchSheet> {
                                     ),
                                   ),
                                   if (isSelected)
-                                    Icon(Icons.check_circle_rounded, color: p.primary, size: 20),
+                                    Icon(Icons.check_circle_rounded,
+                                        color: p.primary, size: 20),
                                 ],
                               ),
                             ),

@@ -97,7 +97,8 @@ class AudioOutputInfo {
     }
 
     return AudioOutputInfo(
-      deviceName: (map['deviceName'] as String?)?.trim() ?? 'Default Audio Output',
+      deviceName:
+          (map['deviceName'] as String?)?.trim() ?? 'Default Audio Output',
       isUsbDac: (map['isUsbDac'] as bool?) ?? false,
       sampleRate: (map['sampleRate'] as num?)?.toInt() ?? 44100,
       bitDepth: (map['bitDepth'] as num?)?.toInt() ?? 16,
@@ -145,7 +146,8 @@ class AudioOutputInfo {
       sampleRate: sampleRate ?? this.sampleRate,
       bitDepth: bitDepth ?? this.bitDepth,
       isBitPerfectActive: isBitPerfectActive ?? this.isBitPerfectActive,
-      isBitPerfectSupported: isBitPerfectSupported ?? this.isBitPerfectSupported,
+      isBitPerfectSupported:
+          isBitPerfectSupported ?? this.isBitPerfectSupported,
       supportedSampleRates: supportedSampleRates ?? this.supportedSampleRates,
       availableDevices: availableDevices ?? this.availableDevices,
       targetSampleRate: targetSampleRate ?? this.targetSampleRate,

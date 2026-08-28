@@ -112,9 +112,11 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                             height: 210,
                             child: ListView.separated(
                               scrollDirection: Axis.horizontal,
-                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 20),
                               itemCount: section.items.length,
-                              separatorBuilder: (_, __) => const SizedBox(width: 14),
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(width: 14),
                               itemBuilder: (context, i) {
                                 final item = section.items[i];
                                 return _buildBrowseCard(context, item, p);
@@ -131,7 +133,8 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
     );
   }
 
-  Widget _buildBrowseCard(BuildContext context, YtmBrowseItem item, PulsrPalette p) {
+  Widget _buildBrowseCard(
+      BuildContext context, YtmBrowseItem item, PulsrPalette p) {
     return Container(
       width: 140,
       decoration: BoxDecoration(
@@ -159,14 +162,16 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                           width: 140,
                           height: 130,
                           color: p.surfaceContainer,
-                          child: Icon(Icons.music_note_rounded, color: p.primary, size: 36),
+                          child: Icon(Icons.music_note_rounded,
+                              color: p.primary, size: 36),
                         ),
                       )
                     : Container(
                         width: 140,
                         height: 130,
                         color: p.surfaceContainer,
-                        child: Icon(Icons.music_note_rounded, color: p.primary, size: 36),
+                        child: Icon(Icons.music_note_rounded,
+                            color: p.primary, size: 36),
                       ),
                 Positioned(
                   bottom: 6,
@@ -177,7 +182,8 @@ class _YtmBrowseScreenState extends State<YtmBrowseScreen> {
                       color: Colors.black.withValues(alpha: 0.7),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 18),
+                    child: const Icon(Icons.play_arrow_rounded,
+                        color: Colors.white, size: 18),
                   ),
                 ),
               ],

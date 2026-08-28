@@ -32,4 +32,30 @@ class LatencyOptimizer {
     final rate = sampleRate <= 0 ? 48000 : sampleRate;
     return (bufferFrames / rate) * 1000.0;
   }
+
+  /// Converts pipeline latency frames (from native C++ DSP engine) into a Duration offset.
+  static Duration calculateLatencyDuration({
+    required int pipelineLatencyFrames,
+    int sampleRate = 48000,
+  }) {
+    if (pipelineLatencyFrames <= 0) return Duration.zero;
+    final rate = sampleRate <= 0 ? 48000 : sampleRate;
+    final ms = (pipelineLatencyFrames / rate) * 1000.0;
+    return Duration(microseconds: (ms * 1000).round());
+  }
+
+  /// Calculates compensated position accounting for native DSP pipeline latency
+  /// (Lookahead Limiter + Sinc Resampler FIR filter group delay).
+  static Duration calculateCompensatedPosition({
+    required Duration rawPosition,
+    required int pipelineLatencyFrames,
+    int sampleRate = 48000,
+  }) {
+    final latency = calculateLatencyDuration(
+      pipelineLatencyFrames: pipelineLatencyFrames,
+      sampleRate: sampleRate,
+    );
+    if (rawPosition <= latency) return Duration.zero;
+    return rawPosition - latency;
+  }
 }

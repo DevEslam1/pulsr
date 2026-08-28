@@ -43,7 +43,8 @@ class SongTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final p = context.palette;
     final isCompact = MediaQuery.sizeOf(context).width < 360;
-    final effectiveArtworkSize = isCompact ? (artworkSize * 0.88).clamp(42.0, 52.0) : artworkSize;
+    final effectiveArtworkSize =
+        isCompact ? (artworkSize * 0.88).clamp(42.0, 52.0) : artworkSize;
 
     final isDownloadedTrack = isDownloaded ??
         (song.isDownloaded == true ||
@@ -64,148 +65,160 @@ class SongTile extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             child: Material(
-            color: selected ? p.accentContainer : Colors.transparent,
-            borderRadius: BorderRadius.circular(16),
-            child: InkWell(
+              color: selected ? p.accentContainer : Colors.transparent,
               borderRadius: BorderRadius.circular(16),
-              onTap: onTap,
-              onLongPress: onLongPress,
-              child: Container(
-                constraints: const BoxConstraints(minHeight: 58),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                child: Row(
-                  children: [
-                    if (index != null)
-                      SizedBox(
-                        width: isCompact ? 24 : 32,
-                        child: Center(
-                          child: Text(
-                            '${index! + 1}',
-                            style: TextStyle(
-                              color: isActive ? p.accent : p.textTertiary,
-                              fontWeight: FontWeight.w700,
-                              fontSize: isCompact ? 12 : 13,
-                              fontFeatures: const [FontFeature.tabularFigures()],
-                            ),
-                          ),
-                        ),
-                      ),
-                    if (showArtwork) ...[
-                      SizedBox(
-                        width: effectiveArtworkSize,
-                        height: effectiveArtworkSize,
-                        child: selected
-                            ? Container(
-                                decoration: BoxDecoration(
-                                  color: p.accent,
-                                  borderRadius: BorderRadius.circular(13),
-                                ),
-                                child: Icon(Icons.check_rounded, color: p.onAccent, size: 24),
-                              )
-                            : Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  CachedArtwork(
-                                    id: song.id,
-                                    remoteUrl: song.remoteArtworkUrl,
-                                    type: ArtworkType.AUDIO,
-                                    size: effectiveArtworkSize,
-                                    borderRadius: 13,
-                                  ),
-                                  if (isActive)
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        color: Colors.black.withValues(alpha: 0.45),
-                                        borderRadius: BorderRadius.circular(13),
-                                      ),
-                                      child: Center(
-                                        child: NowPlayingIndicator(color: p.accent, isPlaying: isPlaying),
-                                      ),
-                                    ),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(16),
+                onTap: onTap,
+                onLongPress: onLongPress,
+                child: Container(
+                  constraints: const BoxConstraints(minHeight: 58),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  child: Row(
+                    children: [
+                      if (index != null)
+                        SizedBox(
+                          width: isCompact ? 24 : 32,
+                          child: Center(
+                            child: Text(
+                              '${index! + 1}',
+                              style: TextStyle(
+                                color: isActive ? p.accent : p.textTertiary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: isCompact ? 12 : 13,
+                                fontFeatures: const [
+                                  FontFeature.tabularFigures()
                                 ],
                               ),
-                      ),
-                      SizedBox(width: isCompact ? 8 : 12),
-                    ],
-                    Expanded(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            song.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: isActive ? p.accent : p.textPrimary,
-                              fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
-                              fontSize: isCompact ? 13.5 : 14.5,
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              if (isDownloadedTrack) ...[
-                                Icon(
-                                  Icons.download_done_rounded,
-                                  size: isCompact ? 12 : 13,
-                                  color: p.accent,
+                        ),
+                      if (showArtwork) ...[
+                        SizedBox(
+                          width: effectiveArtworkSize,
+                          height: effectiveArtworkSize,
+                          child: selected
+                              ? Container(
+                                  decoration: BoxDecoration(
+                                    color: p.accent,
+                                    borderRadius: BorderRadius.circular(13),
+                                  ),
+                                  child: Icon(Icons.check_rounded,
+                                      color: p.onAccent, size: 24),
+                                )
+                              : Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    CachedArtwork(
+                                      id: song.id,
+                                      remoteUrl: song.remoteArtworkUrl,
+                                      type: ArtworkType.AUDIO,
+                                      size: effectiveArtworkSize,
+                                      borderRadius: 13,
+                                    ),
+                                    if (isActive)
+                                      Container(
+                                        decoration: BoxDecoration(
+                                          color: Colors.black
+                                              .withValues(alpha: 0.45),
+                                          borderRadius:
+                                              BorderRadius.circular(13),
+                                        ),
+                                        child: Center(
+                                          child: NowPlayingIndicator(
+                                              color: p.accent,
+                                              isPlaying: isPlaying),
+                                        ),
+                                      ),
+                                  ],
                                 ),
-                                const SizedBox(width: 4),
-                              ],
-                              Expanded(
-                                child: Text(
-                                  subtitleOverride ?? song.artist,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: isCompact ? 11.5 : 12.5,
+                        ),
+                        SizedBox(width: isCompact ? 8 : 12),
+                      ],
+                      Expanded(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              song.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: isActive ? p.accent : p.textPrimary,
+                                fontWeight: isActive
+                                    ? FontWeight.w800
+                                    : FontWeight.w600,
+                                fontSize: isCompact ? 13.5 : 14.5,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                if (isDownloadedTrack) ...[
+                                  Icon(
+                                    Icons.download_done_rounded,
+                                    size: isCompact ? 12 : 13,
+                                    color: p.accent,
+                                  ),
+                                  const SizedBox(width: 4),
+                                ],
+                                Expanded(
+                                  child: Text(
+                                    subtitleOverride ?? song.artist,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      color: p.textSecondary,
+                                      fontSize: isCompact ? 11.5 : 12.5,
+                                    ),
                                   ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (song.durationMs > 0) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        Formatters.formatDurationMs(song.durationMs),
-                        style: TextStyle(
-                          color: p.textTertiary,
-                          fontSize: isCompact ? 11 : 12,
-                          fontWeight: FontWeight.w600,
-                          fontFeatures: const [FontFeature.tabularFigures()],
+                              ],
+                            ),
+                          ],
                         ),
                       ),
+                      if (song.durationMs > 0) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          Formatters.formatDurationMs(song.durationMs),
+                          style: TextStyle(
+                            color: p.textTertiary,
+                            fontSize: isCompact ? 11 : 12,
+                            fontWeight: FontWeight.w600,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                      if (trailing != null)
+                        trailing!
+                      else if (onMorePressed != null)
+                        IconButton(
+                          icon: Icon(Icons.more_vert_rounded,
+                              size: 20, color: p.textTertiary),
+                          onPressed: onMorePressed,
+                          visualDensity: VisualDensity.compact,
+                        ),
                     ],
-                    if (trailing != null)
-                      trailing!
-                    else if (onMorePressed != null)
-                      IconButton(
-                        icon: Icon(Icons.more_vert_rounded, size: 20, color: p.textTertiary),
-                        onPressed: onMorePressed,
-                        visualDensity: VisualDensity.compact,
-                      ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ),
-        ),
-      );
-    },
-  );
-}
+        );
+      },
+    );
+  }
 }
 
 /// Animated 3-bar "now playing" EQ glyph.
 class NowPlayingIndicator extends StatefulWidget {
   final Color color;
   final bool isPlaying;
-  const NowPlayingIndicator({super.key, required this.color, this.isPlaying = true});
+  const NowPlayingIndicator(
+      {super.key, required this.color, this.isPlaying = true});
 
   @override
   State<NowPlayingIndicator> createState() => _NowPlayingIndicatorState();
@@ -218,7 +231,8 @@ class _NowPlayingIndicatorState extends State<NowPlayingIndicator>
   @override
   void initState() {
     super.initState();
-    _c = AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
+    _c = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 900));
     if (widget.isPlaying) _c.repeat(reverse: true);
   }
 
@@ -254,9 +268,8 @@ class _NowPlayingIndicatorState extends State<NowPlayingIndicator>
             crossAxisAlignment: CrossAxisAlignment.end,
             children: List.generate(3, (i) {
               final phase = _c.value * math.pi + i * 0.9;
-              final h = widget.isPlaying
-                  ? 5 + (math.sin(phase).abs() * 11)
-                  : 5.0;
+              final h =
+                  widget.isPlaying ? 5 + (math.sin(phase).abs() * 11) : 5.0;
               return Container(
                 width: 3.5,
                 height: h,

@@ -33,11 +33,17 @@ class _SearchScreenState extends State<SearchScreen> {
   StreamSubscription? _settingsSub;
 
   bool _isOnlineAvailable(BuildContext context) {
-    final offlineOnly = context.watch<SettingsCubit?>()?.state.offlineOnlyMode ?? false;
+    final offlineOnly =
+        context.watch<SettingsCubit?>()?.state.offlineOnlyMode ?? false;
     return AppConfig.ytmEnabled && !offlineOnly;
   }
 
-  static const List<String> _localFilters = ['All', 'Songs', 'Artists', 'Albums'];
+  static const List<String> _localFilters = [
+    'All',
+    'Songs',
+    'Artists',
+    'Albums'
+  ];
 
   @override
   void initState() {
@@ -130,7 +136,11 @@ class _SearchScreenState extends State<SearchScreen> {
                   children: [
                     // ---------- Header ----------
                     Padding(
-                      padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 0),
+                      padding: EdgeInsets.fromLTRB(
+                          Adaptive.pagePadding(context),
+                          16,
+                          Adaptive.pagePadding(context),
+                          0),
                       child: Text(
                         context.l10n.search,
                         style: Theme.of(context).textTheme.headlineMedium,
@@ -141,7 +151,8 @@ class _SearchScreenState extends State<SearchScreen> {
                     if (showOnline) ...[
                       const SizedBox(height: 14),
                       Container(
-                        margin: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+                        margin: EdgeInsets.symmetric(
+                            horizontal: Adaptive.pagePadding(context)),
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
                           color: p.surfaceContainer,
@@ -177,7 +188,8 @@ class _SearchScreenState extends State<SearchScreen> {
                     // ---------- Search Input Field ----------
                     const SizedBox(height: 12),
                     Padding(
-                      padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: Adaptive.pagePadding(context)),
                       child: TextField(
                         controller: _searchController,
                         onChanged: (value) => _onQueryChanged(context, value),
@@ -185,10 +197,12 @@ class _SearchScreenState extends State<SearchScreen> {
                           hintText: (showOnline && currentTab == 1)
                               ? context.l10n.searchOnline
                               : context.l10n.searchPlaceholder,
-                          prefixIcon: Icon(Icons.search_rounded, color: p.textTertiary),
+                          prefixIcon:
+                              Icon(Icons.search_rounded, color: p.textTertiary),
                           suffixIcon: _searchController.text.isNotEmpty
                               ? IconButton(
-                                  icon: Icon(Icons.clear_rounded, color: p.textTertiary),
+                                  icon: Icon(Icons.clear_rounded,
+                                      color: p.textTertiary),
                                   onPressed: () => _clear(context),
                                 )
                               : null,
@@ -200,7 +214,8 @@ class _SearchScreenState extends State<SearchScreen> {
                     if (currentTab == 0) ...[
                       const SizedBox(height: 8),
                       Padding(
-                        padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+                        padding: EdgeInsets.symmetric(
+                            horizontal: Adaptive.pagePadding(context)),
                         child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           physics: const BouncingScrollPhysics(),
@@ -208,7 +223,8 @@ class _SearchScreenState extends State<SearchScreen> {
                             children: [
                               for (final filter in _localFilters)
                                 Padding(
-                                  padding: const EdgeInsetsDirectional.only(end: 8),
+                                  padding:
+                                      const EdgeInsetsDirectional.only(end: 8),
                                   child: _buildChip(context, state, filter, p),
                                 ),
                             ],
@@ -303,7 +319,8 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  Widget _buildChip(BuildContext context, SearchState state, String filter, PulsrPalette p) {
+  Widget _buildChip(
+      BuildContext context, SearchState state, String filter, PulsrPalette p) {
     final selected = state.selectedFilter == filter;
     return ChoiceChip(
       label: Text(_getFilterLabel(context, filter)),
@@ -316,7 +333,8 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildLocalBody(BuildContext context, SearchState state, PlayerCubit playerCubit, PulsrPalette p) {
+  Widget _buildLocalBody(BuildContext context, SearchState state,
+      PlayerCubit playerCubit, PulsrPalette p) {
     if (state.isLoading) {
       return Center(child: CircularProgressIndicator(color: p.accent));
     }
@@ -332,7 +350,10 @@ class _SearchScreenState extends State<SearchScreen> {
                 const SizedBox(height: 12),
                 Text(
                   context.l10n.search,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.textPrimary),
+                  style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800,
+                      color: p.textPrimary),
                 ),
                 const SizedBox(height: 6),
                 Text(
@@ -343,7 +364,11 @@ class _SearchScreenState extends State<SearchScreen> {
                 const SizedBox(height: 24),
                 Text(
                   'QUICK DISCOVERY',
-                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: p.textTertiary, letterSpacing: 1.2),
+                  style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      color: p.textTertiary,
+                      letterSpacing: 1.2),
                 ),
                 const SizedBox(height: 12),
                 Wrap(
@@ -351,12 +376,24 @@ class _SearchScreenState extends State<SearchScreen> {
                   runSpacing: 8,
                   alignment: WrapAlignment.center,
                   children: [
-                    for (final tag in ['Rock', 'Pop', 'Hip-Hop', 'Acoustic', 'FLAC', 'Lossless', 'Jazz', 'Electronic'])
+                    for (final tag in [
+                      'Rock',
+                      'Pop',
+                      'Hip-Hop',
+                      'Acoustic',
+                      'FLAC',
+                      'Lossless',
+                      'Jazz',
+                      'Electronic'
+                    ])
                       ActionChip(
                         label: Text(tag),
                         backgroundColor: p.surfaceContainer,
                         side: BorderSide(color: p.hairline),
-                        labelStyle: TextStyle(color: p.accent, fontSize: 12, fontWeight: FontWeight.w700),
+                        labelStyle: TextStyle(
+                            color: p.accent,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700),
                         onPressed: () {
                           _searchController.text = tag;
                           _onQueryChanged(context, tag);
@@ -444,11 +481,15 @@ class _OnlineResults extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.travel_explore_rounded, size: 48, color: p.textTertiary),
+                  Icon(Icons.travel_explore_rounded,
+                      size: 48, color: p.textTertiary),
                   const SizedBox(height: 12),
                   Text(
                     'Search YouTube Music',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: p.textPrimary),
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: p.textPrimary),
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -459,7 +500,11 @@ class _OnlineResults extends StatelessWidget {
                   const SizedBox(height: 24),
                   Text(
                     'POPULAR SEARCHES',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: p.textTertiary, letterSpacing: 1.2),
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        color: p.textTertiary,
+                        letterSpacing: 1.2),
                   ),
                   const SizedBox(height: 12),
                   Wrap(
@@ -467,12 +512,24 @@ class _OnlineResults extends StatelessWidget {
                     runSpacing: 8,
                     alignment: WrapAlignment.center,
                     children: [
-                      for (final tag in ['Top Hits', 'Trending', 'Lo-Fi Beats', 'Pop', 'Hip-Hop', 'Rock Classics', 'Chillout', 'Electronic'])
+                      for (final tag in [
+                        'Top Hits',
+                        'Trending',
+                        'Lo-Fi Beats',
+                        'Pop',
+                        'Hip-Hop',
+                        'Rock Classics',
+                        'Chillout',
+                        'Electronic'
+                      ])
                         ActionChip(
                           label: Text(tag),
                           backgroundColor: p.surfaceContainer,
                           side: BorderSide(color: p.hairline),
-                          labelStyle: TextStyle(color: p.accent, fontSize: 12, fontWeight: FontWeight.w700),
+                          labelStyle: TextStyle(
+                              color: p.accent,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700),
                           onPressed: () => onSelectTag?.call(tag),
                         ),
                     ],

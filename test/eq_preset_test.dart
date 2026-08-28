@@ -11,7 +11,8 @@ void main() {
 
     test('all built-in presets are 10-band', () {
       for (final preset in EqPreset.defaultPresets) {
-        expect(preset.gains.length, 10, reason: '${preset.name} must have 10 bands');
+        expect(preset.gains.length, 10,
+            reason: '${preset.name} must have 10 bands');
       }
     });
 

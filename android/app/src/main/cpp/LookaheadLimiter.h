@@ -1,34 +1,51 @@
+// android/app/src/main/cpp/LookaheadLimiter.h
 #pragma once
 
+#include "DspParams.h"
 #include <cmath>
 #include <algorithm>
+#include <cassert>
 
 class LookaheadLimiter {
 public:
-    static constexpr int MAX_LOOKAHEAD_SAMPLES = 8192; // Supports up to 768kHz at 10ms lookahead
+    static constexpr int MAX_LOOKAHEAD_SAMPLES = 8192;
+    static constexpr int INTERP_TAPS = 24;
+    static constexpr int INTERP_PHASES = 4;
+    static constexpr int TAPS_PER_PHASE = INTERP_TAPS / INTERP_PHASES; // 6
 
     LookaheadLimiter();
     void setSampleRate(double sampleRate);
-    void configure(double lookaheadMs, double thresholdDb, double releaseMs);
+    void configure(double lookaheadMs, double thresholdDb, double releaseMs, bool truePeakMode = true);
     void setEnabled(bool enabled);
     bool isEnabled() const { return enabled_; }
+    void applyParams(const LimiterParamSet& params);
     void reset();
+
+    int getLatencyFrames() const { return lookaheadSamples_; }
 
     void process(float* L, float* R, int frames);
     void processMono(float* inOut, int frames);
-    void processInterleaved(float* buffer, int frames);
+    void processInterleaved(float* buffer, int frames, int channels = 2);
 
 private:
+    float estimateTruePeak(const float* history);
+
     double sampleRate_ = 48000.0;
-    double lookaheadMs_ = 3.0;     // ~3 ms lookahead
-    double thresholdDb_ = -0.2;    // -0.2 dB true ceiling
-    double releaseMs_ = 50.0;      // 50 ms release
-    int lookaheadSamples_ = 144;
-    float threshold_ = 0.977f;
-    float releaseCoeff_ = 0.9995f;
-    float envelope_ = 1.0f;
+    double lookaheadMs_ = 5.0;
+    double thresholdDb_ = -0.2;
+    double releaseMs_ = 50.0;
+    bool truePeakMode_ = true;
     bool enabled_ = false;
 
-    float delayBuf_[2][MAX_LOOKAHEAD_SAMPLES] = {};
+    int lookaheadSamples_ = 240;
+    float threshold_ = 0.9772f; // pow(10, -0.2 / 20)
+    float releaseCoeff_ = 0.9995f;
+    float envelope_ = 1.0f;
+
+    static constexpr int MAX_CHANNELS = 8;
+    float delayBuf_[MAX_CHANNELS][MAX_LOOKAHEAD_SAMPLES] = {};
     int writeIdx_ = 0;
+
+    // 4x oversampling polyphase interpolation table for true peak detection
+    static const float polyphase4x_[INTERP_PHASES][TAPS_PER_PHASE];
 };

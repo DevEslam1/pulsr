@@ -6,7 +6,8 @@ import 'package:pulsr/features/player/presentation/widgets/player_controls.dart'
 
 void main() {
   group('Pulsr App Flow Headless Test', () {
-    testWidgets('Full playback, queue, and player control interaction flow', (tester) async {
+    testWidgets('Full playback, queue, and player control interaction flow',
+        (tester) async {
       bool isPlaying = false;
       bool isShuffle = false;
       PlayerRepeatMode repeatMode = PlayerRepeatMode.off;
@@ -20,7 +21,8 @@ void main() {
                 appBar: AppBar(title: const Text('Pulsr E2E')),
                 body: Column(
                   children: [
-                    const Text('Track 1 - Echoes', key: Key('now_playing_title')),
+                    const Text('Track 1 - Echoes',
+                        key: Key('now_playing_title')),
                     PlayerControls(
                       isPlaying: isPlaying,
                       isShuffle: isShuffle,

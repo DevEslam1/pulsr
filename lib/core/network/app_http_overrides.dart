@@ -26,7 +26,7 @@ class AppHttpOverrides extends HttpOverrides {
   @override
   HttpClient createHttpClient(SecurityContext? context) {
     final client = super.createHttpClient(context);
-    
+
     // Dynamic findProxy callback
     client.findProxy = (uri) {
       return _config.toFindProxyString(uri);
@@ -57,7 +57,7 @@ class AppHttpOverrides extends HttpOverrides {
   /// Returns a record with `(success, latencyMs, errorMessage)`.
   Future<({bool success, int latencyMs, String? error})> testConnection({
     ProxyConfig? configToTest,
-    String testUrl = 'https://music.youtube.com/generate_204',
+    String testUrl = 'https://www.google.com/generate_204',
     Duration timeout = const Duration(seconds: 10),
   }) async {
     final testConfig = configToTest ?? _config;
@@ -68,9 +68,7 @@ class AppHttpOverrides extends HttpOverrides {
       final uri = Uri.parse(testUrl);
       testClient = HttpClient()
         ..connectionTimeout = timeout
-        ..idleTimeout = timeout
-        ..badCertificateCallback = (cert, host, port) =>
-            testConfig.enabled && (host == testConfig.host || host == uri.host);
+        ..idleTimeout = timeout;
 
       testClient.findProxy = (u) => testConfig.toFindProxyString(u);
 
@@ -86,7 +84,8 @@ class AppHttpOverrides extends HttpOverrides {
             host,
             port,
             realm ?? '',
-            HttpClientBasicCredentials(testConfig.username, testConfig.password),
+            HttpClientBasicCredentials(
+                testConfig.username, testConfig.password),
           );
           return true;
         };
@@ -117,7 +116,10 @@ class AppHttpOverrides extends HttpOverrides {
       return (
         success: false,
         latencyMs: stopwatch.elapsedMilliseconds,
-        error: e.toString().replaceAll('SocketException: ', '').replaceAll('HttpException: ', ''),
+        error: e
+            .toString()
+            .replaceAll('SocketException: ', '')
+            .replaceAll('HttpException: ', ''),
       );
     } finally {
       testClient?.close(force: true);

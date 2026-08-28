@@ -34,7 +34,8 @@ class AutoEqResult {
 class AutoEqService {
   AutoEqService();
 
-  static const String _autoEqApiBase = 'https://raw.githubusercontent.com/jaakkopasanen/AutoEq/master/results';
+  static const String _autoEqApiBase =
+      'https://raw.githubusercontent.com/jaakkopasanen/AutoEq/master/results';
 
   // Popular pre-indexed headphone compensation curves for instant offline search
   static final List<AutoEqResult> _bundledIndex = [
@@ -44,7 +45,8 @@ class AutoEqService {
       manufacturer: 'Sony',
       target: 'Harman Over-Ear',
       gains: [-2.5, -3.0, -1.0, 0.5, 1.0, 1.5, 3.0, 2.0, -1.0, 0.0],
-      sourceUrl: '$_autoEqApiBase/oratory1990/harman_over-ear_2018/Sony%20WH-1000XM4',
+      sourceUrl:
+          '$_autoEqApiBase/oratory1990/harman_over-ear_2018/Sony%20WH-1000XM4',
     ),
     const AutoEqResult(
       name: 'Sony WH-1000XM5 (Harman Target)',
@@ -52,7 +54,8 @@ class AutoEqService {
       manufacturer: 'Sony',
       target: 'Harman Over-Ear',
       gains: [-1.8, -2.2, -0.5, 0.0, 1.2, 2.0, 2.5, 1.8, -0.5, 0.2],
-      sourceUrl: '$_autoEqApiBase/oratory1990/harman_over-ear_2018/Sony%20WH-1000XM5',
+      sourceUrl:
+          '$_autoEqApiBase/oratory1990/harman_over-ear_2018/Sony%20WH-1000XM5',
     ),
     const AutoEqResult(
       name: 'Apple AirPods Pro 2 (Harman In-Ear)',
@@ -60,7 +63,8 @@ class AutoEqService {
       manufacturer: 'Apple',
       target: 'Harman In-Ear',
       gains: [-0.5, 0.0, 0.5, 1.0, 0.5, -0.5, 1.5, 2.0, 1.0, -0.5],
-      sourceUrl: '$_autoEqApiBase/crinacle/harman_in-ear_2019v2/Apple%20AirPods%20Pro%202',
+      sourceUrl:
+          '$_autoEqApiBase/crinacle/harman_in-ear_2019v2/Apple%20AirPods%20Pro%202',
     ),
     const AutoEqResult(
       name: 'Apple AirPods Max (Harman Over-Ear)',
@@ -68,7 +72,8 @@ class AutoEqService {
       manufacturer: 'Apple',
       target: 'Harman Over-Ear',
       gains: [-1.0, -0.5, 0.0, 0.5, 0.8, 1.2, 1.8, 0.5, -1.2, 0.0],
-      sourceUrl: '$_autoEqApiBase/oratory1990/harman_over-ear_2018/Apple%20AirPods%20Max',
+      sourceUrl:
+          '$_autoEqApiBase/oratory1990/harman_over-ear_2018/Apple%20AirPods%20Max',
     ),
     const AutoEqResult(
       name: 'Sennheiser HD 600 (Harman Over-Ear)',
@@ -76,7 +81,8 @@ class AutoEqService {
       manufacturer: 'Sennheiser',
       target: 'Harman Over-Ear',
       gains: [4.5, 4.0, 2.5, 0.5, -0.5, 0.0, 1.0, -1.5, -2.0, 0.5],
-      sourceUrl: '$_autoEqApiBase/oratory1990/harman_over-ear_2018/Sennheiser%20HD%20600',
+      sourceUrl:
+          '$_autoEqApiBase/oratory1990/harman_over-ear_2018/Sennheiser%20HD%20600',
     ),
     const AutoEqResult(
       name: 'Sennheiser HD 650 (Harman Over-Ear)',
@@ -84,7 +90,8 @@ class AutoEqService {
       manufacturer: 'Sennheiser',
       target: 'Harman Over-Ear',
       gains: [5.0, 4.2, 2.0, 0.0, -0.8, 0.0, 1.5, -1.0, -1.5, 1.0],
-      sourceUrl: '$_autoEqApiBase/oratory1990/harman_over-ear_2018/Sennheiser%20HD%20650',
+      sourceUrl:
+          '$_autoEqApiBase/oratory1990/harman_over-ear_2018/Sennheiser%20HD%20650',
     ),
     const AutoEqResult(
       name: 'Sennheiser HD 800 S (Harman Over-Ear)',
@@ -92,7 +99,8 @@ class AutoEqService {
       manufacturer: 'Sennheiser',
       target: 'Harman Over-Ear',
       gains: [6.0, 5.0, 3.0, 1.0, 0.0, 0.5, -2.0, -4.5, 1.0, 0.0],
-      sourceUrl: '$_autoEqApiBase/oratory1990/harman_over-ear_2018/Sennheiser%20HD%20800%20S',
+      sourceUrl:
+          '$_autoEqApiBase/oratory1990/harman_over-ear_2018/Sennheiser%20HD%20800%20S',
     ),
     const AutoEqResult(
       name: 'Beyerdynamic DT 770 Pro 80 Ohm (Harman)',
@@ -100,7 +108,8 @@ class AutoEqService {
       manufacturer: 'Beyerdynamic',
       target: 'Harman Over-Ear',
       gains: [-2.0, -1.5, 0.0, 1.0, 0.5, 0.0, -1.0, -4.0, -3.5, 1.0],
-      sourceUrl: '$_autoEqApiBase/oratory1990/harman_over-ear_2018/Beyerdynamic%20DT%20770%20Pro%2080%20Ohm',
+      sourceUrl:
+          '$_autoEqApiBase/oratory1990/harman_over-ear_2018/Beyerdynamic%20DT%20770%20Pro%2080%20Ohm',
     ),
     const AutoEqResult(
       name: 'Beyerdynamic DT 990 Pro (Harman)',
@@ -108,7 +117,8 @@ class AutoEqService {
       manufacturer: 'Beyerdynamic',
       target: 'Harman Over-Ear',
       gains: [3.5, 2.0, 0.5, 0.0, 0.5, 0.0, -2.5, -6.0, -4.0, 0.5],
-      sourceUrl: '$_autoEqApiBase/oratory1990/harman_over-ear_2018/Beyerdynamic%20DT%20990%20Pro',
+      sourceUrl:
+          '$_autoEqApiBase/oratory1990/harman_over-ear_2018/Beyerdynamic%20DT%20990%20Pro',
     ),
     const AutoEqResult(
       name: 'Audio-Technica ATH-M50x (Harman)',
@@ -116,7 +126,8 @@ class AutoEqService {
       manufacturer: 'Audio-Technica',
       target: 'Harman Over-Ear',
       gains: [-3.0, -2.5, -1.0, 0.5, 1.2, 0.8, -1.5, 1.0, 2.0, -0.5],
-      sourceUrl: '$_autoEqApiBase/oratory1990/harman_over-ear_2018/Audio-Technica%20ATH-M50x',
+      sourceUrl:
+          '$_autoEqApiBase/oratory1990/harman_over-ear_2018/Audio-Technica%20ATH-M50x',
     ),
     const AutoEqResult(
       name: 'Bose QuietComfort 45 (Harman)',
@@ -124,7 +135,8 @@ class AutoEqService {
       manufacturer: 'Bose',
       target: 'Harman Over-Ear',
       gains: [-1.5, -1.0, 0.5, 1.0, 1.5, 1.0, -1.0, 2.5, 1.0, 0.0],
-      sourceUrl: '$_autoEqApiBase/oratory1990/harman_over-ear_2018/Bose%20QuietComfort%2045',
+      sourceUrl:
+          '$_autoEqApiBase/oratory1990/harman_over-ear_2018/Bose%20QuietComfort%2045',
     ),
     const AutoEqResult(
       name: 'Samsung Galaxy Buds 2 Pro (Harman)',
@@ -132,7 +144,8 @@ class AutoEqService {
       manufacturer: 'Samsung',
       target: 'Harman In-Ear',
       gains: [0.0, 0.5, 0.0, -0.5, 0.0, 0.8, 1.2, 0.5, -1.0, 0.0],
-      sourceUrl: '$_autoEqApiBase/crinacle/harman_in-ear_2019v2/Samsung%20Galaxy%20Buds%202%20Pro',
+      sourceUrl:
+          '$_autoEqApiBase/crinacle/harman_in-ear_2019v2/Samsung%20Galaxy%20Buds%202%20Pro',
     ),
   ];
 

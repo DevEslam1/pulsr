@@ -20,9 +20,11 @@ import 'ytm_service.dart';
 /// - Live server health checking.
 @lazySingleton
 class XdmBackendService {
-  static const String defaultBaseUrl = 'https://xdm-backend-10763667121.europe-west1.run.app';
+  static const String defaultBaseUrl =
+      'https://xdm-backend-10763667121.europe-west1.run.app';
   static const String _tokenSecureKey = 'xdm_backend_token_secure';
-  static const String defaultApiToken = String.fromEnvironment('XDM_BACKEND_TOKEN', defaultValue: '');
+  static const String defaultApiToken =
+      String.fromEnvironment('XDM_BACKEND_TOKEN', defaultValue: '');
 
   final http.Client _client;
   final FlutterSecureStorage _secureStorage;
@@ -75,20 +77,31 @@ class XdmBackendService {
     return prefs.getBool(PrefsKeys.ytdlpBackendEnabled) ?? true;
   }
 
-  Map<String, String> _headers(String token, {String? cookies, String? userAgent}) => {
+  Map<String, String> _headers(String token,
+          {String? cookies, String? userAgent}) =>
+      {
         'Authorization': 'Bearer $token',
         'Accept': 'application/json',
         if (cookies != null && cookies.isNotEmpty) 'X-YouTube-Cookies': cookies,
-        if (userAgent != null && userAgent.isNotEmpty) 'X-User-Agent': userAgent,
+        if (userAgent != null && userAgent.isNotEmpty)
+          'X-User-Agent': userAgent,
       };
 
   /// Checks server health, returning a map with version, proxy count, and latency in ms.
-  Future<({bool ok, String ytdlpVersion, int proxyPoolSize, int latencyMs, String? message})> checkHealth() async {
+  Future<
+      ({
+        bool ok,
+        String ytdlpVersion,
+        int proxyPoolSize,
+        int latencyMs,
+        String? message
+      })> checkHealth() async {
     final stopwatch = Stopwatch()..start();
     try {
       final baseUrl = await _getBaseUrl();
       final uri = Uri.parse('$baseUrl/health');
-      final response = await _client.get(uri).timeout(const Duration(seconds: 10));
+      final response =
+          await _client.get(uri).timeout(const Duration(seconds: 10));
       stopwatch.stop();
 
       if (response.statusCode == 200) {
@@ -123,7 +136,8 @@ class XdmBackendService {
   }
 
   /// Resolves an audio stream for [videoId] via the yt-dlp backend.
-  Future<YtmStream?> resolveStream(String videoId, {String quality = 'high'}) async {
+  Future<YtmStream?> resolveStream(String videoId,
+      {String quality = 'high'}) async {
     if (!await isEnabled()) return null;
 
     try {
@@ -131,7 +145,8 @@ class XdmBackendService {
       final token = await _getApiToken();
       // Target YouTube Music URL specifically
       final videoUrl = 'https://music.youtube.com/watch?v=$videoId';
-      final uri = Uri.parse('$baseUrl/api/streams').replace(queryParameters: {'url': videoUrl});
+      final uri = Uri.parse('$baseUrl/api/streams')
+          .replace(queryParameters: {'url': videoUrl});
 
       final response = await _client
           .get(uri, headers: _headers(token))
@@ -139,7 +154,8 @@ class XdmBackendService {
 
       if (response.statusCode != 200) {
         if (response.statusCode == 400 && response.body.contains('407')) {
-          throw const YtmException('YTM_PROXY_AUTH', 'XDM Backend proxy authentication failed (407)');
+          throw const YtmException('YTM_PROXY_AUTH',
+              'XDM Backend proxy authentication failed (407)');
         }
         return null;
       }
@@ -148,7 +164,10 @@ class XdmBackendService {
       final rawStreams = data['streams'] as List<dynamic>? ?? [];
       if (rawStreams.isEmpty) return null;
 
-      final audioStreams = rawStreams.where((s) => s is Map && s['type'] == 'audio').cast<Map<String, dynamic>>().toList();
+      final audioStreams = rawStreams
+          .where((s) => s is Map && s['type'] == 'audio')
+          .cast<Map<String, dynamic>>()
+          .toList();
       if (audioStreams.isEmpty) return null;
 
       // Extract bitrates
@@ -162,7 +181,14 @@ class XdmBackendService {
         final ext = (s['ext'] as String? ?? '').toLowerCase();
         final formatId = (s['format_id'] as String? ?? '').toLowerCase();
         final label = (s['label'] as String? ?? '').toLowerCase();
-        return ext == 'm4a' || ext == 'aac' || ext == 'mp4' || label.contains('m4a') || label.contains('aac') || formatId == '140' || formatId == '141' || formatId == '139';
+        return ext == 'm4a' ||
+            ext == 'aac' ||
+            ext == 'mp4' ||
+            label.contains('m4a') ||
+            label.contains('aac') ||
+            formatId == '140' ||
+            formatId == '141' ||
+            formatId == '139';
       }).toList();
 
       // Use AAC streams if available, otherwise fall back to all audio streams
@@ -199,7 +225,9 @@ class XdmBackendService {
       return YtmStream(
         videoId: videoId,
         url: streamUrl,
-        mimeType: ext == 'm4a' || ext == 'mp4' || ext == 'aac' ? 'audio/mp4' : 'audio/webm',
+        mimeType: ext == 'm4a' || ext == 'mp4' || ext == 'aac'
+            ? 'audio/mp4'
+            : 'audio/webm',
         container: ext,
         bitrateKbps: bitrate > 0 ? bitrate : 160,
         duration: Duration.zero,
@@ -214,13 +242,15 @@ class XdmBackendService {
   }
 
   /// Extracts playlist tracks from [playlistUrl] via the yt-dlp backend.
-  Future<List<YtmTrack>> getPlaylist(String playlistUrl, {int limit = 100, String? cookies}) async {
+  Future<List<YtmTrack>> getPlaylist(String playlistUrl,
+      {int limit = 100, String? cookies}) async {
     if (!await isEnabled()) return const [];
 
     try {
       final baseUrl = await _getBaseUrl();
       final token = await _getApiToken();
-      final uri = Uri.parse('$baseUrl/api/playlist').replace(queryParameters: {'url': playlistUrl});
+      final uri = Uri.parse('$baseUrl/api/playlist')
+          .replace(queryParameters: {'url': playlistUrl});
 
       final response = await _client
           .get(uri, headers: _headers(token, cookies: cookies))
@@ -238,11 +268,14 @@ class XdmBackendService {
         if (v is! Map<String, dynamic>) continue;
         final id = v['id'] as String?;
         final title = v['title'] as String?;
-        if (id == null || id.isEmpty || title == null || title.isEmpty) continue;
+        if (id == null || id.isEmpty || title == null || title.isEmpty) {
+          continue;
+        }
 
         final author = (v['author'] as String?)?.trim() ?? 'Unknown Artist';
         final durationSec = (v['duration'] as num?)?.toInt() ?? 0;
-        final thumb = (v['thumbnailUrl'] as String?) ?? 'https://i.ytimg.com/vi/$id/hqdefault.jpg';
+        final thumb = (v['thumbnailUrl'] as String?) ??
+            'https://i.ytimg.com/vi/$id/hqdefault.jpg';
 
         tracks.add(YtmTrack(
           videoId: id,
@@ -267,7 +300,8 @@ class XdmBackendService {
     try {
       final baseUrl = await _getBaseUrl();
       final token = await _getApiToken();
-      final uri = Uri.parse('$baseUrl/api/search').replace(queryParameters: {'q': query});
+      final uri = Uri.parse('$baseUrl/api/search')
+          .replace(queryParameters: {'q': query});
 
       final response = await _client
           .get(uri, headers: _headers(token))
@@ -285,11 +319,14 @@ class XdmBackendService {
         if (r is! Map<String, dynamic>) continue;
         final id = r['id'] as String?;
         final title = r['title'] as String?;
-        if (id == null || id.isEmpty || title == null || title.isEmpty) continue;
+        if (id == null || id.isEmpty || title == null || title.isEmpty) {
+          continue;
+        }
 
         final author = (r['author'] as String?)?.trim() ?? 'Unknown Artist';
         final durationSec = (r['duration'] as num?)?.toInt() ?? 0;
-        final thumb = (r['thumbnailUrl'] as String?) ?? 'https://i.ytimg.com/vi/$id/hqdefault.jpg';
+        final thumb = (r['thumbnailUrl'] as String?) ??
+            'https://i.ytimg.com/vi/$id/hqdefault.jpg';
 
         tracks.add(YtmTrack(
           videoId: id,

@@ -14,11 +14,13 @@
 -keep class com.lucasjosino.on_audio_query.** { *; }
 -dontwarn com.lucasjosino.on_audio_query.**
 
-# SQLite3 and Drift ProGuard Rules
+# SQLite3, Drift and SQLCipher ProGuard Rules
 -keep class com.tekartik.sqflite.** { *; }
 -dontwarn com.tekartik.sqflite.**
 -keep class org.sqlite.** { *; }
 -dontwarn org.sqlite.**
+-keep class sqlite3.** { *; }
+-dontwarn sqlite3.**
 
 # Path Provider Rules
 -keep class io.flutter.plugins.pathprovider.** { *; }
@@ -29,7 +31,21 @@
 -dontwarn androidx.media.**
 -keep class androidx.media3.** { *; }
 -dontwarn androidx.media3.**
+
+# Keep all Pulsr application classes, companions, and methods
 -keep class com.pulsr.music.** { *; }
+-keepclassmembers class com.pulsr.music.** { *; }
+-keepclasseswithmembernames class * {
+    native <methods>;
+}
+
+# Android WebView & JavascriptInterface (PoToken WebView & BotGuard)
+-keepattributes JavascriptInterface
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+-keep class android.webkit.** { *; }
+-dontwarn android.webkit.**
 
 # Sentry Crash Reporting
 -keepattributes *Annotation*
@@ -41,7 +57,7 @@
 -keep class es.antonborri.home_widget.** { *; }
 -dontwarn es.antonborri.home_widget.**
 
-# Kotlin Coroutines
+# Kotlin Coroutines & Reflect
 -keep class kotlinx.coroutines.** { *; }
 -dontwarn kotlinx.coroutines.**
 
@@ -55,20 +71,10 @@
 -keep class com.google.protobuf.** { *; }
 -dontwarn com.google.protobuf.**
 
-# NewPipeExtractor -- present only in the ytm/dev flavors, absent from prod.
-# Rhino compiles YouTube's player JS at runtime and resolves classes
-# reflectively, so it must not be minified. The extractor reflects into
-# nanojson/jsoup on its deserialization paths.
--keep class org.mozilla.javascript.** { *; }
--keep class org.mozilla.classfile.** { *; }
--dontwarn org.mozilla.javascript.**
--keep class org.schabi.newpipe.extractor.** { *; }
--dontwarn org.schabi.newpipe.extractor.**
--keep class com.grack.nanojson.** { *; }
--keep class org.jsoup.** { *; }
--dontwarn org.jsoup.**
-# Rhino optionally binds javax.script and java.beans; neither exists on Android.
--dontwarn javax.script.**
+# Rhino & Scripting Engine Rules
 -dontwarn java.beans.**
--dontwarn org.mozilla.javascript.tools.**
-
+-dontwarn javax.script.**
+-dontwarn org.mozilla.**
+-keep class org.mozilla.** { *; }
+-dontwarn org.mozilla.javascript.**
+-keep class org.mozilla.javascript.** { *; }

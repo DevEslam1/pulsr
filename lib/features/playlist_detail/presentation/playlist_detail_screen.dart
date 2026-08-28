@@ -23,9 +23,11 @@ class PlaylistDetailScreen extends StatelessWidget {
   final PlaylistsTableData playlist;
   final PlaylistUseCases? playlistUseCases;
 
-  const PlaylistDetailScreen({super.key, required this.playlist, this.playlistUseCases});
+  const PlaylistDetailScreen(
+      {super.key, required this.playlist, this.playlistUseCases});
 
-  PlaylistUseCases get _useCases => playlistUseCases ?? getIt<PlaylistUseCases>();
+  PlaylistUseCases get _useCases =>
+      playlistUseCases ?? getIt<PlaylistUseCases>();
 
   void _downloadPlaylist(BuildContext context, List<SongsTableData> songs) {
     if (songs.isEmpty) {
@@ -35,18 +37,21 @@ class PlaylistDetailScreen extends StatelessWidget {
       return;
     }
 
-    final downloadCubit = context.read<YtmDownloadCubit?>() ?? getIt<YtmDownloadCubit>();
+    final downloadCubit =
+        context.read<YtmDownloadCubit?>() ?? getIt<YtmDownloadCubit>();
     final queuedCount = downloadCubit.downloadAll(songs);
 
     if (queuedCount > 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Queued $queuedCount tracks for download (3 active downloads)...'),
+          content: Text(
+              'Queued $queuedCount tracks for download (3 active downloads)...'),
           behavior: SnackBarBehavior.floating,
         ),
       );
     } else {
-      final hasOnlineTracks = songs.any((s) => s.remoteId != null && s.remoteId!.isNotEmpty);
+      final hasOnlineTracks =
+          songs.any((s) => s.remoteId != null && s.remoteId!.isNotEmpty);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -60,7 +65,8 @@ class PlaylistDetailScreen extends StatelessWidget {
     }
   }
 
-  Future<void> _exportPlaylist(BuildContext context, List<SongsTableData> songs) async {
+  Future<void> _exportPlaylist(
+      BuildContext context, List<SongsTableData> songs) async {
     if (songs.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Cannot export an empty playlist.')),
@@ -72,14 +78,16 @@ class PlaylistDetailScreen extends StatelessWidget {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Playlist exported successfully (${songs.length} tracks).'),
+          content:
+              Text('Playlist exported successfully (${songs.length} tracks).'),
           behavior: SnackBarBehavior.floating,
         ),
       );
     }
   }
 
-  Future<void> _sharePlaylist(BuildContext context, List<SongsTableData> songs) async {
+  Future<void> _sharePlaylist(
+      BuildContext context, List<SongsTableData> songs) async {
     if (songs.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Cannot share an empty playlist.')),
@@ -107,9 +115,13 @@ class PlaylistDetailScreen extends StatelessWidget {
     final p = context.palette;
     final playlistUseCases = _useCases;
 
-    final Stream<List<SongsTableData>> songsStream = playlist.isSmart && playlist.smartCriteria != null
-        ? playlistUseCases.watchSmartPlaylistSongs(SmartCriteria.fromJsonString(playlist.smartCriteria!))
-        : playlistUseCases.watchPlaylistSongs(playlist.id).map((res) => res.fold((l) => <SongsTableData>[], (r) => r));
+    final Stream<List<SongsTableData>> songsStream =
+        playlist.isSmart && playlist.smartCriteria != null
+            ? playlistUseCases.watchSmartPlaylistSongs(
+                SmartCriteria.fromJsonString(playlist.smartCriteria!))
+            : playlistUseCases
+                .watchPlaylistSongs(playlist.id)
+                .map((res) => res.fold((l) => <SongsTableData>[], (r) => r));
 
     return StreamBuilder<List<SongsTableData>>(
       stream: songsStream,
@@ -124,14 +136,17 @@ class PlaylistDetailScreen extends StatelessWidget {
                   Icon(Icons.auto_awesome_rounded, color: p.accent, size: 20),
                   const SizedBox(width: 8),
                 ],
-                Expanded(child: Text(playlist.name, overflow: TextOverflow.ellipsis)),
+                Expanded(
+                    child:
+                        Text(playlist.name, overflow: TextOverflow.ellipsis)),
               ],
             ),
             actions: [
               if (playlist.isSmart)
                 IconButton(
                   icon: Icon(Icons.edit_rounded, color: p.accent),
-                  onPressed: () => context.push('/smart-playlist-builder', extra: playlist),
+                  onPressed: () =>
+                      context.push('/smart-playlist-builder', extra: playlist),
                 ),
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert_rounded),
@@ -158,7 +173,8 @@ class PlaylistDetailScreen extends StatelessWidget {
                       value: 'download',
                       child: Row(
                         children: [
-                          Icon(Icons.download_rounded, color: p.accent, size: 20),
+                          Icon(Icons.download_rounded,
+                              color: p.accent, size: 20),
                           const SizedBox(width: 12),
                           const Text('Download All Tracks'),
                         ],
@@ -168,7 +184,8 @@ class PlaylistDetailScreen extends StatelessWidget {
                     value: 'export',
                     child: Row(
                       children: [
-                        Icon(Icons.file_upload_outlined, color: p.accent, size: 20),
+                        Icon(Icons.file_upload_outlined,
+                            color: p.accent, size: 20),
                         const SizedBox(width: 12),
                         const Text('Export as M3U'),
                       ],
@@ -188,9 +205,11 @@ class PlaylistDetailScreen extends StatelessWidget {
                     value: 'delete',
                     child: Row(
                       children: [
-                        Icon(Icons.delete_outline_rounded, color: p.error, size: 20),
+                        Icon(Icons.delete_outline_rounded,
+                            color: p.error, size: 20),
                         const SizedBox(width: 12),
-                        Text('Delete Playlist', style: TextStyle(color: p.error)),
+                        Text('Delete Playlist',
+                            style: TextStyle(color: p.error)),
                       ],
                     ),
                   ),
@@ -201,11 +220,14 @@ class PlaylistDetailScreen extends StatelessWidget {
           body: Center(
             child: ConstrainedBox(
               constraints: Adaptive.contentConstraints(context),
-              child: snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData
+              child: snapshot.connectionState == ConnectionState.waiting &&
+                      !snapshot.hasData
                   ? Center(child: CircularProgressIndicator(color: p.accent))
                   : songs.isEmpty
                       ? EmptyStateWidget(
-                          icon: playlist.isSmart ? Icons.auto_awesome_rounded : Icons.queue_music_rounded,
+                          icon: playlist.isSmart
+                              ? Icons.auto_awesome_rounded
+                              : Icons.queue_music_rounded,
                           title: 'No Tracks',
                           subtitle: playlist.isSmart
                               ? 'No tracks match the rules for this smart playlist.'
@@ -216,15 +238,20 @@ class PlaylistDetailScreen extends StatelessWidget {
                           children: [
                             // Header Controls
                             Padding(
-                              padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context), vertical: 12),
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: Adaptive.pagePadding(context),
+                                  vertical: 12),
                               child: Row(
                                 children: [
                                   Expanded(
                                     child: ElevatedButton.icon(
                                       onPressed: () {
-                                        context.read<PlayerCubit>().playSong(songs.first, queue: songs);
+                                        context.read<PlayerCubit>().playSong(
+                                            songs.first,
+                                            queue: songs);
                                       },
-                                      icon: const Icon(Icons.play_arrow_rounded),
+                                      icon:
+                                          const Icon(Icons.play_arrow_rounded),
                                       label: const Text('Play All'),
                                     ),
                                   ),
@@ -232,23 +259,32 @@ class PlaylistDetailScreen extends StatelessWidget {
                                   Expanded(
                                     child: OutlinedButton.icon(
                                       onPressed: () {
-                                        final shuffled = List<SongsTableData>.from(songs)..shuffle();
-                                        context.read<PlayerCubit>().playSong(shuffled.first, queue: shuffled);
+                                        final shuffled =
+                                            List<SongsTableData>.from(songs)
+                                              ..shuffle();
+                                        context.read<PlayerCubit>().playSong(
+                                            shuffled.first,
+                                            queue: shuffled);
                                       },
-                                      icon: Icon(Icons.shuffle_rounded, color: p.accent),
+                                      icon: Icon(Icons.shuffle_rounded,
+                                          color: p.accent),
                                       label: const Text('Shuffle'),
                                     ),
                                   ),
                                   if (AppConfig.ytmEnabled) ...[
                                     const SizedBox(width: 8),
                                     IconButton.filledTonal(
-                                      onPressed: () => _downloadPlaylist(context, songs),
-                                      icon: const Icon(Icons.download_rounded, size: 20),
+                                      onPressed: () =>
+                                          _downloadPlaylist(context, songs),
+                                      icon: const Icon(Icons.download_rounded,
+                                          size: 20),
                                       style: IconButton.styleFrom(
-                                        backgroundColor: p.accent.withValues(alpha: 0.15),
+                                        backgroundColor:
+                                            p.accent.withValues(alpha: 0.15),
                                         foregroundColor: p.accent,
                                       ),
-                                      tooltip: 'Download all offline (3 active downloads)',
+                                      tooltip:
+                                          'Download all offline (3 active downloads)',
                                     ),
                                   ],
                                 ],
@@ -260,8 +296,11 @@ class PlaylistDetailScreen extends StatelessWidget {
                               SongTile(
                                 song: songs[i],
                                 index: i,
-                                subtitleOverride: '${songs[i].artist} • ${songs[i].album}',
-                                onTap: () => context.read<PlayerCubit>().playSong(songs[i], queue: songs),
+                                subtitleOverride:
+                                    '${songs[i].artist} • ${songs[i].album}',
+                                onTap: () => context
+                                    .read<PlayerCubit>()
+                                    .playSong(songs[i], queue: songs),
                                 onMorePressed: () => showModalBottomSheet(
                                   context: context,
                                   useRootNavigator: true,
@@ -278,10 +317,14 @@ class PlaylistDetailScreen extends StatelessWidget {
                                       YtmDownloadButton(song: songs[i]),
                                     if (!playlist.isSmart)
                                       IconButton(
-                                        icon: Icon(Icons.remove_circle_outline_rounded,
-                                            size: 20, color: p.textTertiary),
+                                        icon: Icon(
+                                            Icons.remove_circle_outline_rounded,
+                                            size: 20,
+                                            color: p.textTertiary),
                                         onPressed: () {
-                                          playlistUseCases.removeSongFromPlaylist(playlist.id, songs[i].id);
+                                          playlistUseCases
+                                              .removeSongFromPlaylist(
+                                                  playlist.id, songs[i].id);
                                         },
                                       ),
                                   ],

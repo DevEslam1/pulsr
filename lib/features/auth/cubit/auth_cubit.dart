@@ -129,16 +129,22 @@ class AuthCubit extends Cubit<AuthState> {
     if (s.contains('user-not-found') || s.contains('user not found')) {
       return 'No account found with this email.';
     }
-    if (s.contains('wrong-password') || s.contains('wrong password') || s.contains('invalid-credential') || s.contains('invalid-email')) {
+    if (s.contains('wrong-password') ||
+        s.contains('wrong password') ||
+        s.contains('invalid-credential') ||
+        s.contains('invalid-email')) {
       return 'Incorrect email or password.';
     }
-    if (s.contains('email-already-in-use') || s.contains('email already in use')) {
+    if (s.contains('email-already-in-use') ||
+        s.contains('email already in use')) {
       return 'This email is already registered.';
     }
     if (s.contains('weak-password') || s.contains('weak password')) {
       return 'Password must be at least 6 characters.';
     }
-    if (s.contains('network-request-failed') || s.contains('network error') || s.contains('socketexception')) {
+    if (s.contains('network-request-failed') ||
+        s.contains('network error') ||
+        s.contains('socketexception')) {
       return 'Network error. Check your internet connection.';
     }
     if (s.contains('apiexception') && s.contains('10')) {

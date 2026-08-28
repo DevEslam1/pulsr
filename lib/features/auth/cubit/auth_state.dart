@@ -4,7 +4,14 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'auth_state.freezed.dart';
 
-enum AuthStatus { initial, authenticating, authenticated, unauthenticated, error }
+enum AuthStatus {
+  initial,
+  authenticating,
+  authenticated,
+  unauthenticated,
+  error
+}
+
 enum SyncStatus { idle, syncing, success, failure }
 
 @freezed

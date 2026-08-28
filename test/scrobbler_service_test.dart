@@ -54,10 +54,13 @@ void main() {
       expect(methodCalls.first.arguments['isPlaying'], isTrue);
     });
 
-    test('Direct ListenBrainz scrobbling triggers HTTP POST when enabled and threshold reached', () async {
+    test(
+        'Direct ListenBrainz scrobbling triggers HTTP POST when enabled and threshold reached',
+        () async {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(ScrobblerService.keyListenBrainzEnabled, true);
-      await prefs.setString(ScrobblerService.keyListenBrainzToken, 'test_token_12345');
+      await prefs.setString(
+          ScrobblerService.keyListenBrainzToken, 'test_token_12345');
 
       // 1. Initial play -> Playing Now
       await service.notifyPlaybackState(

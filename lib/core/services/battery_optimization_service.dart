@@ -12,7 +12,8 @@ class BatteryOptimizationService {
   static Future<bool> isIgnoringBatteryOptimizations() async {
     if (kIsWeb || !Platform.isAndroid) return true;
     try {
-      final isIgnoring = await _channel.invokeMethod<bool>('isIgnoringBatteryOptimizations');
+      final isIgnoring =
+          await _channel.invokeMethod<bool>('isIgnoringBatteryOptimizations');
       return isIgnoring ?? false;
     } catch (_) {
       return false;
@@ -22,7 +23,8 @@ class BatteryOptimizationService {
   static Future<bool> requestIgnoreBatteryOptimizations() async {
     if (kIsWeb || !Platform.isAndroid) return true;
     try {
-      final res = await _channel.invokeMethod<bool>('requestIgnoreBatteryOptimizations');
+      final res = await _channel
+          .invokeMethod<bool>('requestIgnoreBatteryOptimizations');
       return res ?? false;
     } catch (_) {
       return false;

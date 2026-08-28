@@ -1,4 +1,7 @@
+// android/app/src/main/cpp/AudioDspEngine.cpp
 #include "AudioDspEngine.h"
+#include <algorithm>
+#include <cmath>
 
 AudioDspEngine& AudioDspEngine::instance() {
     static AudioDspEngine sInstance;
@@ -6,108 +9,150 @@ AudioDspEngine& AudioDspEngine::instance() {
 }
 
 AudioDspEngine::AudioDspEngine() {
-    setSampleRate(48000.0);
+    auto initialSnapshot = std::make_shared<DspParamSnapshot>();
+    initialSnapshot->generation = 1;
+    initialSnapshot->sampleRate = 48000.0;
+    initialSnapshot->activeStages = 0xFFFFFFFF;
+    currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(initialSnapshot));
+    setSampleRateInternal(48000.0);
+}
+
+void AudioDspEngine::setSampleRateInternal(double sampleRate) {
+    if (sampleRate < 8000.0) sampleRate = 8000.0;
+    if (sampleRate > 768000.0) sampleRate = 768000.0;
+    sampleRate_ = sampleRate;
+
+    eq_.setSampleRate(sampleRate_);
+    crossfeed_.setSampleRate(sampleRate_);
+    limiter_.setSampleRate(sampleRate_);
+    reverb_.setSampleRate(sampleRate_);
+    resampler_.setRates(sampleRate_, sampleRate_);
 }
 
 void AudioDspEngine::setSampleRate(double sampleRate) {
     if (sampleRate < 8000.0) sampleRate = 8000.0;
     if (sampleRate > 768000.0) sampleRate = 768000.0;
-    sampleRate_ = sampleRate;
 
-    eq_.setSampleRate(sampleRate);
-    crossfeed_.setSampleRate(sampleRate);
-    limiter_.setSampleRate(sampleRate);
-    reverb_.setSampleRate(sampleRate);
+    std::lock_guard<std::mutex> lock(publishMutex_);
+    auto current = currentParams_.load();
+
+    // Prewarm synthetic IR on control thread BEFORE publishing snapshot (R2)
+    auto prewarmedIr = PreparedIr::createSynthetic(
+        sampleRate,
+        current->reverb.preset,
+        static_cast<float>(current->reverb.damping));
+
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->generation = ++snapshotGeneration_;
+    updated->sampleRate = sampleRate;
+    updated->reverb.preparedIr = prewarmedIr;
+    currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(updated));
 }
 
-void AudioDspEngine::reset() {
+void AudioDspEngine::setActiveStages(uint32_t bitmask) {
+    std::lock_guard<std::mutex> lock(publishMutex_);
+    auto current = currentParams_.load();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->generation = ++snapshotGeneration_;
+    updated->activeStages = bitmask;
+    currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(updated));
+}
+
+uint32_t AudioDspEngine::getActiveStages() const {
+    auto snapshot = getParams();
+    return snapshot ? snapshot->activeStages : 0xFFFFFFFF;
+}
+
+void AudioDspEngine::publishParams(std::shared_ptr<const DspParamSnapshot> snapshot) {
+    if (!snapshot) return;
+    std::lock_guard<std::mutex> lock(publishMutex_);
+    currentParams_.store(snapshot);
+}
+
+std::shared_ptr<const DspParamSnapshot> AudioDspEngine::getParams() const {
+    return currentParams_.load();
+}
+
+void AudioDspEngine::resetInternal() {
     eq_.reset();
     crossfeed_.reset();
     limiter_.reset();
     reverb_.reset();
     resampler_.reset();
+    panner_.reset();
     dsdDecoder_.reset();
 }
 
+void AudioDspEngine::reset() {
+    std::lock_guard<std::mutex> lock(publishMutex_);
+    auto current = currentParams_.load();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->generation = ++snapshotGeneration_;
+    updated->resetRequested = true;
+    currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(updated));
+}
+
 int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) {
-    if (!buffer || frames <= 0 || channels < 1) return 0;
-    int chCount = std::min(channels, 8);
+    if (!buffer || frames <= 0 || channels <= 0) return frames;
 
-#if defined(__arm__)
-    // ARMv7: flush-to-zero via FPSCR (VFP control register)
-    unsigned int fpscr;
-    asm volatile("vmrs %0, fpscr" : "=r"(fpscr));
-    fpscr |= (1u << 24); // FZ bit — Flush-to-zero mode
-    asm volatile("vmsr fpscr, %0" : : "r"(fpscr));
-#elif defined(__aarch64__)
-    // AArch64: flush-to-zero via FPCR (replaces FPSCR; uses mrs/msr)
-    uint64_t fpcr;
-    asm volatile("mrs %0, fpcr" : "=r"(fpcr));
-    fpcr |= (1ULL << 24); // FZ bit — Flush-to-zero mode
-    asm volatile("msr fpcr, %0" : : "r"(fpcr));
-#endif
+    // Load parameter snapshot atomically ONCE per processing block
+    auto snapshot = currentParams_.load();
+    if (!snapshot) return frames;
 
-    int outFrames = frames;
-
-    if (chCount == 2) {
-        // 1. Parametric EQ (Stereo)
-        if ((activeStages_ & STAGE_EQ) && eq_.isEnabled()) {
-            eq_.processInterleaved(buffer, outFrames, 2);
+    // Fast check: generation counter skips applyParams entirely when unchanged
+    if (snapshot->generation != lastAppliedGeneration_.load()) {
+        if (snapshot->resetRequested) {
+            resetInternal();
+        }
+        if (std::abs(snapshot->sampleRate - sampleRate_) > 0.5) {
+            setSampleRateInternal(snapshot->sampleRate);
         }
 
-        // 2. Headphone Crossfeed (Stereo only)
-        if ((activeStages_ & STAGE_CROSSFEED) && crossfeed_.isEnabled()) {
-            crossfeed_.processInterleaved(buffer, outFrames);
-        }
+        eq_.applyParams(snapshot->eq);
+        crossfeed_.applyParams(snapshot->crossfeed);
+        reverb_.applyParams(snapshot->reverb);
+        panner_.applyParams(snapshot->panner);
+        resampler_.applyParams(snapshot->resampler);
+        limiter_.applyParams(snapshot->limiter);
 
-        // 3. Convolution Reverb / Room Simulation (Stereo)
-        if ((activeStages_ & STAGE_REVERB) && reverb_.isEnabled()) {
-            reverb_.processInterleaved(buffer, outFrames);
-        }
-
-        // 4. Stereo Balance & Mono Mix (Stereo)
-        if (activeStages_ & STAGE_PANNER) {
-            panner_.processInterleaved(buffer, outFrames);
-        }
-
-        // 5. Lookahead Brickwall Limiter (Stereo)
-        if ((activeStages_ & STAGE_LIMITER) && limiter_.isEnabled()) {
-            limiter_.processInterleaved(buffer, outFrames);
-        }
-
-        // 6. Sinc Resampler (Stereo)
-        if ((activeStages_ & STAGE_RESAMPLER) && resampler_.isEnabled()) {
-            const int expectedOut = resampler_.getExpectedOutFrames(outFrames);
-            const size_t totalSamples = static_cast<size_t>(std::max(outFrames, expectedOut)) * 2;
-            if (resamplerOutBuf_.size() < totalSamples) {
-                resamplerOutBuf_.resize(totalSamples);
-            }
-            int resampledFrames = resampler_.processInterleaved(
-                buffer, outFrames, resamplerOutBuf_.data(),
-                static_cast<int>(totalSamples / 2));
-            if (resampledFrames > 0) {
-                const int copyFrames = std::min(resampledFrames, frames);
-                std::memcpy(buffer, resamplerOutBuf_.data(),
-                            static_cast<size_t>(copyFrames) * 2 * sizeof(float));
-                outFrames = copyFrames;
-            }
-        }
-    } else if (channels == 1) {
-        // Mono channel path
-        if ((activeStages_ & STAGE_EQ) && eq_.isEnabled()) {
-            eq_.processInterleaved(buffer, outFrames, 1);
-        }
-
-        // Apply Lookahead Limiter to mono stream
-        if ((activeStages_ & STAGE_LIMITER) && limiter_.isEnabled()) {
-            limiter_.processMono(buffer, outFrames);
-        }
-    } else {
-        // Multi-channel (>2) path
-        if ((activeStages_ & STAGE_EQ) && eq_.isEnabled()) {
-            eq_.processInterleaved(buffer, outFrames, channels);
-        }
+        lastAppliedGeneration_.store(snapshot->generation);
     }
 
-    return outFrames;
+    const uint32_t stages = snapshot->activeStages;
+    if (stages == 0) {
+        // Bit-perfect direct passthrough — all DSP stages bypassed
+        return frames;
+    }
+
+    // 1. Parametric EQ Stage
+    if (stages & STAGE_EQ) {
+        eq_.processInterleaved(buffer, frames, channels);
+    }
+
+    // 2. Crossfeed Stage (Stereo only)
+    if ((stages & STAGE_CROSSFEED) && channels == 2) {
+        crossfeed_.processInterleaved(buffer, frames);
+    }
+
+    // 3. Convolution Reverb Stage (Stereo only)
+    if ((stages & STAGE_REVERB) && channels == 2) {
+        reverb_.processInterleaved(buffer, frames, channels);
+    }
+
+    // 4. Spatial Panner & Balance (All channels)
+    if (stages & STAGE_PANNER) {
+        panner_.processInterleaved(buffer, frames, channels);
+    }
+
+    // 5. Polyphase Sinc Resampler (Fixed-frame streaming contract)
+    if (stages & STAGE_RESAMPLER) {
+        resampler_.processInterleaved(buffer, frames, channels);
+    }
+
+    // 6. Lookahead Limiter Stage (Multichannel / stereo / mono) - True-peak limiter is final
+    if (stages & STAGE_LIMITER) {
+        limiter_.processInterleaved(buffer, frames, channels);
+    }
+
+    return frames;
 }

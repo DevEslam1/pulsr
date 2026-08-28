@@ -7,8 +7,11 @@ import 'package:pulsr/data/audio/crossfade_manager.dart';
 
 void main() {
   group('Audit Fixes Verification Tests', () {
-    test('splitSetCookies correctly preserves RFC 1123 expires dates with commas', () {
-      const header = 'SID=abc12345; Expires=Wed, 21 Oct 2026 07:28:00 GMT; Path=/; Domain=.google.com; Secure; HttpOnly, HSID=xyz789; Expires=Thu, 22 Oct 2026 08:00:00 GMT; Path=/; Secure';
+    test(
+        'splitSetCookies correctly preserves RFC 1123 expires dates with commas',
+        () {
+      const header =
+          'SID=abc12345; Expires=Wed, 21 Oct 2026 07:28:00 GMT; Path=/; Domain=.google.com; Secure; HttpOnly, HSID=xyz789; Expires=Thu, 22 Oct 2026 08:00:00 GMT; Path=/; Secure';
       final cookies = YtmAccountService.splitSetCookies(header);
       expect(cookies.length, 2);
       expect(cookies[0], contains('SID=abc12345'));
@@ -30,7 +33,8 @@ void main() {
       expect(PulsrChannels.audioEffects, 'com.pulsr.music/audio_effects');
       expect(PulsrChannels.tagEditor, 'com.pulsr.music/tag_editor');
       expect(PulsrChannels.visualizer, 'com.pulsr.music/visualizer');
-      expect(PulsrChannels.visualizerStream, 'com.pulsr.music/visualizer_stream');
+      expect(
+          PulsrChannels.visualizerStream, 'com.pulsr.music/visualizer_stream');
       expect(PulsrChannels.ringtone, 'com.pulsr.music/ringtone');
       expect(PulsrChannels.scrobbler, 'com.pulsr.music/scrobbler');
       expect(PulsrChannels.ytm, 'com.pulsr.music/ytm');
@@ -44,7 +48,8 @@ void main() {
       expect(PulsrChannels.battery, 'com.pulsr.music/battery_optimization');
     });
 
-    test('LinkedHashSet strictly maintains insertion order for FIFO eviction', () {
+    test('LinkedHashSet strictly maintains insertion order for FIFO eviction',
+        () {
       final set = <String>{};
       for (int i = 0; i < 5; i++) {
         set.add('id_$i');
@@ -66,8 +71,11 @@ void main() {
       }
     });
 
-    test('CrossfadeManager calculateBpmAlignedDuration returns clamped duration', () {
-      final dur = CrossfadeManager.calculateBpmAlignedDuration(const Duration(seconds: 4), 120.0);
+    test(
+        'CrossfadeManager calculateBpmAlignedDuration returns clamped duration',
+        () {
+      final dur = CrossfadeManager.calculateBpmAlignedDuration(
+          const Duration(seconds: 4), 120.0);
       expect(dur.inMilliseconds, greaterThanOrEqualTo(1000));
       expect(dur.inMilliseconds, lessThanOrEqualTo(20000));
     });
@@ -104,12 +112,16 @@ void main() {
       expect(normalCalled, isTrue);
     });
 
-    test('AdaptiveBufferEngine computes zero buffer for local files and optimal for network', () {
+    test(
+        'AdaptiveBufferEngine computes zero buffer for local files and optimal for network',
+        () {
       final engine = AdaptiveBufferEngine();
-      final localBuf = engine.calculateOptimalBuffer(bitrateKbps: 320, isWifi: true, isLocalFile: true);
+      final localBuf = engine.calculateOptimalBuffer(
+          bitrateKbps: 320, isWifi: true, isLocalFile: true);
       expect(localBuf, Duration.zero);
 
-      final netBuf = engine.calculateOptimalBuffer(bitrateKbps: 320, isWifi: true, isLocalFile: false);
+      final netBuf = engine.calculateOptimalBuffer(
+          bitrateKbps: 320, isWifi: true, isLocalFile: false);
       expect(netBuf.inSeconds, greaterThanOrEqualTo(2));
       expect(netBuf.inSeconds, lessThanOrEqualTo(30));
     });

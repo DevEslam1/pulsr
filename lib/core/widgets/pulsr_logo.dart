@@ -26,7 +26,8 @@ class PulsrLogo extends StatefulWidget {
   State<PulsrLogo> createState() => _PulsrLogoState();
 }
 
-class _PulsrLogoState extends State<PulsrLogo> with SingleTickerProviderStateMixin {
+class _PulsrLogoState extends State<PulsrLogo>
+    with SingleTickerProviderStateMixin {
   AnimationController? _controller;
 
   @override
@@ -120,7 +121,8 @@ class _PulsrLogoPainter extends CustomPainter {
           radius: 0.75,
           colors: [
             color.withValues(alpha: 0.95),
-            Color.lerp(color, const Color(0xFF002288), 0.5) ?? const Color(0xFF0077FF),
+            Color.lerp(color, const Color(0xFF002288), 0.5) ??
+                const Color(0xFF0077FF),
             const Color(0xFF001550),
             const Color(0xFF0A0C12),
           ],

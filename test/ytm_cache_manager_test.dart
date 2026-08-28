@@ -21,8 +21,10 @@ void main() {
       expect(hash1, isNot(equals(other)));
     });
 
-    test('getCachedAudioFile returns null when track is not cached on disk', () async {
-      final file = await cacheManager.getCachedAudioFile('non_existent_video_id_12345');
+    test('getCachedAudioFile returns null when track is not cached on disk',
+        () async {
+      final file =
+          await cacheManager.getCachedAudioFile('non_existent_video_id_12345');
       expect(file, isNull);
     });
 

@@ -44,10 +44,12 @@ class FolderUseCases {
     final excludedResult = await _repository.getExcludedFolderPaths();
 
     if (songsResult.isLeft()) {
-      return Left(songsResult.fold((l) => l, (r) => const DatabaseFailure('Error')));
+      return Left(
+          songsResult.fold((l) => l, (r) => const DatabaseFailure('Error')));
     }
     if (excludedResult.isLeft()) {
-      return Left(excludedResult.fold((l) => l, (r) => const DatabaseFailure('Error')));
+      return Left(
+          excludedResult.fold((l) => l, (r) => const DatabaseFailure('Error')));
     }
 
     final List<SongsTableData> songs = songsResult.fold((l) => [], (r) => r);
@@ -65,7 +67,11 @@ class FolderUseCases {
     final List<FolderItem> items = [];
     for (final entry in folderSongCounts.entries) {
       final path = entry.key;
-      final name = path.split(Platform.pathSeparator).where((s) => s.isNotEmpty).lastOrNull ?? path;
+      final name = path
+              .split(Platform.pathSeparator)
+              .where((s) => s.isNotEmpty)
+              .lastOrNull ??
+          path;
       final isExcluded = excludedPaths.contains(path);
       items.add(
         FolderItem(
@@ -84,14 +90,15 @@ class FolderUseCases {
   Stream<Result<List<SongsTableData>>> watchFolderSongs(String folderPath) {
     return _repository.watchAllSongs().map((result) {
       return result.map((songs) {
-        final normalizedTarget = folderPath.replaceAll('\\', '/').toLowerCase().trim();
+        final normalizedTarget =
+            folderPath.replaceAll('\\', '/').toLowerCase().trim();
         return songs.where((s) {
           if (s.source != SongSource.local) return false;
-          final parentDir = p.dirname(s.path).replaceAll('\\', '/').toLowerCase().trim();
+          final parentDir =
+              p.dirname(s.path).replaceAll('\\', '/').toLowerCase().trim();
           return parentDir == normalizedTarget;
         }).toList();
       });
     });
   }
 }
-

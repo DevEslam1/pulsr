@@ -10,8 +10,10 @@ abstract class Adaptive {
   static const double maxContentWidth = 1160;
   static const double maxSheetWidth = 620;
 
-  static double widthOf(BuildContext context) => MediaQuery.sizeOf(context).width;
-  static double heightOf(BuildContext context) => MediaQuery.sizeOf(context).height;
+  static double widthOf(BuildContext context) =>
+      MediaQuery.sizeOf(context).width;
+  static double heightOf(BuildContext context) =>
+      MediaQuery.sizeOf(context).height;
 
   static WindowClass windowOf(BuildContext context) {
     final w = widthOf(context);
@@ -42,7 +44,8 @@ abstract class Adaptive {
   }) {
     final w = widthOf(context);
     final isTab = isTablet(context);
-    final railWidth = isTab ? (w >= railExtendedBreakpoint ? 232.0 : 92.0) : 0.0;
+    final railWidth =
+        isTab ? (w >= railExtendedBreakpoint ? 232.0 : 92.0) : 0.0;
     final available = (w - railWidth).clamp(0.0, maxContentWidth);
     final usable = available - pagePadding(context) * 2;
     final calculated = (usable / minItemWidth).floor();
@@ -69,7 +72,8 @@ abstract class Adaptive {
 extension AdaptiveContextX on BuildContext {
   double get screenWidth => MediaQuery.sizeOf(this).width;
   double get screenHeight => MediaQuery.sizeOf(this).height;
-  bool get isLandscape => MediaQuery.orientationOf(this) == Orientation.landscape;
+  bool get isLandscape =>
+      MediaQuery.orientationOf(this) == Orientation.landscape;
   bool get isTablet => Adaptive.isTablet(this);
   bool get isTwoPane => Adaptive.isTwoPane(this);
   double get pagePadding => Adaptive.pagePadding(this);
@@ -82,7 +86,10 @@ extension AdaptiveContextX on BuildContext {
   }) {
     final w = windowClass;
     if (w == WindowClass.expanded && desktop != null) return desktop;
-    if ((w == WindowClass.medium || w == WindowClass.expanded) && tablet != null) return tablet;
+    if ((w == WindowClass.medium || w == WindowClass.expanded) &&
+        tablet != null) {
+      return tablet;
+    }
     return phone;
   }
 }

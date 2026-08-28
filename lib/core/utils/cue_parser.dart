@@ -15,14 +15,19 @@ class CueParser {
     String? currentFileName;
     Duration? currentStart;
 
-    final fileRegex = RegExp(r'^\s*FILE\s+"?([^"]+?)"?\s+([A-Z0-9]+)', caseSensitive: false);
-    final trackRegex = RegExp(r'^\s*TRACK\s+(\d+)\s+AUDIO', caseSensitive: false);
+    final fileRegex =
+        RegExp(r'^\s*FILE\s+"?([^"]+?)"?\s+([A-Z0-9]+)', caseSensitive: false);
+    final trackRegex =
+        RegExp(r'^\s*TRACK\s+(\d+)\s+AUDIO', caseSensitive: false);
     final titleRegex = RegExp(r'^\s*TITLE\s+"?([^"]+)"?', caseSensitive: false);
-    final indexRegex = RegExp(r'^\s*INDEX\s+01\s+(\d{2}):(\d{2}):(\d{2})', caseSensitive: false);
+    final indexRegex = RegExp(r'^\s*INDEX\s+01\s+(\d{2}):(\d{2}):(\d{2})',
+        caseSensitive: false);
 
     void savePrevious() {
       if (currentTrackIndex > 0 && currentStart != null) {
-        final title = currentTitle.isNotEmpty ? currentTitle : 'Chapter $currentTrackIndex';
+        final title = currentTitle.isNotEmpty
+            ? currentTitle
+            : 'Chapter $currentTrackIndex';
         chapters.add(ChapterInfo(
           index: currentTrackIndex,
           title: title,
@@ -46,7 +51,8 @@ class CueParser {
       final trackMatch = trackRegex.firstMatch(line);
       if (trackMatch != null) {
         savePrevious();
-        currentTrackIndex = int.tryParse(trackMatch.group(1) ?? '1') ?? (chapters.length + 1);
+        currentTrackIndex =
+            int.tryParse(trackMatch.group(1) ?? '1') ?? (chapters.length + 1);
         currentTitle = '';
         currentStart = null;
         continue;
@@ -64,7 +70,8 @@ class CueParser {
         final seconds = int.tryParse(indexMatch.group(2) ?? '0') ?? 0;
         final frames = int.tryParse(indexMatch.group(3) ?? '0') ?? 0;
         final ms = ((frames / 75.0) * 1000.0).round();
-        currentStart = Duration(minutes: minutes, seconds: seconds, milliseconds: ms);
+        currentStart =
+            Duration(minutes: minutes, seconds: seconds, milliseconds: ms);
       }
     }
 
@@ -75,9 +82,10 @@ class CueParser {
     for (int i = 0; i < chapters.length; i++) {
       final c = chapters[i];
       // Only set end duration if next track is in the same source file
-      final Duration? end = (i + 1 < chapters.length && chapters[i + 1].fileName == c.fileName)
-          ? chapters[i + 1].start
-          : null;
+      final Duration? end =
+          (i + 1 < chapters.length && chapters[i + 1].fileName == c.fileName)
+              ? chapters[i + 1].start
+              : null;
       resolved.add(ChapterInfo(
         index: c.index,
         title: c.title,
@@ -102,7 +110,8 @@ class CueParser {
         return parse(content);
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to read external .cue file for $audioFilePath', error: e, stackTrace: st, category: 'CueParser');
+      ErrorLogger.log('Failed to read external .cue file for $audioFilePath',
+          error: e, stackTrace: st, category: 'CueParser');
     }
     return const [];
   }

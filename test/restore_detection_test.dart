@@ -21,7 +21,8 @@ void main() {
       when(() => mockScanner.checkPermission()).thenAnswer((_) async => true);
       when(() => mockScanner.scanDeviceLibrary()).thenAnswer((_) async => 0);
 
-      final result = await RestoreDetectionService.checkAndHandleRestore(mockScanner);
+      final result =
+          await RestoreDetectionService.checkAndHandleRestore(mockScanner);
       expect(result, isFalse);
     });
   });

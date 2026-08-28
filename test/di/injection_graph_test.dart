@@ -18,7 +18,8 @@ void main() {
     setUpAll(() {
       final file = File('lib/core/di/injection.config.dart');
       expect(file.existsSync(), isTrue,
-          reason: 'Run: dart run build_runner build --delete-conflicting-outputs');
+          reason:
+              'Run: dart run build_runner build --delete-conflicting-outputs');
       generated = file.readAsStringSync();
     });
 

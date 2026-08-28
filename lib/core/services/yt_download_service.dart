@@ -1,6 +1,7 @@
 // lib/core/services/yt_download_service.dart
 import 'dart:async';
 import 'dart:collection';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -41,7 +42,8 @@ class YtDownloadProgress {
   final double? speedKbps;
   final int? etaSeconds;
 
-  const YtDownloadProgress(this.stage, [this.fraction, this.speedKbps, this.etaSeconds]);
+  const YtDownloadProgress(this.stage,
+      [this.fraction, this.speedKbps, this.etaSeconds]);
 }
 
 class _QueuedDownload {
@@ -118,7 +120,8 @@ class YtDownloadService {
     final completer = Completer<Result<int>>();
     final active = _activeDownloads[videoId];
     if (active != null) {
-      active.completer.future.then(completer.complete, onError: completer.completeError);
+      active.completer.future
+          .then(completer.complete, onError: completer.completeError);
       return completer.future;
     }
 
@@ -149,7 +152,9 @@ class YtDownloadService {
       }
 
       if (_activeDownloads.containsKey(videoId)) {
-        _activeDownloads[videoId]!.completer.future.then(task.completer.complete, onError: task.completer.completeError);
+        _activeDownloads[videoId]!.completer.future.then(
+            task.completer.complete,
+            onError: task.completer.completeError);
         continue;
       }
 
@@ -203,13 +208,17 @@ class YtDownloadService {
 
       // Pre-download storage check (BUG-06)
       try {
-        final freeBytes = await _downloadChannel.invokeMethod<int>('getFreeDiskSpace');
+        final freeBytes =
+            await _downloadChannel.invokeMethod<int>('getFreeDiskSpace');
         if (freeBytes != null && freeBytes > 0) {
           final estBitrate = stream.bitrateKbps > 0 ? stream.bitrateKbps : 160;
-          final estDurationSec = stream.duration.inSeconds > 0 ? stream.duration.inSeconds : 240;
-          final estimatedBytes = (estDurationSec * estBitrate * 1000 ~/ 8) + (5 * 1024 * 1024);
+          final estDurationSec =
+              stream.duration.inSeconds > 0 ? stream.duration.inSeconds : 240;
+          final estimatedBytes =
+              (estDurationSec * estBitrate * 1000 ~/ 8) + (5 * 1024 * 1024);
           if (freeBytes < estimatedBytes) {
-            return const Left(DownloadFailure('Insufficient storage space for download'));
+            return const Left(
+                DownloadFailure('Insufficient storage space for download'));
           }
         }
       } catch (_) {}
@@ -273,7 +282,8 @@ class YtDownloadService {
       }
       final tempSize = await temp.length();
       if (tempSize < 1024) {
-        return const Left(DownloadFailure('Downloaded audio file is corrupt or incomplete'));
+        return const Left(
+            DownloadFailure('Downloaded audio file is corrupt or incomplete'));
       }
 
       // 3. Tagging
@@ -465,7 +475,8 @@ class YtDownloadService {
     // Initial probe to test HTTP Range support and fetch content length
     try {
       final probeReq = await _http.openUrl('GET', uri);
-      _applyStreamHeaders(probeReq, userAgent, cookies: cookies, range: 'bytes=0-0');
+      _applyStreamHeaders(probeReq, userAgent,
+          cookies: cookies, range: 'bytes=0-0');
       final probeResp = await probeReq.close();
 
       final acceptRanges =
@@ -530,7 +541,8 @@ class YtDownloadService {
 
     try {
       try {
-        final freeBytes = await _downloadChannel.invokeMethod<int>('getFreeDiskSpace') ?? 0;
+        final freeBytes =
+            await _downloadChannel.invokeMethod<int>('getFreeDiskSpace') ?? 0;
         if (freeBytes > 0 && freeBytes < total) {
           throw const DownloadFailure('Insufficient storage space');
         }
@@ -558,7 +570,8 @@ class YtDownloadService {
           }
 
           final req = await _http.getUrl(uri);
-          _applyStreamHeaders(req, userAgent, cookies: cookies, range: 'bytes=$start-$end');
+          _applyStreamHeaders(req, userAgent,
+              cookies: cookies, range: 'bytes=$start-$end');
           final resp = await req.close();
 
           if (resp.statusCode == HttpStatus.forbidden ||
@@ -592,7 +605,8 @@ class YtDownloadService {
                       ? (totalReceived / elapsedSeconds) / 1024.0
                       : 0.0;
                   final fraction = (totalReceived / total).clamp(0.0, 1.0);
-                  final remainingBytes = (total - totalReceived).clamp(0, total);
+                  final remainingBytes =
+                      (total - totalReceived).clamp(0, total);
                   final etaSeconds = (speedKbps > 0 && remainingBytes > 0)
                       ? (remainingBytes / (speedKbps * 1024.0)).round()
                       : null;
@@ -624,7 +638,8 @@ class YtDownloadService {
       if (total > 0) {
         final totalReceivedBytes = chunkReceived.reduce((a, b) => a + b);
         if (totalReceivedBytes != total) {
-          throw DownloadFailure('Parallel download byte mismatch: received $totalReceivedBytes, expected $total');
+          throw DownloadFailure(
+              'Parallel download byte mismatch: received $totalReceivedBytes, expected $total');
         }
         final chunkCount = tempParts.length;
         for (int i = 0; i < chunkCount; i++) {
@@ -637,7 +652,8 @@ class YtDownloadService {
               ? total - (chunkSize * (chunkCount - 1))
               : chunkSize;
           if (partSize != expectedSize) {
-            throw DownloadFailure('Chunk $i incomplete: $partSize/$expectedSize bytes');
+            throw DownloadFailure(
+                'Chunk $i incomplete: $partSize/$expectedSize bytes');
           }
         }
       }
@@ -647,7 +663,8 @@ class YtDownloadService {
         throw const DownloadFailure('Download canceled');
       }
 
-      final outSink = dest.openWrite();
+      final outPartFile = File('${dest.path}.part');
+      final outSink = outPartFile.openWrite();
       try {
         for (final part in tempParts) {
           if (task.isCanceled ||
@@ -663,13 +680,19 @@ class YtDownloadService {
         await outSink.close();
       }
 
-      // Verify merged total size
+      // Verify merged total size and atomically rename (BUG-014)
       if (total > 0) {
-        final finalSize = await dest.length();
+        final finalSize = await outPartFile.length();
         if (finalSize != total) {
-          await dest.delete().catchError((_) => dest);
+          await outPartFile.delete().catchError((_) => outPartFile);
           throw DownloadFailure('Merged file size mismatch: $finalSize/$total');
         }
+      }
+      if (await outPartFile.exists()) {
+        if (await dest.exists()) {
+          await dest.delete();
+        }
+        await outPartFile.rename(dest.path);
       }
       mergeCompleted = true;
     } finally {
@@ -680,6 +703,12 @@ class YtDownloadService {
           }
         } catch (_) {}
       }
+      final outPartFile = File('${dest.path}.part');
+      try {
+        if (await outPartFile.exists()) {
+          await outPartFile.delete();
+        }
+      } catch (_) {}
       if (!mergeCompleted) {
         try {
           if (await dest.exists()) {
@@ -714,7 +743,8 @@ class YtDownloadService {
     }
 
     final total = response.contentLength;
-    final sink = dest.openWrite();
+    final partFile = File('${dest.path}.part');
+    final sink = partFile.openWrite();
     var received = 0;
     var lastEmitTime = 0;
 
@@ -730,9 +760,8 @@ class YtDownloadService {
           if (now - lastEmitTime > 80 || (total > 0 && received == total)) {
             lastEmitTime = now;
             final elapsedSeconds = stopwatch.elapsedMilliseconds / 1000.0;
-            final speedKbps = elapsedSeconds > 0
-                ? (received / elapsedSeconds) / 1024.0
-                : 0.0;
+            final speedKbps =
+                elapsedSeconds > 0 ? (received / elapsedSeconds) / 1024.0 : 0.0;
             final fraction =
                 total > 0 ? (received / total).clamp(0.0, 1.0) : null;
             final remainingBytes = total > 0 ? total - received : 0;
@@ -753,6 +782,44 @@ class YtDownloadService {
     } finally {
       await sink.close();
     }
+
+    if (task.isCanceled || _canceledVideoIds.contains(task.song.remoteId)) {
+      try {
+        if (await partFile.exists()) {
+          await partFile.delete();
+        }
+      } catch (_) {}
+      throw const DownloadFailure('Download canceled');
+    }
+
+    if (await partFile.exists()) {
+      if (await dest.exists()) {
+        await dest.delete();
+      }
+      await partFile.rename(dest.path);
+    }
+  }
+
+  Future<void> cleanOrphanPartFiles() async {
+    try {
+      final dir = await getTemporaryDirectory();
+      if (await dir.exists()) {
+        await for (final entity in dir.list()) {
+          if (entity is File) {
+            final name = p.basename(entity.path);
+            if (name.startsWith('ytdl_') || name.contains('.part')) {
+              try {
+                final stat = await entity.stat();
+                if (DateTime.now().difference(stat.modified) >
+                    const Duration(minutes: 5)) {
+                  await entity.delete();
+                }
+              } catch (_) {}
+            }
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _tag(String path, SongsTableData song,
@@ -777,10 +844,67 @@ class YtDownloadService {
     }
   }
 
+  static String sanitizeFilename(String artist, String title, String ext) {
+    var rawArtist = artist.trim();
+    var rawTitle = title.trim();
+    if (rawArtist.isEmpty) rawArtist = 'Unknown Artist';
+    if (rawTitle.isEmpty) rawTitle = 'Unknown Title';
+
+    // 1. Strip reserved characters and control characters (BUG-015)
+    var cleanedArtist =
+        rawArtist.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '_').trim();
+    var cleanedTitle =
+        rawTitle.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '_').trim();
+
+    var base = '$cleanedArtist - $cleanedTitle';
+    // 2. Check Windows reserved device names
+    final baseUpper = base.toUpperCase().split('.').first;
+    const reservedNames = {
+      'CON',
+      'PRN',
+      'AUX',
+      'NUL',
+      'COM1',
+      'COM2',
+      'COM3',
+      'COM4',
+      'COM5',
+      'COM6',
+      'COM7',
+      'COM8',
+      'COM9',
+      'LPT1',
+      'LPT2',
+      'LPT3',
+      'LPT4',
+      'LPT5',
+      'LPT6',
+      'LPT7',
+      'LPT8',
+      'LPT9'
+    };
+    if (reservedNames.contains(baseUpper)) {
+      base = '${base}_track';
+    }
+
+    // 3. Limit UTF-8 byte length to 180 bytes (BUG-015)
+    var encoded = utf8.encode(base);
+    if (encoded.length > 180) {
+      while (encoded.length > 180 && base.isNotEmpty) {
+        base = base.substring(0, base.length - 1);
+        encoded = utf8.encode(base);
+      }
+    }
+    if (base.isEmpty) base = 'Track';
+
+    return '$base.$ext';
+  }
+
   static String _sanitize(String value, [String? ext]) {
-    final cleaned = value.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_').trim();
+    final cleaned = value.replaceAll(RegExp(r'[\\/:*?"<>|\x00-\x1F]'), '_').trim();
     final maxLen = ext != null ? (120 - ext.length - 1).clamp(20, 120) : 120;
-    final truncated = cleaned.length > maxLen ? cleaned.substring(0, maxLen) : cleaned;
+    final truncated =
+        cleaned.length > maxLen ? cleaned.substring(0, maxLen) : cleaned;
     return truncated.isEmpty ? 'Unknown' : truncated;
   }
 }

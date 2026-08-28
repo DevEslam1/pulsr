@@ -16,13 +16,16 @@ void main() {
 
       expect(lines.length, 3);
       expect(lines[0].text, 'First line of lyrics');
-      expect(lines[0].timestamp, const Duration(seconds: 12, milliseconds: 340));
+      expect(
+          lines[0].timestamp, const Duration(seconds: 12, milliseconds: 340));
 
       expect(lines[1].text, 'Second line of lyrics');
-      expect(lines[1].timestamp, const Duration(seconds: 15, milliseconds: 670));
+      expect(
+          lines[1].timestamp, const Duration(seconds: 15, milliseconds: 670));
 
       expect(lines[2].text, 'Chorus line');
-      expect(lines[2].timestamp, const Duration(minutes: 1, seconds: 2, milliseconds: 890));
+      expect(lines[2].timestamp,
+          const Duration(minutes: 1, seconds: 2, milliseconds: 890));
     });
 
     test('parses three-digit millisecond timestamps', () {
@@ -31,7 +34,8 @@ void main() {
 
       expect(lines.length, 1);
       expect(lines[0].text, 'Precision lyric');
-      expect(lines[0].timestamp, const Duration(minutes: 2, seconds: 30, milliseconds: 500));
+      expect(lines[0].timestamp,
+          const Duration(minutes: 2, seconds: 30, milliseconds: 500));
     });
 
     test('handles empty lines and non-timestamp header tags', () {
@@ -48,13 +52,15 @@ void main() {
       expect(lines[0].timestamp, const Duration(seconds: 5));
     });
 
-    test('parsePlainText parses non-synced lyrics with Duration.zero timestamp', () {
+    test('parsePlainText parses non-synced lyrics with Duration.zero timestamp',
+        () {
       const plainText = '''
 First line of plain lyric
 Second line of plain lyric
 Third line of plain lyric
 ''';
-      final lines = LrcParser.parsePlainText(plainText, source: LyricsSource.embedded);
+      final lines =
+          LrcParser.parsePlainText(plainText, source: LyricsSource.embedded);
 
       expect(lines.length, 3);
       expect(lines[0].text, 'First line of plain lyric');
@@ -66,8 +72,11 @@ Third line of plain lyric
       expect(lines[1].source, LyricsSource.embedded);
     });
 
-    test('resolveLyrics returns null for non-existent audio path when no embedded or external lrc', () async {
-      final result = await LrcParser.resolveLyrics('/invalid/path/non_existent.mp3');
+    test(
+        'resolveLyrics returns null for non-existent audio path when no embedded or external lrc',
+        () async {
+      final result =
+          await LrcParser.resolveLyrics('/invalid/path/non_existent.mp3');
       expect(result, isNull);
     });
   });

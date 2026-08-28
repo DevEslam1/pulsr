@@ -57,8 +57,14 @@ class EmptyStateWidget extends StatelessWidget {
                     color: effectiveIconColor.withValues(alpha: 0.08),
                   ),
                 )
-                    .animate(onPlay: (controller) => controller.repeat(reverse: true))
-                    .scaleXY(begin: 0.9, end: 1.15, duration: 2500.ms, curve: Curves.easeInOut),
+                    .animate(
+                        onPlay: (controller) =>
+                            controller.repeat(reverse: true))
+                    .scaleXY(
+                        begin: 0.9,
+                        end: 1.15,
+                        duration: 2500.ms,
+                        curve: Curves.easeInOut),
 
                 // Inner Glass Circle Container
                 Container(
@@ -125,8 +131,10 @@ class EmptyStateWidget extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: p.accent,
                     foregroundColor: p.onAccent,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: AppRadii.cardRadius),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: AppRadii.cardRadius),
                     elevation: 2,
                   ),
                   onPressed: isPrimaryLoading ? null : onPrimaryAction,
@@ -148,7 +156,8 @@ class EmptyStateWidget extends StatelessWidget {
                             ],
                             Text(
                               primaryActionLabel!,
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700, fontSize: 14),
                             ),
                           ],
                         ),
@@ -162,20 +171,24 @@ class EmptyStateWidget extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: p.textPrimary,
                   side: BorderSide(color: p.hairline),
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  shape: RoundedRectangleBorder(borderRadius: AppRadii.cardRadius),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  shape:
+                      RoundedRectangleBorder(borderRadius: AppRadii.cardRadius),
                 ),
                 onPressed: onSecondaryAction,
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (secondaryActionIcon != null) ...[
-                      Icon(secondaryActionIcon, size: 18, color: p.textSecondary),
+                      Icon(secondaryActionIcon,
+                          size: 18, color: p.textSecondary),
                       const SizedBox(width: 8),
                     ],
                     Text(
                       secondaryActionLabel!,
-                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 13),
                     ),
                   ],
                 ),

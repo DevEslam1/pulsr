@@ -53,10 +53,11 @@ class SearchCubit extends Cubit<SearchState> {
     }
 
     // Limit search query to 64 chars to avoid CPU starvation on huge pastes
-    final boundedQuery = trimmed.length > 64 ? trimmed.substring(0, 64) : trimmed;
+    final boundedQuery =
+        trimmed.length > 64 ? trimmed.substring(0, 64) : trimmed;
 
     emit(state.copyWith(isLoading: true));
-    
+
     // Cache excluded folders for 5 seconds to reduce DB round-trips while typing
     final now = DateTime.now();
     if (_cachedExcludedFolders == null ||
@@ -70,16 +71,20 @@ class SearchCubit extends Cubit<SearchState> {
 
     final excluded = _cachedExcludedFolders ?? const <String>[];
 
-    _searchSub = _searchUseCase.searchSongs(boundedQuery, excludedFolders: excluded).listen((result) {
+    _searchSub = _searchUseCase
+        .searchSongs(boundedQuery, excludedFolders: excluded)
+        .listen((result) {
       if (generation != _generation || isClosed) return;
       result.fold(
-        (failure) => emit(state.copyWith(isLoading: false, errorMessage: failure.message)),
+        (failure) => emit(
+            state.copyWith(isLoading: false, errorMessage: failure.message)),
         (allResults) {
           final q = normalize(query);
           final filter = filterOverride ?? state.selectedFilter;
           final filtered = _filterWithFuzzy(allResults, q, filter);
 
-          emit(state.copyWith(results: filtered, isLoading: false, errorMessage: null));
+          emit(state.copyWith(
+              results: filtered, isLoading: false, errorMessage: null));
         },
       );
     });
@@ -111,9 +116,11 @@ class SearchCubit extends Cubit<SearchState> {
     return str.trim();
   }
 
-  static final Expando<({String title, String artist, String album})> _normCache = Expando();
+  static final Expando<({String title, String artist, String album})>
+      _normCache = Expando();
 
-  List<SongsTableData> _filterWithFuzzy(List<SongsTableData> songs, String rawQ, String filter) {
+  List<SongsTableData> _filterWithFuzzy(
+      List<SongsTableData> songs, String rawQ, String filter) {
     final q = rawQ.length > 20 ? rawQ.substring(0, 20) : rawQ;
     final results = <SongsTableData>[];
 
@@ -200,7 +207,8 @@ class SearchCubit extends Cubit<SearchState> {
     _debounceTimer = null;
     _searchSub?.cancel();
     _searchSub = null;
-    emit(state.copyWith(query: '', results: [], isLoading: false, errorMessage: null));
+    emit(state.copyWith(
+        query: '', results: [], isLoading: false, errorMessage: null));
   }
 
   @override

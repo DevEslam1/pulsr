@@ -54,8 +54,10 @@ class MinimalPlayerTheme extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   IconButton(
-                    icon: Icon(Icons.keyboard_arrow_down_rounded, size: 30, color: p.textPrimary),
-                    onPressed: () => context.canPop() ? context.pop() : context.go('/'),
+                    icon: Icon(Icons.keyboard_arrow_down_rounded,
+                        size: 30, color: p.textPrimary),
+                    onPressed: () =>
+                        context.canPop() ? context.pop() : context.go('/'),
                   ),
                   Text(
                     context.l10n.nowPlaying.toUpperCase(),
@@ -85,7 +87,8 @@ class MinimalPlayerTheme extends StatelessWidget {
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final isTwoPane = context.isTwoPane || constraints.maxWidth >= 680;
+                  final isTwoPane =
+                      context.isTwoPane || constraints.maxWidth >= 680;
 
                   final centerDisplay = Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -104,7 +107,8 @@ class MinimalPlayerTheme extends StatelessWidget {
                         }
                       },
                       onHorizontalDragEnd: (details) {
-                        if (settingsState.nowPlayingArtworkSwipe == NowPlayingArtworkSwipeAction.nextPrev &&
+                        if (settingsState.nowPlayingArtworkSwipe ==
+                                NowPlayingArtworkSwipeAction.nextPrev &&
                             details.primaryVelocity != null) {
                           if (details.primaryVelocity! < -200) {
                             cubit.next();
@@ -122,7 +126,8 @@ class MinimalPlayerTheme extends StatelessWidget {
                                 ? SizedBox(
                                     height: isTwoPane ? 220 : 280,
                                     child: LyricsView(
-                                      key: const ValueKey('lyrics_view_minimal'),
+                                      key:
+                                          const ValueKey('lyrics_view_minimal'),
                                       lyrics: state.lyrics,
                                       currentPosition: state.position,
                                       isLoading: state.isLoadingLyrics,
@@ -133,7 +138,9 @@ class MinimalPlayerTheme extends StatelessWidget {
                                 : state.isQueueVisible
                                     ? SizedBox(
                                         height: isTwoPane ? 220 : 280,
-                                        child: const NowPlayingQueueView(key: ValueKey('queue_view_minimal')),
+                                        child: const NowPlayingQueueView(
+                                            key:
+                                                ValueKey('queue_view_minimal')),
                                       )
                                     : Center(
                                         child: ConstrainedBox(
@@ -147,20 +154,25 @@ class MinimalPlayerTheme extends StatelessWidget {
                                               tag: 'now_playing_art_minimal',
                                               child: Container(
                                                 decoration: BoxDecoration(
-                                                  borderRadius: BorderRadius.circular(20),
+                                                  borderRadius:
+                                                      BorderRadius.circular(20),
                                                   boxShadow: [
                                                     BoxShadow(
-                                                      color: activeColor.withValues(alpha: 0.25),
+                                                      color: activeColor
+                                                          .withValues(
+                                                              alpha: 0.25),
                                                       blurRadius: 28,
                                                       spreadRadius: 1,
-                                                      offset: const Offset(0, 12),
+                                                      offset:
+                                                          const Offset(0, 12),
                                                     ),
                                                   ],
                                                 ),
                                                 child: song != null
                                                     ? CachedArtwork(
                                                         id: song.id,
-                                                        remoteUrl: song.remoteArtworkUrl,
+                                                        remoteUrl: song
+                                                            .remoteArtworkUrl,
                                                         type: ArtworkType.AUDIO,
                                                         size: double.infinity,
                                                         borderRadius: 20,
@@ -172,12 +184,17 @@ class MinimalPlayerTheme extends StatelessWidget {
                                         ),
                                       ),
                           ),
-                          if (visualizerStyle != VisualizerStyle.off && !state.isLyricsVisible && !state.isQueueVisible) ...[
+                          if (visualizerStyle != VisualizerStyle.off &&
+                              !state.isLyricsVisible &&
+                              !state.isQueueVisible) ...[
                             const SizedBox(height: 12),
                             AudioVisualizer(
                               style: visualizerStyle,
                               color: activeColor,
-                              height: visualizerStyle == VisualizerStyle.circular ? 70 : 42,
+                              height:
+                                  visualizerStyle == VisualizerStyle.circular
+                                      ? 70
+                                      : 42,
                               isPlaying: state.isPlaying,
                               audioSessionId: state.audioSessionId,
                             ),
@@ -200,7 +217,10 @@ class MinimalPlayerTheme extends StatelessWidget {
                               textAlign: TextAlign.center,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineSmall
+                                  ?.copyWith(
                                     fontWeight: FontWeight.w900,
                                     color: p.textPrimary,
                                   ),
@@ -211,14 +231,18 @@ class MinimalPlayerTheme extends StatelessWidget {
                               textAlign: TextAlign.center,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
                                     color: p.textSecondary,
                                     fontWeight: FontWeight.w600,
                                   ),
                             ),
                             if (song != null) ...[
                               const SizedBox(height: 6),
-                              AudioQualityBadge(song: song, activeColor: activeColor),
+                              AudioQualityBadge(
+                                  song: song, activeColor: activeColor),
                             ],
                           ],
                         ),
@@ -256,20 +280,24 @@ class MinimalPlayerTheme extends StatelessWidget {
 
                       // Bottom Quick Actions
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 4),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
                             IconButton(
                               icon: Icon(
                                 Icons.settings_input_component_rounded,
-                                color: settingsState.currentOutputDevice?.isUsbDac == true
+                                color: settingsState
+                                            .currentOutputDevice?.isUsbDac ==
+                                        true
                                     ? const Color(0xFFFFD700)
                                     : p.textSecondary,
                               ),
                               onPressed: () {
                                 if (song != null) {
-                                  AudioQualitySheet.show(context, song, activeColor);
+                                  AudioQualitySheet.show(
+                                      context, song, activeColor);
                                 }
                               },
                               tooltip: 'Audio Output & DAC',
@@ -277,7 +305,9 @@ class MinimalPlayerTheme extends StatelessWidget {
                             IconButton(
                               icon: Icon(
                                 Icons.equalizer_rounded,
-                                color: state.isEqEnabled ? activeColor : p.textSecondary,
+                                color: state.isEqEnabled
+                                    ? activeColor
+                                    : p.textSecondary,
                               ),
                               onPressed: () {
                                 showModalBottomSheet(
@@ -291,20 +321,29 @@ class MinimalPlayerTheme extends StatelessWidget {
                             IconButton(
                               icon: Icon(
                                 Icons.lyrics_rounded,
-                                color: state.isLyricsVisible ? activeColor : p.textSecondary,
+                                color: state.isLyricsVisible
+                                    ? activeColor
+                                    : p.textSecondary,
                               ),
                               onPressed: () => cubit.toggleLyricsVisibility(),
                             ),
                             IconButton(
                               icon: Icon(
-                                song?.isFavorite == true ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                                color: song?.isFavorite == true ? p.favorite : p.textSecondary,
+                                song?.isFavorite == true
+                                    ? Icons.favorite_rounded
+                                    : Icons.favorite_border_rounded,
+                                color: song?.isFavorite == true
+                                    ? p.favorite
+                                    : p.textSecondary,
                               ),
                               onPressed: () {
                                 if (song != null) cubit.toggleFavorite(song.id);
                               },
                             ),
-                            if (song != null && (song.source == SongSource.youtube || (song.remoteId != null && song.remoteId!.isNotEmpty)))
+                            if (song != null &&
+                                (song.source == SongSource.youtube ||
+                                    (song.remoteId != null &&
+                                        song.remoteId!.isNotEmpty)))
                               YtmDownloadButton(
                                 song: song,
                                 activeColor: activeColor,
@@ -312,7 +351,8 @@ class MinimalPlayerTheme extends StatelessWidget {
                                 iconSize: 22,
                               ),
                             IconButton(
-                              icon: Icon(Icons.playlist_add_rounded, color: p.textSecondary),
+                              icon: Icon(Icons.playlist_add_rounded,
+                                  color: p.textSecondary),
                               onPressed: () {
                                 if (song != null) {
                                   showModalBottomSheet(
@@ -320,7 +360,8 @@ class MinimalPlayerTheme extends StatelessWidget {
                                     useRootNavigator: true,
                                     isScrollControlled: true,
                                     backgroundColor: Colors.transparent,
-                                    builder: (_) => AddToPlaylistSheet(song: song),
+                                    builder: (_) =>
+                                        AddToPlaylistSheet(song: song),
                                   );
                                 }
                               },
@@ -328,7 +369,9 @@ class MinimalPlayerTheme extends StatelessWidget {
                             IconButton(
                               icon: Icon(
                                 Icons.queue_music_rounded,
-                                color: state.isQueueVisible ? activeColor : p.textSecondary,
+                                color: state.isQueueVisible
+                                    ? activeColor
+                                    : p.textSecondary,
                               ),
                               onPressed: () => cubit.toggleQueueVisibility(),
                             ),
@@ -340,7 +383,8 @@ class MinimalPlayerTheme extends StatelessWidget {
 
                   if (isTwoPane) {
                     return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [

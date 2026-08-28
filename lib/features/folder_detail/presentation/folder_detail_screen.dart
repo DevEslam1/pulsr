@@ -48,10 +48,13 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
         actions: [
           IconButton(
             icon: Icon(
-              folder.isExcluded ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+              folder.isExcluded
+                  ? Icons.visibility_off_rounded
+                  : Icons.visibility_rounded,
               color: folder.isExcluded ? p.error : p.textSecondary,
             ),
-            tooltip: folder.isExcluded ? 'Include in Scan' : 'Exclude from Scan',
+            tooltip:
+                folder.isExcluded ? 'Include in Scan' : 'Exclude from Scan',
             onPressed: () async {
               await _useCase.toggleExcludeFolder(folder.path);
               if (context.mounted) {
@@ -107,7 +110,8 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
             );
           }
 
-          final songs = snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
+          final songs =
+              snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
 
           return Center(
             child: ConstrainedBox(
@@ -134,7 +138,9 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                         ],
                       ),
                       child: Icon(
-                        folder.isExcluded ? Icons.folder_off_rounded : Icons.folder_rounded,
+                        folder.isExcluded
+                            ? Icons.folder_off_rounded
+                            : Icons.folder_rounded,
                         size: 48,
                         color: folder.isExcluded ? p.error : p.accent,
                       ),
@@ -147,9 +153,10 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                       child: Text(
                         folder.name,
                         textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
+                        style:
+                            Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
                       ),
                     ),
                   ),
@@ -170,7 +177,10 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                   Center(
                     child: Text(
                       Formatters.formatTrackCount(songs.length),
-                      style: TextStyle(color: p.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600),
                     ),
                   ),
                   const SizedBox(height: 20),
@@ -198,10 +208,12 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                           child: OutlinedButton.icon(
                             onPressed: songs.isNotEmpty
                                 ? () {
-                                    final shuffled = List<SongsTableData>.from(songs)..shuffle();
-                                    context
-                                        .read<PlayerCubit>()
-                                        .playSong(shuffled.first, queue: shuffled);
+                                    final shuffled =
+                                        List<SongsTableData>.from(songs)
+                                          ..shuffle();
+                                    context.read<PlayerCubit>().playSong(
+                                        shuffled.first,
+                                        queue: shuffled);
                                   }
                                 : null,
                             icon: Icon(Icons.shuffle_rounded, color: p.accent),
@@ -221,7 +233,8 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                       child: EmptyStateWidget(
                         icon: Icons.music_off_rounded,
                         title: 'No Tracks Found',
-                        subtitle: 'No playable audio tracks found in this directory.',
+                        subtitle:
+                            'No playable audio tracks found in this directory.',
                       ),
                     )
                   else
@@ -229,9 +242,11 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                       SongTile(
                         song: songs[i],
                         index: i,
-                        subtitleOverride: '${songs[i].artist} • ${songs[i].album}',
-                        onTap: () =>
-                            context.read<PlayerCubit>().playSong(songs[i], queue: songs),
+                        subtitleOverride:
+                            '${songs[i].artist} • ${songs[i].album}',
+                        onTap: () => context
+                            .read<PlayerCubit>()
+                            .playSong(songs[i], queue: songs),
                         onMorePressed: () => showModalBottomSheet(
                           context: context,
                           useRootNavigator: true,

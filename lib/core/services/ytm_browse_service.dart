@@ -92,7 +92,8 @@ class YtmBrowseService {
       _pendingFeed = null;
       return sections;
     } catch (e, st) {
-      ErrorLogger.log('Failed to fetch YTM home feed', error: e, stackTrace: st, category: 'YtmBrowseService');
+      ErrorLogger.log('Failed to fetch YTM home feed',
+          error: e, stackTrace: st, category: 'YtmBrowseService');
       final fallback = _cachedSections ?? [];
       _pendingFeed?.complete(fallback);
       _pendingFeed = null;
@@ -105,28 +106,34 @@ class YtmBrowseService {
     try {
       final trendingTracks = await _ytmService.trending(limit: 15);
       if (trendingTracks.isNotEmpty) {
-        return trendingTracks.take(8).map((t) => YtmBrowseItem(
-          id: t.videoId,
-          title: t.title,
-          subtitle: t.artist,
-          artworkUrl: t.artworkUrl,
-          type: 'song',
-          duration: t.duration,
-        )).toList();
+        return trendingTracks
+            .take(8)
+            .map((t) => YtmBrowseItem(
+                  id: t.videoId,
+                  title: t.title,
+                  subtitle: t.artist,
+                  artworkUrl: t.artworkUrl,
+                  type: 'song',
+                  duration: t.duration,
+                ))
+            .toList();
       }
     } catch (_) {}
 
     try {
       final onlineTracks = await _ytmService.search('Top Global Hits');
       if (onlineTracks.isNotEmpty) {
-        return onlineTracks.take(8).map((t) => YtmBrowseItem(
-          id: t.videoId,
-          title: t.title,
-          subtitle: t.artist,
-          artworkUrl: t.artworkUrl,
-          type: 'song',
-          duration: t.duration,
-        )).toList();
+        return onlineTracks
+            .take(8)
+            .map((t) => YtmBrowseItem(
+                  id: t.videoId,
+                  title: t.title,
+                  subtitle: t.artist,
+                  artworkUrl: t.artworkUrl,
+                  type: 'song',
+                  duration: t.duration,
+                ))
+            .toList();
       }
     } catch (_) {}
 
@@ -138,14 +145,17 @@ class YtmBrowseService {
     try {
       final onlineTracks = await _ytmService.search('New Music Releases');
       if (onlineTracks.isNotEmpty) {
-        return onlineTracks.take(8).map((t) => YtmBrowseItem(
-          id: t.videoId,
-          title: t.title,
-          subtitle: t.artist,
-          artworkUrl: t.artworkUrl,
-          type: 'song',
-          duration: t.duration,
-        )).toList();
+        return onlineTracks
+            .take(8)
+            .map((t) => YtmBrowseItem(
+                  id: t.videoId,
+                  title: t.title,
+                  subtitle: t.artist,
+                  artworkUrl: t.artworkUrl,
+                  type: 'song',
+                  duration: t.duration,
+                ))
+            .toList();
       }
     } catch (_) {}
 
@@ -159,28 +169,32 @@ class YtmBrowseService {
         id: 'mood_chill',
         title: 'Chill & Relax',
         subtitle: 'Calm beats and ambient vibes',
-        artworkUrl: 'https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=500',
+        artworkUrl:
+            'https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=500',
         type: 'playlist',
       ),
       YtmBrowseItem(
         id: 'mood_workout',
         title: 'Workout & Energy',
         subtitle: 'High BPM hype and motivation',
-        artworkUrl: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500',
+        artworkUrl:
+            'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500',
         type: 'playlist',
       ),
       YtmBrowseItem(
         id: 'mood_focus',
         title: 'Deep Focus & Study',
         subtitle: 'Lo-Fi, piano and instrumental',
-        artworkUrl: 'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=500',
+        artworkUrl:
+            'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=500',
         type: 'playlist',
       ),
       YtmBrowseItem(
         id: 'mood_party',
         title: 'Party & Dance',
         subtitle: 'EDM, House and club bangers',
-        artworkUrl: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=500',
+        artworkUrl:
+            'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=500',
         type: 'playlist',
       ),
     ];

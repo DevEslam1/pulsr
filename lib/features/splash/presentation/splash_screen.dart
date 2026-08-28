@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../core/constants/app_strings.dart';
 import '../../../core/theme/aura_theme.dart';
+import '../../../core/utils/l10n_extensions.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -67,11 +67,13 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             )
                 .animate()
-                .scale(duration: const Duration(milliseconds: 800), curve: Curves.easeOutBack)
+                .scale(
+                    duration: const Duration(milliseconds: 800),
+                    curve: Curves.easeOutBack)
                 .fadeIn(duration: const Duration(milliseconds: 600)),
             const SizedBox(height: 24),
             Text(
-              AppStrings.appName,
+              context.l10n.appTitle,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.5,
@@ -79,18 +81,20 @@ class _SplashScreenState extends State<SplashScreen> {
                   ),
             )
                 .animate()
-                .fadeIn(delay: const Duration(milliseconds: 300), duration: const Duration(milliseconds: 600))
+                .fadeIn(
+                    delay: const Duration(milliseconds: 300),
+                    duration: const Duration(milliseconds: 600))
                 .slideY(begin: 0.2, end: 0),
             const SizedBox(height: 8),
             Text(
-              AppStrings.appTagline,
+              context.l10n.appTagline,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: p.textSecondary,
                     letterSpacing: 0.5,
                   ),
-            )
-                .animate()
-                .fadeIn(delay: const Duration(milliseconds: 500), duration: const Duration(milliseconds: 600)),
+            ).animate().fadeIn(
+                delay: const Duration(milliseconds: 500),
+                duration: const Duration(milliseconds: 600)),
           ],
         ),
       ),

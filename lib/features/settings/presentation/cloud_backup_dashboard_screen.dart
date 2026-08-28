@@ -9,10 +9,12 @@ class CloudBackupDashboardScreen extends StatefulWidget {
   const CloudBackupDashboardScreen({super.key, this.syncService});
 
   @override
-  State<CloudBackupDashboardScreen> createState() => _CloudBackupDashboardScreenState();
+  State<CloudBackupDashboardScreen> createState() =>
+      _CloudBackupDashboardScreenState();
 }
 
-class _CloudBackupDashboardScreenState extends State<CloudBackupDashboardScreen> {
+class _CloudBackupDashboardScreenState
+    extends State<CloudBackupDashboardScreen> {
   late final CloudSyncService _syncService;
   bool _isSyncing = false;
   bool _syncFavorites = true;
@@ -34,7 +36,9 @@ class _CloudBackupDashboardScreenState extends State<CloudBackupDashboardScreen>
       setState(() => _isSyncing = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(success ? 'Cloud backup & sync completed!' : 'Sync failed. Please check internet connection.'),
+          content: Text(success
+              ? 'Cloud backup & sync completed!'
+              : 'Sync failed. Please check internet connection.'),
           duration: const Duration(seconds: 2),
         ),
       );
@@ -45,9 +49,8 @@ class _CloudBackupDashboardScreenState extends State<CloudBackupDashboardScreen>
   Widget build(BuildContext context) {
     final p = context.palette;
     final lastSync = _syncService.lastSyncTime;
-    final lastSyncStr = lastSync != null
-        ? '${lastSync.toLocal()}'.split('.').first
-        : 'Never';
+    final lastSyncStr =
+        lastSync != null ? '${lastSync.toLocal()}'.split('.').first : 'Never';
 
     return Scaffold(
       backgroundColor: p.surface,
@@ -78,11 +81,15 @@ class _CloudBackupDashboardScreenState extends State<CloudBackupDashboardScreen>
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.cloud_done_rounded, color: p.primary, size: 24),
+                        Icon(Icons.cloud_done_rounded,
+                            color: p.primary, size: 24),
                         const SizedBox(width: 10),
                         Text(
                           'Cloud Storage Status',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: p.textPrimary),
+                          style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: p.textPrimary),
                         ),
                       ],
                     ),
@@ -90,7 +97,8 @@ class _CloudBackupDashboardScreenState extends State<CloudBackupDashboardScreen>
                       SizedBox(
                         width: 20,
                         height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: p.primary),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: p.primary),
                       ),
                   ],
                 ),
@@ -105,8 +113,13 @@ class _CloudBackupDashboardScreenState extends State<CloudBackupDashboardScreen>
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text('Last Synced:', style: TextStyle(color: p.textSecondary, fontSize: 13)),
-                    Text(lastSyncStr, style: TextStyle(color: p.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                    Text('Last Synced:',
+                        style: TextStyle(color: p.textSecondary, fontSize: 13)),
+                    Text(lastSyncStr,
+                        style: TextStyle(
+                            color: p.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13)),
                   ],
                 ),
               ],
@@ -116,36 +129,44 @@ class _CloudBackupDashboardScreenState extends State<CloudBackupDashboardScreen>
 
           Text(
             'Selective Backup Targets',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: p.textPrimary),
+            style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: p.textPrimary),
           ),
           const SizedBox(height: 12),
 
           CheckboxListTile(
-            title: Text('Starred & Favorite Songs', style: TextStyle(color: p.textPrimary)),
+            title: Text('Starred & Favorite Songs',
+                style: TextStyle(color: p.textPrimary)),
             value: _syncFavorites,
             activeColor: p.primary,
             onChanged: (val) => setState(() => _syncFavorites = val ?? true),
           ),
           CheckboxListTile(
-            title: Text('Playlists & Smart Rules', style: TextStyle(color: p.textPrimary)),
+            title: Text('Playlists & Smart Rules',
+                style: TextStyle(color: p.textPrimary)),
             value: _syncPlaylists,
             activeColor: p.primary,
             onChanged: (val) => setState(() => _syncPlaylists = val ?? true),
           ),
           CheckboxListTile(
-            title: Text('Play History & Track Counters', style: TextStyle(color: p.textPrimary)),
+            title: Text('Play History & Track Counters',
+                style: TextStyle(color: p.textPrimary)),
             value: _syncHistory,
             activeColor: p.primary,
             onChanged: (val) => setState(() => _syncHistory = val ?? true),
           ),
           CheckboxListTile(
-            title: Text('Custom EQ Presets & DSP', style: TextStyle(color: p.textPrimary)),
+            title: Text('Custom EQ Presets & DSP',
+                style: TextStyle(color: p.textPrimary)),
             value: _syncEqPresets,
             activeColor: p.primary,
             onChanged: (val) => setState(() => _syncEqPresets = val ?? true),
           ),
           CheckboxListTile(
-            title: Text('App Settings & Theme Profiles', style: TextStyle(color: p.textPrimary)),
+            title: Text('App Settings & Theme Profiles',
+                style: TextStyle(color: p.textPrimary)),
             value: _syncSettings,
             activeColor: p.primary,
             onChanged: (val) => setState(() => _syncSettings = val ?? true),
@@ -158,12 +179,16 @@ class _CloudBackupDashboardScreenState extends State<CloudBackupDashboardScreen>
               style: FilledButton.styleFrom(
                 backgroundColor: p.primary,
                 padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
               ),
               icon: Icon(Icons.sync_rounded, color: Colors.black),
               label: Text(
                 _isSyncing ? 'Syncing...' : 'Sync Now',
-                style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 15),
+                style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15),
               ),
               onPressed: _isSyncing ? null : _performSync,
             ),

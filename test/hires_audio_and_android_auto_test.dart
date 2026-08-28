@@ -8,6 +8,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockMediaScannerService extends Mock implements MediaScannerService {}
+
 class MockHiResAudioService extends Mock implements HiResAudioService {}
 
 void main() {
@@ -58,7 +59,8 @@ void main() {
         isBitPerfectActive: false,
       );
 
-      final info2 = info1.copyWith(isUsbDac: true, bitDepth: 24, isBitPerfectActive: true);
+      final info2 = info1.copyWith(
+          isUsbDac: true, bitDepth: 24, isBitPerfectActive: true);
 
       expect(info2.isUsbDac, isTrue);
       expect(info2.bitDepth, equals(24));
@@ -76,7 +78,8 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       mockScanner = MockMediaScannerService();
       mockHiRes = MockHiResAudioService();
-      when(() => mockHiRes.outputDeviceStream).thenAnswer((_) => const Stream.empty());
+      when(() => mockHiRes.outputDeviceStream)
+          .thenAnswer((_) => const Stream.empty());
       when(() => mockHiRes.currentOutputInfo).thenReturn(const AudioOutputInfo(
         deviceName: 'Built-in Speaker',
         isUsbDac: false,
@@ -84,14 +87,16 @@ void main() {
         bitDepth: 16,
         isBitPerfectActive: false,
       ));
-      when(() => mockHiRes.setBitPerfectMode(any())).thenAnswer((_) async => true);
-      when(() => mockHiRes.getAudioOutputInfo()).thenAnswer((_) async => const AudioOutputInfo(
-        deviceName: 'Fiio BTR5 (USB DAC)',
-        isUsbDac: true,
-        sampleRate: 96000,
-        bitDepth: 24,
-        isBitPerfectActive: true,
-      ));
+      when(() => mockHiRes.setBitPerfectMode(any()))
+          .thenAnswer((_) async => true);
+      when(() => mockHiRes.getAudioOutputInfo())
+          .thenAnswer((_) async => const AudioOutputInfo(
+                deviceName: 'Fiio BTR5 (USB DAC)',
+                isUsbDac: true,
+                sampleRate: 96000,
+                bitDepth: 24,
+                isBitPerfectActive: true,
+              ));
 
       cubit = SettingsCubit(
         scannerService: mockScanner,

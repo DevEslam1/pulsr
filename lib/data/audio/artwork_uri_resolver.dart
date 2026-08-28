@@ -26,7 +26,8 @@ class ArtworkUriResolver {
             File(oldestUri.toFilePath()).delete().ignore();
           }
         }).catchError((e, st) {
-          ErrorLogger.log('Failed to delete evicted artwork temp file', error: e, stackTrace: st, category: 'ArtworkUriResolver');
+          ErrorLogger.log('Failed to delete evicted artwork temp file',
+              error: e, stackTrace: st, category: 'ArtworkUriResolver');
         });
       }
     }
@@ -38,20 +39,27 @@ class ArtworkUriResolver {
       final tempDir = await getTemporaryDirectory();
       await for (final entity in tempDir.list()) {
         if (entity is File) {
-          final name = entity.uri.pathSegments.isNotEmpty ? entity.uri.pathSegments.last : '';
+          final name = entity.uri.pathSegments.isNotEmpty
+              ? entity.uri.pathSegments.last
+              : '';
           if (name.startsWith('pulsr_art_') ||
               name.startsWith('pulsr_album_art_') ||
               name.startsWith('pulsr_artist_art_')) {
             try {
               await entity.delete();
             } catch (e, st) {
-              ErrorLogger.log('Failed to delete temp artwork file during cleanup: $name', error: e, stackTrace: st, category: 'ArtworkUriResolver');
+              ErrorLogger.log(
+                  'Failed to delete temp artwork file during cleanup: $name',
+                  error: e,
+                  stackTrace: st,
+                  category: 'ArtworkUriResolver');
             }
           }
         }
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to cleanup temp artwork directory', error: e, stackTrace: st, category: 'ArtworkUriResolver');
+      ErrorLogger.log('Failed to cleanup temp artwork directory',
+          error: e, stackTrace: st, category: 'ArtworkUriResolver');
     }
     try {
       _cachedArtworkUris.clear();
@@ -88,7 +96,8 @@ class ArtworkUriResolver {
         return uri;
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to resolve artwork URI for song ID: $songId', error: e, stackTrace: st, category: 'ArtworkUriResolver');
+      ErrorLogger.log('Failed to resolve artwork URI for song ID: $songId',
+          error: e, stackTrace: st, category: 'ArtworkUriResolver');
     }
     return null;
   }
@@ -121,7 +130,11 @@ class ArtworkUriResolver {
         return uri;
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to resolve album artwork URI for album ID: $albumId', error: e, stackTrace: st, category: 'ArtworkUriResolver');
+      ErrorLogger.log(
+          'Failed to resolve album artwork URI for album ID: $albumId',
+          error: e,
+          stackTrace: st,
+          category: 'ArtworkUriResolver');
     }
     return null;
   }
@@ -154,7 +167,11 @@ class ArtworkUriResolver {
         return uri;
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to resolve artist artwork URI for artist ID: $artistId', error: e, stackTrace: st, category: 'ArtworkUriResolver');
+      ErrorLogger.log(
+          'Failed to resolve artist artwork URI for artist ID: $artistId',
+          error: e,
+          stackTrace: st,
+          category: 'ArtworkUriResolver');
     }
     return null;
   }

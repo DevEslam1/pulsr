@@ -178,10 +178,13 @@ class _LibraryScreenState extends State<LibraryScreen>
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(context.l10n.downloaded),
-                            if (state.songs.where((s) => s.isDownloaded == true).isNotEmpty) ...[
+                            if (state.songs
+                                .where((s) => s.isDownloaded == true)
+                                .isNotEmpty) ...[
                               const SizedBox(width: 6),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
                                   color: p.accent.withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(10),
@@ -268,7 +271,8 @@ class _LibraryScreenState extends State<LibraryScreen>
               title: title,
               subtitle: subtitle,
               primaryActionLabel: actionLabel ?? context.l10n.scanStorage,
-              primaryActionIcon: actionIcon ?? Icons.center_focus_strong_rounded,
+              primaryActionIcon:
+                  actionIcon ?? Icons.center_focus_strong_rounded,
               onPrimaryAction: onAction ?? () => _handleRefresh(context),
             ),
           ),
@@ -487,7 +491,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                         .map((l) => InkWell(
                               onTap: () => _scrollToLetter(l, songs),
                               child: Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 1),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 1),
                                 child: Text(l,
                                     style: TextStyle(
                                         fontSize: 9,
@@ -520,7 +525,7 @@ class _LibraryScreenState extends State<LibraryScreen>
         context,
         icon: Icons.cloud_download_rounded,
         title: context.l10n.noDownloadsYet,
-        subtitle: context.l10n.noDownloadsSubtitle,
+        subtitle: context.l10n.noDownloadsYetSubtitle,
         actionLabel: context.l10n.exploreOnlineMusic,
         actionIcon: Icons.travel_explore_rounded,
         onAction: () => context.go('/'),
@@ -533,7 +538,8 @@ class _LibraryScreenState extends State<LibraryScreen>
         children: [
           // ---------- Header Card with Play All & Shuffle ----------
           Padding(
-            padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 12, Adaptive.pagePadding(context), 8),
+            padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 12,
+                Adaptive.pagePadding(context), 8),
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
@@ -556,7 +562,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                       color: p.accent.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.download_done_rounded, color: p.accent, size: 24),
+                    child: Icon(Icons.download_done_rounded,
+                        color: p.accent, size: 24),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -589,7 +596,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                     ),
                     icon: const Icon(Icons.play_arrow_rounded, size: 24),
                     tooltip: context.l10n.playAll,
-                    onPressed: () => playerCubit.playSong(downloaded.first, queue: downloaded),
+                    onPressed: () => playerCubit.playSong(downloaded.first,
+                        queue: downloaded),
                   ),
                   const SizedBox(width: 6),
                   IconButton.filledTonal(
@@ -600,7 +608,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                     icon: const Icon(Icons.shuffle_rounded, size: 20),
                     tooltip: context.l10n.shuffle,
                     onPressed: () {
-                      final shuffled = List<SongsTableData>.from(downloaded)..shuffle();
+                      final shuffled = List<SongsTableData>.from(downloaded)
+                        ..shuffle();
                       playerCubit.playSong(shuffled.first, queue: shuffled);
                     },
                   ),
@@ -613,7 +622,8 @@ class _LibraryScreenState extends State<LibraryScreen>
           Expanded(
             child: ListView.builder(
               physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.only(bottom: 160, top: 4, left: 4, right: 4),
+              padding:
+                  const EdgeInsets.only(bottom: 160, top: 4, left: 4, right: 4),
               itemCount: downloaded.length,
               itemBuilder: (context, index) {
                 final song = downloaded[index];
@@ -626,18 +636,25 @@ class _LibraryScreenState extends State<LibraryScreen>
                     child: Row(children: [
                       Icon(Icons.playlist_play_rounded, color: p.accent),
                       const SizedBox(width: 8),
-                      Text(context.l10n.playNext, style: TextStyle(color: p.accent, fontWeight: FontWeight.w700)),
+                      Text(context.l10n.playNext,
+                          style: TextStyle(
+                              color: p.accent, fontWeight: FontWeight.w700)),
                     ]),
                   ),
                   secondaryBackground: Container(
                     color: p.favorite.withValues(alpha: 0.2),
                     alignment: Alignment.centerRight,
                     padding: const EdgeInsets.only(right: 24),
-                    child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-                      Text(context.l10n.favorite, style: TextStyle(color: p.favorite, fontWeight: FontWeight.w700)),
-                      const SizedBox(width: 8),
-                      Icon(Icons.favorite_rounded, color: p.favorite),
-                    ]),
+                    child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          Text(context.l10n.favorite,
+                              style: TextStyle(
+                                  color: p.favorite,
+                                  fontWeight: FontWeight.w700)),
+                          const SizedBox(width: 8),
+                          Icon(Icons.favorite_rounded, color: p.favorite),
+                        ]),
                   ),
                   confirmDismiss: (direction) async {
                     if (direction == DismissDirection.startToEnd) {
@@ -849,8 +866,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                               fontWeight: FontWeight.w700,
                               fontSize: 13)),
                       Text(Formatters.formatTrackCount(artist.songCount),
-                          style: TextStyle(
-                              color: p.textSecondary, fontSize: 11)),
+                          style:
+                              TextStyle(color: p.textSecondary, fontSize: 11)),
                     ],
                   ),
                 );
@@ -976,10 +993,13 @@ class _LibraryScreenState extends State<LibraryScreen>
     final p = context.palette;
     final cubit = context.read<LibraryCubit>();
     final allFavorites = state.favorites;
-    final localFavorites = allFavorites.where((s) => !_isOnlineFavorite(s)).toList();
-    final onlineFavorites = allFavorites.where((s) => _isOnlineFavorite(s)).toList();
+    final localFavorites =
+        allFavorites.where((s) => !_isOnlineFavorite(s)).toList();
+    final onlineFavorites =
+        allFavorites.where((s) => _isOnlineFavorite(s)).toList();
 
-    final currentFavorites = _favTabFilter == 0 ? localFavorites : onlineFavorites;
+    final currentFavorites =
+        _favTabFilter == 0 ? localFavorites : onlineFavorites;
     final isGrid = state.viewMode == LibraryViewMode.grid;
 
     return RefreshIndicator(
@@ -988,8 +1008,8 @@ class _LibraryScreenState extends State<LibraryScreen>
         children: [
           // ---------- Sub Tabs Switcher (Local / Online) ----------
           Padding(
-            padding: EdgeInsets.fromLTRB(
-                Adaptive.pagePadding(context), 12, Adaptive.pagePadding(context), 8),
+            padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 12,
+                Adaptive.pagePadding(context), 8),
             child: Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
@@ -1042,7 +1062,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                   ),
                   const Spacer(),
                   FilledButton.tonalIcon(
-                    onPressed: () => playerCubit.playSong(currentFavorites.first,
+                    onPressed: () => playerCubit.playSong(
+                        currentFavorites.first,
                         queue: currentFavorites),
                     icon: const Icon(Icons.play_arrow_rounded, size: 20),
                     label: Text(context.l10n.playAll),
@@ -1056,7 +1077,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                   IconButton.filledTonal(
                     onPressed: () {
                       final shuffled =
-                          List<SongsTableData>.from(currentFavorites)..shuffle();
+                          List<SongsTableData>.from(currentFavorites)
+                            ..shuffle();
                       playerCubit.playSong(shuffled.first, queue: shuffled);
                     },
                     icon: const Icon(Icons.shuffle_rounded, size: 18),
@@ -1070,7 +1092,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                   if (AppConfig.ytmEnabled) ...[
                     const SizedBox(width: 8),
                     IconButton.filledTonal(
-                      onPressed: () => _downloadFavorites(context, currentFavorites),
+                      onPressed: () =>
+                          _downloadFavorites(context, currentFavorites),
                       icon: const Icon(Icons.download_rounded, size: 19),
                       style: IconButton.styleFrom(
                         visualDensity: VisualDensity.compact,
@@ -1116,7 +1139,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                     slivers: [
                       SliverFillRemaining(
                         hasScrollBody: false,
-                        child: _buildFavoritesEmptyState(context, p, _favTabFilter),
+                        child: _buildFavoritesEmptyState(
+                            context, p, _favTabFilter),
                       ),
                     ],
                   )
@@ -1155,19 +1179,23 @@ class _LibraryScreenState extends State<LibraryScreen>
                             background: Container(
                               color: p.accentContainer,
                               alignment: AlignmentDirectional.centerStart,
-                              padding: const EdgeInsetsDirectional.only(start: 24),
+                              padding:
+                                  const EdgeInsetsDirectional.only(start: 24),
                               child: Row(children: [
-                                Icon(Icons.playlist_play_rounded, color: p.accent),
+                                Icon(Icons.playlist_play_rounded,
+                                    color: p.accent),
                                 const SizedBox(width: 8),
                                 Text(context.l10n.playNext,
                                     style: TextStyle(
-                                        color: p.accent, fontWeight: FontWeight.w700)),
+                                        color: p.accent,
+                                        fontWeight: FontWeight.w700)),
                               ]),
                             ),
                             secondaryBackground: Container(
                               color: p.error.withValues(alpha: 0.2),
                               alignment: AlignmentDirectional.centerEnd,
-                              padding: const EdgeInsetsDirectional.only(end: 24),
+                              padding:
+                                  const EdgeInsetsDirectional.only(end: 24),
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
@@ -1176,7 +1204,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                                           color: p.error,
                                           fontWeight: FontWeight.w700)),
                                   const SizedBox(width: 8),
-                                  Icon(Icons.delete_outline_rounded, color: p.error),
+                                  Icon(Icons.delete_outline_rounded,
+                                      color: p.error),
                                 ],
                               ),
                             ),
@@ -1196,10 +1225,12 @@ class _LibraryScreenState extends State<LibraryScreen>
                                 if (state.isMultiSelectMode) {
                                   cubit.toggleSongSelection(song.id);
                                 } else {
-                                  playerCubit.playSong(song, queue: currentFavorites);
+                                  playerCubit.playSong(song,
+                                      queue: currentFavorites);
                                 }
                               },
-                              onLongPress: () => cubit.toggleSongSelection(song.id),
+                              onLongPress: () =>
+                                  cubit.toggleSongSelection(song.id),
                               onMorePressed: () => showModalBottomSheet(
                                 context: context,
                                 useRootNavigator: true,
@@ -1245,7 +1276,9 @@ class _LibraryScreenState extends State<LibraryScreen>
           EmptyStateWidget(
             icon: Icons.cloud_sync_rounded,
             iconColor: p.accent,
-            title: isYtmLoggedIn ? context.l10n.ytmConnected : context.l10n.noOnlineFavorites,
+            title: isYtmLoggedIn
+                ? context.l10n.ytmConnected
+                : context.l10n.noOnlineFavorites,
             subtitle: isYtmLoggedIn
                 ? 'Tap sync below to pull your latest YouTube Music Liked Songs library.'
                 : context.l10n.connectYtmSubtitle,
@@ -1379,7 +1412,8 @@ class _LibraryScreenState extends State<LibraryScreen>
         if (isAuth) {
           messenger.showSnackBar(
             SnackBar(
-              content: const Text('YouTube Music session expired. Please sign in again.'),
+              content: const Text(
+                  'YouTube Music session expired. Please sign in again.'),
               behavior: SnackBarBehavior.floating,
               action: SnackBarAction(
                 label: 'Sign In',
@@ -1480,8 +1514,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                   decoration: InputDecoration(
                     hintText: 'https://music.youtube.com/playlist?list=...',
                     hintStyle: TextStyle(color: p.textTertiary, fontSize: 13),
-                    prefixIcon:
-                        Icon(Icons.link_rounded, color: p.textTertiary, size: 20),
+                    prefixIcon: Icon(Icons.link_rounded,
+                        color: p.textTertiary, size: 20),
                     suffixIcon: IconButton(
                       icon: Icon(Icons.content_paste_rounded,
                           color: p.accent, size: 18),
@@ -1520,8 +1554,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                       : () async {
                           final text = controller.text.trim();
                           if (text.isEmpty) {
-                            setSheetState(() =>
-                                errorText = 'Please enter a playlist URL or ID');
+                            setSheetState(() => errorText =
+                                'Please enter a playlist URL or ID');
                             return;
                           }
                           setSheetState(() {
@@ -1556,8 +1590,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                               return;
                             }
 
-                            final count =
-                                await libraryCubit.importYtmTracksAsFavorites(tracks);
+                            final count = await libraryCubit
+                                .importYtmTracksAsFavorites(tracks);
                             if (ctx.mounted && Navigator.of(ctx).canPop()) {
                               Navigator.of(ctx).pop();
                             }
@@ -1661,9 +1695,8 @@ class _LibraryScreenState extends State<LibraryScreen>
                     shape: const CircleBorder(),
                     child: InkWell(
                       customBorder: const CircleBorder(),
-                      onTap: () => context
-                          .read<LibraryCubit>()
-                          .toggleFavorite(song.id),
+                      onTap: () =>
+                          context.read<LibraryCubit>().toggleFavorite(song.id),
                       child: Padding(
                         padding: const EdgeInsets.all(6.0),
                         child: Icon(Icons.favorite_rounded,

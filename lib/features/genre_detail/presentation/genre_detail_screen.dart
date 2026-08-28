@@ -19,7 +19,8 @@ class GenreDetailScreen extends StatefulWidget {
   final GenreItem genreItem;
   final GetGenresUseCase? getGenresUseCase;
 
-  const GenreDetailScreen({super.key, required this.genreItem, this.getGenresUseCase});
+  const GenreDetailScreen(
+      {super.key, required this.genreItem, this.getGenresUseCase});
 
   @override
   State<GenreDetailScreen> createState() => _GenreDetailScreenState();
@@ -57,7 +58,10 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
                     const SizedBox(height: 16),
                     Text(
                       'Could not load genre songs',
-                      style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 16),
+                      style: TextStyle(
+                          color: p.textPrimary,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 16),
                     ),
                     const SizedBox(height: 8),
                     Text(
@@ -76,7 +80,8 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
               ),
             );
           }
-          final songs = snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
+          final songs =
+              snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
 
           return Center(
             child: ConstrainedBox(
@@ -94,7 +99,11 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
                         shape: BoxShape.circle,
                         border: Border.all(color: p.hairline),
                         boxShadow: [
-                          BoxShadow(color: p.glow, blurRadius: 24, spreadRadius: -4, offset: const Offset(0, 8)),
+                          BoxShadow(
+                              color: p.glow,
+                              blurRadius: 24,
+                              spreadRadius: -4,
+                              offset: const Offset(0, 8)),
                         ],
                       ),
                       child: Icon(
@@ -123,13 +132,16 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
 
                   // Action Buttons (Play All, Shuffle)
                   Padding(
-                    padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: Adaptive.pagePadding(context)),
                     child: Row(
                       children: [
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: songs.isNotEmpty
-                                ? () => context.read<PlayerCubit>().playSong(songs.first, queue: songs)
+                                ? () => context
+                                    .read<PlayerCubit>()
+                                    .playSong(songs.first, queue: songs)
                                 : null,
                             icon: const Icon(Icons.play_arrow_rounded),
                             label: Text(context.l10n.playAll),
@@ -140,8 +152,12 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
                           child: OutlinedButton.icon(
                             onPressed: songs.isNotEmpty
                                 ? () {
-                                    final shuffled = List<SongsTableData>.from(songs)..shuffle();
-                                    context.read<PlayerCubit>().playSong(shuffled.first, queue: shuffled);
+                                    final shuffled =
+                                        List<SongsTableData>.from(songs)
+                                          ..shuffle();
+                                    context.read<PlayerCubit>().playSong(
+                                        shuffled.first,
+                                        queue: shuffled);
                                   }
                                 : null,
                             icon: Icon(Icons.shuffle_rounded, color: p.accent),
@@ -169,8 +185,11 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
                       SongTile(
                         song: songs[i],
                         index: i,
-                        subtitleOverride: '${songs[i].artist} • ${songs[i].album}',
-                        onTap: () => context.read<PlayerCubit>().playSong(songs[i], queue: songs),
+                        subtitleOverride:
+                            '${songs[i].artist} • ${songs[i].album}',
+                        onTap: () => context
+                            .read<PlayerCubit>()
+                            .playSong(songs[i], queue: songs),
                         onMorePressed: () => showModalBottomSheet(
                           context: context,
                           useRootNavigator: true,

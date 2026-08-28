@@ -77,9 +77,12 @@ class PlayerCubit extends Cubit<PlayerState> {
   int? _cachedCurrentSongId;
 
   final Map<int, _QueueSlotData> _queueSlots = {
-    0: const _QueueSlotData(songs: [], currentIndex: 0, position: Duration.zero, speed: 1.0),
-    1: const _QueueSlotData(songs: [], currentIndex: 0, position: Duration.zero, speed: 1.0),
-    2: const _QueueSlotData(songs: [], currentIndex: 0, position: Duration.zero, speed: 1.0),
+    0: const _QueueSlotData(
+        songs: [], currentIndex: 0, position: Duration.zero, speed: 1.0),
+    1: const _QueueSlotData(
+        songs: [], currentIndex: 0, position: Duration.zero, speed: 1.0),
+    2: const _QueueSlotData(
+        songs: [], currentIndex: 0, position: Duration.zero, speed: 1.0),
   };
   bool _queueRestorationDone = false;
 
@@ -143,11 +146,14 @@ class PlayerCubit extends Cubit<PlayerState> {
     final settingsCubit = _settingsCubit;
     if (settingsCubit != null) {
       _audioHandler.setCrossfadeDuration(
-        Duration(milliseconds: (settingsCubit.state.crossfadeSeconds * 1000).round()),
+        Duration(
+            milliseconds:
+                (settingsCubit.state.crossfadeSeconds * 1000).round()),
       );
       _settingsSub = settingsCubit.stream.listen((settingsState) {
         _audioHandler.setCrossfadeDuration(
-          Duration(milliseconds: (settingsState.crossfadeSeconds * 1000).round()),
+          Duration(
+              milliseconds: (settingsState.crossfadeSeconds * 1000).round()),
         );
         // Re-apply gain when ReplayGain settings change
         _audioHandler.setVolume(_audioHandler.volume);
@@ -267,7 +273,8 @@ class PlayerCubit extends Cubit<PlayerState> {
   void _listenToWidgetClicks() {
     _widgetClickSub = _widgetService?.listenToWidgetClicks((uri) {
       if (uri != null && uri.scheme.toLowerCase() == 'pulsrwidget') {
-        final action = uri.host.isNotEmpty ? uri.host : uri.path.replaceAll('/', '');
+        final action =
+            uri.host.isNotEmpty ? uri.host : uri.path.replaceAll('/', '');
         switch (action) {
           case 'play_pause':
             togglePlayPause();
@@ -318,12 +325,17 @@ class PlayerCubit extends Cubit<PlayerState> {
     return _cachedNextTitles;
   }
 
+  DateTime? _lastWidgetProgressUpdateTime;
+
   void _updateWidgetThrottled({bool force = false}) {
     final now = DateTime.now();
-    if (!force && _lastWidgetUpdateTime != null && now.difference(_lastWidgetUpdateTime!).inMilliseconds < 1000) {
+    if (!force &&
+        _lastWidgetUpdateTime != null &&
+        now.difference(_lastWidgetUpdateTime!).inMilliseconds < 1000) {
       return;
     }
     _lastWidgetUpdateTime = now;
+    _lastWidgetProgressUpdateTime = now;
     final nextTitles = _getNextTitles(state);
     _widgetService?.updateNowPlaying(
       song: state.currentSong,
@@ -338,6 +350,20 @@ class PlayerCubit extends Cubit<PlayerState> {
         PlayerRepeatMode.off => 'off',
       },
       nextQueueTitles: nextTitles,
+    );
+  }
+
+  void _updateWidgetProgressThrottled() {
+    final now = DateTime.now();
+    if (_lastWidgetProgressUpdateTime != null &&
+        now.difference(_lastWidgetProgressUpdateTime!).inMilliseconds < 1000) {
+      return;
+    }
+    _lastWidgetProgressUpdateTime = now;
+    _widgetService?.updateProgress(
+      isPlaying: state.isPlaying,
+      position: state.position,
+      duration: state.duration,
     );
   }
 
@@ -359,10 +385,13 @@ class PlayerCubit extends Cubit<PlayerState> {
 
           // Check all queue slots if not found in active queue
           if (resolvedSong == null) {
-            for (final slot in _queueSlots.values) {
-              resolvedSong = slot.songs.where((s) => s.id == id).firstOrNull;
-              if (resolvedSong != null) break;
-            }
+            final idx = state.queue.indexWhere((s) => s.id == id);
+            if (idx != -1) resolvedSong = state.queue[idx];
+          }
+
+          if (resolvedSong != null && resolvedSong != state.currentSong) {
+            emit(state.copyWith(currentSong: resolvedSong));
+            _updateWidgetThrottled(force: true);
           }
 
           // Final fallback — construct from MediaItem extras
@@ -387,11 +416,12 @@ class PlayerCubit extends Cubit<PlayerState> {
 
           if (resolvedSong != null) {
             if (gen != _mediaItemResolutionGen || isClosed) return;
-            final duration = (item.duration != null && item.duration! > Duration.zero)
-                ? item.duration!
-                : (resolvedSong!.durationMs > 0
-                    ? Duration(milliseconds: resolvedSong!.durationMs)
-                    : state.duration);
+            final duration =
+                (item.duration != null && item.duration! > Duration.zero)
+                    ? item.duration!
+                    : (resolvedSong!.durationMs > 0
+                        ? Duration(milliseconds: resolvedSong!.durationMs)
+                        : state.duration);
             final isSameSong = state.currentSong?.id == resolvedSong!.id;
 
             emit(
@@ -423,11 +453,14 @@ class PlayerCubit extends Cubit<PlayerState> {
     });
 
     _queueSub = _audioHandler.queue.listen((mediaItems) async {
-      if (mediaItems.isNotEmpty && (state.queue.isEmpty || state.queue.length != mediaItems.length)) {
-        final ids = mediaItems.map((m) => int.tryParse(m.id)).whereType<int>().toList();
+      if (mediaItems.isNotEmpty &&
+          (state.queue.isEmpty || state.queue.length != mediaItems.length)) {
+        final ids =
+            mediaItems.map((m) => int.tryParse(m.id)).whereType<int>().toList();
         final songsRes = await _repository.getSongsByIds(ids);
         final songsMap = {
-          for (final s in songsRes.fold((_) => <SongsTableData>[], (r) => r)) s.id: s
+          for (final s in songsRes.fold((_) => <SongsTableData>[], (r) => r))
+            s.id: s
         };
         final restoredSongs = <SongsTableData>[];
         for (final m in mediaItems) {
@@ -460,10 +493,13 @@ class PlayerCubit extends Cubit<PlayerState> {
     });
 
     _playbackStateSub = _audioHandler.playbackState.listen((playbackState) {
-      final isCompleted = playbackState.processingState == AudioProcessingState.completed;
+      final isCompleted =
+          playbackState.processingState == AudioProcessingState.completed;
       final repeat = switch (playbackState.repeatMode) {
         AudioServiceRepeatMode.one => PlayerRepeatMode.one,
-        AudioServiceRepeatMode.all || AudioServiceRepeatMode.group => PlayerRepeatMode.all,
+        AudioServiceRepeatMode.all ||
+        AudioServiceRepeatMode.group =>
+          PlayerRepeatMode.all,
         _ => PlayerRepeatMode.off,
       };
 
@@ -472,7 +508,9 @@ class PlayerCubit extends Cubit<PlayerState> {
           ? Duration.zero
           : (playbackState.position > Duration.zero
               ? playbackState.position
-              : (state.position > Duration.zero ? state.position : playbackState.position));
+              : (state.position > Duration.zero
+                  ? state.position
+                  : playbackState.position));
 
       emit(
         state.copyWith(
@@ -484,7 +522,11 @@ class PlayerCubit extends Cubit<PlayerState> {
           playbackSpeed: playbackState.speed,
         ),
       );
-      _updateWidgetThrottled(force: false);
+      if (isPlaying != state.isPlaying || repeat != state.repeatMode) {
+        _updateWidgetThrottled(force: true);
+      } else {
+        _updateWidgetProgressThrottled();
+      }
       final currentSong = state.currentSong;
       if (currentSong != null) {
         _debouncedScrobble(currentSong, effectivePos, isPlaying);
@@ -494,11 +536,12 @@ class PlayerCubit extends Cubit<PlayerState> {
     _positionSub = _audioHandler.positionStream.listen((pos) {
       emit(state.copyWith(position: pos));
       if (state.isPlaying) {
-        _updateWidgetThrottled(force: false);
+        _updateWidgetProgressThrottled();
       }
     });
 
-    _sleepTimerSub = _audioHandler.sleepTimerRemainingStream.listen((remaining) {
+    _sleepTimerSub =
+        _audioHandler.sleepTimerRemainingStream.listen((remaining) {
       emit(state.copyWith(sleepTimerRemaining: remaining));
     });
 
@@ -517,7 +560,9 @@ class PlayerCubit extends Cubit<PlayerState> {
     if (song.source != SongSource.local) return;
     if (song.codec != null) return;
     final path = song.path;
-    if (path.isEmpty || path.startsWith('http') || path.startsWith('ytmusic://')) {
+    if (path.isEmpty ||
+        path.startsWith('http') ||
+        path.startsWith('ytmusic://')) {
       return;
     }
     try {
@@ -525,7 +570,10 @@ class PlayerCubit extends Cubit<PlayerState> {
       if (isClosed || gen != _mediaItemResolutionGen) return;
       final refreshed = await _repository.getSongById(song.id);
       final updated = refreshed.fold((_) => null, (s) => s);
-      if (updated != null && !isClosed && gen == _mediaItemResolutionGen && state.currentSong?.id == updated.id) {
+      if (updated != null &&
+          !isClosed &&
+          gen == _mediaItemResolutionGen &&
+          state.currentSong?.id == updated.id) {
         emit(state.copyWith(currentSong: updated));
       }
     } catch (_) {}
@@ -542,7 +590,9 @@ class PlayerCubit extends Cubit<PlayerState> {
     LyricsResult? lyricsResult;
 
     // 1. For local files, check embedded metadata and sidecar .lrc files
-    if (song.source == SongSource.local && !song.path.startsWith('http') && !song.path.startsWith('ytmusic://')) {
+    if (song.source == SongSource.local &&
+        !song.path.startsWith('http') &&
+        !song.path.startsWith('ytmusic://')) {
       lyricsResult = await LrcParser.resolveLyrics(song.path, songId: song.id);
     }
 
@@ -565,7 +615,9 @@ class PlayerCubit extends Cubit<PlayerState> {
 
     // 3. For YouTube Music tracks without LRCLIB matches, fetch native YTM lyrics
     final videoId = song.remoteId;
-    if ((lyricsResult == null || lyricsResult.lines.isEmpty) && videoId != null && videoId.isNotEmpty) {
+    if ((lyricsResult == null || lyricsResult.lines.isEmpty) &&
+        videoId != null &&
+        videoId.isNotEmpty) {
       try {
         final ytmAccount = getIt<YtmAccountService>();
         lyricsResult = await ytmAccount.fetchYtmLyrics(videoId);
@@ -580,7 +632,8 @@ class PlayerCubit extends Cubit<PlayerState> {
     ));
   }
 
-  Future<void> playSong(SongsTableData song, {List<SongsTableData>? queue, Duration? initialPosition}) async {
+  Future<void> playSong(SongsTableData song,
+      {List<SongsTableData>? queue, Duration? initialPosition}) async {
     ++_mediaItemResolutionGen;
     final capturedGen = _mediaItemResolutionGen;
     // Mark restoration as done: any in-flight _restoreQueueSlots must abort
@@ -597,13 +650,16 @@ class PlayerCubit extends Cubit<PlayerState> {
         // Abort if a newer playSong call arrived while we were awaiting
         if (_mediaItemResolutionGen != capturedGen) return;
         final local = match.fold((_) => null, (s) => s);
-        if (local != null && (local.path.startsWith('content:') || await File(local.path).exists())) {
+        if (local != null &&
+            (local.path.startsWith('content:') ||
+                await File(local.path).exists())) {
           targetSong = local;
         }
       } catch (_) {}
     }
 
-    var rawQueue = queue != null ? List<SongsTableData>.from(queue) : [targetSong];
+    var rawQueue =
+        queue != null ? List<SongsTableData>.from(queue) : [targetSong];
     if (targetSong.id != song.id) {
       rawQueue = rawQueue.map((s) => s.id == song.id ? targetSong : s).toList();
     }
@@ -660,7 +716,8 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   Future<void> playNext(SongsTableData song) async {
     if (state.queue.length >= _maxQueueSize) {
-      ErrorLogger.log('Queue size limit reached ($_maxQueueSize)', category: 'PlayerCubit');
+      ErrorLogger.log('Queue size limit reached ($_maxQueueSize)',
+          category: 'PlayerCubit');
       return;
     }
     await _audioHandler.insertNextInQueue(song);
@@ -679,7 +736,8 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   Future<void> addToQueue(SongsTableData song) async {
     if (state.queue.length >= _maxQueueSize) {
-      ErrorLogger.log('Queue size limit reached ($_maxQueueSize)', category: 'PlayerCubit');
+      ErrorLogger.log('Queue size limit reached ($_maxQueueSize)',
+          category: 'PlayerCubit');
       return;
     }
     await _audioHandler.addToQueueEnd(song);
@@ -712,7 +770,8 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   Future<void> removeQueueItem(int index) async {
     await _audioHandler.removeQueueItemAt(index);
-    final updatedQueue = List<SongsTableData>.from(state.queue)..removeAt(index);
+    final updatedQueue = List<SongsTableData>.from(state.queue)
+      ..removeAt(index);
     _queueSlots[state.activeQueueSlot] = _QueueSlotData(
       songs: updatedQueue,
       currentIndex: state.currentIndex,
@@ -726,7 +785,12 @@ class PlayerCubit extends Cubit<PlayerState> {
   bool _isSwitchingSlot = false;
 
   Future<void> switchQueueSlot(int slot) async {
-    if (_isSwitchingSlot || slot == state.activeQueueSlot || slot < 0 || slot > 2) return;
+    if (_isSwitchingSlot ||
+        slot == state.activeQueueSlot ||
+        slot < 0 ||
+        slot > 2) {
+      return;
+    }
     _isSwitchingSlot = true;
     try {
       final wasPlaying = state.isPlaying;
@@ -736,7 +800,9 @@ class PlayerCubit extends Cubit<PlayerState> {
         position: state.position,
         speed: state.playbackSpeed,
       );
-      final targetSlot = _queueSlots[slot] ?? const _QueueSlotData(songs: [], currentIndex: 0, position: Duration.zero, speed: 1.0);
+      final targetSlot = _queueSlots[slot] ??
+          const _QueueSlotData(
+              songs: [], currentIndex: 0, position: Duration.zero, speed: 1.0);
       final validSongs = targetSlot.songs.where((s) => !s.isMissing).toList();
 
       _debouncedPersistQueueSlots();
@@ -801,7 +867,8 @@ class PlayerCubit extends Cubit<PlayerState> {
     if (state.queue.any((s) => s.id == oldId)) {
       emit(state.copyWith(
         queue: state.queue.map((s) => s.id == oldId ? newSong : s).toList(),
-        currentSong: state.currentSong?.id == oldId ? newSong : state.currentSong,
+        currentSong:
+            state.currentSong?.id == oldId ? newSong : state.currentSong,
       ));
       _updateWidgetThrottled(force: true);
     }
@@ -827,7 +894,8 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   Future<void> toggleShuffle() async {
     final next = !state.isShuffle;
-    await _audioHandler.setShuffleMode(next ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none);
+    await _audioHandler.setShuffleMode(
+        next ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none);
   }
 
   Future<void> toggleRepeat() async {
@@ -933,7 +1001,10 @@ class PlayerCubit extends Cubit<PlayerState> {
   Future<void> setBassBoost(double amount) async {
     final clamped = amount.clamp(0.0, 1.0);
     emit(state.copyWith(
-      eqPreset: EqPreset(name: state.eqPreset.name, gains: state.eqPreset.gains, bassBoost: clamped),
+      eqPreset: EqPreset(
+          name: state.eqPreset.name,
+          gains: state.eqPreset.gains,
+          bassBoost: clamped),
     ));
     await _audioHandler.setBassBoost(clamped);
   }
@@ -986,7 +1057,8 @@ class PlayerCubit extends Cubit<PlayerState> {
   Future<void> toggleDynamicsBypass() async {
     await _audioHandler.toggleDynamicsBypass();
     emit(state.copyWith(
-      isDynamicsEnabled: !_audioHandler.isDynamicsBypassed && state.dynamicsPreset != DynamicsPreset.off,
+      isDynamicsEnabled: !_audioHandler.isDynamicsBypassed &&
+          state.dynamicsPreset != DynamicsPreset.off,
     ));
   }
 
@@ -1008,7 +1080,8 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   // --- NATIVE DSP METHODS ---
 
-  Future<void> setCrossfeed(bool enabled, {double? delayUs, double? feedDb}) async {
+  Future<void> setCrossfeed(bool enabled,
+      {double? delayUs, double? feedDb}) async {
     emit(state.copyWith(
       isCrossfeedEnabled: enabled,
       crossfeedDelayUs: delayUs ?? state.crossfeedDelayUs,
@@ -1017,13 +1090,17 @@ class PlayerCubit extends Cubit<PlayerState> {
     await _audioHandler.setCrossfeed(enabled, delayUs: delayUs, feedDb: feedDb);
   }
 
-  Future<void> setLookaheadLimiter(bool enabled, {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {
+  Future<void> setLookaheadLimiter(bool enabled,
+      {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {
     emit(state.copyWith(
       isLimiterEnabled: enabled,
       limiterThresholdDb: thresholdDb ?? state.limiterThresholdDb,
       limiterReleaseMs: releaseMs ?? state.limiterReleaseMs,
     ));
-    await _audioHandler.setLookaheadLimiter(enabled, thresholdDb: thresholdDb, releaseMs: releaseMs, lookaheadMs: lookaheadMs);
+    await _audioHandler.setLookaheadLimiter(enabled,
+        thresholdDb: thresholdDb,
+        releaseMs: releaseMs,
+        lookaheadMs: lookaheadMs);
   }
 
   Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {
@@ -1069,7 +1146,20 @@ class PlayerCubit extends Cubit<PlayerState> {
   void startAbsoluteSleepTimer(DateTime stopTime) {
     _audioHandler.startAbsoluteSleepTimer(stopTime);
     final diff = stopTime.difference(DateTime.now());
-    emit(state.copyWith(sleepTimerRemaining: diff.isNegative ? diff + const Duration(days: 1) : diff));
+    emit(state.copyWith(
+        sleepTimerRemaining:
+            diff.isNegative ? diff + const Duration(days: 1) : diff));
+  }
+
+  void startEndOfTrackTimer() {
+    _audioHandler.startEndOfTrackTimer();
+    emit(state.copyWith(sleepTimerRemaining: const Duration(minutes: 1)));
+  }
+
+  void startAfterNTracksTimer(int trackCount) {
+    _audioHandler.startAfterNTracksTimer(trackCount);
+    emit(
+        state.copyWith(sleepTimerRemaining: Duration(minutes: trackCount * 3)));
   }
 
   void cancelSleepTimer() {
@@ -1081,11 +1171,12 @@ class PlayerCubit extends Cubit<PlayerState> {
   Future<void> _loadPlaybackSpeed() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final speed = prefs.getDouble('playback_speed') ?? 1.0;
+      final speed = prefs.getDouble(PrefsKeys.playbackSpeed) ?? 1.0;
       await _audioHandler.setSpeed(speed);
       emit(state.copyWith(playbackSpeed: speed));
     } catch (e, st) {
-      ErrorLogger.log('Failed to load playback speed from SharedPreferences', error: e, stackTrace: st, category: 'PlayerCubit');
+      ErrorLogger.log('Failed to load playback speed from SharedPreferences',
+          error: e, stackTrace: st, category: 'PlayerCubit');
     }
   }
 
@@ -1093,7 +1184,7 @@ class PlayerCubit extends Cubit<PlayerState> {
     await _audioHandler.setSpeed(speed);
     emit(state.copyWith(playbackSpeed: speed));
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('playback_speed', speed);
+    await prefs.setDouble(PrefsKeys.playbackSpeed, speed);
     _queueSlots[state.activeQueueSlot] = _QueueSlotData(
       songs: state.queue,
       currentIndex: state.currentIndex,

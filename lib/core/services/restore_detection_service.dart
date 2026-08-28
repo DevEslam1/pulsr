@@ -8,12 +8,14 @@ import '../../data/scanner/media_scanner_service.dart';
 class RestoreDetectionService {
   static const String _tokenFileName = 'app_instance_token';
 
-  static Future<bool> checkAndHandleRestore(MediaScannerService scannerService) async {
+  static Future<bool> checkAndHandleRestore(
+      MediaScannerService scannerService) async {
     try {
       final docDir = await getApplicationDocumentsDirectory();
       final tokenFile = File('${docDir.path}/$_tokenFileName');
       final prefs = await SharedPreferences.getInstance();
-      final isOnboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
+      final isOnboardingCompleted =
+          prefs.getBool('onboarding_completed') ?? false;
 
       final tokenExists = await tokenFile.exists();
 
@@ -35,7 +37,8 @@ class RestoreDetectionService {
         }
       }
     } catch (e, st) {
-      ErrorLogger.log('Error checking restore status', error: e, stackTrace: st, category: 'Restore');
+      ErrorLogger.log('Error checking restore status',
+          error: e, stackTrace: st, category: 'Restore');
     }
     return false;
   }

@@ -1,0 +1,103 @@
+{
+  "clients": {
+    "ANDROID_VR": {
+      "clientNameId": "28",
+      "clientVersion": "1.63.27",
+      "requiresPoToken": false,
+      "requiresLogin": false,
+      "supportsStreamResolve": true,
+      "supportsSearch": true,
+      "supportsBrowse": true,
+      "requiresJsSignature": false,
+      "priority": 10
+    },
+    "IOS_MUSIC": {
+      "clientNameId": "26",
+      "clientVersion": "8.32.1",
+      "requiresPoToken": false,
+      "requiresLogin": false,
+      "supportsStreamResolve": true,
+      "supportsSearch": true,
+      "supportsBrowse": true,
+      "requiresJsSignature": false,
+      "priority": 9
+    },
+    "ANDROID_MUSIC": {
+      "clientNameId": "21",
+      "clientVersion": "8.32.50",
+      "requiresPoToken": true,
+      "requiresLogin": false,
+      "supportsStreamResolve": true,
+      "supportsSearch": true,
+      "supportsBrowse": true,
+      "requiresJsSignature": false,
+      "priority": 8
+    },
+    "ANDROID_CREATOR": {
+      "clientNameId": "62",
+      "clientVersion": "24.45.100",
+      "requiresPoToken": false,
+      "requiresLogin": false,
+      "supportsStreamResolve": true,
+      "supportsSearch": false,
+      "supportsBrowse": false,
+      "requiresJsSignature": false,
+      "priority": 7
+    },
+    "TVHTML5_SIMPLY_EMBEDDED_PLAYER": {
+      "clientNameId": "85",
+      "clientVersion": "2.0",
+      "requiresPoToken": false,
+      "requiresLogin": false,
+      "supportsStreamResolve": true,
+      "supportsSearch": false,
+      "supportsBrowse": false,
+      "requiresJsSignature": true,
+      "priority": 6
+    },
+    "WEB_REMIX": {
+      "clientNameId": "67",
+      "clientVersion": "1.20260825.01.00",
+      "requiresPoToken": true,
+      "requiresLogin": false,
+      "supportsStreamResolve": true,
+      "supportsSearch": true,
+      "supportsBrowse": true,
+      "requiresJsSignature": true,
+      "priority": 5
+    },
+    "WEB_EMBEDDED_PLAYER": {
+      "clientNameId": "56",
+      "clientVersion": "1.20260825.01.00",
+      "requiresPoToken": true,
+      "requiresLogin": false,
+      "supportsStreamResolve": true,
+      "supportsSearch": false,
+      "supportsBrowse": false,
+      "requiresJsSignature": true,
+      "priority": 4
+    },
+    "MWEB": {
+      "clientNameId": "65",
+      "clientVersion": "2.20260825.01.00",
+      "requiresPoToken": true,
+      "requiresLogin": false,
+      "supportsStreamResolve": true,
+      "supportsSearch": true,
+      "supportsBrowse": true,
+      "requiresJsSignature": true,
+      "priority": 3
+    },
+    "ANDROID_TESTSUITE": {
+      "clientNameId": "30",
+      "clientVersion": "1.9",
+      "requiresPoToken": false,
+      "requiresLogin": false,
+      "supportsStreamResolve": true,
+      "supportsSearch": false,
+      "supportsBrowse": false,
+      "requiresJsSignature": false,
+      "priority": 2
+    }
+  }
+}

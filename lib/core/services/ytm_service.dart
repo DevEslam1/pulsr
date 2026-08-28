@@ -17,18 +17,36 @@ import '../../domain/models/ytm_track.dart';
 import '../utils/error_logger.dart';
 import '../utils/ytm_rate_limiter.dart';
 
-/// A failed YTM call.
+import '../errors/ytm_error_classifier.dart';
+
+/// A failed YTM call with structured block signal and trace ID.
 class YtmException implements Exception {
   final String code;
   final String? details;
+  final String? traceId;
 
-  const YtmException(this.code, [this.details]);
+  const YtmException(this.code, [this.details, this.traceId]);
+
+  YtmBlockSignal? get signal =>
+      YtmErrorClassifier.classify(
+        details ?? code,
+        traceId,
+      ).signal;
 
   /// Retrying later may work; retrying the rest of the queue now will not.
-  bool get isNetwork => code == 'YTM_NETWORK' || code == 'YTM_TIMEOUT';
+  bool get isNetwork =>
+      code == 'YTM_NETWORK' ||
+      code == 'YTM_TIMEOUT' ||
+      signal == YtmBlockSignal.ipBlocked;
 
   /// YouTube has flagged the IP / client as automated/bot and requires authentication.
   bool get isBotBlocked =>
+      signal == YtmBlockSignal.botChallenge ||
+      signal == YtmBlockSignal.poTokenInvalid ||
+      signal == YtmBlockSignal.rateLimited ||
+      code == 'BOT_CHALLENGE' ||
+      code == 'PO_TOKEN_INVALID' ||
+      code == 'RATE_LIMITED' ||
       code == 'YTM_BOT_BLOCKED' ||
       code == 'YTM_429' ||
       code == 'YTM_RECAPTCHA' ||
@@ -40,6 +58,8 @@ class YtmException implements Exception {
 
   /// Session has expired or authentication is invalid.
   bool get isAuth =>
+      signal == YtmBlockSignal.signInRequired ||
+      code == 'SIGN_IN_REQUIRED' ||
       code == 'YTM_AUTH' ||
       code == 'LOGIN_REQUIRED' ||
       (details != null && details!.toLowerCase().contains('unauthenticated'));
@@ -48,13 +68,19 @@ class YtmException implements Exception {
   bool get isFatal => isNetwork || isDisabled || isBotBlocked || isAuth;
 
   /// This one video cannot be played, but others still can.
-  bool get isUnavailable => code == 'YTM_UNAVAILABLE';
+  bool get isUnavailable =>
+      signal == YtmBlockSignal.videoGone ||
+      signal == YtmBlockSignal.geoBlocked ||
+      code == 'VIDEO_GONE' ||
+      code == 'GEO_BLOCKED' ||
+      code == 'YTM_UNAVAILABLE';
 
   /// The build has no extractor compiled in.
   bool get isDisabled => code == 'YTM_DISABLED' || code == 'YTM_UNSUPPORTED';
 
   @override
-  String toString() => 'YtmException($code${details == null ? '' : ': $details'})';
+  String toString() =>
+      'YtmException($code${traceId != null ? ' [trace=$traceId]' : ''}${details == null ? '' : ': $details'})';
 }
 
 @singleton
@@ -64,7 +90,8 @@ class YtmService {
   static const Duration _defaultResolveTimeout = Duration(seconds: 20);
 
   final MethodChannel _channel = const MethodChannel(channelName);
-  final StreamController<void> _authExpiredController = StreamController<void>.broadcast();
+  final StreamController<void> _authExpiredController =
+      StreamController<void>.broadcast();
 
   bool? _available;
 
@@ -77,6 +104,16 @@ class YtmService {
   @disposeMethod
   void dispose() {
     _authExpiredController.close();
+  }
+
+  Map<String, String> _localeArgs() {
+    final locale = ui.PlatformDispatcher.instance.locale;
+    final country = locale.countryCode;
+    final lang = locale.languageCode;
+    return {
+      if (country != null && country.isNotEmpty) 'country': country,
+      if (lang.isNotEmpty) 'lang': lang,
+    };
   }
 
   /// Synchronizes cookies into the native CookieManager so the extractor
@@ -107,7 +144,8 @@ class YtmService {
   /// Retrieves state of PoTokenManager.
   Future<Map<String, dynamic>?> getPoTokenState() async {
     try {
-      final state = await _channel.invokeMethod<Map<Object?, Object?>>('getPoTokenState');
+      final state =
+          await _channel.invokeMethod<Map<Object?, Object?>>('getPoTokenState');
       if (state == null) return null;
       return state.map((k, v) => MapEntry(k.toString(), v));
     } catch (_) {
@@ -135,18 +173,43 @@ class YtmService {
   /// mint against the correct account (e.g. restored from prefs at startup).
   Future<void> setDataSyncId(String dataSyncId) async {
     try {
-      await _channel.invokeMethod<bool>('setDataSyncId', {'dataSyncId': dataSyncId});
+      await _channel
+          .invokeMethod<bool>('setDataSyncId', {'dataSyncId': dataSyncId});
     } catch (_) {}
   }
 
-  Map<String, String> _localeArgs() {
-    final locale = ui.PlatformDispatcher.instance.locale;
-    final country = locale.countryCode;
-    final lang = locale.languageCode;
-    return {
-      if (country != null && country.isNotEmpty) 'country': country,
-      if (lang.isNotEmpty) 'lang': lang,
-    };
+  /// Pre-warms BotGuard WebView and Capability Matrix.
+  Future<void> preWarm() async {
+    try {
+      await _channel.invokeMethod<bool>('preWarm');
+    } catch (_) {}
+  }
+
+  /// Checks if active connection is via VPN.
+  Future<bool> isVpnConnected() async {
+    try {
+      final vpn = await _channel.invokeMethod<bool>('isVpnConnected');
+      return vpn ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Resets identities and visitor data.
+  Future<void> resetIdentities() async {
+    try {
+      await _channel.invokeMethod<bool>('resetIdentities');
+    } catch (_) {}
+  }
+
+  /// Returns true if native stack is running in limited mode (no poToken).
+  Future<bool> getLimitedMode() async {
+    try {
+      final limited = await _channel.invokeMethod<bool>('getLimitedMode');
+      return limited ?? false;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<bool> isAvailable() async {
@@ -193,7 +256,8 @@ class YtmService {
 
   /// Search with fallback: First tries native extractor, then falls back to
   /// Innertube search if the extractor returns empty or throws.
-  Future<List<YtmTrack>> searchWithFallback(String query, {int limit = 30}) async {
+  Future<List<YtmTrack>> searchWithFallback(String query,
+      {int limit = 30}) async {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return const [];
 
@@ -227,7 +291,8 @@ class YtmService {
     return const [];
   }
 
-  Future<List<YtmTrack>> _searchInnertube(String query, {int limit = 30}) async {
+  Future<List<YtmTrack>> _searchInnertube(String query,
+      {int limit = 30}) async {
     try {
       String apiKey = const String.fromEnvironment(
         'YTM_API_KEY',
@@ -268,7 +333,8 @@ class YtmService {
           final cookies = account.cookies;
           if (cookies != null && cookies.isNotEmpty) {
             headers['Cookie'] = cookies;
-            final authHeader = YtmAccountService.buildAuthorizationHeader(cookies);
+            final authHeader =
+                YtmAccountService.buildAuthorizationHeader(cookies);
             if (authHeader != null) {
               headers['Authorization'] = authHeader;
             }
@@ -279,7 +345,8 @@ class YtmService {
       await YtmRateLimiter.shared.acquirePermit();
       final response = await http
           .post(
-            Uri.parse('https://music.youtube.com/youtubei/v1/search?prettyPrint=false&key=$apiKey'),
+            Uri.parse(
+                'https://music.youtube.com/youtubei/v1/search?prettyPrint=false&key=$apiKey'),
             headers: headers,
             body: body,
           )
@@ -292,7 +359,8 @@ class YtmService {
         void traverse(dynamic node) {
           if (node is Map<String, dynamic>) {
             if (node.containsKey('musicResponsiveListItemRenderer')) {
-              final r = node['musicResponsiveListItemRenderer'] as Map<String, dynamic>;
+              final r = node['musicResponsiveListItemRenderer']
+                  as Map<String, dynamic>;
               final flexCols = r['flexColumns'] as List<dynamic>? ?? [];
               String? videoId;
               String title = 'Unknown Title';
@@ -302,15 +370,20 @@ class YtmService {
               videoId = pData?['videoId'] as String?;
 
               if (flexCols.isNotEmpty) {
-                final c0 = flexCols[0]['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'] as List<dynamic>?;
+                final c0 = flexCols[0]
+                        ['musicResponsiveListItemFlexColumnRenderer']?['text']
+                    ?['runs'] as List<dynamic>?;
                 if (c0 != null && c0.isNotEmpty) {
                   title = c0[0]['text'] as String? ?? title;
-                  final nav = c0[0]['navigationEndpoint'] as Map<String, dynamic>?;
+                  final nav =
+                      c0[0]['navigationEndpoint'] as Map<String, dynamic>?;
                   videoId ??= nav?['watchEndpoint']?['videoId'] as String?;
                 }
               }
               if (flexCols.length > 1) {
-                final c1 = flexCols[1]['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'] as List<dynamic>?;
+                final c1 = flexCols[1]
+                        ['musicResponsiveListItemFlexColumnRenderer']?['text']
+                    ?['runs'] as List<dynamic>?;
                 if (c1 != null && c1.isNotEmpty) {
                   artist = c1[0]['text'] as String? ?? artist;
                 }
@@ -355,7 +428,8 @@ class YtmService {
     return _parseTracks(raw);
   }
 
-  Future<List<YtmTrack>> getPlaylistTracks(String urlOrId, {int limit = 100}) async {
+  Future<List<YtmTrack>> getPlaylistTracks(String urlOrId,
+      {int limit = 100}) async {
     final cleanUrlOrId = switch (urlOrId.trim()) {
       'LM' ||
       'VLLM' ||
@@ -374,7 +448,9 @@ class YtmService {
     try {
       if (getIt.isRegistered<XdmBackendService>()) {
         final xdm = getIt<XdmBackendService>();
-        final account = getIt.isRegistered<YtmAccountService>() ? getIt<YtmAccountService>() : null;
+        final account = getIt.isRegistered<YtmAccountService>()
+            ? getIt<YtmAccountService>()
+            : null;
         final playlistTracks = await xdm.getPlaylist(
           resolvedUrl,
           limit: limit,
@@ -414,7 +490,8 @@ class YtmService {
 
   /// Resolves audio stream using multi-tier fallback:
   /// (a) Remote yt-dlp backend -> (b) Direct authenticated account stream -> (c) Native multi-client extractor
-  Future<YtmStream> resolveStream(String videoId, {String quality = 'high'}) async {
+  Future<YtmStream> resolveStream(String videoId,
+      {String quality = 'high'}) async {
     // 1. Try remote yt-dlp backend (XdmBackendService) if enabled
     try {
       if (getIt.isRegistered<XdmBackendService>()) {
@@ -425,7 +502,8 @@ class YtmService {
         }
       }
     } catch (e) {
-      debugPrint('[YTM_SERVICE] Remote yt-dlp backend stream resolution fallback: $e');
+      debugPrint(
+          '[YTM_SERVICE] Remote yt-dlp backend stream resolution fallback: $e');
     }
 
     // 2. Try direct authenticated YouTube Music InnerTube Player API if logged in
@@ -433,7 +511,8 @@ class YtmService {
       if (getIt.isRegistered<YtmAccountService>()) {
         final account = getIt<YtmAccountService>();
         if (account.isLoggedIn) {
-          final directStream = await account.resolvePlayerStream(videoId, quality: quality);
+          final directStream =
+              await account.resolvePlayerStream(videoId, quality: quality);
           if (directStream != null) {
             return directStream;
           }
@@ -486,7 +565,8 @@ class YtmService {
             e.code == 'YTM_AUTH';
 
         if (attempt == maxRetries || isFatalCode) {
-          ErrorLogger.log('YTM call failed: ${e.code} ${e.message}', category: 'YTM');
+          ErrorLogger.log('YTM call failed: ${e.code} ${e.message}',
+              category: 'YTM');
           if (e.code == 'LOGIN_REQUIRED' || e.code == 'YTM_AUTH') {
             notifyAuthExpired();
           }

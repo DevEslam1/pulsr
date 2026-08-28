@@ -1,4 +1,4 @@
-﻿import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/services/scrobbler_service.dart';
@@ -19,7 +19,8 @@ void main() {
   });
 
   group('Scrobbler Persistence & Session Recovery Tests', () {
-    test('checkPendingScrobble ignores session if played <50% and <240s', () async {
+    test('checkPendingScrobble ignores session if played <50% and <240s',
+        () async {
       SharedPreferences.setMockInitialValues({
         'scrobbler_last_song': 101,
         'scrobbler_last_time': DateTime.now().millisecondsSinceEpoch - 60000,
@@ -35,7 +36,9 @@ void main() {
       expect(prefs.getInt('scrobbler_last_song'), isNull);
     });
 
-    test('checkPendingScrobble triggers scrobble if played >50% before termination', () async {
+    test(
+        'checkPendingScrobble triggers scrobble if played >50% before termination',
+        () async {
       final nowMillis = DateTime.now().millisecondsSinceEpoch - 60000;
       SharedPreferences.setMockInitialValues({
         'scrobbler_last_song': 202,

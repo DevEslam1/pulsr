@@ -8,6 +8,7 @@ import 'package:pulsr/domain/repositories/music_repository_interface.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 
 class MockMusicRepository extends Mock implements IMusicRepository {}
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 void main() {
@@ -58,7 +59,8 @@ void main() {
         lastPositionMs: 0,
       );
 
-      when(() => repository.getSongByPath('/storage/music/queen.mp3')).thenAnswer(
+      when(() => repository.getSongByPath('/storage/music/queen.mp3'))
+          .thenAnswer(
         (_) async => const Right(existingSong),
       );
 
@@ -67,17 +69,23 @@ void main() {
       verify(() => playerCubit.playSong(existingSong)).called(1);
     });
 
-    test('Plays external unregistered audio file with synthetic metadata', () async {
-      when(() => repository.getSongByPath('/storage/downloads/new_podcast.flac')).thenAnswer(
+    test('Plays external unregistered audio file with synthetic metadata',
+        () async {
+      when(() =>
+              repository.getSongByPath('/storage/downloads/new_podcast.flac'))
+          .thenAnswer(
         (_) async => const Right(null),
       );
-      when(() => repository.getSongByUri('/storage/downloads/new_podcast.flac')).thenAnswer(
+      when(() => repository.getSongByUri('/storage/downloads/new_podcast.flac'))
+          .thenAnswer(
         (_) async => const Right(null),
       );
 
-      await fileIntentHandler.handleAudioUri('/storage/downloads/new_podcast.flac');
+      await fileIntentHandler
+          .handleAudioUri('/storage/downloads/new_podcast.flac');
 
-      final captured = verify(() => playerCubit.playSong(captureAny())).captured;
+      final captured =
+          verify(() => playerCubit.playSong(captureAny())).captured;
       expect(captured.length, equals(1));
       final capturedSong = captured.first as SongsTableData;
       expect(capturedSong.id, isNegative);

@@ -6,6 +6,7 @@ import 'package:pulsr/domain/repositories/music_repository_interface.dart';
 import 'package:pulsr/domain/usecases/backup_usecases.dart';
 
 class MockMusicRepository extends Mock implements IMusicRepository {}
+
 class MockAppDatabase extends Mock implements AppDatabase {}
 
 void main() {
@@ -31,7 +32,8 @@ void main() {
       );
     });
 
-    test('accepts backup payload within 10MB byte limit and validates schema', () async {
+    test('accepts backup payload within 10MB byte limit and validates schema',
+        () async {
       final validJson = jsonEncode({
         'version': 1,
         'exportedAt': DateTime.now().toIso8601String(),
@@ -40,7 +42,8 @@ void main() {
         'playbackHistory': [],
       });
 
-      expect(utf8.encode(validJson).length, lessThan(ImportBackupUseCase.maxBackupSizeBytes));
+      expect(utf8.encode(validJson).length,
+          lessThan(ImportBackupUseCase.maxBackupSizeBytes));
     });
   });
 }

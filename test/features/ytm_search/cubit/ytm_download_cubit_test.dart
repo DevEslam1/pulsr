@@ -10,7 +10,9 @@ import 'package:pulsr/core/errors/failures.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockYtDownloadService extends Mock implements YtDownloadService {}
+
 class MockPlayerCubit extends Mock implements PlayerCubit {}
+
 class MockSongsTableData extends Mock implements SongsTableData {}
 
 void main() {
@@ -48,10 +50,13 @@ void main() {
     blocTest<YtmDownloadCubit, YtmDownloadState>(
       'emits [queued, running, done] on successful download',
       build: () {
-        when(() => mockService.download(any(), onProgress: any(named: 'onProgress')))
+        when(() => mockService.download(any(),
+                onProgress: any(named: 'onProgress')))
             .thenAnswer((invocation) async {
-          final onProgress = invocation.namedArguments[#onProgress] as void Function(YtDownloadProgress)?;
-          onProgress?.call(const YtDownloadProgress(YtDownloadStage.downloading, 0.5));
+          final onProgress = invocation.namedArguments[#onProgress] as void
+              Function(YtDownloadProgress)?;
+          onProgress?.call(
+              const YtDownloadProgress(YtDownloadStage.downloading, 0.5));
           return const Right(123);
         });
         when(() => mockPlayerCubit.swapReconciledSong(any(), any()))
@@ -60,9 +65,12 @@ void main() {
       },
       act: (cubit) => cubit.download(mockSong),
       expect: () => [
-        isA<YtmDownloadState>().having((s) => s.itemFor('test_video_id').status, 'status', YtDownloadStatus.queued),
-        isA<YtmDownloadState>().having((s) => s.itemFor('test_video_id').status, 'status', YtDownloadStatus.running),
-        isA<YtmDownloadState>().having((s) => s.itemFor('test_video_id').status, 'status', YtDownloadStatus.done),
+        isA<YtmDownloadState>().having((s) => s.itemFor('test_video_id').status,
+            'status', YtDownloadStatus.queued),
+        isA<YtmDownloadState>().having((s) => s.itemFor('test_video_id').status,
+            'status', YtDownloadStatus.running),
+        isA<YtmDownloadState>().having((s) => s.itemFor('test_video_id').status,
+            'status', YtDownloadStatus.done),
       ],
       verify: (_) {
         verify(() => mockPlayerCubit.swapReconciledSong(123, 123)).called(1);
@@ -72,16 +80,21 @@ void main() {
     blocTest<YtmDownloadCubit, YtmDownloadState>(
       'emits [queued, failed] on download failure',
       build: () {
-        when(() => mockService.download(any(), onProgress: any(named: 'onProgress')))
-            .thenAnswer((_) async => const Left(DownloadFailure('Network Error')));
+        when(() => mockService.download(any(),
+                onProgress: any(named: 'onProgress')))
+            .thenAnswer(
+                (_) async => const Left(DownloadFailure('Network Error')));
         return cubit;
       },
       act: (cubit) => cubit.download(mockSong),
       expect: () => [
-        isA<YtmDownloadState>().having((s) => s.itemFor('test_video_id').status, 'status', YtDownloadStatus.queued),
+        isA<YtmDownloadState>().having((s) => s.itemFor('test_video_id').status,
+            'status', YtDownloadStatus.queued),
         isA<YtmDownloadState>()
-            .having((s) => s.itemFor('test_video_id').status, 'status', YtDownloadStatus.failed)
-            .having((s) => s.itemFor('test_video_id').error, 'error', 'Network Error'),
+            .having((s) => s.itemFor('test_video_id').status, 'status',
+                YtDownloadStatus.failed)
+            .having((s) => s.itemFor('test_video_id').error, 'error',
+                'Network Error'),
       ],
     );
 
@@ -93,7 +106,8 @@ void main() {
       },
       act: (cubit) => cubit.cancelDownload('test_video_id'),
       expect: () => [
-        isA<YtmDownloadState>().having((s) => s.itemFor('test_video_id').status, 'status', YtDownloadStatus.canceled),
+        isA<YtmDownloadState>().having((s) => s.itemFor('test_video_id').status,
+            'status', YtDownloadStatus.canceled),
       ],
       verify: (_) {
         verify(() => mockService.cancel('test_video_id')).called(1);
@@ -103,7 +117,8 @@ void main() {
     blocTest<YtmDownloadCubit, YtmDownloadState>(
       'ignores download request if already running or done',
       build: () {
-        when(() => mockService.download(any(), onProgress: any(named: 'onProgress')))
+        when(() => mockService.download(any(),
+                onProgress: any(named: 'onProgress')))
             .thenAnswer((_) async => const Right(123));
         when(() => mockPlayerCubit.swapReconciledSong(any(), any()))
             .thenAnswer((_) async {});
@@ -114,12 +129,16 @@ void main() {
         await cubit.download(mockSong); // Should be ignored
       },
       expect: () => [
-        isA<YtmDownloadState>().having((s) => s.itemFor('test_video_id').status, 'status', YtDownloadStatus.queued),
-        isA<YtmDownloadState>().having((s) => s.itemFor('test_video_id').status, 'status', YtDownloadStatus.done),
+        isA<YtmDownloadState>().having((s) => s.itemFor('test_video_id').status,
+            'status', YtDownloadStatus.queued),
+        isA<YtmDownloadState>().having((s) => s.itemFor('test_video_id').status,
+            'status', YtDownloadStatus.done),
       ],
     );
 
-    test('downloadAll queues eligible online songs and skips local/duplicate tracks', () async {
+    test(
+        'downloadAll queues eligible online songs and skips local/duplicate tracks',
+        () async {
       final song1 = MockSongsTableData();
       final song2 = MockSongsTableData();
       final localSong = MockSongsTableData();
@@ -136,7 +155,8 @@ void main() {
       when(() => localSong.id).thenReturn(3);
       when(() => localSong.source).thenReturn(SongSource.local);
 
-      when(() => mockService.download(any(), onProgress: any(named: 'onProgress')))
+      when(() =>
+              mockService.download(any(), onProgress: any(named: 'onProgress')))
           .thenAnswer((_) async => const Right(1));
       when(() => mockPlayerCubit.swapReconciledSong(any(), any()))
           .thenAnswer((_) async {});
@@ -149,9 +169,11 @@ void main() {
       expect(countAgain, 0);
     });
 
-    test('persisted running and queued download states reset to idle on init', () async {
+    test('persisted running and queued download states reset to idle on init',
+        () async {
       SharedPreferences.setMockInitialValues({
-        'ytm_download_states': '{"v1":{"status":"running"},"v2":{"status":"queued"},"v3":{"status":"done"}}',
+        'ytm_download_states':
+            '{"v1":{"status":"running"},"v2":{"status":"queued"},"v3":{"status":"done"}}',
       });
       final newCubit = YtmDownloadCubit(mockService, mockPlayerCubit);
       // Wait for _loadPersistedState async execution

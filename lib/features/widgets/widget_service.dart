@@ -41,20 +41,28 @@ class WidgetService {
       );
       await HomeWidget.saveWidgetData<String>(
         'artist',
-        hasSong && song.artist.trim().isNotEmpty ? song.artist : 'Nothing playing',
+        hasSong && song.artist.trim().isNotEmpty
+            ? song.artist
+            : 'Nothing playing',
       );
       await HomeWidget.saveWidgetData<String>(
         'album',
-        hasSong && song.album.trim().isNotEmpty && song.album != 'Unknown Album' ? song.album : '',
+        hasSong && song.album.trim().isNotEmpty && song.album != 'Unknown Album'
+            ? song.album
+            : '',
       );
       await HomeWidget.saveWidgetData<bool>('isPlaying', isPlaying);
-      await HomeWidget.saveWidgetData<int>('positionMs', position.inMilliseconds);
-      await HomeWidget.saveWidgetData<int>('durationMs', duration.inMilliseconds);
+      await HomeWidget.saveWidgetData<int>(
+          'positionMs', position.inMilliseconds);
+      await HomeWidget.saveWidgetData<int>(
+          'durationMs', duration.inMilliseconds);
       await HomeWidget.saveWidgetData<bool>('isFavorite', isFavorite);
       await HomeWidget.saveWidgetData<bool>('isShuffle', isShuffle);
       await HomeWidget.saveWidgetData<String>('repeatMode', repeatMode);
       for (int i = 0; i < 3; i++) {
-        final title = (nextQueueTitles != null && i < nextQueueTitles.length) ? nextQueueTitles[i] : '';
+        final title = (nextQueueTitles != null && i < nextQueueTitles.length)
+            ? nextQueueTitles[i]
+            : '';
         await HomeWidget.saveWidgetData<String>('nextTrack$i', title);
       }
 
@@ -77,8 +85,31 @@ class WidgetService {
         qualifiedAndroidName: qualifiedAndroidName,
       );
     } catch (e, st) {
-      ErrorLogger.log('Failed to update home screen widget state', error: e, stackTrace: st, category: 'WidgetService');
+      ErrorLogger.log('Failed to update home screen widget state',
+          error: e, stackTrace: st, category: 'WidgetService');
     }
+  }
+
+  /// Lightweight progress-only update (throttled 1/sec): updates only position, duration & play state
+  /// without re-resolving artwork or touching bitmap cache.
+  Future<void> updateProgress({
+    required bool isPlaying,
+    Duration position = Duration.zero,
+    Duration duration = Duration.zero,
+  }) async {
+    try {
+      await HomeWidget.saveWidgetData<bool>('isPlaying', isPlaying);
+      await HomeWidget.saveWidgetData<int>(
+          'positionMs', position.inMilliseconds);
+      await HomeWidget.saveWidgetData<int>(
+          'durationMs', duration.inMilliseconds);
+
+      await HomeWidget.updateWidget(
+        name: androidWidgetName,
+        androidName: androidWidgetName,
+        qualifiedAndroidName: qualifiedAndroidName,
+      );
+    } catch (_) {}
   }
 
   /// Exports a corner-rounded artwork PNG for the widget, cached per song.
@@ -142,10 +173,12 @@ class WidgetService {
       final recorder = ui.PictureRecorder();
       final canvas = ui.Canvas(recorder);
       final rect = ui.Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble());
-      canvas.clipRRect(ui.RRect.fromRectAndRadius(rect, ui.Radius.circular(radius)));
+      canvas.clipRRect(
+          ui.RRect.fromRectAndRadius(rect, ui.Radius.circular(radius)));
       canvas.drawImageRect(
         frame.image,
-        ui.Rect.fromLTWH(0, 0, frame.image.width.toDouble(), frame.image.height.toDouble()),
+        ui.Rect.fromLTWH(
+            0, 0, frame.image.width.toDouble(), frame.image.height.toDouble()),
         rect,
         ui.Paint()..filterQuality = ui.FilterQuality.medium,
       );
@@ -156,7 +189,8 @@ class WidgetService {
 
       return byteData?.buffer.asUint8List();
     } catch (e, st) {
-      ErrorLogger.log('Failed to round corners for widget artwork', error: e, stackTrace: st, category: 'WidgetService');
+      ErrorLogger.log('Failed to round corners for widget artwork',
+          error: e, stackTrace: st, category: 'WidgetService');
       return null;
     } finally {
       picture?.dispose();
@@ -166,7 +200,8 @@ class WidgetService {
     }
   }
 
-  StreamSubscription<Uri?> listenToWidgetClicks(void Function(Uri? uri) onUriReceived) {
+  StreamSubscription<Uri?> listenToWidgetClicks(
+      void Function(Uri? uri) onUriReceived) {
     return HomeWidget.widgetClicked.listen(onUriReceived);
   }
 }

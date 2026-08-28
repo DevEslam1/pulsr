@@ -1,218 +1,692 @@
+// android/app/src/main/cpp/ConvolutionReverb.cpp
 #include "ConvolutionReverb.h"
-#include <cstring>
 #include <random>
+#include <algorithm>
+#include <cstring>
+#include <cmath>
+#include <mutex>
+#include <map>
+#include <list>
+#include <tuple>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
 #endif
 
-ConvolutionReverb::ConvolutionReverb() {
-    setSampleRate(48000.0);
-    setPreset(ReverbPreset::StudioRoom);
-    reset();
+struct SyntheticCacheKey {
+    int preset;
+    int sampleRate;
+    int dampingKey; // damping * 50
+
+    bool operator<(const SyntheticCacheKey& other) const {
+        return std::tie(preset, sampleRate, dampingKey) < std::tie(other.preset, other.sampleRate, other.dampingKey);
+    }
+};
+
+struct SyntheticCacheEntry {
+    std::shared_ptr<const PreparedIr> ir;
+    size_t byteSize = 0;
+    std::list<SyntheticCacheKey>::iterator lruIt;
+};
+
+static constexpr size_t SYNTHETIC_CACHE_BUDGET_BYTES = 64 * 1024 * 1024; // 64 MB (R1)
+static std::mutex sIrCacheMutex;
+static std::map<SyntheticCacheKey, SyntheticCacheEntry> sIrCacheMap;
+static std::list<SyntheticCacheKey> sIrCacheLruList;
+static std::vector<std::pair<std::weak_ptr<const PreparedIr>, size_t>> sCustomIrRegistry;
+static size_t sCurrentCacheBytes = 0;
+static std::atomic<uint64_t> sCacheMutexLockCount{0};
+
+static void pruneExpiredCustomIrsLocked() {
+    for (auto it = sCustomIrRegistry.begin(); it != sCustomIrRegistry.end(); ) {
+        if (it->first.expired()) {
+            if (sCurrentCacheBytes >= it->second) {
+                sCurrentCacheBytes -= it->second;
+            } else {
+                sCurrentCacheBytes = 0;
+            }
+            it = sCustomIrRegistry.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
-void ConvolutionReverb::setSampleRate(double sampleRate) {
-    if (sampleRate < 8000.0) sampleRate = 8000.0;
-    if (sampleRate > 768000.0) sampleRate = 768000.0;
-    sampleRate_ = sampleRate;
-    generatePresetIR(currentPreset_);
+uint64_t PreparedIr::getCacheMutexLockCount() {
+    return sCacheMutexLockCount.load(std::memory_order_relaxed);
 }
 
-void ConvolutionReverb::setPreset(ReverbPreset preset) {
-    currentPreset_ = preset;
-    generatePresetIR(preset);
+void PreparedIr::resetCacheMutexLockCount() {
+    sCacheMutexLockCount.store(0, std::memory_order_relaxed);
 }
 
-void ConvolutionReverb::loadCustomIR(const float* irSamples, int sampleCount) {
-    if (!irSamples || sampleCount <= 0 || sampleRate_ <= 0) {
-        irLength_ = 0;
-        irL_.clear();
-        irR_.clear();
-        historyL_.clear();
-        historyR_.clear();
-        historyIdx_ = 0;
-        return;
+struct CacheLockGuard {
+    std::lock_guard<std::mutex> lock;
+    CacheLockGuard(std::mutex& m) : lock(m) {
+        sCacheMutexLockCount.fetch_add(1, std::memory_order_relaxed);
     }
-    int maxLen = static_cast<int>(sampleRate_ * 3.0); // max 3 seconds
-    irLength_ = std::min(sampleCount, maxLen);
-    if (irLength_ <= 0) {
-        irLength_ = 0;
-        return;
-    }
-    irL_.resize(irLength_);
-    irR_.resize(irLength_);
+};
 
-    float sumSq = 0.0f;
-    for (int i = 0; i < irLength_; ++i) {
-        irL_[i] = irSamples[i];
-        irR_[i] = irSamples[i];
-        sumSq += irSamples[i] * irSamples[i];
+size_t PreparedIr::getSyntheticCacheBytes() {
+    CacheLockGuard lock(sIrCacheMutex);
+    pruneExpiredCustomIrsLocked();
+    return sCurrentCacheBytes;
+}
+
+size_t PreparedIr::getSyntheticCacheEntryCount() {
+    CacheLockGuard lock(sIrCacheMutex);
+    return sIrCacheMap.size();
+}
+
+void PreparedIr::clearSyntheticCache() {
+    CacheLockGuard lock(sIrCacheMutex);
+    sIrCacheMap.clear();
+    sIrCacheLruList.clear();
+    sCustomIrRegistry.clear();
+    sCurrentCacheBytes = 0;
+}
+
+std::shared_ptr<const PreparedIr> PreparedIr::create(
+        const float* irLData, const float* irRData, int totalTaps) {
+    if (!irLData || !irRData || totalTaps <= 0) return nullptr;
+
+    auto ir = std::make_shared<PreparedIr>();
+    ir->totalTaps = totalTaps;
+    ir->irL.assign(irLData, irLData + totalTaps);
+    ir->irR.assign(irRData, irRData + totalTaps);
+
+    if (totalTaps <= 1024) {
+        ir->numPartitions = 0;
+        return ir;
     }
-    float rms = std::sqrt(sumSq / irLength_);
-    if (rms > 0.0001f) {
-        for (int i = 0; i < irLength_; ++i) {
-            irL_[i] = (irL_[i] / rms) * 0.4f;
-            irR_[i] = (irR_[i] / rms) * 0.4f;
+
+    ir->numPartitions = (totalTaps + PARTITION_SIZE - 1) / PARTITION_SIZE;
+    ir->irFreqL.assign(ir->numPartitions, std::vector<FftUtil::Complex>(FFT_SIZE));
+    ir->irFreqR.assign(ir->numPartitions, std::vector<FftUtil::Complex>(FFT_SIZE));
+
+    std::vector<FftUtil::Complex> timeBlockL(FFT_SIZE);
+    std::vector<FftUtil::Complex> timeBlockR(FFT_SIZE);
+
+    for (int p = 0; p < ir->numPartitions; ++p) {
+        std::fill(timeBlockL.begin(), timeBlockL.end(), FftUtil::Complex(0.0f, 0.0f));
+        std::fill(timeBlockR.begin(), timeBlockR.end(), FftUtil::Complex(0.0f, 0.0f));
+
+        const int start = p * PARTITION_SIZE;
+        const int count = std::min(PARTITION_SIZE, totalTaps - start);
+
+        for (int i = 0; i < count; ++i) {
+            timeBlockL[i] = FftUtil::Complex(ir->irL[start + i], 0.0f);
+            timeBlockR[i] = FftUtil::Complex(ir->irR[start + i], 0.0f);
+        }
+
+        FftUtil::fft(timeBlockL);
+        FftUtil::fft(timeBlockR);
+
+        ir->irFreqL[p] = timeBlockL;
+        ir->irFreqR[p] = timeBlockR;
+    }
+
+    return ir;
+}
+
+std::shared_ptr<const PreparedIr> PreparedIr::createSynthetic(
+        double sampleRate, int presetInt, float dampingFactor) {
+    auto preset = static_cast<ReverbPreset>(presetInt);
+    if (preset == ReverbPreset::Custom) return nullptr;
+
+    const int srKey = static_cast<int>(std::round(sampleRate));
+    const int dampKey = static_cast<int>(std::round(dampingFactor * 50.0f)); // Quantize * 50 (R1)
+    const SyntheticCacheKey key{presetInt, srKey, dampKey};
+
+    {
+        CacheLockGuard lock(sIrCacheMutex);
+        pruneExpiredCustomIrsLocked();
+        auto it = sIrCacheMap.find(key);
+        if (it != sIrCacheMap.end()) {
+            // Touch LRU: move existing node to front with ZERO allocations via std::list::splice
+            sIrCacheLruList.splice(sIrCacheLruList.begin(), sIrCacheLruList, it->second.lruIt);
+            return it->second.ir;
         }
     }
 
-    historyL_.assign(irLength_, 0.0f);
-    historyR_.assign(irLength_, 0.0f);
-    historyIdx_ = 0;
-    currentPreset_ = ReverbPreset::Custom;
+    float rt60 = 1.2f;
+    float presetDamp = 0.5f;
+
+    switch (preset) {
+        case ReverbPreset::Studio:      rt60 = 0.35f; presetDamp = 0.7f; break;
+        case ReverbPreset::Room:        rt60 = 0.85f; presetDamp = 0.5f; break;
+        case ReverbPreset::Chamber:     rt60 = 1.40f; presetDamp = 0.4f; break;
+        case ReverbPreset::Hall:        rt60 = 2.20f; presetDamp = 0.35f; break;
+        case ReverbPreset::ConcertHall: rt60 = 3.20f; presetDamp = 0.3f; break;
+        case ReverbPreset::Cathedral:   rt60 = 5.00f; presetDamp = 0.2f; break;
+        case ReverbPreset::Plate:       rt60 = 1.80f; presetDamp = 0.1f; break;
+        case ReverbPreset::Spring:      rt60 = 1.10f; presetDamp = 0.6f; break;
+        case ReverbPreset::Custom:      return nullptr;
+    }
+
+    // Respect user damping as multiplier on preset damping (BUG-004)
+    const float damp = std::clamp(presetDamp * dampingFactor * 2.0f, 0.05f, 0.95f);
+
+    const int totalSamples = static_cast<int>(rt60 * sampleRate);
+    if (totalSamples <= 0) return nullptr;
+
+    std::vector<float> irL(totalSamples);
+    std::vector<float> irR(totalSamples);
+
+    std::mt19937 genL(12345);
+    std::mt19937 genR(12345 + 98765);
+    std::normal_distribution<float> dist(0.0f, 1.0f);
+
+    const float decayRate = -6.907755f / static_cast<float>(totalSamples); // ln(0.001) = -6.907755 (-60dB)
+
+    // Air absorption one-pole lowpass filter state
+    float lpStateL = 0.0f;
+    float lpStateR = 0.0f;
+    const float lpAlpha = 1.0f - std::clamp(damp * 0.8f, 0.05f, 0.95f);
+
+    double energySum = 0.0;
+
+    for (int i = 0; i < totalSamples; ++i) {
+        const float env = std::exp(decayRate * static_cast<float>(i));
+        const float noiseL = dist(genL);
+        const float noiseR = dist(genR);
+
+        lpStateL += lpAlpha * (noiseL - lpStateL);
+        lpStateR += lpAlpha * (noiseR - lpStateR);
+
+        const float sL = env * lpStateL;
+        const float sR = env * lpStateR;
+
+        irL[i] = sL;
+        irR[i] = sR;
+
+        energySum += sL * sL + sR * sR;
+    }
+
+    // Normalize to maintain unity acoustic gain
+    if (energySum > 1e-9) {
+        const float norm = static_cast<float>(std::sqrt(2.0 / energySum) * 0.45);
+        for (int i = 0; i < totalSamples; ++i) {
+            irL[i] *= norm;
+            irR[i] *= norm;
+        }
+    }
+
+    auto created = create(irL.data(), irR.data(), totalSamples);
+    if (created) {
+        const size_t entrySize = static_cast<size_t>(created->totalTaps) * 12 +
+                                 static_cast<size_t>(created->numPartitions) * ConvolutionReverb::FFT_SIZE * 16;
+        CacheLockGuard lock(sIrCacheMutex);
+        pruneExpiredCustomIrsLocked();
+        auto it = sIrCacheMap.find(key);
+        if (it != sIrCacheMap.end()) {
+            sIrCacheLruList.splice(sIrCacheLruList.begin(), sIrCacheLruList, it->second.lruIt);
+            return it->second.ir;
+        }
+
+        // Evict oldest entries to satisfy 64MB budget (R1)
+        while (sCurrentCacheBytes + entrySize > SYNTHETIC_CACHE_BUDGET_BYTES && !sIrCacheLruList.empty()) {
+            const auto oldestKey = sIrCacheLruList.back();
+            auto mapIt = sIrCacheMap.find(oldestKey);
+            if (mapIt != sIrCacheMap.end()) {
+                sCurrentCacheBytes -= mapIt->second.byteSize;
+                sIrCacheMap.erase(mapIt);
+            }
+            sIrCacheLruList.pop_back();
+        }
+
+        sIrCacheLruList.push_front(key);
+        sIrCacheMap[key] = SyntheticCacheEntry{created, entrySize, sIrCacheLruList.begin()};
+        sCurrentCacheBytes += entrySize;
+    }
+    return created;
 }
 
-void ConvolutionReverb::setWetDry(float wetRatio) {
-    wetRatio_ = std::max(0.0f, std::min(wetRatio, 1.0f));
+std::shared_ptr<const PreparedIr> PreparedIr::createCustom(
+        double sampleRate, const float* irInterleaved, int frames, int channels) {
+    if (!irInterleaved || frames <= 0 || channels < 1) return nullptr;
+
+    // Cap numPartitions at 512 (BUG-005)
+    constexpr int MAX_CUSTOM_PARTITIONS = 512;
+    constexpr int MAX_CUSTOM_TAPS = MAX_CUSTOM_PARTITIONS * PARTITION_SIZE; // 262,144 samples
+
+    int actualFrames = frames;
+    std::vector<float> irL;
+    std::vector<float> irR;
+
+    if (frames > MAX_CUSTOM_TAPS) {
+        // Decimate to fit under 512 partitions with one-pole anti-aliasing lowpass (NEW-9)
+        actualFrames = MAX_CUSTOM_TAPS;
+        irL.resize(actualFrames);
+        irR.resize(actualFrames);
+
+        const double step = static_cast<double>(frames) / static_cast<double>(actualFrames);
+        // Cutoff at targetNyquist * 0.45 = (0.5 / step) * 0.45 = 0.225 / step
+        const float fc = static_cast<float>(0.225 / step);
+        const float lpAlpha = std::clamp(1.0f - std::exp(-2.0f * static_cast<float>(M_PI) * fc), 0.001f, 0.999f);
+
+        // Filter continuous stream before sampling
+        std::vector<float> filteredL(frames);
+        std::vector<float> filteredR(frames);
+        float lpStateL = 0.0f;
+        float lpStateR = 0.0f;
+
+        for (int i = 0; i < frames; ++i) {
+            const float l = irInterleaved[i * channels];
+            const float r = (channels > 1) ? irInterleaved[i * channels + 1] : l;
+            lpStateL += lpAlpha * (l - lpStateL);
+            lpStateR += lpAlpha * (r - lpStateR);
+            filteredL[i] = lpStateL;
+            filteredR[i] = lpStateR;
+        }
+
+        for (int i = 0; i < actualFrames; ++i) {
+            const int srcIdx = std::min(frames - 1, static_cast<int>(std::round(i * step)));
+            irL[i] = filteredL[srcIdx];
+            irR[i] = filteredR[srcIdx];
+        }
+    } else {
+        irL.resize(actualFrames);
+        irR.resize(actualFrames);
+        for (int i = 0; i < actualFrames; ++i) {
+            const float l = irInterleaved[i * channels];
+            const float r = (channels > 1) ? irInterleaved[i * channels + 1] : l;
+            irL[i] = l;
+            irR[i] = r;
+        }
+    }
+
+    auto created = create(irL.data(), irR.data(), actualFrames);
+    if (!created) return nullptr;
+
+    // Apply 64MB budget & LRU eviction with Custom IR registry tracking (NEW-2)
+    const size_t entrySize = static_cast<size_t>(created->totalTaps) * 12 +
+                             static_cast<size_t>(created->numPartitions) * ConvolutionReverb::FFT_SIZE * 16;
+    if (entrySize > SYNTHETIC_CACHE_BUDGET_BYTES) {
+        return nullptr; // Exceeds entire budget
+    }
+
+    {
+        CacheLockGuard lock(sIrCacheMutex);
+        pruneExpiredCustomIrsLocked();
+
+        // Evict synthetic LRU entries if needed
+        while (sCurrentCacheBytes + entrySize > SYNTHETIC_CACHE_BUDGET_BYTES && !sIrCacheLruList.empty()) {
+            const auto oldestKey = sIrCacheLruList.back();
+            auto mapIt = sIrCacheMap.find(oldestKey);
+            if (mapIt != sIrCacheMap.end()) {
+                sCurrentCacheBytes -= mapIt->second.byteSize;
+                sIrCacheMap.erase(mapIt);
+            }
+            sIrCacheLruList.pop_back();
+        }
+
+        if (sCurrentCacheBytes + entrySize > SYNTHETIC_CACHE_BUDGET_BYTES) {
+            return nullptr; // Custom IRs currently alive exceed remaining budget
+        }
+
+        sCurrentCacheBytes += entrySize;
+        sCustomIrRegistry.emplace_back(created, entrySize);
+    }
+
+    return created;
+}
+
+ConvolutionReverb::ConvolutionReverb() {
+    // Pre-allocate fixed max capacity buffers once in constructor (R2)
+    predelayRingL_.assign(MAX_PREDELAY_SAMPLES, 0.0f);
+    predelayRingR_.assign(MAX_PREDELAY_SAMPLES, 0.0f);
+    predelayWritePos_ = 0;
+
+    prevBlockL_.assign(PARTITION_SIZE, 0.0f);
+    prevBlockR_.assign(PARTITION_SIZE, 0.0f);
+    inputBlockL_.assign(PARTITION_SIZE, 0.0f);
+    inputBlockR_.assign(PARTITION_SIZE, 0.0f);
+    fftWorkL_.assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
+    fftWorkR_.assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
+    accumFreqL_.assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
+    accumFreqR_.assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
+
+    inputHistoryFreqL_.resize(MAX_PREALLOC_PARTITIONS);
+    inputHistoryFreqR_.resize(MAX_PREALLOC_PARTITIONS);
+    for (int p = 0; p < MAX_PREALLOC_PARTITIONS; ++p) {
+        inputHistoryFreqL_[p].assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
+        inputHistoryFreqR_[p].assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
+    }
+    directRingL_.assign(1024 * 2 + 16, 0.0f);
+    directRingR_.assign(1024 * 2 + 16, 0.0f);
+
+    ensureScratchCapacity(8192);
+    setPreset(ReverbPreset::Room);
+    reset();
+}
+
+void ConvolutionReverb::ensurePredelayCapacity() {
+    // Fixed max capacity (153,600) pre-allocated in constructor (Sr up to 768kHz * 0.200).
+    // Real-time audio thread never re-allocates.
+    const int requiredCap = std::max(4096, static_cast<int>(sampleRate_ * 0.150) + 16);
+    if (static_cast<int>(predelayRingL_.size()) < requiredCap) {
+        predelayRingL_.assign(MAX_PREDELAY_SAMPLES, 0.0f);
+        predelayRingR_.assign(MAX_PREDELAY_SAMPLES, 0.0f);
+    }
+}
+
+void ConvolutionReverb::ensureScratchCapacity(int frames) {
+    if (static_cast<int>(scratchInL_.size()) < frames) {
+        scratchInL_.resize(frames, 0.0f);
+        scratchInR_.resize(frames, 0.0f);
+        scratchOutL_.resize(frames, 0.0f);
+        scratchOutR_.resize(frames, 0.0f);
+    }
+}
+
+void ConvolutionReverb::setSampleRate(double sampleRate) {
+    if (sampleRate <= 0.0 || std::abs(sampleRate_ - sampleRate) < 1.0) return;
+    sampleRate_ = sampleRate;
+    setPredelay(predelayMs_);
+    ensurePredelayCapacity();
+}
+
+void ConvolutionReverb::setPreset(ReverbPreset preset) {
+    preset_ = preset;
+    updatePreparedIr();
+}
+
+void ConvolutionReverb::updatePreparedIr() {
+    if (preset_ == ReverbPreset::Custom) return;
+    preparedIr_ = PreparedIr::createSynthetic(sampleRate_, static_cast<int>(preset_), static_cast<float>(damping_));
+    preparePartitions();
+}
+
+void ConvolutionReverb::setWetDry(double wet) {
+    targetWet_ = std::clamp(wet, 0.0, 1.0);
+    smoothedWet_ = targetWet_;
+}
+
+void ConvolutionReverb::setPredelay(double predelayMs) {
+    predelayMs_ = std::clamp(predelayMs, 0.0, 150.0);
+    targetPredelaySamples_ = static_cast<float>(predelayMs_ * 0.001 * sampleRate_);
+}
+
+void ConvolutionReverb::setDamping(double damping) {
+    damping_ = std::clamp(damping, 0.0, 1.0);
+    updatePreparedIr();
 }
 
 void ConvolutionReverb::setEnabled(bool enabled) {
     enabled_ = enabled;
 }
 
+void ConvolutionReverb::applyParams(const ReverbParamSet& params) {
+    enabled_ = params.enabled;
+    targetWet_ = std::clamp(params.wetDry, 0.0, 1.0);
+    setPredelay(params.predelayMs);
+    damping_ = std::clamp(params.damping, 0.0, 1.0);
+
+    // BUG-001: Audio-thread RT safety:
+    // If preparedIr is provided, apply it. If null, DO NOT call setPreset/updatePreparedIr!
+    if (params.preparedIr) {
+        if (params.preparedIr != preparedIr_) {
+            preparedIr_ = params.preparedIr;
+            preset_ = static_cast<ReverbPreset>(params.preset);
+            preparePartitions();
+        }
+    }
+}
+
+bool ConvolutionReverb::loadCustomIR(const float* irInterleaved, int frames, int channels) {
+    auto customIr = PreparedIr::createCustom(sampleRate_, irInterleaved, frames, channels);
+    if (!customIr) return false;
+
+    preparedIr_ = customIr;
+    preset_ = ReverbPreset::Custom;
+    preparePartitions();
+    return true;
+}
+
+void ConvolutionReverb::preparePartitions() {
+    ensureScratchCapacity(8192);
+    if (!preparedIr_) return;
+
+    if (preparedIr_->numPartitions == 0) {
+        const int ringSize = preparedIr_->totalTaps * 2 + 16;
+        if (static_cast<int>(directRingL_.size()) < ringSize) {
+            directRingL_.resize(ringSize, 0.0f);
+            directRingR_.resize(ringSize, 0.0f);
+        }
+        std::fill(directRingL_.begin(), directRingL_.end(), 0.0f);
+        std::fill(directRingR_.begin(), directRingR_.end(), 0.0f);
+        directPos_ = 0;
+        return;
+    }
+
+    const int numPartitions = preparedIr_->numPartitions;
+    if (static_cast<int>(inputHistoryFreqL_.size()) < numPartitions) {
+        inputHistoryFreqL_.resize(numPartitions, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
+        inputHistoryFreqR_.resize(numPartitions, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
+    }
+
+    for (int p = 0; p < numPartitions; ++p) {
+        std::fill(inputHistoryFreqL_[p].begin(), inputHistoryFreqL_[p].end(), FftUtil::Complex(0.0f, 0.0f));
+        std::fill(inputHistoryFreqR_[p].begin(), inputHistoryFreqR_[p].end(), FftUtil::Complex(0.0f, 0.0f));
+    }
+    historyHead_ = 0;
+
+    std::fill(prevBlockL_.begin(), prevBlockL_.end(), 0.0f);
+    std::fill(prevBlockR_.begin(), prevBlockR_.end(), 0.0f);
+    std::fill(inputBlockL_.begin(), inputBlockL_.end(), 0.0f);
+    std::fill(inputBlockR_.begin(), inputBlockR_.end(), 0.0f);
+    inputBlockPos_ = 0;
+
+    std::fill(fftWorkL_.begin(), fftWorkL_.end(), FftUtil::Complex(0.0f, 0.0f));
+    std::fill(fftWorkR_.begin(), fftWorkR_.end(), FftUtil::Complex(0.0f, 0.0f));
+    std::fill(accumFreqL_.begin(), accumFreqL_.end(), FftUtil::Complex(0.0f, 0.0f));
+    std::fill(accumFreqR_.begin(), accumFreqR_.end(), FftUtil::Complex(0.0f, 0.0f));
+}
+
 void ConvolutionReverb::reset() {
-    std::fill(historyL_.begin(), historyL_.end(), 0.0f);
-    std::fill(historyR_.begin(), historyR_.end(), 0.0f);
-    historyIdx_ = 0;
-}
+    ensurePredelayCapacity();
+    ensureScratchCapacity(4096);
+    std::fill(predelayRingL_.begin(), predelayRingL_.end(), 0.0f);
+    std::fill(predelayRingR_.begin(), predelayRingR_.end(), 0.0f);
+    predelayWritePos_ = 0;
+    smoothedPredelaySamples_ = targetPredelaySamples_;
+    smoothedWet_ = targetWet_;
 
-void ConvolutionReverb::generatePresetIR(ReverbPreset preset) {
-    double decaySec = 0.5;
-    double damping = 0.3;
-    switch (preset) {
-        case ReverbPreset::StudioRoom:
-            decaySec = 0.35;
-            damping = 0.4;
-            break;
-        case ReverbPreset::ConcertHall:
-            decaySec = 2.0;
-            damping = 0.15;
-            break;
-        case ReverbPreset::WarmTube:
-            decaySec = 0.9;
-            damping = 0.5;
-            break;
-        case ReverbPreset::PlateReverb:
-            decaySec = 1.4;
-            damping = 0.2;
-            break;
-        case ReverbPreset::Custom:
-            return;
-    }
+    if (!preparedIr_) return;
 
-    // Downsample convolution taps to keep real-time performance lightning fast
-    int tapCount = static_cast<int>(sampleRate_ * decaySec * 0.25);
-    tapCount = std::max(256, std::min(tapCount, 4096));
-    irLength_ = tapCount;
-    irL_.resize(irLength_);
-    irR_.resize(irLength_);
-
-    std::mt19937 rng(1337);
-    std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
-
-    double decayFactor = -6.91 / (decaySec * sampleRate_ * 0.25); // -60dB at decaySec
-    for (int i = 0; i < irLength_; ++i) {
-        float env = static_cast<float>(std::exp(decayFactor * i));
-        // High frequency damping
-        float lowpass = static_cast<float>(1.0 - damping * (static_cast<double>(i) / irLength_));
-        irL_[i] = dist(rng) * env * lowpass;
-        irR_[i] = dist(rng) * env * lowpass;
-    }
-
-    // Early reflections boost
-    int earlyEnd = std::min(64, irLength_ / 4);
-    for (int i = 0; i < earlyEnd; ++i) {
-        if (i % 8 == 0) {
-            irL_[i] += 0.8f * (1.0f - static_cast<float>(i) / earlyEnd);
-            irR_[i] += 0.8f * (1.0f - static_cast<float>(i) / earlyEnd);
-        }
-    }
-
-    // Normalize
-    float sumSqL = 0.0f, sumSqR = 0.0f;
-    for (int i = 0; i < irLength_; ++i) {
-        sumSqL += irL_[i] * irL_[i];
-        sumSqR += irR_[i] * irR_[i];
-    }
-    float normL = std::sqrt(sumSqL);
-    float normR = std::sqrt(sumSqR);
-    if (normL > 0.0001f) {
-        for (int i = 0; i < irLength_; ++i) irL_[i] = (irL_[i] / normL) * 0.4f;
-    }
-    if (normR > 0.0001f) {
-        for (int i = 0; i < irLength_; ++i) irR_[i] = (irR_[i] / normR) * 0.4f;
-    }
-
-    historyL_.assign(irLength_, 0.0f);
-    historyR_.assign(irLength_, 0.0f);
-    historyIdx_ = 0;
-}
-
-void ConvolutionReverb::process(float* L, float* R, int frames) {
-    if (!enabled_ || !L || !R || frames <= 0 || irLength_ <= 0 || wetRatio_ <= 0.001f) return;
-
-    const int step = (irLength_ < 256) ? 1 : std::min(qualityStep_, irLength_);
-    if (step <= 0) return;
-
-    float dryGain = 1.0f - wetRatio_ * 0.5f;
-    float wetGain = wetRatio_ * std::sqrt(static_cast<float>(step));
-
-    for (int f = 0; f < frames; ++f) {
-        float inL = L[f];
-        float inR = R[f];
-
-        historyL_[historyIdx_] = inL;
-        historyR_[historyIdx_] = inR;
-
-        float convL = 0.0f;
-        float convR = 0.0f;
-
-        int hIdx = (historyIdx_ - 1 + irLength_) % irLength_;
-        for (int i = 0; i < irLength_; i += step) {
-            convL += historyL_[hIdx] * irL_[i];
-            convR += historyR_[hIdx] * irR_[i];
-            hIdx -= step;
-            while (hIdx < 0) hIdx += irLength_;
-        }
-
-        historyIdx_ = (historyIdx_ + 1) % irLength_;
-
-        L[f] = inL * dryGain + convL * wetGain;
-        R[f] = inR * dryGain + convR * wetGain;
+    if (preparedIr_->numPartitions == 0) {
+        std::fill(directRingL_.begin(), directRingL_.end(), 0.0f);
+        std::fill(directRingR_.begin(), directRingR_.end(), 0.0f);
+        directPos_ = 0;
+    } else {
+        std::fill(prevBlockL_.begin(), prevBlockL_.end(), 0.0f);
+        std::fill(prevBlockR_.begin(), prevBlockR_.end(), 0.0f);
+        std::fill(inputBlockL_.begin(), inputBlockL_.end(), 0.0f);
+        std::fill(inputBlockR_.begin(), inputBlockR_.end(), 0.0f);
+        for (auto& h : inputHistoryFreqL_) std::fill(h.begin(), h.end(), FftUtil::Complex(0.0f, 0.0f));
+        for (auto& h : inputHistoryFreqR_) std::fill(h.begin(), h.end(), FftUtil::Complex(0.0f, 0.0f));
+        std::fill(accumFreqL_.begin(), accumFreqL_.end(), FftUtil::Complex(0.0f, 0.0f));
+        std::fill(accumFreqR_.begin(), accumFreqR_.end(), FftUtil::Complex(0.0f, 0.0f));
+        inputBlockPos_ = 0;
+        historyHead_ = 0;
     }
 }
 
-void ConvolutionReverb::processInterleaved(float* buffer, int frames) {
-    if (!enabled_ || !buffer || frames <= 0 || irLength_ <= 0 || wetRatio_ <= 0.001f) return;
+void ConvolutionReverb::process(const float* inL, const float* inR, float* outL, float* outR, int frames) {
+    if (!enabled_ || !preparedIr_ || preparedIr_->totalTaps == 0) {
+        if (inL != outL) std::memcpy(outL, inL, frames * sizeof(float));
+        if (inR != outR) std::memcpy(outR, inR, frames * sizeof(float));
+        return;
+    }
 
-    const int step = (irLength_ < 256) ? 1 : std::min(qualityStep_, irLength_);
-    if (step <= 0) return;
+    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * 0.020));
+    smoothedWet_ += smoothFactor * (targetWet_ - smoothedWet_);
 
-    float dryGain = 1.0f - wetRatio_ * 0.5f;
-    float wetGain = wetRatio_ * std::sqrt(static_cast<float>(step));
+    const float dryGain = static_cast<float>(std::cos(smoothedWet_ * (M_PI / 2.0)));
+    const float wetGain = static_cast<float>(std::sin(smoothedWet_ * (M_PI / 2.0)));
 
-    for (int f = 0; f < frames; ++f) {
-        float inL = buffer[f * 2];
-        float inR = buffer[f * 2 + 1];
+    const int totalTaps = preparedIr_->totalTaps;
+    const int predelayCap = static_cast<int>(predelayRingL_.size());
 
-        historyL_[historyIdx_] = inL;
-        historyR_[historyIdx_] = inR;
+    // Direct FIR convolution path (for IR <= 1024) - BUG-006 vectorized contiguous loop
+    if (preparedIr_->numPartitions == 0) {
+        const float* irL = preparedIr_->irL.data();
+        const float* irR = preparedIr_->irR.data();
 
-        float convL = 0.0f;
-        float convR = 0.0f;
+        for (int i = 0; i < frames; ++i) {
+            float inSampleL = inL[i];
+            float inSampleR = inR[i];
 
-        int hIdx = (historyIdx_ - 1 + irLength_) % irLength_;
-        for (int i = 0; i < irLength_; i += step) {
-            convL += historyL_[hIdx] * irL_[i];
-            convR += historyR_[hIdx] * irR_[i];
-            hIdx -= step;
-            while (hIdx < 0) hIdx += irLength_;
+            // Smooth predelay interpolation
+            smoothedPredelaySamples_ += 0.005f * (targetPredelaySamples_ - smoothedPredelaySamples_);
+            if (smoothedPredelaySamples_ > 0.5f && predelayCap > 0) {
+                predelayRingL_[predelayWritePos_] = inSampleL;
+                predelayRingR_[predelayWritePos_] = inSampleR;
+
+                float exactReadPos = static_cast<float>(predelayWritePos_) - smoothedPredelaySamples_;
+                while (exactReadPos < 0.0f) exactReadPos += static_cast<float>(predelayCap);
+                int readPos0 = static_cast<int>(exactReadPos) % predelayCap;
+                int readPos1 = (readPos0 + 1) % predelayCap;
+                float frac = exactReadPos - static_cast<float>(static_cast<int>(exactReadPos));
+
+                inSampleL = (1.0f - frac) * predelayRingL_[readPos0] + frac * predelayRingL_[readPos1];
+                inSampleR = (1.0f - frac) * predelayRingR_[readPos0] + frac * predelayRingR_[readPos1];
+
+                predelayWritePos_ = (predelayWritePos_ + 1) % predelayCap;
+            }
+
+            directRingL_[directPos_] = inSampleL;
+            directRingL_[directPos_ + totalTaps] = inSampleL;
+            directRingR_[directPos_] = inSampleR;
+            directRingR_[directPos_ + totalTaps] = inSampleR;
+
+            float convL = 0.0f;
+            float convR = 0.0f;
+
+            // Direct contiguous pointer loop with zero branches and zero modulo (BUG-006)
+            const float* rL = &directRingL_[directPos_ + totalTaps];
+            const float* rR = &directRingR_[directPos_ + totalTaps];
+
+            for (int tap = 0; tap < totalTaps; ++tap) {
+                convL += rL[-tap] * irL[tap];
+                convR += rR[-tap] * irR[tap];
+            }
+
+            outL[i] = inL[i] * dryGain + convL * wetGain;
+            outR[i] = inR[i] * dryGain + convR * wetGain;
+
+            directPos_ = (directPos_ + 1) % totalTaps;
+        }
+        return;
+    }
+
+    // Textbook Uniform-Partitioned Overlap-Save FFT Convolution (for IR > 1024)
+    const int numPartitions = preparedIr_->numPartitions;
+    const auto& irFreqL = preparedIr_->irFreqL;
+    const auto& irFreqR = preparedIr_->irFreqR;
+
+    for (int i = 0; i < frames; ++i) {
+        float inSampleL = inL[i];
+        float inSampleR = inR[i];
+
+        // Smooth predelay interpolation
+        smoothedPredelaySamples_ += 0.005f * (targetPredelaySamples_ - smoothedPredelaySamples_);
+        if (smoothedPredelaySamples_ > 0.5f && predelayCap > 0) {
+            predelayRingL_[predelayWritePos_] = inSampleL;
+            predelayRingR_[predelayWritePos_] = inSampleR;
+
+            float exactReadPos = static_cast<float>(predelayWritePos_) - smoothedPredelaySamples_;
+            while (exactReadPos < 0.0f) exactReadPos += static_cast<float>(predelayCap);
+            int readPos0 = static_cast<int>(exactReadPos) % predelayCap;
+            int readPos1 = (readPos0 + 1) % predelayCap;
+            float frac = exactReadPos - static_cast<float>(static_cast<int>(exactReadPos));
+
+            inSampleL = (1.0f - frac) * predelayRingL_[readPos0] + frac * predelayRingL_[readPos1];
+            inSampleR = (1.0f - frac) * predelayRingR_[readPos0] + frac * predelayRingR_[readPos1];
+
+            predelayWritePos_ = (predelayWritePos_ + 1) % predelayCap;
         }
 
-        historyIdx_ = (historyIdx_ + 1) % irLength_;
+        inputBlockL_[inputBlockPos_] = inSampleL;
+        inputBlockR_[inputBlockPos_] = inSampleR;
 
-        buffer[f * 2] = inL * dryGain + convL * wetGain;
-        buffer[f * 2 + 1] = inR * dryGain + convR * wetGain;
+        // Overlap-save retrieval: valid linear convolution output is at index PARTITION_SIZE + inputBlockPos_
+        const float convSampleL = accumFreqL_[PARTITION_SIZE + inputBlockPos_].real();
+        const float convSampleR = accumFreqR_[PARTITION_SIZE + inputBlockPos_].real();
+
+        outL[i] = inL[i] * dryGain + convSampleL * wetGain;
+        outR[i] = inR[i] * dryGain + convSampleR * wetGain;
+
+        inputBlockPos_++;
+
+        if (inputBlockPos_ == PARTITION_SIZE) {
+            // Assemble FFT input buffer = [prevBlock (0..P-1) | inputBlock (P..2P-1)]
+            for (int k = 0; k < PARTITION_SIZE; ++k) {
+                fftWorkL_[k] = FftUtil::Complex(prevBlockL_[k], 0.0f);
+                fftWorkR_[k] = FftUtil::Complex(prevBlockR_[k], 0.0f);
+                fftWorkL_[PARTITION_SIZE + k] = FftUtil::Complex(inputBlockL_[k], 0.0f);
+                fftWorkR_[PARTITION_SIZE + k] = FftUtil::Complex(inputBlockR_[k], 0.0f);
+            }
+
+            FftUtil::fft(fftWorkL_);
+            FftUtil::fft(fftWorkR_);
+
+            inputHistoryFreqL_[historyHead_] = fftWorkL_;
+            inputHistoryFreqR_[historyHead_] = fftWorkR_;
+
+            // Frequency domain complex MAC accumulation across all partitions
+            std::fill(accumFreqL_.begin(), accumFreqL_.end(), FftUtil::Complex(0.0f, 0.0f));
+            std::fill(accumFreqR_.begin(), accumFreqR_.end(), FftUtil::Complex(0.0f, 0.0f));
+
+            for (int p = 0; p < numPartitions; ++p) {
+                int histIdx = (historyHead_ - p) % numPartitions;
+                if (histIdx < 0) histIdx += numPartitions;
+
+                const auto& inFreqL = inputHistoryFreqL_[histIdx];
+                const auto& inFreqR = inputHistoryFreqR_[histIdx];
+                const auto& irBlockL = irFreqL[p];
+                const auto& irBlockR = irFreqR[p];
+
+                for (int k = 0; k < FFT_SIZE; ++k) {
+                    accumFreqL_[k] += inFreqL[k] * irBlockL[k];
+                    accumFreqR_[k] += inFreqR[k] * irBlockR[k];
+                }
+            }
+
+            // IFFT to return to time domain
+            FftUtil::fft(accumFreqL_, true);
+            FftUtil::fft(accumFreqR_, true);
+
+            // Overlap-save block advance: current block becomes previous block
+            prevBlockL_ = inputBlockL_;
+            prevBlockR_ = inputBlockR_;
+
+            historyHead_ = (historyHead_ + 1) % numPartitions;
+            inputBlockPos_ = 0;
+        }
+    }
+}
+
+void ConvolutionReverb::processInterleaved(float* buffer, int frames, int channels) {
+    if (!enabled_ || !buffer || frames <= 0 || channels < 2 || !preparedIr_ || preparedIr_->totalTaps == 0) return;
+
+    ensureScratchCapacity(frames);
+
+    float* inL = scratchInL_.data();
+    float* inR = scratchInR_.data();
+    float* outL = scratchOutL_.data();
+    float* outR = scratchOutR_.data();
+
+    for (int i = 0; i < frames; ++i) {
+        inL[i] = buffer[i * channels];
+        inR[i] = buffer[i * channels + 1];
+    }
+
+    process(inL, inR, outL, outR, frames);
+
+    for (int i = 0; i < frames; ++i) {
+        buffer[i * channels] = outL[i];
+        buffer[i * channels + 1] = outR[i];
     }
 }

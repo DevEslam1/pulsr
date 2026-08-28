@@ -17,7 +17,8 @@ class SongsTable extends Table {
 
   IntColumn get id => integer()();
   TextColumn get title => text()();
-  TextColumn get artist => text().withDefault(const Constant('Unknown Artist'))();
+  TextColumn get artist =>
+      text().withDefault(const Constant('Unknown Artist'))();
   IntColumn get artistId => integer().nullable()();
   TextColumn get album => text().withDefault(const Constant('Unknown Album'))();
   IntColumn get albumId => integer().nullable()();
@@ -27,6 +28,7 @@ class SongsTable extends Table {
   IntColumn get trackNumber => integer().nullable()();
   IntColumn get discNumber => integer().nullable()();
   IntColumn get year => integer().nullable()();
+
   /// Stored as timestamp (seconds or milliseconds since Unix epoch, consistent with MediaStore/on_audio_query).
   IntColumn get dateAdded => integer().nullable()();
   TextColumn get genre => text().nullable()();
@@ -36,6 +38,7 @@ class SongsTable extends Table {
   RealColumn get replayGainAlbum => real().nullable()();
   RealColumn get replayGainTrackPeak => real().nullable()();
   RealColumn get replayGainAlbumPeak => real().nullable()();
+
   /// EBU R128 Loudness Range (LRA in LU) for dynamics awareness
   RealColumn get loudnessRange => real().nullable()();
   IntColumn get playCount => integer().withDefault(const Constant(0))();
@@ -50,13 +53,15 @@ class SongsTable extends Table {
   IntColumn get sampleRate => integer().nullable()();
   IntColumn get bitDepth => integer().nullable()();
   IntColumn get bitrateKbps => integer().nullable()();
+
   /// Real container/codec from the header (e.g. FLAC, MP3, AAC, ALAC), used to
   /// gate lossless/Hi-Res so a renamed file cannot fake a higher tier.
   TextColumn get codec => text().nullable()();
 
   /// See [SongSource]. Rows that are not [SongSource.local] have no file on
   /// disk, so scanner cleanup and every path-derived query must exclude them.
-  TextColumn get source => text().withDefault(const Constant(SongSource.local))();
+  TextColumn get source =>
+      text().withDefault(const Constant(SongSource.local))();
 
   /// YouTube video id. Kept after a download completes so the same video is
   /// not fetched twice.
@@ -80,7 +85,8 @@ class AlbumsTable extends Table {
 
   IntColumn get id => integer()();
   TextColumn get title => text()();
-  TextColumn get artist => text().withDefault(const Constant('Unknown Artist'))();
+  TextColumn get artist =>
+      text().withDefault(const Constant('Unknown Artist'))();
   IntColumn get artistId => integer().nullable()();
   IntColumn get songCount => integer().withDefault(const Constant(0))();
   TextColumn get artworkUri => text().nullable()();
@@ -121,8 +127,10 @@ class PlaylistEntriesTable extends Table {
   String get tableName => 'playlist_entries';
 
   IntColumn get id => integer().autoIncrement()();
-  IntColumn get playlistId => integer().references(PlaylistsTable, #id, onDelete: KeyAction.cascade)();
-  IntColumn get songId => integer().references(SongsTable, #id, onDelete: KeyAction.cascade)();
+  IntColumn get playlistId =>
+      integer().references(PlaylistsTable, #id, onDelete: KeyAction.cascade)();
+  IntColumn get songId =>
+      integer().references(SongsTable, #id, onDelete: KeyAction.cascade)();
   IntColumn get orderIndex => integer()();
   DateTimeColumn get addedAt => dateTime().withDefault(currentDateAndTime)();
 }
@@ -132,7 +140,8 @@ class PlayHistoryTable extends Table {
   String get tableName => 'play_history';
 
   IntColumn get id => integer().autoIncrement()();
-  IntColumn get songId => integer().references(SongsTable, #id, onDelete: KeyAction.cascade)();
+  IntColumn get songId =>
+      integer().references(SongsTable, #id, onDelete: KeyAction.cascade)();
   DateTimeColumn get playedAt => dateTime().withDefault(currentDateAndTime)();
   BoolColumn get completed => boolean().withDefault(const Constant(false))();
 }
@@ -142,7 +151,8 @@ class QueueItemsTable extends Table {
   String get tableName => 'queue_items';
 
   IntColumn get id => integer().autoIncrement()();
-  IntColumn get songId => integer().references(SongsTable, #id, onDelete: KeyAction.cascade)();
+  IntColumn get songId =>
+      integer().references(SongsTable, #id, onDelete: KeyAction.cascade)();
   IntColumn get orderIndex => integer()();
   BoolColumn get isCurrent => boolean().withDefault(const Constant(false))();
   IntColumn get positionMs => integer().withDefault(const Constant(0))();
@@ -156,4 +166,3 @@ class ExcludedFoldersTable extends Table {
   TextColumn get folderPath => text().unique()();
   DateTimeColumn get addedAt => dateTime().withDefault(currentDateAndTime)();
 }
-

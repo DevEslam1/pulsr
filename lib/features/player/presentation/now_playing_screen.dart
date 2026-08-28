@@ -91,11 +91,15 @@ class NowPlayingScreen extends StatelessWidget {
           child: Scaffold(
             backgroundColor: bgColor,
             body: _SwipeDownToDismiss(
-              onDismiss: () => context.canPop() ? context.pop() : context.go('/'),
+              onDismiss: () =>
+                  context.canPop() ? context.pop() : context.go('/'),
               child: Center(
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
-                    maxWidth: MediaQuery.orientationOf(context) == Orientation.landscape ? 960 : 560,
+                    maxWidth: MediaQuery.orientationOf(context) ==
+                            Orientation.landscape
+                        ? 960
+                        : 560,
                   ),
                   child: Directionality(
                     textDirection: TextDirection.ltr,
@@ -173,7 +177,8 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     if (_dragOffset > 100 || velocity > 450) {
       widget.onDismiss();
     } else if (_dragOffset > 0) {
-      _anim = Tween<double>(begin: _dragOffset, end: 0.0).animate(_curvedAnimation);
+      _anim =
+          Tween<double>(begin: _dragOffset, end: 0.0).animate(_curvedAnimation);
       _animController.forward(from: 0.0);
     }
   }

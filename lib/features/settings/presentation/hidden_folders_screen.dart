@@ -58,7 +58,8 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
     }
   }
 
-  Future<void> _showAddCustomFolderDialog(BuildContext context, PulsrPalette p) async {
+  Future<void> _showAddCustomFolderDialog(
+      BuildContext context, PulsrPalette p) async {
     _customPathController.clear();
     await showDialog(
       context: context,
@@ -70,7 +71,8 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
         ),
         title: Text(
           context.l10n.hideCustomFolder,
-          style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 18),
+          style: TextStyle(
+              color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 18),
         ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -90,7 +92,8 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                 hintStyle: TextStyle(color: p.textTertiary, fontSize: 12),
                 filled: true,
                 fillColor: p.surface,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: p.hairline),
@@ -110,13 +113,15 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(context.l10n.cancel, style: TextStyle(color: p.textSecondary)),
+            child: Text(context.l10n.cancel,
+                style: TextStyle(color: p.textSecondary)),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: p.accent,
               foregroundColor: p.onAccent,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
             ),
             onPressed: () async {
               final path = _customPathController.text.trim();
@@ -139,7 +144,8 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
     final filteredFolders = _folders.where((f) {
       if (_searchQuery.isEmpty) return true;
       final q = _searchQuery.toLowerCase();
-      return f.name.toLowerCase().contains(q) || f.path.toLowerCase().contains(q);
+      return f.name.toLowerCase().contains(q) ||
+          f.path.toLowerCase().contains(q);
     }).toList();
 
     final hiddenCount = _folders.where((f) => f.isExcluded).length;
@@ -167,18 +173,23 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                   backgroundColor: p.accent,
                   foregroundColor: p.onAccent,
                   minimumSize: const Size.fromHeight(50),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
                 ),
                 icon: state.isScanning
                     ? SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: p.onAccent),
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: p.onAccent),
                       )
                     : const Icon(Icons.sync_rounded),
                 label: Text(
-                  state.isScanning ? 'Rescanning library…' : 'Apply & Rescan Library',
-                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                  state.isScanning
+                      ? 'Rescanning library…'
+                      : 'Apply & Rescan Library',
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 14),
                 ),
                 onPressed: state.isScanning
                     ? null
@@ -186,7 +197,9 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                         final count = await cubit.rescanLibrary();
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Library updated! $count tracks loaded.')),
+                            SnackBar(
+                                content: Text(
+                                    'Library updated! $count tracks loaded.')),
                           );
                         }
                       },
@@ -229,15 +242,18 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                               color: p.accentContainer,
                               borderRadius: BorderRadius.circular(11),
                             ),
-                            child: Icon(Icons.mic_off_rounded, color: p.accent, size: 19),
+                            child: Icon(Icons.mic_off_rounded,
+                                color: p.accent, size: 19),
                           ),
                           title: const Text(
                             'Auto-Filter Voice Notes & Messengers',
-                            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                            style: TextStyle(
+                                fontWeight: FontWeight.w700, fontSize: 14),
                           ),
                           subtitle: Text(
                             'Automatically ignores WhatsApp audio, voice notes, Telegram, Call Recordings, and sound recorder files.',
-                            style: TextStyle(color: p.textSecondary, fontSize: 12),
+                            style:
+                                TextStyle(color: p.textSecondary, fontSize: 12),
                           ),
                         ),
                         Divider(height: 1, indent: 68, color: p.hairline),
@@ -247,7 +263,8 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Row(
                                     children: [
@@ -256,13 +273,16 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                         height: 38,
                                         decoration: BoxDecoration(
                                           color: p.accentContainer,
-                                          borderRadius: BorderRadius.circular(11),
+                                          borderRadius:
+                                              BorderRadius.circular(11),
                                         ),
-                                        child: Icon(Icons.timer_outlined, color: p.accent, size: 19),
+                                        child: Icon(Icons.timer_outlined,
+                                            color: p.accent, size: 19),
                                       ),
                                       const SizedBox(width: 14),
                                       Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             'Short Audio Filter',
@@ -274,20 +294,25 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                           ),
                                           Text(
                                             'Ignore short clips and sound effects',
-                                            style: TextStyle(color: p.textSecondary, fontSize: 12),
+                                            style: TextStyle(
+                                                color: p.textSecondary,
+                                                fontSize: 12),
                                           ),
                                         ],
                                       ),
                                     ],
                                   ),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8, vertical: 3),
                                     decoration: BoxDecoration(
                                       color: p.accentContainer,
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
-                                      state.minDurationSec > 0 ? '${state.minDurationSec}s' : 'Off',
+                                      state.minDurationSec > 0
+                                          ? '${state.minDurationSec}s'
+                                          : 'Off',
                                       style: TextStyle(
                                         color: p.accent,
                                         fontWeight: FontWeight.w800,
@@ -304,7 +329,8 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                 max: 90,
                                 divisions: 18,
                                 activeColor: p.accent,
-                                onChanged: (val) => cubit.setMinDuration(val.toInt()),
+                                onChanged: (val) =>
+                                    cubit.setMinDuration(val.toInt()),
                               ),
                             ],
                           ),
@@ -322,20 +348,28 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                         padding: const EdgeInsets.only(left: 6),
                         child: Text(
                           'DEVICE AUDIO DIRECTORIES',
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(color: p.textTertiary),
+                          style: Theme.of(context)
+                              .textTheme
+                              .labelSmall
+                              ?.copyWith(color: p.textTertiary),
                         ),
                       ),
                       if (hiddenCount > 0)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
                             color: p.error.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: p.error.withValues(alpha: 0.3)),
+                            border: Border.all(
+                                color: p.error.withValues(alpha: 0.3)),
                           ),
                           child: Text(
                             '$hiddenCount Hidden',
-                            style: TextStyle(color: p.error, fontSize: 11, fontWeight: FontWeight.w700),
+                            style: TextStyle(
+                                color: p.error,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700),
                           ),
                         ),
                     ],
@@ -356,11 +390,14 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                       style: TextStyle(fontSize: 13, color: p.textPrimary),
                       decoration: InputDecoration(
                         hintText: 'Search directories by name or path...',
-                        hintStyle: TextStyle(fontSize: 12, color: p.textTertiary),
-                        prefixIcon: Icon(Icons.search_rounded, color: p.textTertiary, size: 18),
+                        hintStyle:
+                            TextStyle(fontSize: 12, color: p.textTertiary),
+                        prefixIcon: Icon(Icons.search_rounded,
+                            color: p.textTertiary, size: 18),
                         suffixIcon: _searchQuery.isNotEmpty
                             ? IconButton(
-                                icon: Icon(Icons.clear_rounded, color: p.textTertiary, size: 16),
+                                icon: Icon(Icons.clear_rounded,
+                                    color: p.textTertiary, size: 16),
                                 onPressed: () {
                                   _searchController.clear();
                                   setState(() => _searchQuery = '');
@@ -368,7 +405,8 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                               )
                             : null,
                         border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                        contentPadding:
+                            const EdgeInsets.symmetric(vertical: 11),
                       ),
                     ),
                   ),
@@ -378,7 +416,8 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                   if (_isLoading)
                     Padding(
                       padding: const EdgeInsets.all(40),
-                      child: Center(child: CircularProgressIndicator(color: p.accent)),
+                      child: Center(
+                          child: CircularProgressIndicator(color: p.accent)),
                     )
                   else if (filteredFolders.isEmpty)
                     Container(
@@ -418,7 +457,8 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                             ),
                           ),
                           child: ListTile(
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 4),
                             leading: Container(
                               width: 40,
                               height: 40,
@@ -429,7 +469,9 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Icon(
-                                isHidden ? Icons.folder_off_rounded : Icons.folder_rounded,
+                                isHidden
+                                    ? Icons.folder_off_rounded
+                                    : Icons.folder_rounded,
                                 color: isHidden ? p.error : p.accent,
                                 size: 20,
                               ),
@@ -441,8 +483,11 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
                                 fontSize: 13.5,
-                                color: isHidden ? p.textSecondary : p.textPrimary,
-                                decoration: isHidden ? TextDecoration.lineThrough : null,
+                                color:
+                                    isHidden ? p.textSecondary : p.textPrimary,
+                                decoration: isHidden
+                                    ? TextDecoration.lineThrough
+                                    : null,
                               ),
                             ),
                             subtitle: Padding(
@@ -452,7 +497,9 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
-                                  color: isHidden ? p.textTertiary : p.textSecondary,
+                                  color: isHidden
+                                      ? p.textTertiary
+                                      : p.textSecondary,
                                   fontSize: 11,
                                 ),
                               ),
@@ -462,17 +509,24 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                 backgroundColor: isHidden
                                     ? p.surfaceContainerHigh
                                     : p.error.withValues(alpha: 0.12),
-                                foregroundColor: isHidden ? p.textPrimary : p.error,
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                foregroundColor:
+                                    isHidden ? p.textPrimary : p.error,
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 6),
+                                shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(10)),
                               ),
                               icon: Icon(
-                                isHidden ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+                                isHidden
+                                    ? Icons.visibility_rounded
+                                    : Icons.visibility_off_rounded,
                                 size: 15,
                               ),
                               label: Text(
                                 isHidden ? 'Unhide' : 'Hide',
-                                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11.5),
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 11.5),
                               ),
                               onPressed: () => _toggleFolder(folder.path),
                             ),

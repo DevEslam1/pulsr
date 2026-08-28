@@ -28,7 +28,8 @@ class TagEditorCubit extends Cubit<TagEditorState> {
     required MediaScannerService scannerService,
     MetadataSearchService? metadataSearchService,
   })  : _scannerService = scannerService,
-        _metadataSearchService = metadataSearchService ?? MetadataSearchService(),
+        _metadataSearchService =
+            metadataSearchService ?? MetadataSearchService(),
         super(_createInitialState(song, batchSongs)) {
     if (!state.isBatchMode) {
       loadTags();
@@ -37,11 +38,15 @@ class TagEditorCubit extends Cubit<TagEditorState> {
     }
   }
 
-  static TagEditorState _createInitialState(SongsTableData song, List<SongsTableData>? batchSongs) {
+  static TagEditorState _createInitialState(
+      SongsTableData song, List<SongsTableData>? batchSongs) {
     final isBatch = batchSongs != null && batchSongs.length > 1;
-    final allSameArtist = isBatch && batchSongs.every((s) => s.artist == song.artist);
-    final allSameAlbum = isBatch && batchSongs.every((s) => s.album == song.album);
-    final allSameGenre = isBatch && batchSongs.every((s) => s.genre == song.genre);
+    final allSameArtist =
+        isBatch && batchSongs.every((s) => s.artist == song.artist);
+    final allSameAlbum =
+        isBatch && batchSongs.every((s) => s.album == song.album);
+    final allSameGenre =
+        isBatch && batchSongs.every((s) => s.genre == song.genre);
     final allSameYear = isBatch && batchSongs.every((s) => s.year == song.year);
 
     return TagEditorState(
@@ -50,9 +55,15 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       title: isBatch ? '' : song.title,
       artist: isBatch ? (allSameArtist ? song.artist : '') : song.artist,
       album: isBatch ? (allSameAlbum ? song.album : '') : song.album,
-      genre: isBatch ? (allSameGenre ? (song.genre ?? '') : '') : (song.genre ?? ''),
-      year: isBatch ? (allSameYear ? (song.year?.toString() ?? '') : '') : (song.year != null ? song.year.toString() : ''),
-      trackNumber: isBatch ? '' : (song.trackNumber != null ? song.trackNumber.toString() : ''),
+      genre: isBatch
+          ? (allSameGenre ? (song.genre ?? '') : '')
+          : (song.genre ?? ''),
+      year: isBatch
+          ? (allSameYear ? (song.year?.toString() ?? '') : '')
+          : (song.year != null ? song.year.toString() : ''),
+      trackNumber: isBatch
+          ? ''
+          : (song.trackNumber != null ? song.trackNumber.toString() : ''),
     );
   }
 
@@ -60,7 +71,8 @@ class TagEditorCubit extends Cubit<TagEditorState> {
     if (isClosed) return;
     emit(state.copyWith(status: TagEditorStatus.loading));
     try {
-      final Map<dynamic, dynamic>? tags = await _channel.invokeMapMethod<dynamic, dynamic>(
+      final Map<dynamic, dynamic>? tags =
+          await _channel.invokeMapMethod<dynamic, dynamic>(
         'readTags',
         {'path': state.song.path},
       );
@@ -94,7 +106,11 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       }
     } catch (e, st) {
       if (isClosed) return;
-      ErrorLogger.log('Failed to read native tags via MethodChannel for ${state.song.path}', error: e, stackTrace: st, category: 'TagEditorCubit');
+      ErrorLogger.log(
+          'Failed to read native tags via MethodChannel for ${state.song.path}',
+          error: e,
+          stackTrace: st,
+          category: 'TagEditorCubit');
       emit(state.copyWith(status: TagEditorStatus.loaded));
     }
   }
@@ -177,7 +193,8 @@ class TagEditorCubit extends Cubit<TagEditorState> {
   /// Searches online metadata without immediately auto-applying.
   Future<List<OnlineTrackMetadata>> searchOnlineMatches() async {
     final searchTitle = state.title.isNotEmpty ? state.title : state.song.title;
-    final searchArtist = state.artist.isNotEmpty ? state.artist : state.song.artist;
+    final searchArtist =
+        state.artist.isNotEmpty ? state.artist : state.song.artist;
     return await _metadataSearchService.searchMetadata(
       title: searchTitle,
       artist: searchArtist,
@@ -192,7 +209,8 @@ class TagEditorCubit extends Cubit<TagEditorState> {
     try {
       String? downloadedArtPath;
       if (match.artworkUrl != null) {
-        downloadedArtPath = await _metadataSearchService.downloadArtworkToTemp(match.artworkUrl!);
+        downloadedArtPath = await _metadataSearchService
+            .downloadArtworkToTemp(match.artworkUrl!);
       }
       if (isClosed) return false;
 
@@ -201,16 +219,24 @@ class TagEditorCubit extends Cubit<TagEditorState> {
         title: match.title.isNotEmpty ? match.title : state.title,
         artist: match.artist.isNotEmpty ? match.artist : state.artist,
         album: match.album.isNotEmpty ? match.album : state.album,
-        genre: (match.genre != null && match.genre!.isNotEmpty) ? match.genre : state.genre,
-        year: (match.releaseYear != null && match.releaseYear!.isNotEmpty) ? match.releaseYear : state.year,
-        trackNumber: (match.trackNumber != null && match.trackNumber!.isNotEmpty) ? match.trackNumber : state.trackNumber,
+        genre: (match.genre != null && match.genre!.isNotEmpty)
+            ? match.genre
+            : state.genre,
+        year: (match.releaseYear != null && match.releaseYear!.isNotEmpty)
+            ? match.releaseYear
+            : state.year,
+        trackNumber:
+            (match.trackNumber != null && match.trackNumber!.isNotEmpty)
+                ? match.trackNumber
+                : state.trackNumber,
         newArtworkPath: downloadedArtPath ?? state.newArtworkPath,
         removeArtwork: false,
       ));
       return true;
     } catch (e, st) {
       if (isClosed) return false;
-      ErrorLogger.log('Applying metadata result failed', error: e, stackTrace: st, category: 'TagEditorCubit');
+      ErrorLogger.log('Applying metadata result failed',
+          error: e, stackTrace: st, category: 'TagEditorCubit');
       emit(state.copyWith(
         isAutoFetching: false,
         errorMessage: 'Failed to apply metadata: $e',
@@ -236,7 +262,8 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       return await applyMetadataResult(results.first);
     } catch (e, st) {
       if (isClosed) return false;
-      ErrorLogger.log('Auto-fetch online tags failed', error: e, stackTrace: st, category: 'TagEditorCubit');
+      ErrorLogger.log('Auto-fetch online tags failed',
+          error: e, stackTrace: st, category: 'TagEditorCubit');
       emit(state.copyWith(
         isAutoFetching: false,
         errorMessage: 'Failed to auto-fetch online tags: $e',
@@ -255,7 +282,10 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       return;
     }
 
-    emit(state.copyWith(status: TagEditorStatus.saving, clearErrorMessage: true, batchProgress: 0.0));
+    emit(state.copyWith(
+        status: TagEditorStatus.saving,
+        clearErrorMessage: true,
+        batchProgress: 0.0));
     try {
       if (state.isBatchMode) {
         final total = state.batchSongs.length;
@@ -265,7 +295,10 @@ class TagEditorCubit extends Cubit<TagEditorState> {
           if (isClosed) return;
           final s = state.batchSongs[i];
           final now = DateTime.now();
-          if (i == 0 || i == total - 1 || (i % 3 == 0) || now.difference(lastEmitTime).inMilliseconds >= 200) {
+          if (i == 0 ||
+              i == total - 1 ||
+              (i % 3 == 0) ||
+              now.difference(lastEmitTime).inMilliseconds >= 200) {
             lastEmitTime = now;
             emit(state.copyWith(
               status: TagEditorStatus.saving,
@@ -276,10 +309,20 @@ class TagEditorCubit extends Cubit<TagEditorState> {
             await _channel.invokeMethod('writeTags', {
               'path': s.path,
               'title': s.title, // keep individual title
-              'artist': _batchArtistEdited ? state.artist : (state.artist.isNotEmpty ? state.artist : s.artist),
-              'album': _batchAlbumEdited ? state.album : (state.album.isNotEmpty ? state.album : s.album),
-              'genre': _batchGenreEdited ? state.genre : (state.genre.isNotEmpty ? state.genre : (s.genre ?? '')),
-              'year': _batchYearEdited ? state.year : (state.year.isNotEmpty ? state.year : (s.year?.toString() ?? '')),
+              'artist': _batchArtistEdited
+                  ? state.artist
+                  : (state.artist.isNotEmpty ? state.artist : s.artist),
+              'album': _batchAlbumEdited
+                  ? state.album
+                  : (state.album.isNotEmpty ? state.album : s.album),
+              'genre': _batchGenreEdited
+                  ? state.genre
+                  : (state.genre.isNotEmpty ? state.genre : (s.genre ?? '')),
+              'year': _batchYearEdited
+                  ? state.year
+                  : (state.year.isNotEmpty
+                      ? state.year
+                      : (s.year?.toString() ?? '')),
               'trackNumber': s.trackNumber?.toString() ?? '',
               'comment': state.comment.isNotEmpty ? state.comment : '',
               'lyrics': '',
@@ -289,7 +332,8 @@ class TagEditorCubit extends Cubit<TagEditorState> {
             if (isClosed) return;
             await _scannerService.rescanSingleFile(s.path);
           } catch (e, st) {
-            ErrorLogger.log('Failed to save tags for ${s.path}', error: e, stackTrace: st, category: 'TagEditor');
+            ErrorLogger.log('Failed to save tags for ${s.path}',
+                error: e, stackTrace: st, category: 'TagEditor');
             failedFiles.add(s.title);
           }
           if (isClosed) return;
@@ -298,12 +342,16 @@ class TagEditorCubit extends Cubit<TagEditorState> {
         if (isClosed) return;
         if (failedFiles.isNotEmpty) {
           emit(state.copyWith(
-            status: failedFiles.length == total ? TagEditorStatus.failure : TagEditorStatus.success,
-            errorMessage: 'Failed to tag ${failedFiles.length} file${failedFiles.length > 1 ? "s" : ""}',
+            status: failedFiles.length == total
+                ? TagEditorStatus.failure
+                : TagEditorStatus.success,
+            errorMessage:
+                'Failed to tag ${failedFiles.length} file${failedFiles.length > 1 ? "s" : ""}',
             clearBatchProgress: true,
           ));
         } else {
-          emit(state.copyWith(status: TagEditorStatus.success, clearBatchProgress: true));
+          emit(state.copyWith(
+              status: TagEditorStatus.success, clearBatchProgress: true));
         }
         return;
       }

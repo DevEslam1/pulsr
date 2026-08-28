@@ -34,7 +34,8 @@ class KaraokeModeScreen extends StatelessWidget {
         }
 
         final activeLine = lyrics.isNotEmpty ? lyrics[activeIdx] : null;
-        final nextLine = activeIdx + 1 < lyrics.length ? lyrics[activeIdx + 1] : null;
+        final nextLine =
+            activeIdx + 1 < lyrics.length ? lyrics[activeIdx + 1] : null;
 
         return Scaffold(
           backgroundColor: const Color(0xFF08090E),
@@ -47,12 +48,14 @@ class KaraokeModeScreen extends StatelessWidget {
             ),
             title: Text(
               song?.title ?? 'Karaoke Mode',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.bold),
             ),
             actions: [
               Container(
                 margin: const EdgeInsets.only(right: 16),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: p.primary.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(10),
@@ -64,7 +67,10 @@ class KaraokeModeScreen extends StatelessWidget {
                     const SizedBox(width: 4),
                     Text(
                       'VOCAL SCORE: 96%',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: p.primary),
+                      style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                          color: p.primary),
                     ),
                   ],
                 ),
@@ -86,7 +92,8 @@ class KaraokeModeScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                     splashColor: p.primary.withValues(alpha: 0.2),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 8, horizontal: 12),
                       child: Text(
                         activeLine.text,
                         textAlign: TextAlign.center,
@@ -118,7 +125,8 @@ class KaraokeModeScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(12),
                     splashColor: p.primary.withValues(alpha: 0.15),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 6, horizontal: 12),
                       child: Text(
                         nextLine.text,
                         textAlign: TextAlign.center,
@@ -153,11 +161,15 @@ class KaraokeModeScreen extends StatelessWidget {
                   children: [
                     Text(
                       Formatters.formatDuration(pos),
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          fontSize: 13),
                     ),
                     Text(
                       Formatters.formatDuration(state.duration),
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
+                      style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.7),
+                          fontSize: 13),
                     ),
                   ],
                 ),

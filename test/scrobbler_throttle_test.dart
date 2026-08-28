@@ -20,8 +20,10 @@ void main() {
       expect(service, isNotNull);
       expect(ScrobblerService.keyLastFmEnabled, 'setting_lastfm_enabled');
       expect(ScrobblerService.keyLibreFmEnabled, 'setting_librefm_enabled');
-      expect(ScrobblerService.keyListenBrainzEnabled, 'setting_listenbrainz_enabled');
-      expect(ScrobblerService.keyCustomWebhookEnabled, 'setting_custom_scrobbler_enabled');
+      expect(ScrobblerService.keyListenBrainzEnabled,
+          'setting_listenbrainz_enabled');
+      expect(ScrobblerService.keyCustomWebhookEnabled,
+          'setting_custom_scrobbler_enabled');
     });
   });
 }

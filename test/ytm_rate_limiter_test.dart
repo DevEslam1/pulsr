@@ -5,8 +5,7 @@ import 'package:pulsr/core/utils/ytm_rate_limiter.dart';
 
 void main() {
   group('YtmRateLimiter backoff', () {
-    test('every concurrent caller waits out the full backoff window',
-        () async {
+    test('every concurrent caller waits out the full backoff window', () async {
       fakeAsync((async) {
         YtmRateLimiter.debugReset();
         final limiter = YtmRateLimiter.shared;

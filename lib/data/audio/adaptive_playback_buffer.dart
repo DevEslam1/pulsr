@@ -9,11 +9,13 @@ class AdaptivePlaybackBuffer {
   }) {
     // If invalid inputs or offline, fallback to safe defaults
     final safeBitrate = bitrateKbps <= 0 ? 320 : bitrateKbps;
-    final safeSpeed = networkSpeedMbps <= 0 ? (isWifi ? 10.0 : 2.0) : networkSpeedMbps;
+    final safeSpeed =
+        networkSpeedMbps <= 0 ? (isWifi ? 10.0 : 2.0) : networkSpeedMbps;
 
     const trackDurationEstimate = Duration(seconds: 240);
     // Data needed in Megabits = (kbps * duration_seconds) / 1000.0
-    final dataNeededMb = (safeBitrate * trackDurationEstimate.inSeconds) / 1000.0;
+    final dataNeededMb =
+        (safeBitrate * trackDurationEstimate.inSeconds) / 1000.0;
     final downloadTimeSec = dataNeededMb / safeSpeed;
 
     if (isWifi) {

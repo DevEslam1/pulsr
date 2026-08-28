@@ -34,7 +34,9 @@ class PlayerControls extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final onPrimaryColor = primaryColor.computeLuminance() > 0.5 ? const Color(0xFF101223) : Colors.white;
+    final onPrimaryColor = primaryColor.computeLuminance() > 0.5
+        ? const Color(0xFF101223)
+        : Colors.white;
 
     return Directionality(
       textDirection: TextDirection.ltr,
@@ -101,9 +103,10 @@ class PlayerControls extends StatelessWidget {
                   color: onPrimaryColor,
                   size: mainButtonSize * 0.55,
                 ),
-              )
-                  .animate(target: isPlaying ? 1 : 0)
-                  .scale(duration: 120.ms, begin: const Offset(0.92, 0.92), end: const Offset(1.0, 1.0)),
+              ).animate(target: isPlaying ? 1 : 0).scale(
+                  duration: 120.ms,
+                  begin: const Offset(0.92, 0.92),
+                  end: const Offset(1.0, 1.0)),
             ),
           ),
           Semantics(

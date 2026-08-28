@@ -40,7 +40,8 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
     for (final song in allSongs) {
       final count = song.playCount;
       if (count > 0 && song.artist.isNotEmpty && song.artist != 'Unknown') {
-        artistCounts[song.artist] = (artistCounts[song.artist] ?? 0) + count.toInt();
+        artistCounts[song.artist] =
+            (artistCounts[song.artist] ?? 0) + count.toInt();
       }
     }
     final sortedArtists = artistCounts.entries.toList()
@@ -50,7 +51,8 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
     final rand = math.Random(42);
     final days = List.generate(7, (i) {
       if (total == 0) return 0;
-      return math.max(1, (total ~/ 14) + rand.nextInt(math.max(2, total ~/ 10)));
+      return math.max(
+          1, (total ~/ 14) + rand.nextInt(math.max(2, total ~/ 10)));
     });
 
     if (mounted) {
@@ -68,7 +70,11 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
   Widget build(BuildContext context) {
     final p = context.palette;
     final lastDateStr = _lastScrobbleTime > 0
-        ? DateTime.fromMillisecondsSinceEpoch(_lastScrobbleTime).toLocal().toString().split('.').first
+        ? DateTime.fromMillisecondsSinceEpoch(_lastScrobbleTime)
+            .toLocal()
+            .toString()
+            .split('.')
+            .first
         : 'Never';
 
     return Scaffold(
@@ -122,16 +128,28 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Total Scrobbles:', style: TextStyle(color: p.textSecondary, fontSize: 13)),
-                          Text('$_totalScrobbles', style: TextStyle(color: p.accent, fontWeight: FontWeight.bold, fontSize: 14)),
+                          Text('Total Scrobbles:',
+                              style: TextStyle(
+                                  color: p.textSecondary, fontSize: 13)),
+                          Text('$_totalScrobbles',
+                              style: TextStyle(
+                                  color: p.accent,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14)),
                         ],
                       ),
                       const SizedBox(height: 8),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text('Last Scrobbled:', style: TextStyle(color: p.textSecondary, fontSize: 13)),
-                          Text(lastDateStr, style: TextStyle(color: p.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+                          Text('Last Scrobbled:',
+                              style: TextStyle(
+                                  color: p.textSecondary, fontSize: 13)),
+                          Text(lastDateStr,
+                              style: TextStyle(
+                                  color: p.primary,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13)),
                         ],
                       ),
                     ],
@@ -152,11 +170,15 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.bar_chart_rounded, color: p.accent, size: 20),
+                          Icon(Icons.bar_chart_rounded,
+                              color: p.accent, size: 20),
                           const SizedBox(width: 8),
                           Text(
                             'Last 7 Days Activity',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: p.textPrimary),
+                            style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: p.textPrimary),
                           ),
                         ],
                       ),
@@ -191,11 +213,15 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.leaderboard_rounded, color: p.primary, size: 20),
+                            Icon(Icons.leaderboard_rounded,
+                                color: p.primary, size: 20),
                             const SizedBox(width: 8),
                             Text(
                               'Top Scrobbled Artists',
-                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: p.textPrimary),
+                              style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                  color: p.textPrimary),
                             ),
                           ],
                         ),
@@ -217,19 +243,24 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
                                 Expanded(
                                   child: Text(
                                     _topArtists[i].key,
-                                    style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w600, fontSize: 13),
+                                    style: TextStyle(
+                                        color: p.textPrimary,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                                 Text(
                                   '${_topArtists[i].value} plays',
-                                  style: TextStyle(color: p.textSecondary, fontSize: 12),
+                                  style: TextStyle(
+                                      color: p.textSecondary, fontSize: 12),
                                 ),
                               ],
                             ),
                           ),
-                          if (i < _topArtists.length - 1) Divider(color: p.hairline, height: 8),
+                          if (i < _topArtists.length - 1)
+                            Divider(color: p.hairline, height: 8),
                         ],
                       ],
                     ),
@@ -280,7 +311,8 @@ class _ScrobbleBarChartPainter extends CustomPainter {
 
       final textSpan = TextSpan(
         text: daysOfWeek[i % daysOfWeek.length],
-        style: TextStyle(color: labelColor, fontSize: 11, fontWeight: FontWeight.w600),
+        style: TextStyle(
+            color: labelColor, fontSize: 11, fontWeight: FontWeight.w600),
       );
       final textPainter = TextPainter(
         text: textSpan,

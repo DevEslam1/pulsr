@@ -17,7 +17,8 @@ class WaveformLogo extends StatefulWidget {
   State<WaveformLogo> createState() => _WaveformLogoState();
 }
 
-class _WaveformLogoState extends State<WaveformLogo> with TickerProviderStateMixin {
+class _WaveformLogoState extends State<WaveformLogo>
+    with TickerProviderStateMixin {
   AnimationController? _controller;
 
   @override
@@ -62,7 +63,8 @@ class _WaveformLogoState extends State<WaveformLogo> with TickerProviderStateMix
       builder: (context, constraints) {
         final effectiveSize = widget.size.isFinite && widget.size > 0
             ? widget.size
-            : (constraints.biggest.shortestSide.isFinite && constraints.biggest.shortestSide > 0
+            : (constraints.biggest.shortestSide.isFinite &&
+                    constraints.biggest.shortestSide > 0
                 ? constraints.biggest.shortestSide
                 : 48.0);
 
@@ -80,7 +82,8 @@ class _WaveformLogoState extends State<WaveformLogo> with TickerProviderStateMix
                       children: List.generate(5, (index) {
                         final pulse = 0.85 + (t * 0.3) * ((index % 3) + 1) / 3;
                         final barHeightRatio = barHeights[index] * pulse;
-                        return _buildBar(effectiveSize, barHeightRatio, themeColor);
+                        return _buildBar(
+                            effectiveSize, barHeightRatio, themeColor);
                       }),
                     );
                   },
@@ -89,7 +92,8 @@ class _WaveformLogoState extends State<WaveformLogo> with TickerProviderStateMix
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: List.generate(5, (index) {
-                    return _buildBar(effectiveSize, barHeights[index], themeColor);
+                    return _buildBar(
+                        effectiveSize, barHeights[index], themeColor);
                   }),
                 ),
         );
@@ -97,7 +101,8 @@ class _WaveformLogoState extends State<WaveformLogo> with TickerProviderStateMix
     );
   }
 
-  Widget _buildBar(double effectiveSize, double barHeightRatio, Color themeColor) {
+  Widget _buildBar(
+      double effectiveSize, double barHeightRatio, Color themeColor) {
     return Container(
       width: effectiveSize * 0.12,
       height: effectiveSize * barHeightRatio,

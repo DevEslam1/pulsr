@@ -35,17 +35,20 @@ class ExportBackupUseCase {
   Future<String> execute() async {
     // 1. Favorites
     final favoritesResult = await _repository.getFavorites();
-    final favoritesSongs = favoritesResult.fold((l) => <SongsTableData>[], (r) => r);
+    final favoritesSongs =
+        favoritesResult.fold((l) => <SongsTableData>[], (r) => r);
     final favoritePaths = favoritesSongs.map((s) => s.path).toList();
 
     // 2. Playlists with song file paths
     final playlistsResult = await _repository.getPlaylists();
-    final playlists = playlistsResult.fold((l) => <PlaylistsTableData>[], (r) => r);
+    final playlists =
+        playlistsResult.fold((l) => <PlaylistsTableData>[], (r) => r);
     final playlistsData = <Map<String, dynamic>>[];
 
     for (final pl in playlists) {
       final songsResult = await _repository.getPlaylistSongs(pl.id);
-      final playlistSongs = songsResult.fold((l) => <SongsTableData>[], (r) => r);
+      final playlistSongs =
+          songsResult.fold((l) => <SongsTableData>[], (r) => r);
       playlistsData.add({
         'name': pl.name,
         'isSmart': pl.isSmart,
@@ -65,7 +68,8 @@ class ExportBackupUseCase {
           eqPresetMap = decoded;
         }
       } catch (e, st) {
-        ErrorLogger.log('Failed to decode eqPreset from prefs', error: e, stackTrace: st, category: 'Backup');
+        ErrorLogger.log('Failed to decode eqPreset from prefs',
+            error: e, stackTrace: st, category: 'Backup');
       }
     }
 
@@ -75,10 +79,13 @@ class ExportBackupUseCase {
       'minDurationSec': prefs.getInt('setting_min_duration') ?? 30,
       'dynamicThemingEnabled': prefs.getBool('setting_dynamic_theme') ?? true,
       'themeColorSource': prefs.getString('setting_theme_color_source'),
-      'resumeAfterInterruption': prefs.getBool('setting_resume_after_interruption') ?? true,
+      'resumeAfterInterruption':
+          prefs.getBool('setting_resume_after_interruption') ?? true,
       'themeMode': prefs.getString('setting_theme_mode') ?? 'dark',
-      'customAccentColorValue': prefs.getInt('setting_custom_accent') ?? 0xFF9B9EF5,
-      'playerThemeMode': prefs.getString('setting_player_theme_mode') ?? 'classic',
+      'customAccentColorValue':
+          prefs.getInt('setting_custom_accent') ?? 0xFF9B9EF5,
+      'playerThemeMode':
+          prefs.getString('setting_player_theme_mode') ?? 'classic',
       'visualizerStyle': prefs.getString('setting_visualizer_style') ?? 'bar',
       if (eqPresetMap != null) 'eqPreset': eqPresetMap,
     };
@@ -129,7 +136,8 @@ class ImportBackupUseCase {
       try {
         final len = await (file as dynamic).length();
         if (len > maxBackupSizeBytes) {
-          throw const FormatException('Backup file exceeds maximum allowed size of 10 MB');
+          throw const FormatException(
+              'Backup file exceeds maximum allowed size of 10 MB');
         }
         final content = await (file as dynamic).readAsString();
         return execute(content);
@@ -143,19 +151,22 @@ class ImportBackupUseCase {
 
   Future<ImportResult> execute(String jsonString) async {
     if (utf8.encode(jsonString).length > maxBackupSizeBytes) {
-      throw const FormatException('Backup file exceeds maximum allowed size of 10 MB');
+      throw const FormatException(
+          'Backup file exceeds maximum allowed size of 10 MB');
     }
 
     final dynamic decoded;
     try {
       decoded = jsonDecode(jsonString);
     } catch (e, st) {
-      ErrorLogger.log('Corrupted JSON structure in backup file', error: e, stackTrace: st, category: 'Backup');
+      ErrorLogger.log('Corrupted JSON structure in backup file',
+          error: e, stackTrace: st, category: 'Backup');
       throw const FormatException('Corrupted or invalid JSON format');
     }
 
     if (decoded is! Map<String, dynamic>) {
-      throw const FormatException('Invalid backup payload: root object must be a JSON map');
+      throw const FormatException(
+          'Invalid backup payload: root object must be a JSON map');
     }
 
     final data = decoded;
@@ -181,7 +192,8 @@ class ImportBackupUseCase {
 
     SongsTableData? matchPath(String path) {
       // 1. Exact or normalized path match
-      final direct = pathMap[path] ?? pathMap[path.replaceAll('\\', '/').toLowerCase()];
+      final direct =
+          pathMap[path] ?? pathMap[path.replaceAll('\\', '/').toLowerCase()];
       if (direct != null) return direct;
 
       // 2. Fallback for ytmusic:// paths matching by remoteId
@@ -199,9 +211,11 @@ class ImportBackupUseCase {
         lazyParentFilenameMap ??= {
           for (final s in allSongs)
             if (s.path.replaceAll('\\', '/').split('/').length >= 2)
-              '${s.path.replaceAll('\\', '/').split('/')[s.path.replaceAll('\\', '/').split('/').length - 2].toLowerCase()}/${s.path.replaceAll('\\', '/').split('/').last.toLowerCase()}': s
+              '${s.path.replaceAll('\\', '/').split('/')[s.path.replaceAll('\\', '/').split('/').length - 2].toLowerCase()}/${s.path.replaceAll('\\', '/').split('/').last.toLowerCase()}':
+                  s
         };
-        final parentAndFilename = '${segments[segments.length - 2]}/${segments.last}';
+        final parentAndFilename =
+            '${segments[segments.length - 2]}/${segments.last}';
         final match = lazyParentFilenameMap![parentAndFilename];
         if (match != null) return match;
       }
@@ -213,7 +227,8 @@ class ImportBackupUseCase {
           final countMap = <String, int>{};
           final nameMap = <String, SongsTableData>{};
           for (final s in allSongs) {
-            final fName = s.path.replaceAll('\\', '/').split('/').last.toLowerCase();
+            final fName =
+                s.path.replaceAll('\\', '/').split('/').last.toLowerCase();
             if (fName.isNotEmpty) {
               countMap[fName] = (countMap[fName] ?? 0) + 1;
               nameMap[fName] = s;
@@ -243,7 +258,8 @@ class ImportBackupUseCase {
         for (final path in favList) {
           final matchedSong = matchPath(path);
           if (matchedSong != null) {
-            await (_db.update(_db.songsTable)..where((t) => t.id.equals(matchedSong.id)))
+            await (_db.update(_db.songsTable)
+                  ..where((t) => t.id.equals(matchedSong.id)))
                 .write(const SongsTableCompanion(isFavorite: Value(true)));
             restoredFavoritesCount++;
           } else {
@@ -268,14 +284,17 @@ class ImportBackupUseCase {
                 : <String>[];
 
             final existingPlaylistsRes = await _repository.getPlaylists();
-            final existingList = existingPlaylistsRes.fold((l) => <PlaylistsTableData>[], (r) => r);
-            final existing = existingList.where((p) => p.name == name).firstOrNull;
+            final existingList = existingPlaylistsRes.fold(
+                (l) => <PlaylistsTableData>[], (r) => r);
+            final existing =
+                existingList.where((p) => p.name == name).firstOrNull;
 
             int? playlistId;
             if (existing != null) {
               playlistId = existing.id;
               if (isSmart && smartCriteria != null) {
-                await _repository.updateSmartPlaylist(existing.id, name, smartCriteria);
+                await _repository.updateSmartPlaylist(
+                    existing.id, name, smartCriteria);
               }
             } else {
               final createRes = await _repository.createPlaylist(
@@ -304,7 +323,8 @@ class ImportBackupUseCase {
                 }
 
                 if (matchedSongIds.isNotEmpty) {
-                  await _repository.addSongsToPlaylist(playlistId, matchedSongIds);
+                  await _repository.addSongsToPlaylist(
+                      playlistId, matchedSongIds);
                 }
               }
               restoredPlaylistsCount++;
@@ -321,41 +341,56 @@ class ImportBackupUseCase {
       final prefs = await SharedPreferences.getInstance();
 
       if (settings.containsKey('gaplessPlayback')) {
-        await prefs.setBool('setting_gapless', settings['gaplessPlayback'] == true);
+        await prefs.setBool(
+            'setting_gapless', settings['gaplessPlayback'] == true);
       }
       if (settings.containsKey('crossfadeSeconds')) {
         final raw = settings['crossfadeSeconds'];
-        final val = raw is num ? raw.toDouble() : double.tryParse(raw?.toString() ?? '0') ?? 0.0;
+        final val = raw is num
+            ? raw.toDouble()
+            : double.tryParse(raw?.toString() ?? '0') ?? 0.0;
         await prefs.setDouble('setting_crossfade', val);
       }
       if (settings.containsKey('minDurationSec')) {
         final raw = settings['minDurationSec'];
-        final val = raw is num ? raw.toInt() : int.tryParse(raw?.toString() ?? '30') ?? 30;
+        final val = raw is num
+            ? raw.toInt()
+            : int.tryParse(raw?.toString() ?? '30') ?? 30;
         await prefs.setInt('setting_min_duration', val);
       }
       if (settings.containsKey('dynamicThemingEnabled')) {
-        await prefs.setBool('setting_dynamic_theme', settings['dynamicThemingEnabled'] == true);
+        await prefs.setBool(
+            'setting_dynamic_theme', settings['dynamicThemingEnabled'] == true);
       }
       if (settings['themeColorSource'] is String) {
-        await prefs.setString('setting_theme_color_source', settings['themeColorSource'] as String);
+        await prefs.setString('setting_theme_color_source',
+            settings['themeColorSource'] as String);
       }
       if (settings.containsKey('resumeAfterInterruption')) {
-        await prefs.setBool('setting_resume_after_interruption', settings['resumeAfterInterruption'] == true);
+        await prefs.setBool('setting_resume_after_interruption',
+            settings['resumeAfterInterruption'] == true);
       }
       if (settings.containsKey('themeMode')) {
-        await prefs.setString('setting_theme_mode', (settings['themeMode'] as String?) ?? 'dark');
+        await prefs.setString(
+            'setting_theme_mode', (settings['themeMode'] as String?) ?? 'dark');
       }
       if (settings.containsKey('customAccentColorValue')) {
-        await prefs.setInt('setting_custom_accent', ((settings['customAccentColorValue'] as num?) ?? 0xFF9B9EF5).toInt());
+        await prefs.setInt(
+            'setting_custom_accent',
+            ((settings['customAccentColorValue'] as num?) ?? 0xFF9B9EF5)
+                .toInt());
       }
       if (settings.containsKey('playerThemeMode')) {
-        await prefs.setString('setting_player_theme_mode', (settings['playerThemeMode'] as String?) ?? 'classic');
+        await prefs.setString('setting_player_theme_mode',
+            (settings['playerThemeMode'] as String?) ?? 'classic');
       }
       if (settings.containsKey('visualizerStyle')) {
-        await prefs.setString('setting_visualizer_style', (settings['visualizerStyle'] as String?) ?? 'bar');
+        await prefs.setString('setting_visualizer_style',
+            (settings['visualizerStyle'] as String?) ?? 'bar');
       }
       if (settings.containsKey('eqPreset') && settings['eqPreset'] is Map) {
-        await prefs.setString('setting_eq_preset', jsonEncode(settings['eqPreset']));
+        await prefs.setString(
+            'setting_eq_preset', jsonEncode(settings['eqPreset']));
       }
 
       restoredSettingsCount = settings.length;
@@ -366,7 +401,8 @@ class ImportBackupUseCase {
     if (data['playHistory'] != null && data['playHistory'] is List) {
       final historyList = data['playHistory'] as List;
       for (var i = 0; i < historyList.length; i += 100) {
-        final batch = historyList.sublist(i, math.min(i + 100, historyList.length));
+        final batch =
+            historyList.sublist(i, math.min(i + 100, historyList.length));
         await _db.transaction(() async {
           for (final item in batch) {
             if (item is Map<String, dynamic>) {
@@ -377,7 +413,9 @@ class ImportBackupUseCase {
               if (path != null && path.isNotEmpty) {
                 final matched = matchPath(path);
                 if (matched != null) {
-                  await (_db.update(_db.songsTable)..where((t) => t.id.equals(matched.id))).write(
+                  await (_db.update(_db.songsTable)
+                        ..where((t) => t.id.equals(matched.id)))
+                      .write(
                     SongsTableCompanion(
                       playCount: Value(playCount),
                       lastPlayed: Value(lastPlayed),
@@ -397,9 +435,11 @@ class ImportBackupUseCase {
     // 5. Restore Excluded Folders
     int restoredExcludedCount = 0;
     if (data['excludedFolders'] != null && data['excludedFolders'] is List) {
-      final folderList = (data['excludedFolders'] as List).whereType<String>().toList();
+      final folderList =
+          (data['excludedFolders'] as List).whereType<String>().toList();
       final existingExcluded = await _repository.getExcludedFolderPaths();
-      final existingPaths = existingExcluded.fold((l) => <String>[], (r) => r).toSet();
+      final existingPaths =
+          existingExcluded.fold((l) => <String>[], (r) => r).toSet();
 
       for (final path in folderList) {
         if (path.isNotEmpty && !existingPaths.contains(path)) {
@@ -460,4 +500,3 @@ class ImportBackupUseCase {
     }
   }
 }
-

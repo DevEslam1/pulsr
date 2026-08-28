@@ -42,7 +42,8 @@ class DynamicThemeState {
       backgroundColor: backgroundColor ?? this.backgroundColor,
       surfaceColor: surfaceColor ?? this.surfaceColor,
       isDark: isDark ?? this.isDark,
-      hasCustomArtworkColor: hasCustomArtworkColor ?? this.hasCustomArtworkColor,
+      hasCustomArtworkColor:
+          hasCustomArtworkColor ?? this.hasCustomArtworkColor,
     );
   }
 }
@@ -51,7 +52,8 @@ class DynamicThemeState {
 class DynamicThemeCubit extends Cubit<DynamicThemeState> {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   static const int _maxCacheSize = 50;
-  final LinkedHashMap<String, DynamicThemeState> _cachedPalettes = LinkedHashMap();
+  final LinkedHashMap<String, DynamicThemeState> _cachedPalettes =
+      LinkedHashMap();
   Timer? _debounceTimer;
   int _currentRequestToken = 0;
 
@@ -64,14 +66,16 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
       resetToDefault();
       return;
     }
-    await updateFromDetails(songId: song.id, remoteArtworkUrl: song.remoteArtworkUrl);
+    await updateFromDetails(
+        songId: song.id, remoteArtworkUrl: song.remoteArtworkUrl);
   }
 
   Future<void> updateFromSongId(int songId, {String? remoteArtworkUrl}) async {
     await updateFromDetails(songId: songId, remoteArtworkUrl: remoteArtworkUrl);
   }
 
-  Future<void> updateFromDetails({required int songId, String? remoteArtworkUrl}) async {
+  Future<void> updateFromDetails(
+      {required int songId, String? remoteArtworkUrl}) async {
     final cacheKey = (remoteArtworkUrl != null && remoteArtworkUrl.isNotEmpty)
         ? remoteArtworkUrl
         : 'AUDIO_$songId';
@@ -86,11 +90,17 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
 
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-      _extractPalette(songId: songId, remoteArtworkUrl: remoteArtworkUrl, cacheKey: cacheKey);
+      _extractPalette(
+          songId: songId,
+          remoteArtworkUrl: remoteArtworkUrl,
+          cacheKey: cacheKey);
     });
   }
 
-  Future<void> _extractPalette({required int songId, String? remoteArtworkUrl, required String cacheKey}) async {
+  Future<void> _extractPalette(
+      {required int songId,
+      String? remoteArtworkUrl,
+      required String cacheKey}) async {
     final token = ++_currentRequestToken;
 
     try {
@@ -98,12 +108,15 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
 
       // 1. If online remote artwork URL exists (YouTube Music streaming / online song)
       if (remoteArtworkUrl != null && remoteArtworkUrl.isNotEmpty) {
-        final highResUrl = CachedArtwork.upgradeToHighResArtwork(remoteArtworkUrl);
-        final cachedBytes = ArtworkLruCache().get(highResUrl) ?? ArtworkLruCache().get(remoteArtworkUrl);
+        final highResUrl =
+            CachedArtwork.upgradeToHighResArtwork(remoteArtworkUrl);
+        final cachedBytes = ArtworkLruCache().get(highResUrl) ??
+            ArtworkLruCache().get(remoteArtworkUrl);
         if (cachedBytes != null && cachedBytes.isNotEmpty) {
           imageProvider = MemoryImage(cachedBytes);
         } else {
-          imageProvider = ResizeImage(NetworkImage(highResUrl), width: 128, height: 128);
+          imageProvider =
+              ResizeImage(NetworkImage(highResUrl), width: 128, height: 128);
         }
       } else {
         // 2. Local audio file from MediaStore
@@ -149,23 +162,30 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
 
         for (final c in candidates) {
           final hsl = HSLColor.fromColor(c);
-          if (hsl.saturation > 0.20 && hsl.lightness > 0.15 && hsl.lightness < 0.85) {
+          if (hsl.saturation > 0.20 &&
+              hsl.lightness > 0.15 &&
+              hsl.lightness < 0.85) {
             primary = c;
             break;
           }
         }
-        primary ??= palette.vibrantColor?.color ?? palette.dominantColor?.color ?? AppColors.primary;
+        primary ??= palette.vibrantColor?.color ??
+            palette.dominantColor?.color ??
+            AppColors.primary;
 
-        final darkVibrant = palette.darkVibrantColor?.color ?? palette.darkMutedColor?.color;
+        final darkVibrant =
+            palette.darkVibrantColor?.color ?? palette.darkMutedColor?.color;
         final bg = darkVibrant != null
-            ? Color.alphaBlend(Colors.black.withValues(alpha: 0.75), darkVibrant)
+            ? Color.alphaBlend(
+                Colors.black.withValues(alpha: 0.75), darkVibrant)
             : const Color(0xFF14172B);
 
         final newState = state.copyWith(
           primaryColor: primary,
           secondaryColor: palette.mutedColor?.color ?? AppColors.secondary,
           backgroundColor: bg,
-          surfaceColor: Color.alphaBlend(primary.withValues(alpha: 0.08), AppColors.surface),
+          surfaceColor: Color.alphaBlend(
+              primary.withValues(alpha: 0.08), AppColors.surface),
           hasCustomArtworkColor: true,
         );
 
@@ -179,11 +199,14 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
         return;
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to generate dynamic theme palette for $cacheKey', error: e, stackTrace: st, category: 'DynamicTheme');
+      ErrorLogger.log('Failed to generate dynamic theme palette for $cacheKey',
+          error: e, stackTrace: st, category: 'DynamicTheme');
       return;
     }
 
-    if (token == _currentRequestToken && !isClosed && !state.hasCustomArtworkColor) {
+    if (token == _currentRequestToken &&
+        !isClosed &&
+        !state.hasCustomArtworkColor) {
       emit(const DynamicThemeState());
     }
   }

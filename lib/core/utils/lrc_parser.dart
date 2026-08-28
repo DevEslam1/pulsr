@@ -7,12 +7,15 @@ import '../constants/channels.dart';
 import 'error_logger.dart';
 
 class LrcParser {
-  static const MethodChannel _lyricsChannel = MethodChannel(PulsrChannels.lyrics);
+  static const MethodChannel _lyricsChannel =
+      MethodChannel(PulsrChannels.lyrics);
   static const int _maxCacheSize = 50;
-  static final LinkedHashMap<String, LyricsResult?> _lyricsCache = LinkedHashMap();
+  static final LinkedHashMap<String, LyricsResult?> _lyricsCache =
+      LinkedHashMap();
 
   /// Parses raw LRC string content into a sorted list of `LyricsLine`.
-  static List<LyricsLine> parse(String lrcContent, {LyricsSource source = LyricsSource.none}) {
+  static List<LyricsLine> parse(String lrcContent,
+      {LyricsSource source = LyricsSource.none}) {
     final lines = lrcContent.split(RegExp(r'\r?\n'));
     final List<LyricsLine> result = [];
 
@@ -34,7 +37,8 @@ class LrcParser {
         final minutes = int.parse(match.group(1)!);
         final seconds = int.parse(match.group(2)!);
         final fractionStr = match.group(3) ?? '0';
-        final milliseconds = int.parse(fractionStr.padRight(3, '0').substring(0, 3));
+        final milliseconds =
+            int.parse(fractionStr.padRight(3, '0').substring(0, 3));
 
         final totalDuration = Duration(
           minutes: minutes,
@@ -42,7 +46,8 @@ class LrcParser {
           milliseconds: milliseconds,
         );
 
-        result.add(LyricsLine(timestamp: totalDuration, text: text, source: source));
+        result.add(
+            LyricsLine(timestamp: totalDuration, text: text, source: source));
       }
     }
 
@@ -51,7 +56,8 @@ class LrcParser {
   }
 
   /// Parses plain text non-synced lyrics into a list of `LyricsLine`.
-  static List<LyricsLine> parsePlainText(String text, {LyricsSource source = LyricsSource.embedded}) {
+  static List<LyricsLine> parsePlainText(String text,
+      {LyricsSource source = LyricsSource.embedded}) {
     final lines = text.split(RegExp(r'\r?\n'));
     final List<LyricsLine> result = [];
     for (final line in lines) {
@@ -89,22 +95,26 @@ class LrcParser {
       // Check sibling "Lyrics" subdirectory
       final parentDir = File(audioFilePath).parent;
       final fileName = audioFilePath.split(Platform.pathSeparator).last;
-      final fileNameWithoutExt = fileName.substring(0, fileName.lastIndexOf('.'));
-      final lyricsSubdirLrc = File('${parentDir.path}${Platform.pathSeparator}Lyrics${Platform.pathSeparator}$fileNameWithoutExt.lrc');
+      final fileNameWithoutExt =
+          fileName.substring(0, fileName.lastIndexOf('.'));
+      final lyricsSubdirLrc = File(
+          '${parentDir.path}${Platform.pathSeparator}Lyrics${Platform.pathSeparator}$fileNameWithoutExt.lrc');
       if (await lyricsSubdirLrc.exists()) {
         final content = await lyricsSubdirLrc.readAsString();
         final lines = parse(content, source: source);
         if (lines.isNotEmpty) return lines;
       }
 
-      final genericLrc = File('${parentDir.path}${Platform.pathSeparator}lyrics.lrc');
+      final genericLrc =
+          File('${parentDir.path}${Platform.pathSeparator}lyrics.lrc');
       if (await genericLrc.exists()) {
         final content = await genericLrc.readAsString();
         final lines = parse(content, source: source);
         if (lines.isNotEmpty) return lines;
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to read external .lrc file for $audioFilePath', error: e, stackTrace: st, category: 'LrcParser');
+      ErrorLogger.log('Failed to read external .lrc file for $audioFilePath',
+          error: e, stackTrace: st, category: 'LrcParser');
     }
     return null;
   }
@@ -120,7 +130,8 @@ class LrcParser {
         return lyrics.trim();
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to query embedded lyrics for $audioFilePath', error: e, stackTrace: st, category: 'LrcParser');
+      ErrorLogger.log('Failed to query embedded lyrics for $audioFilePath',
+          error: e, stackTrace: st, category: 'LrcParser');
     }
     return null;
   }
@@ -154,25 +165,34 @@ class LrcParser {
     if (embeddedText != null && embeddedText.trim().isNotEmpty) {
       final syncedLines = parse(embeddedText, source: LyricsSource.embedded);
       if (syncedLines.isNotEmpty) {
-        resolved = LyricsResult(lines: syncedLines, source: LyricsSource.embedded);
+        resolved =
+            LyricsResult(lines: syncedLines, source: LyricsSource.embedded);
       } else {
-        final plainLines = parsePlainText(embeddedText, source: LyricsSource.embedded);
+        final plainLines =
+            parsePlainText(embeddedText, source: LyricsSource.embedded);
         if (plainLines.isNotEmpty) {
-          resolved = LyricsResult(lines: plainLines, source: LyricsSource.embedded);
+          resolved =
+              LyricsResult(lines: plainLines, source: LyricsSource.embedded);
         }
       }
     }
 
     // 2. External .lrc file
     if (resolved == null) {
-      final lrcLines = await findAndParseLrc(audioFilePath, source: LyricsSource.externalLrc);
+      final lrcLines = await findAndParseLrc(audioFilePath,
+          source: LyricsSource.externalLrc);
       if (lrcLines != null && lrcLines.isNotEmpty) {
-        resolved = LyricsResult(lines: lrcLines, source: LyricsSource.externalLrc);
+        resolved =
+            LyricsResult(lines: lrcLines, source: LyricsSource.externalLrc);
       }
     }
 
     // 3. Online LRCLIB query
-    if (resolved == null && trackTitle != null && trackTitle.isNotEmpty && artist != null && artist.isNotEmpty) {
+    if (resolved == null &&
+        trackTitle != null &&
+        trackTitle.isNotEmpty &&
+        artist != null &&
+        artist.isNotEmpty) {
       try {
         if (lrclibService != null) {
           resolved = await (lrclibService as dynamic).fetchLyrics(
@@ -183,7 +203,8 @@ class LrcParser {
           );
         }
       } catch (e, st) {
-        ErrorLogger.log('Failed to fetch lyrics from LRCLIB for $trackTitle', error: e, stackTrace: st, category: 'LrcParser');
+        ErrorLogger.log('Failed to fetch lyrics from LRCLIB for $trackTitle',
+            error: e, stackTrace: st, category: 'LrcParser');
       }
     }
 

@@ -157,9 +157,11 @@ class ProxyEntry {
   bool get isValid => host.trim().isNotEmpty && port > 0 && port <= 65535;
   bool get hasAuth => username.trim().isNotEmpty;
   String get displayAddress => '$host:$port';
-  String get displayTitle => label.trim().isNotEmpty ? label.trim() : displayAddress;
+  String get displayTitle =>
+      label.trim().isNotEmpty ? label.trim() : displayAddress;
 
-  ProxyConfig toProxyConfig({bool enabled = true, String bypassHosts = 'localhost, 127.0.0.1'}) {
+  ProxyConfig toProxyConfig(
+      {bool enabled = true, String bypassHosts = 'localhost, 127.0.0.1'}) {
     return ProxyConfig(
       enabled: enabled,
       type: type,
@@ -214,7 +216,8 @@ class ProxyEntry {
         );
       }
       // If Uri.tryParse failed, strip scheme
-      if (line.toLowerCase().startsWith('socks5://') || line.toLowerCase().startsWith('socks://')) {
+      if (line.toLowerCase().startsWith('socks5://') ||
+          line.toLowerCase().startsWith('socks://')) {
         detectedType = AppProxyType.socks5;
       }
       line = line.replaceFirst(RegExp(r'^[a-zA-Z0-9]+:\/\/'), '');
@@ -232,7 +235,9 @@ class ProxyEntry {
 
       final serverTokens = serverPart.split(':');
       final host = serverTokens[0].trim();
-      final port = serverTokens.length > 1 ? int.tryParse(serverTokens[1].trim()) ?? 8080 : 8080;
+      final port = serverTokens.length > 1
+          ? int.tryParse(serverTokens[1].trim()) ?? 8080
+          : 8080;
 
       if (host.isNotEmpty) {
         return ProxyEntry(
@@ -290,7 +295,8 @@ class ProxyEntry {
         final key = '${entry.host}:${entry.port}:${entry.username}';
         if (!seen.contains(key)) {
           seen.add(key);
-          results.add(entry.copyWith(id: 'proxy_${results.length + 1}_${DateTime.now().millisecondsSinceEpoch}'));
+          results.add(entry.copyWith(
+              id: 'proxy_${results.length + 1}_${DateTime.now().millisecondsSinceEpoch}'));
         }
       }
     }
@@ -360,4 +366,3 @@ class ProxyEntry {
     );
   }
 }
-

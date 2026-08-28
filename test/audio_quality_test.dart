@@ -86,7 +86,8 @@ void main() {
       expect(info.shortBadgeLabel, 'STANDARD');
     });
 
-    test('Calculates Hi-Res with explicit sampleRate and bitDepth metadata', () {
+    test('Calculates Hi-Res with explicit sampleRate and bitDepth metadata',
+        () {
       const song = SongsTableData(
         id: 4,
         title: 'Explicit HiRes',
@@ -142,7 +143,9 @@ void main() {
       expect(info.shortBadgeLabel, 'DSD • HI-RES');
     });
 
-    test('Provides accurate renderEngineDescription for lossless vs compressed streams', () {
+    test(
+        'Provides accurate renderEngineDescription for lossless vs compressed streams',
+        () {
       const flacSong = SongsTableData(
         id: 10,
         title: 'Lossless Track',
@@ -159,7 +162,8 @@ void main() {
         lastPositionMs: 0,
       );
       final flacInfo = AudioQualityInfo.fromSong(flacSong);
-      expect(flacInfo.renderEngineDescription, 'ExoPlayer Media3 • 32-bit Float PCM');
+      expect(flacInfo.renderEngineDescription,
+          'ExoPlayer Media3 • 32-bit Float PCM');
 
       const ytmSong = SongsTableData(
         id: 11,
@@ -176,7 +180,8 @@ void main() {
         lastPositionMs: 0,
       );
       final ytmInfo = AudioQualityInfo.fromSong(ytmSong);
-      expect(ytmInfo.renderEngineDescription, contains('Hardware Offload (AAC / DSP)'));
+      expect(ytmInfo.renderEngineDescription,
+          contains('Hardware Offload (AAC / DSP)'));
 
       const mp3Song = SongsTableData(
         id: 12,
@@ -194,7 +199,8 @@ void main() {
         lastPositionMs: 0,
       );
       final mp3Info = AudioQualityInfo.fromSong(mp3Song);
-      expect(mp3Info.renderEngineDescription, contains('Hardware Offload (MP3 / DSP)'));
+      expect(mp3Info.renderEngineDescription,
+          contains('Hardware Offload (MP3 / DSP)'));
     });
   });
 }

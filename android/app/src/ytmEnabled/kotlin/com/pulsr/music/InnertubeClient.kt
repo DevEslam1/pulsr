@@ -8,8 +8,10 @@ import org.json.JSONObject
 import java.io.IOException
 import java.io.InputStream
 import java.net.HttpURLConnection
+import java.net.InetAddress
 import java.net.URL
 import java.net.URLDecoder
+import java.net.UnknownHostException
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.text.SimpleDateFormat
@@ -17,24 +19,25 @@ import java.time.Instant
 import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
+import java.util.UUID
 import java.util.zip.GZIPInputStream
 
 /**
- * Hardened Innertube API Client with Multi-Client Context Support.
+ * Hardened Innertube API Client with Multi-Client Context Support and Strategy Engine.
  *
- * Implements robust Innertube `/player`, `/search`, `/browse`, and `/next` requests with:
- * - Multi-client priority fallback (ANDROID_MUSIC -> IOS_MUSIC -> WEB_REMIX -> WEB_EMBEDDED_PLAYER -> MWEB -> ANDROID_TESTSUITE)
- * - Tailored headers per client type (avoiding origin mismatch 400 Precondition Check Failed errors)
- * - Rate limiting (RateLimiter)
- * - Cipher stream URL extraction
- * - Timestamped SAPISIDHASH authorization header generation for authenticated web sessions
- * - Automatic HTTP retry with exponential backoff on 429 / 5xx
- * - Classification of transient, auth, bot-block, and permanent errors
+ * Implements 6-Layer Resilience:
+ * - L1: Consistent Device Fingerprinting per ClientType
+ * - L2: Precise 8-Signal YtmBlockSignal Parser
+ * - L3: Dynamic ResolutionStrategy & Capability Matrix Fallback
+ * - L4: ProxyPool, DoH, and Cellular Failover Integration
+ * - L5: Adaptive Multi-Bucket Rate Limiter with Jitter and Persistence
+ * - L6: Stream itag Fallback Ladder (140 -> 251 -> 139 -> 250 -> 249)
  */
 internal class InnertubeClient(
     private val context: Context,
     private val cookieStore: YtmCookieStore = YtmCookieStore.getInstance(context),
     private val rateLimiter: RateLimiter = RateLimiter.shared,
+    private val resolutionStrategy: ResolutionStrategy = ResolutionStrategy(context, cookieStore, PoTokenManager)
 ) {
     enum class ClientType(
         val clientName: String,
@@ -135,48 +138,27 @@ internal class InnertubeClient(
             }
     }
 
-    enum class ErrorCategory {
-        TRANSIENT,
-        AUTH,
-        BOT_BLOCK,
-        PERMANENT,
-    }
-
     class InnertubeException(
-        val category: ErrorCategory,
+        val signal: YtmBlockSignal,
         message: String,
+        val traceId: String = UUID.randomUUID().toString(),
         cause: Throwable? = null,
-    ) : Exception(message, cause)
+    ) : Exception("[$traceId] [${signal.name}] $message", cause)
 
     /**
-     * Resolves audio formats for [videoId] using a multi-client priority fallback chain:
-     * 1. ANDROID_VR (unthrottled, no PoToken/bot-block challenge required)
-     * 2. ANDROID_CREATOR
-     * 3. TVHTML5_SIMPLY_EMBEDDED_PLAYER
-     * 4. WEB_EMBEDDED_PLAYER
-     * 5. ANDROID_MUSIC
-     * 6. IOS_MUSIC
-     * 7. WEB_REMIX + poToken + session cookies
-     * 8. MWEB
-     * 9. ANDROID_TESTSUITE
+     * Resolves audio stream formats for [videoId] through dynamic fallback ladder:
+     * 1. Consults ResolutionStrategy for eligible client chain
+     * 2. Executes parallel race for high-priority tier
+     * 3. Fallback sequential check for remaining clients
+     * 4. Selects optimal itag via audio itag ladder (140, 251, 139, 250, 249)
      */
     fun resolvePlayerStream(videoId: String, quality: String = "high"): Map<String, Any?> {
-        val clientChain = listOf(
-            ClientType.ANDROID_VR,
-            ClientType.ANDROID_CREATOR,
-            ClientType.ANDROID_MUSIC,
-            ClientType.IOS_MUSIC,
-            ClientType.TVHTML5_SIMPLY_EMBEDDED_PLAYER,
-            ClientType.WEB_REMIX,
-            ClientType.WEB_EMBEDDED_PLAYER,
-            ClientType.MWEB,
-            ClientType.ANDROID_TESTSUITE,
+        val clientChain = resolutionStrategy.buildChain(
+            ResolutionStrategy.Operation.STREAM_RESOLVE,
+            limitedMode = PoTokenManager.isLimitedMode
         )
 
-        // Authenticated cold-start: the account datasyncId may be unknown (e.g. the Dart primary
-        // path was skipped). One WEB_REMIX /player call still returns responseContext.datasyncId
-        // even on LOGIN_REQUIRED — harvest it so the WEB_REMIX attempt below can present an
-        // account-bound poToken instead of a guest token YouTube rejects.
+        // Authenticated cold-start datasyncId bootstrap if needed
         if (cookieStore.isSessionValid() && PoTokenManager.dataSyncId.isEmpty()) {
             try {
                 requestPlayer(videoId, ClientType.WEB_REMIX)
@@ -186,13 +168,13 @@ internal class InnertubeClient(
         }
 
         var lastException: Throwable? = null
-        var sawBotGate = false
+        var lastSignal: YtmBlockSignal = YtmBlockSignal.RateLimited
+        val traceId = UUID.randomUUID().toString()
 
-        // Helper function to attempt resolution on a single client
         fun attemptClient(client: ClientType): Map<String, Any?>? {
             if (Thread.currentThread().isInterrupted) return null
             try {
-                Log.d(TAG, "Attempting player resolution for $videoId using client: ${client.name}")
+                Log.d(TAG, "[$traceId] Attempting player resolution for $videoId using client: ${client.name}")
                 val playerJson = requestPlayer(videoId, client)
                 if (Thread.currentThread().isInterrupted) return null
 
@@ -202,14 +184,17 @@ internal class InnertubeClient(
                 if (status.equals("LOGIN_REQUIRED", ignoreCase = true) ||
                     status.equals("UNPLAYABLE", ignoreCase = true) ||
                     status.contains("BOT", ignoreCase = true)) {
-                    val reason = playability?.optString("reason") ?: status
-                    Log.w(TAG, "Client ${client.name} returned status $status ($reason)")
-                    if (!status.equals("UNPLAYABLE", ignoreCase = true)) sawBotGate = true
+                    val parsedSignal = YtmBlockSignal.parse(200, status, playability)
+                    lastSignal = parsedSignal
+                    Log.w(TAG, "[$traceId] Client ${client.name} returned status $status -> $parsedSignal")
+                    if (parsedSignal == YtmBlockSignal.BotChallenge || parsedSignal == YtmBlockSignal.PoTokenInvalid) {
+                        PoTokenManager.evictMintedTokens()
+                    }
                     return null
                 }
 
-                val streamingData = playerJson.optJSONObject("streamingData") ?: return null
-                val adaptiveFormats = streamingData.optJSONArray("adaptiveFormats") ?: JSONArray()
+                val streamingData = playerJson.optJSONObject("streamingData")
+                val adaptiveFormats = streamingData?.optJSONArray("adaptiveFormats") ?: JSONArray()
 
                 val audioFormats = mutableListOf<Pair<JSONObject, String>>()
                 for (i in 0 until adaptiveFormats.length()) {
@@ -221,17 +206,27 @@ internal class InnertubeClient(
                     }
                 }
 
-                if (audioFormats.isEmpty()) return null
+                if (audioFormats.isEmpty()) {
+                    lastSignal = YtmBlockSignal.PoTokenInvalid
+                    return null
+                }
 
-                // Prefer M4A / AAC for jaudiotagger compatibility
-                val m4aFormats = audioFormats.filter { it.first.optString("mimeType").contains("mp4") }
-                val pool = if (m4aFormats.isNotEmpty()) m4aFormats else audioFormats
-
+                // Layer 6: Itag Ladder Ordering (140, 251, 139, 250, 249)
+                val itagLadder = listOf(140, 251, 139, 250, 249)
                 val selectedPair = when (quality.lowercase()) {
-                    "low" -> pool.minByOrNull { it.first.optInt("bitrate", 0) }
-                    "medium" -> pool.minByOrNull { kotlin.math.abs(it.first.optInt("bitrate", 128000) - 128000) }
-                    else -> pool.maxByOrNull { it.first.optInt("bitrate", 0) }
-                } ?: pool.first()
+                    "low" -> audioFormats.minByOrNull { it.first.optInt("bitrate", 0) }
+                    "medium" -> audioFormats.minByOrNull { kotlin.math.abs(it.first.optInt("bitrate", 128000) - 128000) }
+                    else -> {
+                        // High quality: prefer ladder itags in order, or highest bitrate
+                        audioFormats.sortedWith(
+                            compareBy<Pair<JSONObject, String>> { pair ->
+                                val itag = pair.first.optInt("itag", 0)
+                                val idx = itagLadder.indexOf(itag)
+                                if (idx >= 0) idx else 99
+                            }.thenByDescending { it.first.optInt("bitrate", 0) }
+                        ).firstOrNull() ?: audioFormats.maxByOrNull { it.first.optInt("bitrate", 0) }
+                    }
+                } ?: audioFormats.first()
 
                 val selected = selectedPair.first
                 val selectedUrl = selectedPair.second
@@ -243,7 +238,7 @@ internal class InnertubeClient(
                 val title = videoDetails?.optString("title") ?: ""
                 val author = videoDetails?.optString("author") ?: ""
 
-                Log.i(TAG, "Successfully resolved $videoId via ${client.name} (bitrate: $selectedBitrate)")
+                Log.i(TAG, "[$traceId] Successfully resolved $videoId via ${client.name} (itag: ${selected.optInt("itag")}, bitrate: $selectedBitrate)")
                 return mapOf(
                     "videoId" to videoId,
                     "url" to selectedUrl,
@@ -255,18 +250,17 @@ internal class InnertubeClient(
                     "artist" to author,
                     "artworkUrl" to null,
                     "userAgent" to client.userAgent,
+                    "activeClient" to client.name,
+                    "traceId" to traceId
                 )
             } catch (t: Throwable) {
-                Log.w(TAG, "Failed resolving with ${client.name}: ${t.message}")
+                Log.w(TAG, "[$traceId] Failed resolving with ${client.name}: ${t.message}")
                 lastException = t
                 return null
             }
         }
 
-        // Overall deadline for the entire stream resolution (25s total budget)
         val overallDeadline = android.os.SystemClock.elapsedRealtime() + 25_000L
-
-        // Fast parallel race for the top 3 high-probability clients
         val fastTier = clientChain.take(3)
         val slowTier = clientChain.drop(3)
 
@@ -282,39 +276,22 @@ internal class InnertubeClient(
             try {
                 val future = completionService.poll(pollMs, java.util.concurrent.TimeUnit.MILLISECONDS) ?: continue
                 val res = future.get()
-                if (res != null) {
-                    return res
-                }
+                if (res != null) return res
             } catch (_: Throwable) {}
         }
 
-        // Fallback: sequential check for remaining specialized clients within remaining time budget
         for (client in slowTier) {
             val remainingMs = overallDeadline - android.os.SystemClock.elapsedRealtime()
-            if (remainingMs <= 0) {
-                Log.w(TAG, "Timed out waiting for slow tier stream resolution for $videoId")
-                break
-            }
+            if (remainingMs <= 0) break
             val res = attemptClient(client)
             if (res != null) return res
         }
 
-        // Only a real bot/auth gate justifies touching attestation state.
-        // Evict just the minted tokens so they re-mint; a full invalidation
-        // here would force a slow BotGuard WebView re-run every failing cycle
-        // and hammer YouTube with retries while already flagged.
-        if (sawBotGate) {
-            PoTokenManager.evictMintedTokens()
-            throw InnertubeException(
-                ErrorCategory.BOT_BLOCK,
-                "All Innertube client fallback resolutions failed for video $videoId",
-                lastException,
-            )
-        }
         throw InnertubeException(
-            ErrorCategory.TRANSIENT,
-            "All Innertube client fallback resolutions failed for video $videoId",
-            lastException,
+            signal = lastSignal,
+            message = "All Innertube client fallback resolutions failed for video $videoId",
+            traceId = traceId,
+            cause = lastException
         )
     }
 
@@ -341,7 +318,7 @@ internal class InnertubeClient(
     fun requestPlayer(videoId: String, clientType: ClientType): JSONObject {
         val endpoint = "${clientType.endpointHost}/youtubei/v1/player?prettyPrint=false&key=$API_KEY"
         val payload = buildPlayerBody(videoId, clientType)
-        return postWithRetry(endpoint, payload, clientType)
+        return postWithRetry(endpoint, payload, clientType, RateLimiter.Bucket.PLAYER)
     }
 
     fun requestBrowse(browseId: String, clientType: ClientType = ClientType.WEB_REMIX): JSONObject {
@@ -350,7 +327,7 @@ internal class InnertubeClient(
             put("context", buildClientContext(clientType))
             put("browseId", browseId)
         }
-        return postWithRetry(endpoint, payload, clientType)
+        return postWithRetry(endpoint, payload, clientType, RateLimiter.Bucket.BROWSE)
     }
 
     fun requestContinuation(token: String, clientType: ClientType = ClientType.WEB_REMIX): JSONObject {
@@ -359,7 +336,7 @@ internal class InnertubeClient(
             put("context", buildClientContext(clientType))
             put("continuation", token)
         }
-        return postWithRetry(endpoint, payload, clientType)
+        return postWithRetry(endpoint, payload, clientType, RateLimiter.Bucket.BROWSE)
     }
 
     fun requestSearch(query: String, params: String? = null, clientType: ClientType = ClientType.WEB_REMIX): JSONObject {
@@ -371,19 +348,21 @@ internal class InnertubeClient(
                 put("params", params)
             }
         }
-        return postWithRetry(endpoint, payload, clientType)
+        return postWithRetry(endpoint, payload, clientType, RateLimiter.Bucket.SEARCH)
     }
 
     private fun postWithRetry(
         urlStr: String,
         body: JSONObject,
         clientType: ClientType,
+        bucket: RateLimiter.Bucket,
         maxRetries: Int = 3,
     ): JSONObject {
         var lastError: Exception? = null
+        val traceId = UUID.randomUUID().toString()
 
         for (attempt in 0 until maxRetries) {
-            rateLimiter.acquirePermit()
+            rateLimiter.acquirePermit(bucket)
 
             var connection: HttpURLConnection? = null
             try {
@@ -398,9 +377,10 @@ internal class InnertubeClient(
                     instanceFollowRedirects = true
                 }
 
-                // Headers tailored per client type
+                // Headers tailored per client type & stable fingerprint
+                val fp = FingerprintStore.getFingerprint(context)
                 connection.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                connection.setRequestProperty("User-Agent", clientType.userAgent)
+                connection.setRequestProperty("User-Agent", fp.buildUserAgent(clientType))
                 connection.setRequestProperty("X-Goog-Api-Key", API_KEY)
                 connection.setRequestProperty("x-youtube-client-name", clientType.clientNameId)
                 connection.setRequestProperty("x-youtube-client-version", clientType.effectiveClientVersion)
@@ -427,7 +407,7 @@ internal class InnertubeClient(
                     connection.setRequestProperty("X-Origin", clientType.endpointHost)
                 }
 
-                // Only attach session cookies and SAPISIDHASH for Web client requests
+                // Attach cookies and SAPISIDHASH for Web client requests
                 if (clientType.isWeb) {
                     val cookieHeader = cookieStore.getMergedCookieHeader()
                     if (!cookieHeader.isNullOrEmpty()) {
@@ -468,14 +448,20 @@ internal class InnertubeClient(
                 }
 
                 if (code == 429) {
-                    val backoff = rateLimiter.onRateLimited()
-                    Log.w(TAG, "Rate limited (429) on attempt $attempt. Backing off for ${backoff}ms")
+                    val retryAfter = connection.getHeaderField("Retry-After")?.toLongOrNull()
+                    val backoff = rateLimiter.onRateLimited(retryAfter)
+                    ProxyManager.onPathFailed(urlStr)
+                    Log.w(TAG, "[$traceId] Rate limited (429) on attempt $attempt. Backing off for ${backoff}ms")
                     Thread.sleep(backoff)
                     continue
                 }
 
+                if (code == 403) {
+                    ProxyManager.onPathFailed(urlStr)
+                }
+
                 if (code in 500..599) {
-                    Log.w(TAG, "Server error ($code) on attempt $attempt. Retrying...")
+                    Log.w(TAG, "[$traceId] Server error ($code) on attempt $attempt. Retrying...")
                     Thread.sleep((1000L shl attempt) + (0..500).random())
                     continue
                 }
@@ -491,44 +477,52 @@ internal class InnertubeClient(
                 } ?: ""
 
                 if (code !in 200..299) {
-                    Log.w(TAG, "Innertube (${clientType.name}) returned non-200 ($code): $responseStr")
-                    if (responseStr.contains("LOGIN_REQUIRED") || responseStr.contains("invalid SAPISIDHASH")) {
-                        throw InnertubeException(ErrorCategory.AUTH, "Authentication failed: $responseStr")
-                    }
-                    if (code == 404) {
-                        throw InnertubeException(ErrorCategory.PERMANENT, "Resource not found (404)")
-                    }
-                    throw InnertubeException(ErrorCategory.TRANSIENT, "HTTP error $code: $responseStr")
+                    val signal = YtmBlockSignal.parse(code, responseStr)
+                    Log.w(TAG, "[$traceId] Innertube (${clientType.name}) non-200 ($code) -> $signal: $responseStr")
+                    throw InnertubeException(signal, "HTTP error $code ($signal): $responseStr", traceId)
                 }
 
                 rateLimiter.onSuccess()
+                ProxyManager.onPathSuccess()
                 val parsed = JSONObject(responseStr)
                 harvestSessionState(parsed, clientType)
                 return parsed
             } catch (e: InnertubeException) {
-                if (e.category == ErrorCategory.AUTH || e.category == ErrorCategory.PERMANENT) {
+                if (e.signal == YtmBlockSignal.SignInRequired || e.signal == YtmBlockSignal.VideoGone) {
                     throw e
+                }
+                lastError = e
+            } catch (e: UnknownHostException) {
+                // DoH fallback attempt
+                val host = Uri.parse(urlStr).host
+                if (host != null) {
+                    val dohResolved = DnsOverHttpsResolver.resolve(host)
+                    if (dohResolved != null) {
+                        Log.i(TAG, "[$traceId] Resolved host $host via DoH: ${dohResolved.hostAddress}")
+                    }
                 }
                 lastError = e
             } catch (e: IOException) {
                 lastError = e
-                Log.w(TAG, "Network error on attempt $attempt for ${clientType.name}: ${e.message}")
+                ProxyManager.onPathFailed(urlStr)
+                Log.w(TAG, "[$traceId] Network error on attempt $attempt for ${clientType.name}: ${e.message}")
             } catch (e: Exception) {
                 lastError = e
-                Log.e(TAG, "Unexpected error in Innertube post: ${e.message}", e)
+                Log.e(TAG, "[$traceId] Unexpected error in Innertube post: ${e.message}", e)
             } finally {
                 connection?.disconnect()
+                rateLimiter.releasePermit()
             }
         }
 
-        throw InnertubeException(ErrorCategory.TRANSIENT, "Innertube request failed after $maxRetries attempts for ${clientType.name}", lastError)
+        throw InnertubeException(
+            signal = YtmBlockSignal.RateLimited,
+            message = "Innertube request failed after $maxRetries attempts for ${clientType.name}",
+            traceId = traceId,
+            cause = lastError
+        )
     }
 
-    /**
-     * Opportunistically harvests the account [PoTokenManager.dataSyncId] and session
-     * [PoTokenManager.sessionVisitorData] from an authenticated web response's `responseContext`.
-     * Gated on an authenticated web request so guest visitorData never pollutes session state.
-     */
     private fun harvestSessionState(json: JSONObject, clientType: ClientType) {
         if (!clientType.isWeb || !cookieStore.isSessionValid()) return
         val responseContext = json.optJSONObject("responseContext") ?: return
@@ -568,7 +562,6 @@ internal class InnertubeClient(
         playbackContext.put("contentPlaybackContext", contentPlaybackContext)
         root.put("playbackContext", playbackContext)
 
-        // Web clients attest via root-level serviceIntegrityDimensions; mobile clients use contentPlaybackContext.poToken.
         if (clientType.isWeb && PoTokenManager.isReady) {
             val dataSyncId = PoTokenManager.dataSyncId
             val poToken = if (cookieStore.isSessionValid() && dataSyncId.isNotEmpty()) {
@@ -588,13 +581,12 @@ internal class InnertubeClient(
     }
 
     private fun buildClientContext(clientType: ClientType, videoId: String? = null): JSONObject {
+        val fp = FingerprintStore.getFingerprint(context)
         val client = JSONObject().apply {
             put("clientName", clientType.clientName)
             put("clientVersion", clientType.effectiveClientVersion)
-            put("hl", "en")
-            put("gl", "US")
-            // Only web clients send cookies, so only they are "authenticated": send the harvested
-            // session visitorData in that case, guest visitorData otherwise.
+            put("hl", fp.hl)
+            put("gl", fp.gl)
             val authedWeb = clientType.isWeb && cookieStore.isSessionValid()
             val visitorData = if (authedWeb) {
                 PoTokenManager.sessionVisitorData
@@ -624,10 +616,12 @@ internal class InnertubeClient(
                     put("platform", "TV")
                 }
                 ClientType.ANDROID_MUSIC -> {
-                    put("androidSdkVersion", 34)
+                    put("androidSdkVersion", fp.sdkInt)
                     put("osName", "Android")
-                    put("osVersion", "14")
+                    put("osVersion", fp.osVersion)
                     put("platform", "MOBILE")
+                    put("deviceMake", fp.deviceMake)
+                    put("deviceModel", fp.deviceModel)
                 }
                 ClientType.IOS_MUSIC -> {
                     put("deviceMake", "Apple")

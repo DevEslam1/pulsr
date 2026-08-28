@@ -20,9 +20,12 @@ void main() {
     });
 
     test('Generates valid DontKillMyApp links for OEM', () {
-      expect(BatteryOptimizationService.getDontKillMyAppUrl('Xiaomi'), 'https://dontkillmyapp.com/xiaomi');
-      expect(BatteryOptimizationService.getDontKillMyAppUrl('Huawei'), 'https://dontkillmyapp.com/huawei');
-      expect(BatteryOptimizationService.getDontKillMyAppUrl('Pixel'), 'https://dontkillmyapp.com');
+      expect(BatteryOptimizationService.getDontKillMyAppUrl('Xiaomi'),
+          'https://dontkillmyapp.com/xiaomi');
+      expect(BatteryOptimizationService.getDontKillMyAppUrl('Huawei'),
+          'https://dontkillmyapp.com/huawei');
+      expect(BatteryOptimizationService.getDontKillMyAppUrl('Pixel'),
+          'https://dontkillmyapp.com');
     });
 
     test('Manages dismissal state via SharedPreferences', () async {

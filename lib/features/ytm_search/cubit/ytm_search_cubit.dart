@@ -66,7 +66,8 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
             duration: stream.duration,
             artworkUrl: stream.artworkUrl,
           );
-          emit(state.copyWith(results: [track], isLoading: false, errorMessage: null));
+          emit(state.copyWith(
+              results: [track], isLoading: false, errorMessage: null));
           return;
         } catch (_) {
           // Fall through to regular search if resolving by ID fails
@@ -75,7 +76,8 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
 
       final results = await _service.searchWithFallback(query);
       if (generation != _generation || isClosed) return;
-      emit(state.copyWith(results: results, isLoading: false, errorMessage: null));
+      emit(state.copyWith(
+          results: results, isLoading: false, errorMessage: null));
     } on YtmException catch (e) {
       if (generation != _generation || isClosed) return;
 
@@ -84,15 +86,18 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
         await _service.invalidatePoToken();
         await _service.ensurePoTokenReady();
         if (generation != _generation || isClosed) return;
-        return _executeSearch(query, isRetryAfterBotBlock: true, retryDepth: retryDepth + 1);
+        return _executeSearch(query,
+            isRetryAfterBotBlock: true, retryDepth: retryDepth + 1);
       }
 
       final errorInfo = YtmErrorClassifier.classify(e);
-      emit(state.copyWith(isLoading: false, results: [], errorMessage: errorInfo.message));
+      emit(state.copyWith(
+          isLoading: false, results: [], errorMessage: errorInfo.message));
     } catch (e) {
       if (generation != _generation || isClosed) return;
       final errorInfo = YtmErrorClassifier.classify(e);
-      emit(state.copyWith(isLoading: false, results: [], errorMessage: errorInfo.message));
+      emit(state.copyWith(
+          isLoading: false, results: [], errorMessage: errorInfo.message));
     }
   }
 

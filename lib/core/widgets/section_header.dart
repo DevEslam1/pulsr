@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../theme/aura_theme.dart';
 
 /// Uppercase micro-label section header with optional action — the signature
@@ -27,7 +27,10 @@ class SectionHeader extends StatelessWidget {
           Expanded(
             child: Text(
               title.toUpperCase(),
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: p.textTertiary),
+              style: Theme.of(context)
+                  .textTheme
+                  .labelSmall
+                  ?.copyWith(color: p.textTertiary),
             ),
           ),
           if (actionLabel != null && onAction != null)
@@ -38,7 +41,11 @@ class SectionHeader extends StatelessWidget {
                 minimumSize: const Size(0, 32),
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              child: Text(actionLabel!, style: TextStyle(color: p.accent, fontWeight: FontWeight.w800, fontSize: 12.5)),
+              child: Text(actionLabel!,
+                  style: TextStyle(
+                      color: p.accent,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12.5)),
             ),
         ],
       ),

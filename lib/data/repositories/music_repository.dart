@@ -37,13 +37,18 @@ class MusicRepository implements IMusicRepository {
 
       if (searchQuery != null && searchQuery.trim().isNotEmpty) {
         final pattern = '%${searchQuery.trim().toLowerCase()}%';
-        query.where((t) => t.title.lower().like(pattern) | t.artist.lower().like(pattern) | t.album.lower().like(pattern));
+        query.where((t) =>
+            t.title.lower().like(pattern) |
+            t.artist.lower().like(pattern) |
+            t.album.lower().like(pattern));
       }
 
       if (excludedFolders.isNotEmpty) {
         final sanitizedFolders = excludedFolders
             .where((f) => f.trim().isNotEmpty)
-            .map((folder) => folder.endsWith(Platform.pathSeparator) ? folder : '$folder${Platform.pathSeparator}')
+            .map((folder) => folder.endsWith(Platform.pathSeparator)
+                ? folder
+                : '$folder${Platform.pathSeparator}')
             .toList();
 
         for (final prefix in sanitizedFolders) {
@@ -52,21 +57,41 @@ class MusicRepository implements IMusicRepository {
       }
 
       if (sortBy == 'title') {
-        query.orderBy([(t) => OrderingTerm(expression: t.title, mode: ascending ? OrderingMode.asc : OrderingMode.desc)]);
+        query.orderBy([
+          (t) => OrderingTerm(
+              expression: t.title,
+              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
+        ]);
       } else if (sortBy == 'artist') {
-        query.orderBy([(t) => OrderingTerm(expression: t.artist, mode: ascending ? OrderingMode.asc : OrderingMode.desc)]);
+        query.orderBy([
+          (t) => OrderingTerm(
+              expression: t.artist,
+              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
+        ]);
       } else if (sortBy == 'dateAdded') {
-        query.orderBy([(t) => OrderingTerm(expression: t.dateAdded, mode: ascending ? OrderingMode.asc : OrderingMode.desc)]);
+        query.orderBy([
+          (t) => OrderingTerm(
+              expression: t.dateAdded,
+              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
+        ]);
       } else if (sortBy == 'duration') {
-        query.orderBy([(t) => OrderingTerm(expression: t.durationMs, mode: ascending ? OrderingMode.asc : OrderingMode.desc)]);
+        query.orderBy([
+          (t) => OrderingTerm(
+              expression: t.durationMs,
+              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
+        ]);
       }
 
       if (limit != null) {
         query.limit(limit, offset: offset);
       }
 
-      return query.watch().map((songs) => Right<AppFailure, List<SongsTableData>>(songs)).handleError(
-            (e) => Left<AppFailure, List<SongsTableData>>(DatabaseFailure('Failed to watch songs', e)),
+      return query
+          .watch()
+          .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
+          .handleError(
+            (e) => Left<AppFailure, List<SongsTableData>>(
+                DatabaseFailure('Failed to watch songs', e)),
           );
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch songs', e)));
@@ -87,13 +112,29 @@ class MusicRepository implements IMusicRepository {
             t.source.equals(SongSource.local) &
             t.path.like('ytmusic://%').not());
       if (sortBy == 'title') {
-        query.orderBy([(t) => OrderingTerm(expression: t.title, mode: ascending ? OrderingMode.asc : OrderingMode.desc)]);
+        query.orderBy([
+          (t) => OrderingTerm(
+              expression: t.title,
+              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
+        ]);
       } else if (sortBy == 'artist') {
-        query.orderBy([(t) => OrderingTerm(expression: t.artist, mode: ascending ? OrderingMode.asc : OrderingMode.desc)]);
+        query.orderBy([
+          (t) => OrderingTerm(
+              expression: t.artist,
+              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
+        ]);
       } else if (sortBy == 'dateAdded') {
-        query.orderBy([(t) => OrderingTerm(expression: t.dateAdded, mode: ascending ? OrderingMode.asc : OrderingMode.desc)]);
+        query.orderBy([
+          (t) => OrderingTerm(
+              expression: t.dateAdded,
+              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
+        ]);
       } else if (sortBy == 'duration') {
-        query.orderBy([(t) => OrderingTerm(expression: t.durationMs, mode: ascending ? OrderingMode.asc : OrderingMode.desc)]);
+        query.orderBy([
+          (t) => OrderingTerm(
+              expression: t.durationMs,
+              mode: ascending ? OrderingMode.asc : OrderingMode.desc)
+        ]);
       }
       if (limit != null) {
         query.limit(limit, offset: offset);
@@ -108,7 +149,9 @@ class MusicRepository implements IMusicRepository {
   @override
   Future<Result<SongsTableData?>> getSongById(int id) async {
     try {
-      final song = await (_db.select(_db.songsTable)..where((t) => t.id.equals(id))).getSingleOrNull();
+      final song = await (_db.select(_db.songsTable)
+            ..where((t) => t.id.equals(id)))
+          .getSingleOrNull();
       return Right(song);
     } catch (e) {
       return Left(DatabaseFailure('Failed to fetch song by id', e));
@@ -118,7 +161,9 @@ class MusicRepository implements IMusicRepository {
   @override
   Future<Result<SongsTableData?>> getSongByPath(String path) async {
     try {
-      final song = await (_db.select(_db.songsTable)..where((t) => t.path.equals(path))).getSingleOrNull();
+      final song = await (_db.select(_db.songsTable)
+            ..where((t) => t.path.equals(path)))
+          .getSingleOrNull();
       return Right(song);
     } catch (e) {
       return Left(DatabaseFailure('Failed to fetch song by path', e));
@@ -128,7 +173,9 @@ class MusicRepository implements IMusicRepository {
   @override
   Future<Result<SongsTableData?>> getSongByUri(String uri) async {
     try {
-      final song = await (_db.select(_db.songsTable)..where((t) => t.uri.equals(uri) | t.path.equals(uri))).getSingleOrNull();
+      final song = await (_db.select(_db.songsTable)
+            ..where((t) => t.uri.equals(uri) | t.path.equals(uri)))
+          .getSingleOrNull();
       return Right(song);
     } catch (e) {
       return Left(DatabaseFailure('Failed to fetch song by uri', e));
@@ -140,7 +187,10 @@ class MusicRepository implements IMusicRepository {
     if (remoteId.isEmpty) return const Right(null);
     try {
       final song = await (_db.select(_db.songsTable)
-            ..where((t) => t.remoteId.equals(remoteId) & t.source.equals(SongSource.local) & t.isMissing.equals(false))
+            ..where((t) =>
+                t.remoteId.equals(remoteId) &
+                t.source.equals(SongSource.local) &
+                t.isMissing.equals(false))
             ..limit(1))
           .getSingleOrNull();
       return Right(song);
@@ -150,19 +200,26 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
-  Future<Result<SongsTableData?>> findMatchingLocalSong({String? remoteId, String? title, String? artist}) async {
+  Future<Result<SongsTableData?>> findMatchingLocalSong(
+      {String? remoteId, String? title, String? artist}) async {
     try {
       // 1. Try matching by remoteId first
       if (remoteId != null && remoteId.isNotEmpty) {
         final byRemoteId = await (_db.select(_db.songsTable)
-              ..where((t) => t.remoteId.equals(remoteId) & t.source.equals(SongSource.local) & t.isMissing.equals(false))
+              ..where((t) =>
+                  t.remoteId.equals(remoteId) &
+                  t.source.equals(SongSource.local) &
+                  t.isMissing.equals(false))
               ..limit(1))
             .getSingleOrNull();
         if (byRemoteId != null) return Right(byRemoteId);
       }
 
       // 2. Try matching by title & artist on local rows
-      if (title != null && title.trim().isNotEmpty && artist != null && artist.trim().isNotEmpty) {
+      if (title != null &&
+          title.trim().isNotEmpty &&
+          artist != null &&
+          artist.trim().isNotEmpty) {
         final byMeta = await (_db.select(_db.songsTable)
               ..where((t) =>
                   t.source.equals(SongSource.local) &
@@ -184,7 +241,9 @@ class MusicRepository implements IMusicRepository {
   Future<Result<List<SongsTableData>>> getSongsByIds(List<int> ids) async {
     if (ids.isEmpty) return const Right([]);
     try {
-      final songs = await (_db.select(_db.songsTable)..where((t) => t.id.isIn(ids))).get();
+      final songs = await (_db.select(_db.songsTable)
+            ..where((t) => t.id.isIn(ids)))
+          .get();
       return Right(songs);
     } catch (e) {
       return Left(DatabaseFailure('Failed to fetch songs by ids', e));
@@ -203,9 +262,11 @@ class MusicRepository implements IMusicRepository {
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(DatabaseFailure('Failed to watch favorites', e)));
+          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+              DatabaseFailure('Failed to watch favorites', e)));
     } catch (e) {
-      return Stream.value(Left(DatabaseFailure('Failed to watch favorites', e)));
+      return Stream.value(
+          Left(DatabaseFailure('Failed to watch favorites', e)));
     }
   }
 
@@ -227,7 +288,8 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
-  Future<Result<int>> importOnlineTracksAsFavorites(List<YtmTrack> tracks) async {
+  Future<Result<int>> importOnlineTracksAsFavorites(
+      List<YtmTrack> tracks) async {
     try {
       int count = 0;
       for (final track in tracks) {
@@ -238,7 +300,8 @@ class MusicRepository implements IMusicRepository {
             .getSingleOrNull();
 
         if (existing != null) {
-          await (_db.update(_db.songsTable)..where((t) => t.id.equals(existing.id)))
+          await (_db.update(_db.songsTable)
+                ..where((t) => t.id.equals(existing.id)))
               .write(const SongsTableCompanion(isFavorite: Value(true)));
           count++;
         } else {
@@ -263,7 +326,8 @@ class MusicRepository implements IMusicRepository {
       }
       return Right(count);
     } catch (e) {
-      return Left(DatabaseFailure('Failed to import online tracks as favorites', e));
+      return Left(
+          DatabaseFailure('Failed to import online tracks as favorites', e));
     }
   }
 
@@ -276,18 +340,24 @@ class MusicRepository implements IMusicRepository {
                 t.isMissing.equals(false) &
                 t.source.equals(SongSource.local) &
                 t.path.like('ytmusic://%').not())
-            ..orderBy([(t) => OrderingTerm(expression: t.lastPlayed, mode: OrderingMode.desc)])
+            ..orderBy([
+              (t) => OrderingTerm(
+                  expression: t.lastPlayed, mode: OrderingMode.desc)
+            ])
             ..limit(limit))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(DatabaseFailure('Failed to watch recently played', e)));
+          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+              DatabaseFailure('Failed to watch recently played', e)));
     } catch (e) {
-      return Stream.value(Left(DatabaseFailure('Failed to watch recently played', e)));
+      return Stream.value(
+          Left(DatabaseFailure('Failed to watch recently played', e)));
     }
   }
 
   @override
-  Future<Result<List<SongsTableData>>> getRecentlyPlayed({int limit = 20}) async {
+  Future<Result<List<SongsTableData>>> getRecentlyPlayed(
+      {int limit = 20}) async {
     try {
       final songs = await (_db.select(_db.songsTable)
             ..where((t) =>
@@ -295,7 +365,10 @@ class MusicRepository implements IMusicRepository {
                 t.isMissing.equals(false) &
                 t.source.equals(SongSource.local) &
                 t.path.like('ytmusic://%').not())
-            ..orderBy([(t) => OrderingTerm(expression: t.lastPlayed, mode: OrderingMode.desc)])
+            ..orderBy([
+              (t) => OrderingTerm(
+                  expression: t.lastPlayed, mode: OrderingMode.desc)
+            ])
             ..limit(limit))
           .get();
       return Right(songs);
@@ -312,13 +385,18 @@ class MusicRepository implements IMusicRepository {
                 t.isMissing.equals(false) &
                 t.source.equals(SongSource.local) &
                 t.path.like('ytmusic://%').not())
-            ..orderBy([(t) => OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)])
+            ..orderBy([
+              (t) =>
+                  OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)
+            ])
             ..limit(limit))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(DatabaseFailure('Failed to watch recently added', e)));
+          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+              DatabaseFailure('Failed to watch recently added', e)));
     } catch (e) {
-      return Stream.value(Left(DatabaseFailure('Failed to watch recently added', e)));
+      return Stream.value(
+          Left(DatabaseFailure('Failed to watch recently added', e)));
     }
   }
 
@@ -331,13 +409,18 @@ class MusicRepository implements IMusicRepository {
                 t.isMissing.equals(false) &
                 t.source.equals(SongSource.local) &
                 t.path.like('ytmusic://%').not())
-            ..orderBy([(t) => OrderingTerm(expression: t.playCount, mode: OrderingMode.desc)])
+            ..orderBy([
+              (t) =>
+                  OrderingTerm(expression: t.playCount, mode: OrderingMode.desc)
+            ])
             ..limit(limit))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(DatabaseFailure('Failed to watch top played', e)));
+          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+              DatabaseFailure('Failed to watch top played', e)));
     } catch (e) {
-      return Stream.value(Left(DatabaseFailure('Failed to watch top played', e)));
+      return Stream.value(
+          Left(DatabaseFailure('Failed to watch top played', e)));
     }
   }
 
@@ -348,7 +431,9 @@ class MusicRepository implements IMusicRepository {
   Future<Result<bool>> toggleFavorite(int songId) async {
     try {
       final updatedVal = await _db.transaction(() async {
-        final song = await (_db.select(_db.songsTable)..where((t) => t.id.equals(songId))).getSingleOrNull();
+        final song = await (_db.select(_db.songsTable)
+              ..where((t) => t.id.equals(songId)))
+            .getSingleOrNull();
         if (song == null) return null;
         final nextVal = !song.isFavorite;
         await (_db.update(_db.songsTable)..where((t) => t.id.equals(songId)))
@@ -365,33 +450,39 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
-  Future<Result<void>> recordPlayHistory(int songId, {bool completed = false}) async {
+  Future<Result<void>> recordPlayHistory(int songId,
+      {bool completed = false}) async {
     if (songId <= 0) {
       return const Right(null);
     }
     try {
       final now = DateTime.now();
-      if (_lastRecordedSongId == songId && _lastRecordedTime != null && now.difference(_lastRecordedTime!).inMilliseconds < 1500) {
+      if (_lastRecordedSongId == songId &&
+          _lastRecordedTime != null &&
+          now.difference(_lastRecordedTime!).inMilliseconds < 1500) {
         return const Right(null);
       }
       _lastRecordedSongId = songId;
       _lastRecordedTime = now;
       final nowMs = now.millisecondsSinceEpoch;
       await _db.transaction(() async {
-        final song = await (_db.select(_db.songsTable)..where((t) => t.id.equals(songId))).getSingleOrNull();
+        final song = await (_db.select(_db.songsTable)
+              ..where((t) => t.id.equals(songId)))
+            .getSingleOrNull();
         if (song != null) {
-          await (_db.update(_db.songsTable)..where((t) => t.id.equals(songId))).write(
+          await (_db.update(_db.songsTable)..where((t) => t.id.equals(songId)))
+              .write(
             SongsTableCompanion(
               playCount: Value(song.playCount + 1),
               lastPlayed: Value(nowMs),
             ),
           );
           await _db.into(_db.playHistoryTable).insert(
-            PlayHistoryTableCompanion.insert(
-              songId: songId,
-              completed: Value(completed),
-            ),
-          );
+                PlayHistoryTableCompanion.insert(
+                  songId: songId,
+                  completed: Value(completed),
+                ),
+              );
         }
       });
       return const Right(null);
@@ -403,7 +494,8 @@ class MusicRepository implements IMusicRepository {
   @override
   Future<Result<void>> updateLastPosition(int songId, int positionMs) async {
     try {
-      await (_db.update(_db.songsTable)..where((t) => t.id.equals(songId))).write(
+      await (_db.update(_db.songsTable)..where((t) => t.id.equals(songId)))
+          .write(
         SongsTableCompanion(lastPositionMs: Value(positionMs)),
       );
       return const Right(null);
@@ -416,10 +508,12 @@ class MusicRepository implements IMusicRepository {
   @override
   Stream<Result<List<AlbumsTableData>>> watchAlbums() {
     try {
-      return (_db.select(_db.albumsTable)..orderBy([(t) => OrderingTerm(expression: t.title)]))
+      return (_db.select(_db.albumsTable)
+            ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((albums) => Right<AppFailure, List<AlbumsTableData>>(albums))
-          .handleError((e) => Left<AppFailure, List<AlbumsTableData>>(DatabaseFailure('Failed to watch albums', e)));
+          .handleError((e) => Left<AppFailure, List<AlbumsTableData>>(
+              DatabaseFailure('Failed to watch albums', e)));
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch albums', e)));
     }
@@ -435,14 +529,18 @@ class MusicRepository implements IMusicRepository {
                 t.source.equals(SongSource.local) &
                 t.path.like('ytmusic://%').not())
             ..orderBy([
-              (t) => OrderingTerm(expression: t.discNumber, mode: OrderingMode.asc),
-              (t) => OrderingTerm(expression: t.trackNumber, mode: OrderingMode.asc),
+              (t) => OrderingTerm(
+                  expression: t.discNumber, mode: OrderingMode.asc),
+              (t) => OrderingTerm(
+                  expression: t.trackNumber, mode: OrderingMode.asc),
             ]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(DatabaseFailure('Failed to watch album songs', e)));
+          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+              DatabaseFailure('Failed to watch album songs', e)));
     } catch (e) {
-      return Stream.value(Left(DatabaseFailure('Failed to watch album songs', e)));
+      return Stream.value(
+          Left(DatabaseFailure('Failed to watch album songs', e)));
     }
   }
 
@@ -469,8 +567,10 @@ class MusicRepository implements IMusicRepository {
                 t.source.equals(SongSource.local) &
                 t.path.like('ytmusic://%').not())
             ..orderBy([
-              (t) => OrderingTerm(expression: t.discNumber, mode: OrderingMode.asc),
-              (t) => OrderingTerm(expression: t.trackNumber, mode: OrderingMode.asc),
+              (t) => OrderingTerm(
+                  expression: t.discNumber, mode: OrderingMode.asc),
+              (t) => OrderingTerm(
+                  expression: t.trackNumber, mode: OrderingMode.asc),
             ]))
           .get();
       return Right(songs);
@@ -488,7 +588,8 @@ class MusicRepository implements IMusicRepository {
             ..orderBy([(t) => OrderingTerm(expression: t.name)]))
           .watch()
           .map((artists) => Right<AppFailure, List<ArtistsTableData>>(artists))
-          .handleError((e) => Left<AppFailure, List<ArtistsTableData>>(DatabaseFailure('Failed to watch artists', e)));
+          .handleError((e) => Left<AppFailure, List<ArtistsTableData>>(
+              DatabaseFailure('Failed to watch artists', e)));
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch artists', e)));
     }
@@ -505,9 +606,11 @@ class MusicRepository implements IMusicRepository {
                 t.path.like('ytmusic://%').not()))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(DatabaseFailure('Failed to watch artist songs', e)));
+          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+              DatabaseFailure('Failed to watch artist songs', e)));
     } catch (e) {
-      return Stream.value(Left(DatabaseFailure('Failed to watch artist songs', e)));
+      return Stream.value(
+          Left(DatabaseFailure('Failed to watch artist songs', e)));
     }
   }
 
@@ -543,12 +646,15 @@ class MusicRepository implements IMusicRepository {
   @override
   Stream<Result<List<AlbumsTableData>>> watchArtistAlbums(int artistId) {
     try {
-      return (_db.select(_db.albumsTable)..where((t) => t.artistId.equals(artistId)))
+      return (_db.select(_db.albumsTable)
+            ..where((t) => t.artistId.equals(artistId)))
           .watch()
           .map((albums) => Right<AppFailure, List<AlbumsTableData>>(albums))
-          .handleError((e) => Left<AppFailure, List<AlbumsTableData>>(DatabaseFailure('Failed to watch artist albums', e)));
+          .handleError((e) => Left<AppFailure, List<AlbumsTableData>>(
+              DatabaseFailure('Failed to watch artist albums', e)));
     } catch (e) {
-      return Stream.value(Left(DatabaseFailure('Failed to watch artist albums', e)));
+      return Stream.value(
+          Left(DatabaseFailure('Failed to watch artist albums', e)));
     }
   }
 
@@ -556,25 +662,30 @@ class MusicRepository implements IMusicRepository {
   @override
   Stream<Result<List<PlaylistsTableData>>> watchPlaylists() {
     try {
-      return (_db.select(_db.playlistsTable)..orderBy([(t) => OrderingTerm(expression: t.name)]))
+      return (_db.select(_db.playlistsTable)
+            ..orderBy([(t) => OrderingTerm(expression: t.name)]))
           .watch()
-          .map((playlists) => Right<AppFailure, List<PlaylistsTableData>>(playlists))
-          .handleError((e) => Left<AppFailure, List<PlaylistsTableData>>(DatabaseFailure('Failed to watch playlists', e)));
+          .map((playlists) =>
+              Right<AppFailure, List<PlaylistsTableData>>(playlists))
+          .handleError((e) => Left<AppFailure, List<PlaylistsTableData>>(
+              DatabaseFailure('Failed to watch playlists', e)));
     } catch (e) {
-      return Stream.value(Left(DatabaseFailure('Failed to watch playlists', e)));
+      return Stream.value(
+          Left(DatabaseFailure('Failed to watch playlists', e)));
     }
   }
 
   @override
-  Future<Result<int>> createPlaylist(String name, {bool isSmart = false, String? smartCriteria}) async {
+  Future<Result<int>> createPlaylist(String name,
+      {bool isSmart = false, String? smartCriteria}) async {
     try {
       final id = await _db.into(_db.playlistsTable).insert(
-        PlaylistsTableCompanion.insert(
-          name: name,
-          isSmart: Value(isSmart),
-          smartCriteria: Value(smartCriteria),
-        ),
-      );
+            PlaylistsTableCompanion.insert(
+              name: name,
+              isSmart: Value(isSmart),
+              smartCriteria: Value(smartCriteria),
+            ),
+          );
       return Right(id);
     } catch (e) {
       return Left(DatabaseFailure('Failed to create playlist', e));
@@ -584,7 +695,9 @@ class MusicRepository implements IMusicRepository {
   @override
   Future<Result<void>> renamePlaylist(int playlistId, String newName) async {
     try {
-      await (_db.update(_db.playlistsTable)..where((t) => t.id.equals(playlistId))).write(
+      await (_db.update(_db.playlistsTable)
+            ..where((t) => t.id.equals(playlistId)))
+          .write(
         PlaylistsTableCompanion(
           name: Value(newName),
           updatedAt: Value(DateTime.now()),
@@ -597,9 +710,12 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
-  Future<Result<void>> updateSmartPlaylist(int playlistId, String name, String smartCriteria) async {
+  Future<Result<void>> updateSmartPlaylist(
+      int playlistId, String name, String smartCriteria) async {
     try {
-      await (_db.update(_db.playlistsTable)..where((t) => t.id.equals(playlistId))).write(
+      await (_db.update(_db.playlistsTable)
+            ..where((t) => t.id.equals(playlistId)))
+          .write(
         PlaylistsTableCompanion(
           name: Value(name),
           smartCriteria: Value(smartCriteria),
@@ -615,7 +731,9 @@ class MusicRepository implements IMusicRepository {
   @override
   Future<Result<void>> deletePlaylist(int playlistId) async {
     try {
-      await (_db.delete(_db.playlistsTable)..where((t) => t.id.equals(playlistId))).go();
+      await (_db.delete(_db.playlistsTable)
+            ..where((t) => t.id.equals(playlistId)))
+          .go();
       return const Right(null);
     } catch (e) {
       return Left(DatabaseFailure('Failed to delete playlist', e));
@@ -625,7 +743,8 @@ class MusicRepository implements IMusicRepository {
   @override
   Future<Result<List<PlaylistsTableData>>> getPlaylists() async {
     try {
-      final playlists = await (_db.select(_db.playlistsTable)..orderBy([(t) => OrderingTerm(expression: t.name)]))
+      final playlists = await (_db.select(_db.playlistsTable)
+            ..orderBy([(t) => OrderingTerm(expression: t.name)]))
           .get();
       return Right(playlists);
     } catch (e) {
@@ -637,17 +756,22 @@ class MusicRepository implements IMusicRepository {
   Stream<Result<List<SongsTableData>>> watchPlaylistSongs(int playlistId) {
     try {
       final query = _db.select(_db.playlistEntriesTable).join([
-        innerJoin(_db.songsTable, _db.songsTable.id.equalsExp(_db.playlistEntriesTable.songId)),
+        innerJoin(_db.songsTable,
+            _db.songsTable.id.equalsExp(_db.playlistEntriesTable.songId)),
       ])
         ..where(_db.playlistEntriesTable.playlistId.equals(playlistId))
-        ..orderBy([OrderingTerm(expression: _db.playlistEntriesTable.orderIndex)]);
+        ..orderBy(
+            [OrderingTerm(expression: _db.playlistEntriesTable.orderIndex)]);
 
       return query
           .watch()
-          .map((rows) => Right<AppFailure, List<SongsTableData>>(rows.map((row) => row.readTable(_db.songsTable)).toList()))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(DatabaseFailure('Failed to watch playlist songs', e)));
+          .map((rows) => Right<AppFailure, List<SongsTableData>>(
+              rows.map((row) => row.readTable(_db.songsTable)).toList()))
+          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+              DatabaseFailure('Failed to watch playlist songs', e)));
     } catch (e) {
-      return Stream.value(Left(DatabaseFailure('Failed to watch playlist songs', e)));
+      return Stream.value(
+          Left(DatabaseFailure('Failed to watch playlist songs', e)));
     }
   }
 
@@ -655,10 +779,12 @@ class MusicRepository implements IMusicRepository {
   Future<Result<List<SongsTableData>>> getPlaylistSongs(int playlistId) async {
     try {
       final query = _db.select(_db.playlistEntriesTable).join([
-        innerJoin(_db.songsTable, _db.songsTable.id.equalsExp(_db.playlistEntriesTable.songId)),
+        innerJoin(_db.songsTable,
+            _db.songsTable.id.equalsExp(_db.playlistEntriesTable.songId)),
       ])
         ..where(_db.playlistEntriesTable.playlistId.equals(playlistId))
-        ..orderBy([OrderingTerm(expression: _db.playlistEntriesTable.orderIndex)]);
+        ..orderBy(
+            [OrderingTerm(expression: _db.playlistEntriesTable.orderIndex)]);
 
       final rows = await query.get();
       final songs = rows.map((row) => row.readTable(_db.songsTable)).toList();
@@ -672,7 +798,8 @@ class MusicRepository implements IMusicRepository {
   Future<Result<void>> addSongToPlaylist(int playlistId, int songId) async {
     try {
       final existing = await (_db.select(_db.playlistEntriesTable)
-            ..where((t) => t.playlistId.equals(playlistId) & t.songId.equals(songId)))
+            ..where((t) =>
+                t.playlistId.equals(playlistId) & t.songId.equals(songId)))
           .getSingleOrNull();
       if (existing != null) {
         return const Right(null); // Already present, avoid duplication
@@ -682,15 +809,16 @@ class MusicRepository implements IMusicRepository {
       final query = _db.selectOnly(_db.playlistEntriesTable)
         ..where(_db.playlistEntriesTable.playlistId.equals(playlistId))
         ..addColumns([countExp]);
-      final count = await query.map((row) => row.read(countExp)).getSingle() ?? 0;
+      final count =
+          await query.map((row) => row.read(countExp)).getSingle() ?? 0;
 
       await _db.into(_db.playlistEntriesTable).insert(
-        PlaylistEntriesTableCompanion.insert(
-          playlistId: playlistId,
-          songId: songId,
-          orderIndex: count,
-        ),
-      );
+            PlaylistEntriesTableCompanion.insert(
+              playlistId: playlistId,
+              songId: songId,
+              orderIndex: count,
+            ),
+          );
       return const Right(null);
     } catch (e) {
       return Left(DatabaseFailure('Failed to add song to playlist', e));
@@ -698,7 +826,8 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
-  Future<Result<void>> addSongsToPlaylist(int playlistId, List<int> songIds) async {
+  Future<Result<void>> addSongsToPlaylist(
+      int playlistId, List<int> songIds) async {
     try {
       final existingRows = await (_db.select(_db.playlistEntriesTable)
             ..where((t) => t.playlistId.equals(playlistId)))
@@ -713,12 +842,12 @@ class MusicRepository implements IMusicRepository {
           if (!existingSongIds.contains(songId)) {
             existingSongIds.add(songId);
             await _db.into(_db.playlistEntriesTable).insert(
-              PlaylistEntriesTableCompanion.insert(
-                playlistId: playlistId,
-                songId: songId,
-                orderIndex: nextOrderIndex++,
-              ),
-            );
+                  PlaylistEntriesTableCompanion.insert(
+                    playlistId: playlistId,
+                    songId: songId,
+                    orderIndex: nextOrderIndex++,
+                  ),
+                );
           }
         }
       });
@@ -729,10 +858,12 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
-  Future<Result<void>> removeSongFromPlaylist(int playlistId, int songId) async {
+  Future<Result<void>> removeSongFromPlaylist(
+      int playlistId, int songId) async {
     try {
       await (_db.delete(_db.playlistEntriesTable)
-            ..where((t) => t.playlistId.equals(playlistId) & t.songId.equals(songId)))
+            ..where((t) =>
+                t.playlistId.equals(playlistId) & t.songId.equals(songId)))
           .go();
       return const Right(null);
     } catch (e) {
@@ -741,12 +872,15 @@ class MusicRepository implements IMusicRepository {
   }
 
   @override
-  Future<Result<void>> reorderPlaylistSongs(int playlistId, List<int> orderedSongIds) async {
+  Future<Result<void>> reorderPlaylistSongs(
+      int playlistId, List<int> orderedSongIds) async {
     try {
       await _db.transaction(() async {
         for (int i = 0; i < orderedSongIds.length; i++) {
           await (_db.update(_db.playlistEntriesTable)
-                ..where((t) => t.playlistId.equals(playlistId) & t.songId.equals(orderedSongIds[i])))
+                ..where((t) =>
+                    t.playlistId.equals(playlistId) &
+                    t.songId.equals(orderedSongIds[i])))
               .write(PlaylistEntriesTableCompanion(orderIndex: Value(i)));
         }
       });
@@ -763,10 +897,13 @@ class MusicRepository implements IMusicRepository {
       return _db
           .select(_db.excludedFoldersTable)
           .watch()
-          .map((folders) => Right<AppFailure, List<ExcludedFoldersTableData>>(folders))
-          .handleError((e) => Left<AppFailure, List<ExcludedFoldersTableData>>(DatabaseFailure('Failed to watch excluded folders', e)));
+          .map((folders) =>
+              Right<AppFailure, List<ExcludedFoldersTableData>>(folders))
+          .handleError((e) => Left<AppFailure, List<ExcludedFoldersTableData>>(
+              DatabaseFailure('Failed to watch excluded folders', e)));
     } catch (e) {
-      return Stream.value(Left(DatabaseFailure('Failed to watch excluded folders', e)));
+      return Stream.value(
+          Left(DatabaseFailure('Failed to watch excluded folders', e)));
     }
   }
 
@@ -787,11 +924,13 @@ class MusicRepository implements IMusicRepository {
             ..where((t) => t.folderPath.equals(folderPath)))
           .getSingleOrNull();
       if (existing != null) {
-        await (_db.delete(_db.excludedFoldersTable)..where((t) => t.id.equals(existing.id))).go();
+        await (_db.delete(_db.excludedFoldersTable)
+              ..where((t) => t.id.equals(existing.id)))
+            .go();
       } else {
         await _db.into(_db.excludedFoldersTable).insert(
-          ExcludedFoldersTableCompanion.insert(folderPath: folderPath),
-        );
+              ExcludedFoldersTableCompanion.insert(folderPath: folderPath),
+            );
       }
       return const Right(null);
     } catch (e) {
@@ -801,7 +940,8 @@ class MusicRepository implements IMusicRepository {
 
   // --- QUEUE PERSISTENCE ---
   @override
-  Future<Result<void>> saveQueue(List<int> songIds, int currentIndex, int positionMs) async {
+  Future<Result<void>> saveQueue(
+      List<int> songIds, int currentIndex, int positionMs) async {
     try {
       await _db.transaction(() async {
         await _db.delete(_db.queueItemsTable).go();
@@ -828,7 +968,9 @@ class MusicRepository implements IMusicRepository {
   @override
   Future<Result<List<QueueItemsTableData>>> getSavedQueue() async {
     try {
-      final items = await (_db.select(_db.queueItemsTable)..orderBy([(t) => OrderingTerm(expression: t.orderIndex)])).get();
+      final items = await (_db.select(_db.queueItemsTable)
+            ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+          .get();
       return Right(items);
     } catch (e) {
       return Left(DatabaseFailure('Failed to get saved queue', e));
@@ -878,7 +1020,9 @@ class MusicRepository implements IMusicRepository {
       const chunkSize = 16;
 
       for (var i = 0; i < unscannedSongs.length; i += chunkSize) {
-        final end = (i + chunkSize < unscannedSongs.length) ? i + chunkSize : unscannedSongs.length;
+        final end = (i + chunkSize < unscannedSongs.length)
+            ? i + chunkSize
+            : unscannedSongs.length;
         final chunk = unscannedSongs.sublist(i, end);
         await Future.wait(chunk.map((song) async {
           if (song.path.isEmpty) {
@@ -909,7 +1053,8 @@ class MusicRepository implements IMusicRepository {
         // Ensure newly/currently scanned songs and reappeared songs are marked active (not missing)
         final activeIds = {...scannedSongIds, ...reappearedIds};
         if (activeIds.isNotEmpty) {
-          await (_db.update(_db.songsTable)..where((t) => t.id.isIn(activeIds))).write(
+          await (_db.update(_db.songsTable)..where((t) => t.id.isIn(activeIds)))
+              .write(
             const SongsTableCompanion(isMissing: Value(false)),
           );
         }
@@ -969,7 +1114,8 @@ class MusicRepository implements IMusicRepository {
   Future<Result<int>> hardDeleteMissingSongs() async {
     try {
       final deletedCount = await (_db.delete(_db.songsTable)
-            ..where((t) => t.isMissing.equals(true) & t.source.equals(SongSource.local)))
+            ..where((t) =>
+                t.isMissing.equals(true) & t.source.equals(SongSource.local)))
           .go();
 
       // Reconcile and cleanup orphaned albums and artists in single SQL queries
@@ -1002,12 +1148,17 @@ class MusicRepository implements IMusicRepository {
     try {
       int? survivingId;
       // Step 1: Read + Compute outside transaction
-      final oldRow = await (_db.select(_db.songsTable)..where((t) => t.id.equals(oldId))).getSingleOrNull();
+      final oldRow = await (_db.select(_db.songsTable)
+            ..where((t) => t.id.equals(oldId)))
+          .getSingleOrNull();
 
       // Find the row the scanner minted for the downloaded file.
       var newRow = await (_db.select(_db.songsTable)
             ..where((t) => t.path.equals(newPath))
-            ..orderBy([(t) => OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)])
+            ..orderBy([
+              (t) =>
+                  OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)
+            ])
             ..limit(1))
           .getSingleOrNull();
 
@@ -1019,13 +1170,17 @@ class MusicRepository implements IMusicRepository {
                   t.source.equals(SongSource.local) &
                   t.title.lower().equals(matchMetadata.title.toLowerCase()) &
                   t.artist.lower().equals(matchMetadata.artist.toLowerCase()) &
-                  t.durationMs.isBetweenValues(matchMetadata.durationMs - 5000, matchMetadata.durationMs + 5000))
-              ..orderBy([(t) => OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)])
+                  t.durationMs.isBetweenValues(matchMetadata.durationMs - 5000,
+                      matchMetadata.durationMs + 5000))
+              ..orderBy([
+                (t) => OrderingTerm(
+                    expression: t.dateAdded, mode: OrderingMode.desc)
+              ])
               ..limit(1))
             .getSingleOrNull();
 
-        // Verify the file actually exists before accepting the metadata match (R3-02)
-        if (newRow != null && !await File(newRow.path).exists()) {
+        // Verify the matched row is not flagged as missing (R3-02)
+        if (newRow != null && newRow.isMissing) {
           newRow = null;
         }
       }
@@ -1038,35 +1193,40 @@ class MusicRepository implements IMusicRepository {
           if (fileExists) {
             final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
             if (oldRow != null) {
-              await (_db.update(_db.songsTable)..where((t) => t.id.equals(oldId))).write(
+              await (_db.update(_db.songsTable)
+                    ..where((t) => t.id.equals(oldId)))
+                  .write(
                 SongsTableCompanion(
                   path: Value(newPath),
                   source: const Value(SongSource.local),
                   isMissing: const Value(false),
                   isDownloaded: const Value(true),
-                  dateAdded: Value((oldRow.dateAdded ?? 0) > 0 ? oldRow.dateAdded! : nowSec),
+                  dateAdded: Value(
+                      (oldRow.dateAdded ?? 0) > 0 ? oldRow.dateAdded! : nowSec),
                   pendingDownloadPath: const Value(null),
                 ),
               );
               survivingId = oldId;
             } else if (fallbackSong != null) {
               await _db.into(_db.songsTable).insert(
-                SongsTableCompanion(
-                  id: Value(oldId),
-                  title: Value(fallbackSong.title),
-                  artist: Value(fallbackSong.artist),
-                  album: Value(fallbackSong.album.isNotEmpty ? fallbackSong.album : 'YouTube Music'),
-                  durationMs: Value(fallbackSong.durationMs),
-                  path: Value(newPath),
-                  source: const Value(SongSource.local),
-                  isMissing: const Value(false),
-                  isDownloaded: const Value(true),
-                  remoteId: Value(fallbackSong.remoteId),
-                  remoteArtworkUrl: Value(fallbackSong.remoteArtworkUrl),
-                  dateAdded: Value(nowSec),
-                ),
-                mode: InsertMode.insertOrReplace,
-              );
+                    SongsTableCompanion(
+                      id: Value(oldId),
+                      title: Value(fallbackSong.title),
+                      artist: Value(fallbackSong.artist),
+                      album: Value(fallbackSong.album.isNotEmpty
+                          ? fallbackSong.album
+                          : 'YouTube Music'),
+                      durationMs: Value(fallbackSong.durationMs),
+                      path: Value(newPath),
+                      source: const Value(SongSource.local),
+                      isMissing: const Value(false),
+                      isDownloaded: const Value(true),
+                      remoteId: Value(fallbackSong.remoteId),
+                      remoteArtworkUrl: Value(fallbackSong.remoteArtworkUrl),
+                      dateAdded: Value(nowSec),
+                    ),
+                    mode: InsertMode.insertOrReplace,
+                  );
               survivingId = oldId;
             }
           }
@@ -1079,29 +1239,39 @@ class MusicRepository implements IMusicRepository {
         if (oldRow == null || oldRow.id == targetId) return;
 
         try {
-          final duplicatePlaylists = await (_db.selectOnly(_db.playlistEntriesTable, distinct: true)
-                ..addColumns([_db.playlistEntriesTable.playlistId])
-                ..where(_db.playlistEntriesTable.songId.equals(targetId)))
-              .map((row) => row.read(_db.playlistEntriesTable.playlistId)!)
-              .get();
+          final duplicatePlaylists =
+              await (_db.selectOnly(_db.playlistEntriesTable, distinct: true)
+                    ..addColumns([_db.playlistEntriesTable.playlistId])
+                    ..where(_db.playlistEntriesTable.songId.equals(targetId)))
+                  .map((row) => row.read(_db.playlistEntriesTable.playlistId)!)
+                  .get();
 
           if (duplicatePlaylists.isNotEmpty) {
             await (_db.delete(_db.playlistEntriesTable)
-                  ..where((t) => t.songId.equals(oldId) & t.playlistId.isIn(duplicatePlaylists)))
+                  ..where((t) =>
+                      t.songId.equals(oldId) &
+                      t.playlistId.isIn(duplicatePlaylists)))
                 .go();
           }
-          await (_db.update(_db.playlistEntriesTable)..where((t) => t.songId.equals(oldId)))
+          await (_db.update(_db.playlistEntriesTable)
+                ..where((t) => t.songId.equals(oldId)))
               .write(PlaylistEntriesTableCompanion(songId: Value(targetId)));
-          await (_db.update(_db.queueItemsTable)..where((t) => t.songId.equals(oldId)))
+          await (_db.update(_db.queueItemsTable)
+                ..where((t) => t.songId.equals(oldId)))
               .write(QueueItemsTableCompanion(songId: Value(targetId)));
-          await (_db.update(_db.playHistoryTable)..where((t) => t.songId.equals(oldId)))
+          await (_db.update(_db.playHistoryTable)
+                ..where((t) => t.songId.equals(oldId)))
               .write(PlayHistoryTableCompanion(songId: Value(targetId)));
 
           // Delete old row
-          await (_db.delete(_db.songsTable)..where((t) => t.id.equals(oldId))).go();
+          await (_db.delete(_db.songsTable)..where((t) => t.id.equals(oldId)))
+              .go();
         } catch (e, st) {
-          ErrorLogger.log('Constraint exception in reconcileDownloadedSong; marking row as missing',
-              error: e, stackTrace: st, category: 'MusicRepository');
+          ErrorLogger.log(
+              'Constraint exception in reconcileDownloadedSong; marking row as missing',
+              error: e,
+              stackTrace: st,
+              category: 'MusicRepository');
           try {
             await (_db.update(_db.songsTable)..where((t) => t.id.equals(oldId)))
                 .write(const SongsTableCompanion(isMissing: Value(true)));
@@ -1111,26 +1281,36 @@ class MusicRepository implements IMusicRepository {
         // Merge stats (don't clobber — the scanned row may predate the download).
         final int? mergedLastPlayed;
         if (oldRow.lastPlayed != null && newRow.lastPlayed != null) {
-          mergedLastPlayed = oldRow.lastPlayed! > newRow.lastPlayed! ? oldRow.lastPlayed : newRow.lastPlayed;
+          mergedLastPlayed = oldRow.lastPlayed! > newRow.lastPlayed!
+              ? oldRow.lastPlayed
+              : newRow.lastPlayed;
         } else {
           mergedLastPlayed = oldRow.lastPlayed ?? newRow.lastPlayed;
         }
-        final keepOldPosition = (oldRow.lastPlayed ?? 0) > (newRow.lastPlayed ?? 0);
+        final keepOldPosition =
+            (oldRow.lastPlayed ?? 0) > (newRow.lastPlayed ?? 0);
 
-        final String effectiveTitle = (oldRow.title.isNotEmpty && !oldRow.title.toLowerCase().startsWith('ytdl_'))
+        final String effectiveTitle = (oldRow.title.isNotEmpty &&
+                !oldRow.title.toLowerCase().startsWith('ytdl_'))
             ? oldRow.title
             : newRow.title;
-        final String effectiveArtist = (oldRow.artist.isNotEmpty && oldRow.artist != '<unknown>' && oldRow.artist != 'Unknown')
+        final String effectiveArtist = (oldRow.artist.isNotEmpty &&
+                oldRow.artist != '<unknown>' &&
+                oldRow.artist != 'Unknown')
             ? oldRow.artist
             : newRow.artist;
-        final String effectiveAlbum = (oldRow.album.isNotEmpty && oldRow.album != '<unknown>' && oldRow.album != 'Unknown')
+        final String effectiveAlbum = (oldRow.album.isNotEmpty &&
+                oldRow.album != '<unknown>' &&
+                oldRow.album != 'Unknown')
             ? oldRow.album
             : newRow.album;
-        final String? effectiveRemoteArt = (oldRow.remoteArtworkUrl != null && oldRow.remoteArtworkUrl!.isNotEmpty)
+        final String? effectiveRemoteArt = (oldRow.remoteArtworkUrl != null &&
+                oldRow.remoteArtworkUrl!.isNotEmpty)
             ? oldRow.remoteArtworkUrl
             : newRow.remoteArtworkUrl;
 
-        await (_db.update(_db.songsTable)..where((t) => t.id.equals(targetId))).write(
+        await (_db.update(_db.songsTable)..where((t) => t.id.equals(targetId)))
+            .write(
           SongsTableCompanion(
             title: Value(effectiveTitle),
             artist: Value(effectiveArtist),
@@ -1139,7 +1319,9 @@ class MusicRepository implements IMusicRepository {
             isFavorite: Value(oldRow.isFavorite || newRow.isFavorite),
             playCount: Value(oldRow.playCount + newRow.playCount),
             lastPlayed: Value(mergedLastPlayed),
-            lastPositionMs: Value(keepOldPosition ? oldRow.lastPositionMs : newRow.lastPositionMs),
+            lastPositionMs: Value(keepOldPosition
+                ? oldRow.lastPositionMs
+                : newRow.lastPositionMs),
             // Carry the video id and online remoteArtworkUrl
             remoteId: Value(oldRow.remoteId ?? newRow.remoteId),
             remoteArtworkUrl: Value(effectiveRemoteArt),
@@ -1167,10 +1349,13 @@ class MusicRepository implements IMusicRepository {
   }) async {
     try {
       final existing = await (_db.select(_db.songsTable)
-            ..where((t) => t.path.equals(path) & t.source.equals(SongSource.local)))
+            ..where(
+                (t) => t.path.equals(path) & t.source.equals(SongSource.local)))
           .getSingleOrNull();
       if (existing != null) {
-        await (_db.update(_db.songsTable)..where((t) => t.id.equals(existing.id))).write(
+        await (_db.update(_db.songsTable)
+              ..where((t) => t.id.equals(existing.id)))
+            .write(
           SongsTableCompanion(
             title: Value(title),
             artist: Value(artist),
@@ -1197,7 +1382,8 @@ class MusicRepository implements IMusicRepository {
     double? loudnessRange,
   }) async {
     try {
-      await (_db.update(_db.songsTable)..where((t) => t.id.equals(songId))).write(
+      await (_db.update(_db.songsTable)..where((t) => t.id.equals(songId)))
+          .write(
         SongsTableCompanion(
           sampleRate: Value(sampleRate),
           bitDepth: Value(bitDepth),
@@ -1228,13 +1414,17 @@ class MusicRepository implements IMusicRepository {
         ..orderBy([OrderingTerm(expression: _db.songsTable.genre)]);
 
       return query.watch().map((rows) {
-        final list = rows.map((row) {
-          final genreName = row.read(_db.songsTable.genre) ?? '';
-          final count = row.read(countExp) ?? 0;
-          return GenreItem(name: genreName, songCount: count);
-        }).where((g) => g.name.isNotEmpty).toList();
+        final list = rows
+            .map((row) {
+              final genreName = row.read(_db.songsTable.genre) ?? '';
+              final count = row.read(countExp) ?? 0;
+              return GenreItem(name: genreName, songCount: count);
+            })
+            .where((g) => g.name.isNotEmpty)
+            .toList();
         return Right<AppFailure, List<GenreItem>>(list);
-      }).handleError((e) => Left<AppFailure, List<GenreItem>>(DatabaseFailure('Failed to watch genres', e)));
+      }).handleError((e) => Left<AppFailure, List<GenreItem>>(
+          DatabaseFailure('Failed to watch genres', e)));
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch genres', e)));
     }
@@ -1255,11 +1445,14 @@ class MusicRepository implements IMusicRepository {
         ..orderBy([OrderingTerm(expression: _db.songsTable.genre)]);
 
       final rows = await query.get();
-      final list = rows.map((row) {
-        final genreName = row.read(_db.songsTable.genre) ?? '';
-        final count = row.read(countExp) ?? 0;
-        return GenreItem(name: genreName, songCount: count);
-      }).where((g) => g.name.isNotEmpty).toList();
+      final list = rows
+          .map((row) {
+            final genreName = row.read(_db.songsTable.genre) ?? '';
+            final count = row.read(countExp) ?? 0;
+            return GenreItem(name: genreName, songCount: count);
+          })
+          .where((g) => g.name.isNotEmpty)
+          .toList();
       return Right(list);
     } catch (e) {
       return Left(DatabaseFailure('Failed to get genres', e));
@@ -1278,9 +1471,11 @@ class MusicRepository implements IMusicRepository {
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(DatabaseFailure('Failed to watch genre songs', e)));
+          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+              DatabaseFailure('Failed to watch genre songs', e)));
     } catch (e) {
-      return Stream.value(Left(DatabaseFailure('Failed to watch genre songs', e)));
+      return Stream.value(
+          Left(DatabaseFailure('Failed to watch genre songs', e)));
     }
   }
 
@@ -1314,16 +1509,22 @@ class MusicRepository implements IMusicRepository {
             _db.songsTable.source.equals(SongSource.local) &
             _db.songsTable.path.like('ytmusic://%').not())
         ..groupBy([_db.songsTable.year])
-        ..orderBy([OrderingTerm(expression: _db.songsTable.year, mode: OrderingMode.desc)]);
+        ..orderBy([
+          OrderingTerm(expression: _db.songsTable.year, mode: OrderingMode.desc)
+        ]);
 
       return query.watch().map((rows) {
-        final list = rows.map((row) {
-          final yr = row.read(_db.songsTable.year) ?? 0;
-          final count = row.read(countExp) ?? 0;
-          return YearItem(year: yr, songCount: count);
-        }).where((y) => y.year > 0).toList();
+        final list = rows
+            .map((row) {
+              final yr = row.read(_db.songsTable.year) ?? 0;
+              final count = row.read(countExp) ?? 0;
+              return YearItem(year: yr, songCount: count);
+            })
+            .where((y) => y.year > 0)
+            .toList();
         return Right<AppFailure, List<YearItem>>(list);
-      }).handleError((e) => Left<AppFailure, List<YearItem>>(DatabaseFailure('Failed to watch years', e)));
+      }).handleError((e) => Left<AppFailure, List<YearItem>>(
+          DatabaseFailure('Failed to watch years', e)));
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch years', e)));
     }
@@ -1341,10 +1542,11 @@ class MusicRepository implements IMusicRepository {
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(DatabaseFailure('Failed to watch year songs', e)));
+          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+              DatabaseFailure('Failed to watch year songs', e)));
     } catch (e) {
-      return Stream.value(Left(DatabaseFailure('Failed to watch year songs', e)));
+      return Stream.value(
+          Left(DatabaseFailure('Failed to watch year songs', e)));
     }
   }
 }
-

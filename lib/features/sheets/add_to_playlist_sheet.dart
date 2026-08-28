@@ -17,7 +17,8 @@ class AddToPlaylistSheet extends StatelessWidget {
     this.playlistUseCases,
   });
 
-  PlaylistUseCases get _useCases => playlistUseCases ?? getIt<PlaylistUseCases>();
+  PlaylistUseCases get _useCases =>
+      playlistUseCases ?? getIt<PlaylistUseCases>();
 
   void _showNewPlaylistDialog(BuildContext context) {
     final p = context.palette;
@@ -26,7 +27,9 @@ class AddToPlaylistSheet extends StatelessWidget {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: p.surface,
-        title: Text(context.l10n.createPlaylist, style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w800)),
+        title: Text(context.l10n.createPlaylist,
+            style:
+                TextStyle(color: p.textPrimary, fontWeight: FontWeight.w800)),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -40,7 +43,8 @@ class AddToPlaylistSheet extends StatelessWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(context.l10n.cancel, style: TextStyle(color: p.textSecondary)),
+            child: Text(context.l10n.cancel,
+                style: TextStyle(color: p.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -86,7 +90,8 @@ class AddToPlaylistSheet extends StatelessWidget {
       child: Align(
         alignment: Alignment.bottomCenter,
         child: GestureDetector(
-          onTap: () {}, // Prevent taps on the sheet from bubbling to the dismiss detector
+          onTap:
+              () {}, // Prevent taps on the sheet from bubbling to the dismiss detector
           child: ConstrainedBox(
             constraints: BoxConstraints(
               maxWidth: Adaptive.maxSheetWidth,
@@ -94,7 +99,8 @@ class AddToPlaylistSheet extends StatelessWidget {
             ),
             child: Material(
               color: p.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(28)),
               clipBehavior: Clip.antiAlias,
               child: SafeArea(
                 top: false,
@@ -121,7 +127,10 @@ class AddToPlaylistSheet extends StatelessWidget {
                         children: [
                           Text(
                             context.l10n.addToPlaylist,
-                            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(
                                   fontWeight: FontWeight.w800,
                                   color: p.textPrimary,
                                 ),
@@ -136,10 +145,13 @@ class AddToPlaylistSheet extends StatelessWidget {
                       StreamBuilder(
                         stream: _useCases.watchPlaylists(),
                         builder: (context, snapshot) {
-                          final playlists = snapshot.data?.fold((l) => <PlaylistsTableData>[], (r) => r) ?? [];
+                          final playlists = snapshot.data?.fold(
+                                  (l) => <PlaylistsTableData>[], (r) => r) ??
+                              [];
                           if (playlists.isEmpty) {
                             return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 24.0),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 24.0),
                               child: Center(
                                 child: Column(
                                   children: [
@@ -149,7 +161,8 @@ class AddToPlaylistSheet extends StatelessWidget {
                                     ),
                                     const SizedBox(height: 12),
                                     ElevatedButton.icon(
-                                      onPressed: () => _showNewPlaylistDialog(context),
+                                      onPressed: () =>
+                                          _showNewPlaylistDialog(context),
                                       icon: const Icon(Icons.add_rounded),
                                       label: Text(context.l10n.createPlaylist),
                                     ),
@@ -174,16 +187,25 @@ class AddToPlaylistSheet extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(10),
                                     border: Border.all(color: p.hairline),
                                   ),
-                                  child: Icon(Icons.queue_music_rounded, color: p.accent, size: 20),
+                                  child: Icon(Icons.queue_music_rounded,
+                                      color: p.accent, size: 20),
                                 ),
-                                title: Text(playlist.name, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: p.textPrimary)),
-                                trailing: Icon(Icons.add_circle_outline_rounded, color: p.accent),
+                                title: Text(playlist.name,
+                                    style: TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 14,
+                                        color: p.textPrimary)),
+                                trailing: Icon(Icons.add_circle_outline_rounded,
+                                    color: p.accent),
                                 onTap: () async {
-                                  await _useCases.addSongToPlaylist(playlist.id, song.id);
+                                  await _useCases.addSongToPlaylist(
+                                      playlist.id, song.id);
                                   if (context.mounted) {
                                     Navigator.pop(context);
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('Added to ${playlist.name}')),
+                                      SnackBar(
+                                          content: Text(
+                                              'Added to ${playlist.name}')),
                                     );
                                   }
                                 },

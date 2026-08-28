@@ -31,7 +31,7 @@ abstract class AppColors {
   static const Color lightSurface = Color(0xFFFFFFFF);
   static const Color lightCard = Color(0xFFEBEFF6);
   static const Color lightTextPrimary = Color(0xFF141724);
-  static const Color lightTextSecondary = Color(0xFF67728A);
+  static const Color lightTextSecondary = Color(0xFF5F6A82);
   static const Color lightOutline = Color(0xFFD8DFEC);
   static const Color lightSecondary = Color(0xFF4B4FBE);
 
@@ -44,7 +44,13 @@ abstract class AppColors {
   static const Color amoledOutline = Color(0xFF222222);
 
   static const List<Color> customAccents = [
-    Color(0xFF9B9EF5), Color(0xFF40C4FF), Color(0xFF00E676), Color(0xFFFF9100),
-    Color(0xFFFF4081), Color(0xFFD500F9), Color(0xFFFFD600), Color(0xFF1DE9B6),
+    Color(0xFF9B9EF5),
+    Color(0xFF40C4FF),
+    Color(0xFF00E676),
+    Color(0xFFFF9100),
+    Color(0xFFFF4081),
+    Color(0xFFD500F9),
+    Color(0xFFFFD600),
+    Color(0xFF1DE9B6),
   ];
 }

@@ -18,13 +18,71 @@ class GenreHierarchyView extends StatelessWidget {
   const GenreHierarchyView({super.key, required this.genres});
 
   static const List<GenreCategory> _categories = [
-    GenreCategory('Rock & Metal', Icons.electric_bolt_rounded, ['rock', 'metal', 'grunge', 'punk', 'alternative', 'روك', 'ميتال']),
-    GenreCategory('Electronic & Dance', Icons.album_rounded, ['electronic', 'techno', 'house', 'edm', 'ambient', 'trance', 'synth', 'إلكترونك', 'هاوس', 'تكنو']),
-    GenreCategory('Hip-Hop & R&B', Icons.mic_external_on_rounded, ['hip hop', 'hip-hop', 'rap', 'r&b', 'trap', 'soul', 'راب', 'هيب هوب', 'تراب', 'مهرجانات']),
-    GenreCategory('Jazz & Blues', Icons.music_note_rounded, ['jazz', 'blues', 'swing', 'bebop', 'جاز', 'بلوز']),
-    GenreCategory('Classical & Instrumental', Icons.piano_rounded, ['classical', 'instrumental', 'soundtrack', 'orchestral', 'score', 'كلاسيك', 'موسيقى كلاسيكية', 'أوركسترا', 'موسيقى تصويرية']),
-    GenreCategory('Pop & Acoustic', Icons.star_rounded, ['pop', 'acoustic', 'indie', 'folk', 'vocal', 'بوب', 'شعبي', 'أكوستيك', 'فولك']),
-    GenreCategory('Arabic & Regional', Icons.queue_music_rounded, ['طرب', 'عربي', 'خليجي', 'مغربي', 'شامي', 'مصري', 'أندلسي', 'موشحات', 'arabic', 'tarab', 'khaleeji', 'oriental', 'middle eastern']),
+    GenreCategory('Rock & Metal', Icons.electric_bolt_rounded,
+        ['rock', 'metal', 'grunge', 'punk', 'alternative', 'روك', 'ميتال']),
+    GenreCategory('Electronic & Dance', Icons.album_rounded, [
+      'electronic',
+      'techno',
+      'house',
+      'edm',
+      'ambient',
+      'trance',
+      'synth',
+      'إلكترونك',
+      'هاوس',
+      'تكنو'
+    ]),
+    GenreCategory('Hip-Hop & R&B', Icons.mic_external_on_rounded, [
+      'hip hop',
+      'hip-hop',
+      'rap',
+      'r&b',
+      'trap',
+      'soul',
+      'راب',
+      'هيب هوب',
+      'تراب',
+      'مهرجانات'
+    ]),
+    GenreCategory('Jazz & Blues', Icons.music_note_rounded,
+        ['jazz', 'blues', 'swing', 'bebop', 'جاز', 'بلوز']),
+    GenreCategory('Classical & Instrumental', Icons.piano_rounded, [
+      'classical',
+      'instrumental',
+      'soundtrack',
+      'orchestral',
+      'score',
+      'كلاسيك',
+      'موسيقى كلاسيكية',
+      'أوركسترا',
+      'موسيقى تصويرية'
+    ]),
+    GenreCategory('Pop & Acoustic', Icons.star_rounded, [
+      'pop',
+      'acoustic',
+      'indie',
+      'folk',
+      'vocal',
+      'بوب',
+      'شعبي',
+      'أكوستيك',
+      'فولك'
+    ]),
+    GenreCategory('Arabic & Regional', Icons.queue_music_rounded, [
+      'طرب',
+      'عربي',
+      'خليجي',
+      'مغربي',
+      'شامي',
+      'مصري',
+      'أندلسي',
+      'موشحات',
+      'arabic',
+      'tarab',
+      'khaleeji',
+      'oriental',
+      'middle eastern'
+    ]),
   ];
 
   @override
@@ -44,7 +102,8 @@ class GenreHierarchyView extends StatelessWidget {
     );
   }
 
-  Widget _buildCategoryGroup(BuildContext context, GenreCategory cat, PulsrPalette p) {
+  Widget _buildCategoryGroup(
+      BuildContext context, GenreCategory cat, PulsrPalette p) {
     final matching = genres.where((g) {
       final name = g.name.toLowerCase();
       return cat.keywords.any((kw) => name.contains(kw));
@@ -91,12 +150,17 @@ class GenreHierarchyView extends StatelessWidget {
                 return ActionChip(
                   backgroundColor: p.surfaceContainer,
                   side: BorderSide(color: p.hairline),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   label: Text(
                     '${g.name} (${g.songCount})',
-                    style: TextStyle(fontSize: 12, color: p.textPrimary, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: p.textPrimary,
+                        fontWeight: FontWeight.w600),
                   ),
-                  onPressed: () => context.push('/genre/${Uri.encodeComponent(g.name)}'),
+                  onPressed: () =>
+                      context.push('/genre/${Uri.encodeComponent(g.name)}'),
                 );
               }).toList(),
             ),
@@ -109,7 +173,8 @@ class GenreHierarchyView extends StatelessWidget {
   Widget _buildUncategorizedGroup(BuildContext context, PulsrPalette p) {
     final uncategorized = genres.where((g) {
       final name = g.name.toLowerCase();
-      return !_categories.any((cat) => cat.keywords.any((kw) => name.contains(kw)));
+      return !_categories
+          .any((cat) => cat.keywords.any((kw) => name.contains(kw)));
     }).toList();
 
     if (uncategorized.isEmpty) return const SizedBox.shrink();
@@ -152,12 +217,17 @@ class GenreHierarchyView extends StatelessWidget {
                 return ActionChip(
                   backgroundColor: p.surfaceContainer,
                   side: BorderSide(color: p.hairline),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   label: Text(
                     '${g.name} (${g.songCount})',
-                    style: TextStyle(fontSize: 12, color: p.textPrimary, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: p.textPrimary,
+                        fontWeight: FontWeight.w600),
                   ),
-                  onPressed: () => context.push('/genre/${Uri.encodeComponent(g.name)}'),
+                  onPressed: () =>
+                      context.push('/genre/${Uri.encodeComponent(g.name)}'),
                 );
               }).toList(),
             ),

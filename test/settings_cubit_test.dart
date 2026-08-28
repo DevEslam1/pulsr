@@ -199,7 +199,9 @@ void main() {
           false);
     });
 
-    test('importProxiesFromText, selectProxyEntry, removeProxyEntry and sortProxiesByLatency work correctly', () async {
+    test(
+        'importProxiesFromText, selectProxyEntry, removeProxyEntry and sortProxiesByLatency work correctly',
+        () async {
       final cubit = SettingsCubit(scannerService: mockScannerService);
 
       const rawText = '''
@@ -208,7 +210,8 @@ void main() {
 198.105.121.200:6462:qmyizdto:n5fui7pyec1q
 ''';
 
-      final count = await cubit.importProxiesFromText(rawText, autoSelectFirst: true);
+      final count =
+          await cubit.importProxiesFromText(rawText, autoSelectFirst: true);
       expect(count, 3);
       expect(cubit.state.proxyList.length, 3);
       expect(cubit.state.proxyEnabled, true);
@@ -244,7 +247,9 @@ void main() {
       cubit.close();
     });
 
-    test('proxy list and active proxy settings persist across simulated app relaunch', () async {
+    test(
+        'proxy list and active proxy settings persist across simulated app relaunch',
+        () async {
       // 1. First app session: import proxies and select one
       final cubitSession1 = SettingsCubit(scannerService: mockScannerService);
       const rawText = '''

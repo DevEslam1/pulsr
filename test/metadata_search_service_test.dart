@@ -6,7 +6,9 @@ import 'package:pulsr/core/services/metadata_search_service.dart';
 
 void main() {
   group('MetadataSearchService Tests', () {
-    test('searchMetadata parses iTunes response and upgrades artwork resolution', () async {
+    test(
+        'searchMetadata parses iTunes response and upgrades artwork resolution',
+        () async {
       final mockClient = MockClient((request) async {
         if (request.url.host == 'itunes.apple.com') {
           final payload = {
@@ -19,7 +21,8 @@ void main() {
                 'primaryGenreName': 'Progressive Rock',
                 'releaseDate': '1979-11-30T08:00:00Z',
                 'trackNumber': 19,
-                'artworkUrl100': 'https://is1-ssl.mzstatic.com/image/thumb/100x100bb.jpg',
+                'artworkUrl100':
+                    'https://is1-ssl.mzstatic.com/image/thumb/100x100bb.jpg',
               }
             ]
           };
@@ -29,7 +32,8 @@ void main() {
       });
 
       final service = MetadataSearchService(mockClient);
-      final results = await service.searchMetadata(title: 'Comfortably Numb', artist: 'Pink Floyd');
+      final results = await service.searchMetadata(
+          title: 'Comfortably Numb', artist: 'Pink Floyd');
 
       expect(results.length, equals(1));
       final track = results.first;

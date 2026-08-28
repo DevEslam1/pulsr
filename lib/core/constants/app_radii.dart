@@ -10,12 +10,20 @@ abstract class AppRadii {
   static const double miniPlayer = 20.0;
   static const double dialog = 26.0;
 
-  static const BorderRadius tileRadius = BorderRadius.all(Radius.circular(tile));
-  static const BorderRadius cardRadius = BorderRadius.all(Radius.circular(card));
-  static const BorderRadius buttonRadius = BorderRadius.all(Radius.circular(button));
-  static const BorderRadius artworkRadius = BorderRadius.all(Radius.circular(artwork));
-  static const BorderRadius bottomSheetRadius = BorderRadius.vertical(top: Radius.circular(bottomSheet));
-  static const BorderRadius chipRadius = BorderRadius.all(Radius.circular(chip));
-  static const BorderRadius miniPlayerRadius = BorderRadius.all(Radius.circular(miniPlayer));
-  static const BorderRadius dialogRadius = BorderRadius.all(Radius.circular(dialog));
+  static const BorderRadius tileRadius =
+      BorderRadius.all(Radius.circular(tile));
+  static const BorderRadius cardRadius =
+      BorderRadius.all(Radius.circular(card));
+  static const BorderRadius buttonRadius =
+      BorderRadius.all(Radius.circular(button));
+  static const BorderRadius artworkRadius =
+      BorderRadius.all(Radius.circular(artwork));
+  static const BorderRadius bottomSheetRadius =
+      BorderRadius.vertical(top: Radius.circular(bottomSheet));
+  static const BorderRadius chipRadius =
+      BorderRadius.all(Radius.circular(chip));
+  static const BorderRadius miniPlayerRadius =
+      BorderRadius.all(Radius.circular(miniPlayer));
+  static const BorderRadius dialogRadius =
+      BorderRadius.all(Radius.circular(dialog));
 }

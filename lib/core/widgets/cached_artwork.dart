@@ -46,7 +46,9 @@ class ArtworkLruCache {
       _currentBytes -= existing.length;
     }
 
-    while ((_cache.length >= maxCapacity || _currentBytes + bytes.length > maxBytes) && _cache.isNotEmpty) {
+    while ((_cache.length >= maxCapacity ||
+            _currentBytes + bytes.length > maxBytes) &&
+        _cache.isNotEmpty) {
       final oldestKey = _cache.keys.first;
       final removed = _cache.remove(oldestKey);
       if (removed != null) {
@@ -98,7 +100,8 @@ class CachedArtwork extends StatefulWidget {
 
   static String upgradeToHighResArtwork(String url) {
     var upgraded = url;
-    if (upgraded.contains('googleusercontent.com') || upgraded.contains('ggpht.com')) {
+    if (upgraded.contains('googleusercontent.com') ||
+        upgraded.contains('ggpht.com')) {
       upgraded = upgraded.replaceAll(RegExp(r'=w\d+-h\d+[^?]*'), '=s1200');
       upgraded = upgraded.replaceAll(RegExp(r'=s\d+[^?]*'), '=s1200');
     }
@@ -117,7 +120,8 @@ class _CachedArtworkState extends State<CachedArtwork> {
 
   ArtworkLruCache get _cache => widget.customCache ?? ArtworkLruCache();
 
-  String get _cacheKey => widget.remoteUrl ?? '${widget.type.name}_${widget.id}';
+  String get _cacheKey =>
+      widget.remoteUrl ?? '${widget.type.name}_${widget.id}';
 
   @override
   void initState() {
@@ -136,9 +140,11 @@ class _CachedArtworkState extends State<CachedArtwork> {
     }
   }
 
-  static Future<Uint8List?> _fetchRemote(String url, {bool lowQuality = true}) async {
+  static Future<Uint8List?> _fetchRemote(String url,
+      {bool lowQuality = true}) async {
     final targetUrl = lowQuality
-        ? ArtworkCacheManager.toLowQualityArtworkUrl(url, width: 220, height: 220)
+        ? ArtworkCacheManager.toLowQualityArtworkUrl(url,
+            width: 220, height: 220)
         : CachedArtwork.upgradeToHighResArtwork(url);
 
     var uri = Uri.tryParse(targetUrl);
@@ -157,7 +163,8 @@ class _CachedArtworkState extends State<CachedArtwork> {
         }
       }
 
-      if (response.statusCode != 200 || response.contentLength > _maxRemoteBytes) {
+      if (response.statusCode != 200 ||
+          response.contentLength > _maxRemoteBytes) {
         await response.drain<void>();
         return null;
       }
@@ -197,7 +204,8 @@ class _CachedArtworkState extends State<CachedArtwork> {
 
     Future<Uint8List?> pending;
     if (remoteUrl != null && remoteUrl.isNotEmpty) {
-      pending = _fetchRemote(remoteUrl, lowQuality: isThumbnail).then((remoteBytes) {
+      pending =
+          _fetchRemote(remoteUrl, lowQuality: isThumbnail).then((remoteBytes) {
         if (remoteBytes != null && remoteBytes.isNotEmpty) return remoteBytes;
         if (widget.id > 0) {
           return _audioQuery.queryArtwork(
@@ -241,13 +249,15 @@ class _CachedArtworkState extends State<CachedArtwork> {
   @override
   Widget build(BuildContext context) {
     final isBounded = widget.size.isFinite && widget.size > 0;
-    final effectiveBorderRadius = widget.borderRadius.isFinite ? widget.borderRadius : 12.0;
+    final effectiveBorderRadius =
+        widget.borderRadius.isFinite ? widget.borderRadius : 12.0;
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final effectiveSize = isBounded
             ? widget.size
-            : (constraints.biggest.shortestSide.isFinite && constraints.biggest.shortestSide > 0
+            : (constraints.biggest.shortestSide.isFinite &&
+                    constraints.biggest.shortestSide > 0
                 ? constraints.biggest.shortestSide
                 : 200.0);
 

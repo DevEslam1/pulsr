@@ -16,7 +16,7 @@ Future<void> configureDependencies() async {
 }
 
 FutureOr<void> disposeHttpClient(HttpClient client) {
-  client.close(force: true);
+  client.close(force: false);
 }
 
 @module
@@ -46,4 +46,3 @@ abstract class StorageModule {
         ),
       );
 }
-

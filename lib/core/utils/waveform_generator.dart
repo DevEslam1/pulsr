@@ -38,9 +38,12 @@ class WaveformGenerator {
     return samples;
   }
 
-  List<double> _generateDeterministicWaveform(int songId, int count, [String? filePath]) {
+  List<double> _generateDeterministicWaveform(int songId, int count,
+      [String? filePath]) {
     final List<double> raw = [];
-    final int rawSeed = filePath != null && filePath.isNotEmpty ? (songId ^ filePath.hashCode) : songId;
+    final int rawSeed = filePath != null && filePath.isNotEmpty
+        ? (songId ^ filePath.hashCode)
+        : songId;
     final int seed = rawSeed.abs() & 0x7FFFFFFF;
     final Random random = Random(seed);
 

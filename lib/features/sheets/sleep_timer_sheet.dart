@@ -30,7 +30,8 @@ class SleepTimerSheet extends StatelessWidget {
             ),
             child: Material(
               color: p.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(28)),
               clipBehavior: Clip.antiAlias,
               child: SafeArea(
                 top: false,
@@ -63,26 +64,33 @@ class SleepTimerSheet extends StatelessWidget {
                               children: [
                                 Text(
                                   context.l10n.sleepTimer,
-                                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .titleLarge
+                                      ?.copyWith(
                                         fontWeight: FontWeight.w800,
                                         color: p.textPrimary,
                                       ),
                                 ),
-                                 if (isActive)
+                                if (isActive)
                                   TextButton.icon(
                                     onPressed: () {
                                       cubit.cancelSleepTimer();
                                       Navigator.pop(context);
                                     },
-                                    icon: const Icon(Icons.cancel_rounded, color: Colors.redAccent, size: 18),
-                                    label: Text(context.l10n.turnOff, style: const TextStyle(color: Colors.redAccent)),
+                                    icon: const Icon(Icons.cancel_rounded,
+                                        color: Colors.redAccent, size: 18),
+                                    label: Text(context.l10n.turnOff,
+                                        style: const TextStyle(
+                                            color: Colors.redAccent)),
                                   ),
                               ],
                             ),
                             const SizedBox(height: 8),
                             if (isActive)
                               Padding(
-                                padding: const EdgeInsets.symmetric(vertical: 8.0),
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 8.0),
                                 child: Text(
                                   'Music will stop in ${state.sleepTimerRemaining!.inMinutes}m ${state.sleepTimerRemaining!.inSeconds % 60}s',
                                   style: TextStyle(
@@ -104,16 +112,33 @@ class SleepTimerSheet extends StatelessWidget {
                             Wrap(
                               spacing: 8,
                               runSpacing: 8,
-                              children: presets.map((mins) {
-                                return ChoiceChip(
-                                  label: Text('$mins min'),
+                              children: [
+                                ChoiceChip(
+                                  label: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.skip_next_rounded, size: 14),
+                                      SizedBox(width: 4),
+                                      Text('End of track'),
+                                    ],
+                                  ),
                                   selected: false,
                                   onSelected: (_) {
-                                    cubit.startSleepTimer(mins);
+                                    cubit.startEndOfTrackTimer();
                                     Navigator.pop(context);
                                   },
-                                );
-                              }).toList(),
+                                ),
+                                ...presets.map((mins) {
+                                  return ChoiceChip(
+                                    label: Text('$mins min'),
+                                    selected: false,
+                                    onSelected: (_) {
+                                      cubit.startSleepTimer(mins);
+                                      Navigator.pop(context);
+                                    },
+                                  );
+                                }),
+                              ],
                             ),
                             const SizedBox(height: 24),
                             Text(
@@ -133,10 +158,13 @@ class SleepTimerSheet extends StatelessWidget {
                                   color: p.surfaceContainer,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: Icon(Icons.access_time_rounded, color: p.accent),
+                                child: Icon(Icons.access_time_rounded,
+                                    color: p.accent),
                               ),
-                              title: Text(context.l10n.stopAtSpecificTime, style: TextStyle(color: p.textPrimary)),
-                              trailing: Icon(Icons.chevron_right_rounded, color: p.textSecondary),
+                              title: Text(context.l10n.stopAtSpecificTime,
+                                  style: TextStyle(color: p.textPrimary)),
+                              trailing: Icon(Icons.chevron_right_rounded,
+                                  color: p.textSecondary),
                               onTap: () async {
                                 final now = TimeOfDay.now();
                                 final selectedTime = await showTimePicker(
@@ -145,9 +173,15 @@ class SleepTimerSheet extends StatelessWidget {
                                 );
                                 if (selectedTime != null && context.mounted) {
                                   final today = DateTime.now();
-                                  var stopDate = DateTime(today.year, today.month, today.day, selectedTime.hour, selectedTime.minute);
+                                  var stopDate = DateTime(
+                                      today.year,
+                                      today.month,
+                                      today.day,
+                                      selectedTime.hour,
+                                      selectedTime.minute);
                                   if (stopDate.isBefore(today)) {
-                                    stopDate = stopDate.add(const Duration(days: 1));
+                                    stopDate =
+                                        stopDate.add(const Duration(days: 1));
                                   }
                                   cubit.startAbsoluteSleepTimer(stopDate);
                                   Navigator.pop(context);

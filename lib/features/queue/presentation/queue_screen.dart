@@ -82,7 +82,8 @@ class QueueScreen extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: isCurrent ? p.accent : p.textPrimary,
-                            fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
+                            fontWeight:
+                                isCurrent ? FontWeight.w700 : FontWeight.w500,
                             fontSize: 14,
                           ),
                         ),
@@ -90,14 +91,19 @@ class QueueScreen extends StatelessWidget {
                           '${song.artist} • ${Formatters.formatDuration(Duration(milliseconds: song.durationMs))}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: p.textSecondary, fontSize: 12),
+                          style:
+                              TextStyle(color: p.textSecondary, fontSize: 12),
                         ),
                         trailing: Icon(
-                          isCurrent ? Icons.graphic_eq_rounded : Icons.music_note_rounded,
+                          isCurrent
+                              ? Icons.graphic_eq_rounded
+                              : Icons.music_note_rounded,
                           color: isCurrent ? p.accent : p.textTertiary,
                         ),
                         onTap: () {
-                          context.read<PlayerCubit>().playSong(song, queue: queue);
+                          context
+                              .read<PlayerCubit>()
+                              .playSong(song, queue: queue);
                         },
                       ),
                     ),

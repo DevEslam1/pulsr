@@ -6,8 +6,10 @@ class HeadphoneProfile {
   final String name;
   final String brand;
   final String model;
-  final String category; // 'Target Curve', 'In-Ear', 'TWS Earbuds', 'Over-Ear', 'On-Ear', 'Earbuds', 'Custom'
-  final List<double> gains; // 10-band gains in dB, aligned to EqPreset.centerFrequencies
+  final String
+      category; // 'Target Curve', 'In-Ear', 'TWS Earbuds', 'Over-Ear', 'On-Ear', 'Earbuds', 'Custom'
+  final List<double>
+      gains; // 10-band gains in dB, aligned to EqPreset.centerFrequencies
   final double bassBoost; // 0.0 to 1.0
   final double preampGain; // in dB
 
@@ -23,7 +25,9 @@ class HeadphoneProfile {
   });
 
   factory HeadphoneProfile.fromJson(Map<String, dynamic> json) {
-    final rawGains = (json['gains'] as List<dynamic>).map((e) => (e as num).toDouble()).toList();
+    final rawGains = (json['gains'] as List<dynamic>)
+        .map((e) => (e as num).toDouble())
+        .toList();
     return HeadphoneProfile(
       id: json['id'] as String,
       name: json['name'] as String,
@@ -77,7 +81,9 @@ class HeadphoneProfile {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is HeadphoneProfile && runtimeType == other.runtimeType && id == other.id;
+      other is HeadphoneProfile &&
+          runtimeType == other.runtimeType &&
+          id == other.id;
 
   @override
   int get hashCode => id.hashCode;

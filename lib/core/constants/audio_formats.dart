@@ -15,9 +15,6 @@ class AudioFormats {
     'dff',
   };
 
-  /// Playable file extensions set (alias of supportedExtensions for playback compatibility).
-  static const Set<String> playableExtensions = supportedExtensions;
-
   /// Extensions excluded from library scanning due to lack of standard Android decoding support.
   static const Set<String> unsupportedExtensions = {
     'wma',
@@ -28,17 +25,35 @@ class AudioFormats {
     return supportedExtensions.contains(ext);
   }
 
-  static bool isPlayableExtension(String pathOrExt) {
-    return isSupportedExtension(pathOrExt);
-  }
-
   static String extractExtension(String pathOrExt) {
-    final clean = pathOrExt.split('?').first.split('#').first.trim().toLowerCase();
+    final clean =
+        pathOrExt.split('?').first.split('#').first.trim().toLowerCase();
     if (clean.isEmpty || clean.endsWith('/') || clean.endsWith(r'\')) {
       return '';
     }
+    // Handle bare extension with leading dot e.g. ".mp3" or ".flac"
+    if (clean.startsWith('.') &&
+        !clean.contains('/') &&
+        !clean.contains(r'\')) {
+      final ext = clean.substring(1);
+      if (ext.isNotEmpty &&
+          !ext.contains('.') &&
+          ext != 'nomedia' &&
+          ext != 'gitignore') {
+        return ext;
+      }
+      return '';
+    }
     final filename = clean.split('/').last.split(r'\').last;
-    if (filename.isEmpty || filename == '.nomedia' || filename.startsWith('.')) {
+    if (filename.isEmpty || filename == '.nomedia') {
+      return '';
+    }
+    if (filename.startsWith('.')) {
+      final sub = filename.substring(1);
+      if (supportedExtensions.contains(sub) ||
+          unsupportedExtensions.contains(sub)) {
+        return sub;
+      }
       return '';
     }
     final dotIndex = filename.lastIndexOf('.');
@@ -46,7 +61,11 @@ class AudioFormats {
       return filename.substring(dotIndex + 1);
     }
     // If the input was provided directly as an extension (e.g. "mp3" or "flac") without paths or leading dots
-    if (!clean.contains('/') && !clean.contains(r'\') && !clean.contains('.') && clean.isNotEmpty) {
+    if (!clean.contains('/') &&
+        !clean.contains(r'\') &&
+        !clean.contains('.') &&
+        (supportedExtensions.contains(clean) ||
+            unsupportedExtensions.contains(clean))) {
       return clean;
     }
     return '';

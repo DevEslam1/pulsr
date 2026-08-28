@@ -21,29 +21,29 @@ void main() {
     repo = MusicRepository(db);
 
     await db.into(db.songsTable).insert(
-      SongsTableCompanion.insert(
-        id: const Value(1),
-        title: 'Song Alpha',
-        artist: const Value('Artist One'),
-        album: const Value('Album X'),
-        genre: const Value('Rock'),
-        year: const Value(2023),
-        path: '/storage/music/rock/alpha.mp3',
-        isFavorite: const Value(true),
-      ),
-    );
+          SongsTableCompanion.insert(
+            id: const Value(1),
+            title: 'Song Alpha',
+            artist: const Value('Artist One'),
+            album: const Value('Album X'),
+            genre: const Value('Rock'),
+            year: const Value(2023),
+            path: '/storage/music/rock/alpha.mp3',
+            isFavorite: const Value(true),
+          ),
+        );
     await db.into(db.songsTable).insert(
-      SongsTableCompanion.insert(
-        id: const Value(2),
-        title: 'Song Beta',
-        artist: const Value('Artist Two'),
-        album: const Value('Album Y'),
-        genre: const Value('Jazz'),
-        year: const Value(2021),
-        path: '/storage/music/jazz/beta.mp3',
-        isFavorite: const Value(false),
-      ),
-    );
+          SongsTableCompanion.insert(
+            id: const Value(2),
+            title: 'Song Beta',
+            artist: const Value('Artist Two'),
+            album: const Value('Album Y'),
+            genre: const Value('Jazz'),
+            year: const Value(2021),
+            path: '/storage/music/jazz/beta.mp3',
+            isFavorite: const Value(false),
+          ),
+        );
   });
 
   tearDown(() async {
@@ -105,19 +105,20 @@ void main() {
       expect(items.isNotEmpty, isTrue);
     });
 
-    test('FolderUseCases excludes YouTube rows from the folder hierarchy', () async {
+    test('FolderUseCases excludes YouTube rows from the folder hierarchy',
+        () async {
       // A ytmusic:// sentinel path would otherwise collapse into one phantom
       // folder the user could "exclude". Only the two local folders should show.
       await db.into(db.songsTable).insert(
-        SongsTableCompanion.insert(
-          id: const Value(-42),
-          title: 'Streamed Track',
-          artist: const Value('Remote Artist'),
-          path: 'ytmusic://vid123',
-          source: const Value(SongSource.youtube),
-          remoteId: const Value('vid123'),
-        ),
-      );
+            SongsTableCompanion.insert(
+              id: const Value(-42),
+              title: 'Streamed Track',
+              artist: const Value('Remote Artist'),
+              path: 'ytmusic://vid123',
+              source: const Value(SongSource.youtube),
+              remoteId: const Value('vid123'),
+            ),
+          );
 
       final useCase = FolderUseCases(repo);
       final result = await useCase.getFolderHierarchy();
@@ -133,18 +134,20 @@ void main() {
 
     test('FolderUseCases.watchFolderSongs never yields YouTube rows', () async {
       await db.into(db.songsTable).insert(
-        SongsTableCompanion.insert(
-          id: const Value(-43),
-          title: 'Streamed Track',
-          artist: const Value('Remote Artist'),
-          path: 'ytmusic://vid456',
-          source: const Value(SongSource.youtube),
-          remoteId: const Value('vid456'),
-        ),
-      );
+            SongsTableCompanion.insert(
+              id: const Value(-43),
+              title: 'Streamed Track',
+              artist: const Value('Remote Artist'),
+              path: 'ytmusic://vid456',
+              source: const Value(SongSource.youtube),
+              remoteId: const Value('vid456'),
+            ),
+          );
 
       final useCase = FolderUseCases(repo);
-      final songs = await useCase.watchFolderSongs('/storage/music/rock').first
+      final songs = await useCase
+          .watchFolderSongs('/storage/music/rock')
+          .first
           .then((r) => r.getOrElse((_) => []));
 
       expect(songs.length, equals(1));

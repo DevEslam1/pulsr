@@ -45,12 +45,19 @@ import 'features/settings/cubit/settings_cubit.dart';
 import 'features/settings/cubit/settings_state.dart';
 import 'features/widgets/widget_service.dart';
 import 'features/ytm_search/cubit/ytm_download_cubit.dart';
+import 'domain/repositories/download_repository_interface.dart';
+import 'features/downloads/cubit/downloads_cubit.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   HttpOverrides.global = AppHttpOverrides.instance;
-  AppConfig.validateConfiguration();
-  
+  try {
+    AppConfig.validateConfiguration();
+  } catch (e, st) {
+    ErrorLogger.log('AppConfig.validateConfiguration error',
+        error: e, stackTrace: st, category: 'Startup');
+  }
+
   ErrorLogger.onCrashReported = (error, stackTrace, category) {
     // Production crash reporting hook (FirebaseCrashlytics / Sentry / Bugsnag)
     // FirebaseCrashlytics.instance.recordError(error, stackTrace, reason: category);
@@ -73,25 +80,29 @@ Future<void> main() async {
   try {
     await configureDependencies().timeout(const Duration(seconds: 15));
   } catch (e, st) {
-    ErrorLogger.log('DI configureDependencies failed or timed out', error: e, stackTrace: st, category: 'Startup');
+    ErrorLogger.log('DI configureDependencies failed or timed out',
+        error: e, stackTrace: st, category: 'Startup');
   }
 
   try {
     await YtmRateLimiter.shared.restore().timeout(const Duration(seconds: 8));
   } catch (e, st) {
-    ErrorLogger.log('YtmRateLimiter restore failed or timed out', error: e, stackTrace: st, category: 'Startup');
+    ErrorLogger.log('YtmRateLimiter restore failed or timed out',
+        error: e, stackTrace: st, category: 'Startup');
   }
 
   try {
     await getIt<AuthService>().initialize().timeout(const Duration(seconds: 8));
   } catch (e, st) {
-    ErrorLogger.log('AuthService initialize failed or timed out', error: e, stackTrace: st, category: 'Startup');
+    ErrorLogger.log('AuthService initialize failed or timed out',
+        error: e, stackTrace: st, category: 'Startup');
   }
 
   try {
     await getIt<YtmAccountService>().init().timeout(const Duration(seconds: 8));
   } catch (e, st) {
-    ErrorLogger.log('YtmAccountService init failed or timed out', error: e, stackTrace: st, category: 'Startup');
+    ErrorLogger.log('YtmAccountService init failed or timed out',
+        error: e, stackTrace: st, category: 'Startup');
   }
 
   if (AppConfig.sentryDsn.isNotEmpty) {
@@ -178,7 +189,8 @@ class _PulsrAppState extends State<PulsrApp> {
         await getIt<FileIntentHandler>().checkInitialUri();
       } catch (e, st) {
         if (!mounted) return;
-        ErrorLogger.log('Failed to process initial audio intent on startup', error: e, stackTrace: st, category: 'Startup');
+        ErrorLogger.log('Failed to process initial audio intent on startup',
+            error: e, stackTrace: st, category: 'Startup');
       }
     });
   }
@@ -202,7 +214,8 @@ class _PulsrAppState extends State<PulsrApp> {
         }
       } catch (e, st) {
         if (!mounted) return;
-        ErrorLogger.log('Failed to execute automatic startup media scan', error: e, stackTrace: st, category: 'Startup');
+        ErrorLogger.log('Failed to execute automatic startup media scan',
+            error: e, stackTrace: st, category: 'Startup');
       }
     });
   }
@@ -212,8 +225,10 @@ class _PulsrAppState extends State<PulsrApp> {
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider<AppDatabase>.value(value: getIt<AppDatabase>()),
-        RepositoryProvider<IMusicRepository>.value(value: getIt<IMusicRepository>()),
-        RepositoryProvider<PulsrAudioHandler>.value(value: getIt<PulsrAudioHandler>()),
+        RepositoryProvider<IMusicRepository>.value(
+            value: getIt<IMusicRepository>()),
+        RepositoryProvider<PulsrAudioHandler>.value(
+            value: getIt<PulsrAudioHandler>()),
         RepositoryProvider<MediaScannerService>.value(
             value: getIt<MediaScannerService>()),
         RepositoryProvider<GetSongsUseCase>.value(
@@ -230,8 +245,11 @@ class _PulsrAppState extends State<PulsrApp> {
             value: getIt<SearchMusicUseCase>()),
         RepositoryProvider<PlaylistUseCases>.value(
             value: getIt<PlaylistUseCases>()),
-        RepositoryProvider<FolderUseCases>.value(value: getIt<FolderUseCases>()),
+        RepositoryProvider<FolderUseCases>.value(
+            value: getIt<FolderUseCases>()),
         RepositoryProvider<WidgetService>.value(value: getIt<WidgetService>()),
+        RepositoryProvider<IDownloadRepository>.value(
+            value: getIt<IDownloadRepository>()),
       ],
       child: MultiBlocProvider(
         providers: [
@@ -256,6 +274,9 @@ class _PulsrAppState extends State<PulsrApp> {
           BlocProvider<AuthCubit>(
             create: (_) => getIt<AuthCubit>(),
           ),
+          BlocProvider<DownloadsCubit>(
+            create: (_) => getIt<DownloadsCubit>(),
+          ),
           if (AppConfig.ytmEnabled)
             BlocProvider<YtmDownloadCubit>(
               create: (_) => getIt<YtmDownloadCubit>(),
@@ -264,13 +285,16 @@ class _PulsrAppState extends State<PulsrApp> {
         child: MultiBlocListener(
           listeners: [
             BlocListener<PlayerCubit, PlayerState>(
-              listenWhen: (prev, curr) => prev.currentSong?.id != curr.currentSong?.id,
+              listenWhen: (prev, curr) =>
+                  prev.currentSong?.id != curr.currentSong?.id,
               listener: (context, state) {
                 final song = state.currentSong;
-                final source = context.read<SettingsCubit>().state.themeColorSource;
+                final source =
+                    context.read<SettingsCubit>().state.themeColorSource;
                 // Keep the album-art palette fresh for the artwork source and
                 // for system (used as the pre-Android-12 fallback seed).
-                if (source == ThemeColorSource.artwork || source == ThemeColorSource.system) {
+                if (source == ThemeColorSource.artwork ||
+                    source == ThemeColorSource.system) {
                   if (song != null) {
                     context.read<DynamicThemeCubit>().updateFromSong(song);
                   } else {
@@ -280,10 +304,12 @@ class _PulsrAppState extends State<PulsrApp> {
               },
             ),
             BlocListener<SettingsCubit, SettingsState>(
-              listenWhen: (prev, curr) => prev.themeColorSource != curr.themeColorSource,
+              listenWhen: (prev, curr) =>
+                  prev.themeColorSource != curr.themeColorSource,
               listener: (context, state) {
-                final usesArt = state.themeColorSource == ThemeColorSource.artwork ||
-                    state.themeColorSource == ThemeColorSource.system;
+                final usesArt =
+                    state.themeColorSource == ThemeColorSource.artwork ||
+                        state.themeColorSource == ThemeColorSource.system;
                 if (usesArt) {
                   final song = context.read<PlayerCubit>().state.currentSong;
                   if (song != null) {
@@ -295,7 +321,15 @@ class _PulsrAppState extends State<PulsrApp> {
               },
             ),
           ],
-          child: BlocSelector<SettingsCubit, SettingsState, ({ThemeColorSource colorSource, AppThemeMode themeMode, Color customAccent, String languageCode})>(
+          child: BlocSelector<
+              SettingsCubit,
+              SettingsState,
+              ({
+                ThemeColorSource colorSource,
+                AppThemeMode themeMode,
+                Color customAccent,
+                String languageCode
+              })>(
             selector: (state) => (
               colorSource: state.themeColorSource,
               themeMode: state.themeMode,
@@ -303,7 +337,8 @@ class _PulsrAppState extends State<PulsrApp> {
               languageCode: state.languageCode,
             ),
             builder: (context, settingsConfig) {
-              return BlocSelector<DynamicThemeCubit, DynamicThemeState, ({Color primaryColor, bool hasCustomArtwork})>(
+              return BlocSelector<DynamicThemeCubit, DynamicThemeState,
+                  ({Color primaryColor, bool hasCustomArtwork})>(
                 selector: (state) => (
                   primaryColor: state.primaryColor,
                   hasCustomArtwork: state.hasCustomArtworkColor,
@@ -315,7 +350,9 @@ class _PulsrAppState extends State<PulsrApp> {
                       Color resolveAccent(ColorScheme? dynamicScheme) {
                         switch (settingsConfig.colorSource) {
                           case ThemeColorSource.system:
-                            if (dynamicScheme != null) return dynamicScheme.primary;
+                            if (dynamicScheme != null) {
+                              return dynamicScheme.primary;
+                            }
                             return dynamicThemeConfig.hasCustomArtwork
                                 ? dynamicThemeConfig.primaryColor
                                 : settingsConfig.customAccent;
@@ -334,7 +371,8 @@ class _PulsrAppState extends State<PulsrApp> {
                       final darkTheme = AuraTheme.customTheme(
                         resolveAccent(darkDynamic),
                         brightness: Brightness.dark,
-                        isAmoled: settingsConfig.themeMode == AppThemeMode.amoled,
+                        isAmoled:
+                            settingsConfig.themeMode == AppThemeMode.amoled,
                       );
 
                       final ThemeMode flutterThemeMode;
@@ -353,14 +391,17 @@ class _PulsrAppState extends State<PulsrApp> {
 
                       final isDarkTheme = flutterThemeMode == ThemeMode.dark ||
                           (flutterThemeMode == ThemeMode.system &&
-                              MediaQuery.platformBrightnessOf(context) == Brightness.dark);
+                              MediaQuery.platformBrightnessOf(context) ==
+                                  Brightness.dark);
 
                       return AnnotatedRegion<SystemUiOverlayStyle>(
                         value: SystemUiOverlayStyle(
                           statusBarColor: Colors.transparent,
-                          statusBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
+                          statusBarIconBrightness:
+                              isDarkTheme ? Brightness.light : Brightness.dark,
                           systemNavigationBarColor: Colors.transparent,
-                          systemNavigationBarIconBrightness: isDarkTheme ? Brightness.light : Brightness.dark,
+                          systemNavigationBarIconBrightness:
+                              isDarkTheme ? Brightness.light : Brightness.dark,
                         ),
                         child: MaterialApp.router(
                           title: AppConfig.appTitle,

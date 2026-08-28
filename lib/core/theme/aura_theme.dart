@@ -28,12 +28,12 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
   final Color accent;
   final Color onAccent;
   final Color accentContainer; // soft accent fill (~12-16% alpha)
-  final Color glow;            // shadows / halos
+  final Color glow; // shadows / halos
   final Color bg;
   final Color surface;
   final Color surfaceContainer;
   final Color surfaceContainerHigh;
-  final Color hairline;        // 1px borders
+  final Color hairline; // 1px borders
   final Color textPrimary;
   final Color textSecondary;
   final Color textTertiary;
@@ -49,10 +49,22 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
 
   @override
   PulsrPalette copyWith({
-    Color? accent, Color? onAccent, Color? accentContainer, Color? glow,
-    Color? bg, Color? surface, Color? surfaceContainer, Color? surfaceContainerHigh,
-    Color? hairline, Color? textPrimary, Color? textSecondary, Color? textTertiary,
-    Color? favorite, Color? success, Color? error, bool? isDark,
+    Color? accent,
+    Color? onAccent,
+    Color? accentContainer,
+    Color? glow,
+    Color? bg,
+    Color? surface,
+    Color? surfaceContainer,
+    Color? surfaceContainerHigh,
+    Color? hairline,
+    Color? textPrimary,
+    Color? textSecondary,
+    Color? textTertiary,
+    Color? favorite,
+    Color? success,
+    Color? error,
+    bool? isDark,
   }) {
     return PulsrPalette(
       accent: accent ?? this.accent,
@@ -80,16 +92,23 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
     return PulsrPalette(
       accent: Color.lerp(accent, other.accent, t) ?? accent,
       onAccent: Color.lerp(onAccent, other.onAccent, t) ?? onAccent,
-      accentContainer: Color.lerp(accentContainer, other.accentContainer, t) ?? accentContainer,
+      accentContainer: Color.lerp(accentContainer, other.accentContainer, t) ??
+          accentContainer,
       glow: Color.lerp(glow, other.glow, t) ?? glow,
       bg: Color.lerp(bg, other.bg, t) ?? bg,
       surface: Color.lerp(surface, other.surface, t) ?? surface,
-      surfaceContainer: Color.lerp(surfaceContainer, other.surfaceContainer, t) ?? surfaceContainer,
-      surfaceContainerHigh: Color.lerp(surfaceContainerHigh, other.surfaceContainerHigh, t) ?? surfaceContainerHigh,
+      surfaceContainer:
+          Color.lerp(surfaceContainer, other.surfaceContainer, t) ??
+              surfaceContainer,
+      surfaceContainerHigh:
+          Color.lerp(surfaceContainerHigh, other.surfaceContainerHigh, t) ??
+              surfaceContainerHigh,
       hairline: Color.lerp(hairline, other.hairline, t) ?? hairline,
       textPrimary: Color.lerp(textPrimary, other.textPrimary, t) ?? textPrimary,
-      textSecondary: Color.lerp(textSecondary, other.textSecondary, t) ?? textSecondary,
-      textTertiary: Color.lerp(textTertiary, other.textTertiary, t) ?? textTertiary,
+      textSecondary:
+          Color.lerp(textSecondary, other.textSecondary, t) ?? textSecondary,
+      textTertiary:
+          Color.lerp(textTertiary, other.textTertiary, t) ?? textTertiary,
       favorite: Color.lerp(favorite, other.favorite, t) ?? favorite,
       success: Color.lerp(success, other.success, t) ?? success,
       error: Color.lerp(error, other.error, t) ?? error,
@@ -99,24 +118,34 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
 }
 
 extension PulsrThemeX on BuildContext {
-  PulsrPalette get palette => Theme.of(this).extension<PulsrPalette>() ?? AuraTheme.defaultDark;
+  PulsrPalette get palette =>
+      Theme.of(this).extension<PulsrPalette>() ?? AuraTheme.defaultDark;
   bool get isDarkUi => palette.isDark;
 }
 
 class AuraTheme {
-  static PulsrPalette get defaultDark => _palette(AppColors.primary, Brightness.dark, false);
-  static ThemeData get darkTheme => customTheme(AppColors.primary, brightness: Brightness.dark);
-  static ThemeData get lightTheme => customTheme(AppColors.lightPrimary, brightness: Brightness.light);
-  static ThemeData get amoledTheme => customTheme(AppColors.primary, brightness: Brightness.dark, isAmoled: true);
-  static ThemeData get highContrastTheme => customTheme(const Color(0xFF00E5FF), brightness: Brightness.dark, isAmoled: true);
+  static PulsrPalette get defaultDark =>
+      _palette(AppColors.primary, Brightness.dark, false);
+  static ThemeData get darkTheme =>
+      customTheme(AppColors.primary, brightness: Brightness.dark);
+  static ThemeData get lightTheme =>
+      customTheme(AppColors.lightPrimary, brightness: Brightness.light);
+  static ThemeData get amoledTheme => customTheme(AppColors.primary,
+      brightness: Brightness.dark, isAmoled: true);
+  static ThemeData get highContrastTheme => customTheme(const Color(0xFF00E5FF),
+      brightness: Brightness.dark, isAmoled: true);
 
-  static PulsrPalette _palette(Color accent, Brightness brightness, bool isAmoled) {
+  static PulsrPalette _palette(
+      Color accent, Brightness brightness, bool isAmoled) {
     final isDark = brightness == Brightness.dark;
-    final onAccent = accent.computeLuminance() > 0.5 ? const Color(0xFF101223) : Colors.white;
+    final onAccent = accent.computeLuminance() > 0.5
+        ? const Color(0xFF101223)
+        : Colors.white;
 
     if (!isDark) {
       return PulsrPalette(
-        accent: accent, onAccent: onAccent,
+        accent: accent,
+        onAccent: onAccent,
         accentContainer: accent.withValues(alpha: 0.12),
         glow: accent.withValues(alpha: 0.22),
         bg: const Color(0xFFF4F6FB),
@@ -127,13 +156,16 @@ class AuraTheme {
         textPrimary: const Color(0xFF101425),
         textSecondary: const Color(0xFF5D6880),
         textTertiary: const Color(0xFF9AA3B8),
-        favorite: AppColors.favorite, success: AppColors.success, error: AppColors.error,
+        favorite: AppColors.favorite,
+        success: AppColors.success,
+        error: AppColors.error,
         isDark: false,
       );
     }
     if (isAmoled) {
       return PulsrPalette(
-        accent: accent, onAccent: onAccent,
+        accent: accent,
+        onAccent: onAccent,
         accentContainer: accent.withValues(alpha: 0.16),
         glow: accent.withValues(alpha: 0.30),
         bg: const Color(0xFF000000),
@@ -144,12 +176,15 @@ class AuraTheme {
         textPrimary: const Color(0xFFF5F6FA),
         textSecondary: const Color(0xFF9BA1AE),
         textTertiary: const Color(0xFF5F6470),
-        favorite: AppColors.favorite, success: AppColors.success, error: AppColors.error,
+        favorite: AppColors.favorite,
+        success: AppColors.success,
+        error: AppColors.error,
         isDark: true,
       );
     }
     return PulsrPalette(
-      accent: accent, onAccent: onAccent,
+      accent: accent,
+      onAccent: onAccent,
       accentContainer: accent.withValues(alpha: 0.14),
       glow: accent.withValues(alpha: 0.28),
       bg: const Color(0xFF0A0C12),
@@ -160,7 +195,9 @@ class AuraTheme {
       textPrimary: const Color(0xFFEDEFF7),
       textSecondary: const Color(0xFF98A0B3),
       textTertiary: const Color(0xFF5C6478),
-      favorite: AppColors.favorite, success: AppColors.success, error: AppColors.error,
+      favorite: AppColors.favorite,
+      success: AppColors.success,
+      error: AppColors.error,
       isDark: true,
     );
   }
@@ -173,27 +210,89 @@ class AuraTheme {
     final p = _palette(accent, brightness, isAmoled);
     final isDark = p.isDark;
     const fontFamily = 'Manrope';
-    const fontFallbacks = ['Noto Sans Arabic', 'Segoe UI', 'Roboto', 'Arial', 'sans-serif'];
-    final baseTextTheme = (isDark
-        ? ThemeData.dark().textTheme
-        : ThemeData.light().textTheme).apply(
-            fontFamily: fontFamily,
-            fontFamilyFallback: fontFallbacks,
-          );
+    const fontFallbacks = [
+      'Noto Sans Arabic',
+      'Segoe UI',
+      'Roboto',
+      'Arial',
+      'sans-serif'
+    ];
+    final baseTextTheme =
+        (isDark ? ThemeData.dark().textTheme : ThemeData.light().textTheme)
+            .apply(
+      fontFamily: fontFamily,
+      fontFamilyFallback: fontFallbacks,
+    );
 
     final textTheme = baseTextTheme.copyWith(
-      displayLarge: baseTextTheme.displayLarge?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800, letterSpacing: -1.2, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
-      displayMedium: baseTextTheme.displayMedium?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800, letterSpacing: -0.8, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
-      headlineMedium: baseTextTheme.headlineMedium?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800, letterSpacing: -0.6, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
-      headlineSmall: baseTextTheme.headlineSmall?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w800, letterSpacing: -0.4, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
-      titleLarge: baseTextTheme.titleLarge?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w700, letterSpacing: -0.2, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
-      titleMedium: baseTextTheme.titleMedium?.copyWith(color: p.textPrimary, fontWeight: FontWeight.w700, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
-      titleSmall: baseTextTheme.titleSmall?.copyWith(color: p.textSecondary, fontWeight: FontWeight.w600, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
-      bodyLarge: baseTextTheme.bodyLarge?.copyWith(color: p.textPrimary, fontSize: 16, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
-      bodyMedium: baseTextTheme.bodyMedium?.copyWith(color: p.textSecondary, fontSize: 14, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
-      bodySmall: baseTextTheme.bodySmall?.copyWith(color: p.textTertiary, fontSize: 12, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
-      labelLarge: baseTextTheme.labelLarge?.copyWith(color: p.onAccent, fontWeight: FontWeight.w700, fontSize: 14, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
-      labelSmall: baseTextTheme.labelSmall?.copyWith(color: p.textTertiary, fontWeight: FontWeight.w800, letterSpacing: 1.4, fontSize: 10.5, fontFamily: fontFamily, fontFamilyFallback: fontFallbacks),
+      displayLarge: baseTextTheme.displayLarge?.copyWith(
+          color: p.textPrimary,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -1.2,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks),
+      displayMedium: baseTextTheme.displayMedium?.copyWith(
+          color: p.textPrimary,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.8,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks),
+      headlineMedium: baseTextTheme.headlineMedium?.copyWith(
+          color: p.textPrimary,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.6,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks),
+      headlineSmall: baseTextTheme.headlineSmall?.copyWith(
+          color: p.textPrimary,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.4,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks),
+      titleLarge: baseTextTheme.titleLarge?.copyWith(
+          color: p.textPrimary,
+          fontWeight: FontWeight.w700,
+          letterSpacing: -0.2,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks),
+      titleMedium: baseTextTheme.titleMedium?.copyWith(
+          color: p.textPrimary,
+          fontWeight: FontWeight.w700,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks),
+      titleSmall: baseTextTheme.titleSmall?.copyWith(
+          color: p.textSecondary,
+          fontWeight: FontWeight.w600,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks),
+      bodyLarge: baseTextTheme.bodyLarge?.copyWith(
+          color: p.textPrimary,
+          fontSize: 16,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks),
+      bodyMedium: baseTextTheme.bodyMedium?.copyWith(
+          color: p.textSecondary,
+          fontSize: 14,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks),
+      bodySmall: baseTextTheme.bodySmall?.copyWith(
+          color: p.textTertiary,
+          fontSize: 12,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks),
+      labelLarge: baseTextTheme.labelLarge?.copyWith(
+          color: p.onAccent,
+          fontWeight: FontWeight.w700,
+          fontSize: 14,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks),
+      labelSmall: baseTextTheme.labelSmall?.copyWith(
+          color: p.textTertiary,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1.4,
+          fontSize: 10.5,
+          fontFamily: fontFamily,
+          fontFamilyFallback: fontFallbacks),
     );
 
     final outlineBorder = OutlineInputBorder(
@@ -234,7 +333,11 @@ class AuraTheme {
           statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
           statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
         ),
-        titleTextStyle: TextStyle(color: p.textPrimary, fontSize: 20, fontWeight: FontWeight.w800, letterSpacing: -0.3),
+        titleTextStyle: TextStyle(
+            color: p.textPrimary,
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.3),
         iconTheme: IconThemeData(color: p.textPrimary),
       ),
       cardTheme: CardThemeData(
@@ -258,18 +361,24 @@ class AuraTheme {
           return IconThemeData(color: p.textSecondary, size: 24);
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
-          fontSize: 11.5,
-          fontWeight: states.contains(WidgetState.selected) ? FontWeight.w800 : FontWeight.w600,
-          color: states.contains(WidgetState.selected) ? p.accent : p.textSecondary,
-        )),
+              fontSize: 11.5,
+              fontWeight: states.contains(WidgetState.selected)
+                  ? FontWeight.w800
+                  : FontWeight.w600,
+              color: states.contains(WidgetState.selected)
+                  ? p.accent
+                  : p.textSecondary,
+            )),
       ),
       navigationRailTheme: NavigationRailThemeData(
         backgroundColor: Colors.transparent,
         indicatorColor: p.accentContainer,
         selectedIconTheme: IconThemeData(color: p.accent, size: 24),
         unselectedIconTheme: IconThemeData(color: p.textSecondary, size: 24),
-        selectedLabelTextStyle: TextStyle(color: p.accent, fontWeight: FontWeight.w800, fontSize: 12),
-        unselectedLabelTextStyle: TextStyle(color: p.textSecondary, fontWeight: FontWeight.w600, fontSize: 12),
+        selectedLabelTextStyle: TextStyle(
+            color: p.accent, fontWeight: FontWeight.w800, fontSize: 12),
+        unselectedLabelTextStyle: TextStyle(
+            color: p.textSecondary, fontWeight: FontWeight.w600, fontSize: 12),
       ),
       tabBarTheme: TabBarThemeData(
         labelColor: p.accent,
@@ -279,7 +388,8 @@ class AuraTheme {
         dividerColor: p.hairline,
         labelPadding: const EdgeInsets.symmetric(horizontal: 16),
         labelStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14),
-        unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+        unselectedLabelStyle:
+            const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
         backgroundColor: p.surface,
@@ -294,21 +404,27 @@ class AuraTheme {
         selectedColor: p.accentContainer,
         secondarySelectedColor: p.accentContainer,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        shape: RoundedRectangleBorder(borderRadius: AppRadii.chipRadius, side: BorderSide(color: p.hairline)),
-        labelStyle: TextStyle(color: p.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
-        secondaryLabelStyle: TextStyle(color: p.accent, fontSize: 13, fontWeight: FontWeight.w700),
+        shape: RoundedRectangleBorder(
+            borderRadius: AppRadii.chipRadius,
+            side: BorderSide(color: p.hairline)),
+        labelStyle: TextStyle(
+            color: p.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
+        secondaryLabelStyle: TextStyle(
+            color: p.accent, fontSize: 13, fontWeight: FontWeight.w700),
       ),
       bottomSheetTheme: BottomSheetThemeData(
         backgroundColor: p.surface,
         modalBackgroundColor: p.surface,
         elevation: 24,
-        shape: const RoundedRectangleBorder(borderRadius: AppRadii.bottomSheetRadius),
+        shape: const RoundedRectangleBorder(
+            borderRadius: AppRadii.bottomSheetRadius),
         clipBehavior: Clip.antiAliasWithSaveLayer,
       ),
       dialogTheme: DialogThemeData(
         backgroundColor: p.surface,
         elevation: 24,
-        shape: const RoundedRectangleBorder(borderRadius: AppRadii.dialogRadius),
+        shape:
+            const RoundedRectangleBorder(borderRadius: AppRadii.dialogRadius),
       ),
       listTileTheme: ListTileThemeData(
         iconColor: p.textTertiary,
@@ -317,7 +433,8 @@ class AuraTheme {
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: p.surfaceContainerHigh,
-        contentTextStyle: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w600, fontSize: 13),
+        contentTextStyle: TextStyle(
+            color: p.textPrimary, fontWeight: FontWeight.w600, fontSize: 13),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       ),
@@ -336,7 +453,8 @@ class AuraTheme {
         filled: true,
         fillColor: p.surfaceContainer,
         hintStyle: TextStyle(color: p.textTertiary, fontSize: 14),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: outlineBorder,
         enabledBorder: outlineBorder,
         focusedBorder: OutlineInputBorder(
@@ -350,8 +468,10 @@ class AuraTheme {
           foregroundColor: p.onAccent,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: const RoundedRectangleBorder(borderRadius: AppRadii.buttonRadius),
-          textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5),
+          shape:
+              const RoundedRectangleBorder(borderRadius: AppRadii.buttonRadius),
+          textStyle:
+              const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -359,12 +479,15 @@ class AuraTheme {
           foregroundColor: p.textPrimary,
           side: BorderSide(color: p.hairline),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: const RoundedRectangleBorder(borderRadius: AppRadii.buttonRadius),
+          shape:
+              const RoundedRectangleBorder(borderRadius: AppRadii.buttonRadius),
           textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(foregroundColor: p.accent, textStyle: const TextStyle(fontWeight: FontWeight.w700)),
+        style: TextButton.styleFrom(
+            foregroundColor: p.accent,
+            textStyle: const TextStyle(fontWeight: FontWeight.w700)),
       ),
     );
   }

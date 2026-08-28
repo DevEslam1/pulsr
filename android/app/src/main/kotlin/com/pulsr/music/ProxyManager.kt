@@ -13,7 +13,9 @@ import java.net.URL
  * Thread-safe JVM & Application Proxy Manager.
  *
  * Configures system-wide Java network properties and provides explicit
- * [Proxy] objects for [PulsrDownloader] (NewPipeExtractor) and [InnertubeClient].
+ * [Proxy] objects for network clients and [InnertubeClient].
+ *
+ * Fully generic (no YTM or domain-specific terms) to preserve GPL / Play isolation.
  */
 object ProxyManager {
     private const val TAG = "ProxyManager"
@@ -87,9 +89,21 @@ object ProxyManager {
             }
         }
 
-        // Global JVM system properties intentionally omitted to prevent accidental proxying
-        // of third-party SDK traffic (Firebase, Sentry, crash analytics). Proxies are injected
-        // explicitly via getProxy() into InnertubeClient and PulsrDownloader.
+        // Also configure ProxyPool if host is non-empty
+        if (enabled && this.host.isNotEmpty()) {
+            val pType = if (this.proxyType == "socks5" || this.proxyType == "socks") Proxy.Type.SOCKS else Proxy.Type.HTTP
+            val node = ProxyPool.ProxyNode(
+                id = "${this.host}:${this.port}",
+                type = pType,
+                host = this.host,
+                port = this.port,
+                username = this.username,
+                password = this.password,
+                isEnabled = true
+            )
+            ProxyPool.setProxies(listOf(node))
+        }
+
         Log.i(TAG, "Proxy configured: enabled=$enabled, type=$proxyType, host=${this.host}:${this.port}, hasAuth=${this.username.isNotEmpty()}")
     }
 
@@ -108,6 +122,7 @@ object ProxyManager {
         username = ""
         password = ""
         bypassList = emptyList()
+        ProxyPool.setProxies(emptyList())
     }
 
     /**
@@ -131,20 +146,32 @@ object ProxyManager {
      */
     @Synchronized
     fun getProxy(url: String? = null): Proxy? {
-        if (!enabled || host.isBlank() || port <= 0) return null
+        if (!enabled) return null
         if (url != null && isBypassed(url)) return null
 
+        val poolProxy = ProxyPool.getActiveProxy(url)
+        if (poolProxy != null) return poolProxy
+
+        if (host.isBlank() || port <= 0) return null
         val type = if (proxyType == "socks5" || proxyType == "socks") Proxy.Type.SOCKS else Proxy.Type.HTTP
         return runCatching {
             Proxy(type, InetSocketAddress(host, port))
         }.getOrNull()
     }
 
+    fun onPathFailed(url: String? = null) {
+        ProxyPool.onPathFailed(url)
+    }
+
+    fun onPathSuccess() {
+        ProxyPool.onPathSuccess()
+    }
+
     /**
      * Probes proxy connectivity to [testUrl] and returns latency in milliseconds or an error message.
      */
     fun testConnection(
-        testUrl: String = "https://music.youtube.com/generate_204",
+        testUrl: String = "https://www.google.com/generate_204",
         timeoutMs: Int = 10000,
     ): Map<String, Any?> {
         val start = System.currentTimeMillis()

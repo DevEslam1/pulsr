@@ -33,7 +33,7 @@ android {
 
         externalNativeBuild {
             cmake {
-                cppFlags += listOf("-std=c++17", "-O3", "-ffast-math")
+                cppFlags += listOf("-std=c++20", "-O3", "-ffast-math")
             }
         }
     }
@@ -60,6 +60,7 @@ android {
         // NewPipeExtractor bridge, so YouTube Music search/stream/download works.
         create("ytm") {
             dimension = "default"
+            applicationIdSuffix = ".ytm"
             manifestPlaceholders["appName"] = "Pulsr Music"
         }
     }
@@ -73,14 +74,14 @@ android {
     // likewise GPL and so likewise kept out of prod.
     sourceSets {
         getByName("dev") {
-            kotlin.directories.add("src/ytmEnabled/kotlin")
+            kotlin.srcDir("src/ytmEnabled/kotlin")
             assets.srcDir("src/ytmEnabled/assets")
         }
         getByName("ytm") {
-            kotlin.directories.add("src/ytmEnabled/kotlin")
+            kotlin.srcDir("src/ytmEnabled/kotlin")
             assets.srcDir("src/ytmEnabled/assets")
         }
-        getByName("prod") { kotlin.directories.add("src/ytmDisabled/kotlin") }
+        getByName("prod") { kotlin.srcDir("src/ytmDisabled/kotlin") }
     }
 
     val keystoreProperties = Properties().apply {
@@ -105,6 +106,17 @@ android {
         release {
             val releaseConfig = signingConfigs.getByName("release")
             val hasKeystore = releaseConfig.storeFile != null && releaseConfig.storeFile!!.exists()
+            val isCI = System.getenv("CI") == "true"
+            val isProdOrYtmBuild = gradle.startParameter.taskNames.any {
+                (it.contains("Prod", ignoreCase = true) || it.contains("Ytm", ignoreCase = true)) &&
+                it.contains("Release", ignoreCase = true)
+            }
+            if (!hasKeystore) {
+                if (isCI && isProdOrYtmBuild) {
+                    throw GradleException("Release keystore file missing in key.properties for release build on CI!")
+                }
+                logger.warn("WARNING: Release keystore file not found in key.properties. Falling back to debug signing config for local dev release build.")
+            }
             signingConfig = if (hasKeystore) releaseConfig else signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
@@ -113,6 +125,10 @@ android {
                 "proguard-rules.pro"
             )
         }
+    }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
     }
 
     lint {
@@ -158,6 +174,8 @@ dependencies {
     val newPipeExtractor = "com.github.TeamNewPipe:NewPipeExtractor:v0.26.5"
     "devImplementation"(newPipeExtractor)
     "ytmImplementation"(newPipeExtractor)
+    testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20231013")
 }
 
 configurations.all {
@@ -166,3 +184,176 @@ configurations.all {
     }
 }
 
+tasks.register("testNative") {
+    group = "verification"
+    description = "Compiles and executes native C++ DSP test suite on host (both parity and debug/sanitizer builds)."
+    doLast {
+        val testDir = file("src/test/cpp")
+        val mainDir = file("src/main/cpp")
+        val outDir = file("build/testNative").apply { mkdirs() }
+        val isWindows = org.apache.tools.ant.taskdefs.condition.Os.isFamily(org.apache.tools.ant.taskdefs.condition.Os.FAMILY_WINDOWS)
+        val exeParity = file("${outDir.absolutePath}/test_native_parity" + if (isWindows) ".exe" else "")
+        val exeDebug = file("${outDir.absolutePath}/test_native_debug" + if (isWindows) ".exe" else "")
+
+        val compiler = if (isWindows) {
+            val windhawkClang = file("C:/Program Files/Windhawk/Compiler/bin/clang++.exe")
+            if (windhawkClang.exists()) windhawkClang.absolutePath else "clang++"
+        } else {
+            "clang++"
+        }
+
+        val dspSources = listOf(
+            "ParametricEQ.cpp",
+            "Crossfeed.cpp",
+            "LookaheadLimiter.cpp",
+            "ConvolutionReverb.cpp",
+            "SincResampler.cpp",
+            "DsdDecoder.cpp",
+            "SpatialPanner.cpp",
+            "AudioDspEngine.cpp"
+        ).map { file("${mainDir.absolutePath}/$it").absolutePath }
+
+        // 1. Build & Run (a): Parity Build with exact production flags (-O3 -ffast-math -std=c++20)
+        println("[testNative] Compiling parity build (-O3 -ffast-math -std=c++20)...")
+        val parityCompileCmd = mutableListOf(
+            compiler,
+            "-std=c++20",
+            "-O3",
+            "-ffast-math",
+            "-I", mainDir.absolutePath,
+            file("${testDir.absolutePath}/test_native_all.cpp").absolutePath
+        ).apply {
+            addAll(dspSources)
+            if (isWindows) add("-static")
+            add("-o")
+            add(exeParity.absolutePath)
+        }
+
+        val parityCompileRes = ProcessBuilder(parityCompileCmd).inheritIO().start().waitFor()
+        if (parityCompileRes != 0) {
+            throw GradleException("Native DSP parity test compilation failed with exit code $parityCompileRes")
+        }
+
+        println("[testNative] Running parity test suite...")
+        val parityRunRes = ProcessBuilder(exeParity.absolutePath).inheritIO().start().waitFor()
+        if (parityRunRes != 0) {
+            throw GradleException("Native DSP parity test execution failed with exit code $parityRunRes")
+        }
+
+        // 2. Build & Run (b): Sanitizer / Debug build
+        println("[testNative] Compiling debug/sanitizer build...")
+        val sanitizerArgs = if (!isWindows) {
+            listOf("-std=c++20", "-fsanitize=address,undefined", "-O1")
+        } else {
+            println("[testNative] sanitizers unavailable on Windows")
+            listOf("-std=c++20", "-O1")
+        }
+
+        val debugCompileCmd = mutableListOf<String>().apply {
+            add(compiler)
+            addAll(sanitizerArgs)
+            add("-I")
+            add(mainDir.absolutePath)
+            add(file("${testDir.absolutePath}/test_native_all.cpp").absolutePath)
+            addAll(dspSources)
+            if (isWindows) add("-static")
+            if (!isWindows) add("-fsanitize=address,undefined")
+            add("-o")
+            add(exeDebug.absolutePath)
+        }
+
+        val debugCompileRes = ProcessBuilder(debugCompileCmd).inheritIO().start().waitFor()
+        if (debugCompileRes != 0) {
+            throw GradleException("Native DSP sanitizer/debug test compilation failed with exit code $debugCompileRes")
+        }
+
+        println("[testNative] Running debug/sanitizer test suite...")
+        val debugRunRes = ProcessBuilder(exeDebug.absolutePath).inheritIO().start().waitFor()
+        if (debugRunRes != 0) {
+            throw GradleException("Native DSP sanitizer/debug test execution failed with exit code $debugRunRes")
+        }
+
+        println("[testNative] PASSED: Both parity (-O3) and debug/sanitizer test suites passed 100%.")
+    }
+}
+
+tasks.register("validateProdIsolation") {
+    group = "verification"
+    description = "Ensures GPL / YouTube Extractor code never compiles into the prod variant."
+    doLast {
+        val prodKotlinDir = file("src/ytmDisabled/kotlin")
+        if (!prodKotlinDir.exists()) {
+            throw GradleException("Prod stub directory src/ytmDisabled/kotlin is missing!")
+        }
+        val forbiddenTerms = listOf("music.youtube.com", "NewPipeExtractor", "org.schabi.newpipe", "po_token")
+
+        // 1. Check main Manifest
+        val mainManifest = file("src/main/AndroidManifest.xml")
+        if (mainManifest.exists()) {
+            val content = mainManifest.readText()
+            for (term in forbiddenTerms) {
+                if (content.contains(term)) {
+                    throw GradleException("Forbidden GPL/YouTube term '$term' found in src/main/AndroidManifest.xml!")
+                }
+            }
+        }
+
+        // 2. Check main Kotlin sources
+        val mainKotlinDir = file("src/main/kotlin")
+        if (mainKotlinDir.exists()) {
+            mainKotlinDir.walkTopDown().filter { it.isFile && it.extension == "kt" }.forEach { file ->
+                val text = file.readText()
+                for (term in forbiddenTerms) {
+                    if (text.contains(term)) {
+                        throw GradleException("Forbidden GPL/YouTube term '$term' found in src/main/kotlin file: ${file.path}")
+                    }
+                }
+            }
+        }
+
+        // 3. Check main res
+        val mainResDir = file("src/main/res")
+        if (mainResDir.exists()) {
+            mainResDir.walkTopDown().filter { it.isFile && (it.extension == "xml" || it.extension == "png") }.forEach { file ->
+                val text = file.readText()
+                for (term in forbiddenTerms) {
+                    if (text.contains(term)) {
+                        throw GradleException("Forbidden GPL/YouTube term '$term' found in src/main/res file: ${file.path}")
+                    }
+                }
+            }
+        }
+
+        // 4. Check main assets
+        val mainAssetsDir = file("src/main/assets")
+        if (mainAssetsDir.exists()) {
+            mainAssetsDir.walkTopDown().filter { it.isFile }.forEach { file ->
+                val text = file.readText()
+                for (term in forbiddenTerms) {
+                    if (text.contains(term)) {
+                        throw GradleException("Forbidden GPL/YouTube term '$term' found in src/main/assets file: ${file.path}")
+                    }
+                }
+            }
+        }
+
+        // 5. Check Proguard rules
+        val proguardRules = file("proguard-rules.pro")
+        if (proguardRules.exists()) {
+            val text = proguardRules.readText()
+            for (term in forbiddenTerms) {
+                if (text.contains(term)) {
+                    throw GradleException("Forbidden GPL/YouTube term '$term' found in proguard-rules.pro!")
+                }
+            }
+        }
+
+        println("[validateProdIsolation] PASSED: Prod isolation verified successfully across manifests, kotlin, res, assets, and proguard.")
+    }
+}
+
+afterEvaluate {
+    tasks.matching { it.name.startsWith("assemble") || it.name == "check" || it.name == "test" }.configureEach {
+        dependsOn("validateProdIsolation")
+    }
+}

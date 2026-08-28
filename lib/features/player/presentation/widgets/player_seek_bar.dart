@@ -38,9 +38,12 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
 
   @override
   Widget build(BuildContext context) {
-    final songId = context.select<PlayerCubit, int?>((c) => c.state.currentSong?.id);
-    final songPath = context.select<PlayerCubit, String?>((c) => c.state.currentSong?.path);
-    final waveformEnabled = context.select<SettingsCubit, bool>((c) => c.state.waveformSeekBarEnabled);
+    final songId =
+        context.select<PlayerCubit, int?>((c) => c.state.currentSong?.id);
+    final songPath =
+        context.select<PlayerCubit, String?>((c) => c.state.currentSong?.path);
+    final waveformEnabled = context
+        .select<SettingsCubit, bool>((c) => c.state.waveformSeekBarEnabled);
 
     final effectiveSongId = widget.songId ?? songId;
     final effectiveFilePath = widget.filePath ?? songPath;
@@ -79,8 +82,10 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
   Widget _buildStandardSeekBar(BuildContext context) {
     final double maxDuration = widget.duration.inMilliseconds.toDouble();
     final double currentPos = widget.position.inMilliseconds.toDouble();
-    final double effectiveValue = (_dragValue ?? currentPos).clamp(0.0, maxDuration > 0 ? maxDuration : 1.0);
-    final double progressPercent = maxDuration > 0 ? (effectiveValue / maxDuration).clamp(0.0, 1.0) : 0.0;
+    final double effectiveValue = (_dragValue ?? currentPos)
+        .clamp(0.0, maxDuration > 0 ? maxDuration : 1.0);
+    final double progressPercent =
+        maxDuration > 0 ? (effectiveValue / maxDuration).clamp(0.0, 1.0) : 0.0;
 
     return Directionality(
       textDirection: TextDirection.ltr,
@@ -98,7 +103,8 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                     onHorizontalDragStart: (details) {
                       if (trackWidth > 0 && maxDuration > 0) {
                         HapticFeedback.selectionClick();
-                        final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                        final ratio = (details.localPosition.dx / trackWidth)
+                            .clamp(0.0, 1.0);
                         setState(() {
                           _dragValue = ratio * maxDuration;
                         });
@@ -106,7 +112,8 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                     },
                     onHorizontalDragUpdate: (details) {
                       if (trackWidth > 0 && maxDuration > 0) {
-                        final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                        final ratio = (details.localPosition.dx / trackWidth)
+                            .clamp(0.0, 1.0);
                         setState(() {
                           _dragValue = ratio * maxDuration;
                         });
@@ -115,7 +122,8 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                     onHorizontalDragEnd: (details) {
                       if (_dragValue != null) {
                         HapticFeedback.lightImpact();
-                        widget.onSeek(Duration(milliseconds: _dragValue!.round()));
+                        widget.onSeek(
+                            Duration(milliseconds: _dragValue!.round()));
                         setState(() {
                           _dragValue = null;
                         });
@@ -124,7 +132,8 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                     onTapDown: (details) {
                       if (trackWidth > 0 && maxDuration > 0) {
                         HapticFeedback.selectionClick();
-                        final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                        final ratio = (details.localPosition.dx / trackWidth)
+                            .clamp(0.0, 1.0);
                         final seekMs = ratio * maxDuration;
                         widget.onSeek(Duration(milliseconds: seekMs.round()));
                       }
@@ -138,9 +147,11 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                           Container(
                             height: 5,
                             decoration: BoxDecoration(
-                              color: Theme.of(context).brightness == Brightness.dark
+                              color: Theme.of(context).brightness ==
+                                      Brightness.dark
                                   ? Colors.white.withValues(alpha: 0.18)
-                                  : context.palette.hairline.withValues(alpha: 0.9),
+                                  : context.palette.hairline
+                                      .withValues(alpha: 0.9),
                               borderRadius: BorderRadius.circular(4),
                             ),
                           ),
@@ -159,7 +170,8 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                                 borderRadius: BorderRadius.circular(4),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: widget.activeColor.withValues(alpha: 0.4),
+                                    color: widget.activeColor
+                                        .withValues(alpha: 0.4),
                                     blurRadius: 8,
                                     offset: const Offset(0, 1),
                                   ),
@@ -169,7 +181,8 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                           ),
                           // Scrubber Thumb
                           Positioned(
-                            left: (progressPercent * trackWidth - 7).clamp(0.0, (trackWidth - 14).clamp(0.0, trackWidth)),
+                            left: (progressPercent * trackWidth - 7).clamp(
+                                0.0, (trackWidth - 14).clamp(0.0, trackWidth)),
                             child: Container(
                               width: 14,
                               height: 14,
@@ -199,7 +212,9 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                 children: [
                   Text(
                     Formatters.formatDuration(
-                      _dragValue != null ? Duration(milliseconds: _dragValue!.round()) : widget.position,
+                      _dragValue != null
+                          ? Duration(milliseconds: _dragValue!.round())
+                          : widget.position,
                     ),
                     style: TextStyle(
                       color: context.palette.textSecondary,

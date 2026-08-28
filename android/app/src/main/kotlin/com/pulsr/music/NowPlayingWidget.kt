@@ -26,6 +26,7 @@ import android.util.SizeF
 import android.view.KeyEvent
 import android.view.View
 import android.widget.RemoteViews
+import androidx.core.content.FileProvider
 import es.antonborri.home_widget.HomeWidgetLaunchIntent
 import es.antonborri.home_widget.HomeWidgetPlugin
 import java.io.File
@@ -45,12 +46,13 @@ class NowPlayingWidget : AppWidgetProvider() {
             val componentName = ComponentName(context, NowPlayingWidget::class.java)
             val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
             if (appWidgetIds != null && appWidgetIds.isNotEmpty()) {
+                val isProgressOnly = intent.getBooleanExtra("isProgressOnly", false)
                 for (appWidgetId in appWidgetIds) {
-                    updateAppWidget(context, appWidgetManager, appWidgetId)
+                    updateAppWidget(context, appWidgetManager, appWidgetId, isProgressOnly)
                 }
             }
         } catch (_: Throwable) {
-            // Ignore
+            // Self-heal gracefully
         }
     }
 
@@ -62,7 +64,7 @@ class NowPlayingWidget : AppWidgetProvider() {
     ) {
         super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
         try {
-            updateAppWidget(context, appWidgetManager, appWidgetId)
+            updateAppWidget(context, appWidgetManager, appWidgetId, false)
         } catch (_: Throwable) {
             // Ignore
         }
@@ -124,7 +126,6 @@ class NowPlayingWidget : AppWidgetProvider() {
             }
         }
 
-        // Post a debounced delayed update to refresh widget state from actual media controller playback state
         scheduleDebouncedWidgetUpdate(context, 300L)
     }
 
@@ -135,7 +136,7 @@ class NowPlayingWidget : AppWidgetProvider() {
     ) {
         for (appWidgetId in appWidgetIds) {
             try {
-                updateAppWidget(context, appWidgetManager, appWidgetId)
+                updateAppWidget(context, appWidgetManager, appWidgetId, false)
             } catch (_: Throwable) {
                 // Ignore
             }
@@ -151,11 +152,6 @@ class NowPlayingWidget : AppWidgetProvider() {
             cachedMediaBrowser = null
             cachedMediaController = null
         }
-        try {
-            cachedArtworkBitmap?.let {
-                if (!it.isRecycled) it.recycle()
-            }
-        } catch (_: Throwable) {}
         cachedArtworkBitmap = null
         cachedArtworkPath = null
         cachedArtworkTargetPx = 0
@@ -202,7 +198,7 @@ class NowPlayingWidget : AppWidgetProvider() {
         private val updateHandler = Handler(Looper.getMainLooper())
         private var pendingUpdateRunnable: Runnable? = null
 
-        fun scheduleDebouncedWidgetUpdate(context: Context, delayMs: Long = 150L) {
+        fun scheduleDebouncedWidgetUpdate(context: Context, delayMs: Long = 150L, isProgressOnly: Boolean = false) {
             val appContext = context.applicationContext ?: context
             pendingUpdateRunnable?.let { updateHandler.removeCallbacks(it) }
             val runnable = Runnable {
@@ -212,7 +208,7 @@ class NowPlayingWidget : AppWidgetProvider() {
                     val appWidgetIds = appWidgetManager.getAppWidgetIds(componentName)
                     if (appWidgetIds != null && appWidgetIds.isNotEmpty()) {
                         for (id in appWidgetIds) {
-                            updateAppWidget(appContext, appWidgetManager, id)
+                            updateAppWidget(appContext, appWidgetManager, id, isProgressOnly)
                         }
                     }
                 } catch (_: Throwable) {}
@@ -360,14 +356,16 @@ class NowPlayingWidget : AppWidgetProvider() {
         fun updateAppWidget(
             context: Context,
             appWidgetManager: AppWidgetManager,
-            appWidgetId: Int
+            appWidgetId: Int,
+            isProgressOnly: Boolean = false
         ) {
             try {
                 val data = HomeWidgetPlugin.getData(context)
+
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                    val viewsCompact = createPopulatedRemoteViews(context, R.layout.widget_now_playing, data, 56)
-                    val viewsMedium = createPopulatedRemoteViews(context, R.layout.widget_now_playing_medium, data, 68)
-                    val viewsLarge = createPopulatedRemoteViews(context, R.layout.widget_now_playing_large, data, 88)
+                    val viewsCompact = createPopulatedRemoteViews(context, R.layout.widget_now_playing, data, 56, isProgressOnly)
+                    val viewsMedium = createPopulatedRemoteViews(context, R.layout.widget_now_playing_medium, data, 68, isProgressOnly)
+                    val viewsLarge = createPopulatedRemoteViews(context, R.layout.widget_now_playing_large, data, 88, isProgressOnly)
                     val viewMapping = mapOf(
                         SizeF(140f, 60f) to viewsCompact,
                         SizeF(180f, 110f) to viewsMedium,
@@ -383,11 +381,27 @@ class NowPlayingWidget : AppWidgetProvider() {
                         minHeight >= 110 -> Pair(R.layout.widget_now_playing_medium, 68)
                         else -> Pair(R.layout.widget_now_playing, 56)
                     }
-                    val views = createPopulatedRemoteViews(context, layoutId, data, artDp)
+                    val views = createPopulatedRemoteViews(context, layoutId, data, artDp, isProgressOnly)
                     appWidgetManager.updateAppWidget(appWidgetId, views)
                 }
             } catch (e: Throwable) {
-                android.util.Log.e("NowPlayingWidget", "Widget update failed", e)
+                android.util.Log.e("NowPlayingWidget", "Widget update failed, recovering with fallback views", e)
+                // W3: Self-healing fallback on IllegalStateException / Oplus widget crash
+                try {
+                    cachedArtworkBitmap = null
+                    cachedArtworkPath = null
+                    cachedArtworkTargetPx = 0
+
+                    val fallbackViews = RemoteViews(context.packageName, R.layout.widget_now_playing).apply {
+                        val data = HomeWidgetPlugin.getData(context)
+                        val title = getSafeString(data, "title")
+                        val artist = getSafeString(data, "artist")
+                        setTextViewText(R.id.widget_title, if (title.isNullOrBlank()) "Pulsr Music" else title)
+                        setTextViewText(R.id.widget_artist, if (artist.isNullOrBlank()) "Nothing playing" else artist)
+                        setImageViewResource(R.id.widget_artwork, R.mipmap.launcher_icon)
+                    }
+                    appWidgetManager.updateAppWidget(appWidgetId, fallbackViews)
+                } catch (_: Throwable) {}
             }
         }
 
@@ -395,9 +409,37 @@ class NowPlayingWidget : AppWidgetProvider() {
             context: Context,
             layoutId: Int,
             data: SharedPreferences,
-            targetArtDp: Int
+            targetArtDp: Int,
+            isProgressOnly: Boolean = false
         ): RemoteViews {
             val views = RemoteViews(context.packageName, layoutId)
+
+            // ---- Progress & Transport (always updated) ----
+            val duration = getSafeLong(data, "durationMs", 0L)
+            val position = getSafeLong(data, "positionMs", 0L).coerceAtLeast(0L)
+            if (duration > 0) {
+                views.setViewVisibility(R.id.widget_progress_container, View.VISIBLE)
+                views.setViewVisibility(R.id.widget_times_row, View.VISIBLE)
+                val max = 1000
+                val prog = ((position.toDouble() / duration.toDouble()) * max).toInt().coerceIn(0, max)
+                views.setProgressBar(R.id.widget_progress, max, prog, false)
+                views.setTextViewText(R.id.widget_elapsed, formatMs(position))
+                views.setTextViewText(R.id.widget_duration, formatMs(duration))
+            } else {
+                views.setViewVisibility(R.id.widget_progress_container, View.GONE)
+                views.setViewVisibility(R.id.widget_times_row, View.GONE)
+            }
+
+            val isPlaying = getSafeBoolean(data, "isPlaying", false)
+            views.setImageViewResource(
+                R.id.btn_play_pause,
+                if (isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play
+            )
+
+            // If progress-only tick, skip bitmap decoding and text metadata churn
+            if (isProgressOnly) {
+                return views
+            }
 
             // ---- Text (Title & Artist) ----
             val title = getSafeString(data, "title")
@@ -447,22 +489,6 @@ class NowPlayingWidget : AppWidgetProvider() {
                 views.setViewVisibility(R.id.widget_queue_container, View.VISIBLE)
             }
 
-            // ---- Progress ----
-            val duration = getSafeLong(data, "durationMs", 0L)
-            val position = getSafeLong(data, "positionMs", 0L).coerceAtLeast(0L)
-            if (duration > 0) {
-                views.setViewVisibility(R.id.widget_progress_container, View.VISIBLE)
-                views.setViewVisibility(R.id.widget_times_row, View.VISIBLE)
-                val max = 1000
-                val prog = ((position.toDouble() / duration.toDouble()) * max).toInt().coerceIn(0, max)
-                views.setProgressBar(R.id.widget_progress, max, prog, false)
-                views.setTextViewText(R.id.widget_elapsed, formatMs(position))
-                views.setTextViewText(R.id.widget_duration, formatMs(duration))
-            } else {
-                views.setViewVisibility(R.id.widget_progress_container, View.GONE)
-                views.setViewVisibility(R.id.widget_times_row, View.GONE)
-            }
-
             // ---- Favorite ----
             val isFavorite = getSafeBoolean(data, "isFavorite", false)
             views.setImageViewResource(
@@ -490,14 +516,7 @@ class NowPlayingWidget : AppWidgetProvider() {
                 if (repeatMode == "one") R.drawable.ic_widget_repeat_one else R.drawable.ic_widget_repeat
             )
 
-            // ---- Play / Pause ----
-            val isPlaying = getSafeBoolean(data, "isPlaying", false)
-            views.setImageViewResource(
-                R.id.btn_play_pause,
-                if (isPlaying) R.drawable.ic_widget_pause else R.drawable.ic_widget_play
-            )
-
-            // ---- Artwork (with Downsampling, RGB_565 & Bitmap caching to prevent OOM) ----
+            // ---- Artwork (W1/W2/W4: Safe URI / safe copy with zero Bitmap.recycle() calls) ----
             val artworkPath = getSafeString(data, "artwork")
             var bitmapSet = false
             if (!artworkPath.isNullOrEmpty()) {
@@ -510,8 +529,11 @@ class NowPlayingWidget : AppWidgetProvider() {
                         val cachedBmp = cachedArtworkBitmap
 
                         if (cachedArtworkPath == artworkPath && cachedArtworkMtime == mtime && cachedBmp != null && !cachedBmp.isRecycled && cachedArtworkTargetPx == targetPx) {
-                            views.setImageViewBitmap(R.id.widget_artwork, cachedBmp)
-                            bitmapSet = true
+                            val safeCopy = cachedBmp.copy(cachedBmp.config ?: Bitmap.Config.ARGB_8888, false)
+                            if (safeCopy != null && !safeCopy.isRecycled) {
+                                views.setImageViewBitmap(R.id.widget_artwork, safeCopy)
+                                bitmapSet = true
+                            }
                         } else {
                             val boundsOptions = BitmapFactory.Options().apply {
                                 inJustDecodeBounds = true
@@ -530,34 +552,27 @@ class NowPlayingWidget : AppWidgetProvider() {
                             }
 
                             val rawBitmap = BitmapFactory.decodeFile(artworkPath, decodeOptions)
-                            if (rawBitmap != null) {
+                            if (rawBitmap != null && !rawBitmap.isRecycled) {
                                 val scaledBitmap = if (rawBitmap.width > targetPx || rawBitmap.height > targetPx) {
-                                    val scaled = Bitmap.createScaledBitmap(rawBitmap, targetPx, targetPx, true)
-                                    if (scaled != rawBitmap) {
-                                        rawBitmap.recycle()
-                                    }
-                                    scaled
+                                    Bitmap.createScaledBitmap(rawBitmap, targetPx, targetPx, true)
                                 } else {
                                     rawBitmap
                                 }
                                 val cornerRadiusPx = (if (targetArtDp >= 90) 18f else 14f) * density
                                 val roundedBitmap = getRoundedCornerBitmap(scaledBitmap, cornerRadiusPx)
-                                if (roundedBitmap != scaledBitmap && !scaledBitmap.isRecycled) {
-                                    scaledBitmap.recycle()
-                                }
 
-                                cachedArtworkBitmap?.let {
-                                    if (!it.isRecycled && it != roundedBitmap) {
-                                        it.recycle()
+                                if (!roundedBitmap.isRecycled) {
+                                    cachedArtworkBitmap = roundedBitmap
+                                    cachedArtworkPath = artworkPath
+                                    cachedArtworkMtime = mtime
+                                    cachedArtworkTargetPx = targetPx
+
+                                    val safeCopy = roundedBitmap.copy(roundedBitmap.config ?: Bitmap.Config.ARGB_8888, false)
+                                    if (safeCopy != null && !safeCopy.isRecycled) {
+                                        views.setImageViewBitmap(R.id.widget_artwork, safeCopy)
+                                        bitmapSet = true
                                     }
                                 }
-                                cachedArtworkBitmap = roundedBitmap
-                                cachedArtworkPath = artworkPath
-                                cachedArtworkMtime = mtime
-                                cachedArtworkTargetPx = targetPx
-
-                                views.setImageViewBitmap(R.id.widget_artwork, roundedBitmap)
-                                bitmapSet = true
                             }
                         }
                     }
@@ -650,6 +665,7 @@ class NowPlayingWidget : AppWidgetProvider() {
 
         private fun getRoundedCornerBitmap(bitmap: Bitmap, cornerRadiusPx: Float): Bitmap {
             return try {
+                if (bitmap.isRecycled) return bitmap
                 val output = Bitmap.createBitmap(bitmap.width, bitmap.height, bitmap.config ?: Bitmap.Config.ARGB_8888)
                 val canvas = Canvas(output)
                 val paint = Paint(Paint.ANTI_ALIAS_FLAG)

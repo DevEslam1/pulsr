@@ -20,7 +20,8 @@ import '../utils/error_logger.dart';
 import '../utils/lrc_parser.dart';
 import '../utils/ytm_rate_limiter.dart';
 import 'xdm_backend_service.dart';
-import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart'
+    hide AndroidOptions;
 
 class YtmAccountPlaylist {
   final String playlistId;
@@ -66,12 +67,19 @@ enum SessionValidationResult {
 @singleton
 class YtmAccountService {
   String? _cachedLikedSongsBrowseId;
-  static const String _cookiePrefKey = 'ytm_session_cookies';
-
   /// Session cookies are full Google auth credentials — stored in
-  /// Keystore/Keychain-backed secure storage, never as plaintext prefs.
+  /// Keystore/Keychain-backed secure storage, never as plaintext prefs. (BUG-023)
   static const String _cookieSecureKey = 'ytm_session_cookies_secure';
-  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage();
+  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage(
+    aOptions: AndroidOptions(
+      // ignore: deprecated_member_use
+      encryptedSharedPreferences: true,
+      resetOnError: true,
+    ),
+    iOptions: IOSOptions(
+      accessibility: KeychainAccessibility.first_unlock,
+    ),
+  );
   static const String _accountNamePrefKey = 'ytm_account_name';
   static const String _accountAvatarPrefKey = 'ytm_account_avatar';
   static const String _dataSyncIdPrefKey = 'ytm_data_sync_id';
@@ -121,13 +129,14 @@ class YtmAccountService {
     if (_isInitialized) return;
     try {
       await _versionResolver.init();
-      final prefs = await SharedPreferences.getInstance();
       final nativeCookies = await getNativeCookiesFromDomains();
-      if (nativeCookies != null && nativeCookies.isNotEmpty && looksLikeSignedInCookies(nativeCookies)) {
+      if (nativeCookies != null &&
+          nativeCookies.isNotEmpty &&
+          looksLikeSignedInCookies(nativeCookies)) {
         _cookies = nativeCookies;
         await _persistCookies(nativeCookies);
       } else {
-        _cookies = await _readStoredCookies(prefs);
+        _cookies = await _readStoredCookies();
       }
       if (_cookies != null && _cookies!.isNotEmpty) {
         final ok = await validateSession();
@@ -136,7 +145,8 @@ class YtmAccountService {
           _cookies = null;
         } else {
           final ytmService = getIt<YtmService>();
-          await ytmService.syncCookies(_cookies!); // inject ONLY validated cookies
+          await ytmService
+              .syncCookies(_cookies!); // inject ONLY validated cookies
           final dsid = _dataSyncId;
           if (dsid != null && dsid.isNotEmpty) {
             await ytmService.setDataSyncId(dsid);
@@ -146,6 +156,7 @@ class YtmAccountService {
           unawaited(_persistCookies(_cookies!));
         }
       }
+      final prefs = await SharedPreferences.getInstance();
       _accountName = prefs.getString(_accountNamePrefKey);
       _accountAvatar = prefs.getString(_accountAvatarPrefKey);
       _dataSyncId = prefs.getString(_dataSyncIdPrefKey);
@@ -170,13 +181,19 @@ class YtmAccountService {
         }),
         baseTimeoutSeconds: 8,
       );
-      if (res.statusCode != 200) return SessionValidationResult.unknown; // transient, don't kill session
+      if (res.statusCode != 200) {
+        return SessionValidationResult.unknown; // transient, don't kill session
+      }
       final json = jsonDecode(res.body) as Map<String, dynamic>;
-      if (_isUnauthenticatedResponse(json)) return SessionValidationResult.invalid; // definitive
+      if (_isUnauthenticatedResponse(json)) {
+        return SessionValidationResult.invalid; // definitive
+      }
       _harvestSessionState(json);
       return SessionValidationResult.valid;
     } on YtmException catch (e) {
-      return e.isAuth ? SessionValidationResult.invalid : SessionValidationResult.unknown;
+      return e.isAuth
+          ? SessionValidationResult.invalid
+          : SessionValidationResult.unknown;
     } catch (_) {
       return SessionValidationResult.unknown; // network failure
     }
@@ -199,31 +216,25 @@ class YtmAccountService {
     }
   }
 
-  /// Reads session cookies from secure storage, falling back to the legacy
-  /// plaintext pref for devices where secure storage is unavailable.
-  Future<String?> _readStoredCookies(SharedPreferences prefs) async {
+  /// Reads session cookies exclusively from Keystore/Keychain secure storage. (BUG-023)
+  Future<String?> _readStoredCookies() async {
     try {
       final secure = await _secureStorage.read(key: _cookieSecureKey);
       if (secure != null && secure.isNotEmpty) return secure;
-    } catch (_) {}
-    try {
-      return prefs.getString(_cookiePrefKey);
-    } catch (_) {
-      return null;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to read cookies from secure storage',
+          error: e, stackTrace: st, category: 'YTM_ACCOUNT');
     }
+    return null;
   }
 
-  /// Persists session cookies to secure storage. Never falls back to plaintext SharedPreferences.
+  /// Persists session cookies exclusively to secure storage. (BUG-023)
   Future<void> _persistCookies(String rawCookies) async {
     try {
       await _secureStorage.write(key: _cookieSecureKey, value: rawCookies);
-      // Clean up any legacy plaintext copy
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_cookiePrefKey);
     } catch (e, st) {
       ErrorLogger.log('Failed to persist cookies to secure storage',
           error: e, stackTrace: st, category: 'YTM_ACCOUNT');
-      // Keep cookies in memory only — user re-authenticates on next launch
       _cookies = rawCookies;
     }
   }
@@ -231,10 +242,6 @@ class YtmAccountService {
   Future<void> _deleteStoredCookies() async {
     try {
       await _secureStorage.delete(key: _cookieSecureKey);
-    } catch (_) {}
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_cookiePrefKey);
     } catch (_) {}
   }
 
@@ -303,8 +310,7 @@ class YtmAccountService {
 
   /// Deletes only YTM/Google session cookies from the WebView cookie store.
   /// Public so the login sheet's manual "clear cookies" action stays scoped.
-  Future<void> clearSessionWebViewCookies() =>
-      _deleteSessionWebViewCookies();
+  Future<void> clearSessionWebViewCookies() => _deleteSessionWebViewCookies();
 
   Future<void> _deleteSessionWebViewCookies() async {
     try {
@@ -343,7 +349,8 @@ class YtmAccountService {
       if (res.statusCode == 200) {
         final json = jsonDecode(res.body) as Map<String, dynamic>;
         if (_isUnauthenticatedResponse(json)) {
-          debugPrint('[YTM_ACCOUNT] Warmed session returned unauthenticated — keeping session, notifying expiry check');
+          debugPrint(
+              '[YTM_ACCOUNT] Warmed session returned unauthenticated — keeping session, notifying expiry check');
           getIt<YtmService>().notifyAuthExpired();
           return;
         }
@@ -370,7 +377,8 @@ class YtmAccountService {
     int start = 0;
     bool inExpires = false;
     for (int i = 0; i < header.length; i++) {
-      if (i + 8 <= header.length && header.substring(i, i + 8).toLowerCase() == 'expires=') {
+      if (i + 8 <= header.length &&
+          header.substring(i, i + 8).toLowerCase() == 'expires=') {
         inExpires = true;
       }
       if (header[i] == ';') {
@@ -425,7 +433,8 @@ class YtmAccountService {
         }
         if (attr.startsWith('expires=')) {
           try {
-            final expires = HttpDate.parse(segments[i].trim().substring(8).trim());
+            final expires =
+                HttpDate.parse(segments[i].trim().substring(8).trim());
             if (expires.isBefore(DateTime.now())) {
               shouldDelete = true;
             }
@@ -464,7 +473,8 @@ class YtmAccountService {
   }
 
   /// Builds authenticated Innertube request headers with timestamped SAPISIDHASH, SAPISID3PHASH, or SAPISID1PHASH.
-  Map<String, String> _buildHeaders({String userAgent = '', String origin = 'https://music.youtube.com'}) {
+  Map<String, String> _buildHeaders(
+      {String userAgent = '', String origin = 'https://music.youtube.com'}) {
     final defaultUa =
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36';
 
@@ -493,8 +503,10 @@ class YtmAccountService {
 
   /// Builds the proper Authorization header for YouTube / Google InnerTube requests.
   /// Supports SAPISID (SAPISIDHASH), __Secure-3PAPISID (SAPISID3PHASH), and __Secure-1PAPISID (SAPISID1PHASH).
-  static String? buildAuthorizationHeader(String cookies, {String origin = 'https://music.youtube.com'}) {
-    final timestamp = (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
+  static String? buildAuthorizationHeader(String cookies,
+      {String origin = 'https://music.youtube.com'}) {
+    final timestamp =
+        (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
 
     final sapisid = _extractCookieValue(cookies, 'SAPISID');
     if (sapisid != null && sapisid.isNotEmpty) {
@@ -554,13 +566,20 @@ class YtmAccountService {
     return hasSapisid && hasPsid;
   }
 
-  Map<String, dynamic> _buildClientContext(String clientType, [String? videoId]) {
+  Map<String, dynamic> _buildClientContext(String clientType,
+      [String? videoId]) {
     final clientMap = <String, dynamic>{
       'clientName': clientType,
       // Use the resolved client version for WEB_REMIX; explicit per-client
       // versions for the named mobile clients; fall back to WEB_REMIX version
       // rather than the stale '19.29.37' for anything else.
-      'clientVersion': clientType == 'WEB_REMIX' ? _clientVersion : clientType == 'ANDROID_MUSIC' ? '8.32.50' : clientType == 'IOS_MUSIC' ? '8.32.1' : _clientVersion,
+      'clientVersion': clientType == 'WEB_REMIX'
+          ? _clientVersion
+          : clientType == 'ANDROID_MUSIC'
+              ? '8.32.50'
+              : clientType == 'IOS_MUSIC'
+                  ? '8.32.1'
+                  : _clientVersion,
       'hl': 'en',
       'gl': 'US',
     };
@@ -625,7 +644,8 @@ class YtmAccountService {
       'user': {'lockedSafetyMode': false},
     };
 
-    if (clientType == 'WEB_EMBEDDED_PLAYER' || clientType == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER') {
+    if (clientType == 'WEB_EMBEDDED_PLAYER' ||
+        clientType == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER') {
       contextJson['thirdParty'] = {
         'embedUrl': (videoId != null && videoId.isNotEmpty)
             ? 'https://www.youtube.com/watch?v=$videoId'
@@ -647,13 +667,15 @@ class YtmAccountService {
       try {
         await YtmRateLimiter.shared.acquirePermit();
         final timeout = Duration(seconds: baseTimeoutSeconds + attempt * 5);
-        final res = await http.post(uri, headers: headers, body: body).timeout(timeout);
+        final res =
+            await http.post(uri, headers: headers, body: body).timeout(timeout);
         if (res.statusCode == 429 || res.statusCode >= 500) {
           if (res.statusCode == 429) {
             YtmRateLimiter.shared.onRateLimited();
           }
           final backoffSec = (1 << attempt) + Random().nextInt(2);
-          debugPrint('[YTM_ACCOUNT] HTTP ${res.statusCode} encountered. Backing off for ${backoffSec}s (attempt ${attempt + 1}/$maxAttempts)');
+          debugPrint(
+              '[YTM_ACCOUNT] HTTP ${res.statusCode} encountered. Backing off for ${backoffSec}s (attempt ${attempt + 1}/$maxAttempts)');
           if (attempt < maxAttempts - 1) {
             await Future.delayed(Duration(seconds: backoffSec));
             continue;
@@ -702,7 +724,8 @@ class YtmAccountService {
         if (response.statusCode == 200) {
           final json = jsonDecode(response.body) as Map<String, dynamic>;
           if (_isUnauthenticatedResponse(json)) {
-            debugPrint('[YTM_ACCOUNT] Unauthenticated response detected on $bId');
+            debugPrint(
+                '[YTM_ACCOUNT] Unauthenticated response detected on $bId');
             await logout();
             throw const YtmException('YTM_AUTH', 'Session expired');
           }
@@ -715,7 +738,8 @@ class YtmAccountService {
         }
       } catch (e) {
         if (e is YtmException && e.isAuth) rethrow;
-        debugPrint('[YTM_ACCOUNT] Failed fetching account playlists ($bId): $e');
+        debugPrint(
+            '[YTM_ACCOUNT] Failed fetching account playlists ($bId): $e');
       }
     }
     return [];
@@ -729,7 +753,9 @@ class YtmAccountService {
 
     // Refresh cookies from native CookieManager if needed
     final nativeCookies = await getNativeCookiesFromDomains();
-    if (nativeCookies != null && nativeCookies.isNotEmpty && looksLikeSignedInCookies(nativeCookies)) {
+    if (nativeCookies != null &&
+        nativeCookies.isNotEmpty &&
+        looksLikeSignedInCookies(nativeCookies)) {
       _cookies = nativeCookies;
       unawaited(_persistCookies(nativeCookies));
     }
@@ -763,7 +789,8 @@ class YtmAccountService {
         if (response.statusCode == 200) {
           final json = jsonDecode(response.body) as Map<String, dynamic>;
           if (_isUnauthenticatedResponse(json)) {
-            debugPrint('[YTM_ACCOUNT] Liked songs returned unauthenticated on $bId, trying next candidate');
+            debugPrint(
+                '[YTM_ACCOUNT] Liked songs returned unauthenticated on $bId, trying next candidate');
             continue;
           }
 
@@ -842,12 +869,14 @@ class YtmAccountService {
                   break;
                 }
               } catch (e) {
-                debugPrint('[YTM_ACCOUNT] Liked songs continuation error on page $pageCount: $e');
+                debugPrint(
+                    '[YTM_ACCOUNT] Liked songs continuation error on page $pageCount: $e');
                 break;
               }
             }
             if (pageCount >= maxPages) {
-              debugPrint('[YTM_ACCOUNT] Hit max continuation pages ($maxPages)');
+              debugPrint(
+                  '[YTM_ACCOUNT] Hit max continuation pages ($maxPages)');
             }
 
             final seenIds = <String>{};
@@ -944,11 +973,14 @@ class YtmAccountService {
 
     // Try Native Kotlin Innertube browse with full WebView cookie jar
     try {
-      debugPrint('[YTM_ACCOUNT] Attempting Native Kotlin Innertube fallback for liked songs...');
+      debugPrint(
+          '[YTM_ACCOUNT] Attempting Native Kotlin Innertube fallback for liked songs...');
       final ytmService = getIt<YtmService>();
-      final nativeTracks = await ytmService.getPlaylistTracks('VLLM', limit: maxTracks);
+      final nativeTracks =
+          await ytmService.getPlaylistTracks('VLLM', limit: maxTracks);
       if (nativeTracks.isNotEmpty) {
-        debugPrint('[YTM_ACCOUNT] Native Kotlin fallback returned ${nativeTracks.length} liked songs');
+        debugPrint(
+            '[YTM_ACCOUNT] Native Kotlin fallback returned ${nativeTracks.length} liked songs');
         return nativeTracks.take(maxTracks).toList();
       }
     } catch (e) {
@@ -958,7 +990,8 @@ class YtmAccountService {
     // Last resort: XDM yt-dlp backend — passes authenticated cookies server-side
     // via the cookie pool and can access private playlists that InnerTube rejects.
     try {
-      debugPrint('[YTM_ACCOUNT] Attempting XDM backend fallback for liked songs...');
+      debugPrint(
+          '[YTM_ACCOUNT] Attempting XDM backend fallback for liked songs...');
       final xdm = getIt<XdmBackendService>();
       if (await xdm.isEnabled()) {
         var tracks = await xdm.getPlaylist(
@@ -974,7 +1007,8 @@ class YtmAccountService {
           );
         }
         if (tracks.isNotEmpty) {
-          debugPrint('[YTM_ACCOUNT] XDM backend returned ${tracks.length} liked songs');
+          debugPrint(
+              '[YTM_ACCOUNT] XDM backend returned ${tracks.length} liked songs');
           return tracks.take(maxTracks).toList();
         }
       }
@@ -990,7 +1024,9 @@ class YtmAccountService {
     if (!isLoggedIn) return [];
 
     final nativeCookies = await getNativeCookiesFromDomains();
-    if (nativeCookies != null && nativeCookies.isNotEmpty && looksLikeSignedInCookies(nativeCookies)) {
+    if (nativeCookies != null &&
+        nativeCookies.isNotEmpty &&
+        looksLikeSignedInCookies(nativeCookies)) {
       _cookies = nativeCookies;
       unawaited(_persistCookies(nativeCookies));
     }
@@ -1028,7 +1064,8 @@ class YtmAccountService {
                 body: contBody,
               );
               if (contRes.statusCode == 200) {
-                final contJson = jsonDecode(contRes.body) as Map<String, dynamic>;
+                final contJson =
+                    jsonDecode(contRes.body) as Map<String, dynamic>;
                 final contTracks = _parseInnertubePlaylistTracks(contJson);
                 if (contTracks.isNotEmpty) {
                   tracks.addAll(contTracks);
@@ -1067,7 +1104,8 @@ class YtmAccountService {
       });
 
       final nextRes = await _postWithRetry(
-        Uri.parse('https://music.youtube.com/youtubei/v1/next?prettyPrint=false&key=$_apiKey'),
+        Uri.parse(
+            'https://music.youtube.com/youtubei/v1/next?prettyPrint=false&key=$_apiKey'),
         headers: headers,
         body: nextBody,
         baseTimeoutSeconds: 8,
@@ -1166,21 +1204,25 @@ class YtmAccountService {
   /// 2. ANDROID client
   /// 3. IOS client
   /// 4. TVHTML5_SIMPLY_EMBEDDED_PLAYER
-  Future<YtmStream?> resolvePlayerStream(String videoId, {String quality = 'high'}) async {
+  Future<YtmStream?> resolvePlayerStream(String videoId,
+      {String quality = 'high'}) async {
     try {
       return await _resolvePlayerStreamInternal(videoId, quality: quality)
           .timeout(const Duration(seconds: 25));
     } on TimeoutException {
-      debugPrint('[YTM_ACCOUNT] Global stream resolution timed out after 25s for $videoId');
+      debugPrint(
+          '[YTM_ACCOUNT] Global stream resolution timed out after 25s for $videoId');
       return null;
     }
   }
 
-  Future<YtmStream?> _resolvePlayerStreamInternal(String videoId, {String quality = 'high'}) async {
+  Future<YtmStream?> _resolvePlayerStreamInternal(String videoId,
+      {String quality = 'high'}) async {
     // BotGuard requires a poToken on WEB_REMIX player requests regardless of login.
     // Authenticated → the token must be content-bound to the account's datasyncId, sent WITH
     // the session cookies + SAPISIDHASH. Unauthenticated → a guest token bound to guest visitorData.
-    final isAuthenticated = isLoggedIn && _cookies != null && _cookies!.isNotEmpty;
+    final isAuthenticated =
+        isLoggedIn && _cookies != null && _cookies!.isNotEmpty;
     // Warm the native BotGuard attestation once so both the account-bound and
     // guest minting below have a live generator instead of a cold WebView.
     try {
@@ -1243,10 +1285,17 @@ class YtmAccountService {
 
     for (final client in clientChain) {
       try {
-        final isWeb = client == 'WEB_REMIX' || client == 'WEB_EMBEDDED_PLAYER' || client == 'MWEB' || client == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER';
-        final endpointHost = (client == 'ANDROID_MUSIC' || client == 'IOS_MUSIC' || client == 'WEB_REMIX')
+        final isWeb = client == 'WEB_REMIX' ||
+            client == 'WEB_EMBEDDED_PLAYER' ||
+            client == 'MWEB' ||
+            client == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER';
+        final endpointHost = (client == 'ANDROID_MUSIC' ||
+                client == 'IOS_MUSIC' ||
+                client == 'WEB_REMIX')
             ? 'https://music.youtube.com'
-            : (client == 'MWEB' ? 'https://m.youtube.com' : 'https://www.youtube.com');
+            : (client == 'MWEB'
+                ? 'https://m.youtube.com'
+                : 'https://www.youtube.com');
 
         final headers = <String, String>{
           'Content-Type': 'application/json',
@@ -1266,7 +1315,9 @@ class YtmAccountService {
                                   ? '24.45.100'
                                   : (client == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER'
                                       ? '2.0'
-                                      : (client == 'ANDROID_TESTSUITE' ? '1.9' : _clientVersion))))))),
+                                      : (client == 'ANDROID_TESTSUITE'
+                                          ? '1.9'
+                                          : _clientVersion))))))),
           'User-Agent': client == 'ANDROID_MUSIC'
               ? 'com.google.android.apps.youtube.music/8.32.50 (Linux; U; Android 14; en_US) gzip'
               : (client == 'IOS_MUSIC'
@@ -1297,7 +1348,8 @@ class YtmAccountService {
           headers['x-goog-authuser'] = '0';
           if (_cookies != null && _cookies!.isNotEmpty) {
             headers['Cookie'] = _cookies!;
-            final authHeader = buildAuthorizationHeader(_cookies!, origin: origin);
+            final authHeader =
+                buildAuthorizationHeader(_cookies!, origin: origin);
             if (authHeader != null) {
               headers['Authorization'] = authHeader;
             }
@@ -1312,7 +1364,10 @@ class YtmAccountService {
         }
 
         final clientContext = _buildClientContext(client, videoId);
-        if (visitorData != null && visitorData.isNotEmpty && clientContext.containsKey('client') && clientContext['client'] is Map) {
+        if (visitorData != null &&
+            visitorData.isNotEmpty &&
+            clientContext.containsKey('client') &&
+            clientContext['client'] is Map) {
           (clientContext['client'] as Map)['visitorData'] = visitorData;
         }
 
@@ -1335,7 +1390,8 @@ class YtmAccountService {
         });
 
         final response = await _postWithRetry(
-          Uri.parse('$endpointHost/youtubei/v1/player?prettyPrint=false&key=$_apiKey'),
+          Uri.parse(
+              '$endpointHost/youtubei/v1/player?prettyPrint=false&key=$_apiKey'),
           headers: headers,
           body: body,
           baseTimeoutSeconds: 10,
@@ -1343,69 +1399,94 @@ class YtmAccountService {
 
         if (response.statusCode == 200) {
           final data = jsonDecode(response.body) as Map<String, dynamic>;
-          final playability = data['playabilityStatus'] as Map<String, dynamic>?;
+          final playability =
+              data['playabilityStatus'] as Map<String, dynamic>?;
           final status = playability?['status'] as String? ?? '';
 
-          if (status == 'LOGIN_REQUIRED' || status == 'UNPLAYABLE' || status.contains('BOT')) {
-            final statusReason = playability?['reason'] as String? ?? 'no reason';
-            debugPrint('[YTM_ACCOUNT] Client $client returned playability $status ($statusReason, poTokenAttached: $hadPoToken), falling back to next');
+          if (status == 'LOGIN_REQUIRED' ||
+              status == 'UNPLAYABLE' ||
+              status.contains('BOT')) {
+            final statusReason =
+                playability?['reason'] as String? ?? 'no reason';
+            debugPrint(
+                '[YTM_ACCOUNT] Client $client returned playability $status ($statusReason, poTokenAttached: $hadPoToken), falling back to next');
 
             // If WEB_REMIX (the client using auth cookies) returns LOGIN_REQUIRED,
             // check whether it's a genuine session expiry or just a bot challenge.
             // Bot challenges say "Sign in to confirm you're not a bot" — don't logout for those.
-            if (client == 'WEB_REMIX' && status == 'LOGIN_REQUIRED' && _cookies != null && _cookies!.isNotEmpty) {
-              final reason = (playability?['reason'] as String? ?? '').toLowerCase();
-              final isBotChallenge = reason.contains('bot') || reason.contains('confirm');
+            if (client == 'WEB_REMIX' &&
+                status == 'LOGIN_REQUIRED' &&
+                _cookies != null &&
+                _cookies!.isNotEmpty) {
+              final reason =
+                  (playability?['reason'] as String? ?? '').toLowerCase();
+              final isBotChallenge =
+                  reason.contains('bot') || reason.contains('confirm');
               if (!isBotChallenge) {
-                debugPrint('[YTM_ACCOUNT] Session expired detected on WEB_REMIX. Clearing cookies and notifying UI.');
+                debugPrint(
+                    '[YTM_ACCOUNT] Session expired detected on WEB_REMIX. Clearing cookies and notifying UI.');
                 unawaited(logout());
                 try {
                   getIt<YtmService>().notifyAuthExpired();
                 } catch (_) {}
 
-                throw const YtmException('YTM_AUTH', 'YouTube Music session expired. Please sign in again.');
+                throw const YtmException('YTM_AUTH',
+                    'YouTube Music session expired. Please sign in again.');
               }
-              debugPrint('[YTM_ACCOUNT] WEB_REMIX bot challenge detected, trying next client without logout');
+              debugPrint(
+                  '[YTM_ACCOUNT] WEB_REMIX bot challenge detected, trying next client without logout');
             }
             continue;
           }
 
           final streamingData = data['streamingData'] as Map<String, dynamic>?;
-          final adaptive = (streamingData?['adaptiveFormats'] as List<dynamic>? ?? [])
-              .whereType<Map<String, dynamic>>()
-              .toList();
+          final adaptive =
+              (streamingData?['adaptiveFormats'] as List<dynamic>? ?? [])
+                  .whereType<Map<String, dynamic>>()
+                  .toList();
 
           final audioFormats = <({Map<String, dynamic> format, String url})>[];
           for (final f in adaptive) {
             final mime = f['mimeType'] as String? ?? '';
             final streamUrl = _extractUrlFromFormat(f);
-            if (mime.startsWith('audio/') && streamUrl != null && streamUrl.isNotEmpty) {
+            if (mime.startsWith('audio/') &&
+                streamUrl != null &&
+                streamUrl.isNotEmpty) {
               audioFormats.add((format: f, url: streamUrl));
             }
           }
 
           if (audioFormats.isNotEmpty) {
             final m4a = audioFormats
-                .where((f) => ((f.format['mimeType'] as String?) ?? '').contains('mp4'))
+                .where((f) =>
+                    ((f.format['mimeType'] as String?) ?? '').contains('mp4'))
                 .toList();
             final pool = m4a.isNotEmpty ? m4a : audioFormats;
 
             final selected = switch (quality.toLowerCase()) {
               'low' => pool.reduce((a, b) =>
-                  ((a.format['bitrate'] as num?) ?? 0) < ((b.format['bitrate'] as num?) ?? 0) ? a : b),
-              'medium' => pool.reduce((a, b) =>
-                  (((a.format['bitrate'] as num?) ?? 128000) - 128000).abs() <
-                          (((b.format['bitrate'] as num?) ?? 128000) - 128000).abs()
+                  ((a.format['bitrate'] as num?) ?? 0) <
+                          ((b.format['bitrate'] as num?) ?? 0)
                       ? a
                       : b),
-              _ => pool.reduce((a, b) =>
-                  ((a.format['bitrate'] as num?) ?? 0) > ((b.format['bitrate'] as num?) ?? 0) ? a : b),
+              'medium' => pool.reduce((a, b) =>
+                  (((a.format['bitrate'] as num?) ?? 128000) - 128000).abs() <
+                          (((b.format['bitrate'] as num?) ?? 128000) - 128000)
+                              .abs()
+                      ? a
+                      : b),
+              _ => pool.reduce((a, b) => ((a.format['bitrate'] as num?) ?? 0) >
+                      ((b.format['bitrate'] as num?) ?? 0)
+                  ? a
+                  : b),
             };
 
             final mime = selected.format['mimeType'] as String? ?? 'audio/mp4';
-            final bitrate = (selected.format['bitrate'] as num?)?.toInt() ?? 128000;
-            final durationMs =
-                int.tryParse(selected.format['approxDurationMs']?.toString() ?? '0') ?? 0;
+            final bitrate =
+                (selected.format['bitrate'] as num?)?.toInt() ?? 128000;
+            final durationMs = int.tryParse(
+                    selected.format['approxDurationMs']?.toString() ?? '0') ??
+                0;
             final details = data['videoDetails'] as Map<String, dynamic>?;
 
             return YtmStream(
@@ -1419,17 +1500,22 @@ class YtmAccountService {
               artist: details?['author'] as String? ?? '',
               artworkUrl: null,
               userAgent: headers['User-Agent'],
-              cookies: (isWeb || client == 'ANDROID_MUSIC' || client == 'IOS_MUSIC') ? _cookies : null,
+              cookies:
+                  (isWeb || client == 'ANDROID_MUSIC' || client == 'IOS_MUSIC')
+                      ? _cookies
+                      : null,
             );
           } else {
-            debugPrint('[YTM_ACCOUNT] Client $client returned status $status but no audio formats (adaptiveFormats: ${adaptive.length} total, streamingData: ${streamingData != null})');
+            debugPrint(
+                '[YTM_ACCOUNT] Client $client returned status $status but no audio formats (adaptiveFormats: ${adaptive.length} total, streamingData: ${streamingData != null})');
           }
         }
       } catch (e) {
         // Session-expiry must surface to callers/UI, not be swallowed as a
         // per-client resolution failure.
         if (e is YtmException && e.isAuth) rethrow;
-        debugPrint('[YTM_ACCOUNT] Client $client resolution error for $videoId: $e');
+        debugPrint(
+            '[YTM_ACCOUNT] Client $client resolution error for $videoId: $e');
       }
     }
     return null;
@@ -1607,8 +1693,7 @@ class YtmAccountService {
           return;
         }
         if (node.containsKey('musicShelfRenderer')) {
-          final shelf =
-              node['musicShelfRenderer'] as Map<String, dynamic>;
+          final shelf = node['musicShelfRenderer'] as Map<String, dynamic>;
           final contents = shelf['contents'];
           if (contents is List) {
             for (final item in contents) {
@@ -1690,10 +1775,16 @@ class YtmAccountService {
         } else if (node.containsKey('musicTwoRowItemRenderer')) {
           final renderer =
               node['musicTwoRowItemRenderer'] as Map<String, dynamic>;
-          String? vid = renderer['navigationEndpoint']?['watchEndpoint']?['videoId'] as String?;
-          vid ??= renderer['thumbnailRenderer']?['musicThumbnailRenderer']?['navigationEndpoint']?['watchEndpoint']?['videoId'] as String?;
-          vid ??= renderer['thumbnailOverlay']?['musicItemThumbnailOverlayRenderer']?['content']?['musicPlayButtonRenderer']?['playNavigationEndpoint']?['watchEndpoint']?['videoId'] as String?;
-          vid ??= renderer['navigationEndpoint']?['watchPlaylistEndpoint']?['videoId'] as String?;
+          String? vid = renderer['navigationEndpoint']?['watchEndpoint']
+              ?['videoId'] as String?;
+          vid ??= renderer['thumbnailRenderer']?['musicThumbnailRenderer']
+              ?['navigationEndpoint']?['watchEndpoint']?['videoId'] as String?;
+          vid ??= renderer['thumbnailOverlay']
+                      ?['musicItemThumbnailOverlayRenderer']?['content']
+                  ?['musicPlayButtonRenderer']?['playNavigationEndpoint']
+              ?['watchEndpoint']?['videoId'] as String?;
+          vid ??= renderer['navigationEndpoint']?['watchPlaylistEndpoint']
+              ?['videoId'] as String?;
           vid ??= renderer['onTap']?['watchEndpoint']?['videoId'] as String?;
 
           if (vid != null && vid.length == 11) {
@@ -1776,13 +1867,13 @@ class YtmAccountService {
           renderer['playlistItemData'] as Map<String, dynamic>?;
       String? videoId = playlistItemData?['videoId'] as String?;
 
-      videoId ??=
-          renderer['navigationEndpoint']?['watchEndpoint']?['videoId'] as String?;
+      videoId ??= renderer['navigationEndpoint']?['watchEndpoint']?['videoId']
+          as String?;
       videoId ??= renderer['overlay']?['musicItemThumbnailOverlayRenderer']
-              ?['content']?['musicPlayButtonRenderer']?['playNavigationEndpoint']
-          ?['watchEndpoint']?['videoId'] as String?;
-      videoId ??=
-          renderer['doubleTapEndpoint']?['watchEndpoint']?['videoId'] as String?;
+              ?['content']?['musicPlayButtonRenderer']
+          ?['playNavigationEndpoint']?['watchEndpoint']?['videoId'] as String?;
+      videoId ??= renderer['doubleTapEndpoint']?['watchEndpoint']?['videoId']
+          as String?;
 
       if (videoId == null || videoId.length != 11) {
         final flexColumns =
@@ -1828,6 +1919,7 @@ class YtmAccountService {
           }
           return null;
         }
+
         videoId = findVideoId(renderer);
       }
 
@@ -1839,19 +1931,17 @@ class YtmAccountService {
 
       final flexColumns = renderer['flexColumns'] as List<dynamic>? ?? const [];
       if (flexColumns.isNotEmpty) {
-        final col0Runs = flexColumns[0]['musicResponsiveListItemFlexColumnRenderer']
-            ?['text']?['runs'];
+        final col0Runs = flexColumns[0]
+            ['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'];
         if (col0Runs is List && col0Runs.isNotEmpty) {
-          final t = col0Runs
-              .map((r) => r['text']?.toString() ?? '')
-              .join('')
-              .trim();
+          final t =
+              col0Runs.map((r) => r['text']?.toString() ?? '').join('').trim();
           if (t.isNotEmpty) title = t;
         }
       }
       if (flexColumns.length > 1) {
-        final col1Runs = flexColumns[1]['musicResponsiveListItemFlexColumnRenderer']
-            ?['text']?['runs'];
+        final col1Runs = flexColumns[1]
+            ['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs'];
         if (col1Runs is List && col1Runs.isNotEmpty) {
           final texts = col1Runs
               .map((r) => r['text']?.toString().trim() ?? '')

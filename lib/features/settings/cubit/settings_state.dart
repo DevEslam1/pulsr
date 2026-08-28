@@ -16,7 +16,16 @@ enum AppThemeMode { dark, light, amoled, system }
 /// - [custom]: the user-picked [customAccentColor].
 enum ThemeColorSource { system, artwork, custom }
 
-enum PlayerThemeMode { classic, card, circle, minimal, vinyl, cassette, waveform, lyricsFocus }
+enum PlayerThemeMode {
+  classic,
+  card,
+  circle,
+  minimal,
+  vinyl,
+  cassette,
+  waveform,
+  lyricsFocus
+}
 
 enum MiniPlayerSwipeAction { next, prev, volume, none }
 
@@ -47,10 +56,14 @@ abstract class SettingsState with _$SettingsState {
     @Default(0xFF9B9EF5) int customAccentColorValue,
     @Default(PlayerThemeMode.classic) PlayerThemeMode playerThemeMode,
     @Default(VisualizerStyle.bar) VisualizerStyle visualizerStyle,
-    @Default(MiniPlayerSwipeAction.next) MiniPlayerSwipeAction miniPlayerSwipeLeft,
-    @Default(MiniPlayerSwipeAction.prev) MiniPlayerSwipeAction miniPlayerSwipeRight,
-    @Default(NowPlayingDoubleTapAction.toggleFavorite) NowPlayingDoubleTapAction nowPlayingDoubleTap,
-    @Default(NowPlayingArtworkSwipeAction.nextPrev) NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
+    @Default(MiniPlayerSwipeAction.next)
+    MiniPlayerSwipeAction miniPlayerSwipeLeft,
+    @Default(MiniPlayerSwipeAction.prev)
+    MiniPlayerSwipeAction miniPlayerSwipeRight,
+    @Default(NowPlayingDoubleTapAction.toggleFavorite)
+    NowPlayingDoubleTapAction nowPlayingDoubleTap,
+    @Default(NowPlayingArtworkSwipeAction.nextPrev)
+    NowPlayingArtworkSwipeAction nowPlayingArtworkSwipe,
     @Default(ReplayGainMode.track) ReplayGainMode replayGainMode,
     @Default(0.0) double replayGainPreampWithRg,
     @Default(-3.0) double replayGainPreampWithoutRg,
@@ -72,7 +85,8 @@ abstract class SettingsState with _$SettingsState {
     // Extractor & Backend Settings
     @Default(ExtractorEngine.auto) ExtractorEngine extractorEngine,
     @Default(true) bool ytdlpBackendEnabled,
-    @Default('https://xdm-backend-10763667121.europe-west1.run.app') String ytdlpBackendUrl,
+    @Default('https://xdm-backend-10763667121.europe-west1.run.app')
+    String ytdlpBackendUrl,
     @Default('') String ytdlpBackendToken,
     @Default(false) bool isTestingYtdlpBackend,
     String? ytdlpBackendStatusMessage,
@@ -96,13 +110,15 @@ abstract class SettingsState with _$SettingsState {
     @Default(0.0) double stereoBalance,
     @Default(false) bool monoMix,
     @Default(true) bool sincResamplerEnabled,
+    @Default('native') String dspPreference,
   }) = _SettingsState;
 
   Color get customAccentColor => Color(customAccentColorValue);
 
   /// True when the accent should track album artwork. Kept for call sites that
   /// only care about the per-song artwork behavior (e.g. Now Playing).
-  bool get dynamicThemingEnabled => themeColorSource == ThemeColorSource.artwork;
+  bool get dynamicThemingEnabled =>
+      themeColorSource == ThemeColorSource.artwork;
 
   ProxyConfig get proxyConfig => ProxyConfig(
         enabled: proxyEnabled,

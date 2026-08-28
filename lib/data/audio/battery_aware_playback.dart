@@ -12,10 +12,12 @@ class BatteryAwarePlayback {
   BatteryOptimizationLevel _currentLevel = BatteryOptimizationLevel.normal;
   BatteryOptimizationLevel get currentLevel => _currentLevel;
 
-  final void Function({required bool disableVisualizer, required bool reduceDsp})?
-      onLowPowerMode;
-  final void Function({required bool disableCrossfade, required bool minimalBuffer})?
-      onCriticalMode;
+  final void Function(
+      {required bool disableVisualizer,
+      required bool reduceDsp})? onLowPowerMode;
+  final void Function(
+      {required bool disableCrossfade,
+      required bool minimalBuffer})? onCriticalMode;
   final void Function()? onRestoreNormal;
 
   BatteryAwarePlayback({

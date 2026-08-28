@@ -31,7 +31,8 @@ class NowPlayingQueueView extends StatelessWidget {
             children: [
               // Queue Slots Switcher Header (Queue 1, Queue 2, Queue 3)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 child: Row(
                   children: [
                     Text(
@@ -52,9 +53,12 @@ class NowPlayingQueueView extends StatelessWidget {
                           borderRadius: BorderRadius.circular(10),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 5),
                             decoration: BoxDecoration(
-                              color: isSelected ? p.accent : p.surfaceContainerHigh,
+                              color: isSelected
+                                  ? p.accent
+                                  : p.surfaceContainerHigh,
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
                                 color: isSelected ? p.accent : p.hairline,
@@ -65,7 +69,8 @@ class NowPlayingQueueView extends StatelessWidget {
                               style: TextStyle(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w800,
-                                color: isSelected ? Colors.white : p.textSecondary,
+                                color:
+                                    isSelected ? Colors.white : p.textSecondary,
                               ),
                             ),
                           ),
@@ -114,11 +119,13 @@ class NowPlayingQueueView extends StatelessWidget {
                                     width: 42,
                                     height: 42,
                                     decoration: BoxDecoration(
-                                      color: Colors.black.withValues(alpha: 0.5),
+                                      color:
+                                          Colors.black.withValues(alpha: 0.5),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                     child: Center(
-                                      child: NowPlayingIndicator(color: p.accent),
+                                      child:
+                                          NowPlayingIndicator(color: p.accent),
                                     ),
                                   ),
                               ],
@@ -128,7 +135,9 @@ class NowPlayingQueueView extends StatelessWidget {
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
-                                fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
+                                fontWeight: isCurrent
+                                    ? FontWeight.w800
+                                    : FontWeight.w600,
                                 color: isCurrent ? p.accent : p.textPrimary,
                                 fontSize: 13.5,
                               ),
@@ -147,10 +156,13 @@ class NowPlayingQueueView extends StatelessWidget {
                               children: [
                                 if (!isCurrent)
                                   IconButton(
-                                    icon: Icon(Icons.close_rounded, size: 18, color: p.textTertiary),
-                                    onPressed: () => cubit.removeQueueItem(index),
+                                    icon: Icon(Icons.close_rounded,
+                                        size: 18, color: p.textTertiary),
+                                    onPressed: () =>
+                                        cubit.removeQueueItem(index),
                                   ),
-                                Icon(Icons.drag_handle_rounded, color: p.textTertiary, size: 20),
+                                Icon(Icons.drag_handle_rounded,
+                                    color: p.textTertiary, size: 20),
                               ],
                             ),
                             onTap: () {

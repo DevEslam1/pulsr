@@ -1,19 +1,74 @@
+// android/app/src/main/cpp/SincResampler.cpp
 #include "SincResampler.h"
+#include <cmath>
 #include <cstring>
+#include <algorithm>
+#if defined(__ARM_NEON)
+#include <arm_neon.h>
+#endif
 
 SincResampler::SincResampler() {
-    historyL_.assign(TAPS, 0.0f);
-    historyR_.assign(TAPS, 0.0f);
-    setRates(44100.0, 48000.0);
+    tempOutBuf_.assign(8192 * MAX_CHANNELS, 0.0f);
+    setRates(48000.0, 48000.0);
+    setEnabled(false);
     reset();
 }
 
+float SincResampler::sinc(float x) {
+    if (std::abs(x) < 1e-7f) return 1.0f;
+    const float px = static_cast<float>(M_PI) * x;
+    return std::sin(px) / px;
+}
+
+float SincResampler::blackmanHarris(float x, float halfWidth) {
+    if (std::abs(x) >= halfWidth) return 0.0f;
+    // Normalized to [0, 1]
+    const float n = (x + halfWidth) / (2.0f * halfWidth);
+    const float a0 = 0.35875f;
+    const float a1 = 0.48829f;
+    const float a2 = 0.14128f;
+    const float a3 = 0.01168f;
+    const float twoPiN = 2.0f * static_cast<float>(M_PI) * n;
+
+    return a0 - a1 * std::cos(twoPiN) + a2 * std::cos(2.0f * twoPiN) - a3 * std::cos(3.0f * twoPiN);
+}
+
+void SincResampler::generatePolyphaseTable() {
+    const float cutoff = 0.45f * static_cast<float>(std::min(1.0, outRate_ / inRate_));
+    const float halfWidth = static_cast<float>(TAPS_PER_PHASE) / 2.0f;
+
+    for (int phaseIdx = 0; phaseIdx < NUM_PHASES; ++phaseIdx) {
+        const float phaseFraction = static_cast<float>(phaseIdx) / static_cast<float>(NUM_PHASES);
+        float sum = 0.0f;
+
+        for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
+            const float t = static_cast<float>(tap - HALF_TAPS) - phaseFraction;
+            const float sincVal = 2.0f * cutoff * sinc(2.0f * cutoff * t);
+            const float winVal = blackmanHarris(t, halfWidth);
+            const float coeff = sincVal * winVal;
+
+            polyphaseTable_[phaseIdx][tap] = coeff;
+            sum += coeff;
+        }
+
+        // Normalize DC gain to 1.0 across all phases
+        if (std::abs(sum) > 1e-6f) {
+            const float invSum = 1.0f / sum;
+            for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
+                polyphaseTable_[phaseIdx][tap] *= invSum;
+            }
+        }
+    }
+}
+
 void SincResampler::setRates(double inRate, double outRate) {
-    if (inRate < 8000.0) inRate = 8000.0;
-    if (outRate < 8000.0) outRate = 8000.0;
+    if (inRate <= 0.0 || outRate <= 0.0) return;
+    if (std::abs(inRate_ - inRate) < 0.1 && std::abs(outRate_ - outRate) < 0.1) return;
+
     inRate_ = inRate;
     outRate_ = outRate;
     ratio_ = inRate_ / outRate_;
+    generatePolyphaseTable();
     reset();
 }
 
@@ -21,150 +76,178 @@ void SincResampler::setEnabled(bool enabled) {
     enabled_ = enabled;
 }
 
+void SincResampler::applyParams(const ResamplerParamSet& params) {
+    enabled_ = params.enabled;
+    setRates(params.inRate, params.outRate);
+}
+
 void SincResampler::reset() {
-    std::fill(historyL_.begin(), historyL_.end(), 0.0f);
-    std::fill(historyR_.begin(), historyR_.end(), 0.0f);
     phase_ = 0.0;
+    writePos_ = 0;
+    availableFrames_ = 0;
+    std::memset(ringBuf_, 0, sizeof(ringBuf_));
 }
 
-int SincResampler::getExpectedOutFrames(int inFrames) const {
-    if (ratio_ <= 0.0) return inFrames;
-    const int effectiveIn = inFrames - TAPS;
-    if (effectiveIn <= 0) return 0;
-    return static_cast<int>(std::ceil(effectiveIn / ratio_));
-}
-
-float SincResampler::sinc(float x) const {
-    if (std::abs(x) < 1e-6f) return 1.0f;
-    float px = static_cast<float>(M_PI) * x;
-    return std::sin(px) / px;
-}
-
-float SincResampler::blackmanHarris(float x) const {
-    // x in [-HALF_TAPS, HALF_TAPS] -> normalized t in [0, 1]
-    float t = (x + HALF_TAPS) / static_cast<float>(TAPS);
-    if (t < 0.0f || t > 1.0f) return 0.0f;
-    constexpr float a0 = 0.35875f;
-    constexpr float a1 = 0.48829f;
-    constexpr float a2 = 0.14128f;
-    constexpr float a3 = 0.01168f;
-    float twoPiT = static_cast<float>(2.0 * M_PI * t);
-    return a0 - a1 * std::cos(twoPiT) + a2 * std::cos(2.0f * twoPiT) - a3 * std::cos(3.0f * twoPiT);
-}
-
-int SincResampler::process(const float* inL, const float* inR, int inFrames,
-                           float* outL, float* outR, int maxOutFrames) {
-    if (!enabled_ || std::abs(inRate_ - outRate_) < 1.0) {
-        int count = std::min(inFrames, maxOutFrames);
-        if (inL && outL) std::memcpy(outL, inL, count * sizeof(float));
-        if (inR && outR) std::memcpy(outR, inR, count * sizeof(float));
-        return count;
+int SincResampler::processInterleaved(float* buffer, int frames, int channels) {
+    if (!enabled_ || frames <= 0 || std::abs(ratio_ - 1.0) < 1e-5) {
+        return frames;
     }
 
-    // Append new input to history using pre-allocated buffers
-    int histSize = static_cast<int>(historyL_.size());
-    int needed = histSize + inFrames;
-    if (needed > bufCapacity_) {
-        bufCapacity_ = std::max(needed * 2, 4096);
-        bufL_.resize(bufCapacity_, 0.0f);
-        bufR_.resize(bufCapacity_, 0.0f);
+    channels = std::clamp(channels, 1, MAX_CHANNELS);
+
+    const int neededOutputSamples = frames * channels;
+    if (static_cast<int>(tempOutBuf_.size()) < neededOutputSamples) {
+        tempOutBuf_.resize(neededOutputSamples);
     }
 
-    std::memcpy(bufL_.data(), historyL_.data(), histSize * sizeof(float));
-    std::memcpy(bufR_.data(), historyR_.data(), histSize * sizeof(float));
-    if (inL) std::memcpy(bufL_.data() + histSize, inL, inFrames * sizeof(float));
-    if (inR) std::memcpy(bufR_.data() + histSize, inR, inFrames * sizeof(float));
+    // Push input frames into ring buffer
+    for (int f = 0; f < frames; ++f) {
+        for (int ch = 0; ch < channels; ++ch) {
+            ringBuf_[ch][writePos_] = buffer[f * channels + ch];
+        }
+        writePos_ = (writePos_ + 1) % FIFO_CAPACITY;
+    }
+    availableFrames_ += frames;
 
-    int outCount = 0;
-    double currentInPos = phase_;
-    double cutoff = (ratio_ > 1.0) ? (1.0 / ratio_) : 1.0; // Anti-aliasing cutoff for downsampling
+    // Sinc interpolation for each of the `frames` output points
+    for (int outF = 0; outF < frames; ++outF) {
+        const double samplePos = phase_;
+        const int baseInt = static_cast<int>(std::floor(samplePos));
+        const double frac = samplePos - static_cast<double>(baseInt);
 
-    while (outCount < maxOutFrames) {
-        int centerIdx = histSize + static_cast<int>(std::floor(currentInPos));
-        if (centerIdx + HALF_TAPS >= needed) {
-            break; // Need more input
+        const int phaseIdx = std::clamp(
+            static_cast<int>(frac * NUM_PHASES),
+            0,
+            NUM_PHASES - 1
+        );
+
+        const float* coeffs = polyphaseTable_[phaseIdx];
+
+
+        for (int ch = 0; ch < channels; ++ch) {
+#if defined(__ARM_NEON)
+            float32x4_t sumVec = vdupq_n_f32(0.0f);
+            for (int tap = 0; tap < TAPS_PER_PHASE; tap += 4) {
+                const int readOffset0 = availableFrames_ - baseInt + (tap - HALF_TAPS);
+                int ringIndex0 = (writePos_ - readOffset0) % FIFO_CAPACITY;
+                if (ringIndex0 < 0) ringIndex0 += FIFO_CAPACITY;
+
+                const int readOffset1 = availableFrames_ - baseInt + (tap + 1 - HALF_TAPS);
+                int ringIndex1 = (writePos_ - readOffset1) % FIFO_CAPACITY;
+                if (ringIndex1 < 0) ringIndex1 += FIFO_CAPACITY;
+
+                const int readOffset2 = availableFrames_ - baseInt + (tap + 2 - HALF_TAPS);
+                int ringIndex2 = (writePos_ - readOffset2) % FIFO_CAPACITY;
+                if (ringIndex2 < 0) ringIndex2 += FIFO_CAPACITY;
+
+                const int readOffset3 = availableFrames_ - baseInt + (tap + 3 - HALF_TAPS);
+                int ringIndex3 = (writePos_ - readOffset3) % FIFO_CAPACITY;
+                if (ringIndex3 < 0) ringIndex3 += FIFO_CAPACITY;
+
+                const float s[4] = {
+                    ringBuf_[ch][ringIndex0],
+                    ringBuf_[ch][ringIndex1],
+                    ringBuf_[ch][ringIndex2],
+                    ringBuf_[ch][ringIndex3]
+                };
+
+                float32x4_t sampVec = vld1q_f32(s);
+                float32x4_t coeffVec = vld1q_f32(&coeffs[tap]);
+                sumVec = vmlaq_f32(sumVec, sampVec, coeffVec);
+            }
+#if defined(__aarch64__)
+            const float sum = vaddvq_f32(sumVec);
+#else
+            float32x2_t sumPair = vadd_f32(vget_low_f32(sumVec), vget_high_f32(sumVec));
+            const float sum = vget_lane_f32(vpadd_f32(sumPair, sumPair), 0);
+#endif
+#else
+            float sum = 0.0f;
+            for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
+                // Sinc history lookup relative to current write position & phase
+                const int readOffset = availableFrames_ - baseInt + (tap - HALF_TAPS);
+                int ringIndex = (writePos_ - readOffset) % FIFO_CAPACITY;
+                if (ringIndex < 0) ringIndex += FIFO_CAPACITY;
+
+                sum += ringBuf_[ch][ringIndex] * coeffs[tap];
+            }
+#endif
+            tempOutBuf_[outF * channels + ch] = sum;
         }
 
-        double frac = currentInPos - std::floor(currentInPos);
-        float sumL = 0.0f;
-        float sumR = 0.0f;
-        float weightSum = 0.0f;
+        phase_ += ratio_;
+    }
 
-        for (int tap = -HALF_TAPS; tap < HALF_TAPS; ++tap) {
-            float dist = static_cast<float>(tap - frac);
-            float w = blackmanHarris(dist) * sinc(static_cast<float>(dist * cutoff));
-            int sampleIdx = centerIdx + tap;
-            if (sampleIdx >= 0 && sampleIdx < needed) {
-                sumL += bufL_[sampleIdx] * w;
-                sumR += bufR_[sampleIdx] * w;
-                weightSum += w;
+    // Wrap / prune phase and ring buffer
+    const int consumedInt = static_cast<int>(std::floor(phase_));
+    if (consumedInt > 0) {
+        phase_ -= static_cast<double>(consumedInt);
+        availableFrames_ = std::max(0, availableFrames_ - consumedInt);
+    }
+
+    // Prevent availableFrames_ growth past capacity
+    if (availableFrames_ > FIFO_CAPACITY - 256) {
+        availableFrames_ = FIFO_CAPACITY - 256;
+    }
+
+    // Copy interpolated frames back to output
+    std::memcpy(buffer, tempOutBuf_.data(), neededOutputSamples * sizeof(float));
+    return frames;
+}
+
+int SincResampler::processPlanar(const float* const* in, float* const* out, int frames, int channels) {
+    if (!enabled_ || frames <= 0 || std::abs(ratio_ - 1.0) < 1e-5) {
+        if (in != out) {
+            for (int ch = 0; ch < channels; ++ch) {
+                std::memcpy(out[ch], in[ch], frames * sizeof(float));
             }
         }
-
-        float norm = (std::abs(weightSum) > 1e-5f) ? (1.0f / weightSum) : 1.0f;
-        outL[outCount] = sumL * norm;
-        outR[outCount] = sumR * norm;
-        outCount++;
-
-        currentInPos += ratio_;
+        return frames;
     }
 
-    // Save remainder for next block
-    int consumedInSamples = static_cast<int>(std::floor(currentInPos));
-    phase_ = currentInPos - consumedInSamples;
+    channels = std::clamp(channels, 1, MAX_CHANNELS);
 
-    int remaining = inFrames - consumedInSamples;
-    if (remaining < 0) remaining = 0;
-
-    // Shift last TAPS samples into history
-    int startIdx = needed - TAPS;
-    if (startIdx >= 0) {
-        std::memcpy(historyL_.data(), bufL_.data() + startIdx, TAPS * sizeof(float));
-        std::memcpy(historyR_.data(), bufR_.data() + startIdx, TAPS * sizeof(float));
-    }
-
-    // Shrink capacity if needed drops significantly below allocated capacity
-    if (bufCapacity_ > 8192 && needed < bufCapacity_ / 4) {
-        bufCapacity_ = std::max(needed * 2, 4096);
-        bufL_.resize(bufCapacity_, 0.0f);
-        bufR_.resize(bufCapacity_, 0.0f);
-        bufL_.shrink_to_fit();
-        bufR_.shrink_to_fit();
-    }
-
-    return outCount;
-}
-
-int SincResampler::processInterleaved(const float* in, int inFrames,
-                                     float* out, int maxOutFrames) {
-    if (!in || !out || inFrames <= 0 || maxOutFrames <= 0) return 0;
-
-    if (!enabled_ || std::abs(inRate_ - outRate_) < 1.0) {
-        int count = std::min(inFrames, maxOutFrames);
-        if (in != out) {
-            std::memcpy(out, in, count * 2 * sizeof(float));
+    for (int f = 0; f < frames; ++f) {
+        for (int ch = 0; ch < channels; ++ch) {
+            ringBuf_[ch][writePos_] = in[ch][f];
         }
-        return count;
+        writePos_ = (writePos_ + 1) % FIFO_CAPACITY;
+    }
+    availableFrames_ += frames;
+
+    for (int outF = 0; outF < frames; ++outF) {
+        const double samplePos = phase_;
+        const int baseInt = static_cast<int>(std::floor(samplePos));
+        const double frac = samplePos - static_cast<double>(baseInt);
+
+        const int phaseIdx = std::clamp(
+            static_cast<int>(frac * NUM_PHASES),
+            0,
+            NUM_PHASES - 1
+        );
+
+        const float* coeffs = polyphaseTable_[phaseIdx];
+
+        for (int ch = 0; ch < channels; ++ch) {
+            float sum = 0.0f;
+            for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
+                const int readOffset = availableFrames_ - baseInt + (tap - HALF_TAPS);
+                int ringIndex = (writePos_ - readOffset) % FIFO_CAPACITY;
+                if (ringIndex < 0) ringIndex += FIFO_CAPACITY;
+
+                sum += ringBuf_[ch][ringIndex] * coeffs[tap];
+            }
+            out[ch][outF] = sum;
+        }
+
+        phase_ += ratio_;
     }
 
-    if (static_cast<int>(inL_.size()) < inFrames) {
-        inL_.resize(inFrames * 2);
-        inR_.resize(inFrames * 2);
-    }
-    if (static_cast<int>(outL_.size()) < maxOutFrames) {
-        outL_.resize(maxOutFrames * 2);
-        outR_.resize(maxOutFrames * 2);
+    const int consumedInt = static_cast<int>(std::floor(phase_));
+    if (consumedInt > 0) {
+        phase_ -= static_cast<double>(consumedInt);
+        availableFrames_ = std::max(0, availableFrames_ - consumedInt);
     }
 
-    for (int i = 0; i < inFrames; ++i) {
-        inL_[i] = in[i * 2];
-        inR_[i] = in[i * 2 + 1];
-    }
-
-    int outFrames = process(inL_.data(), inR_.data(), inFrames, outL_.data(), outR_.data(), maxOutFrames);
-    for (int i = 0; i < outFrames; ++i) {
-        out[i * 2] = outL_[i];
-        out[i * 2 + 1] = outR_[i];
-    }
-    return outFrames;
+    return frames;
 }

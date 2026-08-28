@@ -27,7 +27,9 @@ void main() {
       expect(cache.containsKey('key_empty'), isFalse);
     });
 
-    test('Evicts least recently used item when capacity exceeded (max 200 items logic)', () {
+    test(
+        'Evicts least recently used item when capacity exceeded (max 200 items logic)',
+        () {
       final capacity = 3;
       final cache = ArtworkLruCache.withCapacity(capacity);
 

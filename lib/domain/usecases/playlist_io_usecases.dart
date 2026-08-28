@@ -1,4 +1,4 @@
-// lib/domain/usecases/playlist_io_usecases.dart
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:fpdart/fpdart.dart';
@@ -19,8 +19,10 @@ class PlaylistExportUseCase {
       // A `ytmusic://` sentinel is meaningless to any other player.
       if (song.source != SongSource.local) continue;
       final durationSec = (song.durationMs / 1000).round();
-      final artist = song.artist.trim().isNotEmpty ? song.artist.trim() : 'Unknown Artist';
-      final title = song.title.trim().isNotEmpty ? song.title.trim() : 'Unknown Track';
+      final artist =
+          song.artist.trim().isNotEmpty ? song.artist.trim() : 'Unknown Artist';
+      final title =
+          song.title.trim().isNotEmpty ? song.title.trim() : 'Unknown Track';
       buffer.writeln('#EXTINF:$durationSec,$artist - $title');
       buffer.writeln(song.path);
     }
@@ -28,7 +30,8 @@ class PlaylistExportUseCase {
   }
 
   /// Writes M3U content to a temp file and returns the file object.
-  Future<File> exportToFile(String playlistName, List<SongsTableData> songs) async {
+  Future<File> exportToFile(
+      String playlistName, List<SongsTableData> songs) async {
     final content = generateM3uContent(songs);
     final tempDir = await getTemporaryDirectory();
     final sanitizedName = playlistName.replaceAll(RegExp(r'[\\/:*?"<>|]'), '_');
@@ -76,8 +79,7 @@ class PlaylistImportUseCase {
     return paths;
   }
 
-  /// Reads M3U file, matches paths against SongsTable, creates a new playlist,
-  /// and adds matched songs.
+  /// Reads M3U file with UTF-8 BOM, Latin-1 fallback, and relative path resolution.
   Future<Result<M3uImportResult>> importPlaylistFromFile({
     required String filePath,
     required String playlistName,
@@ -87,8 +89,22 @@ class PlaylistImportUseCase {
       if (!await file.exists()) {
         return Left(DatabaseFailure('File not found: $filePath'));
       }
-      final content = await file.readAsString();
+
+      String content;
+      final bytes = await file.readAsBytes();
+      try {
+        content = utf8.decode(bytes);
+      } catch (_) {
+        content = latin1.decode(bytes);
+      }
+
+      // Strip UTF-8 BOM if present
+      if (content.startsWith('\uFEFF')) {
+        content = content.substring(1);
+      }
+
       final rawPaths = parseM3uContent(content);
+      final playlistDir = file.parent.path;
 
       final songsResult = await _repository.getAllSongs();
       final allSongs = songsResult.fold((l) => <SongsTableData>[], (r) => r);
@@ -102,7 +118,8 @@ class PlaylistImportUseCase {
         exactMap[song.path] = song;
         final normPath = song.path.replaceAll('\\', '/').toLowerCase();
         normalizedMap[normPath] = song;
-        final filename = song.path.replaceAll('\\', '/').split('/').last.toLowerCase();
+        final filename =
+            song.path.replaceAll('\\', '/').split('/').last.toLowerCase();
         if (filename.isNotEmpty) {
           filenameCounts[filename] = (filenameCounts[filename] ?? 0) + 1;
           filenameMap[filename] = song;
@@ -114,10 +131,17 @@ class PlaylistImportUseCase {
       });
 
       final matchedSongIds = <int>[];
-      final matchedSet = <int>{};
       final unmatchedPaths = <String>[];
 
-      for (final path in rawPaths) {
+      for (final rawPath in rawPaths) {
+        String path = rawPath;
+        // Resolve relative paths against playlist parent directory
+        if (!path.startsWith('/') &&
+            !path.contains(':\\') &&
+            !path.contains(':/')) {
+          path = '$playlistDir/$path'.replaceAll('\\', '/');
+        }
+
         SongsTableData? matchedSong = exactMap[path];
 
         if (matchedSong == null) {
@@ -126,17 +150,15 @@ class PlaylistImportUseCase {
         }
 
         if (matchedSong == null) {
-          final filename = path.replaceAll('\\', '/').split('/').last.toLowerCase();
+          final filename =
+              path.replaceAll('\\', '/').split('/').last.toLowerCase();
           matchedSong = filenameMap[filename];
         }
 
         if (matchedSong != null) {
-          if (!matchedSet.contains(matchedSong.id)) {
-            matchedSet.add(matchedSong.id);
-            matchedSongIds.add(matchedSong.id);
-          }
+          matchedSongIds.add(matchedSong.id);
         } else {
-          unmatchedPaths.add(path);
+          unmatchedPaths.add(rawPath);
         }
       }
 

@@ -27,7 +27,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSAppleMusicUsageDescription</key>
-	<string>Pulsr needs access to your local music library to play your songs.</string>
+	<string>Pulsr requires access to your Apple Music and media library to scan, organize, and play your offline audio tracks.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Pulsr needs access to your photos to set custom album artwork.</string>
 	<key>UISupportsDocumentBrowser</key>

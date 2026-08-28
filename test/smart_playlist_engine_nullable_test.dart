@@ -44,7 +44,9 @@ void main() {
         ));
   }
 
-  test('smart playlist with isLossless criteria excludes null bitDepth without error', () async {
+  test(
+      'smart playlist with isLossless criteria excludes null bitDepth without error',
+      () async {
     await insertSong(id: 1, title: 'MP3 Track', codec: 'MP3', bitDepth: null);
     await insertSong(id: 2, title: 'FLAC Hi-Res', codec: 'FLAC', bitDepth: 24);
 
@@ -65,7 +67,8 @@ void main() {
     expect(results.first.title, 'FLAC Hi-Res');
   });
 
-  test('smart playlist with year and decade criteria guards null year columns', () async {
+  test('smart playlist with year and decade criteria guards null year columns',
+      () async {
     await insertSong(id: 10, title: 'Unknown Year', year: null);
     await insertSong(id: 11, title: '80s Classic', year: 1985);
 

@@ -9,6 +9,7 @@ import 'package:pulsr/features/search/cubit/search_cubit.dart';
 import 'package:pulsr/features/search/cubit/search_state.dart';
 
 class MockSearchMusicUseCase extends Mock implements SearchMusicUseCase {}
+
 class MockFolderUseCases extends Mock implements FolderUseCases {}
 
 void main() {
@@ -65,8 +66,10 @@ void main() {
       ),
     ];
 
-    when(() => mockFolderUseCases.getExcludedFolders()).thenAnswer((_) async => const Right(<String>[]));
-    when(() => mockSearchUseCase.searchSongs(any(), excludedFolders: any(named: 'excludedFolders')))
+    when(() => mockFolderUseCases.getExcludedFolders())
+        .thenAnswer((_) async => const Right(<String>[]));
+    when(() => mockSearchUseCase.searchSongs(any(),
+            excludedFolders: any(named: 'excludedFolders')))
         .thenAnswer((_) => Stream.value(Right(testSongs)));
   });
 

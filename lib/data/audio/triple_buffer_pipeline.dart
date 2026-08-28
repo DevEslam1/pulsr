@@ -31,7 +31,9 @@ class TripleBufferPipeline {
       final tag = songToMediaItem(nextSong);
       final source = await resolveAudioSource(nextSong, tag);
       await preloadedPlayer.setAudioSource(source, preload: true);
-    } catch (e) { ErrorLogger.log('Preload failed', error: e, category: 'TripleBuffer'); }
+    } catch (e) {
+      ErrorLogger.log('Preload failed', error: e, category: 'TripleBuffer');
+    }
   }
 
   /// Prefetches track N+2 into [prefetchPlayer] without decoding ahead of time.
@@ -41,6 +43,8 @@ class TripleBufferPipeline {
       final tag = songToMediaItem(aheadSong);
       final source = await resolveAudioSource(aheadSong, tag);
       await prefetchPlayer!.setAudioSource(source, preload: false);
-    } catch (e) { ErrorLogger.log('Preload failed', error: e, category: 'TripleBuffer'); }
+    } catch (e) {
+      ErrorLogger.log('Preload failed', error: e, category: 'TripleBuffer');
+    }
   }
 }

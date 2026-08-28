@@ -5,7 +5,8 @@ class EqBand {
   final double centerFrequency; // in Hz
   final double gain; // in dB, typically -15.0 to 15.0
   final double q; // Q factor, default 1.414
-  final int filterType; // 0=Peaking, 1=LowShelf, 2=HighShelf, 3=LowPass, 4=HighPass
+  final int
+      filterType; // 0=Peaking, 1=LowShelf, 2=HighShelf, 3=LowPass, 4=HighPass
   final bool enabled;
 
   const EqBand({
@@ -45,7 +46,8 @@ class EqBand {
 
   factory EqBand.fromJson(Map<String, dynamic> json) => EqBand(
         index: (json['index'] as num?)?.toInt() ?? 0,
-        centerFrequency: (json['centerFrequency'] as num?)?.toDouble() ?? 1000.0,
+        centerFrequency:
+            (json['centerFrequency'] as num?)?.toDouble() ?? 1000.0,
         gain: (json['gain'] as num?)?.toDouble() ?? 0.0,
         q: (json['q'] as num?)?.toDouble() ?? 1.414,
         filterType: (json['filterType'] as num?)?.toInt() ?? 0,
@@ -111,15 +113,52 @@ class EqPreset {
 
   /// ISO 10-band graphic-EQ centers (Hz).
   static const List<double> centerFrequencies = [
-    32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000,
+    32,
+    64,
+    125,
+    250,
+    500,
+    1000,
+    2000,
+    4000,
+    8000,
+    16000,
   ];
 
   /// ISO 32-band 1/3-octave studio parametric EQ centers (Hz).
   static const List<double> iso32Frequencies = [
-    20, 25, 31.5, 40, 50, 63, 80, 100, 125, 160,
-    200, 250, 315, 400, 500, 630, 800, 1000, 1250, 1600,
-    2000, 2500, 3150, 4000, 5000, 6300, 8000, 10000, 12500, 16000,
-    20000, 24000,
+    20,
+    25,
+    31.5,
+    40,
+    50,
+    63,
+    80,
+    100,
+    125,
+    160,
+    200,
+    250,
+    315,
+    400,
+    500,
+    630,
+    800,
+    1000,
+    1250,
+    1600,
+    2000,
+    2500,
+    3150,
+    4000,
+    5000,
+    6300,
+    8000,
+    10000,
+    12500,
+    16000,
+    20000,
+    24000,
   ];
 
   /// The 5-band centers used before 10-band migration.
@@ -143,10 +182,13 @@ class EqPreset {
                 ? iso32Frequencies
                 : _logSpread(source.length, targetFrequencies)));
 
-    return [for (final f in targetFrequencies) _interpAtLogFreq(f, srcFreqs, source)];
+    return [
+      for (final f in targetFrequencies) _interpAtLogFreq(f, srcFreqs, source)
+    ];
   }
 
-  static double _interpAtLogFreq(double freq, List<double> freqs, List<double> gains) {
+  static double _interpAtLogFreq(
+      double freq, List<double> freqs, List<double> gains) {
     final logF = math.log(freq);
     if (logF <= math.log(freqs.first)) return gains.first;
     if (logF >= math.log(freqs.last)) return gains.last;
@@ -162,7 +204,9 @@ class EqPreset {
   }
 
   static List<double> _logSpread(int count, List<double> spanFreqs) {
-    if (count <= 1) return List.filled(count, spanFreqs.isNotEmpty ? spanFreqs.first : 0.0);
+    if (count <= 1) {
+      return List.filled(count, spanFreqs.isNotEmpty ? spanFreqs.first : 0.0);
+    }
     final logLo = math.log(spanFreqs.first);
     final logHi = math.log(spanFreqs.last);
     return [
@@ -172,13 +216,35 @@ class EqPreset {
   }
 
   static const List<EqPreset> defaultPresets = [
-    EqPreset(name: 'Flat', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], bassBoost: 0.0),
-    EqPreset(name: 'Bass Boost', gains: [7, 6.5, 5, 3, 1, 0, 0, 0, 0, 0], bassBoost: 0.5),
-    EqPreset(name: 'Rock', gains: [5, 4, 2.5, 0, -1, -1, 0.5, 2.5, 4, 4.5], bassBoost: 0.2),
-    EqPreset(name: 'Pop', gains: [-1, -0.5, 0.5, 2, 3.5, 4, 3, 1.5, 0, -1], bassBoost: 0.1),
-    EqPreset(name: 'Jazz', gains: [3.5, 3, 2, 1, -0.5, -1, 0, 1.5, 3, 3.5], bassBoost: 0.1),
-    EqPreset(name: 'Electronic', gains: [6, 5.5, 4, 2, 0, -0.5, 0.5, 2.5, 4.5, 5], bassBoost: 0.4),
-    EqPreset(name: 'Vocal Boost', gains: [-3, -2.5, -1, 1, 3.5, 4.5, 4, 2, 0.5, -0.5], bassBoost: 0.0),
-    EqPreset(name: 'Classical', gains: [4, 3.5, 2.5, 1, 0, -0.5, 0, 1.5, 3, 3.5], bassBoost: 0.0),
+    EqPreset(
+        name: 'Flat', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], bassBoost: 0.0),
+    EqPreset(
+        name: 'Bass Boost',
+        gains: [7, 6.5, 5, 3, 1, 0, 0, 0, 0, 0],
+        bassBoost: 0.5),
+    EqPreset(
+        name: 'Rock',
+        gains: [5, 4, 2.5, 0, -1, -1, 0.5, 2.5, 4, 4.5],
+        bassBoost: 0.2),
+    EqPreset(
+        name: 'Pop',
+        gains: [-1, -0.5, 0.5, 2, 3.5, 4, 3, 1.5, 0, -1],
+        bassBoost: 0.1),
+    EqPreset(
+        name: 'Jazz',
+        gains: [3.5, 3, 2, 1, -0.5, -1, 0, 1.5, 3, 3.5],
+        bassBoost: 0.1),
+    EqPreset(
+        name: 'Electronic',
+        gains: [6, 5.5, 4, 2, 0, -0.5, 0.5, 2.5, 4.5, 5],
+        bassBoost: 0.4),
+    EqPreset(
+        name: 'Vocal Boost',
+        gains: [-3, -2.5, -1, 1, 3.5, 4.5, 4, 2, 0.5, -0.5],
+        bassBoost: 0.0),
+    EqPreset(
+        name: 'Classical',
+        gains: [4, 3.5, 2.5, 1, 0, -0.5, 0, 1.5, 3, 3.5],
+        bassBoost: 0.0),
   ];
 }

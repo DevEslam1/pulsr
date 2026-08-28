@@ -64,7 +64,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '973193718497',
     projectId: 'pulsr-24243',
     storageBucket: 'pulsr-24243.firebasestorage.app',
-    iosClientId: '973193718497-bb716okvnhklii03mimq4pv5pdfjaveg.apps.googleusercontent.com',
+    iosClientId:
+        '973193718497-bb716okvnhklii03mimq4pv5pdfjaveg.apps.googleusercontent.com',
     iosBundleId: 'com.example.pulsr',
   );
 
@@ -74,7 +75,8 @@ class DefaultFirebaseOptions {
     messagingSenderId: '973193718497',
     projectId: 'pulsr-24243',
     storageBucket: 'pulsr-24243.firebasestorage.app',
-    iosClientId: '973193718497-bb716okvnhklii03mimq4pv5pdfjaveg.apps.googleusercontent.com',
+    iosClientId:
+        '973193718497-bb716okvnhklii03mimq4pv5pdfjaveg.apps.googleusercontent.com',
     iosBundleId: 'com.example.pulsr',
   );
 

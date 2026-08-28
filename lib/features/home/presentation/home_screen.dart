@@ -46,8 +46,10 @@ class _HomeScreenState extends State<HomeScreen> {
   String _selectedOnlineCategory = 'Recommended For You';
 
   YtmService get _ytmService => widget.ytmService ?? getIt<YtmService>();
-  YtmAccountService get _ytmAccountService => widget.ytmAccountService ?? getIt<YtmAccountService>();
-  GetSongsUseCase get _getSongsUseCase => widget.getSongsUseCase ?? getIt<GetSongsUseCase>();
+  YtmAccountService get _ytmAccountService =>
+      widget.ytmAccountService ?? getIt<YtmAccountService>();
+  GetSongsUseCase get _getSongsUseCase =>
+      widget.getSongsUseCase ?? getIt<GetSongsUseCase>();
 
   /// Resolved once and reused across rebuilds with 10-minute TTL cache.
   final Map<String, Future<List<YtmTrack>>> _categoryFutures = {};
@@ -106,7 +108,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     final isLoggedIn = _ytmAccountService.isLoggedIn;
-    _selectedOnlineCategory = isLoggedIn ? 'Recommended For You' : 'Trending Egypt';
+    _selectedOnlineCategory =
+        isLoggedIn ? 'Recommended For You' : 'Trending Egypt';
     _ytmAccountService.loginState.addListener(_onLoginStateChanged);
   }
 
@@ -115,7 +118,8 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _categoryFutures.clear();
       final isLoggedIn = _ytmAccountService.isLoggedIn;
-      _selectedOnlineCategory = isLoggedIn ? 'Recommended For You' : 'Trending Egypt';
+      _selectedOnlineCategory =
+          isLoggedIn ? 'Recommended For You' : 'Trending Egypt';
     });
   }
 
@@ -144,7 +148,8 @@ class _HomeScreenState extends State<HomeScreen> {
             final account = _ytmAccountService;
             if (account.isLoggedIn) {
               try {
-                final recs = await account.fetchHomeRecommendations(maxTracks: 50);
+                final recs =
+                    await account.fetchHomeRecommendations(maxTracks: 50);
                 if (recs.isNotEmpty) return recs;
               } catch (_) {}
             }
@@ -152,14 +157,18 @@ class _HomeScreenState extends State<HomeScreen> {
               final trending = await _ytmService.trending(limit: 25);
               if (trending.isNotEmpty) return trending;
             } catch (_) {}
-            return await _ytmService.searchWithFallback(_categoryQueries['Recommended For You'] ?? 'top hits music', limit: 25);
+            return await _ytmService.searchWithFallback(
+                _categoryQueries['Recommended For You'] ?? 'top hits music',
+                limit: 25);
           }
           if (category == 'Trending Egypt') {
             try {
               final trending = await _ytmService.trending(limit: 25);
               if (trending.isNotEmpty) return trending;
             } catch (_) {}
-            return await _ytmService.searchWithFallback(_categoryQueries['Trending Egypt'] ?? 'أغاني مصرية جديدة تريند', limit: 25);
+            return await _ytmService.searchWithFallback(
+                _categoryQueries['Trending Egypt'] ?? 'أغاني مصرية جديدة تريند',
+                limit: 25);
           }
           final query = _categoryQueries[category] ?? '$category songs';
           return await _ytmService.searchWithFallback(query, limit: 25);
@@ -191,7 +200,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final getSongsUseCase = _getSongsUseCase;
     final playerCubit = context.read<PlayerCubit>();
     final isTablet = Adaptive.isTablet(context);
-    final offlineOnly = context.watch<SettingsCubit?>()?.state.offlineOnlyMode ?? false;
+    final offlineOnly =
+        context.watch<SettingsCubit?>()?.state.offlineOnlyMode ?? false;
     final showOnlineTab = AppConfig.ytmEnabled && !offlineOnly;
 
     // Reset to local tab if offline only is enabled
@@ -206,7 +216,8 @@ class _HomeScreenState extends State<HomeScreen> {
             child: RefreshIndicator(
               onRefresh: () async {
                 if (currentTab == 0) {
-                  final count = await context.read<SettingsCubit>().rescanLibrary();
+                  final count =
+                      await context.read<SettingsCubit>().rescanLibrary();
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
@@ -222,12 +233,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 }
               },
               child: ListView(
-                physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+                physics: const AlwaysScrollableScrollPhysics(
+                    parent: BouncingScrollPhysics()),
                 padding: const EdgeInsets.only(bottom: 160),
                 children: [
                   // ---------- Header ----------
                   Padding(
-                    padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 16, Adaptive.pagePadding(context), 0),
+                    padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context),
+                        16, Adaptive.pagePadding(context), 0),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
@@ -236,13 +249,18 @@ class _HomeScreenState extends State<HomeScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                MaterialLocalizations.of(context).formatMediumDate(DateTime.now()),
-                                style: Theme.of(context).textTheme.labelSmall?.copyWith(color: p.textTertiary),
+                                MaterialLocalizations.of(context)
+                                    .formatMediumDate(DateTime.now()),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(color: p.textTertiary),
                               ),
                               const SizedBox(height: 6),
                               Text(
                                 _getGreeting(context),
-                                style: Theme.of(context).textTheme.headlineMedium,
+                                style:
+                                    Theme.of(context).textTheme.headlineMedium,
                               ),
                             ],
                           ),
@@ -254,10 +272,18 @@ class _HomeScreenState extends State<HomeScreen> {
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(color: p.hairline),
                             boxShadow: [
-                              BoxShadow(color: p.glow, blurRadius: 24, spreadRadius: -4, offset: const Offset(0, 8)),
+                              BoxShadow(
+                                  color: p.glow,
+                                  blurRadius: 24,
+                                  spreadRadius: -4,
+                                  offset: const Offset(0, 8)),
                             ],
                           ),
-                          child: PulsrLogo(size: 26, color: p.accent, glowColor: p.glow, animate: false),
+                          child: PulsrLogo(
+                              size: 26,
+                              color: p.accent,
+                              glowColor: p.glow,
+                              animate: false),
                         ),
                       ],
                     ),
@@ -267,7 +293,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (showOnlineTab) ...[
                     const SizedBox(height: 16),
                     Container(
-                      margin: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+                      margin: EdgeInsets.symmetric(
+                          horizontal: Adaptive.pagePadding(context)),
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
                         color: p.surfaceContainer,
@@ -307,7 +334,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: ListView(
                       scrollDirection: Axis.horizontal,
                       physics: const BouncingScrollPhysics(),
-                      padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+                      padding: EdgeInsets.symmetric(
+                          horizontal: Adaptive.pagePadding(context)),
                       children: [
                         if (AppConfig.ytmEnabled) ...[
                           _DiscoveryChip(
@@ -352,7 +380,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   // ---------- Content (Local vs Online) ----------
                   if (currentTab == 0)
-                    _buildLocalView(context, p, getSongsUseCase, playerCubit, isTablet)
+                    _buildLocalView(
+                        context, p, getSongsUseCase, playerCubit, isTablet)
                   else if (showOnlineTab)
                     _buildOnlineView(context, p, playerCubit, isTablet),
                 ],
@@ -424,7 +453,8 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         // ---------- Quick actions ----------
         Padding(
-          padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 0, Adaptive.pagePadding(context), 16),
+          padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 0,
+              Adaptive.pagePadding(context), 16),
           child: Row(
             children: [
               _QuickCard(
@@ -436,7 +466,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   final songs = await getSongsUseCase.getAllSongs();
                   songs.fold((l) => null, (list) {
                     final favs = list.where((s) => s.isFavorite).toList();
-                    if (favs.isNotEmpty) playerCubit.playSong(favs.first, queue: favs);
+                    if (favs.isNotEmpty) {
+                      playerCubit.playSong(favs.first, queue: favs);
+                    }
                   });
                 },
               ),
@@ -450,7 +482,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   final songs = await getSongsUseCase.getAllSongs();
                   songs.fold((l) => null, (list) {
                     if (list.isNotEmpty) {
-                      final shuffled = List<SongsTableData>.from(list)..shuffle();
+                      final shuffled = List<SongsTableData>.from(list)
+                        ..shuffle();
                       playerCubit.playSong(shuffled.first, queue: shuffled);
                     }
                   });
@@ -466,7 +499,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   final songs = await getSongsUseCase.getAllSongs();
                   songs.fold((l) => null, (list) {
                     final top = list.where((s) => s.playCount > 0).toList();
-                    if (top.isNotEmpty) playerCubit.playSong(top.first, queue: top);
+                    if (top.isNotEmpty) {
+                      playerCubit.playSong(top.first, queue: top);
+                    }
                   });
                 },
               ),
@@ -481,7 +516,8 @@ class _HomeScreenState extends State<HomeScreen> {
             if (snapshot.hasError) {
               return _SectionError(onRetry: () => setState(() {}));
             }
-            final songs = snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
+            final songs =
+                snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
             if (songs.isEmpty) return const SizedBox.shrink();
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -492,7 +528,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: ListView.builder(
                     scrollDirection: Axis.horizontal,
                     physics: const BouncingScrollPhysics(),
-                    padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: Adaptive.pagePadding(context)),
                     itemCount: songs.length,
                     itemBuilder: (context, index) {
                       final song = songs[index];
@@ -526,10 +563,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                           color: p.accent,
                                           shape: BoxShape.circle,
                                           boxShadow: [
-                                            BoxShadow(color: p.glow, blurRadius: 14, spreadRadius: 1),
+                                            BoxShadow(
+                                                color: p.glow,
+                                                blurRadius: 14,
+                                                spreadRadius: 1),
                                           ],
                                         ),
-                                        child: Icon(Icons.play_arrow_rounded, color: p.onAccent, size: 22),
+                                        child: Icon(Icons.play_arrow_rounded,
+                                            color: p.onAccent, size: 22),
                                       ),
                                     ),
                                   ],
@@ -554,7 +595,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   song.artist,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: TextStyle(color: p.textSecondary, fontSize: 11.5),
+                                  style: TextStyle(
+                                      color: p.textSecondary, fontSize: 11.5),
                                 ),
                               ],
                             ),
@@ -578,7 +620,8 @@ class _HomeScreenState extends State<HomeScreen> {
             if (snapshot.hasError) {
               return _SectionError(onRetry: () => setState(() {}));
             }
-            final songs = snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
+            final songs =
+                snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
             if (songs.isEmpty) return const _EmptyLibrary();
 
             return Column(
@@ -616,7 +659,8 @@ class _HomeScreenState extends State<HomeScreen> {
       children: [
         // ---------- Search YouTube Music Action Banner ----------
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context), vertical: 12),
+          padding: EdgeInsets.symmetric(
+              horizontal: Adaptive.pagePadding(context), vertical: 12),
           child: InkWell(
             borderRadius: BorderRadius.circular(20),
             onTap: () => context.push('/ytm-search'),
@@ -642,7 +686,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: p.accent.withValues(alpha: 0.2),
                       shape: BoxShape.circle,
                     ),
-                    child: Icon(Icons.travel_explore_rounded, color: p.accent, size: 22),
+                    child: Icon(Icons.travel_explore_rounded,
+                        color: p.accent, size: 22),
                   ),
                   const SizedBox(width: 14),
                   Expanded(
@@ -668,7 +713,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       ],
                     ),
                   ),
-                  Icon(Icons.arrow_forward_ios_rounded, size: 14, color: p.accent),
+                  Icon(Icons.arrow_forward_ios_rounded,
+                      size: 14, color: p.accent),
                 ],
               ),
             ),
@@ -677,15 +723,24 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // ---------- Quick Moods & Vibe Cards ----------
         Padding(
-          padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context), vertical: 6),
+          padding: EdgeInsets.symmetric(
+              horizontal: Adaptive.pagePadding(context), vertical: 6),
           child: Row(
             children: [
               _QuickCard(
                 title: _ytmAccountService.isLoggedIn ? 'For You' : 'Top Hits',
-                subtitle: _ytmAccountService.isLoggedIn ? 'Personalized' : 'Trending',
-                icon: _ytmAccountService.isLoggedIn ? Icons.auto_awesome_rounded : Icons.local_fire_department_rounded,
-                color: _ytmAccountService.isLoggedIn ? p.accent : const Color(0xFFFF5252),
-                onTap: () => setState(() => _selectedOnlineCategory = _ytmAccountService.isLoggedIn ? 'Recommended For You' : 'Global Top Hits'),
+                subtitle:
+                    _ytmAccountService.isLoggedIn ? 'Personalized' : 'Trending',
+                icon: _ytmAccountService.isLoggedIn
+                    ? Icons.auto_awesome_rounded
+                    : Icons.local_fire_department_rounded,
+                color: _ytmAccountService.isLoggedIn
+                    ? p.accent
+                    : const Color(0xFFFF5252),
+                onTap: () => setState(() => _selectedOnlineCategory =
+                    _ytmAccountService.isLoggedIn
+                        ? 'Recommended For You'
+                        : 'Global Top Hits'),
               ),
               const SizedBox(width: 10),
               _QuickCard(
@@ -693,7 +748,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 subtitle: 'Trending',
                 icon: Icons.local_fire_department_rounded,
                 color: const Color(0xFFFF5252),
-                onTap: () => setState(() => _selectedOnlineCategory = 'Global Top Hits'),
+                onTap: () =>
+                    setState(() => _selectedOnlineCategory = 'Global Top Hits'),
               ),
               const SizedBox(width: 10),
               _QuickCard(
@@ -701,7 +757,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 subtitle: 'Relaxing',
                 icon: Icons.spa_rounded,
                 color: const Color(0xFF7C4DFF),
-                onTap: () => setState(() => _selectedOnlineCategory = 'Chill & Lo-Fi'),
+                onTap: () =>
+                    setState(() => _selectedOnlineCategory = 'Chill & Lo-Fi'),
               ),
             ],
           ),
@@ -713,7 +770,8 @@ class _HomeScreenState extends State<HomeScreen> {
         SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+          padding:
+              EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
           child: Row(
             children: [
               for (final cat in _onlineCategories)
@@ -721,7 +779,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
                     avatar: cat == 'Recommended For You'
-                        ? Icon(Icons.auto_awesome_rounded, size: 14, color: _selectedOnlineCategory == cat ? p.onAccent : p.accent)
+                        ? Icon(Icons.auto_awesome_rounded,
+                            size: 14,
+                            color: _selectedOnlineCategory == cat
+                                ? p.onAccent
+                                : p.accent)
                         : null,
                     label: Text(cat),
                     selected: _selectedOnlineCategory == cat,
@@ -733,12 +795,20 @@ class _HomeScreenState extends State<HomeScreen> {
                     selectedColor: p.accent,
                     backgroundColor: p.surfaceContainer,
                     labelStyle: TextStyle(
-                      color: _selectedOnlineCategory == cat ? p.onAccent : p.textSecondary,
-                      fontWeight: _selectedOnlineCategory == cat ? FontWeight.w700 : FontWeight.w500,
+                      color: _selectedOnlineCategory == cat
+                          ? p.onAccent
+                          : p.textSecondary,
+                      fontWeight: _selectedOnlineCategory == cat
+                          ? FontWeight.w700
+                          : FontWeight.w500,
                       fontSize: 12.5,
                     ),
-                    side: BorderSide(color: _selectedOnlineCategory == cat ? p.accent : p.hairline),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    side: BorderSide(
+                        color: _selectedOnlineCategory == cat
+                            ? p.accent
+                            : p.hairline),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
                   ),
                 ),
             ],
@@ -797,7 +867,8 @@ class _OnlineCategorySection extends StatelessWidget {
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   physics: const NeverScrollableScrollPhysics(),
-                  padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+                  padding: EdgeInsets.symmetric(
+                      horizontal: Adaptive.pagePadding(context)),
                   itemCount: 4,
                   itemBuilder: (context, index) => Padding(
                     padding: const EdgeInsetsDirectional.only(end: 14),
@@ -856,7 +927,8 @@ class _OnlineCategorySection extends StatelessWidget {
             child: Center(
               child: Column(
                 children: [
-                  Icon(Icons.wifi_tethering_error_rounded, color: p.textTertiary, size: 38),
+                  Icon(Icons.wifi_tethering_error_rounded,
+                      color: p.textTertiary, size: 38),
                   const SizedBox(height: 10),
                   Text(
                     'Could not load songs for $title',
@@ -886,7 +958,8 @@ class _OnlineCategorySection extends StatelessWidget {
                 height: isTablet ? 232 : 212,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+                  padding: EdgeInsets.symmetric(
+                      horizontal: Adaptive.pagePadding(context)),
                   itemCount: songs.length,
                   itemBuilder: (context, index) {
                     final song = songs[index];
@@ -1079,7 +1152,10 @@ class _QuickCard extends StatelessWidget {
             ),
             decoration: BoxDecoration(
               gradient: LinearGradient(
-                colors: [color.withValues(alpha: 0.16), color.withValues(alpha: 0.03)],
+                colors: [
+                  color.withValues(alpha: 0.16),
+                  color.withValues(alpha: 0.03)
+                ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
@@ -1189,8 +1265,8 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
       final scanner = context.read<MediaScannerService>();
       final count = await scanner.scanDeviceLibrary();
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Scan complete! $count tracks loaded.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Scan complete! $count tracks loaded.')));
       }
     } finally {
       if (mounted) setState(() => _isScanning = false);
@@ -1216,13 +1292,17 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
               child: _isScanning
                   ? Padding(
                       padding: const EdgeInsets.all(22),
-                      child: CircularProgressIndicator(strokeWidth: 3, color: p.accent),
+                      child: CircularProgressIndicator(
+                          strokeWidth: 3, color: p.accent),
                     )
                   : Icon(Icons.music_off_rounded, size: 38, color: p.accent),
             ),
             const SizedBox(height: 18),
             Text('No Music Loaded Yet',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 6),
             Text(
               'Scan your device storage to load your audio tracks.',
@@ -1231,7 +1311,9 @@ class _EmptyLibraryState extends State<_EmptyLibrary> {
             ),
             const SizedBox(height: 22),
             ElevatedButton.icon(
-              icon: Icon(_isScanning ? Icons.hourglass_top_rounded : Icons.refresh_rounded),
+              icon: Icon(_isScanning
+                  ? Icons.hourglass_top_rounded
+                  : Icons.refresh_rounded),
               label: Text(_isScanning ? 'Scanning...' : 'Scan Device Storage'),
               onPressed: _isScanning ? null : _scan,
             ),

@@ -60,7 +60,8 @@ class TagFieldWidget extends StatelessWidget {
                   : null,
               filled: true,
               fillColor: p.surfaceContainer,
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(14),
                 borderSide: BorderSide.none,

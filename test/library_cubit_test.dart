@@ -15,12 +15,19 @@ import 'package:pulsr/features/library/cubit/library_cubit.dart';
 import 'package:pulsr/features/library/cubit/library_state.dart';
 
 class MockGetSongsUseCase extends Mock implements GetSongsUseCase {}
+
 class MockGetAlbumsUseCase extends Mock implements GetAlbumsUseCase {}
+
 class MockGetArtistsUseCase extends Mock implements GetArtistsUseCase {}
+
 class MockGetGenresUseCase extends Mock implements GetGenresUseCase {}
+
 class MockGetYearsUseCase extends Mock implements GetYearsUseCase {}
+
 class MockGetFavoritesUseCase extends Mock implements GetFavoritesUseCase {}
+
 class MockToggleFavoriteUseCase extends Mock implements ToggleFavoriteUseCase {}
+
 class MockFolderUseCases extends Mock implements FolderUseCases {}
 
 void main() {
@@ -48,13 +55,20 @@ void main() {
           ascending: any(named: 'ascending'),
           excludedFolders: any(named: 'excludedFolders'),
         )).thenAnswer((_) => Stream.value(const Right([])));
-    when(() => mockGetAlbums.watchAlbums()).thenAnswer((_) => Stream.value(const Right([])));
-    when(() => mockGetArtists.watchArtists()).thenAnswer((_) => Stream.value(const Right([])));
-    when(() => mockGetGenres.watchGenres()).thenAnswer((_) => Stream.value(const Right([])));
-    when(() => mockGetYears.watchYears()).thenAnswer((_) => Stream.value(const Right([])));
-    when(() => mockGetFavorites.watchFavorites()).thenAnswer((_) => Stream.value(const Right([])));
-    when(() => mockFolderUseCases.getFolderHierarchy()).thenAnswer((_) async => const Right([]));
-    when(() => mockFolderUseCases.getExcludedFolders()).thenAnswer((_) async => const Right([]));
+    when(() => mockGetAlbums.watchAlbums())
+        .thenAnswer((_) => Stream.value(const Right([])));
+    when(() => mockGetArtists.watchArtists())
+        .thenAnswer((_) => Stream.value(const Right([])));
+    when(() => mockGetGenres.watchGenres())
+        .thenAnswer((_) => Stream.value(const Right([])));
+    when(() => mockGetYears.watchYears())
+        .thenAnswer((_) => Stream.value(const Right([])));
+    when(() => mockGetFavorites.watchFavorites())
+        .thenAnswer((_) => Stream.value(const Right([])));
+    when(() => mockFolderUseCases.getFolderHierarchy())
+        .thenAnswer((_) async => const Right([]));
+    when(() => mockFolderUseCases.getExcludedFolders())
+        .thenAnswer((_) async => const Right([]));
   });
 
   group('LibraryCubit', () {
@@ -122,7 +136,8 @@ void main() {
     });
 
     test('toggleFavorite delegates to ToggleFavoriteUseCase', () async {
-      when(() => mockToggleFavorite(101)).thenAnswer((_) async => const Right(true));
+      when(() => mockToggleFavorite(101))
+          .thenAnswer((_) async => const Right(true));
 
       final cubit = LibraryCubit(
         getSongsUseCase: mockGetSongs,
@@ -161,13 +176,20 @@ void main() {
             ascending: any(named: 'ascending'),
             excludedFolders: any(named: 'excludedFolders'),
           )).thenAnswer((_) => Stream.value(const Right([song])));
-      when(() => mockGetAlbums.watchAlbums()).thenAnswer((_) => Stream.value(const Right([])));
-      when(() => mockGetArtists.watchArtists()).thenAnswer((_) => Stream.value(const Right([])));
-      when(() => mockGetGenres.watchGenres()).thenAnswer((_) => Stream.value(const Right([])));
-      when(() => mockGetYears.watchYears()).thenAnswer((_) => Stream.value(const Right([])));
-      when(() => mockGetFavorites.watchFavorites()).thenAnswer((_) => Stream.value(const Right([])));
-      when(() => mockFolderUseCases.getFolderHierarchy()).thenAnswer((_) async => const Right([]));
-      when(() => mockFolderUseCases.getExcludedFolders()).thenAnswer((_) async => const Right([]));
+      when(() => mockGetAlbums.watchAlbums())
+          .thenAnswer((_) => Stream.value(const Right([])));
+      when(() => mockGetArtists.watchArtists())
+          .thenAnswer((_) => Stream.value(const Right([])));
+      when(() => mockGetGenres.watchGenres())
+          .thenAnswer((_) => Stream.value(const Right([])));
+      when(() => mockGetYears.watchYears())
+          .thenAnswer((_) => Stream.value(const Right([])));
+      when(() => mockGetFavorites.watchFavorites())
+          .thenAnswer((_) => Stream.value(const Right([])));
+      when(() => mockFolderUseCases.getFolderHierarchy())
+          .thenAnswer((_) async => const Right([]));
+      when(() => mockFolderUseCases.getExcludedFolders())
+          .thenAnswer((_) async => const Right([]));
 
       final cubit = LibraryCubit(
         getSongsUseCase: mockGetSongs,

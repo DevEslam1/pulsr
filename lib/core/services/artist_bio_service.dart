@@ -41,7 +41,8 @@ class ArtistBioService {
 
     try {
       // 1. Search Deezer for HD Artist Picture and Top Tracks
-      final uri = Uri.parse('https://api.deezer.com/search/artist?q=${Uri.encodeComponent(cleanName)}&limit=1');
+      final uri = Uri.parse(
+          'https://api.deezer.com/search/artist?q=${Uri.encodeComponent(cleanName)}&limit=1');
       final res = await _client.get(uri).timeout(const Duration(seconds: 8));
 
       String? pictureUrl;
@@ -52,7 +53,9 @@ class ArtistBioService {
         final list = data['data'] as List<dynamic>?;
         if (list != null && list.isNotEmpty) {
           final first = list.first;
-          pictureUrl = first['picture_xl'] ?? first['picture_big'] ?? first['picture_medium'];
+          pictureUrl = first['picture_xl'] ??
+              first['picture_big'] ??
+              first['picture_medium'];
           fanCount = (first['nb_fan'] as num?)?.toInt();
         }
       }
@@ -60,8 +63,10 @@ class ArtistBioService {
       // 2. Fetch artist bio snippet from Wikipedia API
       String? bio;
       try {
-        final wikiUri = Uri.parse('https://en.wikipedia.org/api/rest_v1/page/summary/${Uri.encodeComponent(cleanName)}');
-        final wikiRes = await _client.get(wikiUri).timeout(const Duration(seconds: 6));
+        final wikiUri = Uri.parse(
+            'https://en.wikipedia.org/api/rest_v1/page/summary/${Uri.encodeComponent(cleanName)}');
+        final wikiRes =
+            await _client.get(wikiUri).timeout(const Duration(seconds: 6));
         if (wikiRes.statusCode == 200) {
           final wikiData = json.decode(wikiRes.body);
           bio = wikiData['extract'] as String?;
@@ -81,7 +86,8 @@ class ArtistBioService {
       _cache[cleanName.toLowerCase()] = info;
       return info;
     } catch (e, st) {
-      ErrorLogger.log('Failed to fetch artist info for $cleanName', error: e, stackTrace: st, category: 'ArtistBioService');
+      ErrorLogger.log('Failed to fetch artist info for $cleanName',
+          error: e, stackTrace: st, category: 'ArtistBioService');
       return null;
     }
   }

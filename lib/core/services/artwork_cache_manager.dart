@@ -16,7 +16,8 @@ class ArtworkCacheManager {
   ArtworkCacheManager._internal();
 
   static const String _prefMaxCacheSizeMb = 'setting_max_cache_size_mb';
-  static const int defaultMaxCacheSizeMb = 100; // 100 MB default maximum cache size
+  static const int defaultMaxCacheSizeMb =
+      100; // 100 MB default maximum cache size
 
   final Map<String, Uint8List> _memoryCache = {};
   static const int _maxMemoryItems = 150;
@@ -30,7 +31,8 @@ class ArtworkCacheManager {
   Future<void> init() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _maxCacheSizeMb = prefs.getInt(_prefMaxCacheSizeMb) ?? defaultMaxCacheSizeMb;
+      _maxCacheSizeMb =
+          prefs.getInt(_prefMaxCacheSizeMb) ?? defaultMaxCacheSizeMb;
       final tempDir = await getTemporaryDirectory();
       _cacheDir = Directory(p.join(tempDir.path, 'artwork_cache'));
       if (!await _cacheDir!.exists()) {
@@ -202,8 +204,8 @@ class ArtworkCacheManager {
         transformed.contains('ggpht.com')) {
       final sizePattern = RegExp(r'=(?:w\d+-h\d+|s\d+)[^?]*');
       if (sizePattern.hasMatch(transformed)) {
-        transformed = transformed.replaceAll(
-            sizePattern, '=w$width-h$height-l80-rj');
+        transformed =
+            transformed.replaceAll(sizePattern, '=w$width-h$height-l80-rj');
       } else {
         transformed = '$transformed=w$width-h$height-l80-rj';
       }

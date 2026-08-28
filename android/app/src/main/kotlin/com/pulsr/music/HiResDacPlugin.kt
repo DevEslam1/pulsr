@@ -150,7 +150,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 notifyDeviceChange()
                 result.success(true)
             }
-            "configureTargetAudio" -> {
+            "setTargetOutputFormat", "configureTargetAudio" -> {
                 val sampleRate = call.argument<Int>("sampleRate") ?: 0
                 val bitDepth = call.argument<Int>("bitDepth") ?: 0
                 targetSampleRate = sampleRate

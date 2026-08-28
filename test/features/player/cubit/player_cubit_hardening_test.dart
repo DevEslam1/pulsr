@@ -17,10 +17,14 @@ import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockMusicRepository extends Mock implements IMusicRepository {}
+
 class MockToggleFavoriteUseCase extends Mock implements ToggleFavoriteUseCase {}
+
 class MockScrobblerService extends Mock implements ScrobblerService {}
 
-class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler implements PulsrAudioHandler {
+class TestPulsrAudioHandler extends BaseAudioHandler
+    with QueueHandler, SeekHandler
+    implements PulsrAudioHandler {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 
@@ -37,6 +41,7 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   Future<void> setVolume(double volume) async {
     _vol = volume;
   }
+
   bool eqEnabled = false;
   EqPreset currentEqPreset = EqPreset.defaultPresets.first;
   Duration? sleepTimerDuration;
@@ -54,7 +59,8 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   @override
   Stream<Duration> get positionStream => _positionController.stream;
 
-  final StreamController<Duration> _positionController = StreamController<Duration>.broadcast();
+  final StreamController<Duration> _positionController =
+      StreamController<Duration>.broadcast();
 
   @override
   void setCrossfadeDuration(Duration d) {
@@ -105,7 +111,8 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   Future<void> setVirtualizerStrength(double strength) async {}
 
   @override
-  Future<void> setDynamicsPreset(DynamicsPreset preset, {bool? enabled}) async {}
+  Future<void> setDynamicsPreset(DynamicsPreset preset,
+      {bool? enabled}) async {}
 
   @override
   Future<void> applyHeadphoneProfile(HeadphoneProfile? profile) async {}
@@ -170,9 +177,11 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   List<String> get detectedOemEngines => const [];
 
   @override
-  Future<void> setCrossfeed(bool enabled, {double? delayUs, double? feedDb}) async {}
+  Future<void> setCrossfeed(bool enabled,
+      {double? delayUs, double? feedDb}) async {}
   @override
-  Future<void> setLookaheadLimiter(bool enabled, {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {}
+  Future<void> setLookaheadLimiter(bool enabled,
+      {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {}
   @override
   Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {}
   @override
@@ -224,7 +233,8 @@ class TestPulsrAudioHandler extends BaseAudioHandler with QueueHandler, SeekHand
   Future<void> removeQueueItemAt(int index) async {}
 
   @override
-  Future<void> loadQueue(List<SongsTableData> songs, {int initialIndex = 0, Duration? initialPosition}) async {}
+  Future<void> loadQueue(List<SongsTableData> songs,
+      {int initialIndex = 0, Duration? initialPosition}) async {}
 
   @override
   Stream<Duration?> get sleepTimerRemainingStream => const Stream.empty();
@@ -292,8 +302,10 @@ void main() {
     mockScrobblerService = MockScrobblerService();
     testAudioHandler = TestPulsrAudioHandler();
 
-    when(() => mockRepository.getSongById(any())).thenAnswer((_) async => right(sampleSong1));
-    when(() => mockRepository.getSongsByIds(any())).thenAnswer((_) async => right([sampleSong1]));
+    when(() => mockRepository.getSongById(any()))
+        .thenAnswer((_) async => right(sampleSong1));
+    when(() => mockRepository.getSongsByIds(any()))
+        .thenAnswer((_) async => right([sampleSong1]));
     when(() => mockScrobblerService.notifyPlaybackState(
           id: any(named: 'id'),
           artist: any(named: 'artist'),
@@ -306,7 +318,8 @@ void main() {
   });
 
   group('PlayerCubit Hardening Tests', () {
-    test('Queue slots persist to SharedPreferences after queue operations', () async {
+    test('Queue slots persist to SharedPreferences after queue operations',
+        () async {
       final cubit = PlayerCubit(
         audioHandler: testAudioHandler,
         repository: mockRepository,
@@ -371,7 +384,7 @@ void main() {
           path: '/path/$i.mp3',
           isFavorite: false,
           isMissing: false,
-    isDownloaded: false,
+          isDownloaded: false,
           playCount: 0,
           lastPositionMs: 0,
           source: 'local',

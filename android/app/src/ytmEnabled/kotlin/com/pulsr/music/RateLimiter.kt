@@ -1,6 +1,10 @@
 package com.pulsr.music
 
+import android.content.Context
+import android.content.SharedPreferences
 import android.os.SystemClock
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
@@ -9,29 +13,80 @@ import kotlin.math.min
 import kotlin.random.Random
 
 /**
- * Token-Bucket Rate Limiter with Exponential Backoff and Jitter.
+ * Layer 5: Adaptive Rate Limiter with Multi-Bucket Pacing, Jitter, and Persistence.
  *
- * Enforces a maximum request rate across all Innertube requests (default 6 req/s with burst of 10).
- * Handles HTTP 429 backoff gracefully with randomized jitter (±20%) to avoid thundering herds.
+ * Features:
+ * - Per-endpoint token buckets (SEARCH, BROWSE, PLAYER, STREAM, DOWNLOAD)
+ * - Global concurrency cap (max 8 in-flight requests)
+ * - Adaptive multiplier (doubles cooldown on 429, decays after 10m clean traffic)
+ * - Full-jitter exponential backoff (base 1s, capped at 15 min)
+ * - Retry-After header respect
+ * - SharedPreferences persistence across app restarts
+ * - Injectable Clock for deterministic testing
  */
-internal class RateLimiter(
-    private val maxTokens: Int = 10,
-    private val refillTokensPerSecond: Double = 6.0,
+class RateLimiter(
+    private val clock: Clock = SystemClockImpl(),
+    private var prefs: SharedPreferences? = null,
+    val respectfulMode: Boolean = true
 ) {
-    private val availableTokens = AtomicInteger(maxTokens)
-    private val lastRefillTimestamp = AtomicLong(SystemClock.elapsedRealtime())
+    interface Clock {
+        fun elapsedRealtime(): Long
+        fun currentTimeMillis(): Long
+        fun sleep(millis: Long)
+    }
+
+    class SystemClockImpl : Clock {
+        override fun elapsedRealtime(): Long = SystemClock.elapsedRealtime()
+        override fun currentTimeMillis(): Long = System.currentTimeMillis()
+        override fun sleep(millis: Long) = Thread.sleep(millis)
+    }
+
+    enum class Bucket(val maxTokens: Int, val refillPerSecond: Double, val minGapMs: Long) {
+        SEARCH(8, 2.0, 1500L),
+        BROWSE(10, 4.0, 500L),
+        PLAYER(10, 5.0, 200L),
+        STREAM(12, 6.0, 100L),
+        DOWNLOAD(6, 3.0, 300L)
+    }
+
+    private class BucketState(val bucket: Bucket, var availableTokens: Double, var lastRefill: Long, var lastRequest: Long = 0L)
+
+    private val bucketStates = ConcurrentHashMap<Bucket, BucketState>()
+    private val globalSemaphore = Semaphore(8, true)
     private val backoffUntilTimestamp = AtomicLong(0L)
+    private val adaptiveMultiplier = AtomicInteger(1)
+    private val lastSuccessTimestamp = AtomicLong(0L)
     private val consecutiveThrottles = AtomicInteger(0)
 
     private val lock = ReentrantLock()
     private val condition = lock.newCondition()
 
+    init {
+        val now = clock.elapsedRealtime()
+        for (b in Bucket.values()) {
+            bucketStates[b] = BucketState(b, b.maxTokens.toDouble(), now)
+        }
+    }
+
+    fun initPrefs(context: Context) {
+        prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val savedBackoff = prefs?.getLong(KEY_BACKOFF_UNTIL, 0L) ?: 0L
+        val nowWall = clock.currentTimeMillis()
+        if (savedBackoff > nowWall) {
+            val remainingMs = savedBackoff - nowWall
+            backoffUntilTimestamp.set(clock.elapsedRealtime() + remainingMs)
+        }
+    }
+
     /**
-     * Blocks the calling thread until a token permit is available and any backoff has elapsed.
+     * Acquires permit for [bucket], honoring concurrency cap and pacing floors.
      */
-    fun acquirePermit() {
+    fun acquirePermit(bucket: Bucket = Bucket.PLAYER) {
+        // 1. Global in-flight concurrency limiter
+        globalSemaphore.acquire()
+
         while (true) {
-            val now = SystemClock.elapsedRealtime()
+            val now = clock.elapsedRealtime()
             val backoffUntil = backoffUntilTimestamp.get()
 
             if (now < backoffUntil) {
@@ -52,14 +107,45 @@ internal class RateLimiter(
 
             lock.lock()
             try {
-                refillTokens()
-                val current = availableTokens.get()
-                if (current > 0) {
-                    availableTokens.decrementAndGet()
+                // Check clean traffic decay (10 minutes clean decays multiplier)
+                val lastSuccess = lastSuccessTimestamp.get()
+                if (lastSuccess > 0 && (now - lastSuccess) > 600_000L) {
+                    adaptiveMultiplier.set(1)
+                }
+
+                val state = bucketStates[bucket] ?: BucketState(bucket, bucket.maxTokens.toDouble(), now).also {
+                    bucketStates[bucket] = it
+                }
+
+                // Refill bucket tokens
+                val elapsedSec = (now - state.lastRefill) / 1000.0
+                if (elapsedSec > 0) {
+                    state.availableTokens = min(bucket.maxTokens.toDouble(), state.availableTokens + (elapsedSec * bucket.refillPerSecond))
+                    state.lastRefill = now
+                }
+
+                // Check respectful human pacing gap
+                if (respectfulMode && bucket.minGapMs > 0 && state.lastRequest > 0) {
+                    val gapElapsed = now - state.lastRequest
+                    if (gapElapsed < bucket.minGapMs) {
+                        val waitGap = bucket.minGapMs - gapElapsed + (0..150).random()
+                        try {
+                            condition.await(waitGap, TimeUnit.MILLISECONDS)
+                        } catch (_: InterruptedException) {
+                            Thread.currentThread().interrupt()
+                            return
+                        }
+                        continue
+                    }
+                }
+
+                if (state.availableTokens >= 1.0) {
+                    state.availableTokens -= 1.0
+                    state.lastRequest = now
                     return
                 }
 
-                val waitTimeMs = (1000.0 / refillTokensPerSecond).toLong().coerceIn(50L, 500L)
+                val waitTimeMs = ((1.0 - state.availableTokens) / bucket.refillPerSecond * 1000.0).toLong().coerceIn(50L, 500L)
                 try {
                     condition.await(waitTimeMs, TimeUnit.MILLISECONDS)
                 } catch (_: InterruptedException) {
@@ -72,53 +158,61 @@ internal class RateLimiter(
         }
     }
 
-    private fun refillTokens() {
-        val now = SystemClock.elapsedRealtime()
-        val lastRefill = lastRefillTimestamp.get()
-        val elapsedSeconds = (now - lastRefill) / 1000.0
-
-        if (elapsedSeconds > 0) {
-            val newTokens = (elapsedSeconds * refillTokensPerSecond).toInt()
-            if (newTokens > 0) {
-                val current = availableTokens.get()
-                val updated = min(maxTokens, current + newTokens)
-                availableTokens.set(updated)
-                lastRefillTimestamp.set(now)
-            }
-        }
+    fun releasePermit() {
+        globalSemaphore.release()
     }
 
     /**
-     * Signals an HTTP 429 Too Many Requests response.
-     * Triggers exponential backoff (1s -> 2s -> 4s -> 8s ... capped at 30s) with +/-20% jitter.
+     * Handles RateLimited / 429 response, doubling the multiplier and applying jittered backoff.
      */
-    fun onRateLimited(): Long {
-        val throttleCount = consecutiveThrottles.incrementAndGet().coerceAtMost(5)
-        val baseDelayMs = (1L shl (throttleCount - 1)) * 1000L // 1s, 2s, 4s, 8s, 16s...
-        val cappedDelayMs = min(baseDelayMs, 30_000L)
+    fun onRateLimited(retryAfterSeconds: Long? = null): Long {
+        val count = consecutiveThrottles.incrementAndGet().coerceAtMost(10)
+        val multiplier = adaptiveMultiplier.updateAndGet { (it * 2).coerceAtMost(16) }
 
-        // Jitter: +/- 20%
-        val jitterRange = (cappedDelayMs * 0.2).toLong().coerceAtLeast(100L)
-        val jitter = Random.nextLong(-jitterRange, jitterRange)
-        val delayWithJitter = (cappedDelayMs + jitter).coerceAtLeast(500L)
+        val delayMs = if (retryAfterSeconds != null && retryAfterSeconds > 0) {
+            retryAfterSeconds * 1000L
+        } else {
+            val baseDelayMs = (1L shl (count - 1)) * 1000L * multiplier // 1s, 2s, 4s, 8s...
+            val cappedDelayMs = min(baseDelayMs, 900_000L) // 15 min max cap
 
-        val now = SystemClock.elapsedRealtime()
-        val backoffUntil = now + delayWithJitter
+            // Full Jitter: +/- 20%
+            val jitterRange = (cappedDelayMs * 0.2).toLong().coerceAtLeast(200L)
+            val jitter = Random.nextLong(-jitterRange, jitterRange)
+            (cappedDelayMs + jitter).coerceAtLeast(1000L)
+        }
+
+        val nowRealtime = clock.elapsedRealtime()
+        val backoffUntil = nowRealtime + delayMs
         backoffUntilTimestamp.set(backoffUntil)
 
-        // Drain tokens to enforce immediate pause
-        availableTokens.set(0)
-        return delayWithJitter
+        // Persist to prefs
+        val wallBackoffUntil = clock.currentTimeMillis() + delayMs
+        prefs?.edit()?.putLong(KEY_BACKOFF_UNTIL, wallBackoffUntil)?.apply()
+
+        // Drain tokens
+        bucketStates.values.forEach { it.availableTokens = 0.0 }
+        return delayMs
     }
 
     /**
-     * Resets backoff count on successful requests.
+     * Resets throttle counter on successful response.
      */
     fun onSuccess() {
         consecutiveThrottles.set(0)
+        lastSuccessTimestamp.set(clock.elapsedRealtime())
+        prefs?.edit()?.remove(KEY_BACKOFF_UNTIL)?.apply()
+    }
+
+    fun getRemainingBackoffMs(): Long {
+        val now = clock.elapsedRealtime()
+        val until = backoffUntilTimestamp.get()
+        return (until - now).coerceAtLeast(0L)
     }
 
     companion object {
-        val shared = RateLimiter(maxTokens = 10, refillTokensPerSecond = 6.0)
+        private const val PREFS_NAME = "ytm_ratelimiter_prefs"
+        private const val KEY_BACKOFF_UNTIL = "key_backoff_until"
+
+        val shared = RateLimiter()
     }
 }

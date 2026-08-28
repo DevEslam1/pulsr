@@ -71,6 +71,7 @@ mixin _$SettingsState {
   double get stereoBalance;
   bool get monoMix;
   bool get sincResamplerEnabled;
+  String get dspPreference;
 
   /// Create a copy of SettingsState
   /// with the given fields replaced by the non-null parameter values.
@@ -173,7 +174,8 @@ mixin _$SettingsState {
             (identical(other.reverbWetDry, reverbWetDry) || other.reverbWetDry == reverbWetDry) &&
             (identical(other.stereoBalance, stereoBalance) || other.stereoBalance == stereoBalance) &&
             (identical(other.monoMix, monoMix) || other.monoMix == monoMix) &&
-            (identical(other.sincResamplerEnabled, sincResamplerEnabled) || other.sincResamplerEnabled == sincResamplerEnabled));
+            (identical(other.sincResamplerEnabled, sincResamplerEnabled) || other.sincResamplerEnabled == sincResamplerEnabled) &&
+            (identical(other.dspPreference, dspPreference) || other.dspPreference == dspPreference));
   }
 
   @override
@@ -235,12 +237,13 @@ mixin _$SettingsState {
         reverbWetDry,
         stereoBalance,
         monoMix,
-        sincResamplerEnabled
+        sincResamplerEnabled,
+        dspPreference
       ]);
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled, dspPreference: $dspPreference)';
   }
 }
 
@@ -307,7 +310,8 @@ abstract mixin class $SettingsStateCopyWith<$Res> {
       double reverbWetDry,
       double stereoBalance,
       bool monoMix,
-      bool sincResamplerEnabled});
+      bool sincResamplerEnabled,
+      String dspPreference});
 }
 
 /// @nodoc
@@ -380,6 +384,7 @@ class _$SettingsStateCopyWithImpl<$Res>
     Object? stereoBalance = null,
     Object? monoMix = null,
     Object? sincResamplerEnabled = null,
+    Object? dspPreference = null,
   }) {
     return _then(_self.copyWith(
       gaplessPlayback: null == gaplessPlayback
@@ -610,6 +615,10 @@ class _$SettingsStateCopyWithImpl<$Res>
           ? _self.sincResamplerEnabled
           : sincResamplerEnabled // ignore: cast_nullable_to_non_nullable
               as bool,
+      dspPreference: null == dspPreference
+          ? _self.dspPreference
+          : dspPreference // ignore: cast_nullable_to_non_nullable
+              as String,
     ));
   }
 }
@@ -764,7 +773,8 @@ extension SettingsStatePatterns on SettingsState {
             double reverbWetDry,
             double stereoBalance,
             bool monoMix,
-            bool sincResamplerEnabled)?
+            bool sincResamplerEnabled,
+            String dspPreference)?
         $default, {
     required TResult orElse(),
   }) {
@@ -828,7 +838,8 @@ extension SettingsStatePatterns on SettingsState {
             _that.reverbWetDry,
             _that.stereoBalance,
             _that.monoMix,
-            _that.sincResamplerEnabled);
+            _that.sincResamplerEnabled,
+            _that.dspPreference);
       case _:
         return orElse();
     }
@@ -906,7 +917,8 @@ extension SettingsStatePatterns on SettingsState {
             double reverbWetDry,
             double stereoBalance,
             bool monoMix,
-            bool sincResamplerEnabled)
+            bool sincResamplerEnabled,
+            String dspPreference)
         $default,
   ) {
     final _that = this;
@@ -969,7 +981,8 @@ extension SettingsStatePatterns on SettingsState {
             _that.reverbWetDry,
             _that.stereoBalance,
             _that.monoMix,
-            _that.sincResamplerEnabled);
+            _that.sincResamplerEnabled,
+            _that.dspPreference);
       case _:
         throw StateError('Unexpected subclass');
     }
@@ -1046,7 +1059,8 @@ extension SettingsStatePatterns on SettingsState {
             double reverbWetDry,
             double stereoBalance,
             bool monoMix,
-            bool sincResamplerEnabled)?
+            bool sincResamplerEnabled,
+            String dspPreference)?
         $default,
   ) {
     final _that = this;
@@ -1109,7 +1123,8 @@ extension SettingsStatePatterns on SettingsState {
             _that.reverbWetDry,
             _that.stereoBalance,
             _that.monoMix,
-            _that.sincResamplerEnabled);
+            _that.sincResamplerEnabled,
+            _that.dspPreference);
       case _:
         return null;
     }
@@ -1177,7 +1192,8 @@ class _SettingsState extends SettingsState {
       this.reverbWetDry = 0.20,
       this.stereoBalance = 0.0,
       this.monoMix = false,
-      this.sincResamplerEnabled = true})
+      this.sincResamplerEnabled = true,
+      this.dspPreference = 'native'})
       : _proxyList = proxyList,
         super._();
 
@@ -1358,6 +1374,9 @@ class _SettingsState extends SettingsState {
   @override
   @JsonKey()
   final bool sincResamplerEnabled;
+  @override
+  @JsonKey()
+  final String dspPreference;
 
   /// Create a copy of SettingsState
   /// with the given fields replaced by the non-null parameter values.
@@ -1460,7 +1479,8 @@ class _SettingsState extends SettingsState {
             (identical(other.reverbWetDry, reverbWetDry) || other.reverbWetDry == reverbWetDry) &&
             (identical(other.stereoBalance, stereoBalance) || other.stereoBalance == stereoBalance) &&
             (identical(other.monoMix, monoMix) || other.monoMix == monoMix) &&
-            (identical(other.sincResamplerEnabled, sincResamplerEnabled) || other.sincResamplerEnabled == sincResamplerEnabled));
+            (identical(other.sincResamplerEnabled, sincResamplerEnabled) || other.sincResamplerEnabled == sincResamplerEnabled) &&
+            (identical(other.dspPreference, dspPreference) || other.dspPreference == dspPreference));
   }
 
   @override
@@ -1522,12 +1542,13 @@ class _SettingsState extends SettingsState {
         reverbWetDry,
         stereoBalance,
         monoMix,
-        sincResamplerEnabled
+        sincResamplerEnabled,
+        dspPreference
       ]);
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled)';
+    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled, dspPreference: $dspPreference)';
   }
 }
 
@@ -1596,7 +1617,8 @@ abstract mixin class _$SettingsStateCopyWith<$Res>
       double reverbWetDry,
       double stereoBalance,
       bool monoMix,
-      bool sincResamplerEnabled});
+      bool sincResamplerEnabled,
+      String dspPreference});
 }
 
 /// @nodoc
@@ -1669,6 +1691,7 @@ class __$SettingsStateCopyWithImpl<$Res>
     Object? stereoBalance = null,
     Object? monoMix = null,
     Object? sincResamplerEnabled = null,
+    Object? dspPreference = null,
   }) {
     return _then(_SettingsState(
       gaplessPlayback: null == gaplessPlayback
@@ -1899,6 +1922,10 @@ class __$SettingsStateCopyWithImpl<$Res>
           ? _self.sincResamplerEnabled
           : sincResamplerEnabled // ignore: cast_nullable_to_non_nullable
               as bool,
+      dspPreference: null == dspPreference
+          ? _self.dspPreference
+          : dspPreference // ignore: cast_nullable_to_non_nullable
+              as String,
     ));
   }
 }

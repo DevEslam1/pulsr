@@ -27,8 +27,10 @@ class ArtworkPicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final bool hasCustomNewImage = newArtworkPath != null && newArtworkPath!.isNotEmpty;
-    final bool hasBytesImage = artworkBytes != null && artworkBytes!.isNotEmpty && !removeArtwork;
+    final bool hasCustomNewImage =
+        newArtworkPath != null && newArtworkPath!.isNotEmpty;
+    final bool hasBytesImage =
+        artworkBytes != null && artworkBytes!.isNotEmpty && !removeArtwork;
 
     return Center(
       child: Column(
@@ -53,7 +55,8 @@ class ArtworkPicker extends StatelessWidget {
                 clipBehavior: Clip.antiAlias,
                 child: removeArtwork
                     ? Center(
-                        child: Icon(Icons.music_note_rounded, size: 64, color: p.textSecondary),
+                        child: Icon(Icons.music_note_rounded,
+                            size: 64, color: p.textSecondary),
                       )
                     : hasCustomNewImage
                         ? Image.file(
@@ -62,7 +65,8 @@ class ArtworkPicker extends StatelessWidget {
                             width: 150,
                             height: 150,
                             errorBuilder: (_, __, ___) => Center(
-                              child: Icon(Icons.music_note_rounded, size: 64, color: p.textSecondary),
+                              child: Icon(Icons.music_note_rounded,
+                                  size: 64, color: p.textSecondary),
                             ),
                           )
                         : hasBytesImage
@@ -96,7 +100,8 @@ class ArtworkPicker extends StatelessWidget {
                     color: p.accent.withAlpha(200),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(Icons.camera_alt_rounded, color: Colors.white, size: 28),
+                  child: const Icon(Icons.camera_alt_rounded,
+                      color: Colors.white, size: 28),
                 ),
               ),
             ],

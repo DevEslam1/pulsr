@@ -50,7 +50,8 @@ void main() {
       expect(decoded['playHistory'], isA<List>());
     });
 
-    test('Import restores favorites, playlists, history, and excluded folders', () async {
+    test('Import restores favorites, playlists, history, and excluded folders',
+        () async {
       await db.into(db.songsTable).insert(
             SongsTableCompanion.insert(
               id: const Value(10),
@@ -94,7 +95,9 @@ void main() {
       expect(result.restoredExcludedFoldersCount, equals(1));
 
       // Verify DB updates
-      final song = await (db.select(db.songsTable)..where((t) => t.id.equals(10))).getSingle();
+      final song = await (db.select(db.songsTable)
+            ..where((t) => t.id.equals(10)))
+          .getSingle();
       expect(song.isFavorite, isTrue);
       expect(song.playCount, equals(12));
     });
@@ -111,7 +114,8 @@ void main() {
       );
     });
 
-    test('Import throws FormatException on invalid or corrupted JSON', () async {
+    test('Import throws FormatException on invalid or corrupted JSON',
+        () async {
       expect(
         () => importUseCase.execute('not-valid-json { ['),
         throwsA(isA<FormatException>()),
@@ -130,7 +134,9 @@ void main() {
       );
     });
 
-    test('Import matches by parent folder + filename and avoids cross-matching duplicates', () async {
+    test(
+        'Import matches by parent folder + filename and avoids cross-matching duplicates',
+        () async {
       // Two songs with the same filename in different album directories
       await db.into(db.songsTable).insert(
             SongsTableCompanion.insert(
@@ -159,8 +165,12 @@ void main() {
       final result = await importUseCase.execute(jsonEncode(backupData));
       expect(result.restoredFavoritesCount, equals(1));
 
-      final songA = await (db.select(db.songsTable)..where((t) => t.id.equals(101))).getSingle();
-      final songB = await (db.select(db.songsTable)..where((t) => t.id.equals(102))).getSingle();
+      final songA = await (db.select(db.songsTable)
+            ..where((t) => t.id.equals(101)))
+          .getSingle();
+      final songB = await (db.select(db.songsTable)
+            ..where((t) => t.id.equals(102)))
+          .getSingle();
 
       expect(songA.isFavorite, isFalse);
       expect(songB.isFavorite, isTrue); // Correctly matched AlbumB!

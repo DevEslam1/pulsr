@@ -2,14 +2,14 @@
 import 'package:injectable/injectable.dart';
 import '../../core/errors/failures.dart';
 import '../../data/db/app_database.dart';
-import '../../data/repositories/smart_playlist_engine.dart';
+import '../../domain/repositories/smart_playlist_engine_interface.dart';
 import '../models/smart_playlist_criteria.dart';
 import '../repositories/music_repository_interface.dart';
 
 @singleton
 class PlaylistUseCases {
   final IMusicRepository _repository;
-  final SmartPlaylistEngine _smartPlaylistEngine;
+  final ISmartPlaylistEngine _smartPlaylistEngine;
 
   PlaylistUseCases(this._repository, this._smartPlaylistEngine);
 
@@ -29,15 +29,18 @@ class PlaylistUseCases {
     return _smartPlaylistEngine.evaluateCriteria(criteria);
   }
 
-  Future<Result<int>> createPlaylist(String name, {bool isSmart = false, String? smartCriteria}) {
-    return _repository.createPlaylist(name, isSmart: isSmart, smartCriteria: smartCriteria);
+  Future<Result<int>> createPlaylist(String name,
+      {bool isSmart = false, String? smartCriteria}) {
+    return _repository.createPlaylist(name,
+        isSmart: isSmart, smartCriteria: smartCriteria);
   }
 
   Future<Result<void>> renamePlaylist(int playlistId, String newName) {
     return _repository.renamePlaylist(playlistId, newName);
   }
 
-  Future<Result<void>> updateSmartPlaylist(int playlistId, String name, String smartCriteria) {
+  Future<Result<void>> updateSmartPlaylist(
+      int playlistId, String name, String smartCriteria) {
     return _repository.updateSmartPlaylist(playlistId, name, smartCriteria);
   }
 
@@ -57,7 +60,8 @@ class PlaylistUseCases {
     return _repository.removeSongFromPlaylist(playlistId, songId);
   }
 
-  Future<Result<void>> reorderPlaylistSongs(int playlistId, List<int> orderedSongIds) {
+  Future<Result<void>> reorderPlaylistSongs(
+      int playlistId, List<int> orderedSongIds) {
     return _repository.reorderPlaylistSongs(playlistId, orderedSongIds);
   }
 

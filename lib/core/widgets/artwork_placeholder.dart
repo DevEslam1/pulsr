@@ -23,11 +23,13 @@ class ArtworkPlaceholder extends StatelessWidget {
         final isBounded = size.isFinite && size > 0;
         final effectiveSize = isBounded
             ? size
-            : (constraints.biggest.shortestSide.isFinite && constraints.biggest.shortestSide > 0
+            : (constraints.biggest.shortestSide.isFinite &&
+                    constraints.biggest.shortestSide > 0
                 ? constraints.biggest.shortestSide
                 : 56.0);
 
-        final effectiveBorderRadius = borderRadius.isFinite ? borderRadius : 12.0;
+        final effectiveBorderRadius =
+            borderRadius.isFinite ? borderRadius : 12.0;
 
         return Container(
           width: isBounded ? effectiveSize : null,

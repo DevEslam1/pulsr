@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <cache-path name="widget_cache" path="." />
+    <external-cache-path name="external_widget_cache" path="." />
+    <files-path name="widget_files" path="." />
+</paths>

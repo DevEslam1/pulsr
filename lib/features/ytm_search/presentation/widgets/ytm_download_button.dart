@@ -36,7 +36,8 @@ class YtmDownloadButton extends StatelessWidget {
     final tintColor = activeColor ?? p.accent;
     final baseColor = iconColor ?? p.textTertiary;
 
-    final cubit = context.watch<YtmDownloadCubit?>() ?? getIt<YtmDownloadCubit>();
+    final cubit =
+        context.watch<YtmDownloadCubit?>() ?? getIt<YtmDownloadCubit>();
 
     return BlocBuilder<YtmDownloadCubit, YtmDownloadState>(
       bloc: cubit,
@@ -45,12 +46,14 @@ class YtmDownloadButton extends StatelessWidget {
           a.itemFor(videoId).progress != b.itemFor(videoId).progress,
       builder: (context, state) {
         final item = state.itemFor(videoId);
-        final isAlreadyLocal = song.source == SongSource.local && (song.remoteId != null && song.remoteId!.isNotEmpty);
+        final isAlreadyLocal = song.source == SongSource.local &&
+            (song.remoteId != null && song.remoteId!.isNotEmpty);
         if (isAlreadyLocal || item.status == YtDownloadStatus.done) {
           return SizedBox(
             width: 40,
             height: 40,
-            child: Icon(Icons.download_done_rounded, size: iconSize, color: tintColor),
+            child: Icon(Icons.download_done_rounded,
+                size: iconSize, color: tintColor),
           );
         }
 
@@ -66,7 +69,9 @@ class YtmDownloadButton extends StatelessWidget {
                   height: iconSize,
                   child: CircularProgressIndicator(
                     strokeWidth: 2.4,
-                    value: item.status == YtDownloadStatus.queued ? null : item.progress,
+                    value: item.status == YtDownloadStatus.queued
+                        ? null
+                        : item.progress,
                     color: tintColor,
                   ),
                 ),
@@ -76,12 +81,14 @@ class YtmDownloadButton extends StatelessWidget {
             return SizedBox(
               width: 40,
               height: 40,
-              child: Icon(Icons.download_done_rounded, size: iconSize, color: tintColor),
+              child: Icon(Icons.download_done_rounded,
+                  size: iconSize, color: tintColor),
             );
           case YtDownloadStatus.failed:
             return IconButton(
               tooltip: item.error,
-              icon: Icon(Icons.error_outline_rounded, size: iconSize, color: p.error),
+              icon: Icon(Icons.error_outline_rounded,
+                  size: iconSize, color: p.error),
               onPressed: () => cubit.download(song),
               visualDensity: VisualDensity.compact,
             );
@@ -89,7 +96,8 @@ class YtmDownloadButton extends StatelessWidget {
           case YtDownloadStatus.idle:
             return IconButton(
               tooltip: 'Download offline',
-              icon: Icon(Icons.download_rounded, size: iconSize, color: baseColor),
+              icon: Icon(Icons.download_rounded,
+                  size: iconSize, color: baseColor),
               onPressed: () => cubit.download(song),
               visualDensity: VisualDensity.compact,
             );

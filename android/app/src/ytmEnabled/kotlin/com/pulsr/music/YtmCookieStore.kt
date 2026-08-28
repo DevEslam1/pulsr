@@ -226,6 +226,8 @@ internal class YtmCookieStore private constructor(context: Context) {
         }
     }
 
+    fun clearCookies() = clear()
+
     private fun parseAndPut(cookieString: String) {
         for (pair in cookieString.split(";")) {
             val trimmed = pair.trim()

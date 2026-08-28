@@ -34,7 +34,8 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
   }
 
   void _onScroll() {
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 400) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 400) {
       if (mounted) {
         setState(() {
           _visibleCount += 50;
@@ -64,13 +65,19 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
               IconButton(
                 icon: const Icon(Icons.zoom_out_rounded),
                 onPressed: () {
-                  if (_columnCount < maxCols) setState(() => _columnCount = (_columnCount + 1).clamp(minCols, maxCols));
+                  if (_columnCount < maxCols) {
+                    setState(() => _columnCount =
+                        (_columnCount + 1).clamp(minCols, maxCols));
+                  }
                 },
               ),
               IconButton(
                 icon: const Icon(Icons.zoom_in_rounded),
                 onPressed: () {
-                  if (_columnCount > minCols) setState(() => _columnCount = (_columnCount - 1).clamp(minCols, maxCols));
+                  if (_columnCount > minCols) {
+                    setState(() => _columnCount =
+                        (_columnCount - 1).clamp(minCols, maxCols));
+                  }
                 },
               ),
             ],
@@ -90,7 +97,8 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
             );
           }
 
-          final displayCount = albums.length > _visibleCount ? _visibleCount : albums.length;
+          final displayCount =
+              albums.length > _visibleCount ? _visibleCount : albums.length;
 
           return Align(
             alignment: Alignment.topCenter,
@@ -99,16 +107,19 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
               child: GestureDetector(
                 onScaleUpdate: (details) {
                   if (details.scale > 1.2 && _columnCount > minCols) {
-                    setState(() => _columnCount = (_columnCount - 0.05).clamp(minCols, maxCols));
+                    setState(() => _columnCount =
+                        (_columnCount - 0.05).clamp(minCols, maxCols));
                   } else if (details.scale < 0.8 && _columnCount < maxCols) {
-                    setState(() => _columnCount = (_columnCount + 0.05).clamp(minCols, maxCols));
+                    setState(() => _columnCount =
+                        (_columnCount + 0.05).clamp(minCols, maxCols));
                   }
                 },
                 child: GridView.builder(
                   controller: _scrollController,
                   addRepaintBoundaries: true,
                   addAutomaticKeepAlives: false,
-                  padding: EdgeInsetsDirectional.fromSTEB(context.pagePadding, 8, context.pagePadding, 160),
+                  padding: EdgeInsetsDirectional.fromSTEB(
+                      context.pagePadding, 8, context.pagePadding, 160),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: _columnCount.round(),
                     crossAxisSpacing: 10,
@@ -119,7 +130,8 @@ class _ArtworkGridScreenState extends State<ArtworkGridScreen> {
                   itemBuilder: (context, index) {
                     final album = albums[index];
                     return InkWell(
-                      onTap: () => context.push('/album/${album.id}', extra: album),
+                      onTap: () =>
+                          context.push('/album/${album.id}', extra: album),
                       borderRadius: BorderRadius.circular(14),
                       child: Container(
                         decoration: BoxDecoration(

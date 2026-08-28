@@ -4,8 +4,10 @@ import 'package:flutter/services.dart';
 import '../constants/channels.dart';
 
 class PlatformCapabilities {
-  static bool get isAndroid => !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
-  static bool get isIOS => !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
+  static bool get isAndroid =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.android;
+  static bool get isIOS =>
+      !kIsWeb && defaultTargetPlatform == TargetPlatform.iOS;
 
   static bool get hasEqualizer => isAndroid;
   static bool get hasAudioEffects => isAndroid;
@@ -32,7 +34,8 @@ class PlatformCapabilities {
 
     try {
       const channel = MethodChannel(PulsrChannels.audioEffects);
-      final caps = await channel.invokeMapMethod<String, dynamic>('getCapabilities');
+      final caps =
+          await channel.invokeMapMethod<String, dynamic>('getCapabilities');
       if (caps != null) {
         return caps.map((k, v) => MapEntry(k, v == true));
       }

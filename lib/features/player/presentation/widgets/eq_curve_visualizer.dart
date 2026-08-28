@@ -44,7 +44,8 @@ class _EqCurvePainter extends CustomPainter {
     if (gains.isEmpty) return;
 
     final midY = size.height / 2;
-    final stepX = gains.length > 1 ? size.width / (gains.length - 1) : size.width;
+    final stepX =
+        gains.length > 1 ? size.width / (gains.length - 1) : size.width;
     const maxGain = 15.0;
 
     // Draw real-time FFT spectrum analyzer background if available
@@ -77,12 +78,16 @@ class _EqCurvePainter extends CustomPainter {
     final path = Path();
     for (int i = 0; i < gains.length; i++) {
       final x = i * stepX;
-      final y = midY - (gains[i].clamp(-maxGain, maxGain) / maxGain) * (size.height / 2 * 0.9);
+      final y = midY -
+          (gains[i].clamp(-maxGain, maxGain) / maxGain) *
+              (size.height / 2 * 0.9);
       if (i == 0) {
         path.moveTo(x, y);
       } else {
         final prevX = (i - 1) * stepX;
-        final prevY = midY - (gains[i - 1].clamp(-maxGain, maxGain) / maxGain) * (size.height / 2 * 0.9);
+        final prevY = midY -
+            (gains[i - 1].clamp(-maxGain, maxGain) / maxGain) *
+                (size.height / 2 * 0.9);
         final ctrlX = (prevX + x) / 2;
         path.cubicTo(ctrlX, prevY, ctrlX, y, x, y);
       }
@@ -120,7 +125,9 @@ class _EqCurvePainter extends CustomPainter {
       ..style = PaintingStyle.fill;
     for (int i = 0; i < gains.length; i++) {
       final x = i * stepX;
-      final y = midY - (gains[i].clamp(-maxGain, maxGain) / maxGain) * (size.height / 2 * 0.9);
+      final y = midY -
+          (gains[i].clamp(-maxGain, maxGain) / maxGain) *
+              (size.height / 2 * 0.9);
       if (gains[i].abs() > 0.1) {
         canvas.drawCircle(Offset(x, y), 3.0, dotPaint);
       }

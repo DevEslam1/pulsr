@@ -17,7 +17,8 @@ import '../db/app_database.dart';
 class MediaScannerService {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   final IMusicRepository _repository;
-  final StreamController<double> _progressController = StreamController<double>.broadcast();
+  final StreamController<double> _progressController =
+      StreamController<double>.broadcast();
 
   Stream<double> get scanProgress => _progressController.stream;
 
@@ -89,7 +90,8 @@ class MediaScannerService {
       if (lower.contains(pattern)) return true;
     }
     final fileName = lower.split('/').lastOrNull ?? '';
-    if (fileName.startsWith('ptt-') || (fileName.startsWith('aud-') && fileName.length > 20)) {
+    if (fileName.startsWith('ptt-') ||
+        (fileName.startsWith('aud-') && fileName.length > 20)) {
       if (lower.contains('whatsapp') || lower.contains('opus')) return true;
     }
     // Ignore hidden dot folders (.thumbnails, .private, etc.)
@@ -127,12 +129,15 @@ class MediaScannerService {
           ignoreCase: true,
         );
       } catch (e, stack) {
-        ErrorLogger.log('on_audio_query querySongs failed', error: e, stackTrace: stack, category: 'scanner');
+        ErrorLogger.log('on_audio_query querySongs failed',
+            error: e, stackTrace: stack, category: 'scanner');
         return 0;
       }
 
       final minDurationMs = ignoreShortFiles ? minDurationSec * 1000 : 0;
-      ErrorLogger.addBreadcrumb('Scanner started with ${songs.length} raw MediaStore songs', category: 'scanner');
+      ErrorLogger.addBreadcrumb(
+          'Scanner started with ${songs.length} raw MediaStore songs',
+          category: 'scanner');
 
       _progressController.add(0.3);
 
@@ -145,7 +150,8 @@ class MediaScannerService {
         pathSeparator: Platform.pathSeparator,
       );
 
-      final parseResult = await compute(_parseScannedMediaInIsolate, parseInput);
+      final parseResult =
+          await compute(_parseScannedMediaInIsolate, parseInput);
       _progressController.add(0.7);
 
       await _repository.syncScannedMusic(
@@ -160,11 +166,14 @@ class MediaScannerService {
       await _repository.cleanupOrphanedSongs(parseResult.validSongIds);
       _progressController.add(1.0);
 
-      ErrorLogger.addBreadcrumb('Scanner completed: ${parseResult.songs.length} valid songs indexed', category: 'scanner');
+      ErrorLogger.addBreadcrumb(
+          'Scanner completed: ${parseResult.songs.length} valid songs indexed',
+          category: 'scanner');
 
       return parseResult.songs.length;
     } catch (e, st) {
-      ErrorLogger.log('Media scanner failed', error: e, stackTrace: st, category: 'scanner');
+      ErrorLogger.log('Media scanner failed',
+          error: e, stackTrace: st, category: 'scanner');
       rethrow;
     }
   }
@@ -172,7 +181,8 @@ class MediaScannerService {
   Future<void> rescanSingleFile(String path) async {
     const channel = MethodChannel(PulsrChannels.tagEditor);
     try {
-      final Map<dynamic, dynamic>? tags = await channel.invokeMapMethod<dynamic, dynamic>('readTags', {
+      final Map<dynamic, dynamic>? tags =
+          await channel.invokeMapMethod<dynamic, dynamic>('readTags', {
         'path': path,
         'includeArtwork': false,
       });
@@ -190,7 +200,8 @@ class MediaScannerService {
         await _repository.updateSongTags(
           path: path,
           title: (title != null && title.isNotEmpty) ? title : 'Unknown Song',
-          artist: (artist != null && artist.isNotEmpty) ? artist : 'Unknown Artist',
+          artist:
+              (artist != null && artist.isNotEmpty) ? artist : 'Unknown Artist',
           album: (album != null && album.isNotEmpty) ? album : 'Unknown Album',
           genre: genre,
           year: year,
@@ -215,12 +226,15 @@ class MediaScannerService {
   /// in a background isolate and therefore cannot do this inline.
   Future<void> enrichAudioQuality(int songId, String path) async {
     if (!Platform.isAndroid) return;
-    if (path.isEmpty || path.startsWith('http') || path.startsWith('ytmusic://')) {
+    if (path.isEmpty ||
+        path.startsWith('http') ||
+        path.startsWith('ytmusic://')) {
       return;
     }
     const channel = MethodChannel(PulsrChannels.tagEditor);
     try {
-      final Map<dynamic, dynamic>? tags = await channel.invokeMapMethod<dynamic, dynamic>('readTags', {
+      final Map<dynamic, dynamic>? tags =
+          await channel.invokeMapMethod<dynamic, dynamic>('readTags', {
         'path': path,
         'includeArtwork': false,
       });
@@ -237,7 +251,8 @@ class MediaScannerService {
         songId: songId,
         sampleRate: sampleRate != null && sampleRate > 0 ? sampleRate : null,
         bitDepth: bitDepth != null && bitDepth > 0 ? bitDepth : null,
-        bitrateKbps: bitrateKbps != null && bitrateKbps > 0 ? bitrateKbps : null,
+        bitrateKbps:
+            bitrateKbps != null && bitrateKbps > 0 ? bitrateKbps : null,
         codec: (codec != null && codec.isNotEmpty) ? codec : null,
         loudnessRange: lraVal,
       );
@@ -258,19 +273,21 @@ class MediaScannerService {
   }) async {
     if (!Platform.isAndroid || songs.isEmpty) return;
 
-    final eligible = songs.where((s) =>
-      s.codec == null &&
-      s.path.isNotEmpty &&
-      !s.path.startsWith('http') &&
-      !s.path.startsWith('ytmusic://')
-    ).toList();
+    final eligible = songs
+        .where((s) =>
+            s.codec == null &&
+            s.path.isNotEmpty &&
+            !s.path.startsWith('http') &&
+            !s.path.startsWith('ytmusic://'))
+        .toList();
 
     final total = eligible.length;
     int processed = 0;
 
     for (int i = 0; i < eligible.length; i += 10) {
       final batch = eligible.sublist(i, (i + 10).clamp(0, eligible.length));
-      await Future.wait(batch.map((song) => enrichAudioQuality(song.id, song.path)));
+      await Future.wait(
+          batch.map((song) => enrichAudioQuality(song.id, song.path)));
       processed += batch.length;
       onProgress?.call(processed, total);
     }
@@ -287,18 +304,18 @@ class MediaScannerService {
       final s0 = (i > 0 ? samples[i - 1] : samples[i]) / maxInt;
       final s1 = samples[i] / maxInt;
       final s2 = samples[i + 1] / maxInt;
-      final s3 = (i + 2 < samples.length ? samples[i + 2] : samples[i + 1]) / maxInt;
+      final s3 =
+          (i + 2 < samples.length ? samples[i + 2] : samples[i + 1]) / maxInt;
 
       // 4-point cubic Hermite interpolation for 4x oversampling
       for (double t = 0.0; t < 1.0; t += 0.25) {
         final t2 = t * t;
         final t3 = t2 * t;
-        final val = 0.5 * (
-          (2.0 * s1) +
-          (-s0 + s2) * t +
-          (2.0 * s0 - 5.0 * s1 + 4.0 * s2 - s3) * t2 +
-          (-s0 + 3.0 * s1 - 3.0 * s2 + s3) * t3
-        );
+        final val = 0.5 *
+            ((2.0 * s1) +
+                (-s0 + s2) * t +
+                (2.0 * s0 - 5.0 * s1 + 4.0 * s2 - s3) * t2 +
+                (-s0 + 3.0 * s1 - 3.0 * s2 + s3) * t3);
         final absVal = val.abs();
         if (absVal > maxTruePeak) {
           maxTruePeak = absVal;
@@ -318,8 +335,10 @@ class MediaScannerService {
     if (validLufs.isEmpty) return 0.0;
 
     validLufs.sort();
-    final p10Idx = (validLufs.length * 0.10).floor().clamp(0, validLufs.length - 1);
-    final p95Idx = (validLufs.length * 0.95).floor().clamp(0, validLufs.length - 1);
+    final p10Idx =
+        (validLufs.length * 0.10).floor().clamp(0, validLufs.length - 1);
+    final p95Idx =
+        (validLufs.length * 0.95).floor().clamp(0, validLufs.length - 1);
 
     final lra = validLufs[p95Idx] - validLufs[p10Idx];
     return lra.clamp(0.0, 30.0);
@@ -395,35 +414,42 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
     }
 
     // Auto-hide system media / messenger voice notes
-    if (input.autoHideSystemMedia && MediaScannerService.isSystemIgnoredPath(path)) {
+    if (input.autoHideSystemMedia &&
+        MediaScannerService.isSystemIgnoredPath(path)) {
       continue;
     }
 
     // Skip if within a user-excluded folder
     if (input.excludedFolders.any((folder) {
-      final prefix = folder.endsWith(input.pathSeparator) ? folder : '$folder${input.pathSeparator}';
+      final prefix = folder.endsWith(input.pathSeparator)
+          ? folder
+          : '$folder${input.pathSeparator}';
       return path.startsWith(prefix) || path == folder;
     })) {
       continue;
     }
 
     final rawTitle = parseString(raw['title']);
-    final title = (rawTitle != null && rawTitle.isNotEmpty) ? rawTitle : 'Unknown Song';
+    final title =
+        (rawTitle != null && rawTitle.isNotEmpty) ? rawTitle : 'Unknown Song';
 
     final rawArtist = parseString(raw['artist']);
-    final artist = (rawArtist != null && rawArtist.isNotEmpty && rawArtist != '<unknown>')
-        ? rawArtist
-        : 'Unknown Artist';
+    final artist =
+        (rawArtist != null && rawArtist.isNotEmpty && rawArtist != '<unknown>')
+            ? rawArtist
+            : 'Unknown Artist';
 
     final rawAlbum = parseString(raw['album']);
-    final album = (rawAlbum != null && rawAlbum.isNotEmpty && rawAlbum != '<unknown>')
-        ? rawAlbum
-        : 'Unknown Album';
+    final album =
+        (rawAlbum != null && rawAlbum.isNotEmpty && rawAlbum != '<unknown>')
+            ? rawAlbum
+            : 'Unknown Album';
 
     final rawGenre = parseString(raw['genre']);
-    final genre = (rawGenre != null && rawGenre.isNotEmpty && rawGenre != '<unknown>')
-        ? rawGenre
-        : null;
+    final genre =
+        (rawGenre != null && rawGenre.isNotEmpty && rawGenre != '<unknown>')
+            ? rawGenre
+            : null;
 
     final int? year = parseInt(raw['year']);
     final artistId = parseInt(raw['artist_id']) ?? parseInt(raw['artistId']);
@@ -497,5 +523,3 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
     validSongIds: validSongIds,
   );
 }
-
-

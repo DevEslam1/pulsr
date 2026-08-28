@@ -167,8 +167,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         height: 8,
                         width: isActive ? 24 : 8,
                         decoration: BoxDecoration(
-                          color:
-                              isActive ? p.accent : p.hairline,
+                          color: isActive ? p.accent : p.hairline,
                           borderRadius: BorderRadius.circular(4),
                         ),
                       );
@@ -202,7 +201,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 : Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      const Icon(Icons.shield_rounded, size: 20),
+                                      const Icon(Icons.shield_rounded,
+                                          size: 20),
                                       const SizedBox(width: 8),
                                       Text(
                                         context.l10n.grantAccess,
@@ -218,8 +218,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             style: ElevatedButton.styleFrom(
                               backgroundColor: p.surfaceContainer,
                               foregroundColor: p.textPrimary,
-                              side: BorderSide(
-                                  color: p.hairline, width: 1.5),
+                              side: BorderSide(color: p.hairline, width: 1.5),
                               shape: RoundedRectangleBorder(
                                   borderRadius: AppRadii.cardRadius),
                             ),
@@ -437,8 +436,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.palette_rounded,
-                        color: p.accent, size: 24),
+                    Icon(Icons.palette_rounded, color: p.accent, size: 24),
                     const SizedBox(width: 8),
                     Text(
                       '4 DISTINCT PLAYER THEMES',

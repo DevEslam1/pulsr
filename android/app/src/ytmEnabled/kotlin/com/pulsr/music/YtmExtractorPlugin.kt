@@ -147,6 +147,31 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 PoTokenManager.invalidate()
                 result.success(true)
             }
+            "isVpnConnected" -> {
+                val ctx = context?.applicationContext
+                val isVpn = if (ctx != null) CellularFailoverHelper.isVpnActive(ctx) else false
+                result.success(isVpn)
+            }
+            "preWarm" -> {
+                val ctx = context?.applicationContext
+                if (ctx != null) {
+                    ClientCapabilityMatrix.init(ctx)
+                    PoTokenManager.preWarm(ctx)
+                }
+                result.success(true)
+            }
+            "resetIdentities" -> {
+                val ctx = context?.applicationContext
+                if (ctx != null) {
+                    PoTokenManager.invalidate()
+                    FingerprintStore.resetFingerprint(ctx)
+                    YtmCookieStore.getInstance(ctx).clearCookies()
+                }
+                result.success(true)
+            }
+            "getLimitedMode" -> {
+                result.success(PoTokenManager.isLimitedMode)
+            }
             "getPoTokenState" -> {
                 result.success(
                     mapOf(
@@ -156,6 +181,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                         "visitorData" to PoTokenManager.visitorData,
                         "streamingPoToken" to PoTokenManager.streamingPoToken,
                         "webViewBroken" to PoTokenManager.webViewBroken,
+                        "isLimitedMode" to PoTokenManager.isLimitedMode,
                     )
                 )
             }
@@ -263,33 +289,30 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             } catch (e: Throwable) {
                 Log.w(TAG, "YTM native request failed: ${e.message}")
                 val code = errorCodeFor(e)
-                mainHandler.post { runCatching { result.error(code, e.message, null) } }
+                val details = if (e is InnertubeClient.InnertubeException) {
+                    mapOf("signal" to e.signal.code, "traceId" to e.traceId)
+                } else {
+                    null
+                }
+                mainHandler.post { runCatching { result.error(code, e.message, details) } }
             }
         }
     }
 
     private fun errorCodeFor(e: Throwable): String {
+        if (e is InnertubeClient.InnertubeException) {
+            return e.signal.code
+        }
         val msg = e.message?.lowercase() ?: ""
         if (msg.contains("not a bot") || msg.contains("login_required") || msg.contains("recaptcha") || msg.contains("bot_block")) {
-            return "YTM_BOT_BLOCKED"
-        }
-        // Structured category mapping: without this, InnertubeClient's
-        // BOT_BLOCK verdict is lost and Dart never runs its bot-block
-        // backoff / poToken-invalidation recovery path.
-        if (e is InnertubeClient.InnertubeException) {
-            return when (e.category) {
-                InnertubeClient.ErrorCategory.BOT_BLOCK -> "YTM_BOT_BLOCKED"
-                InnertubeClient.ErrorCategory.AUTH -> "LOGIN_REQUIRED"
-                InnertubeClient.ErrorCategory.PERMANENT -> "YTM_UNAVAILABLE"
-                InnertubeClient.ErrorCategory.TRANSIENT -> "YTM_NETWORK"
-            }
+            return "BOT_CHALLENGE"
         }
         return when (e) {
-            is ReCaptchaException -> "YTM_RECAPTCHA"
-            is ContentNotAvailableException -> "YTM_UNAVAILABLE"
-            is IOException -> "YTM_NETWORK"
-            is ExtractionException -> "YTM_EXTRACTION"
-            else -> "YTM_FAILED"
+            is ReCaptchaException -> "BOT_CHALLENGE"
+            is ContentNotAvailableException -> "VIDEO_GONE"
+            is IOException -> "IP_BLOCKED"
+            is ExtractionException -> "CLIENT_DEPRECATED"
+            else -> "RATE_LIMITED"
         }
     }
 
@@ -665,36 +688,35 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
     }
 
     /**
-     * Resolves audio stream using multi-client priority fallback:
-     * 1. NewPipeExtractor with PoTokenProvider
-     * 2. InnertubeClient fallback chain (WEB_REMIX -> ANDROID -> IOS -> TV)
+     * Resolves audio stream using dual-engine fallback:
+     * 1. Native InnertubeClient (fast, multi-client, itag ladder)
+     * 2. NewPipeExtractor bridge fallback
      */
     private fun resolveStreamWithFallback(videoId: String, quality: String): Map<String, Any?> {
-        var newPipeError: Throwable? = null
-        // 1. Try NewPipeExtractor
-        try {
-            val stream = resolveStreamNewPipe(videoId, quality)
-            return stream
-        } catch (e: Throwable) {
-            newPipeError = e
-            Log.w(TAG, "NewPipe stream extraction failed for $videoId: ${e.message}. Attempting Innertube client fallback...")
-        }
-
-        // 2. Multi-client fallback via InnertubeClient
+        var innertubeError: Throwable? = null
         val ctx = context?.applicationContext
+
+        // 1. Primary: Native InnertubeClient
         if (ctx != null) {
             val client = InnertubeClient(ctx)
             try {
                 return client.resolvePlayerStream(videoId, quality)
-            } catch (innertubeErr: Throwable) {
-                if (newPipeError != null) {
-                    innertubeErr.addSuppressed(newPipeError)
-                }
-                throw innertubeErr
+            } catch (e: Throwable) {
+                innertubeError = e
+                Log.w(TAG, "Native Innertube stream extraction failed for $videoId: ${e.message}. Attempting NewPipeExtractor fallback...")
             }
         }
 
-        throw ExtractionException("Unable to resolve audio stream for videoId: $videoId", newPipeError)
+        // 2. Fallback: NewPipeExtractor
+        try {
+            val stream = resolveStreamNewPipe(videoId, quality)
+            return stream
+        } catch (newPipeError: Throwable) {
+            if (innertubeError != null) {
+                newPipeError.addSuppressed(innertubeError)
+            }
+            throw innertubeError ?: newPipeError
+        }
     }
 
     private fun resolveStreamNewPipe(videoId: String, quality: String): Map<String, Any?> {

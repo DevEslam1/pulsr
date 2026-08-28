@@ -2,11 +2,16 @@
 
 enum DynamicsPreset {
   off('Direct', 'No compression or dynamics processing applied'),
-  studioPunch('Studio Punch', 'Modern punchy dynamics with transient snap & limiting'),
-  warmAnalog('Warm Analog', 'Gentle tube-style warmth with rich low-mid presence'),
-  vocalFocus('Vocal Focus', 'Crisp vocal presence with vocal intelligibility boost'),
-  nightLeveller('Night Leveller', 'Smooths volume peaks for comfortable quiet listening'),
-  bassTightener('Bass Tightener', 'Controls sub-bass rumble for tight, punchy low-end');
+  studioPunch(
+      'Studio Punch', 'Modern punchy dynamics with transient snap & limiting'),
+  warmAnalog(
+      'Warm Analog', 'Gentle tube-style warmth with rich low-mid presence'),
+  vocalFocus(
+      'Vocal Focus', 'Crisp vocal presence with vocal intelligibility boost'),
+  nightLeveller(
+      'Night Leveller', 'Smooths volume peaks for comfortable quiet listening'),
+  bassTightener(
+      'Bass Tightener', 'Controls sub-bass rumble for tight, punchy low-end');
 
   final String label;
   final String description;
@@ -46,13 +51,13 @@ class CustomDynamicsPreset {
   }
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'name': name,
-    'basePreset': basePreset.name,
-    if (thresholdOverride != null) 'thresholdOverride': thresholdOverride,
-    if (ratioOverride != null) 'ratioOverride': ratioOverride,
-    if (postGainOverride != null) 'postGainOverride': postGainOverride,
-  };
+        'id': id,
+        'name': name,
+        'basePreset': basePreset.name,
+        if (thresholdOverride != null) 'thresholdOverride': thresholdOverride,
+        if (ratioOverride != null) 'ratioOverride': ratioOverride,
+        if (postGainOverride != null) 'postGainOverride': postGainOverride,
+      };
 }
 
 class AudioEffectsConfig {

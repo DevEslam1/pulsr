@@ -6,8 +6,11 @@ import 'package:pulsr/core/services/lrclib_service.dart';
 import 'package:pulsr/domain/models/lyrics_line.dart';
 
 class MockHttpClient extends Mock implements HttpClient {}
+
 class MockHttpClientRequest extends Mock implements HttpClientRequest {}
+
 class MockHttpClientResponse extends Mock implements HttpClientResponse {}
+
 class MockHttpHeaders extends Mock implements HttpHeaders {}
 
 void main() {
@@ -47,13 +50,15 @@ void main() {
         (_) => Stream.value(jsonResponse),
       );
 
-      final result = await service.fetchLyrics(trackName: 'Test', artistName: 'Artist');
+      final result =
+          await service.fetchLyrics(trackName: 'Test', artistName: 'Artist');
 
       expect(result, isNotNull);
       expect(result!.source, equals(LyricsSource.lrclib));
       expect(result.lines.length, equals(2));
       expect(result.lines.first.text, equals('Hello World'));
-      expect(result.lines.first.timestamp, equals(const Duration(seconds: 12, milliseconds: 340)));
+      expect(result.lines.first.timestamp,
+          equals(const Duration(seconds: 12, milliseconds: 340)));
     });
 
     test('Returns null gracefully on network failure or 404', () async {
@@ -62,7 +67,8 @@ void main() {
         (_) => Stream.value('{"message":"Not found"}'),
       );
 
-      final result = await service.fetchLyrics(trackName: 'NonExistent', artistName: 'Nobody');
+      final result = await service.fetchLyrics(
+          trackName: 'NonExistent', artistName: 'Nobody');
       expect(result, isNull);
     });
   });

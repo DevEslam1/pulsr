@@ -41,7 +41,8 @@ class SortFilterSheet extends StatelessWidget {
             ),
             child: Material(
               color: p.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(28)),
               clipBehavior: Clip.antiAlias,
               child: SafeArea(
                 top: false,
@@ -78,13 +79,17 @@ class SortFilterSheet extends StatelessWidget {
                             option['label']!,
                             style: TextStyle(
                               color: isSelected ? p.accent : p.textPrimary,
-                              fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                              fontWeight: isSelected
+                                  ? FontWeight.w800
+                                  : FontWeight.w500,
                               fontSize: 14.5,
                             ),
                           ),
                           trailing: isSelected
                               ? Icon(
-                                  ascending ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+                                  ascending
+                                      ? Icons.arrow_upward_rounded
+                                      : Icons.arrow_downward_rounded,
                                   color: p.accent,
                                   size: 20,
                                 )

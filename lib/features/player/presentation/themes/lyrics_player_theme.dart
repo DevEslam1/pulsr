@@ -176,11 +176,13 @@ class LyricsPlayerTheme extends StatelessWidget {
                     ),
                   ),
                   if (song != null) ...[
-                    AudioQualityBadge(song: song, activeColor: props.activeColor),
+                    AudioQualityBadge(
+                        song: song, activeColor: props.activeColor),
                     const SizedBox(width: 8),
                   ],
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
                       color: p.primary.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),

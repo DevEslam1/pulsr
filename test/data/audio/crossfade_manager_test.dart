@@ -50,7 +50,8 @@ void main() {
       expect(executionOrder, equals([1, 2]));
     });
 
-    test('fadeVolume completes immediately if duration is Duration.zero', () async {
+    test('fadeVolume completes immediately if duration is Duration.zero',
+        () async {
       await crossfadeManager.fadeVolume(
         mockPlayerA,
         0.0,
@@ -91,7 +92,8 @@ void main() {
       expect(crossfadeManager.isCrossfading, isTrue);
       expect(crossfadeManager.pendingIndex, equals(3));
 
-      await crossfadeManager.cancel(mockPlayerA, mockPlayerB, restoreVolume: 0.8);
+      await crossfadeManager.cancel(mockPlayerA, mockPlayerB,
+          restoreVolume: 0.8);
 
       expect(crossfadeManager.isCrossfading, isFalse);
       expect(crossfadeManager.pendingIndex, isNull);
@@ -101,7 +103,8 @@ void main() {
       verify(() => mockPlayerB.setVolume(0.8)).called(1);
     });
 
-    test('waitForActiveCrossfade completes when finishCrossfade is called', () async {
+    test('waitForActiveCrossfade completes when finishCrossfade is called',
+        () async {
       crossfadeManager.beginCrossfade(1);
       bool finished = false;
 

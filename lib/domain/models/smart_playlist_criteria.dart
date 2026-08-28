@@ -172,7 +172,10 @@ class SmartCriteria {
   static const Map<String, SmartCriteria> presetTemplates = {
     'Chill Evening': SmartCriteria(
       rules: [
-        SmartRule(field: SmartRuleField.genre, operator: SmartOperator.contains, value: 'chill'),
+        SmartRule(
+            field: SmartRuleField.genre,
+            operator: SmartOperator.contains,
+            value: 'chill'),
       ],
       sortBy: 'lastPlayed',
       sortAscending: false,
@@ -180,7 +183,10 @@ class SmartCriteria {
     ),
     'Workout Energy': SmartCriteria(
       rules: [
-        SmartRule(field: SmartRuleField.genre, operator: SmartOperator.contains, value: 'electronic'),
+        SmartRule(
+            field: SmartRuleField.genre,
+            operator: SmartOperator.contains,
+            value: 'electronic'),
       ],
       sortBy: 'playCount',
       sortAscending: false,
@@ -188,14 +194,20 @@ class SmartCriteria {
     ),
     'Lossless Collection': SmartCriteria(
       rules: [
-        SmartRule(field: SmartRuleField.isLossless, operator: SmartOperator.equals, value: 'true'),
+        SmartRule(
+            field: SmartRuleField.isLossless,
+            operator: SmartOperator.equals,
+            value: 'true'),
       ],
       sortBy: 'title',
       sortAscending: true,
     ),
     '90s Gems': SmartCriteria(
       rules: [
-        SmartRule(field: SmartRuleField.decade, operator: SmartOperator.equals, value: '1990'),
+        SmartRule(
+            field: SmartRuleField.decade,
+            operator: SmartOperator.equals,
+            value: '1990'),
       ],
       sortBy: 'year',
       sortAscending: true,
@@ -203,7 +215,10 @@ class SmartCriteria {
     ),
     'Recently Added': SmartCriteria(
       rules: [
-        SmartRule(field: SmartRuleField.dateAdded, operator: SmartOperator.withinDays, value: '30'),
+        SmartRule(
+            field: SmartRuleField.dateAdded,
+            operator: SmartOperator.withinDays,
+            value: '30'),
       ],
       sortBy: 'dateAdded',
       sortAscending: false,
@@ -211,7 +226,10 @@ class SmartCriteria {
     ),
     'Heavy Rotation': SmartCriteria(
       rules: [
-        SmartRule(field: SmartRuleField.playCount, operator: SmartOperator.greaterThanOrEqual, value: '10'),
+        SmartRule(
+            field: SmartRuleField.playCount,
+            operator: SmartOperator.greaterThanOrEqual,
+            value: '10'),
       ],
       sortBy: 'playCount',
       sortAscending: false,
@@ -219,4 +237,3 @@ class SmartCriteria {
     ),
   };
 }
-

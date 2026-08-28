@@ -1852,11 +1852,11 @@ abstract class AppLocalizations {
   /// **'No Downloads Yet'**
   String get noDownloadsYet;
 
-  /// No description provided for @noDownloadsSubtitle.
+  /// No description provided for @noDownloadsYetSubtitle.
   ///
   /// In en, this message translates to:
   /// **'Download your favorite songs from YouTube Music to listen offline anywhere.'**
-  String get noDownloadsSubtitle;
+  String get noDownloadsYetSubtitle;
 
   /// No description provided for @offlineDownloads.
   ///
@@ -2229,6 +2229,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Connects Pulsr to a remote yt-dlp backend with rotating proxies to bypass YouTube bot detection and IP bans.'**
   String get ytdlpServerDesc;
+
+  /// No description provided for @downloadsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloads'**
+  String get downloadsTitle;
+
+  /// No description provided for @noDownloadsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No downloads yet'**
+  String get noDownloadsTitle;
+
+  /// No description provided for @noDownloadsSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Songs downloaded for offline playback will appear here.'**
+  String get noDownloadsSubtitle;
+
+  /// No description provided for @statusQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Queued'**
+  String get statusQueued;
+
+  /// No description provided for @statusDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading'**
+  String get statusDownloading;
+
+  /// No description provided for @statusPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get statusPaused;
+
+  /// No description provided for @statusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get statusCompleted;
+
+  /// No description provided for @statusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get statusFailed;
+
+  /// No description provided for @storageUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage Used'**
+  String get storageUsed;
+
+  /// No description provided for @storageFree.
+  ///
+  /// In en, this message translates to:
+  /// **'Free Space'**
+  String get storageFree;
+
+  /// No description provided for @resume.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get resume;
+
+  /// No description provided for @dspEnginePreference.
+  ///
+  /// In en, this message translates to:
+  /// **'DSP Engine Preference'**
+  String get dspEnginePreference;
+
+  /// No description provided for @dspEnginePreferenceSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose real-time DSP engine or OEM system sound effects'**
+  String get dspEnginePreferenceSubtitle;
+
+  /// No description provided for @dspEngineNative.
+  ///
+  /// In en, this message translates to:
+  /// **'Native Studio DSP (Zero Latency)'**
+  String get dspEngineNative;
+
+  /// No description provided for @dspEngineOem.
+  ///
+  /// In en, this message translates to:
+  /// **'OEM / System AudioFX'**
+  String get dspEngineOem;
+
+  /// No description provided for @dspEngineAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic (Prefer Native)'**
+  String get dspEngineAuto;
 }
 
 class _AppLocalizationsDelegate

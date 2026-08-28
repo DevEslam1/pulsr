@@ -23,7 +23,8 @@ class AudioQualityBadge extends StatelessWidget {
 
     final settingsState = context.watch<SettingsCubit?>()?.state;
     final streamingQuality = settingsState?.streamingQuality;
-    final info = AudioQualityInfo.fromSong(song, streamingQuality: streamingQuality);
+    final info =
+        AudioQualityInfo.fromSong(song, streamingQuality: streamingQuality);
     final output = settingsState?.currentOutputDevice;
     final isUsb = output?.isUsbDac == true;
     final isBitPerfect = output?.isBitPerfectActive == true;
@@ -38,9 +39,12 @@ class AudioQualityBadge extends StatelessWidget {
 
     final deviceShortName = isUsb
         ? 'USB DAC'
-        : (output?.deviceName.contains('Bluetooth') == true || output?.deviceName.contains('A2DP') == true
+        : (output?.deviceName.contains('Bluetooth') == true ||
+                output?.deviceName.contains('A2DP') == true
             ? 'Bluetooth'
-            : (output?.deviceName.contains('Speaker') == true ? 'Speaker' : 'DAC'));
+            : (output?.deviceName.contains('Speaker') == true
+                ? 'Speaker'
+                : 'DAC'));
 
     return Material(
       color: Colors.transparent,
@@ -55,20 +59,24 @@ class AudioQualityBadge extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                (isUsb ? const Color(0xFFFFD700) : info.badgeColor).withValues(alpha: 0.20),
-                (isUsb ? const Color(0xFFFFD700) : info.badgeColor).withValues(alpha: 0.06),
+                (isUsb ? const Color(0xFFFFD700) : info.badgeColor)
+                    .withValues(alpha: 0.20),
+                (isUsb ? const Color(0xFFFFD700) : info.badgeColor)
+                    .withValues(alpha: 0.06),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: (isUsb ? const Color(0xFFFFD700) : info.badgeColor).withValues(alpha: 0.45),
+              color: (isUsb ? const Color(0xFFFFD700) : info.badgeColor)
+                  .withValues(alpha: 0.45),
               width: 1.0,
             ),
             boxShadow: [
               BoxShadow(
-                color: (isUsb ? const Color(0xFFFFD700) : info.badgeColor).withValues(alpha: 0.14),
+                color: (isUsb ? const Color(0xFFFFD700) : info.badgeColor)
+                    .withValues(alpha: 0.14),
                 blurRadius: 8,
                 spreadRadius: -1,
                 offset: const Offset(0, 2),
@@ -104,7 +112,9 @@ class AudioQualityBadge extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                isBitPerfect ? '$deviceShortName • Direct' : '$deviceShortName • ${outputRate}kHz/${outputBitDepth}b',
+                isBitPerfect
+                    ? '$deviceShortName • Direct'
+                    : '$deviceShortName • ${outputRate}kHz/${outputBitDepth}b',
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.9),
                   fontSize: compact ? 9.5 : 11,
@@ -115,7 +125,8 @@ class AudioQualityBadge extends StatelessWidget {
               Icon(
                 Icons.tune_rounded,
                 size: compact ? 11 : 13,
-                color: (isUsb ? const Color(0xFFFFD700) : info.badgeColor).withValues(alpha: 0.8),
+                color: (isUsb ? const Color(0xFFFFD700) : info.badgeColor)
+                    .withValues(alpha: 0.8),
               ),
             ],
           ),

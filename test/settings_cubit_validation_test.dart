@@ -23,7 +23,8 @@ void main() {
   });
 
   group('SettingsCubit URL Validation Tests', () {
-    test('rejects invalid backend URLs and sets error message in state', () async {
+    test('rejects invalid backend URLs and sets error message in state',
+        () async {
       await cubit.setYtdlpBackendUrl('invalid-url-without-scheme');
       expect(cubit.state.errorMessage, contains('Invalid backend URL format'));
 

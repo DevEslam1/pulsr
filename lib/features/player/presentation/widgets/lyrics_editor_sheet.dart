@@ -32,7 +32,8 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
     _lines = List.from(widget.initialLyrics);
     if (_lines.isEmpty) {
       _lines = [
-        LyricsLine(timestamp: const Duration(seconds: 0), text: 'First lyric line...'),
+        LyricsLine(
+            timestamp: const Duration(seconds: 0), text: 'First lyric line...'),
       ];
     }
   }
@@ -40,7 +41,8 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
   void _stampCurrentPosition(int index) {
     setState(() {
       final old = _lines[index];
-      _lines[index] = LyricsLine(timestamp: widget.currentPosition, text: old.text);
+      _lines[index] =
+          LyricsLine(timestamp: widget.currentPosition, text: old.text);
     });
   }
 
@@ -48,13 +50,15 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
     setState(() {
       final old = _lines[index];
       final newMs = (old.timestamp.inMilliseconds + deltaMs).clamp(0, 3600000);
-      _lines[index] = LyricsLine(timestamp: Duration(milliseconds: newMs), text: old.text);
+      _lines[index] =
+          LyricsLine(timestamp: Duration(milliseconds: newMs), text: old.text);
     });
   }
 
   void _addNewLine() {
     setState(() {
-      _lines.add(LyricsLine(timestamp: widget.currentPosition, text: 'New line...'));
+      _lines.add(
+          LyricsLine(timestamp: widget.currentPosition, text: 'New line...'));
     });
   }
 
@@ -99,7 +103,10 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                   ),
                   Text(
                     'Now at: ${Formatters.formatDuration(widget.currentPosition)}',
-                    style: TextStyle(color: p.primary, fontSize: 12, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                        color: p.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600),
                   ),
                 ],
               ),
@@ -113,13 +120,16 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                   FilledButton(
                     style: FilledButton.styleFrom(
                       backgroundColor: p.primary,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
                     onPressed: () {
                       widget.onSave(_lines);
                       Navigator.pop(context);
                     },
-                    child: const Text('Save', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                    child: const Text('Save',
+                        style: TextStyle(
+                            color: Colors.black, fontWeight: FontWeight.bold)),
                   ),
                 ],
               ),
@@ -146,7 +156,8 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                         onTap: () => _stampCurrentPosition(index),
                         borderRadius: BorderRadius.circular(8),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 6),
                           decoration: BoxDecoration(
                             color: p.primary.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(8),
@@ -173,7 +184,8 @@ class _LyricsEditorSheetState extends State<LyricsEditorSheet> {
                             contentPadding: EdgeInsets.zero,
                           ),
                           onChanged: (val) {
-                            _lines[index] = LyricsLine(timestamp: line.timestamp, text: val);
+                            _lines[index] = LyricsLine(
+                                timestamp: line.timestamp, text: val);
                           },
                         ),
                       ),

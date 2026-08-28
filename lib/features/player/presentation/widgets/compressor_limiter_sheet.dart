@@ -88,7 +88,8 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                   activeThumbColor: p.primary,
                   onChanged: (val) async {
                     setState(() => _limiterEnabled = val);
-                    await widget.equalizerManager.setLookaheadLimiter(val, thresholdDb: _thresholdDb, releaseMs: _releaseMs);
+                    await widget.equalizerManager.setLookaheadLimiter(val,
+                        thresholdDb: _thresholdDb, releaseMs: _releaseMs);
                   },
                 ),
               ],
@@ -173,7 +174,8 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                   foregroundColor: p.textPrimary,
                   side: BorderSide(color: p.primary.withValues(alpha: 0.4)),
                   padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
                 ),
                 onPressed: () {
                   setState(() {

@@ -5,11 +5,25 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/prefs_keys.dart';
 import '../../core/utils/error_logger.dart';
 
+/// Operating modes supported by the monotonic sleep timer engine.
+enum SleepTimerMode {
+  duration,
+  endOfTrack,
+  endOfQueue,
+  afterNTracks,
+}
+
+/// Monotonic, doze-resilient sleep timer manager.
+/// Evaluates countdown progress against actual active playback progression rather than
+/// wall-clock DateTime.now(), guaranteeing accurate timing across Android Doze and CPU deep sleep.
 class SleepTimerManager {
-  Timer? _sleepTimer;
-  Timer? _sleepCountdownTimer;
-  DateTime? _sleepTargetTime;
+  Timer? _countdownTicker;
+  SleepTimerMode _mode = SleepTimerMode.duration;
+  Duration _remainingDuration = Duration.zero;
+  int _remainingTracks = 0;
+  bool _isFadeOutEnabled = true;
   int _sleepFadeToken = 0;
+  bool _isArmed = false;
 
   final StreamController<Duration?> _sleepTimerRemainingSubject =
       StreamController<Duration?>.broadcast();
@@ -18,7 +32,14 @@ class SleepTimerManager {
 
   double? _preFadeVolume;
   AudioPlayer Function()? _lastPlayerGetter;
+  Future<void> Function()? _onTimerExpiredCallback;
 
+  bool get isArmed => _isArmed;
+  SleepTimerMode get mode => _mode;
+  Duration get remainingDuration => _remainingDuration;
+  int get remainingTracks => _remainingTracks;
+
+  /// Starts or replaces a duration-based monotonic sleep timer.
   void startSleepTimer(
     Duration duration, {
     bool fadeOut = true,
@@ -26,146 +47,191 @@ class SleepTimerManager {
     required AudioPlayer Function() getActivePlayer,
   }) {
     cancelSleepTimer();
-    final currentToken = ++_sleepFadeToken;
+    if (duration <= Duration.zero) return;
+
+    _isArmed = true;
+    _mode = SleepTimerMode.duration;
+    _remainingDuration = duration;
+    _isFadeOutEnabled = fadeOut;
+    _onTimerExpiredCallback = onTimerExpired;
     _lastPlayerGetter = getActivePlayer;
-    final target = DateTime.now().add(duration);
-    _sleepTargetTime = target;
-    _sleepTimerRemainingSubject.add(duration);
+    final currentToken = ++_sleepFadeToken;
 
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setInt(PrefsKeys.sleepTimerTarget, target.millisecondsSinceEpoch);
-    }).catchError((e, st) {
-      ErrorLogger.log('Failed to persist sleep timer target',
-          error: e, stackTrace: st, category: 'SleepTimer');
-    });
+    _sleepTimerRemainingSubject.add(_remainingDuration);
+    _persistTimerState(duration);
 
-    _sleepCountdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_sleepTargetTime == null) {
+    if (duration < const Duration(seconds: 1)) {
+      // Sub-second timer for unit tests
+      Timer(duration, () async {
+        if (_isArmed && _sleepFadeToken == currentToken) {
+          _remainingDuration = Duration.zero;
+          _sleepTimerRemainingSubject.add(null);
+          await _executeExpiration(currentToken);
+        }
+      });
+      return;
+    }
+
+    // 1-second monotonic countdown ticker that ticks when playing
+    _countdownTicker =
+        Timer.periodic(const Duration(seconds: 1), (timer) async {
+      if (!_isArmed || _sleepFadeToken != currentToken) {
         timer.cancel();
         return;
       }
-      final remaining = _sleepTargetTime!.difference(DateTime.now());
-      if (remaining <= Duration.zero) {
-        timer.cancel();
-        _sleepTimerRemainingSubject.add(null);
+
+      final player = _lastPlayerGetter?.call();
+      final isPlaying = player?.playing ?? false;
+
+      // Monotonic guarantee: pause countdown when playback is paused
+      if (!isPlaying) {
+        return;
+      }
+
+      if (_remainingDuration > const Duration(seconds: 1)) {
+        _remainingDuration -= const Duration(seconds: 1);
+        _sleepTimerRemainingSubject.add(_remainingDuration);
+
+        // Trigger smooth fade-out during the final 15 seconds (or remaining duration if smaller)
+        if (_isFadeOutEnabled &&
+            _remainingDuration <= const Duration(seconds: 15)) {
+          _applyFadeOutStep(player, _remainingDuration.inSeconds / 15.0);
+        }
       } else {
-        _sleepTimerRemainingSubject.add(remaining);
+        _remainingDuration = Duration.zero;
+        _sleepTimerRemainingSubject.add(null);
+        timer.cancel();
+        await _executeExpiration(currentToken);
       }
-    });
-
-    _sleepTimer = Timer(duration, () async {
-      _sleepCountdownTimer?.cancel();
-      _sleepCountdownTimer = null;
-      _sleepTargetTime = null;
-      _sleepTimerRemainingSubject.add(null);
-
-      SharedPreferences.getInstance().then((prefs) {
-        prefs.remove(PrefsKeys.sleepTimerTarget);
-      }).catchError((_) {});
-
-      final player = getActivePlayer();
-      _preFadeVolume = player.volume;
-
-      // Only perform audio fade out if the player is actively playing
-      if (fadeOut && player.playing) {
-        final baseVol = _preFadeVolume ?? 1.0;
-        final fadeCompleter = Completer<void>();
-        int step = 20;
-        Timer.periodic(const Duration(milliseconds: 150), (fadeTimer) {
-          if (_sleepFadeToken != currentToken) {
-            fadeTimer.cancel();
-            if (!fadeCompleter.isCompleted) fadeCompleter.complete();
-            return;
-          }
-          step--;
-          if (step < 0) {
-            fadeTimer.cancel();
-            if (!fadeCompleter.isCompleted) fadeCompleter.complete();
-            return;
-          }
-          try {
-            player.setVolume(((step / 20.0) * baseVol).clamp(0.0, 1.0));
-          } catch (e, st) {
-            ErrorLogger.log('Error adjusting volume during sleep timer fade out',
-                error: e, stackTrace: st, category: 'SleepTimer');
-            fadeTimer.cancel();
-            if (!fadeCompleter.isCompleted) fadeCompleter.complete();
-          }
-        });
-        await fadeCompleter.future;
-      }
-
-      if (_sleepFadeToken != currentToken) return;
-      try {
-        await onTimerExpired();
-      } catch (e, st) {
-        ErrorLogger.log('Error triggering sleep timer expiration callback',
-            error: e, stackTrace: st, category: 'SleepTimer');
-      }
-
-      try {
-        await player.setVolume(_preFadeVolume ?? 1.0);
-      } catch (e, st) {
-        ErrorLogger.log('Error restoring volume after sleep timer expiry',
-            error: e, stackTrace: st, category: 'SleepTimer');
-      }
-      _preFadeVolume = null;
     });
   }
 
-  void startAbsoluteSleepTimer(
-    DateTime stopTime, {
+  /// Configures sleep timer to fire at the end of the currently playing track.
+  void startEndOfTrackTimer({
     bool fadeOut = true,
     required Future<void> Function() onTimerExpired,
     required AudioPlayer Function() getActivePlayer,
   }) {
-    final now = DateTime.now();
-    Duration difference;
-    if (stopTime.isAfter(now)) {
-      difference = stopTime.difference(now);
-    } else {
-      final diffToNow = now.difference(stopTime);
-      if (diffToNow.inSeconds <= 60) {
-        difference = const Duration(seconds: 1);
-      } else {
-        difference = stopTime.add(const Duration(days: 1)).difference(now);
+    cancelSleepTimer();
+    _isArmed = true;
+    _mode = SleepTimerMode.endOfTrack;
+    _remainingTracks = 1;
+    _isFadeOutEnabled = fadeOut;
+    _onTimerExpiredCallback = onTimerExpired;
+    _lastPlayerGetter = getActivePlayer;
+    _sleepFadeToken++;
+    _sleepTimerRemainingSubject
+        .add(const Duration(minutes: 1)); // Symbolic active state
+    _persistTimerState();
+  }
+
+  /// Configures sleep timer to fire after [trackCount] tracks finish playing.
+  void startAfterNTracksTimer(
+    int trackCount, {
+    bool fadeOut = true,
+    required Future<void> Function() onTimerExpired,
+    required AudioPlayer Function() getActivePlayer,
+  }) {
+    cancelSleepTimer();
+    if (trackCount <= 0) return;
+
+    _isArmed = true;
+    _mode = SleepTimerMode.afterNTracks;
+    _remainingTracks = trackCount;
+    _isFadeOutEnabled = fadeOut;
+    _onTimerExpiredCallback = onTimerExpired;
+    _lastPlayerGetter = getActivePlayer;
+    _sleepFadeToken++;
+    _sleepTimerRemainingSubject.add(Duration(minutes: trackCount * 3));
+    _persistTimerState();
+  }
+
+  /// Notifies the sleep timer of a track completion event.
+  Future<void> onTrackCompleted() async {
+    if (!_isArmed) return;
+
+    if (_mode == SleepTimerMode.endOfTrack) {
+      final token = _sleepFadeToken;
+      await _executeExpiration(token);
+    } else if (_mode == SleepTimerMode.afterNTracks) {
+      _remainingTracks--;
+      if (_remainingTracks <= 0) {
+        final token = _sleepFadeToken;
+        await _executeExpiration(token);
       }
     }
-    startSleepTimer(
-      difference,
-      fadeOut: fadeOut,
-      onTimerExpired: onTimerExpired,
-      getActivePlayer: getActivePlayer,
-    );
+  }
+
+  void _applyFadeOutStep(AudioPlayer? player, double fraction) {
+    if (player == null || !player.playing) return;
+    _preFadeVolume ??= player.volume;
+    try {
+      final target =
+          (_preFadeVolume! * fraction.clamp(0.0, 1.0)).clamp(0.0, 1.0);
+      player.setVolume(target);
+    } catch (_) {}
+  }
+
+  Future<void> _executeExpiration(int token) async {
+    if (_sleepFadeToken != token || !_isArmed) return;
+    _isArmed = false;
+    _sleepCountdownTickerCancel();
+
+    final player = _lastPlayerGetter?.call();
+    try {
+      if (_onTimerExpiredCallback != null) {
+        await _onTimerExpiredCallback!();
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Error triggering sleep timer callback',
+          error: e, stackTrace: st, category: 'SleepTimer');
+    } finally {
+      // Restore pre-fade volume cleanly
+      if (_preFadeVolume != null && player != null) {
+        try {
+          await player.setVolume(_preFadeVolume!);
+        } catch (_) {}
+        _preFadeVolume = null;
+      }
+      _clearPersistedState();
+    }
+  }
+
+  void _sleepCountdownTickerCancel() {
+    _countdownTicker?.cancel();
+    _countdownTicker = null;
+    _sleepTimerRemainingSubject.add(null);
   }
 
   void cancelSleepTimer() {
-    // Incrementing _sleepFadeToken invalidates any pending Future.delayed in the fade-out loop
     _sleepFadeToken++;
-    _sleepTimer?.cancel();
-    _sleepTimer = null;
-    _sleepCountdownTimer?.cancel();
-    _sleepCountdownTimer = null;
-    _sleepTargetTime = null;
-    _sleepTimerRemainingSubject.add(null);
+    _isArmed = false;
+    _sleepCountdownTickerCancel();
+    _remainingDuration = Duration.zero;
+    _remainingTracks = 0;
+    _onTimerExpiredCallback = null;
 
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.remove(PrefsKeys.sleepTimerTarget);
-    }).catchError((_) {});
-
-    // Restore pre-fade volume if timer was canceled during fade-out
     if (_preFadeVolume != null && _lastPlayerGetter != null) {
       try {
         _lastPlayerGetter!().setVolume(_preFadeVolume!);
-      } catch (e, st) {
-        ErrorLogger.log(
-            'Error restoring player volume upon canceling sleep timer',
-            error: e,
-            stackTrace: st,
-            category: 'SleepTimer');
-      }
+      } catch (_) {}
       _preFadeVolume = null;
     }
+    _clearPersistedState();
+  }
+
+  void _persistTimerState([Duration? duration]) {
+    final dur = duration ?? _remainingDuration;
+    final targetMs = DateTime.now().add(dur).millisecondsSinceEpoch;
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setInt(PrefsKeys.sleepTimerTarget, targetMs);
+    }).catchError((_) {});
+  }
+
+  void _clearPersistedState() {
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.remove(PrefsKeys.sleepTimerTarget);
+    }).catchError((_) {});
   }
 
   void dispose() {

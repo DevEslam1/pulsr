@@ -52,7 +52,8 @@ class DuplicateFinderService {
     // Duration + Size matches (where titles might differ slightly)
     for (final entry in byDurationSize.entries) {
       if (entry.value.length > 1) {
-        final alreadyGrouped = result.any((g) => g.songs.contains(entry.value.first));
+        final alreadyGrouped =
+            result.any((g) => g.songs.contains(entry.value.first));
         if (!alreadyGrouped) {
           result.add(DuplicateGroup(
             key: entry.key,
@@ -69,7 +70,8 @@ class DuplicateFinderService {
   String _normalizeString(String str) {
     var s = str
         .toLowerCase()
-        .replaceAll(RegExp(r'\([^)]*\)'), '') // remove parenthesized info like (Official Video)
+        .replaceAll(RegExp(r'\([^)]*\)'),
+            '') // remove parenthesized info like (Official Video)
         .replaceAll(RegExp(r'\[[^\]]*\]'), ''); // remove bracketed info
 
     // Strip Arabic Tashkeel
@@ -93,6 +95,8 @@ class DuplicateFinderService {
         .replaceAll('ç', 'c');
 
     // Remove punctuation & symbols while preserving Arabic and Unicode alphanumeric letters
-    return s.replaceAll(RegExp(r'[\s\-_.,!?:;/@#$%^&*()+={}\[\]|\\<>"~`]+'), '').trim();
+    return s
+        .replaceAll(RegExp(r'[\s\-_.,!?:;/@#$%^&*()+={}\[\]|\\<>"~`]+'), '')
+        .trim();
   }
 }

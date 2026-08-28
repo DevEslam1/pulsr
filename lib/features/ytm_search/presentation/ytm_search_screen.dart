@@ -62,7 +62,11 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Padding(
-                      padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context), 12, Adaptive.pagePadding(context), 6),
+                      padding: EdgeInsets.fromLTRB(
+                          Adaptive.pagePadding(context),
+                          12,
+                          Adaptive.pagePadding(context),
+                          6),
                       child: TextField(
                         controller: _searchController,
                         autofocus: true,
@@ -70,10 +74,12 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                         onChanged: cubit.onQueryChanged,
                         decoration: InputDecoration(
                           hintText: 'Songs on YouTube Music…',
-                          prefixIcon: Icon(Icons.search_rounded, color: p.textTertiary),
+                          prefixIcon:
+                              Icon(Icons.search_rounded, color: p.textTertiary),
                           suffixIcon: state.query.isNotEmpty
                               ? IconButton(
-                                  icon: Icon(Icons.clear_rounded, color: p.textTertiary),
+                                  icon: Icon(Icons.clear_rounded,
+                                      color: p.textTertiary),
                                   onPressed: () {
                                     _searchController.clear();
                                     cubit.clearQuery();
@@ -128,7 +134,8 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
           : const EmptyStateWidget(
               icon: Icons.travel_explore_rounded,
               title: 'Search YouTube Music',
-              subtitle: 'Stream and download songs from YouTube Music, ad-free.',
+              subtitle:
+                  'Stream and download songs from YouTube Music, ad-free.',
             );
     }
 

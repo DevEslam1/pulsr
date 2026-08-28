@@ -62,11 +62,15 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.check_circle_outline_rounded, size: 64, color: p.accent),
+                      Icon(Icons.check_circle_outline_rounded,
+                          size: 64, color: p.accent),
                       const SizedBox(height: 16),
                       Text(
                         'No Duplicates Found!',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: p.textPrimary),
+                        style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: p.textPrimary),
                       ),
                       const SizedBox(height: 6),
                       Text(
@@ -104,14 +108,16 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                                 ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
                                   color: p.surfaceContainer,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
                                   '${group.songs.length} Tracks',
-                                  style: TextStyle(fontSize: 11, color: p.textSecondary),
+                                  style: TextStyle(
+                                      fontSize: 11, color: p.textSecondary),
                                 ),
                               ),
                             ],
@@ -120,7 +126,8 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
                           for (final song in group.songs)
                             SongTile(
                               song: song,
-                              onTap: () => context.read<PlayerCubit>().playSong(song),
+                              onTap: () =>
+                                  context.read<PlayerCubit>().playSong(song),
                             ),
                         ],
                       ),

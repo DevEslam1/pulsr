@@ -35,7 +35,8 @@ class YtmCacheManager {
         final f = File(p.join(dir.path, '$hash.$ext'));
         if (await f.exists()) {
           final len = await f.length();
-          if (len > 100 * 1024) { // Minimum 100KB for valid audio stream
+          if (len > 100 * 1024) {
+            // Minimum 100KB for valid audio stream
             // Update last modified time for LRU
             try {
               await f.setLastModified(DateTime.now());
@@ -45,7 +46,8 @@ class YtmCacheManager {
         }
       }
     } catch (e, st) {
-      ErrorLogger.log('Error checking cached audio for $videoId', error: e, stackTrace: st, category: 'YtmCacheManager');
+      ErrorLogger.log('Error checking cached audio for $videoId',
+          error: e, stackTrace: st, category: 'YtmCacheManager');
     }
     return null;
   }
@@ -83,7 +85,8 @@ class YtmCacheManager {
         }
       }
     } catch (e, st) {
-      ErrorLogger.log('Error clearing stream cache', error: e, stackTrace: st, category: 'YtmCacheManager');
+      ErrorLogger.log('Error clearing stream cache',
+          error: e, stackTrace: st, category: 'YtmCacheManager');
     }
   }
 
@@ -120,7 +123,8 @@ class YtmCacheManager {
         } catch (_) {}
       }
     } catch (e, st) {
-      ErrorLogger.log('Error pruning stream cache', error: e, stackTrace: st, category: 'YtmCacheManager');
+      ErrorLogger.log('Error pruning stream cache',
+          error: e, stackTrace: st, category: 'YtmCacheManager');
     }
   }
 }

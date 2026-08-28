@@ -15,7 +15,8 @@ class MiniPlayer extends StatelessWidget {
   final VoidCallback onTap;
   const MiniPlayer({super.key, required this.onTap});
 
-  void _handleSwipe(PlayerCubit cubit, MiniPlayerSwipeAction action, {required bool isLeft}) {
+  void _handleSwipe(PlayerCubit cubit, MiniPlayerSwipeAction action,
+      {required bool isLeft}) {
     switch (action) {
       case MiniPlayerSwipeAction.next:
         cubit.next();
@@ -58,8 +59,14 @@ class MiniPlayer extends StatelessWidget {
             },
             onHorizontalDragEnd: (d) {
               final v = d.primaryVelocity ?? 0;
-              if (v < -200) _handleSwipe(cubit, settingsState.miniPlayerSwipeLeft, isLeft: true);
-              if (v > 200) _handleSwipe(cubit, settingsState.miniPlayerSwipeRight, isLeft: false);
+              if (v < -200) {
+                _handleSwipe(cubit, settingsState.miniPlayerSwipeLeft,
+                    isLeft: true);
+              }
+              if (v > 200) {
+                _handleSwipe(cubit, settingsState.miniPlayerSwipeRight,
+                    isLeft: false);
+              }
             },
             child: Padding(
               padding: const EdgeInsetsDirectional.fromSTEB(12, 4, 12, 8),
@@ -68,8 +75,11 @@ class MiniPlayer extends StatelessWidget {
                   blur: 16,
                   opacity: p.isDark ? 0.92 : 0.96,
                   borderRadius: AppRadii.miniPlayerRadius,
-                  color: Color.alphaBlend(activeAccent.withValues(alpha: p.isDark ? 0.12 : 0.08), p.surface),
-                  border: Border.all(color: activeAccent.withValues(alpha: 0.22), width: 1.2),
+                  color: Color.alphaBlend(
+                      activeAccent.withValues(alpha: p.isDark ? 0.12 : 0.08),
+                      p.surface),
+                  border: Border.all(
+                      color: activeAccent.withValues(alpha: 0.22), width: 1.2),
                   child: ClipRRect(
                     borderRadius: AppRadii.miniPlayerRadius,
                     child: Column(
@@ -97,7 +107,8 @@ class MiniPlayer extends StatelessWidget {
                                   child: Column(
                                     mainAxisSize: MainAxisSize.min,
                                     mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         song.title,
@@ -125,9 +136,13 @@ class MiniPlayer extends StatelessWidget {
                                 ),
                                 const SizedBox(width: 4),
                                 IconButton(
-                                  tooltip: state.isPlaying ? context.l10n.pause : context.l10n.play,
+                                  tooltip: state.isPlaying
+                                      ? context.l10n.pause
+                                      : context.l10n.play,
                                   icon: Icon(
-                                    state.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                                    state.isPlaying
+                                        ? Icons.pause_rounded
+                                        : Icons.play_arrow_rounded,
                                     color: activeAccent,
                                     size: 32,
                                   ),
@@ -189,14 +204,16 @@ class _MiniPlayerProgressBar extends StatelessWidget {
             selector: (s) => s.position,
             builder: (context, position) {
               final progress = duration.inMilliseconds > 0
-                  ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
+                  ? (position.inMilliseconds / duration.inMilliseconds)
+                      .clamp(0.0, 1.0)
                   : 0.0;
 
               return GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTapDown: (details) {
                   if (trackWidth > 0 && duration.inMilliseconds > 0) {
-                    final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                    final ratio =
+                        (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
                     final seekMs = (duration.inMilliseconds * ratio).round();
                     onSeek(Duration(milliseconds: seekMs));
                   }
@@ -204,7 +221,8 @@ class _MiniPlayerProgressBar extends StatelessWidget {
                 onHorizontalDragStart: (_) {},
                 onHorizontalDragUpdate: (details) {
                   if (trackWidth > 0 && duration.inMilliseconds > 0) {
-                    final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                    final ratio =
+                        (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
                     final seekMs = (duration.inMilliseconds * ratio).round();
                     onSeek(Duration(milliseconds: seekMs));
                   }
@@ -216,7 +234,8 @@ class _MiniPlayerProgressBar extends StatelessWidget {
                     alignment: Alignment.centerLeft,
                     children: [
                       Positioned.fill(
-                        child: ColoredBox(color: hairlineColor.withValues(alpha: 0.35)),
+                        child: ColoredBox(
+                            color: hairlineColor.withValues(alpha: 0.35)),
                       ),
                       Align(
                         alignment: Alignment.centerLeft,

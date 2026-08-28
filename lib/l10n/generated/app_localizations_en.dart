@@ -934,7 +934,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get noDownloadsYet => 'No Downloads Yet';
 
   @override
-  String get noDownloadsSubtitle =>
+  String get noDownloadsYetSubtitle =>
       'Download your favorite songs from YouTube Music to listen offline anywhere.';
 
   @override
@@ -1152,4 +1152,54 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get ytdlpServerDesc =>
       'Connects Pulsr to a remote yt-dlp backend with rotating proxies to bypass YouTube bot detection and IP bans.';
+
+  @override
+  String get downloadsTitle => 'Downloads';
+
+  @override
+  String get noDownloadsTitle => 'No downloads yet';
+
+  @override
+  String get noDownloadsSubtitle =>
+      'Songs downloaded for offline playback will appear here.';
+
+  @override
+  String get statusQueued => 'Queued';
+
+  @override
+  String get statusDownloading => 'Downloading';
+
+  @override
+  String get statusPaused => 'Paused';
+
+  @override
+  String get statusCompleted => 'Completed';
+
+  @override
+  String get statusFailed => 'Failed';
+
+  @override
+  String get storageUsed => 'Storage Used';
+
+  @override
+  String get storageFree => 'Free Space';
+
+  @override
+  String get resume => 'Resume';
+
+  @override
+  String get dspEnginePreference => 'DSP Engine Preference';
+
+  @override
+  String get dspEnginePreferenceSubtitle =>
+      'Choose real-time DSP engine or OEM system sound effects';
+
+  @override
+  String get dspEngineNative => 'Native Studio DSP (Zero Latency)';
+
+  @override
+  String get dspEngineOem => 'OEM / System AudioFX';
+
+  @override
+  String get dspEngineAuto => 'Automatic (Prefer Native)';
 }

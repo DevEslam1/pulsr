@@ -21,7 +21,8 @@ class ArtistDetailScreen extends StatefulWidget {
   final ArtistsTableData artist;
   final GetArtistsUseCase? getArtistsUseCase;
 
-  const ArtistDetailScreen({super.key, required this.artist, this.getArtistsUseCase});
+  const ArtistDetailScreen(
+      {super.key, required this.artist, this.getArtistsUseCase});
 
   @override
   State<ArtistDetailScreen> createState() => _ArtistDetailScreenState();
@@ -58,9 +59,14 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                   padding: const EdgeInsets.all(4),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    border: Border.all(color: p.accent.withValues(alpha: 0.3), width: 2),
+                    border: Border.all(
+                        color: p.accent.withValues(alpha: 0.3), width: 2),
                     boxShadow: [
-                      BoxShadow(color: p.glow, blurRadius: 28, spreadRadius: -4, offset: const Offset(0, 8)),
+                      BoxShadow(
+                          color: p.glow,
+                          blurRadius: 28,
+                          spreadRadius: -4,
+                          offset: const Offset(0, 8)),
                     ],
                   ),
                   child: CachedArtwork(
@@ -96,7 +102,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                   if (snapshot.hasData && snapshot.data?.bio != null) {
                     final bio = snapshot.data!.bio!;
                     return Container(
-                      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 20, vertical: 8),
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
                         color: p.surfaceContainer.withValues(alpha: 0.6),
@@ -108,7 +115,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.info_outline_rounded, size: 16, color: p.accent),
+                              Icon(Icons.info_outline_rounded,
+                                  size: 16, color: p.accent),
                               const SizedBox(width: 6),
                               Text(
                                 'About Artist',
@@ -150,7 +158,9 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                       onRetry: () => setState(() {}),
                     );
                   }
-                  final albums = snapshot.data?.fold((l) => <AlbumsTableData>[], (r) => r) ?? [];
+                  final albums = snapshot.data
+                          ?.fold((l) => <AlbumsTableData>[], (r) => r) ??
+                      [];
                   if (albums.isEmpty) return const SizedBox.shrink();
 
                   return Column(
@@ -161,7 +171,8 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                         height: 175,
                         child: ListView.builder(
                           scrollDirection: Axis.horizontal,
-                          padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
+                          padding: EdgeInsets.symmetric(
+                              horizontal: Adaptive.pagePadding(context)),
                           itemCount: albums.length,
                           itemBuilder: (context, index) {
                             final album = albums[index];
@@ -170,17 +181,31 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                               margin: const EdgeInsets.only(right: 14),
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(16),
-                                onTap: () => context.push('/album', extra: album),
+                                onTap: () =>
+                                    context.push('/album', extra: album),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    CachedArtwork(id: album.id, type: ArtworkType.ALBUM, size: 120, borderRadius: 16),
+                                    CachedArtwork(
+                                        id: album.id,
+                                        type: ArtworkType.ALBUM,
+                                        size: 120,
+                                        borderRadius: 16),
                                     const SizedBox(height: 8),
-                                    Text(album.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 13)),
+                                    Text(album.title,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: TextStyle(
+                                            color: p.textPrimary,
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 13)),
                                     const SizedBox(height: 2),
-                                    Text(Formatters.formatTrackCount(album.songCount),
-                                        style: TextStyle(color: p.textSecondary, fontSize: 11)),
+                                    Text(
+                                        Formatters.formatTrackCount(
+                                            album.songCount),
+                                        style: TextStyle(
+                                            color: p.textSecondary,
+                                            fontSize: 11)),
                                   ],
                                 ),
                               ),
@@ -204,7 +229,9 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                       onRetry: () => setState(() {}),
                     );
                   }
-                  final songs = snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
+                  final songs = snapshot.data
+                          ?.fold((l) => <SongsTableData>[], (r) => r) ??
+                      [];
                   if (songs.isEmpty) return const SizedBox.shrink();
 
                   return Column(
@@ -216,7 +243,9 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
                           song: songs[i],
                           index: i,
                           subtitleOverride: songs[i].album,
-                          onTap: () => context.read<PlayerCubit>().playSong(songs[i], queue: songs),
+                          onTap: () => context
+                              .read<PlayerCubit>()
+                              .playSong(songs[i], queue: songs),
                           onMorePressed: () => showModalBottomSheet(
                             context: context,
                             useRootNavigator: true,

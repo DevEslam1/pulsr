@@ -32,7 +32,8 @@ abstract class PlayerState with _$PlayerState {
     @Default(false) bool isLoadingLyrics,
     @Default(false) bool isLyricsVisible,
     @Default(false) bool isQueueVisible,
-    @Default(EqPreset(name: 'Flat', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0])) EqPreset eqPreset,
+    @Default(EqPreset(name: 'Flat', gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))
+    EqPreset eqPreset,
     @Default(false) bool isEqEnabled,
     @Default(false) bool isVirtualizerEnabled,
     @Default(0.0) double virtualizerStrength,

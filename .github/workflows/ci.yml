@@ -43,8 +43,16 @@ jobs:
       - name: Run Build Runner Codegen
         run: dart run build_runner build --delete-conflicting-outputs
 
+      - name: Format Check
+        run: dart format --output=none --set-exit-if-changed .
+
       - name: Analyze Code
         run: flutter analyze
+
+      - name: Flavor Isolation Guard Check
+        run: |
+          cd android && ./gradlew :app:processProdReleaseMainManifest && cd ..
+          python3 scripts/check_prod_flavor.py
 
       - name: Run Tests with Coverage
         run: flutter test --coverage

@@ -45,7 +45,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get recentlyPlayed => 'تم تشغيله مؤخرًا';
 
   @override
-  String get recentlyAdded => 'أضيف مؤخراً';
+  String get recentlyAdded => 'المضاف حديثًا';
 
   @override
   String get favorites => 'المفضلة';
@@ -390,7 +390,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get sampleRate => 'معدل العينة';
 
   @override
-  String get fileSize => 'حجم الملف';
+  String get fileSize => 'الحجم';
 
   @override
   String get settings => 'الإعدادات';
@@ -938,7 +938,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get noDownloadsYet => 'لا توجد تنزيلات بعد';
 
   @override
-  String get noDownloadsSubtitle =>
+  String get noDownloadsYetSubtitle =>
       'قم بتنزيل أغانيك المفضلة من يوتيوب ميوزك للاستماع دون اتصال في أي مكان.';
 
   @override
@@ -995,7 +995,7 @@ class AppLocalizationsAr extends AppLocalizations {
   String get addPlaylistUrl => 'إضافة رابط قائمة تشغيل';
 
   @override
-  String get addYouTubePlaylist => 'إضافة قائمة تشغيل يوتيوب';
+  String get addYouTubePlaylist => 'إضافة قائمة تشغيل من يوتيوب';
 
   @override
   String get playlistImported => 'تم استيراد قائمة التشغيل';
@@ -1016,14 +1016,14 @@ class AppLocalizationsAr extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'مسار',
-      many: 'مساراً',
-      few: 'مسارات',
+      other: '$count مسار',
+      many: '$count مساراً',
+      few: '$count مسارات',
       two: 'مساران',
-      one: 'مسار',
-      zero: 'مسار',
+      one: 'مسار واحد',
+      zero: '0 مسار',
     );
-    return '$count $_temp0';
+    return '$_temp0';
   }
 
   @override
@@ -1101,14 +1101,14 @@ class AppLocalizationsAr extends AppLocalizations {
     String _temp0 = intl.Intl.pluralLogic(
       count,
       locale: localeName,
-      other: 'مرة',
-      many: 'مرة',
-      few: 'مرات',
+      other: '$count مرة',
+      many: '$count مرة',
+      few: '$count مرات',
       two: 'مرتان',
       one: 'مرة واحدة',
-      zero: 'مرة',
+      zero: '0 مرة',
     );
-    return '$count $_temp0';
+    return '$_temp0';
   }
 
   @override
@@ -1164,4 +1164,54 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String get ytdlpServerDesc =>
       'يربط التطبيق بخادم yt-dlp خارجي بوكلاء متناوبين لتجاوز حظر يوتيوب.';
+
+  @override
+  String get downloadsTitle => 'التنزيلات';
+
+  @override
+  String get noDownloadsTitle => 'لا توجد تنزيلات بعد';
+
+  @override
+  String get noDownloadsSubtitle =>
+      'ستظهر هنا الأغاني التي تم تنزيلها للتشغيل بلا إنترنت.';
+
+  @override
+  String get statusQueued => 'في قائمة الانتظار';
+
+  @override
+  String get statusDownloading => 'جارٍ التنزيل';
+
+  @override
+  String get statusPaused => 'متوقف مؤقتاً';
+
+  @override
+  String get statusCompleted => 'مكتمل';
+
+  @override
+  String get statusFailed => 'فشل';
+
+  @override
+  String get storageUsed => 'المساحة المستخدمة';
+
+  @override
+  String get storageFree => 'المساحة المتوفرة';
+
+  @override
+  String get resume => 'استئناف';
+
+  @override
+  String get dspEnginePreference => 'تفضيل محرك معالجة الصوت (DSP)';
+
+  @override
+  String get dspEnginePreferenceSubtitle =>
+      'اختر محرك الاستوديو المدمج أو مؤثرات النظام الأصلية';
+
+  @override
+  String get dspEngineNative => 'محرك DSP استوديو مدمج (بدون تأخير)';
+
+  @override
+  String get dspEngineOem => 'مؤثرات نظام الجهاز / OEM';
+
+  @override
+  String get dspEngineAuto => 'تلقائي (تفضيل المدمج)';
 }

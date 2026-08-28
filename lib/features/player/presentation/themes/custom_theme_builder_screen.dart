@@ -8,7 +8,8 @@ class CustomThemeBuilderScreen extends StatefulWidget {
   const CustomThemeBuilderScreen({super.key});
 
   @override
-  State<CustomThemeBuilderScreen> createState() => _CustomThemeBuilderScreenState();
+  State<CustomThemeBuilderScreen> createState() =>
+      _CustomThemeBuilderScreenState();
 }
 
 class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
@@ -50,7 +51,9 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
             decoration: BoxDecoration(
               color: const Color(0xFF14172B),
               borderRadius: BorderRadius.circular(_cornerRadius),
-              border: Border.all(color: Color(_accentColor).withValues(alpha: 0.4), width: 1.5),
+              border: Border.all(
+                  color: Color(_accentColor).withValues(alpha: 0.4),
+                  width: 1.5),
               boxShadow: [
                 if (_glowEnabled)
                   BoxShadow(
@@ -72,7 +75,8 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                         color: Color(_accentColor).withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(_cornerRadius / 2),
                       ),
-                      child: Icon(Icons.music_note_rounded, color: Color(_accentColor), size: 32),
+                      child: Icon(Icons.music_note_rounded,
+                          color: Color(_accentColor), size: 32),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -81,12 +85,17 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                         children: [
                           const Text(
                             'Live Theme Preview',
-                            style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             'Pulsr Audiophile Edition',
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
+                            style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.7),
+                                fontSize: 12),
                           ),
                         ],
                       ),
@@ -97,13 +106,15 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                 LinearProgressIndicator(
                   value: 0.65,
                   backgroundColor: Colors.white12,
-                  valueColor: AlwaysStoppedAnimation<Color>(Color(_accentColor)),
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(Color(_accentColor)),
                 ),
                 const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(Icons.skip_previous_rounded, color: Colors.white, size: 28),
+                    Icon(Icons.skip_previous_rounded,
+                        color: Colors.white, size: 28),
                     const SizedBox(width: 24),
                     Container(
                       padding: const EdgeInsets.all(10),
@@ -111,10 +122,12 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                         color: Color(_accentColor),
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 28),
+                      child: const Icon(Icons.play_arrow_rounded,
+                          color: Colors.black, size: 28),
                     ),
                     const SizedBox(width: 24),
-                    Icon(Icons.skip_next_rounded, color: Colors.white, size: 28),
+                    Icon(Icons.skip_next_rounded,
+                        color: Colors.white, size: 28),
                   ],
                 ),
               ],
@@ -124,7 +137,10 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
 
           Text(
             'Accent Color Palette',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: p.textPrimary),
+            style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: p.textPrimary),
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -135,7 +151,9 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
               return GestureDetector(
                 onTap: () {
                   setState(() => _accentColor = colorVal);
-                  context.read<SettingsCubit>().setCustomAccentColor(Color(colorVal));
+                  context
+                      .read<SettingsCubit>()
+                      .setCustomAccentColor(Color(colorVal));
                 },
                 child: Container(
                   width: 44,
@@ -149,7 +167,8 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
                     ),
                   ),
                   child: isSelected
-                      ? const Icon(Icons.check_rounded, color: Colors.black, size: 22)
+                      ? const Icon(Icons.check_rounded,
+                          color: Colors.black, size: 22)
                       : null,
                 ),
               );
@@ -159,7 +178,10 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
 
           Text(
             'Card & Artwork Corner Radius (${_cornerRadius.round()}px)',
-            style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: p.textPrimary),
+            style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: p.textPrimary),
           ),
           Slider(
             value: _cornerRadius,
@@ -171,8 +193,11 @@ class _CustomThemeBuilderScreenState extends State<CustomThemeBuilderScreen> {
           const SizedBox(height: 16),
 
           SwitchListTile(
-            title: Text('Ambient Acoustic Glow', style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w600)),
-            subtitle: Text('Glows with the active track artwork', style: TextStyle(color: p.textSecondary, fontSize: 12)),
+            title: Text('Ambient Acoustic Glow',
+                style: TextStyle(
+                    color: p.textPrimary, fontWeight: FontWeight.w600)),
+            subtitle: Text('Glows with the active track artwork',
+                style: TextStyle(color: p.textSecondary, fontSize: 12)),
             value: _glowEnabled,
             activeThumbColor: Color(_accentColor),
             onChanged: (val) => setState(() => _glowEnabled = val),

@@ -39,7 +39,7 @@ class EqualizerManager {
   // Tier 1 & Tier 2 & Tier 3 Native DSP features
   bool isCrossfeedEnabled = false;
   double crossfeedDelayUs = 350.0; // 200 - 700 us
-  double crossfeedFeedDb = -9.0;   // -15 to -6 dB
+  double crossfeedFeedDb = -9.0; // -15 to -6 dB
 
   bool isLimiterEnabled = false;
   double limiterThresholdDb = -0.2;
@@ -52,7 +52,8 @@ class EqualizerManager {
   double compressorMakeupGainDb = 0.0;
 
   bool isReverbEnabled = false;
-  int reverbPreset = 0; // 0=Studio, 1=Concert Hall, 2=Warm Tube, 3=Plate, 4=Custom IR
+  int reverbPreset =
+      0; // 0=Studio, 1=Concert Hall, 2=Warm Tube, 3=Plate, 4=Custom IR
   double reverbWetDry = 0.20;
 
   double stereoBalance = 0.0; // -1.0 to +1.0
@@ -113,17 +114,20 @@ class EqualizerManager {
             customFrequencies = decodedFreqs;
           }
         } catch (e, st) {
-          ErrorLogger.log('Failed to decode custom EQ frequencies', error: e, stackTrace: st, category: 'EqualizerManager');
+          ErrorLogger.log('Failed to decode custom EQ frequencies',
+              error: e, stackTrace: st, category: 'EqualizerManager');
         }
       }
 
-      final targetFreqs = is32BandMode ? custom32Frequencies : customFrequencies;
+      final targetFreqs =
+          is32BandMode ? custom32Frequencies : customFrequencies;
       List<double> gains = List<double>.filled(targetFreqs.length, 0.0);
       bool gainsLoaded = false;
       if (gainsJson != null) {
         try {
           final decoded = json.decode(gainsJson) as List<dynamic>;
-          final parsedGains = decoded.map((e) => (e as num).toDouble()).toList();
+          final parsedGains =
+              decoded.map((e) => (e as num).toDouble()).toList();
           if (parsedGains.isNotEmpty) {
             gains = EqPreset.interpolateGains(
               parsedGains,
@@ -132,14 +136,17 @@ class EqualizerManager {
             gainsLoaded = gains.length == targetFreqs.length;
           }
         } catch (e, st) {
-          ErrorLogger.log('Failed to decode equalizer gains from prefs', error: e, stackTrace: st, category: 'EqualizerManager');
+          ErrorLogger.log('Failed to decode equalizer gains from prefs',
+              error: e, stackTrace: st, category: 'EqualizerManager');
         }
       }
 
       if (!gainsLoaded) {
-        final match = EqPreset.defaultPresets.where((p) => p.name == presetName);
+        final match =
+            EqPreset.defaultPresets.where((p) => p.name == presetName);
         if (match.isNotEmpty) {
-          gains = EqPreset.interpolateGains(match.first.gains, targetFrequencies: targetFreqs);
+          gains = EqPreset.interpolateGains(match.first.gains,
+              targetFrequencies: targetFreqs);
         } else {
           gains = List<double>.filled(targetFreqs.length, 0.0);
         }
@@ -148,39 +155,50 @@ class EqualizerManager {
       currentPreset = EqPreset(name: presetName, gains: gains, bassBoost: bass);
       comparisonSlots[ComparisonSlot.slotA] = currentPreset;
 
-      isVirtualizerEnabled = prefs.getBool(PrefsKeys.eqVirtualizerEnabled) ?? false;
-      virtualizerStrength = prefs.getDouble(PrefsKeys.eqVirtualizerStrength) ?? 0.0;
+      isVirtualizerEnabled =
+          prefs.getBool(PrefsKeys.eqVirtualizerEnabled) ?? false;
+      virtualizerStrength =
+          prefs.getDouble(PrefsKeys.eqVirtualizerStrength) ?? 0.0;
 
-      final dynPresetStr = prefs.getString(PrefsKeys.eqDynamicsPreset) ?? DynamicsPreset.off.name;
+      final dynPresetStr = prefs.getString(PrefsKeys.eqDynamicsPreset) ??
+          DynamicsPreset.off.name;
       dynamicsPreset = DynamicsPreset.values.firstWhere(
         (d) => d.name == dynPresetStr,
         orElse: () => DynamicsPreset.off,
       );
       isDynamicsEnabled = prefs.getBool(PrefsKeys.eqDynamicsEnabled) ?? false;
-      _isDynamicsBypassed = prefs.getBool(PrefsKeys.eqDynamicsBypassed) ?? false;
+      _isDynamicsBypassed =
+          prefs.getBool(PrefsKeys.eqDynamicsBypassed) ?? false;
 
-      isSpatializerEnabled = prefs.getBool(PrefsKeys.eqSpatializerEnabled) ?? false;
+      isSpatializerEnabled =
+          prefs.getBool(PrefsKeys.eqSpatializerEnabled) ?? false;
 
       isCrossfeedEnabled = prefs.getBool(PrefsKeys.crossfeedEnabled) ?? false;
       crossfeedDelayUs = prefs.getDouble(PrefsKeys.crossfeedDelayUs) ?? 350.0;
       crossfeedFeedDb = prefs.getDouble(PrefsKeys.crossfeedFeedDb) ?? -9.0;
 
-      isLimiterEnabled = prefs.getBool(PrefsKeys.lookaheadLimiterEnabled) ?? false;
-      limiterThresholdDb = prefs.getDouble(PrefsKeys.lookaheadLimiterThresholdDb) ?? -0.2;
-      limiterReleaseMs = prefs.getDouble(PrefsKeys.lookaheadLimiterReleaseMs) ?? 50.0;
+      isLimiterEnabled =
+          prefs.getBool(PrefsKeys.lookaheadLimiterEnabled) ?? false;
+      limiterThresholdDb =
+          prefs.getDouble(PrefsKeys.lookaheadLimiterThresholdDb) ?? -0.2;
+      limiterReleaseMs =
+          prefs.getDouble(PrefsKeys.lookaheadLimiterReleaseMs) ?? 50.0;
 
-      isReverbEnabled = prefs.getBool(PrefsKeys.convolutionReverbEnabled) ?? false;
+      isReverbEnabled =
+          prefs.getBool(PrefsKeys.convolutionReverbEnabled) ?? false;
       reverbPreset = prefs.getInt(PrefsKeys.convolutionReverbPreset) ?? 0;
       reverbWetDry = prefs.getDouble(PrefsKeys.convolutionReverbWetDry) ?? 0.20;
 
       stereoBalance = prefs.getDouble(PrefsKeys.stereoBalance) ?? 0.0;
       monoMix = prefs.getBool(PrefsKeys.monoMix) ?? false;
-      isSincResamplerEnabled = prefs.getBool(PrefsKeys.sincResamplerEnabled) ?? true;
+      isSincResamplerEnabled =
+          prefs.getBool(PrefsKeys.sincResamplerEnabled) ?? true;
 
       final profileId = prefs.getString(PrefsKeys.eqHeadphoneProfileId);
       if (profileId != null) {
         await HeadphoneProfilesRepository().loadProfiles();
-        selectedHeadphoneProfile = HeadphoneProfilesRepository().getProfileById(profileId);
+        selectedHeadphoneProfile =
+            HeadphoneProfilesRepository().getProfileById(profileId);
       }
 
       if (isEnabled) {
@@ -206,11 +224,13 @@ class EqualizerManager {
       }
 
       if (isCrossfeedEnabled) {
-        await _effectsChannel.setCrossfeedParams(crossfeedDelayUs, crossfeedFeedDb);
+        await _effectsChannel.setCrossfeedParams(
+            crossfeedDelayUs, crossfeedFeedDb);
         await _effectsChannel.setCrossfeedEnabled(true);
       }
       if (isLimiterEnabled) {
-        await _effectsChannel.setLimiterParams(limiterLookaheadMs, limiterThresholdDb, limiterReleaseMs);
+        await _effectsChannel.setLimiterParams(
+            limiterLookaheadMs, limiterThresholdDb, limiterReleaseMs);
         await _effectsChannel.setLimiterEnabled(true);
       }
       if (isReverbEnabled) {
@@ -228,7 +248,8 @@ class EqualizerManager {
         await _effectsChannel.setSincResamplerEnabled(false);
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to restore equalizer preferences', error: e, stackTrace: st, category: 'EqualizerManager');
+      ErrorLogger.log('Failed to restore equalizer preferences',
+          error: e, stackTrace: st, category: 'EqualizerManager');
     }
   }
 
@@ -238,12 +259,15 @@ class EqualizerManager {
       await prefs.setBool(PrefsKeys.eqEnabled, isEnabled);
       await prefs.setBool('eq_32_band_mode', is32BandMode);
       await prefs.setString(PrefsKeys.eqPresetName, currentPreset.name);
-      await prefs.setString(PrefsKeys.eqGains, json.encode(currentPreset.gains));
-      await prefs.setString('eq_custom_frequencies', json.encode(customFrequencies));
+      await prefs.setString(
+          PrefsKeys.eqGains, json.encode(currentPreset.gains));
+      await prefs.setString(
+          'eq_custom_frequencies', json.encode(customFrequencies));
       await prefs.setDouble(PrefsKeys.eqBassBoost, currentPreset.bassBoost);
       await prefs.setDouble(PrefsKeys.eqVolumeBoost, volumeBoost);
       await prefs.setBool(PrefsKeys.eqVirtualizerEnabled, isVirtualizerEnabled);
-      await prefs.setDouble(PrefsKeys.eqVirtualizerStrength, virtualizerStrength);
+      await prefs.setDouble(
+          PrefsKeys.eqVirtualizerStrength, virtualizerStrength);
       await prefs.setString(PrefsKeys.eqDynamicsPreset, dynamicsPreset.name);
       await prefs.setBool(PrefsKeys.eqDynamicsEnabled, isDynamicsEnabled);
       await prefs.setBool(PrefsKeys.eqDynamicsBypassed, _isDynamicsBypassed);
@@ -254,8 +278,10 @@ class EqualizerManager {
       await prefs.setDouble(PrefsKeys.crossfeedFeedDb, crossfeedFeedDb);
 
       await prefs.setBool(PrefsKeys.lookaheadLimiterEnabled, isLimiterEnabled);
-      await prefs.setDouble(PrefsKeys.lookaheadLimiterThresholdDb, limiterThresholdDb);
-      await prefs.setDouble(PrefsKeys.lookaheadLimiterReleaseMs, limiterReleaseMs);
+      await prefs.setDouble(
+          PrefsKeys.lookaheadLimiterThresholdDb, limiterThresholdDb);
+      await prefs.setDouble(
+          PrefsKeys.lookaheadLimiterReleaseMs, limiterReleaseMs);
 
       await prefs.setBool(PrefsKeys.convolutionReverbEnabled, isReverbEnabled);
       await prefs.setInt(PrefsKeys.convolutionReverbPreset, reverbPreset);
@@ -263,22 +289,26 @@ class EqualizerManager {
 
       await prefs.setDouble(PrefsKeys.stereoBalance, stereoBalance);
       await prefs.setBool(PrefsKeys.monoMix, monoMix);
-      await prefs.setBool(PrefsKeys.sincResamplerEnabled, isSincResamplerEnabled);
+      await prefs.setBool(
+          PrefsKeys.sincResamplerEnabled, isSincResamplerEnabled);
 
       if (selectedHeadphoneProfile != null) {
-        await prefs.setString(PrefsKeys.eqHeadphoneProfileId, selectedHeadphoneProfile!.id);
+        await prefs.setString(
+            PrefsKeys.eqHeadphoneProfileId, selectedHeadphoneProfile!.id);
       } else {
         await prefs.remove(PrefsKeys.eqHeadphoneProfileId);
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to save equalizer preferences', error: e, stackTrace: st, category: 'EqualizerManager');
+      ErrorLogger.log('Failed to save equalizer preferences',
+          error: e, stackTrace: st, category: 'EqualizerManager');
     }
   }
 
   Future<void> set32BandMode(bool enabled) async {
     is32BandMode = enabled;
     final targetFreqs = enabled ? custom32Frequencies : customFrequencies;
-    final interpolated = EqPreset.interpolateGains(currentPreset.gains, targetFrequencies: targetFreqs);
+    final interpolated = EqPreset.interpolateGains(currentPreset.gains,
+        targetFrequencies: targetFreqs);
     currentPreset = currentPreset.copyWith(gains: interpolated);
 
     if (Platform.isAndroid) {
@@ -311,18 +341,21 @@ class EqualizerManager {
       await _savePreferences();
     } catch (e, st) {
       isEnabled = previous;
-      ErrorLogger.log('Failed to toggle equalizer state ($enabled)', error: e, stackTrace: st, category: 'EqualizerManager');
+      ErrorLogger.log('Failed to toggle equalizer state ($enabled)',
+          error: e, stackTrace: st, category: 'EqualizerManager');
     }
   }
 
   Future<void> setEqualizerEnabled(bool enabled) => setEnabled(enabled);
   Future<void> applyPreset(EqPreset preset) => setPreset(preset);
-  Future<void> applyHeadphoneProfile(HeadphoneProfile? profile) => setHeadphoneProfile(profile);
+  Future<void> applyHeadphoneProfile(HeadphoneProfile? profile) =>
+      setHeadphoneProfile(profile);
 
   Future<void> setPreset(EqPreset preset) async {
     selectedHeadphoneProfile = null;
     final targetFreqs = is32BandMode ? custom32Frequencies : customFrequencies;
-    final gains = EqPreset.interpolateGains(preset.gains, targetFrequencies: targetFreqs);
+    final gains =
+        EqPreset.interpolateGains(preset.gains, targetFrequencies: targetFreqs);
     currentPreset = preset.copyWith(gains: gains);
     comparisonSlots[activeComparisonSlot] = currentPreset;
     await applyCurrentPreset();
@@ -424,7 +457,8 @@ class EqualizerManager {
       await setPreset(preset);
       return true;
     } catch (e, st) {
-      ErrorLogger.log('Failed to import EQ preset from JSON', error: e, stackTrace: st, category: 'EqualizerManager');
+      ErrorLogger.log('Failed to import EQ preset from JSON',
+          error: e, stackTrace: st, category: 'EqualizerManager');
       return false;
     }
   }
@@ -471,11 +505,13 @@ class EqualizerManager {
   Future<void> endAbComparison() async {
     isAbComparisonActive = false;
     if (_abComparisonGains.isNotEmpty) {
-      final targetFreqs = is32BandMode ? custom32Frequencies : customFrequencies;
+      final targetFreqs =
+          is32BandMode ? custom32Frequencies : customFrequencies;
       if (Platform.isAndroid) {
         if (is32BandMode) {
           for (int i = 0; i < _abComparisonGains.length; i++) {
-            await _effectsChannel.setNativeEqBand(i, targetFreqs[i], _abComparisonGains[i], 1.414);
+            await _effectsChannel.setNativeEqBand(
+                i, targetFreqs[i], _abComparisonGains[i], 1.414);
           }
         } else {
           await _effectsChannel.setEqBandGains(_abComparisonGains);
@@ -513,8 +549,10 @@ class EqualizerManager {
     final prevProfile = selectedHeadphoneProfile;
     try {
       if (profile != null) {
-        final targetFreqs = is32BandMode ? custom32Frequencies : customFrequencies;
-        final gains = EqPreset.interpolateGains(profile.gains, targetFrequencies: targetFreqs);
+        final targetFreqs =
+            is32BandMode ? custom32Frequencies : customFrequencies;
+        final gains = EqPreset.interpolateGains(profile.gains,
+            targetFrequencies: targetFreqs);
         currentPreset = EqPreset(
           name: profile.name,
           gains: gains,
@@ -532,7 +570,8 @@ class EqualizerManager {
     } catch (e, st) {
       currentPreset = prevPreset;
       selectedHeadphoneProfile = prevProfile;
-      ErrorLogger.log('Failed to apply headphone profile', error: e, stackTrace: st, category: 'EqualizerManager');
+      ErrorLogger.log('Failed to apply headphone profile',
+          error: e, stackTrace: st, category: 'EqualizerManager');
     }
     _debouncedSavePreferences();
   }
@@ -545,7 +584,8 @@ class EqualizerManager {
       await _savePreferences();
     } catch (e, st) {
       isVirtualizerEnabled = previous;
-      ErrorLogger.log('Failed to set virtualizer enabled', error: e, stackTrace: st, category: 'EqualizerManager');
+      ErrorLogger.log('Failed to set virtualizer enabled',
+          error: e, stackTrace: st, category: 'EqualizerManager');
     }
   }
 
@@ -565,7 +605,8 @@ class EqualizerManager {
       isDynamicsEnabled = true;
     }
     if (!_isDynamicsBypassed) {
-      await _effectsChannel.setDynamicsPreset(dynamicsPreset, isDynamicsEnabled);
+      await _effectsChannel.setDynamicsPreset(
+          dynamicsPreset, isDynamicsEnabled);
     }
     await _savePreferences();
   }
@@ -602,30 +643,35 @@ class EqualizerManager {
       await _savePreferences();
     } catch (e, st) {
       isSpatializerEnabled = previous;
-      ErrorLogger.log('Failed to set spatializer enabled', error: e, stackTrace: st, category: 'EqualizerManager');
+      ErrorLogger.log('Failed to set spatializer enabled',
+          error: e, stackTrace: st, category: 'EqualizerManager');
     }
   }
 
   bool get hasOemAudio => _effectsChannel.hasOemAudio;
   List<String> get detectedOemEngines => _effectsChannel.detectedOemEngines;
 
-  Future<void> setCrossfeed(bool enabled, {double? delayUs, double? feedDb}) async {
+  Future<void> setCrossfeed(bool enabled,
+      {double? delayUs, double? feedDb}) async {
     isCrossfeedEnabled = enabled;
     if (delayUs != null) crossfeedDelayUs = delayUs;
     if (feedDb != null) crossfeedFeedDb = feedDb;
     if (Platform.isAndroid) {
-      await _effectsChannel.setCrossfeedParams(crossfeedDelayUs, crossfeedFeedDb);
+      await _effectsChannel.setCrossfeedParams(
+          crossfeedDelayUs, crossfeedFeedDb);
       await _effectsChannel.setCrossfeedEnabled(enabled);
     }
     _debouncedSavePreferences();
   }
 
-  Future<void> setLookaheadLimiter(bool enabled, {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {
+  Future<void> setLookaheadLimiter(bool enabled,
+      {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {
     isLimiterEnabled = enabled;
     if (thresholdDb != null) limiterThresholdDb = thresholdDb;
     if (releaseMs != null) limiterReleaseMs = releaseMs;
     if (Platform.isAndroid) {
-      await _effectsChannel.setLimiterParams(lookaheadMs ?? 3.0, limiterThresholdDb, limiterReleaseMs);
+      await _effectsChannel.setLimiterParams(
+          lookaheadMs ?? 3.0, limiterThresholdDb, limiterReleaseMs);
       await _effectsChannel.setLimiterEnabled(enabled);
     }
     _debouncedSavePreferences();
@@ -645,7 +691,8 @@ class EqualizerManager {
     if (makeupGainDb != null) compressorMakeupGainDb = makeupGainDb;
 
     if (Platform.isAndroid) {
-      await _effectsChannel.setLimiterParams(limiterLookaheadMs, limiterThresholdDb, limiterReleaseMs);
+      await _effectsChannel.setLimiterParams(
+          limiterLookaheadMs, limiterThresholdDb, limiterReleaseMs);
     }
     _debouncedSavePreferences();
   }
@@ -672,6 +719,13 @@ class EqualizerManager {
     _debouncedSavePreferences();
   }
 
+  Future<int> getPipelineLatencyFrames() =>
+      _effectsChannel.getPipelineLatencyFrames();
+  Future<void> setBandSolo(int index, bool solo) =>
+      _effectsChannel.setBandSolo(index, solo);
+  Future<void> setBandMute(int index, bool mute) =>
+      _effectsChannel.setBandMute(index, mute);
+
   Future<void> setStereoBalance(double balance) async {
     stereoBalance = balance.clamp(-1.0, 1.0);
     if (Platform.isAndroid) {
@@ -697,14 +751,38 @@ class EqualizerManager {
   }
 
   static final Map<String, EqPreset> _genreEqMap = {
-    'rock': const EqPreset(name: 'Rock', gains: [4.0, 3.0, -1.0, -1.0, 2.0, 4.0, 5.0, 5.0, 5.0, 6.0], bassBoost: 0.2),
-    'pop': const EqPreset(name: 'Pop', gains: [-1.5, -0.5, 1.5, 3.0, 4.0, 3.5, 2.0, 0.5, -0.5, -1.0], bassBoost: 0.1),
-    'jazz': const EqPreset(name: 'Jazz', gains: [3.0, 2.0, 1.0, 2.0, -1.0, -1.0, 0.0, 1.0, 2.0, 3.0], bassBoost: 0.0),
-    'classical': const EqPreset(name: 'Classical', gains: [4.0, 3.0, 2.0, 1.0, -1.0, -1.0, 0.0, 2.0, 3.0, 4.0], bassBoost: 0.0),
-    'electronic': const EqPreset(name: 'Electronic', gains: [5.0, 4.0, 2.0, 0.0, -1.0, 0.0, 2.0, 4.0, 5.0, 5.0], bassBoost: 0.3),
-    'hip-hop': const EqPreset(name: 'Hip-Hop', gains: [5.0, 4.0, 3.0, 1.0, 0.0, 0.0, 1.0, 3.0, 4.0, 4.0], bassBoost: 0.35),
-    'acoustic': const EqPreset(name: 'Acoustic', gains: [2.5, 1.5, 0.0, 1.0, 2.0, 2.5, 2.0, 1.5, 2.0, 2.5], bassBoost: 0.05),
-    'metal': const EqPreset(name: 'Metal', gains: [4.5, 3.5, 0.0, -1.5, -2.0, 0.0, 3.0, 5.0, 5.5, 6.0], bassBoost: 0.25),
+    'rock': const EqPreset(
+        name: 'Rock',
+        gains: [4.0, 3.0, -1.0, -1.0, 2.0, 4.0, 5.0, 5.0, 5.0, 6.0],
+        bassBoost: 0.2),
+    'pop': const EqPreset(
+        name: 'Pop',
+        gains: [-1.5, -0.5, 1.5, 3.0, 4.0, 3.5, 2.0, 0.5, -0.5, -1.0],
+        bassBoost: 0.1),
+    'jazz': const EqPreset(
+        name: 'Jazz',
+        gains: [3.0, 2.0, 1.0, 2.0, -1.0, -1.0, 0.0, 1.0, 2.0, 3.0],
+        bassBoost: 0.0),
+    'classical': const EqPreset(
+        name: 'Classical',
+        gains: [4.0, 3.0, 2.0, 1.0, -1.0, -1.0, 0.0, 2.0, 3.0, 4.0],
+        bassBoost: 0.0),
+    'electronic': const EqPreset(
+        name: 'Electronic',
+        gains: [5.0, 4.0, 2.0, 0.0, -1.0, 0.0, 2.0, 4.0, 5.0, 5.0],
+        bassBoost: 0.3),
+    'hip-hop': const EqPreset(
+        name: 'Hip-Hop',
+        gains: [5.0, 4.0, 3.0, 1.0, 0.0, 0.0, 1.0, 3.0, 4.0, 4.0],
+        bassBoost: 0.35),
+    'acoustic': const EqPreset(
+        name: 'Acoustic',
+        gains: [2.5, 1.5, 0.0, 1.0, 2.0, 2.5, 2.0, 1.5, 2.0, 2.5],
+        bassBoost: 0.05),
+    'metal': const EqPreset(
+        name: 'Metal',
+        gains: [4.5, 3.5, 0.0, -1.5, -2.0, 0.0, 3.0, 5.0, 5.5, 6.0],
+        bassBoost: 0.25),
   };
 
   Future<bool> applyGenreBasedEq(String? genre) async {
@@ -724,4 +802,3 @@ class EqualizerManager {
     _saveDebounce = null;
   }
 }
-

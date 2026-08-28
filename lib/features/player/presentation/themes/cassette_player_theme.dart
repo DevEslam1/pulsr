@@ -87,7 +87,8 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                     // Cassette Label Header
                     Container(
                       width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: p.primary.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(8),
@@ -145,7 +146,8 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
                                 child: Container(
                                   height: 12,
                                   width: 50,
-                                  color: const Color(0xFF5A3825), // Brown tape strip
+                                  color: const Color(
+                                      0xFF5A3825), // Brown tape strip
                                 ),
                               ),
                             ),
@@ -203,7 +205,8 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
 
             // Audio Quality & DAC Badge
             if (song != null)
-              AudioQualityBadge(song: song, activeColor: widget.props.activeColor),
+              AudioQualityBadge(
+                  song: song, activeColor: widget.props.activeColor),
             const SizedBox(height: 12),
 
             // Seek Bar

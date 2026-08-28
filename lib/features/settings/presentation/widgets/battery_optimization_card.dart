@@ -9,7 +9,8 @@ class BatteryOptimizationCard extends StatefulWidget {
   const BatteryOptimizationCard({super.key});
 
   @override
-  State<BatteryOptimizationCard> createState() => _BatteryOptimizationCardState();
+  State<BatteryOptimizationCard> createState() =>
+      _BatteryOptimizationCardState();
 }
 
 class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
@@ -26,7 +27,8 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
   Future<void> _checkStatus() async {
     if (!PlatformCapabilities.isAndroid) return;
     final dismissed = await BatteryOptimizationService.isCardDismissed();
-    final ignoring = await BatteryOptimizationService.isIgnoringBatteryOptimizations();
+    final ignoring =
+        await BatteryOptimizationService.isIgnoringBatteryOptimizations();
     final m = await BatteryOptimizationService.getDeviceManufacturer();
     if (mounted) {
       setState(() {
@@ -44,7 +46,8 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
     }
 
     final p = context.palette;
-    final isAggressive = BatteryOptimizationService.isAggressiveOem(_manufacturer);
+    final isAggressive =
+        BatteryOptimizationService.isAggressiveOem(_manufacturer);
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -72,7 +75,8 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
                 ),
               ),
               IconButton(
-                icon: Icon(Icons.close_rounded, size: 18, color: p.textTertiary),
+                icon:
+                    Icon(Icons.close_rounded, size: 18, color: p.textTertiary),
                 onPressed: () async {
                   await BatteryOptimizationService.dismissCard();
                   setState(() => _isDismissed = true);
@@ -94,11 +98,14 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
                 style: FilledButton.styleFrom(
                   backgroundColor: p.accent,
                   foregroundColor: p.onAccent,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  textStyle: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w700),
                 ),
                 onPressed: () async {
-                  await BatteryOptimizationService.requestIgnoreBatteryOptimizations();
+                  await BatteryOptimizationService
+                      .requestIgnoreBatteryOptimizations();
                   await _checkStatus();
                 },
                 child: const Text('Allow Background Playback'),
@@ -107,11 +114,14 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
                 const SizedBox(width: 8),
                 TextButton(
                   onPressed: () {
-                    final guideUrl = BatteryOptimizationService.getDontKillMyAppUrl(_manufacturer);
+                    final guideUrl =
+                        BatteryOptimizationService.getDontKillMyAppUrl(
+                            _manufacturer);
                     showDialog(
                       context: context,
                       builder: (ctx) => AlertDialog(
-                        title: Text('${_manufacturer.toUpperCase()} Background Guide'),
+                        title: Text(
+                            '${_manufacturer.toUpperCase()} Background Guide'),
                         content: Text(
                           'Your device manufacturer is known for aggressive background process killing.\n\nVisit $guideUrl to configure lock screen and battery settings.',
                         ),
@@ -126,7 +136,10 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
                   },
                   child: Text(
                     'Device Guide',
-                    style: TextStyle(color: p.accent, fontSize: 12, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                        color: p.accent,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700),
                   ),
                 ),
               ],

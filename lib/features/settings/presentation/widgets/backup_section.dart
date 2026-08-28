@@ -25,7 +25,8 @@ class _BackupSectionState extends State<BackupSection> {
   bool _isImporting = false;
 
   static Widget _buildIconContainer(BuildContext context, IconData icon) {
-    final cardColor = Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
+    final cardColor =
+        Theme.of(context).cardTheme.color ?? context.palette.surfaceContainer;
     final outlineColor = Theme.of(context).colorScheme.outline;
     final primaryColor = Theme.of(context).colorScheme.primary;
 
@@ -47,7 +48,11 @@ class _BackupSectionState extends State<BackupSection> {
       final exportUseCase = getIt<ExportBackupUseCase>();
       final jsonContent = await exportUseCase.execute();
 
-      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+      final timestamp = DateTime.now()
+          .toIso8601String()
+          .replaceAll(':', '-')
+          .split('.')
+          .first;
       final fileName = 'pulsr_backup_$timestamp.json';
       final bytes = Uint8List.fromList(utf8.encode(jsonContent));
 
@@ -68,7 +73,8 @@ class _BackupSectionState extends State<BackupSection> {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Backup exported successfully to ${file.path.split(Platform.pathSeparator).last}'),
+              content: Text(
+                  'Backup exported successfully to ${file.path.split(Platform.pathSeparator).last}'),
               backgroundColor: context.palette.accent,
             ),
           );
@@ -159,18 +165,21 @@ class _BackupSectionState extends State<BackupSection> {
             Text('• ${context.l10n.favorites}: $favsCount'),
             Text('• ${context.l10n.playlists}: $playlistsCount'),
             Text('• History: $historyCount'),
-            Text('• ${context.l10n.settings}: ${hasSettings ? "Included" : "None"}'),
+            Text(
+                '• ${context.l10n.settings}: ${hasSettings ? "Included" : "None"}'),
             const SizedBox(height: 12),
             Text(
               context.l10n.existingLibraryUpdateNotice,
-              style: TextStyle(fontSize: 12, color: context.palette.textSecondary),
+              style:
+                  TextStyle(fontSize: 12, color: context.palette.textSecondary),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: Text(context.l10n.cancel, style: TextStyle(color: context.palette.textSecondary)),
+            child: Text(context.l10n.cancel,
+                style: TextStyle(color: context.palette.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx, true),
@@ -213,12 +222,17 @@ class _BackupSectionState extends State<BackupSection> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('• Restored Favorites: ${importResult.restoredFavoritesCount}'),
-                Text('• Restored Playlists: ${importResult.restoredPlaylistsCount}'),
-                Text('• Restored History Entries: ${importResult.restoredHistoryCount}'),
-                Text('• Restored Settings: ${importResult.restoredSettingsCount} keys'),
+                Text(
+                    '• Restored Favorites: ${importResult.restoredFavoritesCount}'),
+                Text(
+                    '• Restored Playlists: ${importResult.restoredPlaylistsCount}'),
+                Text(
+                    '• Restored History Entries: ${importResult.restoredHistoryCount}'),
+                Text(
+                    '• Restored Settings: ${importResult.restoredSettingsCount} keys'),
                 if (importResult.restoredExcludedFoldersCount > 0)
-                  Text('• Restored Excluded Folders: ${importResult.restoredExcludedFoldersCount}'),
+                  Text(
+                      '• Restored Excluded Folders: ${importResult.restoredExcludedFoldersCount}'),
                 if (importResult.unmatchedPaths.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   Text(
@@ -253,7 +267,8 @@ class _BackupSectionState extends State<BackupSection> {
 
   @override
   Widget build(BuildContext context) {
-    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ?? context.palette.textSecondary;
+    final textSecondary = Theme.of(context).textTheme.bodyMedium?.color ??
+        context.palette.textSecondary;
 
     return Column(
       children: [
@@ -277,7 +292,8 @@ class _BackupSectionState extends State<BackupSection> {
           onTap: _isExporting ? null : () => _exportBackup(context),
         ),
         ListTile(
-          leading: _buildIconContainer(context, Icons.download_for_offline_rounded),
+          leading:
+              _buildIconContainer(context, Icons.download_for_offline_rounded),
           title: const Text(
             'Import Backup',
             style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),

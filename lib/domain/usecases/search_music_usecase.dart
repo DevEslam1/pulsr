@@ -10,7 +10,8 @@ class SearchMusicUseCase {
 
   SearchMusicUseCase(this._repository);
 
-  Stream<Result<List<SongsTableData>>> searchSongs(String query, {List<String> excludedFolders = const []}) {
+  Stream<Result<List<SongsTableData>>> searchSongs(String query,
+      {List<String> excludedFolders = const []}) {
     return _repository.watchAllSongs(
       searchQuery: query,
       excludedFolders: excludedFolders,

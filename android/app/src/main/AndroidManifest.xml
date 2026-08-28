@@ -10,6 +10,7 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+    <!-- Required solely for the audio visualizer; requested at runtime only when the user enables it -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
 
     <!-- Custom signature permission to protect internal widget & playback broadcasts -->
@@ -21,12 +22,13 @@
         android:label="${appName}"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:supportsRtl="true"
         android:networkSecurityConfig="@xml/network_security_config"
         android:enableOnBackInvokedCallback="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/backup_rules">
+        android:fullBackupContent="@xml/backup_rules"
+        tools:replace="android:allowBackup">
 
         <meta-data
             android:name="com.google.android.gms.car.application"
@@ -63,52 +65,21 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:scheme="pulsrWidget" />
             </intent-filter>
-            <!-- Intent filter to open YouTube Music & YouTube links -->
+            <!-- Unified intent filter to view/play audio files from file managers, downloads, etc. (BUG-012) -->
             <intent-filter android:label="${appName}">
                 <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="http" />
-                <data android:scheme="https" />
-                <data android:host="music.youtube.com" />
-                <data android:host="www.youtube.com" />
-                <data android:host="youtube.com" />
-                <data android:host="m.youtube.com" />
-                <data android:host="youtu.be" />
-            </intent-filter>
-            <!-- Intent filter for shared YouTube / YouTube Music links (Share via Pulsr) -->
-            <intent-filter android:label="${appName}">
-                <action android:name="android.intent.action.SEND" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="text/plain" />
-            </intent-filter>
-            <!-- Intent filter to open audio files from File Explorers & Downloads -->
-            <intent-filter android:label="${appName}">
-                <action android:name="android.intent.action.VIEW" />
-                <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="file" />
                 <data android:scheme="content" />
                 <data android:mimeType="audio/*" />
-                <data android:mimeType="text/plain" />
-                <data android:mimeType="text/*" />
                 <data android:mimeType="application/ogg" />
                 <data android:mimeType="application/x-ogg" />
                 <data android:mimeType="application/flac" />
                 <data android:mimeType="application/x-flac" />
                 <data android:mimeType="application/x-matroska" />
-            </intent-filter>
-            <intent-filter android:label="${appName}">
-                <action android:name="android.intent.action.VIEW" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <category android:name="android.intent.category.BROWSABLE" />
-                <data android:scheme="file" />
-                <data android:scheme="content" />
                 <data android:host="*" />
-                <!-- Layered pathPattern matchers for filenames with multiple dots (B7) -->
-                <data android:pathPattern=".*\\.txt" />
-                <data android:pathPattern=".*\\..*\\.txt" />
+                <!-- Layered pathPattern matchers for filenames with multiple dots -->
                 <data android:pathPattern=".*\\.mp3" />
                 <data android:pathPattern=".*\\..*\\.mp3" />
                 <data android:pathPattern=".*\\..*\\..*\\.mp3" />
@@ -133,6 +104,20 @@
                 <data android:pathPattern=".*\\.mka" />
                 <data android:pathPattern=".*\\..*\\.mka" />
                 <data android:pathPattern=".*\\..*\\..*\\.mka" />
+                <data android:pathPattern=".*\\.dsf" />
+                <data android:pathPattern=".*\\..*\\.dsf" />
+                <data android:pathPattern=".*\\..*\\..*\\.dsf" />
+                <data android:pathPattern=".*\\.dff" />
+                <data android:pathPattern=".*\\..*\\.dff" />
+                <data android:pathPattern=".*\\..*\\..*\\.dff" />
+            </intent-filter>
+            <!-- Intent filter to receive shared text/audio/URLs via Android share sheet -->
+            <intent-filter android:label="${appName}">
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+                <data android:mimeType="text/*" />
+                <data android:mimeType="audio/*" />
             </intent-filter>
         </activity>
         
@@ -162,6 +147,16 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info" />
         </receiver>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <meta-data
             android:name="flutterEmbedding"

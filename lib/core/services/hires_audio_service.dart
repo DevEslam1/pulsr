@@ -8,8 +8,10 @@ import '../utils/error_logger.dart';
 
 @lazySingleton
 class HiResAudioService {
-  static const MethodChannel _methodChannel = MethodChannel(PulsrChannels.hiresDac);
-  static const EventChannel _eventChannel = EventChannel(PulsrChannels.hiresDacEvents);
+  static const MethodChannel _methodChannel =
+      MethodChannel(PulsrChannels.hiresDac);
+  static const EventChannel _eventChannel =
+      EventChannel(PulsrChannels.hiresDacEvents);
 
   final StreamController<AudioOutputInfo> _deviceController =
       StreamController<AudioOutputInfo>.broadcast();
@@ -26,25 +28,23 @@ class HiResAudioService {
 
   void _init() {
     try {
-      _eventSubscription = _eventChannel
-          .receiveBroadcastStream()
-          .handleError((e, st) {
-            // Ignore missing plugin exception in unit tests or platforms without native implementation
-            if (e is! MissingPluginException) {
-              ErrorLogger.log('HiRes DAC event stream error',
-                  error: e, stackTrace: st, category: 'HiResAudio');
-            }
-          })
-          .listen(
-            (data) {
-              if (data is Map) {
-                final info = AudioOutputInfo.fromMap(data);
-                _cachedOutputInfo = info;
-                _deviceController.add(info);
-              }
-            },
-            cancelOnError: false,
-          );
+      _eventSubscription =
+          _eventChannel.receiveBroadcastStream().handleError((e, st) {
+        // Ignore missing plugin exception in unit tests or platforms without native implementation
+        if (e is! MissingPluginException) {
+          ErrorLogger.log('HiRes DAC event stream error',
+              error: e, stackTrace: st, category: 'HiResAudio');
+        }
+      }).listen(
+        (data) {
+          if (data is Map) {
+            final info = AudioOutputInfo.fromMap(data);
+            _cachedOutputInfo = info;
+            _deviceController.add(info);
+          }
+        },
+        cancelOnError: false,
+      );
       // Eagerly query current status
       getAudioOutputInfo();
     } catch (e, st) {
@@ -55,8 +55,8 @@ class HiResAudioService {
 
   Future<AudioOutputInfo> getAudioOutputInfo() async {
     try {
-      final Map<dynamic, dynamic>? res =
-          await _methodChannel.invokeMapMethod<dynamic, dynamic>('getAudioOutputInfo');
+      final Map<dynamic, dynamic>? res = await _methodChannel
+          .invokeMapMethod<dynamic, dynamic>('getAudioOutputInfo');
       if (res != null) {
         final info = AudioOutputInfo.fromMap(res);
         _cachedOutputInfo = info;
@@ -121,7 +121,8 @@ class HiResAudioService {
 
   Future<bool> clearOutputDevice() async {
     try {
-      final bool? success = await _methodChannel.invokeMethod<bool>('clearOutputDevice');
+      final bool? success =
+          await _methodChannel.invokeMethod<bool>('clearOutputDevice');
       await getAudioOutputInfo();
       return success ?? false;
     } catch (e, st) {
@@ -131,7 +132,8 @@ class HiResAudioService {
     }
   }
 
-  Future<bool> setTargetOutputFormat({int sampleRate = 0, int bitDepth = 0}) async {
+  Future<bool> setTargetOutputFormat(
+      {int sampleRate = 0, int bitDepth = 0}) async {
     try {
       final bool? success = await _methodChannel.invokeMethod<bool>(
         'setTargetOutputFormat',

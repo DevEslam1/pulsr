@@ -16,7 +16,8 @@ class FormatAwareDecoder {
   });
 
   /// Decodes and wraps [song] into an optimal [AudioSource].
-  Future<AudioSource> decodeForFormat(SongsTableData song, MediaItem tag) async {
+  Future<AudioSource> decodeForFormat(
+      SongsTableData song, MediaItem tag) async {
     if (song.source == SongSource.youtube) {
       return resolveYtmStream(song, tag);
     }

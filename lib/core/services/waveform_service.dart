@@ -74,7 +74,8 @@ class WaveformService {
       int mtime = 0;
       int size = 0;
       if (!path.startsWith('content:')) {
-        final file = File(path.startsWith('file://') ? Uri.parse(path).toFilePath() : path);
+        final file = File(
+            path.startsWith('file://') ? Uri.parse(path).toFilePath() : path);
         if (await file.exists()) {
           final stat = await file.stat();
           mtime = stat.modified.millisecondsSinceEpoch;
@@ -123,7 +124,8 @@ class WaveformService {
     }
   }
 
-  Future<File> _diskCacheFile(String path, int mtime, int size, int count) async {
+  Future<File> _diskCacheFile(
+      String path, int mtime, int size, int count) async {
     final dir = _cacheDir ??= await _initCacheDir();
     if (path.startsWith('content:')) {
       return File('${dir.path}/content_${_hashPath(path)}_$count.json');

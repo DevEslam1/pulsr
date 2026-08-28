@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/utils/l10n_extensions.dart';
@@ -6,11 +8,36 @@ import 'package:pulsr/l10n/generated/app_localizations.dart';
 void main() {
   group('Localization Tests', () {
     test('Supports English, Spanish, and Arabic', () {
-      final supportedLanguageCodes = AppLocalizations.supportedLocales.map((l) => l.languageCode).toList();
+      final supportedLanguageCodes =
+          AppLocalizations.supportedLocales.map((l) => l.languageCode).toList();
       expect(supportedLanguageCodes, containsAll(['en', 'es', 'ar']));
     });
 
-    testWidgets('Renders localized strings and LTR for English', (tester) async {
+    test('All ARB locale files have identical key sets', () async {
+      final enJson =
+          jsonDecode(await File('lib/l10n/app_en.arb').readAsString())
+              as Map<String, dynamic>;
+      final arJson =
+          jsonDecode(await File('lib/l10n/app_ar.arb').readAsString())
+              as Map<String, dynamic>;
+      final esJson =
+          jsonDecode(await File('lib/l10n/app_es.arb').readAsString())
+              as Map<String, dynamic>;
+
+      final enKeys = enJson.keys.where((k) => !k.startsWith('@')).toSet();
+      final arKeys = arJson.keys.where((k) => !k.startsWith('@')).toSet();
+      final esKeys = esJson.keys.where((k) => !k.startsWith('@')).toSet();
+
+      expect(arKeys, equals(enKeys),
+          reason:
+              'Missing in AR: ${enKeys.difference(arKeys)}, Extra in AR: ${arKeys.difference(enKeys)}');
+      expect(esKeys, equals(enKeys),
+          reason:
+              'Missing in ES: ${enKeys.difference(esKeys)}, Extra in ES: ${esKeys.difference(enKeys)}');
+    });
+
+    testWidgets('Renders localized strings and LTR for English',
+        (tester) async {
       TextDirection? direction;
       await tester.pumpWidget(
         MaterialApp(
@@ -74,7 +101,8 @@ void main() {
       expect(find.text('تم العثور على 5 أغنية'), findsOneWidget);
     });
 
-    testWidgets('Renders localized strings and LTR for Spanish', (tester) async {
+    testWidgets('Renders localized strings and LTR for Spanish',
+        (tester) async {
       TextDirection? direction;
       await tester.pumpWidget(
         MaterialApp(
@@ -106,7 +134,8 @@ void main() {
       expect(find.text('Se encontraron 12 canciones'), findsOneWidget);
     });
 
-    testWidgets('PlayerControls preserves LTR directionality in RTL context', (tester) async {
+    testWidgets('PlayerControls preserves LTR directionality in RTL context',
+        (tester) async {
       await tester.pumpWidget(
         MaterialApp(
           localizationsDelegates: AppLocalizations.localizationsDelegates,

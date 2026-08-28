@@ -48,7 +48,9 @@ void main() {
       expect(health.proxyPoolSize, 10);
     });
 
-    test('resolveStream uses YouTube Music URL and prioritizes AAC stream by quality', () async {
+    test(
+        'resolveStream uses YouTube Music URL and prioritizes AAC stream by quality',
+        () async {
       final sampleStreamResponse = {
         'url': 'https://music.youtube.com/watch?v=dQw4w9WgXcQ',
         'title': 'Test Song Title',
@@ -81,7 +83,8 @@ void main() {
       };
 
       when(() => mockClient.get(
-            Uri.parse('https://test-xdm-backend.app/api/streams?url=https%3A%2F%2Fmusic.youtube.com%2Fwatch%3Fv%3DdQw4w9WgXcQ'),
+            Uri.parse(
+                'https://test-xdm-backend.app/api/streams?url=https%3A%2F%2Fmusic.youtube.com%2Fwatch%3Fv%3DdQw4w9WgXcQ'),
             headers: any(named: 'headers'),
           )).thenAnswer((_) async => http.Response(
             jsonEncode(sampleStreamResponse),
@@ -89,14 +92,16 @@ void main() {
           ));
 
       // High Quality -> selects 128kbps AAC over 160kbps Opus webm
-      final highResult = await service.resolveStream('dQw4w9WgXcQ', quality: 'high');
+      final highResult =
+          await service.resolveStream('dQw4w9WgXcQ', quality: 'high');
       expect(highResult, isNotNull);
       expect(highResult!.url, 'https://cdn.youtube.com/audio_m4a_128');
       expect(highResult.container, 'm4a');
       expect(highResult.bitrateKbps, 128);
 
       // Low Quality -> selects 48kbps AAC
-      final lowResult = await service.resolveStream('dQw4w9WgXcQ', quality: 'low');
+      final lowResult =
+          await service.resolveStream('dQw4w9WgXcQ', quality: 'low');
       expect(lowResult, isNotNull);
       expect(lowResult!.url, 'https://cdn.youtube.com/audio_m4a_48');
       expect(lowResult.container, 'm4a');
@@ -127,14 +132,16 @@ void main() {
       };
 
       when(() => mockClient.get(
-            Uri.parse('https://test-xdm-backend.app/api/playlist?url=https%3A%2F%2Fwww.youtube.com%2Fplaylist%3Flist%3DPL123'),
+            Uri.parse(
+                'https://test-xdm-backend.app/api/playlist?url=https%3A%2F%2Fwww.youtube.com%2Fplaylist%3Flist%3DPL123'),
             headers: any(named: 'headers'),
           )).thenAnswer((_) async => http.Response(
             jsonEncode(samplePlaylistResponse),
             200,
           ));
 
-      final tracks = await service.getPlaylist('https://www.youtube.com/playlist?list=PL123');
+      final tracks = await service
+          .getPlaylist('https://www.youtube.com/playlist?list=PL123');
 
       expect(tracks.length, 2);
       expect(tracks[0].videoId, 'video_1');
@@ -174,14 +181,16 @@ void main() {
       expect(results[0].duration.inSeconds, 210);
     });
 
-    test('returns null / empty when backend is disabled in preferences', () async {
+    test('returns null / empty when backend is disabled in preferences',
+        () async {
       SharedPreferences.setMockInitialValues({
         PrefsKeys.ytdlpBackendEnabled: false,
       });
 
       final streamResult = await service.resolveStream('dQw4w9WgXcQ');
       final searchResult = await service.search('Adele');
-      final playlistResult = await service.getPlaylist('https://www.youtube.com/playlist?list=PL123');
+      final playlistResult = await service
+          .getPlaylist('https://www.youtube.com/playlist?list=PL123');
 
       expect(streamResult, isNull);
       expect(searchResult, isEmpty);

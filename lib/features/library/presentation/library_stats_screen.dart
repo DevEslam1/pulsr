@@ -29,13 +29,22 @@ class LibraryStatsScreen extends StatelessWidget {
           final albums = state.albums;
           final genres = state.genres;
 
-          final totalDurationMs = songs.fold<int>(0, (sum, s) => sum + s.durationMs);
-          final totalSizeBytes = songs.fold<int>(0, (sum, s) => sum + (s.fileSize ?? 0));
-          final losslessCount = songs.where((s) => s.codec == 'FLAC' || s.codec == 'ALAC' || s.bitDepth != null && s.bitDepth! > 16).length;
+          final totalDurationMs =
+              songs.fold<int>(0, (sum, s) => sum + s.durationMs);
+          final totalSizeBytes =
+              songs.fold<int>(0, (sum, s) => sum + (s.fileSize ?? 0));
+          final losslessCount = songs
+              .where((s) =>
+                  s.codec == 'FLAC' ||
+                  s.codec == 'ALAC' ||
+                  s.bitDepth != null && s.bitDepth! > 16)
+              .length;
           final lossyCount = songs.length - losslessCount;
 
-          final totalHours = (totalDurationMs / (1000 * 60 * 60)).toStringAsFixed(1);
-          final totalGb = (totalSizeBytes / (1024 * 1024 * 1024)).toStringAsFixed(2);
+          final totalHours =
+              (totalDurationMs / (1000 * 60 * 60)).toStringAsFixed(1);
+          final totalGb =
+              (totalSizeBytes / (1024 * 1024 * 1024)).toStringAsFixed(2);
 
           return ListView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 120),
@@ -126,7 +135,8 @@ class LibraryStatsScreen extends StatelessWidget {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        Icon(Icons.high_quality_rounded, color: p.primary, size: 20),
+                        Icon(Icons.high_quality_rounded,
+                            color: p.primary, size: 20),
                         const SizedBox(width: 8),
                         Text(
                           'Quality Tier Distribution',
@@ -168,11 +178,15 @@ class LibraryStatsScreen extends StatelessWidget {
                       children: [
                         Text(
                           'Lossless / Hi-Res: $losslessCount tracks',
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF64D2FF), fontWeight: FontWeight.w600),
+                          style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF64D2FF),
+                              fontWeight: FontWeight.w600),
                         ),
                         Text(
                           'Standard Lossy: $lossyCount tracks',
-                          style: TextStyle(fontSize: 12, color: p.textSecondary),
+                          style:
+                              TextStyle(fontSize: 12, color: p.textSecondary),
                         ),
                       ],
                     ),
@@ -244,7 +258,11 @@ class LibraryStatsScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title, style: TextStyle(fontSize: 11, color: p.textSecondary)),
-            Text(value, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: p.textPrimary)),
+            Text(value,
+                style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                    color: p.textPrimary)),
           ],
         ),
       ],

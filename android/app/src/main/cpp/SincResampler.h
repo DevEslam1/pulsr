@@ -1,8 +1,11 @@
+// android/app/src/main/cpp/SincResampler.h
 #pragma once
 
+#include "DspParams.h"
 #include <vector>
 #include <cmath>
 #include <algorithm>
+#include <cstring>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -10,39 +13,51 @@
 
 class SincResampler {
 public:
-    static constexpr int TAPS = 64;
-    static constexpr int HALF_TAPS = TAPS / 2;
+    static constexpr int NUM_PHASES = 32;
+    static constexpr int TAPS_PER_PHASE = 32;
+    static constexpr int TOTAL_TAPS = NUM_PHASES * TAPS_PER_PHASE;
+    static constexpr int HALF_TAPS = TAPS_PER_PHASE / 2;
 
     SincResampler();
     void setRates(double inRate, double outRate);
     void setEnabled(bool enabled);
     bool isEnabled() const { return enabled_; }
+    void applyParams(const ResamplerParamSet& params);
     void reset();
 
-    int getExpectedOutFrames(int inFrames) const;
-    int process(const float* inL, const float* inR, int inFrames,
-                float* outL, float* outR, int maxOutFrames);
-    int processInterleaved(const float* in, int inFrames,
-                           float* out, int maxOutFrames);
+    double getInRate() const { return inRate_; }
+    double getOutRate() const { return outRate_; }
+    double getRatio() const { return ratio_; }
+
+    // Latency reporting in frames (exact group delay)
+    int getLatencyFrames() const { return HALF_TAPS; }
+
+    // HARD CONTRACT: Consumes N input frames and returns exactly N output frames
+    int processInterleaved(float* buffer, int frames, int channels = 2);
+
+    // Multi-channel planar processing: consumes frames and writes frames
+    int processPlanar(const float* const* in, float* const* out, int frames, int channels);
 
 private:
-    float sinc(float x) const;
-    float blackmanHarris(float x) const; // x in [-HALF_TAPS, HALF_TAPS]
+    void generatePolyphaseTable();
+    static float sinc(float x);
+    static float blackmanHarris(float x, float halfWidth);
 
-    double inRate_ = 44100.0;
+    double inRate_ = 48000.0;
     double outRate_ = 48000.0;
-    double ratio_ = 44100.0 / 48000.0; // inFrames per outFrame
+    double ratio_ = 1.0;
     double phase_ = 0.0;
-    bool enabled_ = true;
+    bool enabled_ = false;
 
-    std::vector<float> historyL_;
-    std::vector<float> historyR_;
-    std::vector<float> bufL_;
-    std::vector<float> bufR_;
-    int bufCapacity_ = 0;
+    // Polyphase FIR filter coefficients [NUM_PHASES][TAPS_PER_PHASE]
+    float polyphaseTable_[NUM_PHASES][TAPS_PER_PHASE] = {};
 
-    std::vector<float> inL_;
-    std::vector<float> inR_;
-    std::vector<float> outL_;
-    std::vector<float> outR_;
+    // Per-channel FIFO ring buffers
+    static constexpr int MAX_CHANNELS = 8;
+    static constexpr int FIFO_CAPACITY = 8192;
+    float ringBuf_[MAX_CHANNELS][FIFO_CAPACITY] = {};
+    int writePos_ = 0;
+    int availableFrames_ = 0;
+
+    std::vector<float> tempOutBuf_;
 };

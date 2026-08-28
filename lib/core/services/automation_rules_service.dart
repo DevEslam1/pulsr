@@ -54,10 +54,13 @@ class AutomationRulesService {
       final jsonStr = prefs.getString(_keyRules);
       if (jsonStr != null) {
         final list = json.decode(jsonStr) as List<dynamic>;
-        return list.map((e) => AutomationRule.fromJson(e as Map<String, dynamic>)).toList();
+        return list
+            .map((e) => AutomationRule.fromJson(e as Map<String, dynamic>))
+            .toList();
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to load automation rules', error: e, stackTrace: st, category: 'AutomationRulesService');
+      ErrorLogger.log('Failed to load automation rules',
+          error: e, stackTrace: st, category: 'AutomationRulesService');
     }
     return const [
       AutomationRule(
@@ -83,6 +86,7 @@ class AutomationRulesService {
       updated.add(rule);
     }
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_keyRules, json.encode(updated.map((r) => r.toJson()).toList()));
+    await prefs.setString(
+        _keyRules, json.encode(updated.map((r) => r.toJson()).toList()));
   }
 }

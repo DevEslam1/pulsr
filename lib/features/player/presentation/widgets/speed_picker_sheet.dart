@@ -35,7 +35,8 @@ class SpeedPickerSheet extends StatelessWidget {
     return Align(
       alignment: Alignment.bottomCenter,
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: Adaptive.sheetConstraints(context).maxWidth),
+        constraints: BoxConstraints(
+            maxWidth: Adaptive.sheetConstraints(context).maxWidth),
         child: Material(
           color: p.surface,
           borderRadius: AppRadii.bottomSheetRadius,
@@ -50,63 +51,65 @@ class SpeedPickerSheet extends StatelessWidget {
                 return SafeArea(
                   top: false,
                   child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: p.hairline,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-                Text(
-                  context.l10n.playbackSpeed,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: p.textPrimary,
-                      ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  context.l10n.currentSpeed(formatSpeed(currentSpeed)),
-                  style: TextStyle(color: p.textSecondary, fontSize: 13),
-                ),
-                const SizedBox(height: 20),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: speedOptions.map((speed) {
-                      final isSelected = (currentSpeed == speed);
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8.0),
-                        child: ChoiceChip(
-                          label: Text(formatSpeed(speed)),
-                          selected: isSelected,
-                          selectedColor: p.accent.withValues(alpha: 0.2),
-                          backgroundColor: p.surfaceContainer,
-                          labelStyle: TextStyle(
-                            color: isSelected ? p.accent : p.textPrimary,
-                            fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: p.hairline,
+                            borderRadius: BorderRadius.circular(2),
                           ),
-                          side: BorderSide(
-                            color: isSelected ? p.accent : p.hairline,
-                          ),
-                          onSelected: (selected) {
-                            if (selected) {
-                              cubit.setPlaybackSpeed(speed);
-                            }
-                          },
                         ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ],
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        context.l10n.playbackSpeed,
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: p.textPrimary,
+                            ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        context.l10n.currentSpeed(formatSpeed(currentSpeed)),
+                        style: TextStyle(color: p.textSecondary, fontSize: 13),
+                      ),
+                      const SizedBox(height: 20),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: speedOptions.map((speed) {
+                            final isSelected = (currentSpeed == speed);
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: ChoiceChip(
+                                label: Text(formatSpeed(speed)),
+                                selected: isSelected,
+                                selectedColor: p.accent.withValues(alpha: 0.2),
+                                backgroundColor: p.surfaceContainer,
+                                labelStyle: TextStyle(
+                                  color: isSelected ? p.accent : p.textPrimary,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w800
+                                      : FontWeight.w500,
+                                ),
+                                side: BorderSide(
+                                  color: isSelected ? p.accent : p.hairline,
+                                ),
+                                onSelected: (selected) {
+                                  if (selected) {
+                                    cubit.setPlaybackSpeed(speed);
+                                  }
+                                },
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ),
+                    ],
                   ),
                 );
               },

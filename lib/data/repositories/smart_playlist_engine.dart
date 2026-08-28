@@ -1,17 +1,19 @@
-// lib/data/repositories/smart_playlist_engine.dart
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
+import 'package:rxdart/rxdart.dart';
 import '../../domain/models/smart_playlist_criteria.dart';
+import '../../domain/repositories/smart_playlist_engine_interface.dart';
 import '../db/app_database.dart';
 
-@singleton
-class SmartPlaylistEngine {
+@Singleton(as: ISmartPlaylistEngine)
+class SmartPlaylistEngine implements ISmartPlaylistEngine {
   final AppDatabase _db;
 
   SmartPlaylistEngine(this._db);
 
-  SimpleSelectStatement<$SongsTableTable, SongsTableData> _buildQuery(SmartCriteria criteria) {
+  SimpleSelectStatement<$SongsTableTable, SongsTableData> _buildQuery(
+      SmartCriteria criteria) {
     final query = _db.select(_db.songsTable)
       ..where((t) =>
           t.isMissing.equals(false) &
@@ -27,7 +29,8 @@ class SmartPlaylistEngine {
           if (combined == null) {
             combined = expr;
           } else {
-            combined = criteria.matchAll ? (combined & expr) : (combined | expr);
+            combined =
+                criteria.matchAll ? (combined & expr) : (combined | expr);
           }
         }
         return combined ?? const Constant(true);
@@ -35,19 +38,24 @@ class SmartPlaylistEngine {
     }
 
     if (criteria.sortBy != null) {
-      final mode = criteria.sortAscending ? OrderingMode.asc : OrderingMode.desc;
+      final mode =
+          criteria.sortAscending ? OrderingMode.asc : OrderingMode.desc;
       switch (criteria.sortBy) {
         case 'dateAdded':
-          query.orderBy([(t) => OrderingTerm(expression: t.dateAdded, mode: mode)]);
+          query.orderBy(
+              [(t) => OrderingTerm(expression: t.dateAdded, mode: mode)]);
           break;
         case 'playCount':
-          query.orderBy([(t) => OrderingTerm(expression: t.playCount, mode: mode)]);
+          query.orderBy(
+              [(t) => OrderingTerm(expression: t.playCount, mode: mode)]);
           break;
         case 'lastPlayed':
-          query.orderBy([(t) => OrderingTerm(expression: t.lastPlayed, mode: mode)]);
+          query.orderBy(
+              [(t) => OrderingTerm(expression: t.lastPlayed, mode: mode)]);
           break;
         case 'durationMs':
-          query.orderBy([(t) => OrderingTerm(expression: t.durationMs, mode: mode)]);
+          query.orderBy(
+              [(t) => OrderingTerm(expression: t.durationMs, mode: mode)]);
           break;
         case 'year':
           query.orderBy([(t) => OrderingTerm(expression: t.year, mode: mode)]);
@@ -123,7 +131,8 @@ class SmartPlaylistEngine {
         }
 
       case SmartRuleField.isLossless:
-        return t.codec.isIn(const ['FLAC', 'ALAC', 'WAV', 'AIFF', 'PCM', 'DSF', 'DFF']) |
+        return t.codec.isIn(
+                const ['FLAC', 'ALAC', 'WAV', 'AIFF', 'PCM', 'DSF', 'DFF']) |
             (t.bitDepth.isNotNull() & t.bitDepth.isBiggerOrEqualValue(24)) |
             t.path.lower().like('%.flac') |
             t.path.lower().like('%.wav') |
@@ -135,27 +144,35 @@ class SmartPlaylistEngine {
       case SmartRuleField.decade:
         if (rule.operator == SmartOperator.between) {
           final b = _parseIntBetween(valStr);
-          return b != null ? (t.year.isNotNull() & t.year.isBetweenValues(b.$1, b.$2)) : null;
+          return b != null
+              ? (t.year.isNotNull() & t.year.isBetweenValues(b.$1, b.$2))
+              : null;
         }
         if (valInt == null) return null;
         final startYear = (valInt ~/ 10) * 10;
         final endYear = startYear + 9;
-        return t.year.isNotNull() & t.year.isBiggerOrEqualValue(startYear) & t.year.isSmallerOrEqualValue(endYear);
+        return t.year.isNotNull() &
+            t.year.isBiggerOrEqualValue(startYear) &
+            t.year.isSmallerOrEqualValue(endYear);
 
       case SmartRuleField.genre:
         if (valStr.isEmpty) return null;
         switch (rule.operator) {
           case SmartOperator.equals:
-            return t.genre.isNotNull() & t.genre.lower().equals(valStr.toLowerCase());
+            return t.genre.isNotNull() &
+                t.genre.lower().equals(valStr.toLowerCase());
           case SmartOperator.contains:
           default:
-            return t.genre.isNotNull() & t.genre.lower().contains(valStr.toLowerCase());
+            return t.genre.isNotNull() &
+                t.genre.lower().contains(valStr.toLowerCase());
         }
 
       case SmartRuleField.year:
         if (rule.operator == SmartOperator.between) {
           final b = _parseIntBetween(valStr);
-          return b != null ? (t.year.isNotNull() & t.year.isBetweenValues(b.$1, b.$2)) : null;
+          return b != null
+              ? (t.year.isNotNull() & t.year.isBetweenValues(b.$1, b.$2))
+              : null;
         }
         if (valInt == null) return null;
         switch (rule.operator) {
@@ -176,7 +193,8 @@ class SmartPlaylistEngine {
       case SmartRuleField.dateAdded:
         if (rule.operator == SmartOperator.withinDays) {
           final days = valInt ?? 30;
-          final cutoffSec = DateTime.now().millisecondsSinceEpoch ~/ 1000 - (days * 86400);
+          final cutoffSec =
+              DateTime.now().millisecondsSinceEpoch ~/ 1000 - (days * 86400);
           return t.dateAdded.isBiggerOrEqualValue(cutoffSec);
         }
         if (rule.operator == SmartOperator.between) {
@@ -227,27 +245,37 @@ class SmartPlaylistEngine {
       case SmartRuleField.lastPlayed:
         if (rule.operator == SmartOperator.withinDays) {
           final days = valInt ?? 30;
-          final cutoffSec = DateTime.now().millisecondsSinceEpoch ~/ 1000 - (days * 86400);
-          return t.lastPlayed.isNotNull() & t.lastPlayed.isBiggerOrEqualValue(cutoffSec);
+          final cutoffSec =
+              DateTime.now().millisecondsSinceEpoch ~/ 1000 - (days * 86400);
+          return t.lastPlayed.isNotNull() &
+              t.lastPlayed.isBiggerOrEqualValue(cutoffSec);
         }
         if (rule.operator == SmartOperator.between) {
           final b = _parseIntBetween(valStr);
-          return b != null ? (t.lastPlayed.isNotNull() & t.lastPlayed.isBetweenValues(b.$1, b.$2)) : null;
+          return b != null
+              ? (t.lastPlayed.isNotNull() &
+                  t.lastPlayed.isBetweenValues(b.$1, b.$2))
+              : null;
         }
         if (valInt == null) return null;
         switch (rule.operator) {
           case SmartOperator.equals:
             return t.lastPlayed.isNotNull() & t.lastPlayed.equals(valInt);
           case SmartOperator.greaterThan:
-            return t.lastPlayed.isNotNull() & t.lastPlayed.isBiggerThanValue(valInt);
+            return t.lastPlayed.isNotNull() &
+                t.lastPlayed.isBiggerThanValue(valInt);
           case SmartOperator.lessThan:
-            return t.lastPlayed.isNotNull() & t.lastPlayed.isSmallerThanValue(valInt);
+            return t.lastPlayed.isNotNull() &
+                t.lastPlayed.isSmallerThanValue(valInt);
           case SmartOperator.greaterThanOrEqual:
-            return t.lastPlayed.isNotNull() & t.lastPlayed.isBiggerOrEqualValue(valInt);
+            return t.lastPlayed.isNotNull() &
+                t.lastPlayed.isBiggerOrEqualValue(valInt);
           case SmartOperator.lessThanOrEqual:
-            return t.lastPlayed.isNotNull() & t.lastPlayed.isSmallerOrEqualValue(valInt);
+            return t.lastPlayed.isNotNull() &
+                t.lastPlayed.isSmallerOrEqualValue(valInt);
           default:
-            return t.lastPlayed.isNotNull() & t.lastPlayed.isBiggerOrEqualValue(valInt);
+            return t.lastPlayed.isNotNull() &
+                t.lastPlayed.isBiggerOrEqualValue(valInt);
         }
 
       case SmartRuleField.bpm:
@@ -257,30 +285,41 @@ class SmartPlaylistEngine {
       case SmartRuleField.loudnessRange:
         if (rule.operator == SmartOperator.between) {
           final b = _parseDoubleBetween(valStr);
-          return b != null ? (t.loudnessRange.isNotNull() & t.loudnessRange.isBetweenValues(b.$1, b.$2)) : null;
+          return b != null
+              ? (t.loudnessRange.isNotNull() &
+                  t.loudnessRange.isBetweenValues(b.$1, b.$2))
+              : null;
         }
         final valDouble = double.tryParse(valStr);
         if (valDouble == null) return null;
         switch (rule.operator) {
           case SmartOperator.greaterThan:
-            return t.loudnessRange.isNotNull() & t.loudnessRange.isBiggerThanValue(valDouble);
+            return t.loudnessRange.isNotNull() &
+                t.loudnessRange.isBiggerThanValue(valDouble);
           case SmartOperator.lessThan:
-            return t.loudnessRange.isNotNull() & t.loudnessRange.isSmallerThanValue(valDouble);
+            return t.loudnessRange.isNotNull() &
+                t.loudnessRange.isSmallerThanValue(valDouble);
           default:
-            return t.loudnessRange.isNotNull() & t.loudnessRange.equals(valDouble);
+            return t.loudnessRange.isNotNull() &
+                t.loudnessRange.equals(valDouble);
         }
 
       case SmartRuleField.bitrate:
         if (rule.operator == SmartOperator.between) {
           final b = _parseIntBetween(valStr);
-          return b != null ? (t.bitrateKbps.isNotNull() & t.bitrateKbps.isBetweenValues(b.$1, b.$2)) : null;
+          return b != null
+              ? (t.bitrateKbps.isNotNull() &
+                  t.bitrateKbps.isBetweenValues(b.$1, b.$2))
+              : null;
         }
         if (valInt == null) return null;
         switch (rule.operator) {
           case SmartOperator.greaterThan:
-            return t.bitrateKbps.isNotNull() & t.bitrateKbps.isBiggerThanValue(valInt);
+            return t.bitrateKbps.isNotNull() &
+                t.bitrateKbps.isBiggerThanValue(valInt);
           case SmartOperator.lessThan:
-            return t.bitrateKbps.isNotNull() & t.bitrateKbps.isSmallerThanValue(valInt);
+            return t.bitrateKbps.isNotNull() &
+                t.bitrateKbps.isSmallerThanValue(valInt);
           default:
             return t.bitrateKbps.isNotNull() & t.bitrateKbps.equals(valInt);
         }
@@ -315,13 +354,22 @@ class SmartPlaylistEngine {
     return null;
   }
 
+  @override
   Future<List<SongsTableData>> evaluateCriteria(SmartCriteria criteria) async {
     final query = _buildQuery(criteria);
     return await query.get();
   }
 
+  @override
   Stream<List<SongsTableData>> watchCriteria(SmartCriteria criteria) {
     final query = _buildQuery(criteria);
-    return query.watch();
+    return query.watch().debounceTime(const Duration(milliseconds: 500));
+  }
+
+  @override
+  Future<List<SongsTableData>> createPlaybackSnapshot(
+      SmartCriteria criteria) async {
+    final songs = await evaluateCriteria(criteria);
+    return List<SongsTableData>.unmodifiable(songs);
   }
 }

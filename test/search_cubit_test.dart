@@ -13,7 +13,8 @@ class MockSearchMusicUseCase implements SearchMusicUseCase {
   MockSearchMusicUseCase({this.mockSongs = const []});
 
   @override
-  Stream<Result<List<SongsTableData>>> searchSongs(String query, {List<String> excludedFolders = const []}) {
+  Stream<Result<List<SongsTableData>>> searchSongs(String query,
+      {List<String> excludedFolders = const []}) {
     return Stream.value(Right(mockSongs));
   }
 }
@@ -25,7 +26,8 @@ void main() {
 
   setUp(() {
     mockFolderUseCases = MockFolderUseCases();
-    when(() => mockFolderUseCases.getExcludedFolders()).thenAnswer((_) async => const Right([]));
+    when(() => mockFolderUseCases.getExcludedFolders())
+        .thenAnswer((_) async => const Right([]));
   });
 
   group('SearchCubit Tests', () {
@@ -167,9 +169,9 @@ void main() {
             durationMs: 180000,
             path: '/path/1',
             source: SongSource.local,
-          isFavorite: false,
-          isMissing: false,
-          isDownloaded: false,
+            isFavorite: false,
+            isMissing: false,
+            isDownloaded: false,
             playCount: 0,
             lastPositionMs: 0,
           ),

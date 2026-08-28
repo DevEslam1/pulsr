@@ -26,7 +26,8 @@ abstract class IMusicRepository {
   Future<Result<SongsTableData?>> getSongByPath(String path);
   Future<Result<SongsTableData?>> getSongByUri(String uri);
   Future<Result<SongsTableData?>> getSongByRemoteId(String remoteId);
-  Future<Result<SongsTableData?>> findMatchingLocalSong({String? remoteId, String? title, String? artist});
+  Future<Result<SongsTableData?>> findMatchingLocalSong(
+      {String? remoteId, String? title, String? artist});
   Future<Result<List<SongsTableData>>> getSongsByIds(List<int> ids);
   Future<Result<int>> hardDeleteMissingSongs();
 
@@ -69,9 +70,11 @@ abstract class IMusicRepository {
 
   // --- PLAYLISTS ---
   Stream<Result<List<PlaylistsTableData>>> watchPlaylists();
-  Future<Result<int>> createPlaylist(String name, {bool isSmart = false, String? smartCriteria});
+  Future<Result<int>> createPlaylist(String name,
+      {bool isSmart = false, String? smartCriteria});
   Future<Result<void>> renamePlaylist(int playlistId, String newName);
-  Future<Result<void>> updateSmartPlaylist(int playlistId, String name, String smartCriteria);
+  Future<Result<void>> updateSmartPlaylist(
+      int playlistId, String name, String smartCriteria);
   Future<Result<void>> deletePlaylist(int playlistId);
   Future<Result<List<PlaylistsTableData>>> getPlaylists();
   Stream<Result<List<SongsTableData>>> watchPlaylistSongs(int playlistId);
@@ -79,7 +82,8 @@ abstract class IMusicRepository {
   Future<Result<void>> addSongToPlaylist(int playlistId, int songId);
   Future<Result<void>> addSongsToPlaylist(int playlistId, List<int> songIds);
   Future<Result<void>> removeSongFromPlaylist(int playlistId, int songId);
-  Future<Result<void>> reorderPlaylistSongs(int playlistId, List<int> orderedSongIds);
+  Future<Result<void>> reorderPlaylistSongs(
+      int playlistId, List<int> orderedSongIds);
 
   // --- EXCLUDED FOLDERS ---
   Stream<Result<List<ExcludedFoldersTableData>>> watchExcludedFolders();
@@ -87,7 +91,8 @@ abstract class IMusicRepository {
   Future<Result<void>> toggleFolderExclusion(String folderPath);
 
   // --- QUEUE PERSISTENCE ---
-  Future<Result<void>> saveQueue(List<int> songIds, int currentIndex, int positionMs);
+  Future<Result<void>> saveQueue(
+      List<int> songIds, int currentIndex, int positionMs);
   Future<Result<List<QueueItemsTableData>>> getSavedQueue();
 
   // --- SCAN SYNC ---

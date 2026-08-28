@@ -1,4 +1,4 @@
-﻿/// 8-pt spacing scale used across the app for a consistent premium rhythm.
+/// 8-pt spacing scale used across the app for a consistent premium rhythm.
 abstract class AppSpacing {
   static const double xxs = 4;
   static const double xs = 8;

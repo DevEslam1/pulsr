@@ -1,9 +1,11 @@
+// android/app/src/main/cpp/Crossfeed.cpp
 #include "Crossfeed.h"
 #include <cstring>
+#include <cmath>
 
 Crossfeed::Crossfeed() {
     setSampleRate(48000.0);
-    configure(350.0, -9.0);
+    configure(350.0, -9.0, 650.0);
     reset();
 }
 
@@ -11,23 +13,29 @@ void Crossfeed::setSampleRate(double sampleRate) {
     if (sampleRate < 8000.0) sampleRate = 8000.0;
     if (sampleRate > 768000.0) sampleRate = 768000.0;
     sampleRate_ = sampleRate;
-    configure(delayUs_, feedDb_);
+    configure(delayUs_, feedDb_, fcut_);
 }
 
-void Crossfeed::configure(double delayUs, double feedDb) {
-    delayUs_ = std::max(50.0, std::min(delayUs, 2000.0));
-    feedDb_ = std::max(-30.0, std::min(feedDb, 0.0));
+void Crossfeed::configure(double delayUs, double feedDb, double fcut) {
+    delayUs_ = std::clamp(delayUs, 50.0, 2000.0);
+    feedDb_ = std::clamp(feedDb, -30.0, 0.0);
+    fcut_ = std::clamp(fcut, 100.0, 5000.0);
 
-    delaySamples_ = std::max(1, std::min(static_cast<int>(sampleRate_ * delayUs_ / 1e6), MAX_DELAY_SAMPLES - 1));
+    delaySamples_ = std::clamp(static_cast<int>(sampleRate_ * delayUs_ / 1e6), 1, MAX_DELAY_SAMPLES - 1);
     feedLevel_ = static_cast<float>(std::pow(10.0, feedDb_ / 20.0));
 
-    // One-pole lowpass cutoff ~700 Hz (head shadow frequency)
-    double fc = 700.0 / sampleRate_;
+    // One-pole lowpass filter for head-shadow simulation at fcut
+    const double fc = fcut_ / sampleRate_;
     lpCoeff_ = static_cast<float>(1.0 - std::exp(-2.0 * M_PI * fc));
 }
 
 void Crossfeed::setEnabled(bool enabled) {
     enabled_ = enabled;
+}
+
+void Crossfeed::applyParams(const CrossfeedParamSet& params) {
+    enabled_ = params.enabled;
+    configure(params.delayUs, params.feedDb, params.fcut);
 }
 
 void Crossfeed::reset() {
@@ -42,24 +50,20 @@ void Crossfeed::process(float* L, float* R, int frames) {
     if (!enabled_ || !L || !R || frames <= 0) return;
 
     for (int i = 0; i < frames; ++i) {
-        float l = L[i];
-        float r = R[i];
+        const float l = L[i];
+        const float r = R[i];
 
-        // Lowpass filter signal for head shadow
         lpL_ += lpCoeff_ * (l - lpL_);
         lpR_ += lpCoeff_ * (r - lpR_);
 
-        // Retrieve delayed lowpassed signal from opposite channel
-        int rdIdx = (writeIdx_ - delaySamples_ + MAX_DELAY_SAMPLES) % MAX_DELAY_SAMPLES;
-        float delayedL = delayBufferL_[rdIdx];
-        float delayedR = delayBufferR_[rdIdx];
+        const int rdIdx = (writeIdx_ - delaySamples_ + MAX_DELAY_SAMPLES) % MAX_DELAY_SAMPLES;
+        const float delayedL = delayBufferL_[rdIdx];
+        const float delayedR = delayBufferR_[rdIdx];
 
-        // Store current lowpassed samples in delay buffer
         delayBufferL_[writeIdx_] = lpL_;
         delayBufferR_[writeIdx_] = lpR_;
         writeIdx_ = (writeIdx_ + 1) % MAX_DELAY_SAMPLES;
 
-        // Crossfeed mix
         L[i] = l + delayedR * feedLevel_;
         R[i] = r + delayedL * feedLevel_;
     }
@@ -69,15 +73,15 @@ void Crossfeed::processInterleaved(float* buffer, int frames) {
     if (!enabled_ || !buffer || frames <= 0) return;
 
     for (int i = 0; i < frames; ++i) {
-        float l = buffer[i * 2];
-        float r = buffer[i * 2 + 1];
+        const float l = buffer[i * 2];
+        const float r = buffer[i * 2 + 1];
 
         lpL_ += lpCoeff_ * (l - lpL_);
         lpR_ += lpCoeff_ * (r - lpR_);
 
-        int rdIdx = (writeIdx_ - delaySamples_ + MAX_DELAY_SAMPLES) % MAX_DELAY_SAMPLES;
-        float delayedL = delayBufferL_[rdIdx];
-        float delayedR = delayBufferR_[rdIdx];
+        const int rdIdx = (writeIdx_ - delaySamples_ + MAX_DELAY_SAMPLES) % MAX_DELAY_SAMPLES;
+        const float delayedL = delayBufferL_[rdIdx];
+        const float delayedR = delayBufferR_[rdIdx];
 
         delayBufferL_[writeIdx_] = lpL_;
         delayBufferR_[writeIdx_] = lpR_;

@@ -18,7 +18,8 @@ class AlbumDetailScreen extends StatefulWidget {
   final AlbumsTableData album;
   final GetAlbumsUseCase? getAlbumsUseCase;
 
-  const AlbumDetailScreen({super.key, required this.album, this.getAlbumsUseCase});
+  const AlbumDetailScreen(
+      {super.key, required this.album, this.getAlbumsUseCase});
 
   @override
   State<AlbumDetailScreen> createState() => _AlbumDetailScreenState();
@@ -50,7 +51,8 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
           if (snapshot.hasError) {
             return _AlbumErrorView(onRetry: () => setState(() {}));
           }
-          final songs = snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
+          final songs =
+              snapshot.data?.fold((l) => <SongsTableData>[], (r) => r) ?? [];
 
           return Center(
             child: ConstrainedBox(
@@ -84,11 +86,16 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                                 ),
                               ),
                               const SizedBox(height: 12),
-                              Text(album.title, textAlign: TextAlign.center,
-                                  style: Theme.of(context).textTheme.headlineSmall),
+                              Text(album.title,
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .headlineSmall),
                               const SizedBox(height: 4),
-                              Text('${album.artist} • ${Formatters.formatTrackCount(songs.length)}',
-                                  style: TextStyle(color: p.textSecondary, fontSize: 13)),
+                              Text(
+                                  '${album.artist} • ${Formatters.formatTrackCount(songs.length)}',
+                                  style: TextStyle(
+                                      color: p.textSecondary, fontSize: 13)),
                               const SizedBox(height: 16),
                             ],
                           ),
@@ -96,61 +103,73 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                       ),
                     ),
                   ),
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: Adaptive.pagePadding(context)),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: songs.isEmpty ? null : () => context.read<PlayerCubit>().playSong(songs.first, queue: songs),
-                          icon: const Icon(Icons.play_arrow_rounded),
-                          label: Text(context.l10n.playAll),
-                        ),
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: Adaptive.pagePadding(context)),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: songs.isEmpty
+                                  ? null
+                                  : () => context
+                                      .read<PlayerCubit>()
+                                      .playSong(songs.first, queue: songs),
+                              icon: const Icon(Icons.play_arrow_rounded),
+                              label: Text(context.l10n.playAll),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              onPressed: songs.isEmpty
+                                  ? null
+                                  : () {
+                                      final shuffled =
+                                          List<SongsTableData>.from(songs)
+                                            ..shuffle();
+                                      context.read<PlayerCubit>().playSong(
+                                          shuffled.first,
+                                          queue: shuffled);
+                                    },
+                              icon:
+                                  Icon(Icons.shuffle_rounded, color: p.accent),
+                              label: Text(context.l10n.shuffle),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: songs.isEmpty
-                              ? null
-                              : () {
-                                  final shuffled = List<SongsTableData>.from(songs)..shuffle();
-                                  context.read<PlayerCubit>().playSong(shuffled.first, queue: shuffled);
-                                },
-                          icon: Icon(Icons.shuffle_rounded, color: p.accent),
-                          label: Text(context.l10n.shuffle),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              SliverPadding(
-                padding: const EdgeInsets.only(top: 16, bottom: 160),
-                sliver: SliverList.builder(
-                  itemCount: songs.length,
-                  itemBuilder: (context, index) => SongTile(
-                    song: songs[index],
-                    index: index,
-                    showArtwork: false,
-                    onTap: () => context.read<PlayerCubit>().playSong(songs[index], queue: songs),
-                    onMorePressed: () => showModalBottomSheet(
-                      context: context,
-                      useRootNavigator: true,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => SongInfoSheet(song: songs[index]),
                     ),
                   ),
-                ),
+                  SliverPadding(
+                    padding: const EdgeInsets.only(top: 16, bottom: 160),
+                    sliver: SliverList.builder(
+                      itemCount: songs.length,
+                      itemBuilder: (context, index) => SongTile(
+                        song: songs[index],
+                        index: index,
+                        showArtwork: false,
+                        onTap: () => context
+                            .read<PlayerCubit>()
+                            .playSong(songs[index], queue: songs),
+                        onMorePressed: () => showModalBottomSheet(
+                          context: context,
+                          useRootNavigator: true,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => SongInfoSheet(song: songs[index]),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-        ),
-      );
-    },
-  ),
-);
+            ),
+          );
+        },
+      ),
+    );
   }
 }
 
@@ -174,7 +193,10 @@ class _AlbumErrorView extends StatelessWidget {
               const SizedBox(height: 16),
               Text(
                 'Could not load album songs',
-                style: TextStyle(color: p.textPrimary, fontWeight: FontWeight.w700, fontSize: 16),
+                style: TextStyle(
+                    color: p.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16),
               ),
               const SizedBox(height: 8),
               Text(

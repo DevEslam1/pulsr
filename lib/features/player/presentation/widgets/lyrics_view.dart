@@ -34,7 +34,8 @@ class _LyricsViewState extends State<LyricsView> {
   final ScrollController _scrollController = ScrollController();
   int _lastActiveIndex = -1;
 
-  bool get _isSynced => widget.lyrics.any((line) => line.timestamp > Duration.zero);
+  bool get _isSynced =>
+      widget.lyrics.any((line) => line.timestamp > Duration.zero);
 
   LyricsSource get _effectiveSource {
     if (widget.source != LyricsSource.none) return widget.source;
@@ -71,7 +72,8 @@ class _LyricsViewState extends State<LyricsView> {
     final denom = widget.lyrics.length > 1 ? (widget.lyrics.length - 1) : 1;
     final rawProgress = (index / denom);
     // Interpolate offset so early lines are at top and late lines reveal bottom fully
-    final targetOffset = rawProgress * maxScroll - (1.0 - rawProgress) * (viewportHeight * 0.25);
+    final targetOffset =
+        rawProgress * maxScroll - (1.0 - rawProgress) * (viewportHeight * 0.25);
     _scrollController.animateTo(
       targetOffset.clamp(0.0, maxScroll),
       duration: const Duration(milliseconds: 300),
@@ -163,7 +165,8 @@ class _LyricsViewState extends State<LyricsView> {
               Text(
                 'Place a .lrc file in the same folder as your audio track or embed lyrics into file tags.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: p.textSecondary, fontSize: 13, height: 1.4),
+                style: TextStyle(
+                    color: p.textSecondary, fontSize: 13, height: 1.4),
               ),
             ],
           ),
@@ -194,7 +197,9 @@ class _LyricsViewState extends State<LyricsView> {
                   final nextLineMs = index + 1 < widget.lyrics.length
                       ? widget.lyrics[index + 1].timestamp.inMilliseconds
                       : double.infinity;
-                  final isCurrent = currentMs >= line.timestamp.inMilliseconds && currentMs < nextLineMs;
+                  final isCurrent =
+                      currentMs >= line.timestamp.inMilliseconds &&
+                          currentMs < nextLineMs;
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
@@ -213,19 +218,25 @@ class _LyricsViewState extends State<LyricsView> {
                         },
                         borderRadius: BorderRadius.circular(12),
                         splashColor: widget.activeColor.withValues(alpha: 0.15),
-                        highlightColor: widget.activeColor.withValues(alpha: 0.08),
+                        highlightColor:
+                            widget.activeColor.withValues(alpha: 0.08),
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 6, horizontal: 12),
                           child: AnimatedDefaultTextStyle(
                             duration: const Duration(milliseconds: 200),
                             style: TextStyle(
                               fontSize: isCurrent ? 20 : 15,
-                              fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w500,
-                              color: isCurrent ? widget.activeColor : Colors.white.withValues(alpha: 0.45),
+                              fontWeight:
+                                  isCurrent ? FontWeight.w800 : FontWeight.w500,
+                              color: isCurrent
+                                  ? widget.activeColor
+                                  : Colors.white.withValues(alpha: 0.45),
                               height: 1.3,
                             ),
                             textAlign: TextAlign.center,
-                            child: Text(line.text.isNotEmpty ? line.text : '•••'),
+                            child:
+                                Text(line.text.isNotEmpty ? line.text : '•••'),
                           ),
                         ),
                       ),

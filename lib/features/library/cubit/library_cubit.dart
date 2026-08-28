@@ -81,7 +81,11 @@ class LibraryCubit extends Cubit<LibraryState> {
         ));
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to load library preferences from SharedPreferences', error: e, stackTrace: st, category: 'LibraryCubit');
+      ErrorLogger.log(
+          'Failed to load library preferences from SharedPreferences',
+          error: e,
+          stackTrace: st,
+          category: 'LibraryCubit');
     }
 
     await _subscribeSongs();
@@ -192,7 +196,9 @@ class LibraryCubit extends Cubit<LibraryState> {
   }
 
   void toggleViewMode() {
-    final nextMode = state.viewMode == LibraryViewMode.list ? LibraryViewMode.grid : LibraryViewMode.list;
+    final nextMode = state.viewMode == LibraryViewMode.list
+        ? LibraryViewMode.grid
+        : LibraryViewMode.list;
     emit(state.copyWith(viewMode: nextMode));
     SharedPreferences.getInstance().then((prefs) {
       prefs.setString('library_view_mode', nextMode.name);
@@ -220,7 +226,8 @@ class LibraryCubit extends Cubit<LibraryState> {
     final result = await _toggleFavoriteUseCase(songId);
     if (isClosed) return;
     result.fold(
-      (failure) => emit(state.copyWith(favorites: previousFavorites, errorMessage: failure.message)),
+      (failure) => emit(state.copyWith(
+          favorites: previousFavorites, errorMessage: failure.message)),
       (_) => null,
     );
   }
@@ -262,7 +269,9 @@ class LibraryCubit extends Cubit<LibraryState> {
   }
 
   List<SongsTableData> getSelectedSongs() {
-    return state.songs.where((s) => state.selectedSongIds.contains(s.id)).toList();
+    return state.songs
+        .where((s) => state.selectedSongIds.contains(s.id))
+        .toList();
   }
 
   /// Batch imports YouTube Music playlist tracks as Favorites.
@@ -288,8 +297,12 @@ class LibraryCubit extends Cubit<LibraryState> {
       final count = await importYtmTracksAsFavorites(tracks);
       return count;
     } catch (e, st) {
-      ErrorLogger.log('Failed to sync YTM account likes', error: e, stackTrace: st, category: 'LibraryCubit');
-      if (!isClosed) emit(state.copyWith(errorMessage: 'Failed to sync YouTube Music likes'));
+      ErrorLogger.log('Failed to sync YTM account likes',
+          error: e, stackTrace: st, category: 'LibraryCubit');
+      if (!isClosed) {
+        emit(
+            state.copyWith(errorMessage: 'Failed to sync YouTube Music likes'));
+      }
       return 0;
     }
   }

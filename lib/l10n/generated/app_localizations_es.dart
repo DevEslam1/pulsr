@@ -393,7 +393,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get sampleRate => 'Frecuencia de muestreo';
 
   @override
-  String get fileSize => 'Tamaño del archivo';
+  String get fileSize => 'Tamaño';
 
   @override
   String get settings => 'Ajustes';
@@ -937,7 +937,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get noDownloadsYet => 'Aún no hay descargas';
 
   @override
-  String get noDownloadsSubtitle =>
+  String get noDownloadsYetSubtitle =>
       'Descarga tus canciones favoritas de YouTube Music para escuchar sin conexión.';
 
   @override
@@ -997,7 +997,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get addYouTubePlaylist => 'Añadir lista de YouTube';
 
   @override
-  String get playlistImported => 'Lista de reproducción importada';
+  String get playlistImported => 'Lista importada';
 
   @override
   String tracksMatched(int matched, int total) {
@@ -1156,4 +1156,54 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get ytdlpServerDesc =>
       'Conecta Pulsr a un servidor yt-dlp remoto con proxies rotativos para evitar bloqueos de YouTube.';
+
+  @override
+  String get downloadsTitle => 'Descargas';
+
+  @override
+  String get noDownloadsTitle => 'No hay descargas aún';
+
+  @override
+  String get noDownloadsSubtitle =>
+      'Las canciones descargadas para reproducir sin conexión aparecerán aquí.';
+
+  @override
+  String get statusQueued => 'En cola';
+
+  @override
+  String get statusDownloading => 'Descargando';
+
+  @override
+  String get statusPaused => 'En pausa';
+
+  @override
+  String get statusCompleted => 'Completado';
+
+  @override
+  String get statusFailed => 'Fallido';
+
+  @override
+  String get storageUsed => 'Espacio usado';
+
+  @override
+  String get storageFree => 'Espacio libre';
+
+  @override
+  String get resume => 'Reanudar';
+
+  @override
+  String get dspEnginePreference => 'Preferencia de motor DSP';
+
+  @override
+  String get dspEnginePreferenceSubtitle =>
+      'Elija el motor DSP nativo o los efectos del sistema OEM';
+
+  @override
+  String get dspEngineNative => 'DSP nativo de estudio (Cero latencia)';
+
+  @override
+  String get dspEngineOem => 'AudioFX del sistema / OEM';
+
+  @override
+  String get dspEngineAuto => 'Automático (Preferir nativo)';
 }

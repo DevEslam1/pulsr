@@ -66,8 +66,10 @@ class ClassicPlayerTheme extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   IconButton(
-                    icon: Icon(Icons.keyboard_arrow_down_rounded, size: 32, color: p.textPrimary),
-                    onPressed: () => context.canPop() ? context.pop() : context.go('/'),
+                    icon: Icon(Icons.keyboard_arrow_down_rounded,
+                        size: 32, color: p.textPrimary),
+                    onPressed: () =>
+                        context.canPop() ? context.pop() : context.go('/'),
                   ),
                   Column(
                     children: [
@@ -76,18 +78,20 @@ class ClassicPlayerTheme extends StatelessWidget {
                         children: [
                           WaveformLogo(
                             size: 16,
-                            color: state.isPlaying ? activeColor : p.textSecondary,
+                            color:
+                                state.isPlaying ? activeColor : p.textSecondary,
                             animate: state.isPlaying,
                           ),
                           const SizedBox(width: 6),
                           Text(
                             context.l10n.playingFrom.toUpperCase(),
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  fontSize: 10,
-                                  letterSpacing: 1.2,
-                                  fontWeight: FontWeight.w800,
-                                  color: p.textSecondary,
-                                ),
+                            style:
+                                Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      fontSize: 10,
+                                      letterSpacing: 1.2,
+                                      fontWeight: FontWeight.w800,
+                                      color: p.textSecondary,
+                                    ),
                           ),
                         ],
                       ),
@@ -122,7 +126,8 @@ class ClassicPlayerTheme extends StatelessWidget {
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final isTwoPane = context.isTwoPane || constraints.maxWidth >= 680;
+                  final isTwoPane =
+                      context.isTwoPane || constraints.maxWidth >= 680;
 
                   final centerDisplay = GestureDetector(
                     onTap: () => cubit.toggleLyricsVisibility(),
@@ -139,7 +144,8 @@ class ClassicPlayerTheme extends StatelessWidget {
                       }
                     },
                     onHorizontalDragEnd: (details) {
-                      if (settingsState.nowPlayingArtworkSwipe == NowPlayingArtworkSwipeAction.nextPrev &&
+                      if (settingsState.nowPlayingArtworkSwipe ==
+                              NowPlayingArtworkSwipeAction.nextPrev &&
                           details.primaryVelocity != null) {
                         if (details.primaryVelocity! < -200) {
                           cubit.next();
@@ -160,7 +166,8 @@ class ClassicPlayerTheme extends StatelessWidget {
                               source: state.lyricsSource,
                             )
                           : state.isQueueVisible
-                              ? const NowPlayingQueueView(key: ValueKey('queue_view'))
+                              ? const NowPlayingQueueView(
+                                  key: ValueKey('queue_view'))
                               : Center(
                                   key: const ValueKey('artwork_view'),
                                   child: ConstrainedBox(
@@ -174,10 +181,12 @@ class ClassicPlayerTheme extends StatelessWidget {
                                         tag: 'now_playing_art_full',
                                         child: Container(
                                           decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(24),
+                                            borderRadius:
+                                                BorderRadius.circular(24),
                                             boxShadow: [
                                               BoxShadow(
-                                                color: activeColor.withValues(alpha: 0.35),
+                                                color: activeColor.withValues(
+                                                    alpha: 0.35),
                                                 blurRadius: 36,
                                                 spreadRadius: 2,
                                                 offset: const Offset(0, 16),
@@ -187,7 +196,8 @@ class ClassicPlayerTheme extends StatelessWidget {
                                           child: song != null
                                               ? CachedArtwork(
                                                   id: song.id,
-                                                  remoteUrl: song.remoteArtworkUrl,
+                                                  remoteUrl:
+                                                      song.remoteArtworkUrl,
                                                   type: ArtworkType.AUDIO,
                                                   size: double.infinity,
                                                   borderRadius: 24,
@@ -201,13 +211,18 @@ class ClassicPlayerTheme extends StatelessWidget {
                     ),
                   );
 
-                  final visualizer = (visualizerStyle != VisualizerStyle.off && !state.isLyricsVisible && !state.isQueueVisible)
+                  final visualizer = (visualizerStyle != VisualizerStyle.off &&
+                          !state.isLyricsVisible &&
+                          !state.isQueueVisible)
                       ? Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 4),
                           child: AudioVisualizer(
                             style: visualizerStyle,
                             color: activeColor,
-                            height: visualizerStyle == VisualizerStyle.circular ? 70 : 46,
+                            height: visualizerStyle == VisualizerStyle.circular
+                                ? 70
+                                : 46,
                             isPlaying: state.isPlaying,
                             audioSessionId: state.audioSessionId,
                           ),
@@ -219,7 +234,8 @@ class ClassicPlayerTheme extends StatelessWidget {
                     children: [
                       // Title, Artist, Favorite & Download
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 4),
                         child: Row(
                           children: [
                             Expanded(
@@ -230,7 +246,10 @@ class ClassicPlayerTheme extends StatelessWidget {
                                     song?.title ?? context.l10n.noTrackSelected,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineSmall
+                                        ?.copyWith(
                                           fontWeight: FontWeight.w900,
                                           color: p.textPrimary,
                                         ),
@@ -240,19 +259,26 @@ class ClassicPlayerTheme extends StatelessWidget {
                                     song?.artist ?? context.l10n.unknownArtist,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
                                           color: p.textSecondary,
                                           fontWeight: FontWeight.w600,
                                         ),
                                   ),
                                   if (song != null) ...[
                                     const SizedBox(height: 6),
-                                    AudioQualityBadge(song: song, activeColor: activeColor),
+                                    AudioQualityBadge(
+                                        song: song, activeColor: activeColor),
                                   ],
                                 ],
                               ),
                             ),
-                            if (song != null && (song.source == SongSource.youtube || (song.remoteId != null && song.remoteId!.isNotEmpty))) ...[
+                            if (song != null &&
+                                (song.source == SongSource.youtube ||
+                                    (song.remoteId != null &&
+                                        song.remoteId!.isNotEmpty))) ...[
                               YtmDownloadButton(
                                 song: song,
                                 activeColor: activeColor,
@@ -313,20 +339,24 @@ class ClassicPlayerTheme extends StatelessWidget {
 
                       // Bottom Action Strip
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 6),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
                             IconButton(
                               icon: Icon(
                                 Icons.settings_input_component_rounded,
-                                color: settingsState.currentOutputDevice?.isUsbDac == true
+                                color: settingsState
+                                            .currentOutputDevice?.isUsbDac ==
+                                        true
                                     ? const Color(0xFFFFD700)
                                     : p.textSecondary,
                               ),
                               onPressed: () {
                                 if (song != null) {
-                                  AudioQualitySheet.show(context, song, activeColor);
+                                  AudioQualitySheet.show(
+                                      context, song, activeColor);
                                 }
                               },
                               tooltip: 'Audio Output & DAC',
@@ -334,7 +364,9 @@ class ClassicPlayerTheme extends StatelessWidget {
                             IconButton(
                               icon: Icon(
                                 Icons.equalizer_rounded,
-                                color: state.isEqEnabled ? activeColor : p.textSecondary,
+                                color: state.isEqEnabled
+                                    ? activeColor
+                                    : p.textSecondary,
                               ),
                               onPressed: () {
                                 showModalBottomSheet(
@@ -347,7 +379,8 @@ class ClassicPlayerTheme extends StatelessWidget {
                               tooltip: context.l10n.equalizer,
                             ),
                             IconButton(
-                              icon: Icon(Icons.speed_rounded, color: p.textSecondary),
+                              icon: Icon(Icons.speed_rounded,
+                                  color: p.textSecondary),
                               onPressed: () {
                                 showModalBottomSheet(
                                   context: context,
@@ -359,7 +392,9 @@ class ClassicPlayerTheme extends StatelessWidget {
                             IconButton(
                               icon: Icon(
                                 Icons.lyrics_rounded,
-                                color: state.isLyricsVisible ? activeColor : p.textSecondary,
+                                color: state.isLyricsVisible
+                                    ? activeColor
+                                    : p.textSecondary,
                               ),
                               onPressed: () => cubit.toggleLyricsVisibility(),
                               tooltip: context.l10n.lyrics,
@@ -367,7 +402,9 @@ class ClassicPlayerTheme extends StatelessWidget {
                             IconButton(
                               icon: Icon(
                                 Icons.timer_outlined,
-                                color: state.sleepTimerRemaining != null ? activeColor : p.textSecondary,
+                                color: state.sleepTimerRemaining != null
+                                    ? activeColor
+                                    : p.textSecondary,
                               ),
                               onPressed: () {
                                 showModalBottomSheet(
@@ -381,7 +418,8 @@ class ClassicPlayerTheme extends StatelessWidget {
                               tooltip: context.l10n.sleepTimer,
                             ),
                             IconButton(
-                              icon: Icon(Icons.playlist_add_rounded, color: p.textSecondary),
+                              icon: Icon(Icons.playlist_add_rounded,
+                                  color: p.textSecondary),
                               onPressed: () {
                                 if (song != null) {
                                   showModalBottomSheet(
@@ -389,7 +427,8 @@ class ClassicPlayerTheme extends StatelessWidget {
                                     useRootNavigator: true,
                                     isScrollControlled: true,
                                     backgroundColor: Colors.transparent,
-                                    builder: (_) => AddToPlaylistSheet(song: song),
+                                    builder: (_) =>
+                                        AddToPlaylistSheet(song: song),
                                   );
                                 }
                               },
@@ -398,7 +437,9 @@ class ClassicPlayerTheme extends StatelessWidget {
                             IconButton(
                               icon: Icon(
                                 Icons.queue_music_rounded,
-                                color: state.isQueueVisible ? activeColor : p.textSecondary,
+                                color: state.isQueueVisible
+                                    ? activeColor
+                                    : p.textSecondary,
                               ),
                               onPressed: () => cubit.toggleQueueVisibility(),
                               tooltip: context.l10n.queue,
@@ -411,7 +452,8 @@ class ClassicPlayerTheme extends StatelessWidget {
 
                   if (isTwoPane) {
                     return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
@@ -441,13 +483,15 @@ class ClassicPlayerTheme extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 8),
                           child: centerDisplay,
                         ),
                       ),
                       visualizer,
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 4),
                         child: controlsColumn,
                       ),
                     ],

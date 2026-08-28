@@ -43,12 +43,16 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
   Widget build(BuildContext context) {
     final double maxDuration = widget.duration.inMilliseconds.toDouble();
     final double currentPos = widget.position.inMilliseconds.toDouble();
-    final double effectiveValue = (_dragValue ?? currentPos).clamp(0.0, maxDuration > 0 ? maxDuration : 1.0);
-    final double progressPercent = maxDuration > 0 ? (effectiveValue / maxDuration).clamp(0.0, 1.0) : 0.0;
+    final double effectiveValue = (_dragValue ?? currentPos)
+        .clamp(0.0, maxDuration > 0 ? maxDuration : 1.0);
+    final double progressPercent =
+        maxDuration > 0 ? (effectiveValue / maxDuration).clamp(0.0, 1.0) : 0.0;
     final p = context.palette;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final Color inactiveColor = widget.inactiveColor ??
-        (isDark ? Colors.white.withValues(alpha: 0.22) : p.hairline.withValues(alpha: 0.8));
+        (isDark
+            ? Colors.white.withValues(alpha: 0.22)
+            : p.hairline.withValues(alpha: 0.8));
 
     return Directionality(
       textDirection: TextDirection.ltr,
@@ -67,14 +71,16 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                     onScaleUpdate: (details) {
                       if (details.scale != 1.0) {
                         setState(() {
-                          _zoomScale = (_zoomScale * details.scale).clamp(1.0, 4.0);
+                          _zoomScale =
+                              (_zoomScale * details.scale).clamp(1.0, 4.0);
                         });
                       }
                     },
                     onHorizontalDragStart: (details) {
                       if (trackWidth > 0 && maxDuration > 0) {
                         HapticFeedback.selectionClick();
-                        final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                        final ratio = (details.localPosition.dx / trackWidth)
+                            .clamp(0.0, 1.0);
                         setState(() {
                           _dragValue = ratio * maxDuration;
                         });
@@ -82,7 +88,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                     },
                     onHorizontalDragUpdate: (details) {
                       if (trackWidth > 0 && maxDuration > 0) {
-                        final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                        final ratio = (details.localPosition.dx / trackWidth)
+                            .clamp(0.0, 1.0);
                         setState(() {
                           _dragValue = ratio * maxDuration;
                         });
@@ -91,7 +98,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                     onHorizontalDragEnd: (details) {
                       if (_dragValue != null) {
                         HapticFeedback.lightImpact();
-                        widget.onSeek(Duration(milliseconds: _dragValue!.round()));
+                        widget.onSeek(
+                            Duration(milliseconds: _dragValue!.round()));
                         setState(() {
                           _dragValue = null;
                         });
@@ -100,7 +108,8 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                     onTapDown: (details) {
                       if (trackWidth > 0 && maxDuration > 0) {
                         HapticFeedback.selectionClick();
-                        final ratio = (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                        final ratio = (details.localPosition.dx / trackWidth)
+                            .clamp(0.0, 1.0);
                         final seekMs = ratio * maxDuration;
                         widget.onSeek(Duration(milliseconds: seekMs.round()));
                       }
@@ -132,7 +141,9 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                 children: [
                   Text(
                     Formatters.formatDuration(
-                      _dragValue != null ? Duration(milliseconds: _dragValue!.round()) : widget.position,
+                      _dragValue != null
+                          ? Duration(milliseconds: _dragValue!.round())
+                          : widget.position,
                     ),
                     style: TextStyle(
                       color: context.palette.textSecondary,
@@ -195,17 +206,20 @@ class _WaveformPainter extends CustomPainter {
       return;
     }
 
-    final int visibleCount = (totalCount / zoomScale.clamp(1.0, 8.0)).round().clamp(2, totalCount);
+    final int visibleCount =
+        (totalCount / zoomScale.clamp(1.0, 8.0)).round().clamp(2, totalCount);
     final int centerIndex = (progress * totalCount).round();
     final int halfVisible = visibleCount ~/ 2;
-    final int startIndex = (centerIndex - halfVisible).clamp(0, totalCount - visibleCount);
+    final int startIndex =
+        (centerIndex - halfVisible).clamp(0, totalCount - visibleCount);
     final int endIndex = (startIndex + visibleCount).clamp(0, totalCount);
     final visibleSamples = samples.sublist(startIndex, endIndex);
 
     final int count = visibleSamples.length;
     const double spacing = 2.5;
     final double totalSpacing = spacing * (count - 1);
-    final double barWidth = ((size.width - totalSpacing) / count).clamp(1.0, 12.0);
+    final double barWidth =
+        ((size.width - totalSpacing) / count).clamp(1.0, 12.0);
     const double minBarHeight = 4.0;
 
     final Paint inactivePaint = Paint()
@@ -218,7 +232,8 @@ class _WaveformPainter extends CustomPainter {
 
     // 1. Render inactive waveform bars
     for (int i = 0; i < count; i++) {
-      final double barHeight = (visibleSamples[i] * size.height).clamp(minBarHeight, size.height);
+      final double barHeight =
+          (visibleSamples[i] * size.height).clamp(minBarHeight, size.height);
       final double x = i * (barWidth + spacing);
       final double y = (size.height - barHeight) / 2;
 
@@ -230,12 +245,15 @@ class _WaveformPainter extends CustomPainter {
     }
 
     // 2. Render active waveform bars clipped to current progress in visible window
-    final double visibleProgress = ((progress * totalCount - startIndex) / visibleCount).clamp(0.0, 1.0);
+    final double visibleProgress =
+        ((progress * totalCount - startIndex) / visibleCount).clamp(0.0, 1.0);
     if (visibleProgress > 0) {
       canvas.save();
-      canvas.clipRect(Rect.fromLTWH(0, 0, size.width * visibleProgress, size.height));
+      canvas.clipRect(
+          Rect.fromLTWH(0, 0, size.width * visibleProgress, size.height));
       for (int i = 0; i < count; i++) {
-        final double barHeight = (visibleSamples[i] * size.height).clamp(minBarHeight, size.height);
+        final double barHeight =
+            (visibleSamples[i] * size.height).clamp(minBarHeight, size.height);
         final double x = i * (barWidth + spacing);
         final double y = (size.height - barHeight) / 2;
 
@@ -262,10 +280,12 @@ class _WaveformPainter extends CustomPainter {
         ..strokeWidth = 2.0;
 
       for (final marker in chapterMarkers!) {
-        final markerRatio = (marker.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
+        final markerRatio =
+            (marker.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
         final markerX = mapToVisibleX(markerRatio);
         if (markerX != null) {
-          canvas.drawLine(Offset(markerX, 0), Offset(markerX, size.height), markerPaint);
+          canvas.drawLine(
+              Offset(markerX, 0), Offset(markerX, size.height), markerPaint);
         }
       }
     }
@@ -277,14 +297,16 @@ class _WaveformPainter extends CustomPainter {
         ..strokeWidth = 2.5;
 
       if (loopPointA != null) {
-        final ratioA = (loopPointA!.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
+        final ratioA = (loopPointA!.inMilliseconds / duration.inMilliseconds)
+            .clamp(0.0, 1.0);
         final xA = mapToVisibleX(ratioA);
         if (xA != null) {
           canvas.drawLine(Offset(xA, 0), Offset(xA, size.height), loopPaint);
         }
       }
       if (loopPointB != null) {
-        final ratioB = (loopPointB!.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
+        final ratioB = (loopPointB!.inMilliseconds / duration.inMilliseconds)
+            .clamp(0.0, 1.0);
         final xB = mapToVisibleX(ratioB);
         if (xB != null) {
           canvas.drawLine(Offset(xB, 0), Offset(xB, size.height), loopPaint);

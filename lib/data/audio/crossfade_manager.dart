@@ -8,7 +8,8 @@ import '../../core/utils/error_logger.dart';
 /// Supported crossfade curves.
 enum CrossfadeCurve {
   linear('Linear', 'Equal slope linear volume ramp'),
-  equalPower('Equal Power', 'Constant perceived acoustic loudness (sine/cosine)'),
+  equalPower(
+      'Equal Power', 'Constant perceived acoustic loudness (sine/cosine)'),
   sCurve('S-Curve', 'Smooth ease-in ease-out transition'),
   exponential('Exponential', 'Natural logarithmic acoustic response'),
   djCutDrop('DJ Cut/Drop', 'Aggressive club DJ blend with quick drop-in');
@@ -16,6 +17,25 @@ enum CrossfadeCurve {
   final String label;
   final String description;
   const CrossfadeCurve(this.label, this.description);
+}
+
+/// Transition type determined by crossfade arbitration authority.
+enum TransitionType { gapless, crossfade }
+
+/// Outcome of transition arbitration.
+class TransitionDecision {
+  final TransitionType type;
+  final Duration effectiveDuration;
+  final String reason;
+
+  const TransitionDecision({
+    required this.type,
+    required this.effectiveDuration,
+    required this.reason,
+  });
+
+  bool get isCrossfade => type == TransitionType.crossfade;
+  bool get isGapless => type == TransitionType.gapless;
 }
 
 /// Manages crossfading between two [AudioPlayer] instances with atomic concurrency,
@@ -39,10 +59,12 @@ class CrossfadeManager {
   int get currentFadeId => _fadeId;
 
   /// Executes [action] with exclusive access to the crossfade pipeline.
-  Future<T> protect<T>(Future<T> Function() action) => _fadeMutex.protect(action);
+  Future<T> protect<T>(Future<T> Function() action) =>
+      _fadeMutex.protect(action);
 
   /// Calculates beat-aligned duration if BPM is provided.
-  static Duration calculateBpmAlignedDuration(Duration baseDuration, double? bpm) {
+  static Duration calculateBpmAlignedDuration(
+      Duration baseDuration, double? bpm) {
     if (bpm == null || bpm <= 40.0 || bpm >= 240.0) return baseDuration;
     final secondsPerBeat = 60.0 / bpm;
     // Align to nearest 2, 4, 8, or 16 beats
@@ -63,7 +85,8 @@ class CrossfadeManager {
     }
 
     final alignedSeconds = bestBeats * secondsPerBeat;
-    return Duration(milliseconds: (alignedSeconds * 1000).round().clamp(1000, 20000));
+    return Duration(
+        milliseconds: (alignedSeconds * 1000).round().clamp(1000, 20000));
   }
 
   /// Returns the effective crossfade duration, optionally aligned to song [bpm].
@@ -90,8 +113,89 @@ class CrossfadeManager {
 
       case CrossfadeCurve.djCutDrop:
         // Sharp attack after midpoint
-        return f < 0.2 ? f * 1.5 : (0.3 + 0.7 * math.sin((f - 0.2) / 0.8 * (math.pi / 2)));
+        return f < 0.2
+            ? f * 1.5
+            : (0.3 + 0.7 * math.sin((f - 0.2) / 0.8 * (math.pi / 2)));
     }
+  }
+
+  /// Evaluates both old (fade-out) and new (fade-in) gains for a given [fraction] (0.0 to 1.0)
+  /// ensuring constant acoustic power for equal-power curves ($cos^2 + sin^2 = 1.0$).
+  (double oldGain, double newGain) evaluateGainPair(double fraction,
+      {bool isRepeatOne = false}) {
+    final f = fraction.clamp(0.0, 1.0);
+    if (isRepeatOne) {
+      // Linear equal-gain for identical correlated signals
+      return (1.0 - f, f);
+    }
+    switch (curve) {
+      case CrossfadeCurve.linear:
+        return (1.0 - f, f);
+      case CrossfadeCurve.equalPower:
+        final theta = f * (math.pi / 2.0);
+        return (math.cos(theta), math.sin(theta));
+      case CrossfadeCurve.sCurve:
+        final s = f * f * (3.0 - 2.0 * f);
+        return (1.0 - s, s);
+      case CrossfadeCurve.exponential:
+        final inGain =
+            f == 0.0 ? 0.0 : math.pow(2.0, 10.0 * (f - 1.0)).toDouble();
+        final outGain = (1.0 - f) == 0.0
+            ? 0.0
+            : math.pow(2.0, 10.0 * ((1.0 - f) - 1.0)).toDouble();
+        return (outGain, inGain);
+      case CrossfadeCurve.djCutDrop:
+        final inGain = f < 0.2
+            ? f * 1.5
+            : (0.3 + 0.7 * math.sin((f - 0.2) / 0.8 * (math.pi / 2)));
+        final outGain = (1.0 - f) < 0.2
+            ? (1.0 - f) * 1.5
+            : (0.3 + 0.7 * math.sin(((1.0 - f) - 0.2) / 0.8 * (math.pi / 2)));
+        return (outGain, inGain);
+    }
+  }
+
+  /// Arbitrates the transition between outgoing track and incoming track.
+  /// Returns [TransitionType.gapless] or [TransitionType.crossfade].
+  static TransitionDecision arbitrateTransition({
+    required Duration configuredCrossfade,
+    required Duration remainingTrackDuration,
+    required bool isSameDecoderConfig,
+    required bool isRepeatOne,
+  }) {
+    if (configuredCrossfade == Duration.zero ||
+        configuredCrossfade.inMilliseconds < 100) {
+      return const TransitionDecision(
+        type: TransitionType.gapless,
+        effectiveDuration: Duration.zero,
+        reason: 'Crossfade disabled (0s)',
+      );
+    }
+
+    if (remainingTrackDuration < const Duration(seconds: 1)) {
+      return const TransitionDecision(
+        type: TransitionType.gapless,
+        effectiveDuration: Duration.zero,
+        reason: 'Remaining track duration < 1s; skipping crossfade for safety',
+      );
+    }
+
+    // Clamp duration to min(configured, remaining - 500ms)
+    final maxAllowedFade =
+        remainingTrackDuration - const Duration(milliseconds: 500);
+    final clampedDuration = configuredCrossfade > maxAllowedFade
+        ? maxAllowedFade
+        : configuredCrossfade;
+    final effectiveFade = clampedDuration < const Duration(milliseconds: 500)
+        ? const Duration(milliseconds: 500)
+        : clampedDuration;
+
+    return TransitionDecision(
+      type: TransitionType.crossfade,
+      effectiveDuration: effectiveFade,
+      reason:
+          'Crossfade active (${effectiveFade.inMilliseconds}ms, ${isRepeatOne ? "linear" : "equalPower"})',
+    );
   }
 
   /// Gradually transitions the volume of [player] from [from] to [to] over [fadeDuration]
@@ -164,7 +268,8 @@ class CrossfadeManager {
     AudioPlayer activePlayer, {
     double restoreVolume = 1.0,
   }) async {
-    final hadActiveFade = isCrossfading || _activeTimers.isNotEmpty || _fadeTimer != null;
+    final hadActiveFade =
+        isCrossfading || _activeTimers.isNotEmpty || _fadeTimer != null;
     if (!hadActiveFade) return;
 
     _fadeId++; // Invalidate any in-progress fade timers
