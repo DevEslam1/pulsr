@@ -190,8 +190,10 @@ internal class InnertubeClient(
                     val parsedSignal = YtmBlockSignal.parse(200, status, playability)
                     lastSignal = parsedSignal
                     Log.w(TAG, "[$traceId] Client ${client.name} returned status $status -> $parsedSignal")
-                    if (parsedSignal == YtmBlockSignal.BotChallenge || parsedSignal == YtmBlockSignal.PoTokenInvalid) {
+                    if ((parsedSignal == YtmBlockSignal.BotChallenge || parsedSignal == YtmBlockSignal.PoTokenInvalid) &&
+                        (client == ClientType.ANDROID_MUSIC || client == ClientType.WEB_REMIX)) {
                         PoTokenManager.evictMintedTokens()
+                        PoTokenManager.triggerBackgroundRefresh()
                     }
                     return null
                 }
@@ -629,7 +631,8 @@ internal class InnertubeClient(
         val contentPlaybackContext = JSONObject().apply {
             put("html5Preference", "HTML5_PREF_WANTS")
             if (!clientType.isWeb && hasPo) {
-                val poToken = PoTokenManager.poTokenForSync(videoId)
+                val tokenTarget = PoTokenManager.visitorData.ifEmpty { videoId }
+                val poToken = PoTokenManager.poTokenForSync(tokenTarget)
                 if (poToken.isNotEmpty()) {
                     put("poToken", poToken)
                 }
@@ -643,7 +646,8 @@ internal class InnertubeClient(
             val poToken = if (cookieStore.isSessionValid() && dataSyncId.isNotEmpty()) {
                 PoTokenManager.accountPoTokenForSync(dataSyncId)
             } else {
-                PoTokenManager.poTokenForSync(videoId)
+                val tokenTarget = PoTokenManager.visitorData.ifEmpty { videoId }
+                PoTokenManager.poTokenForSync(tokenTarget)
             }
             if (poToken.isNotEmpty()) {
                 root.put(
