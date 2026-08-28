@@ -11,6 +11,7 @@ import java.net.HttpURLConnection
 import java.net.InetAddress
 import java.net.URL
 import java.net.URLDecoder
+import java.net.URLEncoder
 import java.net.UnknownHostException
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
@@ -370,14 +371,34 @@ internal class InnertubeClient(
         val cipher = format.optString("signatureCipher").ifEmpty { format.optString("cipher") }
         if (cipher.isNotEmpty()) {
             return runCatching {
+                var rawUrl: String? = null
+                var sig: String? = null
+                var sigParam: String = "sig"
+
                 val pairs = cipher.split("&")
                 for (pair in pairs) {
                     val parts = pair.split("=", limit = 2)
-                    if (parts.size == 2 && parts[0] == "url") {
-                        return@runCatching URLDecoder.decode(parts[1], "UTF-8")
+                    if (parts.size == 2) {
+                        when (parts[0]) {
+                            "url" -> rawUrl = URLDecoder.decode(parts[1], "UTF-8")
+                            "s" -> sig = URLDecoder.decode(parts[1], "UTF-8")
+                            "sp" -> sigParam = URLDecoder.decode(parts[1], "UTF-8")
+                        }
                     }
                 }
-                null
+
+                if (rawUrl != null) {
+                    if (sig != null) {
+                        val decipherCache = JsDecipherCache.getInstance(context)
+                        val deciphered = decipherCache.decipherSignature(sig)
+                        val separator = if (rawUrl.contains("?")) "&" else "?"
+                        "$rawUrl$separator$sigParam=${URLEncoder.encode(deciphered, "UTF-8")}"
+                    } else {
+                        rawUrl
+                    }
+                } else {
+                    null
+                }
             }.getOrNull()
         }
         return null
