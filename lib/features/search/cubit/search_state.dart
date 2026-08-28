@@ -13,6 +13,7 @@ abstract class SearchState with _$SearchState {
     @Default('All') String selectedFilter,
     @Default([]) List<SongsTableData> results,
     @Default(false) bool isLoading,
+    @Default([]) List<String> history,
     String? errorMessage,
   }) = _SearchState;
 }

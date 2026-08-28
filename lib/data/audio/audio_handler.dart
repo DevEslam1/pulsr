@@ -727,6 +727,7 @@ class PulsrAudioHandler extends BaseAudioHandler
               if (!_gaplessMode &&
                   state.processingState == ProcessingState.completed &&
                   !_crossfadeManager.isCrossfading) {
+                unawaited(_sleepTimerManager.onTrackCompleted());
                 skipToNext();
               }
             }
@@ -1224,8 +1225,12 @@ class PulsrAudioHandler extends BaseAudioHandler
         BatteryOptimizationLevel.critical) {
       return;
     }
+    // Throttle prefetch when ExoPlayer reports pipelineFull (Hi-Res 48kHz fills fast)
+    final pendingPrefetch = _prefetching.length;
+    if (pendingPrefetch >= 2) return;
 
     for (int offset = 1; offset <= 2; offset++) {
+      if (_prefetching.length >= 2) break;
       final targetIdx = _getNextIndex(offset: offset);
       if (targetIdx != null && targetIdx >= 0 && targetIdx < _songs.length) {
         final song = _songs[targetIdx];
@@ -1762,11 +1767,21 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (_songs.length > index + 2) {
       unawaited(_tripleBufferPipeline.prefetchAhead(_songs[index + 2]));
     }
+    // Notify sleep timer of track completion for endOfTrack / afterNTracks modes (fixes silent never-fire)
+    unawaited(_sleepTimerManager.onTrackCompleted());
   }
 
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {
     if (index < 0 || index >= _songs.length) return;
     cancelPrefetches();
+    // Ensure previous MediaCodec EventHandler is fully released before creating new decoder
+    // — prevents LegacyMessageQueue dead-thread crash on rapid Hi-Res FLAC switch (LOG-12)
+    try {
+      await _activePlayer.pause().timeout(const Duration(milliseconds: 800));
+    } catch (_) {}
+    try {
+      await _activePlayer.stop().timeout(const Duration(milliseconds: 800));
+    } catch (_) {}
     await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
         restoreVolume: _volume);
     // A YouTube resolve below can await for seconds; a second skip during that
@@ -2717,10 +2732,11 @@ class PulsrAudioHandler extends BaseAudioHandler
       sub.cancel();
     }
     _subscriptions.clear();
-    _positionSubject.close();
-    _audioSessionIdSubject.close();
-    _errorSubject.close();
+    // Dispose sleep timer before closing its subject to avoid add-after-close race
     _sleepTimerManager.dispose();
+    if (!_positionSubject.isClosed) _positionSubject.close();
+    if (!_audioSessionIdSubject.isClosed) _audioSessionIdSubject.close();
+    if (!_errorSubject.isClosed) _errorSubject.close();
     _equalizerManager.dispose();
     _crossfadeManager.dispose();
     AudioEffectsChannel().releaseEffects();

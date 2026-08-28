@@ -18,6 +18,7 @@ mixin _$SearchState {
   String get selectedFilter;
   List<SongsTableData> get results;
   bool get isLoading;
+  List<String> get history;
   String? get errorMessage;
 
   /// Create a copy of SearchState
@@ -38,17 +39,24 @@ mixin _$SearchState {
             const DeepCollectionEquality().equals(other.results, results) &&
             (identical(other.isLoading, isLoading) ||
                 other.isLoading == isLoading) &&
+            const DeepCollectionEquality().equals(other.history, history) &&
             (identical(other.errorMessage, errorMessage) ||
                 other.errorMessage == errorMessage));
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, query, selectedFilter,
-      const DeepCollectionEquality().hash(results), isLoading, errorMessage);
+  int get hashCode => Object.hash(
+      runtimeType,
+      query,
+      selectedFilter,
+      const DeepCollectionEquality().hash(results),
+      isLoading,
+      const DeepCollectionEquality().hash(history),
+      errorMessage);
 
   @override
   String toString() {
-    return 'SearchState(query: $query, selectedFilter: $selectedFilter, results: $results, isLoading: $isLoading, errorMessage: $errorMessage)';
+    return 'SearchState(query: $query, selectedFilter: $selectedFilter, results: $results, isLoading: $isLoading, history: $history, errorMessage: $errorMessage)';
   }
 }
 
@@ -63,6 +71,7 @@ abstract mixin class $SearchStateCopyWith<$Res> {
       String selectedFilter,
       List<SongsTableData> results,
       bool isLoading,
+      List<String> history,
       String? errorMessage});
 }
 
@@ -82,6 +91,7 @@ class _$SearchStateCopyWithImpl<$Res> implements $SearchStateCopyWith<$Res> {
     Object? selectedFilter = null,
     Object? results = null,
     Object? isLoading = null,
+    Object? history = null,
     Object? errorMessage = freezed,
   }) {
     return _then(_self.copyWith(
@@ -101,6 +111,10 @@ class _$SearchStateCopyWithImpl<$Res> implements $SearchStateCopyWith<$Res> {
           ? _self.isLoading
           : isLoading // ignore: cast_nullable_to_non_nullable
               as bool,
+      history: null == history
+          ? _self.history
+          : history // ignore: cast_nullable_to_non_nullable
+              as List<String>,
       errorMessage: freezed == errorMessage
           ? _self.errorMessage
           : errorMessage // ignore: cast_nullable_to_non_nullable
@@ -202,8 +216,13 @@ extension SearchStatePatterns on SearchState {
 
   @optionalTypeArgs
   TResult maybeWhen<TResult extends Object?>(
-    TResult Function(String query, String selectedFilter,
-            List<SongsTableData> results, bool isLoading, String? errorMessage)?
+    TResult Function(
+            String query,
+            String selectedFilter,
+            List<SongsTableData> results,
+            bool isLoading,
+            List<String> history,
+            String? errorMessage)?
         $default, {
     required TResult orElse(),
   }) {
@@ -211,7 +230,7 @@ extension SearchStatePatterns on SearchState {
     switch (_that) {
       case _SearchState() when $default != null:
         return $default(_that.query, _that.selectedFilter, _that.results,
-            _that.isLoading, _that.errorMessage);
+            _that.isLoading, _that.history, _that.errorMessage);
       case _:
         return orElse();
     }
@@ -232,15 +251,20 @@ extension SearchStatePatterns on SearchState {
 
   @optionalTypeArgs
   TResult when<TResult extends Object?>(
-    TResult Function(String query, String selectedFilter,
-            List<SongsTableData> results, bool isLoading, String? errorMessage)
+    TResult Function(
+            String query,
+            String selectedFilter,
+            List<SongsTableData> results,
+            bool isLoading,
+            List<String> history,
+            String? errorMessage)
         $default,
   ) {
     final _that = this;
     switch (_that) {
       case _SearchState():
         return $default(_that.query, _that.selectedFilter, _that.results,
-            _that.isLoading, _that.errorMessage);
+            _that.isLoading, _that.history, _that.errorMessage);
       case _:
         throw StateError('Unexpected subclass');
     }
@@ -260,15 +284,20 @@ extension SearchStatePatterns on SearchState {
 
   @optionalTypeArgs
   TResult? whenOrNull<TResult extends Object?>(
-    TResult? Function(String query, String selectedFilter,
-            List<SongsTableData> results, bool isLoading, String? errorMessage)?
+    TResult? Function(
+            String query,
+            String selectedFilter,
+            List<SongsTableData> results,
+            bool isLoading,
+            List<String> history,
+            String? errorMessage)?
         $default,
   ) {
     final _that = this;
     switch (_that) {
       case _SearchState() when $default != null:
         return $default(_that.query, _that.selectedFilter, _that.results,
-            _that.isLoading, _that.errorMessage);
+            _that.isLoading, _that.history, _that.errorMessage);
       case _:
         return null;
     }
@@ -283,8 +312,10 @@ class _SearchState extends SearchState {
       this.selectedFilter = 'All',
       final List<SongsTableData> results = const [],
       this.isLoading = false,
+      final List<String> history = const [],
       this.errorMessage})
       : _results = results,
+        _history = history,
         super._();
 
   @override
@@ -305,6 +336,15 @@ class _SearchState extends SearchState {
   @override
   @JsonKey()
   final bool isLoading;
+  final List<String> _history;
+  @override
+  @JsonKey()
+  List<String> get history {
+    if (_history is EqualUnmodifiableListView) return _history;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_history);
+  }
+
   @override
   final String? errorMessage;
 
@@ -327,17 +367,24 @@ class _SearchState extends SearchState {
             const DeepCollectionEquality().equals(other._results, _results) &&
             (identical(other.isLoading, isLoading) ||
                 other.isLoading == isLoading) &&
+            const DeepCollectionEquality().equals(other._history, _history) &&
             (identical(other.errorMessage, errorMessage) ||
                 other.errorMessage == errorMessage));
   }
 
   @override
-  int get hashCode => Object.hash(runtimeType, query, selectedFilter,
-      const DeepCollectionEquality().hash(_results), isLoading, errorMessage);
+  int get hashCode => Object.hash(
+      runtimeType,
+      query,
+      selectedFilter,
+      const DeepCollectionEquality().hash(_results),
+      isLoading,
+      const DeepCollectionEquality().hash(_history),
+      errorMessage);
 
   @override
   String toString() {
-    return 'SearchState(query: $query, selectedFilter: $selectedFilter, results: $results, isLoading: $isLoading, errorMessage: $errorMessage)';
+    return 'SearchState(query: $query, selectedFilter: $selectedFilter, results: $results, isLoading: $isLoading, history: $history, errorMessage: $errorMessage)';
   }
 }
 
@@ -354,6 +401,7 @@ abstract mixin class _$SearchStateCopyWith<$Res>
       String selectedFilter,
       List<SongsTableData> results,
       bool isLoading,
+      List<String> history,
       String? errorMessage});
 }
 
@@ -373,6 +421,7 @@ class __$SearchStateCopyWithImpl<$Res> implements _$SearchStateCopyWith<$Res> {
     Object? selectedFilter = null,
     Object? results = null,
     Object? isLoading = null,
+    Object? history = null,
     Object? errorMessage = freezed,
   }) {
     return _then(_SearchState(
@@ -392,6 +441,10 @@ class __$SearchStateCopyWithImpl<$Res> implements _$SearchStateCopyWith<$Res> {
           ? _self.isLoading
           : isLoading // ignore: cast_nullable_to_non_nullable
               as bool,
+      history: null == history
+          ? _self._history
+          : history // ignore: cast_nullable_to_non_nullable
+              as List<String>,
       errorMessage: freezed == errorMessage
           ? _self.errorMessage
           : errorMessage // ignore: cast_nullable_to_non_nullable

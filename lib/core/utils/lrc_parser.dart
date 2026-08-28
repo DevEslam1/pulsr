@@ -92,25 +92,29 @@ class LrcParser {
         if (lines.isNotEmpty) return lines;
       }
 
-      // Check sibling "Lyrics" subdirectory
+      // Check sibling "Lyrics" / "lyrics" subdirectory (case-insensitive on ext4)
       final parentDir = File(audioFilePath).parent;
       final fileName = audioFilePath.split(Platform.pathSeparator).last;
       final fileNameWithoutExt =
           fileName.substring(0, fileName.lastIndexOf('.'));
-      final lyricsSubdirLrc = File(
-          '${parentDir.path}${Platform.pathSeparator}Lyrics${Platform.pathSeparator}$fileNameWithoutExt.lrc');
-      if (await lyricsSubdirLrc.exists()) {
-        final content = await lyricsSubdirLrc.readAsString();
-        final lines = parse(content, source: source);
-        if (lines.isNotEmpty) return lines;
+      for (final subdirName in ['Lyrics', 'lyrics']) {
+        final lyricsSubdirLrc = File(
+            '${parentDir.path}${Platform.pathSeparator}$subdirName${Platform.pathSeparator}$fileNameWithoutExt.lrc');
+        if (await lyricsSubdirLrc.exists()) {
+          final content = await lyricsSubdirLrc.readAsString();
+          final lines = parse(content, source: source);
+          if (lines.isNotEmpty) return lines;
+        }
       }
 
-      final genericLrc =
-          File('${parentDir.path}${Platform.pathSeparator}lyrics.lrc');
-      if (await genericLrc.exists()) {
-        final content = await genericLrc.readAsString();
-        final lines = parse(content, source: source);
-        if (lines.isNotEmpty) return lines;
+      for (final genericName in ['lyrics.lrc', 'Lyrics.lrc']) {
+        final genericLrc =
+            File('${parentDir.path}${Platform.pathSeparator}$genericName');
+        if (await genericLrc.exists()) {
+          final content = await genericLrc.readAsString();
+          final lines = parse(content, source: source);
+          if (lines.isNotEmpty) return lines;
+        }
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to read external .lrc file for $audioFilePath',
@@ -142,6 +146,9 @@ class LrcParser {
   /// 3. External .lrc file
   /// 4. Online LRCLIB database query
   /// 5. null
+  static final Map<String, DateTime> _negativeCacheTimes = {};
+  static const Duration _negativeCacheTtl = Duration(minutes: 10);
+
   static Future<LyricsResult?> resolveLyrics(
     String audioFilePath, {
     int? songId,
@@ -153,9 +160,23 @@ class LrcParser {
   }) async {
     final cacheKey = songId != null ? 'song_$songId' : audioFilePath;
     if (_lyricsCache.containsKey(cacheKey)) {
-      final cached = _lyricsCache.remove(cacheKey);
-      _lyricsCache[cacheKey] = cached;
-      return cached;
+      final cached = _lyricsCache[cacheKey];
+      // Negative cache (null) expires after TTL so new sidecar .lrc can be discovered
+      if (cached == null) {
+        final cachedTime = _negativeCacheTimes[cacheKey];
+        if (cachedTime != null && DateTime.now().difference(cachedTime) > _negativeCacheTtl) {
+          _lyricsCache.remove(cacheKey);
+          _negativeCacheTimes.remove(cacheKey);
+        } else {
+          final restored = _lyricsCache.remove(cacheKey);
+          _lyricsCache[cacheKey] = restored;
+          return restored;
+        }
+      } else {
+        final restored = _lyricsCache.remove(cacheKey);
+        _lyricsCache[cacheKey] = restored;
+        return restored;
+      }
     }
 
     LyricsResult? resolved;
@@ -208,11 +229,18 @@ class LrcParser {
       }
     }
 
-    // Cache the result (including null to avoid repeated failing lookups)
+    // Cache the result (including null to avoid repeated failing lookups, with TTL)
     if (_lyricsCache.length >= _maxCacheSize) {
-      _lyricsCache.remove(_lyricsCache.keys.first);
+      final evictedKey = _lyricsCache.keys.first;
+      _lyricsCache.remove(evictedKey);
+      _negativeCacheTimes.remove(evictedKey);
     }
     _lyricsCache[cacheKey] = resolved;
+    if (resolved == null) {
+      _negativeCacheTimes[cacheKey] = DateTime.now();
+    } else {
+      _negativeCacheTimes.remove(cacheKey);
+    }
 
     return resolved;
   }
@@ -221,14 +249,17 @@ class LrcParser {
   static void invalidateSong({int? songId, String? path}) {
     if (songId != null) {
       _lyricsCache.remove('song_$songId');
+      _negativeCacheTimes.remove('song_$songId');
     }
     if (path != null) {
       _lyricsCache.remove(path);
+      _negativeCacheTimes.remove(path);
     }
   }
 
   /// Clear the lyrics cache (e.g. on tag edit or rescan)
   static void clearCache() {
     _lyricsCache.clear();
+    _negativeCacheTimes.clear();
   }
 }

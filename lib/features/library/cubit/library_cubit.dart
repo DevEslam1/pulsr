@@ -189,10 +189,12 @@ class LibraryCubit extends Cubit<LibraryState> {
   void updateSort(String sortBy, bool ascending) {
     emit(state.copyWith(sortBy: sortBy, ascending: ascending));
     _subscribeSongs();
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setString('library_sort_by', sortBy);
-      prefs.setBool('library_sort_ascending', ascending);
-    }).catchError((_) {});
+    SharedPreferences.getInstance().then((prefs) async {
+      try {
+        await prefs.setString('library_sort_by', sortBy);
+        await prefs.setBool('library_sort_ascending', ascending);
+      } catch (e, st) { ErrorLogger.log('Failed to persist library sort', error: e, stackTrace: st, category: 'LibraryCubit'); }
+    }).catchError((e, st) { ErrorLogger.log('Failed to persist library sort', error: e, stackTrace: st, category: 'LibraryCubit'); });
   }
 
   void toggleViewMode() {
@@ -200,13 +202,15 @@ class LibraryCubit extends Cubit<LibraryState> {
         ? LibraryViewMode.grid
         : LibraryViewMode.list;
     emit(state.copyWith(viewMode: nextMode));
-    SharedPreferences.getInstance().then((prefs) {
-      prefs.setString('library_view_mode', nextMode.name);
-    }).catchError((_) {});
+    SharedPreferences.getInstance().then((prefs) async {
+      try { await prefs.setString('library_view_mode', nextMode.name); } catch (e, st) { ErrorLogger.log('Failed to persist view mode', error: e, stackTrace: st, category: 'LibraryCubit'); }
+    }).catchError((e, st) { ErrorLogger.log('Failed to persist view mode', error: e, stackTrace: st, category: 'LibraryCubit'); });
   }
 
+  int _favoriteOpGen = 0;
   Future<void> toggleFavorite(int songId) async {
-    final previousFavorites = state.favorites;
+    final opGen = ++_favoriteOpGen;
+    final previousFavorites = List<SongsTableData>.from(state.favorites);
     final currentFavs = List<SongsTableData>.from(state.favorites);
     final isFav = currentFavs.any((s) => s.id == songId);
     if (isFav) {
@@ -224,7 +228,7 @@ class LibraryCubit extends Cubit<LibraryState> {
     }
 
     final result = await _toggleFavoriteUseCase(songId);
-    if (isClosed) return;
+    if (isClosed || opGen != _favoriteOpGen) return;
     result.fold(
       (failure) => emit(state.copyWith(
           favorites: previousFavorites, errorMessage: failure.message)),

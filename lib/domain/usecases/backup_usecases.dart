@@ -87,6 +87,20 @@ class ExportBackupUseCase {
       'playerThemeMode':
           prefs.getString('setting_player_theme_mode') ?? 'classic',
       'visualizerStyle': prefs.getString('setting_visualizer_style') ?? 'bar',
+      // Extended settings (previously missing — caused data loss on restore)
+      'replayGainMode': prefs.getString('setting_replay_gain_mode') ?? 'track',
+      'replayGainPreampWithRg': prefs.getDouble('setting_replay_gain_preamp_with_rg') ?? 0.0,
+      'replayGainPreampWithoutRg': prefs.getDouble('setting_replay_gain_preamp_without_rg') ?? -3.0,
+      'wifiOnlyMode': prefs.getBool('setting_wifi_only_mode') ?? false,
+      'offlineOnlyMode': prefs.getBool('setting_offline_only_mode') ?? false,
+      'bitPerfectMode': prefs.getBool('setting_bit_perfect') ?? false,
+      'dspPreference': prefs.getString('setting_dsp_preference') ?? 'native',
+      'streamingQuality': prefs.getString('setting_streaming_quality') ?? 'high',
+      'downloadQuality': prefs.getString('setting_download_quality') ?? 'high',
+      'isLosslessMode': prefs.getBool('setting_lossless') ?? false,
+      'eqEnabled': prefs.getBool('setting_eq_enabled') ?? false,
+      'eqGains': prefs.getString('setting_eq_gains'),
+      'playbackSpeed': prefs.getDouble('setting_playback_speed') ?? 1.0,
       if (eqPresetMap != null) 'eqPreset': eqPresetMap,
     };
 
@@ -150,7 +164,13 @@ class ImportBackupUseCase {
   }
 
   Future<ImportResult> execute(String jsonString) async {
-    if (utf8.encode(jsonString).length > maxBackupSizeBytes) {
+    // Cheap length check first (chars) to avoid double alloc for size check — prevents OOM on low RAM
+    if (jsonString.length > maxBackupSizeBytes) {
+      if (utf8.encode(jsonString).length > maxBackupSizeBytes) {
+        throw const FormatException(
+            'Backup file exceeds maximum allowed size of 10 MB');
+      }
+    } else if (utf8.encode(jsonString).length > maxBackupSizeBytes) {
       throw const FormatException(
           'Backup file exceeds maximum allowed size of 10 MB');
     }
@@ -392,6 +412,20 @@ class ImportBackupUseCase {
         await prefs.setString(
             'setting_eq_preset', jsonEncode(settings['eqPreset']));
       }
+      // Restore extended settings with validation
+      if (settings['replayGainMode'] is String) await prefs.setString('setting_replay_gain_mode', settings['replayGainMode']);
+      if (settings['replayGainPreampWithRg'] is num) await prefs.setDouble('setting_replay_gain_preamp_with_rg', (settings['replayGainPreampWithRg'] as num).toDouble());
+      if (settings['replayGainPreampWithoutRg'] is num) await prefs.setDouble('setting_replay_gain_preamp_without_rg', (settings['replayGainPreampWithoutRg'] as num).toDouble());
+      if (settings['wifiOnlyMode'] is bool) await prefs.setBool('setting_wifi_only_mode', settings['wifiOnlyMode']);
+      if (settings['offlineOnlyMode'] is bool) await prefs.setBool('setting_offline_only_mode', settings['offlineOnlyMode']);
+      if (settings['bitPerfectMode'] is bool) await prefs.setBool('setting_bit_perfect', settings['bitPerfectMode']);
+      if (settings['dspPreference'] is String) await prefs.setString('setting_dsp_preference', settings['dspPreference']);
+      if (settings['streamingQuality'] is String) await prefs.setString('setting_streaming_quality', settings['streamingQuality']);
+      if (settings['downloadQuality'] is String) await prefs.setString('setting_download_quality', settings['downloadQuality']);
+      if (settings['isLosslessMode'] is bool) await prefs.setBool('setting_lossless', settings['isLosslessMode']);
+      if (settings['eqEnabled'] is bool) await prefs.setBool('setting_eq_enabled', settings['eqEnabled']);
+      if (settings['eqGains'] is String) await prefs.setString('setting_eq_gains', settings['eqGains']);
+      if (settings['playbackSpeed'] is num) await prefs.setDouble('setting_playback_speed', (settings['playbackSpeed'] as num).toDouble());
 
       restoredSettingsCount = settings.length;
     }
@@ -413,12 +447,17 @@ class ImportBackupUseCase {
               if (path != null && path.isNotEmpty) {
                 final matched = matchPath(path);
                 if (matched != null) {
+                  // Merge with max to avoid restore reducing play counts incremented since backup
+                  final mergedCount = playCount > matched.playCount ? playCount : matched.playCount;
+                  final mergedLastPlayed = (lastPlayed != null && matched.lastPlayed != null)
+                      ? (lastPlayed > matched.lastPlayed! ? lastPlayed : matched.lastPlayed!)
+                      : (lastPlayed ?? matched.lastPlayed);
                   await (_db.update(_db.songsTable)
                         ..where((t) => t.id.equals(matched.id)))
                       .write(
                     SongsTableCompanion(
-                      playCount: Value(playCount),
-                      lastPlayed: Value(lastPlayed),
+                      playCount: Value(mergedCount),
+                      lastPlayed: Value(mergedLastPlayed),
                     ),
                   );
                   restoredHistoryCount++;

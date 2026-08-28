@@ -121,6 +121,7 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
             throw IOException("Request to ${request.url()} failed: ${e.message}", e)
         } finally {
             connection?.disconnect()
+            RateLimiter.shared.releasePermit()
         }
     }
 

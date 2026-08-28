@@ -169,6 +169,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   }
 
   Future<void> _persistQueueSlots() async {
+    if (isClosed) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       final data = <String, dynamic>{};
@@ -184,7 +185,7 @@ class PlayerCubit extends Cubit<PlayerState> {
     } catch (e, st) {
       ErrorLogger.log('Failed to persist queue slots',
           error: e, stackTrace: st, category: 'PlayerCubit');
-      emit(state.copyWith(errorMessage: 'Failed to save queue'));
+      if (!isClosed) emit(state.copyWith(errorMessage: 'Failed to save queue'));
     }
   }
 
@@ -374,25 +375,16 @@ class PlayerCubit extends Cubit<PlayerState> {
         final id = int.tryParse(item.id);
         if (id != null) {
           SongsTableData? resolvedSong;
-          final songResult = await _repository.getSongById(id);
-          if (gen != _mediaItemResolutionGen || isClosed) return;
-          songResult.fold((_) => null, (song) => resolvedSong = song);
-
-          // Crucial fallback for in-memory online tracks (negative IDs) or newly queued songs
-          resolvedSong ??= _audioHandler.currentSong?.id == id
+          // Try in-memory sources first (no I/O) before hitting Drift — avoids stale overwrite
+          resolvedSong = _audioHandler.currentSong?.id == id
               ? _audioHandler.currentSong
               : state.queue.where((s) => s.id == id).firstOrNull;
-
-          // Check all queue slots if not found in active queue
           if (resolvedSong == null) {
-            final idx = state.queue.indexWhere((s) => s.id == id);
-            if (idx != -1) resolvedSong = state.queue[idx];
+            final songResult = await _repository.getSongById(id);
+            if (gen != _mediaItemResolutionGen || isClosed) return;
+            songResult.fold((_) => null, (song) => resolvedSong = song);
           }
-
-          if (resolvedSong != null && resolvedSong != state.currentSong) {
-            emit(state.copyWith(currentSong: resolvedSong));
-            _updateWidgetThrottled(force: true);
-          }
+          if (gen != _mediaItemResolutionGen || isClosed) return;
 
           // Final fallback — construct from MediaItem extras
           if (resolvedSong == null && item.id.isNotEmpty) {

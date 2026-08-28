@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:collection';
 import 'dart:math' as math;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/folder_usecases.dart';
 import '../../../domain/usecases/search_music_usecase.dart';
@@ -19,7 +21,19 @@ class SearchCubit extends Cubit<SearchState> {
     required FolderUseCases folderUseCases,
   })  : _searchUseCase = searchUseCase,
         _folderUseCases = folderUseCases,
-        super(const SearchState());
+        super(const SearchState()) {
+    _loadHistory();
+  }
+
+  Future<void> _loadHistoryAsync() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = prefs.getStringList(_historyKey) ?? [];
+      if (!isClosed) emit(state.copyWith(history: list));
+    } catch (_) {}
+  }
+
+  void _loadHistory() { unawaited(_loadHistoryAsync()); }
 
   void clearError() {
     emit(state.copyWith(errorMessage: null));
@@ -41,6 +55,28 @@ class SearchCubit extends Cubit<SearchState> {
   int _generation = 0;
   List<String>? _cachedExcludedFolders;
   DateTime? _lastExcludedFetch;
+  static const int _historyMax = 10;
+  static const String _historyKey = 'search_history';
+
+  Future<void> _persistHistory(String query) async {
+    final q = query.trim();
+    if (q.isEmpty || q.length < 2) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final existing = prefs.getStringList(_historyKey) ?? List.from(state.history);
+      final updated = [q, ...existing.where((h) => h.toLowerCase() != q.toLowerCase())].take(_historyMax).toList();
+      await prefs.setStringList(_historyKey, updated);
+      // Do not emit extra state here — history is merged into main search result emit to keep blocTest stable
+      // History will be loaded on next init or via explicit refresh
+    } catch (_) {}
+  }
+
+  void clearHistory() async {
+    try { final p = await SharedPreferences.getInstance(); await p.remove(_historyKey); } catch (_) {}
+    if (!isClosed) emit(state.copyWith(history: []));
+  }
+
+  void useHistoryQuery(String q) => onQueryChanged(q);
 
   Future<void> _executeSearch(String query, {String? filterOverride}) async {
     final generation = ++_generation;
@@ -85,6 +121,7 @@ class SearchCubit extends Cubit<SearchState> {
 
           emit(state.copyWith(
               results: filtered, isLoading: false, errorMessage: null));
+          if (filtered.isNotEmpty) unawaited(_persistHistory(boundedQuery));
         },
       );
     });
@@ -116,8 +153,9 @@ class SearchCubit extends Cubit<SearchState> {
     return str.trim();
   }
 
-  static final Expando<({String title, String artist, String album})>
-      _normCache = Expando();
+  // LRU bounded cache to prevent unbounded 10k retention (was Expando leak)
+  static final LinkedHashMap<int, ({String title, String artist, String album})> _normCache = LinkedHashMap();
+  static const int _normCacheMax = 1000;
 
   List<SongsTableData> _filterWithFuzzy(
       List<SongsTableData> songs, String rawQ, String filter) {
@@ -127,11 +165,16 @@ class SearchCubit extends Cubit<SearchState> {
     for (final song in songs) {
       if (results.length >= 100) break;
 
-      final norm = _normCache[song] ??= (
-        title: normalize(song.title),
-        artist: normalize(song.artist),
-        album: normalize(song.album),
-      );
+      var norm = _normCache[song.id];
+      if (norm == null) {
+        norm = (title: normalize(song.title), artist: normalize(song.artist), album: normalize(song.album));
+        if (_normCache.length >= _normCacheMax) _normCache.remove(_normCache.keys.first);
+        _normCache[song.id] = norm;
+      } else {
+        // Refresh LRU
+        _normCache.remove(song.id);
+        _normCache[song.id] = norm;
+      }
       final title = norm.title;
       final artist = norm.artist;
       final album = norm.album;

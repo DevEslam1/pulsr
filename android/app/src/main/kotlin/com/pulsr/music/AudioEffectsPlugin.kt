@@ -97,6 +97,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private var isSincResamplerEnabled = true
     private var dspPreference: String = "native" // "native", "oem", "auto"
+    private var _oemWarningLogged = false
 
     // Deduplication caches for native effect parameter pushes (W7)
     private var lastNativeEqPreamp: Double? = null
@@ -180,23 +181,25 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             }
 
             // W6: Bypass / disable OEM DynamicsProcessing when native DSP stages are active
+            // Fix sound drops: avoid toggling .enabled when already in desired state (causes dropout requiring EQ off/on)
             if (activeDspStages != 0 && dspPreference != "oem") {
                 try {
-                    dynamicsProcessing?.enabled = false
+                    if (dynamicsProcessing?.enabled == true) dynamicsProcessing?.enabled = false
                 } catch (_: Exception) {}
             } else if (activeDspStages == 0 && isEqEnabled && dspPreference != "native") {
                 try {
-                    dynamicsProcessing?.enabled = true
+                    if (dynamicsProcessing?.enabled == false) dynamicsProcessing?.enabled = true
                 } catch (_: Exception) {}
             }
 
             val ctx = context
-            if (ctx != null) {
+            if (ctx != null && !_oemWarningLogged) {
                 try {
                     val oemInfo = getCachedOemInfo(ctx)
                     val hasOemAudio = oemInfo["hasOemAudio"] as? Boolean ?: false
                     if (hasOemAudio && (isEqEnabled || isCrossfeedEnabled)) {
                         Log.w(TAG, "WARNING: OEM audio engine detected alongside native DSP. Double-processing bypassed via native DSP routing.")
+                        _oemWarningLogged = true
                     }
                 } catch (_: Exception) {}
             }

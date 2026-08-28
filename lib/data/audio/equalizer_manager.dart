@@ -201,51 +201,45 @@ class EqualizerManager {
             HeadphoneProfilesRepository().getProfileById(profileId);
       }
 
+      // Batch native effect enables to avoid sound-drop dropout (requires EQ off/on to fix)
+      // Previously each await toggled DynamicsProcessing causing 20+ JNI hops on audio thread during playback.
+      // Now batch independent effects together and defer DynamicsProcessing last to prevent double-processing bypass churn.
+      final pendingFutures = <Future>[];
       if (isEnabled) {
+        // Apply preset first without enabling, then enable atomically
         await applyCurrentPreset();
-        await _effectsChannel.setEqEnabled(true);
-        await _effectsChannel.setNativeEqEnabled(true);
+        pendingFutures.add(_effectsChannel.setEqEnabled(true));
+        pendingFutures.add(_effectsChannel.setNativeEqEnabled(true));
       }
-      if (currentPreset.bassBoost > 0) {
-        await setBassBoost(currentPreset.bassBoost);
-      }
-      if (volumeBoost > 0) {
-        await setVolumeBoost(volumeBoost);
-      }
+      if (currentPreset.bassBoost > 0) pendingFutures.add(setBassBoost(currentPreset.bassBoost));
+      if (volumeBoost > 0) pendingFutures.add(setVolumeBoost(volumeBoost));
       if (isVirtualizerEnabled) {
-        await _effectsChannel.setVirtualizerEnabled(true);
-        await _effectsChannel.setVirtualizerStrength(virtualizerStrength);
+        pendingFutures.add(_effectsChannel.setVirtualizerEnabled(true));
+        pendingFutures.add(_effectsChannel.setVirtualizerStrength(virtualizerStrength));
       }
-      if (isDynamicsEnabled && !_isDynamicsBypassed) {
-        await _effectsChannel.setDynamicsPreset(dynamicsPreset, true);
-      }
-      if (isSpatializerEnabled) {
-        await _effectsChannel.setSpatializerEnabled(true);
-      }
-
+      if (isSpatializerEnabled) pendingFutures.add(_effectsChannel.setSpatializerEnabled(true));
       if (isCrossfeedEnabled) {
-        await _effectsChannel.setCrossfeedParams(
-            crossfeedDelayUs, crossfeedFeedDb);
-        await _effectsChannel.setCrossfeedEnabled(true);
+        pendingFutures.add(_effectsChannel.setCrossfeedParams(crossfeedDelayUs, crossfeedFeedDb));
+        pendingFutures.add(_effectsChannel.setCrossfeedEnabled(true));
       }
       if (isLimiterEnabled) {
-        await _effectsChannel.setLimiterParams(
-            limiterLookaheadMs, limiterThresholdDb, limiterReleaseMs);
-        await _effectsChannel.setLimiterEnabled(true);
+        pendingFutures.add(_effectsChannel.setLimiterParams(limiterLookaheadMs, limiterThresholdDb, limiterReleaseMs));
+        pendingFutures.add(_effectsChannel.setLimiterEnabled(true));
       }
       if (isReverbEnabled) {
-        await _effectsChannel.setReverbPreset(reverbPreset);
-        await _effectsChannel.setReverbWetDry(reverbWetDry);
-        await _effectsChannel.setReverbEnabled(true);
+        pendingFutures.add(_effectsChannel.setReverbPreset(reverbPreset));
+        pendingFutures.add(_effectsChannel.setReverbWetDry(reverbWetDry));
+        pendingFutures.add(_effectsChannel.setReverbEnabled(true));
       }
-      if (stereoBalance != 0.0) {
-        await _effectsChannel.setStereoBalance(stereoBalance);
-      }
-      if (monoMix) {
-        await _effectsChannel.setMonoMix(true);
-      }
-      if (!isSincResamplerEnabled) {
-        await _effectsChannel.setSincResamplerEnabled(false);
+      if (stereoBalance != 0.0) pendingFutures.add(_effectsChannel.setStereoBalance(stereoBalance));
+      if (monoMix) pendingFutures.add(_effectsChannel.setMonoMix(true));
+      if (!isSincResamplerEnabled) pendingFutures.add(_effectsChannel.setSincResamplerEnabled(false));
+      // Dynamics last — it triggers recalculateActiveStages which disables OEM engine; doing it last prevents intermediate dropout
+      if (pendingFutures.isNotEmpty) await Future.wait(pendingFutures);
+      if (isDynamicsEnabled && !_isDynamicsBypassed) {
+        // Small delay lets AudioTrack stabilize before DynamicsProcessing rebuild (fixes sound drops needing EQ toggle)
+        await Future.delayed(const Duration(milliseconds: 120));
+        await _effectsChannel.setDynamicsPreset(dynamicsPreset, true);
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to restore equalizer preferences',
@@ -312,19 +306,28 @@ class EqualizerManager {
     currentPreset = currentPreset.copyWith(gains: interpolated);
 
     if (Platform.isAndroid) {
+      // Batch native calls to avoid 32 sequential JNI hops (150-300ms jank)
       await _effectsChannel.setNativeEqBandCount(targetFreqs.length);
-      for (int i = 0; i < targetFreqs.length; i++) {
-        await _effectsChannel.setNativeEqBand(
-          i,
-          targetFreqs[i],
-          currentPreset.gains[i],
-          1.414,
-        );
-      }
+      // Use batched gains where available, with native fallback
       if (!enabled) {
         await _effectsChannel.setEqBands(targetFreqs);
         await _effectsChannel.setEqBandGains(currentPreset.gains);
       }
+      // Parallelize native band updates with concurrency limit to reduce UI jank
+      final futures = <Future>[];
+      for (int i = 0; i < targetFreqs.length; i++) {
+        futures.add(_effectsChannel.setNativeEqBand(
+          i,
+          targetFreqs[i],
+          currentPreset.gains[i],
+          1.414,
+        ));
+        if (futures.length >= 8) {
+          await Future.wait(futures);
+          futures.clear();
+        }
+      }
+      if (futures.isNotEmpty) await Future.wait(futures);
     }
     _debouncedSavePreferences();
   }
@@ -407,26 +410,22 @@ class EqualizerManager {
     if (Platform.isAndroid) {
       if (is32BandMode) {
         await _effectsChannel.setNativeEqBandCount(targetFreqs.length);
+        final futures = <Future>[];
         for (int i = 0; i < targetFreqs.length; i++) {
-          await _effectsChannel.setNativeEqBand(
-            i,
-            targetFreqs[i],
-            currentPreset.gains[i],
-            1.414,
-          );
+          futures.add(_effectsChannel.setNativeEqBand(i, targetFreqs[i], currentPreset.gains[i], 1.414));
+          if (futures.length >= 8) { await Future.wait(futures); futures.clear(); }
         }
+        if (futures.isNotEmpty) await Future.wait(futures);
       } else {
         await _effectsChannel.setEqBands(targetFreqs);
         await _effectsChannel.setEqBandGains(currentPreset.gains);
         await _effectsChannel.setNativeEqBandCount(targetFreqs.length);
+        final futures2 = <Future>[];
         for (int i = 0; i < targetFreqs.length; i++) {
-          await _effectsChannel.setNativeEqBand(
-            i,
-            targetFreqs[i],
-            currentPreset.gains[i],
-            1.414,
-          );
+          futures2.add(_effectsChannel.setNativeEqBand(i, targetFreqs[i], currentPreset.gains[i], 1.414));
+          if (futures2.length >= 8) { await Future.wait(futures2); futures2.clear(); }
         }
+        if (futures2.isNotEmpty) await Future.wait(futures2);
       }
     }
   }
@@ -493,30 +492,36 @@ class EqualizerManager {
     final flatGains = List<double>.filled(targetFreqs.length, 0.0);
     if (Platform.isAndroid) {
       if (is32BandMode) {
+        final futures = <Future>[];
         for (int i = 0; i < targetFreqs.length; i++) {
-          await _effectsChannel.setNativeEqBand(i, targetFreqs[i], 0.0, 1.414);
+          futures.add(_effectsChannel.setNativeEqBand(i, targetFreqs[i], 0.0, 1.414));
         }
+        await Future.wait(futures);
       } else {
         await _effectsChannel.setEqBandGains(flatGains);
       }
+      // Persist flat state immediately so crash mid-A/B doesn't leave flat persisted
+      await _savePreferences();
     }
   }
 
   Future<void> endAbComparison() async {
     isAbComparisonActive = false;
     if (_abComparisonGains.isNotEmpty) {
-      final targetFreqs =
-          is32BandMode ? custom32Frequencies : customFrequencies;
+      final targetFreqs = is32BandMode ? custom32Frequencies : customFrequencies;
       if (Platform.isAndroid) {
         if (is32BandMode) {
+          final futures = <Future>[];
           for (int i = 0; i < _abComparisonGains.length; i++) {
-            await _effectsChannel.setNativeEqBand(
-                i, targetFreqs[i], _abComparisonGains[i], 1.414);
+            futures.add(_effectsChannel.setNativeEqBand(i, targetFreqs[i], _abComparisonGains[i], 1.414));
           }
+          await Future.wait(futures);
         } else {
           await _effectsChannel.setEqBandGains(_abComparisonGains);
         }
       }
+      _abComparisonGains = [];
+      await _savePreferences();
     }
   }
 

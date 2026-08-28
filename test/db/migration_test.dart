@@ -17,9 +17,9 @@ void main() {
       await db.close();
     });
 
-    test('Fresh database opens at schemaVersion 8 and has all indexes',
+    test('Fresh database opens at schemaVersion 9 and has all indexes',
         () async {
-      expect(db.schemaVersion, equals(8));
+      expect(db.schemaVersion, equals(9));
 
       // Test inserting a song with schema v4 fields
       final songId = await db.into(db.songsTable).insert(
@@ -156,7 +156,7 @@ void main() {
 
       final version =
           await upgraded.customSelect('PRAGMA user_version;').getSingle();
-      expect(version.data['user_version'], equals(8));
+      expect(version.data['user_version'], equals(9));
 
       // The upgraded schema must accept remote rows, not just the fresh one.
       await upgraded.into(upgraded.songsTable).insert(

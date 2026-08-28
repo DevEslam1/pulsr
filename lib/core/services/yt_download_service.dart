@@ -78,6 +78,7 @@ class YtDownloadService {
 
   final HttpClient _http;
   final YtmService _ytmService;
+  // ignore: unused_field - kept for future single-file rescan without full library scan (dedup fix)
   final MediaScannerService _scanner;
   final IMusicRepository _repository;
 
@@ -321,7 +322,11 @@ class YtDownloadService {
         fallbackSong: song,
       );
 
-      unawaited(_scanner.scanDeviceLibrary());
+      // FIX: Downloaded song repeated twice — full rescan after reconcile creates duplicate path row
+      // The file is already indexed via reconcile (old YTM row → local). Triggering a full MediaStore scan
+      // inserts a second row with the new MediaStore id for the same file path, causing the double entry
+      // on local. Do not rescan the whole library here; deduplication is handled inside reconcile.
+      // If needed, a lightweight single-file rescan can be done, but the reconciled row is sufficient.
 
       return reconciled.fold(
         (f) => Left(f),
@@ -840,7 +845,7 @@ class YtDownloadService {
     }
   }
 
-  Future<void> cleanOrphanPartFiles() async {
+  Future<void> cleanOrphanPartFiles({Set<String>? activePartNames}) async {
     try {
       final dir = await getTemporaryDirectory();
       if (await dir.exists()) {
@@ -848,10 +853,11 @@ class YtDownloadService {
           if (entity is File) {
             final name = p.basename(entity.path);
             if (name.startsWith('ytdl_') || name.contains('.part')) {
+              if (activePartNames != null && activePartNames.contains(name)) continue;
               try {
                 final stat = await entity.stat();
                 if (DateTime.now().difference(stat.modified) >
-                    const Duration(minutes: 5)) {
+                    const Duration(minutes: 10)) {
                   await entity.delete();
                 }
               } catch (_) {}

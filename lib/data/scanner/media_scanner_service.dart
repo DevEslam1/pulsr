@@ -24,6 +24,10 @@ class MediaScannerService {
 
   MediaScannerService(this._repository);
 
+  void dispose() {
+    if (!_progressController.isClosed) _progressController.close();
+  }
+
   Future<bool> checkPermission() async {
     if (Platform.isAndroid) {
       final audio = await Permission.audio.status;
@@ -94,9 +98,10 @@ class MediaScannerService {
         (fileName.startsWith('aud-') && fileName.length > 20)) {
       if (lower.contains('whatsapp') || lower.contains('opus')) return true;
     }
-    // Ignore hidden dot folders (.thumbnails, .private, etc.)
+    // Ignore only known system dot folders — user dot folders like .my_collection are now allowed
     final parts = lower.split('/');
-    if (parts.any((p) => p.startsWith('.') && p != '.' && p != '..')) {
+    const knownSystemDotFolders = {'.thumbnails', '.trash', '.cache', '.nomedia'};
+    if (parts.any((p) => knownSystemDotFolders.contains(p))) {
       return true;
     }
     return false;

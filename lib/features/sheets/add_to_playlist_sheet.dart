@@ -9,13 +9,17 @@ import '../../domain/usecases/playlist_usecases.dart';
 
 class AddToPlaylistSheet extends StatelessWidget {
   final SongsTableData song;
+  final List<SongsTableData>? songs;
   final PlaylistUseCases? playlistUseCases;
 
   const AddToPlaylistSheet({
     super.key,
     required this.song,
+    this.songs,
     this.playlistUseCases,
   });
+
+  List<SongsTableData> get _allSongs => songs != null && songs!.length > 1 ? songs! : [song];
 
   PlaylistUseCases get _useCases =>
       playlistUseCases ?? getIt<PlaylistUseCases>();
@@ -60,7 +64,11 @@ class AddToPlaylistSheet extends StatelessWidget {
                     }
                   },
                   (id) async {
-                    await _useCases.addSongToPlaylist(id, song.id);
+                    if (_allSongs.length == 1) {
+                      await _useCases.addSongToPlaylist(id, song.id);
+                    } else {
+                      await _useCases.addSongsToPlaylist(id, _allSongs.map((s) => s.id).toList());
+                    }
                     if (context.mounted) {
                       Navigator.pop(ctx);
                       Navigator.pop(context);
@@ -198,14 +206,15 @@ class AddToPlaylistSheet extends StatelessWidget {
                                 trailing: Icon(Icons.add_circle_outline_rounded,
                                     color: p.accent),
                                 onTap: () async {
-                                  await _useCases.addSongToPlaylist(
-                                      playlist.id, song.id);
+                                  if (_allSongs.length == 1) {
+                                    await _useCases.addSongToPlaylist(playlist.id, song.id);
+                                  } else {
+                                    await _useCases.addSongsToPlaylist(playlist.id, _allSongs.map((s) => s.id).toList());
+                                  }
                                   if (context.mounted) {
                                     Navigator.pop(context);
                                     ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                          content: Text(
-                                              'Added to ${playlist.name}')),
+                                      SnackBar(content: Text(_allSongs.length == 1 ? 'Added to ${playlist.name}' : 'Added ${_allSongs.length} tracks to ${playlist.name}')),
                                     );
                                   }
                                 },

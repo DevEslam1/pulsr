@@ -26,7 +26,19 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
+
+  static Future<void> _createFtsTable(
+      Future<void> Function(String) executeSql) async {
+    await executeSql(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS songs_fts USING fts5(title, artist, album, content='songs', content_rowid='id', tokenize='unicode61 remove_diacritics 1');");
+    await executeSql(
+        "CREATE TRIGGER IF NOT EXISTS songs_fts_insert AFTER INSERT ON songs BEGIN INSERT INTO songs_fts(rowid, title, artist, album) VALUES (new.id, new.title, new.artist, new.album); END;");
+    await executeSql(
+        "CREATE TRIGGER IF NOT EXISTS songs_fts_delete AFTER DELETE ON songs BEGIN INSERT INTO songs_fts(songs_fts, rowid, title, artist, album) VALUES('delete', old.id, old.title, old.artist, old.album); END;");
+    await executeSql(
+        "CREATE TRIGGER IF NOT EXISTS songs_fts_update AFTER UPDATE ON songs BEGIN INSERT INTO songs_fts(songs_fts, rowid, title, artist, album) VALUES('delete', old.id, old.title, old.artist, old.album); INSERT INTO songs_fts(rowid, title, artist, album) VALUES (new.id, new.title, new.artist, new.album); END;");
+  }
 
   static Future<void> _createIndexes(
       Future<void> Function(String) executeSql) async {
@@ -85,6 +97,7 @@ class AppDatabase extends _$AppDatabase {
           await m.createAll();
           await _createIndexes(customStatement);
           await _createRemoteSourceIndexes(customStatement);
+          await _createFtsTable(customStatement);
         },
         onUpgrade: (Migrator m, int from, int to) async {
           if (from < 2) {
@@ -142,6 +155,14 @@ class AppDatabase extends _$AppDatabase {
             if (!await hasColumn('songs', 'loudness_range')) {
               await m.addColumn(songsTable, songsTable.loudnessRange);
             }
+          }
+          if (from < 9) {
+            await _createFtsTable(customStatement);
+            // Backfill existing rows
+            try {
+              await customStatement(
+                  "INSERT INTO songs_fts(songs_fts) VALUES('rebuild');");
+            } catch (_) {}
           }
           // Must run after every addColumn above: several indexes cover columns a
           // later branch introduces, so creating them mid-ladder fails on an older

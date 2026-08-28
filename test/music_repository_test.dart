@@ -19,9 +19,9 @@ void main() {
   });
 
   group('MusicRepository & AppDatabase Tests', () {
-    test('AppDatabase schema migration to v8 creates indexes successfully',
+    test('AppDatabase schema migration to v9 creates indexes successfully',
         () async {
-      expect(db.schemaVersion, equals(8));
+      expect(db.schemaVersion, equals(9));
 
       // Query pragma index_list for songs table
       final indexes =

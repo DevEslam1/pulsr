@@ -672,17 +672,31 @@ internal class InnertubeClient(
     companion object {
         private const val TAG = "InnertubeClient"
         var API_KEY: String = System.getProperty("YTM_API_KEY") ?: "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30"
-        val streamResolverPool: java.util.concurrent.ExecutorService = java.util.concurrent.Executors.newFixedThreadPool(3) { r ->
-            Thread(r).apply {
-                isDaemon = true
-                name = "InnertubeStream-${id}"
+        @Volatile
+        private var _streamResolverPool: java.util.concurrent.ExecutorService? = null
+        val streamResolverPool: java.util.concurrent.ExecutorService
+            get() {
+                val existing = _streamResolverPool
+                if (existing != null && !existing.isShutdown && !existing.isTerminated) return existing
+                synchronized(this) {
+                    val existing2 = _streamResolverPool
+                    if (existing2 != null && !existing2.isShutdown && !existing2.isTerminated) return existing2
+                    val newPool = java.util.concurrent.Executors.newFixedThreadPool(3) { r ->
+                        Thread(r).apply {
+                            isDaemon = true
+                            name = "InnertubeStream-${id}"
+                        }
+                    }
+                    _streamResolverPool = newPool
+                    return newPool
+                }
             }
-        }
 
         fun shutdown() {
             try {
-                streamResolverPool.shutdownNow()
+                _streamResolverPool?.shutdownNow()
             } catch (_: Exception) {}
+            _streamResolverPool = null
         }
     }
 }

@@ -62,9 +62,12 @@ class DownloadRepositoryImpl implements IDownloadRepository {
 
     final existing = _tasks[videoId];
     if (existing != null && existing.status == DownloadStatus.complete) {
-      // Check if file still exists on disk
-      if (existing.filePath != null && File(existing.filePath!).existsSync()) {
-        return Right(existing.id);
+      // Check if file still exists on disk — off main thread via async check
+      if (existing.filePath != null) {
+        try {
+          final exists = await File(existing.filePath!).exists();
+          if (exists) return Right(existing.id);
+        } catch (_) {}
       }
     }
 
@@ -190,19 +193,20 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           await _downloadChannel.invokeMethod<int>('getFreeDiskSpace') ?? 0;
 
       int totalUsedBytes = 0;
-      int completedCount = 0;
-
-      for (final t in _tasks.values) {
-        if (t.status == DownloadStatus.complete && t.filePath != null) {
-          completedCount++;
+      int completedCount = _tasks.values.where((t) => t.status == DownloadStatus.complete && t.filePath != null).length;
+      try {
+        final files = _tasks.values.where((t) => t.status == DownloadStatus.complete && t.filePath != null).map((t) => t.filePath!).toList();
+        final sizes = await Future.wait(files.map((p) async {
           try {
-            final f = File(t.filePath!);
-            if (f.existsSync()) {
-              totalUsedBytes += f.lengthSync();
-            }
+            final f = File(p);
+            if (await f.exists()) return await f.length();
           } catch (_) {}
-        }
-      }
+          return 0;
+        }));
+        totalUsedBytes = sizes.fold(0, (a, b) => a + b);
+        final existingCount = sizes.where((s) => s > 0).length;
+        if (existingCount > 0) completedCount = existingCount;
+      } catch (_) {}
 
       final totalBytes = freeBytes + totalUsedBytes;
       final stats = StorageStats(
@@ -223,8 +227,10 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   @override
   Future<void> reconcileOnBoot() async {
     try {
-      await _ytDownloadService.cleanOrphanPartFiles();
       final prefs = await SharedPreferences.getInstance();
+      // Collect active part names to not delete paused downloads
+      final activeNames = _tasks.values.where((t) => t.status == DownloadStatus.paused).map((t) => 'ytdl_${t.videoId}.part').toSet();
+      await _ytDownloadService.cleanOrphanPartFiles(activePartNames: activeNames.isNotEmpty ? activeNames : null);
       final rawJson = prefs.getString(_prefKey);
       if (rawJson != null && rawJson.isNotEmpty) {
         final list = jsonDecode(rawJson) as List<dynamic>;
@@ -251,6 +257,10 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     }
   }
 
+  // Throttle pending flush to not drop final intermediate progress
+  Timer? _throttleFlushTimer;
+  DownloadTask? _pendingThrottledTask;
+
   void _updateTask(DownloadTask task) {
     _tasks[task.videoId] = task;
 
@@ -259,17 +269,35 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     final isIntermediateProgress = task.status == DownloadStatus.downloading &&
         task.progress > 0.0 &&
         task.progress < 1.0;
+    final isTerminal = task.status == DownloadStatus.complete || task.status == DownloadStatus.failed || task.status == DownloadStatus.paused;
 
-    // 4Hz (250ms) throttle for progress updates, instant for status changes (BUG-019)
-    if (isIntermediateProgress && (now - lastEmit < 250)) {
+    if (isIntermediateProgress && (now - lastEmit < 250) && !isTerminal) {
+      _pendingThrottledTask = task;
+      _throttleFlushTimer?.cancel();
+      _throttleFlushTimer = Timer(const Duration(milliseconds: 250), () {
+        if (_pendingThrottledTask != null && _pendingThrottledTask!.videoId == task.videoId) {
+          _lastProgressEmitMs[task.videoId] = DateTime.now().millisecondsSinceEpoch;
+          if (!_streamController.isClosed) _streamController.add(_pendingThrottledTask!);
+          _pendingThrottledTask = null;
+        }
+      });
+      _schedulePersist();
       return;
     }
+    _throttleFlushTimer?.cancel();
+    _pendingThrottledTask = null;
 
     _lastProgressEmitMs[task.videoId] = now;
     if (!_streamController.isClosed) {
       _streamController.add(task);
     }
     _schedulePersist();
+  }
+
+  void dispose() {
+    _saveDebounce?.cancel();
+    _throttleFlushTimer?.cancel();
+    if (!_streamController.isClosed) _streamController.close();
   }
 
   void _schedulePersist() {

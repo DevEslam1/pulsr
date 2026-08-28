@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
-import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
 import 'package:rxdart/rxdart.dart';
+import '../../core/utils/error_logger.dart';
 import '../../domain/models/smart_playlist_criteria.dart';
 import '../../domain/repositories/smart_playlist_engine_interface.dart';
 import '../db/app_database.dart';
@@ -279,7 +279,7 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
         }
 
       case SmartRuleField.bpm:
-        debugPrint('[SmartPlaylistEngine] BPM rules are not yet supported');
+        ErrorLogger.log('BPM smart rule ignored — BPM column not indexed, rule will be skipped until enrichment', category: 'SmartPlaylist');
         return null;
 
       case SmartRuleField.loudnessRange:
@@ -327,8 +327,10 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   }
 
   (int, int)? _parseIntBetween(String valStr) {
-    final parts = valStr
-        .split(RegExp(r'[,.\s-]+|to|\.\.'))
+    // Fix: previously `RegExp(r'[,.\s-]+|to|\.\.')` had `to` inside char class matching single t/o; now correctly handles "100 to 200" and "100..200"
+    final normalized = valStr.replaceAll(RegExp(r'\bto\b', caseSensitive: false), ' ').replaceAll('..', ' ');
+    final parts = normalized
+        .split(RegExp(r'[,;\s-]+'))
         .map((e) => int.tryParse(e.trim()))
         .whereType<int>()
         .toList();
@@ -341,8 +343,9 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
   }
 
   (double, double)? _parseDoubleBetween(String valStr) {
-    final parts = valStr
-        .split(RegExp(r'[,.\s-]+|to|\.\.'))
+    final normalized = valStr.replaceAll(RegExp(r'\bto\b', caseSensitive: false), ' ').replaceAll('..', ' ');
+    final parts = normalized
+        .split(RegExp(r'[,;\s-]+'))
         .map((e) => double.tryParse(e.trim()))
         .whereType<double>()
         .toList();

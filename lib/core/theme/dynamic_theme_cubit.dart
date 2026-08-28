@@ -146,7 +146,7 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
           imageProvider,
           size: const Size(64, 64),
           maximumColorCount: 16,
-        );
+        ).timeout(const Duration(seconds: 5), onTimeout: () => throw TimeoutException('Palette timeout'));
 
         if (token != _currentRequestToken || isClosed) return;
 
@@ -199,6 +199,12 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
         return;
       }
     } catch (e, st) {
+      // Do not reset to default on single artwork 404/timeout — keep existing palette
+      if (e is TimeoutException || e.toString().contains('404') || e.toString().contains('Failed host lookup')) {
+        ErrorLogger.log('Palette fetch transient failure for $cacheKey (keeping existing)',
+            error: e, stackTrace: st, category: 'DynamicTheme');
+        return;
+      }
       ErrorLogger.log('Failed to generate dynamic theme palette for $cacheKey',
           error: e, stackTrace: st, category: 'DynamicTheme');
       return;

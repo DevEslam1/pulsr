@@ -805,18 +805,19 @@ class MusicRepository implements IMusicRepository {
         return const Right(null); // Already present, avoid duplication
       }
 
-      final countExp = _db.playlistEntriesTable.id.count();
-      final query = _db.selectOnly(_db.playlistEntriesTable)
+      // Use MAX(orderIndex) not COUNT to avoid duplicate orderIndex on concurrent dual add (P2-1)
+      final maxExp = _db.playlistEntriesTable.orderIndex.max();
+      final maxQuery = _db.selectOnly(_db.playlistEntriesTable)
         ..where(_db.playlistEntriesTable.playlistId.equals(playlistId))
-        ..addColumns([countExp]);
-      final count =
-          await query.map((row) => row.read(countExp)).getSingle() ?? 0;
+        ..addColumns([maxExp]);
+      final maxIdx = await maxQuery.map((row) => row.read(maxExp)).getSingle();
+      final nextIdx = (maxIdx ?? -1) + 1;
 
       await _db.into(_db.playlistEntriesTable).insert(
             PlaylistEntriesTableCompanion.insert(
               playlistId: playlistId,
               songId: songId,
-              orderIndex: count,
+              orderIndex: nextIdx,
             ),
           );
       return const Right(null);
@@ -992,6 +993,13 @@ class MusicRepository implements IMusicRepository {
           batch.insertAllOnConflictUpdate(_db.artistsTable, artists);
         });
       });
+      // FIX: Deduplicate by file path after scan — prevents downloaded song appearing twice when scanner
+      // inserts a new row for a path already owned by a reconciled YTM row. Keep the downloaded/isDownloaded or lowest id.
+      try {
+        await _db.customStatement(
+          "DELETE FROM songs WHERE id NOT IN (SELECT MIN(id) FROM songs WHERE path != '' AND path NOT LIKE 'ytmusic://%' GROUP BY lower(path)) AND path != '' AND path NOT LIKE 'ytmusic://%' AND lower(path) IN (SELECT lower(path) FROM songs WHERE path != '' AND path NOT LIKE 'ytmusic://%' GROUP BY lower(path) HAVING COUNT(*) > 1);",
+        );
+      } catch (_) {}
       return const Right(null);
     } catch (e) {
       return Left(DatabaseFailure('Failed to sync scanned music', e));
@@ -1207,6 +1215,19 @@ class MusicRepository implements IMusicRepository {
                 ),
               );
               survivingId = oldId;
+              // FIX: Clean any other row that already owns this path (scanner may have inserted it first)
+              try {
+                final dupes = await (_db.select(_db.songsTable)
+                      ..where((t) => t.path.lower().equals(newPath.toLowerCase()) & t.id.equals(oldId).not()))
+                    .get();
+                for (final d in dupes) {
+                  await (_db.update(_db.playlistEntriesTable)..where((t) => t.songId.equals(d.id)))
+                      .write(PlaylistEntriesTableCompanion(songId: Value(oldId)));
+                  await (_db.update(_db.queueItemsTable)..where((t) => t.songId.equals(d.id)))
+                      .write(QueueItemsTableCompanion(songId: Value(oldId)));
+                  await (_db.delete(_db.songsTable)..where((t) => t.id.equals(d.id))).go();
+                }
+              } catch (_) {}
             } else if (fallbackSong != null) {
               await _db.into(_db.songsTable).insert(
                     SongsTableCompanion(
@@ -1228,6 +1249,14 @@ class MusicRepository implements IMusicRepository {
                     mode: InsertMode.insertOrReplace,
                   );
               survivingId = oldId;
+              try {
+                final dupes2 = await (_db.select(_db.songsTable)
+                      ..where((t) => t.path.lower().equals(newPath.toLowerCase()) & t.id.equals(oldId).not()))
+                    .get();
+                for (final d in dupes2) {
+                  await (_db.delete(_db.songsTable)..where((t) => t.id.equals(d.id))).go();
+                }
+              } catch (_) {}
             }
           }
           return;
@@ -1330,6 +1359,25 @@ class MusicRepository implements IMusicRepository {
             pendingDownloadPath: const Value(null),
           ),
         );
+
+        // FIX: Remove any other duplicate path rows that the scanner may have inserted in parallel
+        // This guarantees a single entry per file path after download, fixing "repeats twice on local"
+        final newRowPath = newRow.path;
+        final duplicateOthers = await (_db.select(_db.songsTable)
+              ..where((t) =>
+                  t.path.lower().equals(newRowPath.toLowerCase()) &
+                  t.id.isNotIn([oldId, targetId])))
+            .get();
+        for (final dupe in duplicateOthers) {
+          try {
+            // Move any playlist/queue/history refs to surviving target before deleting duplicate
+            await (_db.update(_db.playlistEntriesTable)..where((t) => t.songId.equals(dupe.id)))
+                .write(PlaylistEntriesTableCompanion(songId: Value(targetId)));
+            await (_db.update(_db.queueItemsTable)..where((t) => t.songId.equals(dupe.id)))
+                .write(QueueItemsTableCompanion(songId: Value(targetId)));
+            await (_db.delete(_db.songsTable)..where((t) => t.id.equals(dupe.id))).go();
+          } catch (_) {}
+        }
       });
       return Right(survivingId);
     } catch (e) {

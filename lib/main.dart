@@ -12,8 +12,10 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'core/config/app_config.dart';
 import 'core/di/injection.dart';
 import 'core/network/app_http_overrides.dart';
+import 'core/services/artwork_cache_manager.dart';
 import 'core/theme/aura_theme.dart';
 import 'core/theme/dynamic_theme_cubit.dart';
+import 'core/widgets/cached_artwork.dart';
 import 'core/router/app_router.dart';
 import 'core/services/auth_service.dart';
 import 'core/services/file_intent_handler.dart';
@@ -84,25 +86,31 @@ Future<void> main() async {
         error: e, stackTrace: st, category: 'Startup');
   }
 
-  try {
-    await YtmRateLimiter.shared.restore().timeout(const Duration(seconds: 8));
-  } catch (e, st) {
-    ErrorLogger.log('YtmRateLimiter restore failed or timed out',
-        error: e, stackTrace: st, category: 'Startup');
-  }
-
-  try {
-    await getIt<AuthService>().initialize().timeout(const Duration(seconds: 8));
-  } catch (e, st) {
-    ErrorLogger.log('AuthService initialize failed or timed out',
-        error: e, stackTrace: st, category: 'Startup');
-  }
-
-  try {
-    await getIt<YtmAccountService>().init().timeout(const Duration(seconds: 8));
-  } catch (e, st) {
-    ErrorLogger.log('YtmAccountService init failed or timed out',
-        error: e, stackTrace: st, category: 'Startup');
+  // Defer heavy post-DI tasks to AFTER runApp to eliminate Davey! 1223ms jank on OnePlus
+  // Previously awaited 3x8s before first frame -> Skipped 121 frames. Now fire-and-forget.
+  void firePostStartupTasks() {
+    // Run in next microtask so first frame draws before any I/O
+    Future.microtask(() async {
+      try {
+        await Future.wait([
+          YtmRateLimiter.shared.restore().timeout(const Duration(seconds: 8)).catchError((e, st) {
+            ErrorLogger.log('YtmRateLimiter restore failed or timed out',
+                error: e, stackTrace: st, category: 'Startup');
+          }),
+          getIt<AuthService>().initialize().timeout(const Duration(seconds: 8)).catchError((e, st) {
+            ErrorLogger.log('AuthService initialize failed or timed out',
+                error: e, stackTrace: st, category: 'Startup');
+          }),
+          getIt<YtmAccountService>().init().timeout(const Duration(seconds: 8)).catchError((e, st) {
+            ErrorLogger.log('YtmAccountService init failed or timed out',
+                error: e, stackTrace: st, category: 'Startup');
+          }),
+        ]);
+      } catch (e, st) {
+        ErrorLogger.log('Parallel startup init failed',
+            error: e, stackTrace: st, category: 'Startup');
+      }
+    });
   }
 
   if (AppConfig.sentryDsn.isNotEmpty) {
@@ -114,10 +122,14 @@ Future<void> main() async {
         options.sendDefaultPii = false;
         options.enableAutoPerformanceTracing = true;
       },
-      appRunner: () => runApp(const PulsrApp()),
+      appRunner: () {
+        runApp(const PulsrApp());
+        firePostStartupTasks();
+      },
     );
   } else {
     runApp(const PulsrApp());
+    firePostStartupTasks();
   }
 }
 
@@ -128,7 +140,7 @@ class PulsrApp extends StatefulWidget {
   State<PulsrApp> createState() => _PulsrAppState();
 }
 
-class _PulsrAppState extends State<PulsrApp> {
+class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
   late final GoRouter _router;
   StreamSubscription<void>? _authExpiredSub;
   DateTime? _lastAuthExpiredPrompt;
@@ -136,10 +148,33 @@ class _PulsrAppState extends State<PulsrApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _router = createRouter(getIt<MediaScannerService>());
     _autoScanOnStartup();
     _checkInitialAudioIntent();
     _listenForYtmSessionExpiry();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // No-op: locale is stable; avoid AssetManager thrash (LOG-16)
+    }
+  }
+
+  @override
+  void didHaveMemoryPressure() {
+    // Trim artwork and stream caches on GC pressure (LOG-14 14MB/59MB)
+    try {
+      getIt<ArtworkCacheManager>().clearAllCache();
+    } catch (_) {}
+    try {
+      // ignore: avoid_dynamic_calls
+      (getIt.get<ArtworkLruCache>() as dynamic)?.trimForMemoryPressure();
+    } catch (_) {
+      // Fallback direct trim
+      try { ArtworkLruCache().trimForMemoryPressure(); } catch (_) {}
+    }
   }
 
   /// Surfaces a re-login prompt when the YouTube Music session dies mid-use
@@ -178,6 +213,7 @@ class _PulsrAppState extends State<PulsrApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _authExpiredSub?.cancel();
     super.dispose();
   }

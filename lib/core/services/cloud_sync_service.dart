@@ -161,6 +161,10 @@ class CloudSyncService {
         }
 
         final ref = favCollection.doc(docId);
+        // Privacy: hash local file paths, keep remoteId for YTM (path is PII)
+        final isLocalPath = song.path.startsWith('/') && song.remoteId == null;
+        final sanitizedPath = isLocalPath ? null : song.path;
+        final pathHash = isLocalPath ? sha256.convert(utf8.encode(song.path)).toString() : null;
         currentBatch.set(
             ref,
             {
@@ -169,7 +173,8 @@ class CloudSyncService {
               'artist': song.artist,
               'album': song.album,
               'durationMs': song.durationMs,
-              'path': song.path,
+              'path': sanitizedPath,
+              'pathHash': pathHash,
               'remoteId': song.remoteId,
               'remoteArtworkUrl': song.remoteArtworkUrl,
               'source': song.source,
@@ -228,6 +233,7 @@ class CloudSyncService {
           final fullKey = '${plDocId}_$songDocId';
 
           if (_syncedDocHashes[fullKey] != sHash) {
+            final isLocalSongPath = song.path.startsWith('/') && song.remoteId == null;
             currentBatch.set(
                 plDoc.collection('songs').doc(songDocId),
                 {
@@ -235,7 +241,8 @@ class CloudSyncService {
                   'title': song.title,
                   'artist': song.artist,
                   'album': song.album,
-                  'path': song.path,
+                  'path': isLocalSongPath ? null : song.path,
+                  'pathHash': isLocalSongPath ? sha256.convert(utf8.encode(song.path)).toString() : null,
                   'remoteId': song.remoteId,
                   'remoteArtworkUrl': song.remoteArtworkUrl,
                   'durationMs': song.durationMs,

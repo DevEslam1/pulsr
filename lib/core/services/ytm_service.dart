@@ -1,6 +1,7 @@
 // lib/core/services/ytm_service.dart
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -86,8 +87,8 @@ class YtmException implements Exception {
 @singleton
 class YtmService {
   static const String channelName = PulsrChannels.ytm;
-  static const Duration _defaultSearchTimeout = Duration(seconds: 15);
-  static const Duration _defaultResolveTimeout = Duration(seconds: 20);
+  static const Duration _defaultSearchTimeout = Duration(seconds: 25);
+  static const Duration _defaultResolveTimeout = Duration(seconds: 25);
 
   final MethodChannel _channel = const MethodChannel(channelName);
   final StreamController<void> _authExpiredController =
@@ -576,6 +577,13 @@ class YtmService {
         }
       } on MissingPluginException {
         throw const YtmException('YTM_UNSUPPORTED');
+      } on SocketException catch (e) {
+        // Offline/DNS failure — retry with backoff like YTM_TIMEOUT, surface offline
+        if (attempt == maxRetries) {
+          ErrorLogger.log('YTM network failure (offline): $e', category: 'YTM');
+          throw YtmException('YTM_OFFLINE', 'No internet: ${e.message}');
+        }
+        await Future.delayed(Duration(milliseconds: 800 * (1 << attempt)));
       } on PlatformException catch (e) {
         final isFatalCode = e.code == 'YTM_DISABLED' ||
             e.code == 'YTM_UNSUPPORTED' ||

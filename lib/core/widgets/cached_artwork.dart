@@ -46,6 +46,7 @@ class ArtworkLruCache {
       _currentBytes -= existing.length;
     }
 
+    // Evict LRU until within both count and bytes bounds (maxCapacity is inclusive)
     while ((_cache.length >= maxCapacity ||
             _currentBytes + bytes.length > maxBytes) &&
         _cache.isNotEmpty) {
@@ -72,6 +73,20 @@ class ArtworkLruCache {
     _cache.clear();
     _currentBytes = 0;
     ArtworkCacheManager().clearAllCache();
+  }
+
+  void trimForMemoryPressure() {
+    // Evict half of cache on memory pressure (LOG-14 GC 14MB/59MB)
+    while (_cache.length > maxCapacity ~/ 2 && _cache.isNotEmpty) {
+      final oldest = _cache.keys.first;
+      final removed = _cache.remove(oldest);
+      if (removed != null) _currentBytes -= removed.length;
+    }
+    while (_currentBytes > maxBytes ~/ 2 && _cache.isNotEmpty) {
+      final oldest = _cache.keys.first;
+      final removed = _cache.remove(oldest);
+      if (removed != null) _currentBytes -= removed.length;
+    }
   }
 }
 
@@ -149,8 +164,9 @@ class _CachedArtworkState extends State<CachedArtwork> {
 
     var uri = Uri.tryParse(targetUrl);
     if (uri == null || !uri.isScheme('https')) return null;
+    HttpClientRequest? request;
     try {
-      var request = await getIt<HttpClient>().getUrl(uri);
+      request = await getIt<HttpClient>().getUrl(uri).timeout(const Duration(seconds: 8));
       var response = await request.close().timeout(const Duration(seconds: 8));
 
       // Fall back to original URL if low-res or transformed URL returned non-200
@@ -158,7 +174,7 @@ class _CachedArtworkState extends State<CachedArtwork> {
         await response.drain<void>();
         final fallbackUri = Uri.tryParse(url);
         if (fallbackUri != null) {
-          request = await getIt<HttpClient>().getUrl(fallbackUri);
+          request = await getIt<HttpClient>().getUrl(fallbackUri).timeout(const Duration(seconds: 8));
           response = await request.close().timeout(const Duration(seconds: 8));
         }
       }
@@ -168,8 +184,11 @@ class _CachedArtworkState extends State<CachedArtwork> {
         await response.drain<void>();
         return null;
       }
-      return consolidateHttpClientResponseBytes(response);
+      final bytes = await consolidateHttpClientResponseBytes(response).timeout(const Duration(seconds: 8));
+      if (bytes.lengthInBytes > _maxRemoteBytes) return null;
+      return bytes;
     } catch (_) {
+      try { request?.abort(); } catch (_) {}
       return null;
     }
   }

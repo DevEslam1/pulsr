@@ -17,9 +17,11 @@ class AppHttpOverrides extends HttpOverrides {
 
   void update(ProxyConfig newConfig) {
     _config = newConfig;
+    // Log resolved proxy string rather than raw host:port when disabled to avoid misleading :8080
+    final resolved = newConfig.toFindProxyString(Uri.parse('https://example.com'));
     debugPrint(
       '[AppHttpOverrides] Proxy updated: enabled=${newConfig.enabled}, '
-      'type=${newConfig.type.name}, host=${newConfig.host}:${newConfig.port}',
+      'type=${newConfig.type.name}, resolved=$resolved, host=${newConfig.host}:${newConfig.port}',
     );
   }
 

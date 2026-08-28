@@ -144,13 +144,17 @@ class TagEditorCubit extends Cubit<TagEditorState> {
     emit(state.copyWith(year: val));
   }
 
+  bool _batchTrackEdited = false;
+  bool _batchCommentEdited = false;
   void updateTrackNumber(String val) {
     if (isClosed) return;
+    if (state.isBatchMode) _batchTrackEdited = true;
     emit(state.copyWith(trackNumber: val));
   }
 
   void updateComment(String val) {
     if (isClosed) return;
+    if (state.isBatchMode) _batchCommentEdited = true;
     emit(state.copyWith(comment: val));
   }
 
@@ -175,6 +179,10 @@ class TagEditorCubit extends Cubit<TagEditorState> {
           removeArtwork: false,
         ));
       }
+    } on PlatformException catch (e) {
+      if (isClosed) return;
+      final msg = e.code == 'photo_access_denied' || e.code == 'camera_access_denied' ? 'Permission denied to access gallery' : 'Failed to pick artwork image: ${e.message ?? e.code}';
+      emit(state.copyWith(errorMessage: msg));
     } catch (e) {
       if (isClosed) return;
       emit(state.copyWith(errorMessage: 'Failed to pick artwork image: $e'));
@@ -323,8 +331,8 @@ class TagEditorCubit extends Cubit<TagEditorState> {
                   : (state.year.isNotEmpty
                       ? state.year
                       : (s.year?.toString() ?? '')),
-              'trackNumber': s.trackNumber?.toString() ?? '',
-              'comment': state.comment.isNotEmpty ? state.comment : '',
+              'trackNumber': _batchTrackEdited ? state.trackNumber : (s.trackNumber?.toString() ?? ''),
+              'comment': _batchCommentEdited ? state.comment : '',
               'lyrics': '',
               'artworkPath': state.newArtworkPath,
               'removeArtwork': state.removeArtwork,
@@ -338,7 +346,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
           }
           if (isClosed) return;
         }
-        LrcParser.clearCache();
+        if (failedFiles.isEmpty) LrcParser.clearCache();
         if (isClosed) return;
         if (failedFiles.isNotEmpty) {
           emit(state.copyWith(
