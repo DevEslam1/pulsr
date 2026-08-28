@@ -45,4 +45,19 @@ void runSampleRateChangeTest() {
     }
 
     std::cout << "  ✓ All 8 sample rate transitions up to 768kHz remained stable, finite, and bounded." << std::endl;
+
+    // A2 (B-05): Direct ConvolutionReverb::setSampleRate must regenerate preparedIr for non-custom presets
+    {
+        std::cout << "  Running A2 ConvolutionReverb setSampleRate non-custom regeneration test..." << std::endl;
+        ConvolutionReverb reverb;
+        reverb.setSampleRate(44100.0);
+        reverb.setPreset(ReverbPreset::Hall);
+        assert(reverb.getPreparedIr() != nullptr);
+        assert(reverb.getPreparedIr()->createdSampleRate == 44100);
+
+        reverb.setSampleRate(96000.0);
+        assert(reverb.getPreparedIr() != nullptr);
+        assert(reverb.getPreparedIr()->createdSampleRate == 96000);
+        std::cout << "  ✓ A2 ConvolutionReverb::setSampleRate successfully regenerated IR at 96kHz." << std::endl;
+    }
 }

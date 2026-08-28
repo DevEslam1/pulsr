@@ -199,8 +199,10 @@ configurations.all {
     }
 }
 
+// A5 (N-07): Verified package*UnitTestForUnitTest matches real AGP PackageForHostTest tasks when isIncludeAndroidResources=true.
+// Must declare explicit dependency on copyFlutterAssets tasks to avoid Gradle implicit dependency failure.
 tasks.matching { it.name.startsWith("package") && it.name.endsWith("UnitTestForUnitTest") }.configureEach {
-    mustRunAfter(tasks.matching { it.name.startsWith("copyFlutterAssets") })
+    dependsOn(tasks.matching { it.name.startsWith("copyFlutterAssets") })
 }
 
 tasks.register("testNative") {

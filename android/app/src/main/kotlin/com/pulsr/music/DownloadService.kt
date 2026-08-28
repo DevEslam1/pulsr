@@ -189,5 +189,26 @@ class DownloadService : Service() {
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        // B1 (c): When task is removed with stopWithTask=false, keep foreground running if active downloads exist
+        if (activeDownloads.isEmpty()) {
+            stopForegroundAndSelf()
+        }
+    }
+
+    private val timeoutHandler = DownloadTimeoutHandler(this)
+
+    // A10 (N-06): API 35+ Foreground Service dataSync timeout handling
+    override fun onTimeout(startId: Int) {
+        timeoutHandler.handleTimeout(activeDownloads)
+        stopForegroundAndSelf()
+    }
+
+    override fun onTimeout(startId: Int, fgsType: Int) {
+        timeoutHandler.handleTimeout(activeDownloads)
+        stopForegroundAndSelf()
+    }
+
     private fun Iterable<Int>.average(): Double = if (none()) 0.0 else sum().toDouble() / count()
 }

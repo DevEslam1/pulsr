@@ -1901,6 +1901,11 @@ class PulsrAudioHandler extends BaseAudioHandler
       if (generation != _playGeneration) return;
       await _activePlayer.setVolume(_calculateReplayGainVolume(song));
       await _activePlayer.play();
+      final sessionId = _activePlayer.androidAudioSessionId;
+      if (sessionId != null && sessionId > 0) {
+        _currentAudioSessionId = sessionId;
+        unawaited(AudioEffectsChannel().setAudioSessionId(sessionId));
+      }
       _consecutiveFailures = 0;
       _repository.recordPlayHistory(song.id);
       _saveCurrentPosition();
@@ -1972,7 +1977,7 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   // --- PLAYBACK ACTIONS ---
   @override
-  Future<void> play() {
+  Future<void> play() async {
     ErrorLogger.addBreadcrumb('Playback started', category: 'player');
     // A restored YouTube session in the crossfade engine is left with no source
     // loaded (see restoreLastPlaybackSession); resolve and start it on the first
@@ -1983,7 +1988,12 @@ class PulsrAudioHandler extends BaseAudioHandler
       _pendingLazyPosition = null;
       return playSongAt(_currentIndex, initialPosition: pending);
     }
-    return _activePlayer.play();
+    await _activePlayer.play();
+    final sessionId = _activePlayer.androidAudioSessionId;
+    if (sessionId != null && sessionId > 0) {
+      _currentAudioSessionId = sessionId;
+      unawaited(AudioEffectsChannel().setAudioSessionId(sessionId));
+    }
   }
 
   @override

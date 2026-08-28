@@ -12,7 +12,11 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
-    <!-- Required solely for the audio visualizer; requested at runtime only when the user enables it -->
+    <!-- Play Console Policy Justification: android.permission.RECORD_AUDIO is required strictly for the
+         hardware-accelerated live audio visualizer DSP pipeline (android.media.audiofx.Visualizer) to render
+         real-time frequency spectrum waveforms. It is NEVER used to capture microphone audio, record user
+         conversations, or transmit audio data off-device. It is requested at runtime ONLY when the user opens
+         the visualizer screen; if denied, Pulsr gracefully falls back to synthetic simulated waveforms. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
 
     <!-- Custom signature permission to protect internal widget & playback broadcasts -->
@@ -36,7 +40,7 @@
             android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc" />
         <activity
-            android:name=".MainActivity"
+            android:name="com.pulsr.music.MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""
@@ -135,7 +139,7 @@
              Keeps downloads alive when app is backgrounded / screen off.
              Shows progress notification with pause/cancel actions; auto-stops when queue drains.
              Android 14+ requires foregroundServiceType="dataSync" matching the permission above. -->
-        <service android:name=".DownloadService"
+        <service android:name="com.pulsr.music.DownloadService"
             android:foregroundServiceType="dataSync"
             android:exported="false"
             android:stopWithTask="false" />
@@ -148,7 +152,7 @@
         </receiver>
 
         <receiver
-            android:name=".NowPlayingWidget"
+            android:name="com.pulsr.music.NowPlayingWidget"
             android:label="${appName} Widget"
             android:exported="true">
             <intent-filter>

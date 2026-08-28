@@ -1,6 +1,8 @@
 package com.pulsr.music
 
 import android.content.Context
+import android.media.AudioDeviceCallback
+import android.media.AudioDeviceInfo
 import android.media.AudioManager
 import android.media.audiofx.AudioEffect
 import android.media.audiofx.BassBoost
@@ -178,18 +180,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 nativeSetActiveStages(activeDspStages)
             } catch (e: Exception) {
                 Log.w(TAG, "nativeSetActiveStages failed: ${e.message}")
-            }
-
-            // W6: Bypass / disable OEM DynamicsProcessing when native DSP stages are active
-            // Fix sound drops: avoid toggling .enabled when already in desired state (causes dropout requiring EQ off/on)
-            if (activeDspStages != 0 && dspPreference != "oem") {
-                try {
-                    if (dynamicsProcessing?.enabled == true) dynamicsProcessing?.enabled = false
-                } catch (_: Exception) {}
-            } else if (activeDspStages == 0 && isEqEnabled && dspPreference != "native") {
-                try {
-                    if (dynamicsProcessing?.enabled == false) dynamicsProcessing?.enabled = true
-                } catch (_: Exception) {}
             }
 
             val ctx = context
@@ -406,13 +396,49 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
+    private var audioDeviceCallback: Any? = null
+
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         context = binding.applicationContext
         methodChannel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME)
         methodChannel.setMethodCallHandler(this)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val audioManager = binding.applicationContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            if (audioManager != null) {
+                val callback = object : AudioDeviceCallback() {
+                    override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
+                        mainHandler.postDelayed({
+                            if (currentAudioSessionId != 0 && hasActiveEffects()) {
+                                recreateEffects()
+                            }
+                        }, 200L)
+                    }
+
+                    override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
+                        mainHandler.postDelayed({
+                            if (currentAudioSessionId != 0 && hasActiveEffects()) {
+                                recreateEffects()
+                            }
+                        }, 200L)
+                    }
+                }
+                audioManager.registerAudioDeviceCallback(callback, mainHandler)
+                audioDeviceCallback = callback
+            }
+        }
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val callback = audioDeviceCallback as? AudioDeviceCallback
+            val audioManager = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            if (callback != null && audioManager != null) {
+                try { audioManager.unregisterAudioDeviceCallback(callback) } catch (_: Exception) {}
+            }
+        }
+        audioDeviceCallback = null
+
         volumeBoostRetryRunnable?.let {
             mainHandler.removeCallbacks(it)
             volumeBoostRetryRunnable = null
@@ -1229,7 +1255,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
         try {
             val builder = DynamicsProcessing.Config.Builder(
-                DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION,
+                DynamicsProcessing.VARIANT_FAVOR_TIME_RESOLUTION,
                 CHANNEL_COUNT,
                 false, // preEq
                 0,
@@ -1239,13 +1265,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 eqBandCount,
                 true   // limiter
             )
-            val nativeBufferMs = try {
-                val audioManager = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-                val nativeRate = audioManager?.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toIntOrNull() ?: 48000
-                val nativeFrames = audioManager?.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)?.toIntOrNull() ?: 192
-                (nativeFrames.toDouble() / nativeRate * 1000).toFloat().coerceIn(5f, 20f)
-            } catch (_: Exception) { 10f }
-            builder.setPreferredFrameDuration(nativeBufferMs)
+            builder.setPreferredFrameDuration(10f)
             builder.setPostEqAllChannelsTo(buildPostEq())
 
             val config = builder.build()
@@ -1257,7 +1277,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 neutralizeDynamics(dp)
             }
 
-            dp.enabled = true
+            dp.enabled = isEqEnabled || dynamicsActive
             dynamicsProcessing = dp
         } catch (e: Exception) {
             Log.w(TAG, "DynamicsProcessing build failed: ${e.message}")

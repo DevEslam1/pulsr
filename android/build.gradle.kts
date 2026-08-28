@@ -32,10 +32,6 @@ subprojects {
     project.evaluationDependsOn(":app")
 }
 
-// Subproject configuration for Flutter Android library plugins
-// FIX: Inconsistent JVM Target 1.8 vs 17 on :home_widget (and other KGP plugins)
-// Root cause: plugin's own android.compileOptions defaults to 1.8, while Kotlin targets 17.
-// We force 17 via android DSL + toolchain so Java and Kotlin match (AGP 9 + Kotlin 2.3 + JDK 17).
 subprojects {
     plugins.withId("com.android.library") {
         val android = extensions.findByType(com.android.build.gradle.LibraryExtension::class.java)
@@ -48,16 +44,6 @@ subprojects {
             }
             android.compileSdk = 36
         }
-    }
-}
-// Force Java 17 for all Android library/app projects after they are evaluated.
-// Using gradle.afterProject avoids the "already evaluated" error from Project.afterEvaluate
-// when subprojects have already been configured.
-gradle.afterProject {
-    val android = extensions.findByName("android")
-    if (android is com.android.build.gradle.BaseExtension) {
-        android.compileOptions.sourceCompatibility = JavaVersion.VERSION_17
-        android.compileOptions.targetCompatibility = JavaVersion.VERSION_17
     }
 }
 

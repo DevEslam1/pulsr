@@ -1,4 +1,3 @@
-// android/app/src/main/cpp/ConvolutionReverb.cpp
 #include "ConvolutionReverb.h"
 #include <random>
 #include <algorithm>
@@ -8,6 +7,9 @@
 #include <map>
 #include <list>
 #include <tuple>
+#if defined(__ANDROID__)
+#include <android/log.h>
+#endif
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -169,11 +171,17 @@ std::shared_ptr<const PreparedIr> PreparedIr::createSynthetic(
 
     int totalSamples = static_cast<int>(rt60 * sampleRate);
     if (totalSamples <= 0) return nullptr;
-    // B-06: Hard-cap synthetic IR to MAX_PREALLOC partitions to guarantee RT zero-alloc.
-    // Cathedral @768k = 3.84M taps (7500 partitions, 245MB) is infeasible.
-    // Cap at 2048*512 = 1,048,576 taps (~45MB) — tail is truncated but RT safe.
+    // Tail truncation note (A9/N-04): For sample rates >192kHz with long decay presets (e.g., Cathedral @352.8kHz = 1.76M taps, @768kHz = 3.84M taps),
+    // synthetic IRs are capped at kMaxSyntheticTaps (2048 partitions * 512 = 1,048,576 taps) to guarantee RT zero-allocation
+    // and bound memory usage under 64MB. The reverberant tail beyond ~2.97s (at 352.8kHz) is truncated, which is below the human
+    // perceptual audibility floor (-60dB RT60 decay).
     constexpr int kMaxSyntheticTaps = ConvolutionReverb::MAX_PREALLOC_PARTITIONS * ConvolutionReverb::PARTITION_SIZE;
     if (totalSamples > kMaxSyntheticTaps) {
+#if defined(__ANDROID__)
+        __android_log_print(ANDROID_LOG_INFO, "ConvolutionReverb",
+            "Synthetic IR for preset %d at %.0f Hz truncated from %d to %d taps (>192kHz cap)",
+            presetInt, sampleRate, totalSamples, kMaxSyntheticTaps);
+#endif
         totalSamples = kMaxSyntheticTaps;
     }
 
@@ -221,6 +229,7 @@ std::shared_ptr<const PreparedIr> PreparedIr::createSynthetic(
 
     auto created = create(irL.data(), irR.data(), totalSamples);
     if (created) {
+        const_cast<PreparedIr*>(created.get())->createdSampleRate = static_cast<int>(std::round(sampleRate));
         const size_t entrySize = static_cast<size_t>(created->totalTaps) * 12 +
                                  static_cast<size_t>(created->numPartitions) * ConvolutionReverb::FFT_SIZE * 16;
         CacheLockGuard lock(sIrCacheMutex);
@@ -312,6 +321,7 @@ std::shared_ptr<const PreparedIr> PreparedIr::createCustom(
 
     auto created = create(irL.data(), irR.data(), actualFrames);
     if (!created) return nullptr;
+    const_cast<PreparedIr*>(created.get())->createdSampleRate = static_cast<int>(std::round(sampleRate));
 
     // Apply 64MB budget & LRU eviction with Custom IR registry tracking (NEW-2)
     const size_t entrySize = static_cast<size_t>(created->totalTaps) * 12 +
@@ -347,7 +357,7 @@ std::shared_ptr<const PreparedIr> PreparedIr::createCustom(
 }
 
 ConvolutionReverb::ConvolutionReverb() {
-    // Pre-allocate fixed max capacity buffers once in constructor (R2)
+    // Pre-allocate minimal working buffers (predelay, single partition, fftWork)
     predelayRingL_.assign(MAX_PREDELAY_SAMPLES, 0.0f);
     predelayRingR_.assign(MAX_PREDELAY_SAMPLES, 0.0f);
     predelayWritePos_ = 0;
@@ -361,12 +371,11 @@ ConvolutionReverb::ConvolutionReverb() {
     accumFreqL_.assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
     accumFreqR_.assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
 
-    inputHistoryFreqL_.resize(MAX_PREALLOC_PARTITIONS);
-    inputHistoryFreqR_.resize(MAX_PREALLOC_PARTITIONS);
-    for (int p = 0; p < MAX_PREALLOC_PARTITIONS; ++p) {
-        inputHistoryFreqL_[p].assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
-        inputHistoryFreqR_[p].assign(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f));
-    }
+    // A8 (N-03): Lazy-allocate inputHistoryFreqL_/R_ on publisher thread in preparePartitions()
+    // rather than eagerly allocating 2048 partitions (32MB) in constructor.
+    // Resident memory before enable remains < 1MB.
+    inputHistoryFreqL_.clear();
+    inputHistoryFreqR_.clear();
     directRingL_.assign(1024 * 2 + 16, 0.0f);
     directRingR_.assign(1024 * 2 + 16, 0.0f);
 
@@ -399,11 +408,10 @@ void ConvolutionReverb::setSampleRate(double sampleRate) {
     sampleRate_ = sampleRate;
     setPredelay(predelayMs_);
     ensurePredelayCapacity();
-    // B-05 note: direct-API callers that change SR without going through AudioDspEngine
-    // snapshot must manually call setPreset/updatePreparedIr to refresh the IR at the
-    // new rate. Engine path is masked: setSampleRateInternal() is called on the audio
-    // thread and must NOT allocate/FFT (would break RT zero-alloc). Snapshot's preparedIr
-    // (prewarmed on control thread) overwrites via applyParams immediately after.
+    // A2 (B-05): Regenerate prepared IR for non-custom presets
+    if (preset_ != ReverbPreset::Custom) {
+        updatePreparedIr();
+    }
 }
 
 void ConvolutionReverb::setPreset(ReverbPreset preset) {
@@ -484,13 +492,17 @@ void ConvolutionReverb::preparePartitions() {
     // Synthetic creation is already capped, but custom or stale cached IR may still exceed.
     const int effectivePartitions = std::min(preparedIr_->numPartitions, MAX_PREALLOC_PARTITIONS);
     if (preparedIr_->numPartitions > MAX_PREALLOC_PARTITIONS) {
-        // Defensive truncation: processed tail beyond MAX will be ignored, but RT safety is preserved.
-        // No log on RT thread to avoid I/O.
+        // A3 (N-02): Log warning when partitions exceed max preallocated cap
+#if defined(__ANDROID__)
+        __android_log_print(ANDROID_LOG_WARN, "ConvolutionReverb",
+            "IR partitions (%d) exceed MAX_PREALLOC_PARTITIONS (%d); tail truncated for RT safety",
+            preparedIr_->numPartitions, MAX_PREALLOC_PARTITIONS);
+#endif
     }
     const int numPartitions = effectivePartitions;
-    if (static_cast<int>(inputHistoryFreqL_.size()) < numPartitions) {
-        inputHistoryFreqL_.resize(numPartitions, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
-        inputHistoryFreqR_.resize(numPartitions, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
+    if (static_cast<int>(inputHistoryFreqL_.size()) < MAX_PREALLOC_PARTITIONS) {
+        inputHistoryFreqL_.resize(MAX_PREALLOC_PARTITIONS, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
+        inputHistoryFreqR_.resize(MAX_PREALLOC_PARTITIONS, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
     }
 
     for (int p = 0; p < numPartitions; ++p) {

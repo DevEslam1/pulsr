@@ -89,11 +89,12 @@ class YtmUrlCache {
       : _capacity = capacity,
         _ttl = ttl;
 
-  String _buildKey(String videoId, String quality) => '$videoId:${quality.toLowerCase()}';
+  String _buildKey(String videoId, String quality, [String? egressId]) =>
+      '$videoId:${quality.toLowerCase()}:${egressId ?? "default"}';
 
   /// Retrieves cached entry if present and not expired. Moves entry to MRU position.
-  YtmUrlCacheEntry? get(String videoId, {String quality = 'high'}) {
-    final key = _buildKey(videoId, quality);
+  YtmUrlCacheEntry? get(String videoId, {String quality = 'high', String? egressId}) {
+    final key = _buildKey(videoId, quality, egressId);
     final entry = _cache[key];
     if (entry == null) return null;
 
@@ -110,18 +111,18 @@ class YtmUrlCache {
   }
 
   /// Returns valid cached URL string if available, null otherwise.
-  String? getUrl(String videoId, {String quality = 'high'}) {
-    return get(videoId, quality: quality)?.url;
+  String? getUrl(String videoId, {String quality = 'high', String? egressId}) {
+    return get(videoId, quality: quality, egressId: egressId)?.url;
   }
 
   /// Returns valid cached [YtmStream] if available, null otherwise.
-  YtmStream? getStream(String videoId, {String quality = 'high'}) {
-    return get(videoId, quality: quality)?.toStream(quality: quality);
+  YtmStream? getStream(String videoId, {String quality = 'high', String? egressId}) {
+    return get(videoId, quality: quality, egressId: egressId)?.toStream(quality: quality);
   }
 
   /// Checks if a valid, unexpired entry exists in cache.
-  bool contains(String videoId, {String quality = 'high'}) {
-    return get(videoId, quality: quality) != null;
+  bool contains(String videoId, {String quality = 'high', String? egressId}) {
+    return get(videoId, quality: quality, egressId: egressId) != null;
   }
 
   /// Stores a resolved stream URL into the LRU cache.
@@ -129,12 +130,13 @@ class YtmUrlCache {
     String videoId,
     String url, {
     String quality = 'high',
+    String? egressId,
     DateTime? explicitExpiry,
     String? userAgent,
     String? cookies,
     YtmStream? stream,
   }) {
-    final key = _buildKey(videoId, quality);
+    final key = _buildKey(videoId, quality, egressId);
     final now = _clock.now();
 
     // Determine expiration timestamp
@@ -169,11 +171,13 @@ class YtmUrlCache {
   void putStream(
     YtmStream stream, {
     String quality = 'high',
+    String? egressId,
   }) {
     put(
       stream.videoId,
       stream.url,
       quality: quality,
+      egressId: egressId,
       explicitExpiry: stream.expiresAtDateTime,
       userAgent: stream.userAgent,
       cookies: stream.cookies,
@@ -183,9 +187,15 @@ class YtmUrlCache {
 
   /// Invalidates entry for [videoId]. If [quality] is specified, removes exact entry.
   /// If [quality] is omitted or null, invalidates all qualities for that video.
-  void invalidate(String videoId, {String? quality}) {
-    if (quality != null) {
-      _cache.remove(_buildKey(videoId, quality));
+  void invalidate(String videoId, {String? quality, String? egressId}) {
+    if (quality != null && egressId != null) {
+      _cache.remove(_buildKey(videoId, quality, egressId));
+    } else if (quality != null) {
+      final prefix = '$videoId:${quality.toLowerCase()}:';
+      final keysToRemove = _cache.keys.where((k) => k.startsWith(prefix)).toList();
+      for (final k in keysToRemove) {
+        _cache.remove(k);
+      }
     } else {
       final prefix = '$videoId:';
       final keysToRemove = _cache.keys.where((k) => k.startsWith(prefix)).toList();
@@ -193,6 +203,11 @@ class YtmUrlCache {
         _cache.remove(k);
       }
     }
+  }
+
+  /// Flushes all cached URLs when network connectivity or proxy egress changes.
+  void flushOnEgressChange([String? newEgressId]) {
+    _cache.clear();
   }
 
   /// Clears entire in-memory URL cache.

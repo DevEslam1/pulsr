@@ -39,6 +39,8 @@ public:
     void reset();
 
     bool loadCustomIR(const float* irInterleaved, int frames, int channels);
+    std::shared_ptr<const PreparedIr> getPreparedIr() const { return preparedIr_; }
+    ReverbPreset getPreset() const { return preset_; }
 
     // Reverb wet-path block latency: 512 samples in partitioned mode, 0 in direct FIR
     int getReverbLatencyFrames() const {

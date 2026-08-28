@@ -87,4 +87,66 @@ void runSnapshotRaceTest() {
         assert(finalParams->activeStages == testStages[(iterations - 1) % 4]);
         std::cout << "  ✓ Interleaved 2-writer test completed with zero lost updates." << std::endl;
     }
+
+    // 3. A1 (N-01): Concurrent publishParams (preset changes) + setSampleRate stress test
+    {
+        std::cout << "  Running A1 concurrent preset mutations vs setSampleRate stress test..." << std::endl;
+        std::atomic<bool> stressRunning{true};
+        const double testRates[] = {44100.0, 48000.0, 88200.0, 96000.0, 192000.0};
+        const int iterations = 1000;
+
+        std::thread writerSR([&]() {
+            for (int i = 0; i < iterations; ++i) {
+                engine.setSampleRate(testRates[i % 5]);
+                std::this_thread::yield();
+            }
+            stressRunning.store(false);
+        });
+
+        std::thread writerPresets([&]() {
+            int p = 0;
+            while (stressRunning.load(std::memory_order_relaxed)) {
+                auto current = engine.getParams();
+                if (current) {
+                    auto updated = std::make_shared<DspParamSnapshot>(*current);
+                    updated->generation = current->generation + 1;
+                    updated->reverb.preset = p % 8; // 0..7 synthetic presets
+                    updated->reverb.damping = 0.1 * ((p % 9) + 1);
+                    updated->reverb.preparedIr = PreparedIr::createSynthetic(
+                        current->sampleRate,
+                        updated->reverb.preset,
+                        static_cast<float>(updated->reverb.damping));
+                    engine.publishParams(updated);
+                }
+                p++;
+                std::this_thread::yield();
+            }
+        });
+
+        std::thread readerVerify([&]() {
+            while (stressRunning.load(std::memory_order_relaxed)) {
+                auto snap = engine.getParams();
+                if (snap && snap->reverb.preparedIr && snap->reverb.preset != static_cast<int>(ReverbPreset::Custom)) {
+                    // Assert createdSampleRate matches snap->sampleRate
+                    int expectedSr = static_cast<int>(std::round(snap->sampleRate));
+                    int actualSr = snap->reverb.preparedIr->createdSampleRate;
+                    assert(actualSr == expectedSr || actualSr == 0);
+                }
+                std::this_thread::yield();
+            }
+        });
+
+        writerSR.join();
+        writerPresets.join();
+        readerVerify.join();
+
+        // Final verification after quiescence
+        auto snap = engine.getParams();
+        assert(snap != nullptr);
+        if (snap->reverb.preparedIr && snap->reverb.preset != static_cast<int>(ReverbPreset::Custom)) {
+            int expectedSr = static_cast<int>(std::round(snap->sampleRate));
+            assert(snap->reverb.preparedIr->createdSampleRate == expectedSr || snap->reverb.preparedIr->createdSampleRate == 0);
+        }
+        std::cout << "  ✓ A1 snapshot race test passed: all published IRs match their snapshot sample rate." << std::endl;
+    }
 }

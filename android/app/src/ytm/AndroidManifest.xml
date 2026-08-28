@@ -1,7 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
         <activity
-            android:name=".MainActivity">
+            android:name="com.pulsr.music.MainActivity">
             <!-- Intent filter to open YouTube Music & YouTube links (dev/ytm flavors only) -->
             <intent-filter android:label="${appName}">
                 <action android:name="android.intent.action.VIEW" />

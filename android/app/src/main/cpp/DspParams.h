@@ -56,6 +56,7 @@ struct PreparedIr {
     static constexpr int FFT_SIZE = PARTITION_SIZE * 2; // 1024
 
     int totalTaps = 0;
+    int createdSampleRate = 0;
     std::vector<float> irL;
     std::vector<float> irR;
     int numPartitions = 0;

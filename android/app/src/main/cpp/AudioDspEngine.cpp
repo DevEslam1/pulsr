@@ -2,6 +2,7 @@
 #include "AudioDspEngine.h"
 #include <algorithm>
 #include <cmath>
+#include <thread>
 
 AudioDspEngine& AudioDspEngine::instance() {
     static AudioDspEngine sInstance;
@@ -25,7 +26,7 @@ void AudioDspEngine::setSampleRateInternal(double sampleRate) {
     eq_.setSampleRate(sampleRate_);
     crossfeed_.setSampleRate(sampleRate_);
     limiter_.setSampleRate(sampleRate_);
-    reverb_.setSampleRate(sampleRate_);
+    // Reverb sample rate and prewarmed IR are applied via reverb_.applyParams(snapshot->reverb)
     resampler_.setRates(sampleRate_, sampleRate_);
 }
 
@@ -33,47 +34,75 @@ void AudioDspEngine::setSampleRate(double sampleRate) {
     if (sampleRate < 8000.0) sampleRate = 8000.0;
     if (sampleRate > 768000.0) sampleRate = 768000.0;
 
-    // B-03 fix: expensive IR synthesis (FFT of up to 1M taps) must NOT hold publishMutex_
-    // — otherwise EQ slider publishParams() stalls behind it (priority inversion).
-    // Prewarm BEFORE acquiring the lock, then re-validate under lock.
-    auto initial = currentParams_.load();
-    const bool wasCustom = (initial->reverb.preset == static_cast<int>(ReverbPreset::Custom));
-    std::shared_ptr<const PreparedIr> prewarmedIr = nullptr;
-    if (!wasCustom) {
-        prewarmedIr = PreparedIr::createSynthetic(
-            sampleRate,
-            initial->reverb.preset,
-            static_cast<float>(initial->reverb.damping));
-    } else {
-        // B-04 fix: Custom IR must survive SR change; createSynthetic would return nullptr
-        // and null would make applyParams keep stale old-rate IR (pitch-shifted).
-        // Retain the existing preparedIr so Custom tail isn't silently nulled.
-        prewarmedIr = initial->reverb.preparedIr;
-    }
+    // A1 (N-01): Bounded retry (max 2 attempts) to prewarm outside the lock.
+    // If snapshot mutated while prewarming (e.g. preset/damping changed), release lock and
+    // re-prewarm for the new parameters at the new sample rate.
+    // On second conflict, publish without an IR swap and schedule one async re-prewarm.
+    for (int attempt = 0; attempt < 2; ++attempt) {
+        auto initial = currentParams_.load();
+        const bool wasCustom = (initial->reverb.preset == static_cast<int>(ReverbPreset::Custom));
+        std::shared_ptr<const PreparedIr> prewarmedIr = nullptr;
+        if (!wasCustom) {
+            prewarmedIr = PreparedIr::createSynthetic(
+                sampleRate,
+                initial->reverb.preset,
+                static_cast<float>(initial->reverb.damping));
+        } else {
+            prewarmedIr = initial->reverb.preparedIr;
+        }
 
-    std::lock_guard<std::mutex> lock(publishMutex_);
-    auto current = currentParams_.load();
-    // If snapshot mutated while we were prewarming, discard stale prewarm and keep
-    // the newest preparedIr to avoid publishing mismatched damping/preset.
-    if (current != initial) {
+        std::unique_lock<std::mutex> lock(publishMutex_);
+        auto current = currentParams_.load();
         const bool nowCustom = (current->reverb.preset == static_cast<int>(ReverbPreset::Custom));
+
+        if (!nowCustom && current != initial &&
+            (current->reverb.preset != initial->reverb.preset ||
+             std::abs(current->reverb.damping - initial->reverb.damping) > 1e-9)) {
+            if (attempt == 0) {
+                // First conflict: unlock and re-prewarm with the new reverb params
+                lock.unlock();
+                continue;
+            } else {
+                // Second conflict: publish preserving current IR and schedule one async re-prewarm
+                const int targetPreset = current->reverb.preset;
+                const double targetDamping = current->reverb.damping;
+                auto updated = std::make_shared<DspParamSnapshot>(*current);
+                updated->generation = ++snapshotGeneration_;
+                updated->sampleRate = sampleRate;
+                updated->reverb.preparedIr = current->reverb.preparedIr;
+                currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(updated));
+                lock.unlock();
+
+                std::thread([this, sampleRate, targetPreset, targetDamping]() {
+                    auto asyncIr = PreparedIr::createSynthetic(sampleRate, targetPreset, static_cast<float>(targetDamping));
+                    if (asyncIr) {
+                        std::lock_guard<std::mutex> asyncLock(publishMutex_);
+                        auto latest = currentParams_.load();
+                        if (latest && latest->sampleRate == sampleRate &&
+                            latest->reverb.preset == targetPreset &&
+                            std::abs(latest->reverb.damping - targetDamping) < 1e-9) {
+                            auto newSnap = std::make_shared<DspParamSnapshot>(*latest);
+                            newSnap->generation = ++snapshotGeneration_;
+                            newSnap->reverb.preparedIr = asyncIr;
+                            currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(newSnap));
+                        }
+                    }
+                }).detach();
+                return;
+            }
+        }
+
         if (nowCustom) {
             prewarmedIr = current->reverb.preparedIr;
-        } else if (current->reverb.preset != initial->reverb.preset ||
-                   std::abs(current->reverb.damping - initial->reverb.damping) > 1e-9) {
-            // Stale damping/preset — keep current's IR; correct SR-specific IR will be
-            // regenerated on next preset/damping change or explicit setSampleRate retry.
-            prewarmedIr = current->reverb.preparedIr;
-            // Optional: lazily regenerate in background without holding lock (future improvement
-            // could dispatch async createSynthetic and re-publish). For now keep consistency.
         }
-    }
 
-    auto updated = std::make_shared<DspParamSnapshot>(*current);
-    updated->generation = ++snapshotGeneration_;
-    updated->sampleRate = sampleRate;
-    updated->reverb.preparedIr = prewarmedIr;
-    currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(updated));
+        auto updated = std::make_shared<DspParamSnapshot>(*current);
+        updated->generation = ++snapshotGeneration_;
+        updated->sampleRate = sampleRate;
+        updated->reverb.preparedIr = prewarmedIr;
+        currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(updated));
+        return;
+    }
 }
 
 void AudioDspEngine::setActiveStages(uint32_t bitmask) {
