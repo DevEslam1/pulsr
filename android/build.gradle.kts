@@ -1,3 +1,5 @@
+import org.gradle.api.tasks.compile.JavaCompile
+
 /**
  * Pulsr Music - Root Build Configuration
  *
@@ -31,6 +33,9 @@ subprojects {
 }
 
 // Subproject configuration for Flutter Android library plugins
+// FIX: Inconsistent JVM Target 1.8 vs 17 on :home_widget (and other KGP plugins)
+// Root cause: plugin's own android.compileOptions defaults to 1.8, while Kotlin targets 17.
+// We force 17 via android DSL + toolchain so Java and Kotlin match (AGP 9 + Kotlin 2.3 + JDK 17).
 subprojects {
     plugins.withId("com.android.library") {
         val android = extensions.findByType(com.android.build.gradle.LibraryExtension::class.java)
@@ -42,18 +47,26 @@ subprojects {
                 }
             }
             android.compileSdk = 36
-            android.compileOptions {
-                sourceCompatibility = JavaVersion.VERSION_17
-                targetCompatibility = JavaVersion.VERSION_17
-            }
         }
     }
+}
+// Force Java 17 for all Android library/app projects after they are evaluated.
+// Using gradle.afterProject avoids the "already evaluated" error from Project.afterEvaluate
+// when subprojects have already been configured.
+gradle.afterProject {
+    val android = extensions.findByName("android")
+    if (android is com.android.build.gradle.BaseExtension) {
+        android.compileOptions.sourceCompatibility = JavaVersion.VERSION_17
+        android.compileOptions.targetCompatibility = JavaVersion.VERSION_17
+    }
+}
 
+// Enforce JVM 17 for Java and Kotlin — fixes :home_widget 1.8 vs 17 (AGP 9 + KGP)
+subprojects {
     tasks.withType<JavaCompile>().configureEach {
         sourceCompatibility = JavaVersion.VERSION_17.toString()
         targetCompatibility = JavaVersion.VERSION_17.toString()
     }
-
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
@@ -62,6 +75,9 @@ subprojects {
         }
     }
 }
+
+// tasks.withType handles any late-created JavaCompile tasks that escape the DSL above
+// (kept for completeness; the android.compileOptions fix above is primary).
 
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)

@@ -15,6 +15,9 @@ class PlatformCapabilities {
   static bool get hasRingtoneManager => isAndroid;
   static bool get hasAppWidget => isAndroid;
   static bool get hasHardwareVisualizer => isAndroid;
+  // Downloads are Android-only (native downloader + MediaStore + FGS dataSync)
+  static bool get hasDownloads => isAndroid;
+  static bool get hasYtm => isAndroid;
 
   static Future<Map<String, bool>> queryNativeCapabilities() async {
     if (!isAndroid) {

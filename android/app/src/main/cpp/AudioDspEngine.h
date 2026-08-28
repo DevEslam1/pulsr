@@ -29,6 +29,21 @@ class AtomicSharedPtr {
 public:
     AtomicSharedPtr() = default;
     explicit AtomicSharedPtr(std::shared_ptr<T> p) : ptr_(std::move(p)) {}
+#if defined(__cpp_lib_atomic_shared_ptr) && __cpp_lib_atomic_shared_ptr >= 201711L
+    // C++20 path: lock-free atomic<shared_ptr> when the STL supports it (e.g. libstdc++ on NDK r26+)
+    std::shared_ptr<T> load(std::memory_order order = std::memory_order_seq_cst) const noexcept {
+        return ptr_.load(order);
+    }
+    void store(std::shared_ptr<T> desired, std::memory_order order = std::memory_order_seq_cst) noexcept {
+        ptr_.store(std::move(desired), order);
+    }
+private:
+    mutable std::atomic<std::shared_ptr<T>> ptr_;
+#else
+    // Fallback for libc++ on Windows host tests and older NDKs: the old free-function
+    // std::atomic_load / std::atomic_store are deprecated in C++20 but remain the only
+    // portable way to get atomic shared_ptr. Not guaranteed lock-free (B-11), but the
+    // runtime check in test_snapshot_race.cpp verifies lock-freedom where available.
     std::shared_ptr<T> load(std::memory_order order = std::memory_order_seq_cst) const noexcept {
         return std::atomic_load_explicit(&ptr_, order);
     }
@@ -37,6 +52,7 @@ public:
     }
 private:
     std::shared_ptr<T> ptr_;
+#endif
 };
 
 class AudioDspEngine {

@@ -19,6 +19,7 @@ import '../../domain/repositories/music_repository_interface.dart';
 import '../constants/channels.dart';
 import '../di/injection.dart';
 import '../errors/failures.dart';
+import '../errors/ytm_error_classifier.dart';
 import '../utils/error_logger.dart';
 import '../widgets/cached_artwork.dart';
 import 'xdm_backend_service.dart';
@@ -137,6 +138,8 @@ class YtDownloadService {
 
     _queue.add(task);
     onProgress?.call(const YtDownloadProgress(YtDownloadStage.queued));
+    ErrorLogger.addBreadcrumb('Download queued: ${task.song.remoteId}',
+        category: 'download', data: {'videoId': task.song.remoteId ?? ''});
     _processQueue();
 
     return completer.future;
@@ -203,6 +206,8 @@ class YtDownloadService {
       }
 
       onProgress?.call(const YtDownloadProgress(YtDownloadStage.resolving));
+      ErrorLogger.addBreadcrumb('Download resolving: $videoId',
+          category: 'download', data: {'videoId': videoId});
 
       // 1. Ensure PoToken attestation is fresh before requesting stream
       await _ytmService.ensurePoTokenReady();
@@ -265,8 +270,10 @@ class YtDownloadService {
 
       onProgress
           ?.call(const YtDownloadProgress(YtDownloadStage.downloading, 0));
+      ErrorLogger.addBreadcrumb('Download started: $videoId container=$ext',
+          category: 'download', data: {'videoId': videoId, 'ext': ext});
 
-      // 2. Download audio with transparent 403 re-resolution & resume
+      // 2. Download audio with transparent 403 re-resolution & resume (206 verified)
       await _downloadAudioWithRetry(
         stream: stream,
         videoId: videoId,
@@ -290,9 +297,10 @@ class YtDownloadService {
             DownloadFailure('Downloaded audio file is corrupt or incomplete'));
       }
 
-      // 3. Tagging
+      // 3. Tagging — artwork embed + tag standardization (TagEditorPlugin)
       if (stream.isTaggable) {
         onProgress?.call(const YtDownloadProgress(YtDownloadStage.tagging));
+        ErrorLogger.addBreadcrumb('Download tagging: $videoId', category: 'download');
         final artPath = artworkFuture != null ? await artworkFuture : null;
         await _tag(temp.path, song, artworkPath: artPath);
       }
@@ -302,6 +310,8 @@ class YtDownloadService {
       }
 
       onProgress?.call(const YtDownloadProgress(YtDownloadStage.saving));
+      ErrorLogger.addBreadcrumb('Download saving to MediaStore: $videoId',
+          category: 'download', data: {'videoId': videoId});
       final displayName =
           '${_sanitize(song.artist)} - ${_sanitize(song.title)}.$ext';
       final finalPath =
@@ -316,6 +326,8 @@ class YtDownloadService {
       }
 
       onProgress?.call(const YtDownloadProgress(YtDownloadStage.indexing));
+      ErrorLogger.addBreadcrumb('Download indexing: $videoId',
+          category: 'download', data: {'path': finalPath});
       final reconciled = await _repository.reconcileDownloadedSong(
         oldId: song.id,
         newPath: finalPath,
@@ -332,23 +344,31 @@ class YtDownloadService {
         (f) => Left(f),
         (newId) {
           if (newId == null) {
+            ErrorLogger.log('Download indexing missing library row: $videoId',
+                category: 'download');
             return const Left(DownloadFailure(
                 'Downloaded file was not found in the library'));
           }
           onProgress?.call(const YtDownloadProgress(YtDownloadStage.done, 1));
+          ErrorLogger.addBreadcrumb('Download done: $videoId',
+              category: 'download', data: {'newId': newId});
           return Right(newId);
         },
       );
     } on YtmException catch (e) {
+      final classified = YtmErrorClassifier.classify(e);
+      ErrorLogger.log('YTM download YtmException: ${e.code} → ${classified.message}',
+          error: e, category: 'download');
       if (e.isBotBlocked) {
-        return const Left(DownloadFailure(
-          'YouTube is rate-limiting downloads. Try again in a few minutes.',
+        return Left(DownloadFailure(
+          classified.message,
+          e,
         ));
       }
       return Left(DownloadFailure(
         e.isNetwork
             ? 'No connection while downloading'
-            : 'Could not resolve this track',
+            : classified.message,
         e,
       ));
     } on PlatformException catch (e) {
@@ -463,13 +483,24 @@ class YtDownloadService {
             '[YtDownloadService] Download attempt $attempts failed for $videoId: $e');
 
         if (e is FileSystemException ||
+            e is StorageFailure ||
             attempts >= maxAttempts ||
             task.isCanceled ||
             _canceledVideoIds.contains(videoId)) {
           rethrow;
         }
 
-        // Transparent 403 / failure re-resolution via same engine chain
+        // 429 → Retry-After-aware exponential backoff + jitter before poToken rotation
+        if (e is YtmException && (e.code == 'YTM_429' || e.details?.contains('Retry-After') == true)) {
+          final retryMatch = RegExp(r'Retry-After:\s*(\d+)').firstMatch(e.details ?? '');
+          final retrySec = retryMatch != null ? int.tryParse(retryMatch.group(1)!) : null;
+          final backoffMs = retrySec != null
+              ? retrySec * 1000
+              : (1000 * (1 << (attempts - 1))).clamp(1000, 15000) + (attempts * 137 % 400);
+          await Future.delayed(Duration(milliseconds: backoffMs));
+        }
+
+        // Transparent 403 / failure re-resolution via same engine chain (poToken rotation mid-download)
         await _ytmService.invalidatePoToken();
         await _ytmService.ensurePoTokenReady();
         currentStream = await _resolveDownloadStream(videoId, quality);
@@ -619,10 +650,16 @@ class YtDownloadService {
               cookies: cookies, range: 'bytes=$start-$end');
           final resp = await req.close();
 
-          if (resp.statusCode == HttpStatus.forbidden ||
-              resp.statusCode == 429) {
-            throw const YtmException(
-                'YTM_BOT_BLOCKED', 'Rate limited or forbidden');
+          if (resp.statusCode == 429) {
+            final retryAfter = resp.headers.value(HttpHeaders.retryAfterHeader);
+            final retrySec = int.tryParse(retryAfter ?? '');
+            await resp.drain<void>();
+            throw YtmException('YTM_429',
+                'HTTP 429 Rate limited${retrySec != null ? ' Retry-After: $retrySec' : ''}');
+          }
+          if (resp.statusCode == HttpStatus.forbidden) {
+            await resp.drain<void>();
+            throw const YtmException('YTM_BOT_BLOCKED', 'HTTP 403 Forbidden');
           }
 
           if (resp.statusCode != HttpStatus.partialContent &&
@@ -638,7 +675,15 @@ class YtDownloadService {
                   _canceledVideoIds.contains(task.song.remoteId)) {
                 throw const DownloadFailure('Download canceled');
               }
-              sink.add(chunk);
+              try {
+                sink.add(chunk);
+              } on FileSystemException catch (e) {
+                final m = e.message.toLowerCase();
+                if (m.contains('no space') || m.contains('enospc') || e.osError?.errorCode == 28) {
+                  throw const StorageFailure('Storage full while writing chunk');
+                }
+                rethrow;
+              }
               chunkReceived[chunkIndex] += chunk.length;
               final totalReceived = chunkReceived.reduce((a, b) => a + b);
               if (onProgress != null && total > 0) {
@@ -666,6 +711,12 @@ class YtDownloadService {
               }
             }
             await sink.flush();
+          } on FileSystemException catch (e) {
+            final m = e.message.toLowerCase();
+            if (m.contains('no space') || m.contains('enospc') || e.osError?.errorCode == 28) {
+              throw const StorageFailure('Storage full while writing chunk');
+            }
+            rethrow;
           } finally {
             await sink.close();
           }
@@ -773,25 +824,89 @@ class YtDownloadService {
     String? cookies,
   }) async {
     final stopwatch = Stopwatch()..start();
+    final partFile = File('${dest.path}.part');
+    int resumeOffset = 0;
+    try {
+      if (await partFile.exists()) {
+        resumeOffset = await partFile.length();
+        // Keep resume only if meaningful (>64k) to avoid overhead for tiny partials
+        if (resumeOffset < 64 * 1024) {
+          await partFile.delete();
+          resumeOffset = 0;
+        }
+      }
+    } catch (_) {
+      resumeOffset = 0;
+    }
+
     final request = await _http.openUrl('GET', uri);
-    _applyStreamHeaders(request, userAgent, cookies: cookies);
+    if (resumeOffset > 0) {
+      _applyStreamHeaders(request, userAgent,
+          cookies: cookies, range: 'bytes=$resumeOffset-');
+    } else {
+      _applyStreamHeaders(request, userAgent, cookies: cookies);
+    }
     final response = await request.close();
 
-    if (response.statusCode == HttpStatus.forbidden ||
-        response.statusCode == 429) {
-      throw const YtmException('YTM_BOT_BLOCKED', 'Rate limited or forbidden');
+    // 429 / Retry-After aware backoff + jitter integration
+    if (response.statusCode == 429) {
+      final retryAfter = response.headers.value(HttpHeaders.retryAfterHeader);
+      final retrySec = int.tryParse(retryAfter ?? '');
+      // Drain body before throwing so connection reused
+      await response.drain<void>();
+      throw YtmException('YTM_429',
+          'HTTP 429 Too Many Requests${retrySec != null ? ' Retry-After: $retrySec' : ''}');
+    }
+    if (response.statusCode == HttpStatus.forbidden) {
+      await response.drain<void>();
+      throw const YtmException('YTM_BOT_BLOCKED', 'HTTP 403 Forbidden');
     }
 
-    if (response.statusCode != HttpStatus.ok &&
-        response.statusCode != HttpStatus.partialContent) {
-      throw DownloadFailure('Server returned ${response.statusCode}');
+    // Resume correctness: if we sent Range, server MUST reply 206. A 200 means it ignored Range
+    // → appending would corrupt file. Discard stale part and restart.
+    if (resumeOffset > 0) {
+      if (response.statusCode == HttpStatus.ok) {
+        await response.drain<void>();
+        try {
+          await partFile.delete();
+        } catch (_) {}
+        // Retry fresh without Range (recurse once)
+        return _downloadSequential(uri, dest, task, onProgress,
+            userAgent: userAgent, cookies: cookies);
+      }
+      if (response.statusCode != HttpStatus.partialContent) {
+        await response.drain<void>();
+        throw DownloadFailure('Server returned ${response.statusCode} for resume');
+      }
+    } else {
+      if (response.statusCode != HttpStatus.ok &&
+          response.statusCode != HttpStatus.partialContent) {
+        await response.drain<void>();
+        throw DownloadFailure('Server returned ${response.statusCode}');
+      }
     }
 
-    final total = response.contentLength;
-    final partFile = File('${dest.path}.part');
-    final sink = partFile.openWrite();
-    var received = 0;
+    // Determine total expected size for atomic commit verification
+    int total = response.contentLength; // remaining bytes
+    // If resumed, total via Content-Range: bytes start-end/total
+    final contentRange = response.headers.value(HttpHeaders.contentRangeHeader);
+    int? expectedFinalSize;
+    if (contentRange != null && contentRange.contains('/')) {
+      expectedFinalSize = int.tryParse(contentRange.split('/').last);
+    } else if (total > 0) {
+      expectedFinalSize = resumeOffset + total;
+    }
+    // Fallback: if server gave contentLength as full size even for 206, handle
+    if (resumeOffset > 0 && total > 0 && expectedFinalSize == null) {
+      expectedFinalSize = resumeOffset + total;
+    }
+
+    final sink = resumeOffset > 0
+        ? partFile.openWrite(mode: FileMode.append)
+        : partFile.openWrite();
+    var received = resumeOffset;
     var lastEmitTime = 0;
+    final baseReceived = resumeOffset;
 
     try {
       await for (final chunk in response) {
@@ -802,14 +917,17 @@ class YtDownloadService {
         sink.add(chunk);
         if (onProgress != null) {
           final now = DateTime.now().millisecondsSinceEpoch;
-          if (now - lastEmitTime > 80 || (total > 0 && received == total)) {
+          final effectiveTotal = expectedFinalSize ?? total;
+          final fraction = effectiveTotal > 0
+              ? (received / effectiveTotal).clamp(0.0, 1.0).toDouble()
+              : null;
+          if (now - lastEmitTime > 80 ||
+              (effectiveTotal > 0 && received >= effectiveTotal)) {
             lastEmitTime = now;
             final elapsedSeconds = stopwatch.elapsedMilliseconds / 1000.0;
             final speedKbps =
-                elapsedSeconds > 0 ? (received / elapsedSeconds) / 1024.0 : 0.0;
-            final fraction =
-                total > 0 ? (received / total).clamp(0.0, 1.0) : null;
-            final remainingBytes = total > 0 ? total - received : 0;
+                elapsedSeconds > 0 ? ((received - baseReceived) / elapsedSeconds) / 1024.0 : 0.0;
+            final remainingBytes = effectiveTotal > 0 ? effectiveTotal - received : 0;
             final etaSeconds = (speedKbps > 0 && remainingBytes > 0)
                 ? (remainingBytes / (speedKbps * 1024.0)).round()
                 : null;
@@ -824,20 +942,40 @@ class YtDownloadService {
         }
       }
       await sink.flush();
+    } on FileSystemException catch (e) {
+      final msg = e.message.toLowerCase();
+      if (msg.contains('no space') || msg.contains('enospc') || e.osError?.errorCode == 28) {
+        throw const StorageFailure('Storage full while writing download');
+      }
+      rethrow;
     } finally {
       await sink.close();
     }
 
     if (task.isCanceled || _canceledVideoIds.contains(task.song.remoteId)) {
-      try {
-        if (await partFile.exists()) {
-          await partFile.delete();
-        }
-      } catch (_) {}
+      // Keep .part for resume if partially downloaded; don't delete on cancel (pause semantics)
       throw const DownloadFailure('Download canceled');
     }
 
+    // Atomic commit: verify size == expected, fsync, then rename
     if (await partFile.exists()) {
+      final finalSize = await partFile.length();
+      if (expectedFinalSize != null && finalSize != expectedFinalSize) {
+        // If server didn't give expected, at least ensure we received contentLength
+        if (total > 0 && finalSize < expectedFinalSize) {
+          throw DownloadFailure('Incomplete download: $finalSize/$expectedFinalSize bytes');
+        }
+      }
+      if (finalSize < 1024) {
+        await partFile.delete().catchError((_) => partFile);
+        throw const DownloadFailure('Downloaded file too small — corrupt');
+      }
+      // fsync before rename for durability (atomic commit)
+      try {
+        final raf = await partFile.open(mode: FileMode.append);
+        await raf.flush();
+        await raf.close();
+      } catch (_) {}
       if (await dest.exists()) {
         await dest.delete();
       }

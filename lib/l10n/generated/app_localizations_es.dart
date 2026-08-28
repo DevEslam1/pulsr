@@ -1192,6 +1192,27 @@ class AppLocalizationsEs extends AppLocalizations {
   String get resume => 'Reanudar';
 
   @override
+  String get downloadErrorNoSpace =>
+      'Sin espacio — libera almacenamiento y reintenta';
+
+  @override
+  String get downloadErrorRateLimited => 'YouTube está ocupado. Enfriando…';
+
+  @override
+  String get downloadErrorNetwork => 'Sin conexión. Revisa tu red.';
+
+  @override
+  String get downloadErrorBotChallenge =>
+      'Verificación de YouTube activada. Reintentando…';
+
+  @override
+  String get downloadErrorUnavailable => 'Esta pista no está disponible.';
+
+  @override
+  String get downloadWifiOnly =>
+      'Modo solo Wi-Fi activo. Conéctate al Wi-Fi para descargar.';
+
+  @override
   String get dspEnginePreference => 'Preferencia de motor DSP';
 
   @override

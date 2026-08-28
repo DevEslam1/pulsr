@@ -2296,6 +2296,42 @@ abstract class AppLocalizations {
   /// **'Resume'**
   String get resume;
 
+  /// No description provided for @downloadErrorNoSpace.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage full — free up space and retry'**
+  String get downloadErrorNoSpace;
+
+  /// No description provided for @downloadErrorRateLimited.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube is busy. Cooling down…'**
+  String get downloadErrorRateLimited;
+
+  /// No description provided for @downloadErrorNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'No connection. Check your network.'**
+  String get downloadErrorNetwork;
+
+  /// No description provided for @downloadErrorBotChallenge.
+  ///
+  /// In en, this message translates to:
+  /// **'YouTube verification triggered. Retrying…'**
+  String get downloadErrorBotChallenge;
+
+  /// No description provided for @downloadErrorUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'This track is unavailable.'**
+  String get downloadErrorUnavailable;
+
+  /// No description provided for @downloadWifiOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Wi-Fi Only Mode is active. Connect to Wi-Fi to download.'**
+  String get downloadWifiOnly;
+
   /// No description provided for @dspEnginePreference.
   ///
   /// In en, this message translates to:

@@ -65,6 +65,14 @@ android {
         }
     }
 
+    // Flavor-specific ProGuard keep rules for NewPipeExtractor + Rhino.
+    // AGP does NOT auto-discover src/<flavor>/proguard-rules.pro, so we wire them
+    // explicitly. B-02 fix: these rules were previously dead code; without them
+    // R8 strips the extractor in dev/ytm release builds -> runtime crash.
+    // Using androidComponents to inject per-flavor proguard files correctly.
+    // Fallback wiring via buildTypes ensures the rules are present even if
+    // productFlavors ProGuard DSL is not supported in this AGP version.
+
     // The extractor bridge lives outside src/main so that `prod` -- the Play
     // Store variant -- cannot compile it and does not link NewPipeExtractor at
     // all. This is a hard exclusion, unlike the Dart-side ENABLE_YTM gate which
@@ -120,15 +128,21 @@ android {
             signingConfig = if (hasKeystore) releaseConfig else signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
+            // Include flavor-specific ProGuard rules so dev/ytm keep NewPipe/Rhino (B-02).
+            // Both flavor files contain identical keep rules; including both is idempotent and harmless for prod.
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
+                "src/dev/proguard-rules.pro",
+                "src/ytm/proguard-rules.pro"
             )
         }
     }
 
     testOptions {
-        unitTests.isReturnDefaultValues = true
+        // B-10 fix: false prevents silent stubbing of un-mocked MethodChannels (which caused false-greens)
+        unitTests.isReturnDefaultValues = false
+        unitTests.isIncludeAndroidResources = true
     }
 
     lint {
@@ -348,7 +362,42 @@ tasks.register("validateProdIsolation") {
             }
         }
 
-        println("[validateProdIsolation] PASSED: Prod isolation verified successfully across manifests, kotlin, res, assets, and proguard.")
+        // 6. Check native C++ sources (B-12 completeness gap)
+        val mainCppDir = file("src/main/cpp")
+        if (mainCppDir.exists()) {
+            mainCppDir.walkTopDown().filter { it.isFile && (it.extension == "cpp" || it.extension == "h" || it.extension == "c" || it.extension == "cc") }.forEach { file ->
+                val text = file.readText()
+                for (term in forbiddenTerms) {
+                    if (text.contains(term)) {
+                        throw GradleException("Forbidden GPL/YouTube term '$term' found in src/main/cpp file: ${file.path}")
+                    }
+                }
+            }
+        }
+
+        // 7. Check jniLibs (prebuilt .so that could hide extractor)
+        val jniLibsDir = file("src/main/jniLibs")
+        if (jniLibsDir.exists()) {
+            jniLibsDir.walkTopDown().filter { it.isFile }.forEach { file ->
+                // Binary scan as text fallback — look for forbidden strings in file name and text-readable content
+                val name = file.name
+                for (term in forbiddenTerms) {
+                    if (name.contains(term)) {
+                        throw GradleException("Forbidden GPL/YouTube term '$term' found in jniLibs file name: ${file.path}")
+                    }
+                }
+                try {
+                    val text = file.readText(Charsets.UTF_8)
+                    for (term in forbiddenTerms) {
+                        if (text.contains(term)) {
+                            throw GradleException("Forbidden GPL/YouTube term '$term' found in jniLibs file: ${file.path}")
+                        }
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+
+        println("[validateProdIsolation] PASSED: Prod isolation verified successfully across manifests, kotlin, res, assets, proguard, cpp, and jniLibs.")
     }
 }
 

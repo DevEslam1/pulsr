@@ -7,7 +7,8 @@ void main() {
       expect(AppConfig.environment, AppEnvironment.dev);
       expect(AppConfig.isDev, isTrue);
       expect(AppConfig.isProd, isFalse);
-      expect(AppConfig.appTitle, 'Pulsr Dev');
+      // B-08 single source: dev flavor native label is "Pulsr Plus"
+      expect(AppConfig.appTitle, 'Pulsr Plus');
     });
 
     test('Reads environment fields', () {

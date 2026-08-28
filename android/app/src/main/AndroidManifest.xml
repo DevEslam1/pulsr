@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
+    <!-- B-07: downloads need a dataSync FGS to survive Doze/App Standby; Android 14+ requires typed permission -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
@@ -128,6 +130,15 @@
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
+
+        <!-- B-07: Dedicated foreground service for YouTube downloads (dataSync).
+             Keeps downloads alive when app is backgrounded / screen off.
+             Shows progress notification with pause/cancel actions; auto-stops when queue drains.
+             Android 14+ requires foregroundServiceType="dataSync" matching the permission above. -->
+        <service android:name=".DownloadService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false"
+            android:stopWithTask="false" />
 
         <receiver android:name="androidx.media.session.MediaButtonReceiver"
             android:exported="true" tools:ignore="Instantiatable">

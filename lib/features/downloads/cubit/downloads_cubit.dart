@@ -67,13 +67,15 @@ class DownloadsCubit extends Cubit<DownloadsState> {
       final lastEmit = _lastEmitTimeByVideoId[task.videoId] ?? 0;
       final existingTask = state.tasks[task.videoId];
 
-      // Immediate emit on status transition or terminal state; throttle intermediate progress (4Hz / 250ms)
+      // Coalesce intermediate progress at ~10Hz (100ms) — prevents rebuild storms
+      // from 1000/s chunk callbacks (native parallel emits at ~80ms). Immediate on
+      // status transitions / terminal states so pause/complete feels instant.
       final isProgressOnly = existingTask != null &&
           existingTask.status == task.status &&
           task.status == DownloadStatus.downloading &&
           task.progress < 1.0;
 
-      if (isProgressOnly && (now - lastEmit < 250)) {
+      if (isProgressOnly && (now - lastEmit < 100)) {
         return;
       }
 

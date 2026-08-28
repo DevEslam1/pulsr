@@ -1200,6 +1200,25 @@ class AppLocalizationsAr extends AppLocalizations {
   String get resume => 'استئناف';
 
   @override
+  String get downloadErrorNoSpace => 'التخزين ممتلئ — حرّر مساحة وأعد المحاولة';
+
+  @override
+  String get downloadErrorRateLimited => 'يوتيوب مشغول. فترة تبريد…';
+
+  @override
+  String get downloadErrorNetwork => 'لا يوجد اتصال. تحقق من الشبكة.';
+
+  @override
+  String get downloadErrorBotChallenge =>
+      'تم تشغيل التحقق من يوتيوب. جارٍ إعادة المحاولة…';
+
+  @override
+  String get downloadErrorUnavailable => 'هذا المسار غير متوفر.';
+
+  @override
+  String get downloadWifiOnly => 'وضع Wi-Fi فقط نشط. اتصل بالشبكة للتنزيل.';
+
+  @override
   String get dspEnginePreference => 'تفضيل محرك معالجة الصوت (DSP)';
 
   @override

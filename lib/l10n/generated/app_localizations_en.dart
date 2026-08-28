@@ -1188,6 +1188,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get resume => 'Resume';
 
   @override
+  String get downloadErrorNoSpace => 'Storage full — free up space and retry';
+
+  @override
+  String get downloadErrorRateLimited => 'YouTube is busy. Cooling down…';
+
+  @override
+  String get downloadErrorNetwork => 'No connection. Check your network.';
+
+  @override
+  String get downloadErrorBotChallenge =>
+      'YouTube verification triggered. Retrying…';
+
+  @override
+  String get downloadErrorUnavailable => 'This track is unavailable.';
+
+  @override
+  String get downloadWifiOnly =>
+      'Wi-Fi Only Mode is active. Connect to Wi-Fi to download.';
+
+  @override
   String get dspEnginePreference => 'DSP Engine Preference';
 
   @override

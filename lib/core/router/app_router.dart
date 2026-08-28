@@ -45,8 +45,9 @@ GoRouter createRouter(MediaScannerService scannerService) {
     navigatorKey: rootNavigatorKey,
     initialLocation: '/splash',
     redirect: (context, state) {
-      if (!AppConfig.ytmEnabled && state.uri.path == '/ytm-search') {
-        return '/';
+      if (!AppConfig.ytmEnabled) {
+        const ytmPaths = {'/ytm-search', '/ytm-explore', '/downloads'};
+        if (ytmPaths.contains(state.uri.path)) return '/';
       }
       return null;
     },
@@ -310,6 +311,12 @@ GoRouter createRouter(MediaScannerService scannerService) {
           parentNavigatorKey: rootNavigatorKey,
           builder: (context, state) => const YtmBrowseScreen(),
         ),
+        GoRoute(
+          path: '/downloads',
+          name: 'downloads',
+          parentNavigatorKey: rootNavigatorKey,
+          builder: (context, state) => const DownloadsScreen(),
+        ),
       ],
       GoRoute(
         path: '/artwork-grid',
@@ -346,12 +353,6 @@ GoRouter createRouter(MediaScannerService scannerService) {
         name: 'cloud-backup-dashboard',
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const CloudBackupDashboardScreen(),
-      ),
-      GoRoute(
-        path: '/downloads',
-        name: 'downloads',
-        parentNavigatorKey: rootNavigatorKey,
-        builder: (context, state) => const DownloadsScreen(),
       ),
     ],
   );

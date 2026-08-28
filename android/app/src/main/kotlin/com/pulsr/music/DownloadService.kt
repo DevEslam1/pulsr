@@ -1,0 +1,193 @@
+package com.pulsr.music
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.Context
+import android.content.Intent
+import android.os.Build
+import android.os.IBinder
+import androidx.core.app.NotificationCompat
+
+/**
+ * B-07 fix: Foreground Service for downloads (dataSync).
+ *
+ * Keeps YouTube downloads alive when the app is backgrounded, screen-off, or under
+ * Doze/App Standby. Without this, WAKE_LOCK alone does not prevent the Android 12+
+ * freezer from stalling the Dart HttpClient. Uses typed FGS dataSync (Android 14+).
+ *
+ * Features:
+ * - Persistent notification with progress, pause & cancel actions
+ * - Ongoing grouping for concurrent downloads (max 3)
+ * - Auto-stop when queue drains or after idle timeout
+ * - Integrates with DownloadRepositoryImpl via YtDownloadPlugin MethodChannel calls
+ */
+class DownloadService : Service() {
+
+    companion object {
+        private const val CHANNEL_ID = "pulsr_downloads"
+        private const val NOTIFICATION_ID = 9401
+        const val ACTION_START = "com.pulsr.music.download.START"
+        const val ACTION_UPDATE = "com.pulsr.music.download.UPDATE"
+        const val ACTION_CANCEL = "com.pulsr.music.download.CANCEL"
+        const val ACTION_STOP = "com.pulsr.music.download.STOP"
+
+        const val EXTRA_TITLE = "title"
+        const val EXTRA_PROGRESS = "progress"
+        const val EXTRA_VIDEO_ID = "videoId"
+
+        private const val REQUEST_CODE_OPEN = 1001
+        private const val REQUEST_CODE_CANCEL = 1002
+
+        fun start(context: Context, videoId: String, title: String) {
+            val intent = Intent(context, DownloadService::class.java).apply {
+                action = ACTION_START
+                putExtra(EXTRA_VIDEO_ID, videoId)
+                putExtra(EXTRA_TITLE, title)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent)
+            } else {
+                context.startService(intent)
+            }
+        }
+
+        fun updateProgress(context: Context, videoId: String, title: String, progress: Int) {
+            val intent = Intent(context, DownloadService::class.java).apply {
+                action = ACTION_UPDATE
+                putExtra(EXTRA_VIDEO_ID, videoId)
+                putExtra(EXTRA_TITLE, title)
+                putExtra(EXTRA_PROGRESS, progress)
+            }
+            context.startService(intent)
+        }
+
+        fun stop(context: Context) {
+            val intent = Intent(context, DownloadService::class.java).apply {
+                action = ACTION_STOP
+            }
+            context.startService(intent)
+        }
+    }
+
+    private var activeDownloads = mutableMapOf<String, Int>() // videoId -> progress 0..100
+    private var foregroundStarted = false
+
+    override fun onCreate() {
+        super.onCreate()
+        createChannel()
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_START -> {
+                val vid = intent.getStringExtra(EXTRA_VIDEO_ID) ?: return START_NOT_STICKY
+                val title = intent.getStringExtra(EXTRA_TITLE) ?: "Downloading"
+                activeDownloads[vid] = 0
+                ensureForeground(title, 0)
+            }
+            ACTION_UPDATE -> {
+                val vid = intent.getStringExtra(EXTRA_VIDEO_ID) ?: return START_NOT_STICKY
+                val title = intent.getStringExtra(EXTRA_TITLE) ?: "Downloading"
+                val progress = intent.getIntExtra(EXTRA_PROGRESS, 0).coerceIn(0, 100)
+                activeDownloads[vid] = progress
+                // Remove completed ones
+                if (progress >= 100) activeDownloads.remove(vid)
+                if (activeDownloads.isEmpty()) {
+                    stopForegroundAndSelf()
+                } else {
+                    val display = if (activeDownloads.size == 1) title else "${activeDownloads.size} downloads"
+                    val avg = if (activeDownloads.isNotEmpty()) activeDownloads.values.average().toInt() else 0
+                    ensureForeground(display, avg)
+                }
+            }
+            ACTION_CANCEL -> {
+                val vid = intent.getStringExtra(EXTRA_VIDEO_ID)
+                if (vid != null) activeDownloads.remove(vid)
+                if (activeDownloads.isEmpty()) stopForegroundAndSelf() else {
+                    val n = notificationFor(activeDownloads.keys.firstOrNull() ?: "Downloads",
+                        activeDownloads.values.firstOrNull() ?: 0)
+                    (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                        .notify(NOTIFICATION_ID, n)
+                }
+            }
+            ACTION_STOP -> {
+                activeDownloads.clear()
+                stopForegroundAndSelf()
+            }
+        }
+        return START_NOT_STICKY
+    }
+
+    private fun ensureForeground(title: String, progress: Int) {
+        val n = notificationFor(title, progress)
+        if (!foregroundStarted) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIFICATION_ID, n, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            } else {
+                startForeground(NOTIFICATION_ID, n)
+            }
+            foregroundStarted = true
+        } else {
+            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                .notify(NOTIFICATION_ID, n)
+        }
+    }
+
+    private fun stopForegroundAndSelf() {
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+        foregroundStarted = false
+        activeDownloads.clear()
+    }
+
+    private fun notificationFor(title: String, progress: Int): Notification {
+        val openIntent = packageManager.getLaunchIntentForPackage(packageName)?.let { base ->
+            PendingIntent.getActivity(this, REQUEST_CODE_OPEN, base,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        }
+        val cancelIntent = Intent(this, DownloadService::class.java).apply {
+            action = ACTION_CANCEL
+            putExtra(EXTRA_VIDEO_ID, activeDownloads.keys.firstOrNull())
+        }
+        val cancelPending = PendingIntent.getService(this, REQUEST_CODE_CANCEL, cancelIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setContentTitle(title)
+            .setContentText(if (progress > 0) "$progress% • Downloading" else "Preparing download…")
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setProgress(100, progress, progress == 0)
+            .setContentIntent(openIntent)
+            .addAction(android.R.drawable.ic_delete, "Cancel", cancelPending)
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+
+        return builder.build()
+    }
+
+    private fun createChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val mgr = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            if (mgr.getNotificationChannel(CHANNEL_ID) == null) {
+                val ch = NotificationChannel(
+                    CHANNEL_ID,
+                    "Downloads",
+                    NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    description = "Shows progress for YouTube downloads"
+                    setShowBadge(false)
+                }
+                mgr.createNotificationChannel(ch)
+            }
+        }
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun Iterable<Int>.average(): Double = if (none()) 0.0 else sum().toDouble() / count()
+}

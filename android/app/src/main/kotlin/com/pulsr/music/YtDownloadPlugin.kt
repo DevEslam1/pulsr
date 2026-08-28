@@ -106,6 +106,36 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                     }
                 }
             }
+            // B-07: Download foreground service lifecycle
+            "startDownloadForeground" -> {
+                val videoId = call.argument<String>("videoId") ?: ""
+                val title = call.argument<String>("title") ?: "Downloading"
+                try {
+                    DownloadService.start(currentContext, videoId, title)
+                    result.success(true)
+                } catch (e: Exception) {
+                    result.error("FGS_START_FAILED", e.message, null)
+                }
+            }
+            "updateDownloadProgress" -> {
+                val videoId = call.argument<String>("videoId") ?: ""
+                val title = call.argument<String>("title") ?: "Downloading"
+                val progress = (call.argument<Int>("progress") ?: 0).coerceIn(0, 100)
+                try {
+                    DownloadService.updateProgress(currentContext, videoId, title, progress)
+                    result.success(true)
+                } catch (e: Exception) {
+                    result.success(false)
+                }
+            }
+            "stopDownloadForeground" -> {
+                try {
+                    DownloadService.stop(currentContext)
+                    result.success(true)
+                } catch (e: Exception) {
+                    result.success(false)
+                }
+            }
             else -> result.notImplemented()
         }
     }

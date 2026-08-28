@@ -46,7 +46,10 @@ class AppConfig {
     if (lowerFlavor == 'ytm' || ytmEnabled) {
       return 'Pulsr Music';
     }
-    return isProd ? 'Pulsr Music' : 'Pulsr Dev';
+    // B-08 single source of truth: dev flavor's native label is "Pulsr Plus" (app/build.gradle.kts)
+    // Align Dart title so launcher + in-app branding match. Prod stays "Pulsr Music".
+    if (lowerFlavor == 'dev') return 'Pulsr Plus';
+    return isProd ? 'Pulsr Music' : 'Pulsr Plus';
   }
 
   /// Validates that build flavor and runtime environment configuration are aligned.

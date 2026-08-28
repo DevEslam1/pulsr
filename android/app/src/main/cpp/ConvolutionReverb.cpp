@@ -167,8 +167,15 @@ std::shared_ptr<const PreparedIr> PreparedIr::createSynthetic(
     // Respect user damping as multiplier on preset damping (BUG-004)
     const float damp = std::clamp(presetDamp * dampingFactor * 2.0f, 0.05f, 0.95f);
 
-    const int totalSamples = static_cast<int>(rt60 * sampleRate);
+    int totalSamples = static_cast<int>(rt60 * sampleRate);
     if (totalSamples <= 0) return nullptr;
+    // B-06: Hard-cap synthetic IR to MAX_PREALLOC partitions to guarantee RT zero-alloc.
+    // Cathedral @768k = 3.84M taps (7500 partitions, 245MB) is infeasible.
+    // Cap at 2048*512 = 1,048,576 taps (~45MB) — tail is truncated but RT safe.
+    constexpr int kMaxSyntheticTaps = ConvolutionReverb::MAX_PREALLOC_PARTITIONS * ConvolutionReverb::PARTITION_SIZE;
+    if (totalSamples > kMaxSyntheticTaps) {
+        totalSamples = kMaxSyntheticTaps;
+    }
 
     std::vector<float> irL(totalSamples);
     std::vector<float> irR(totalSamples);
@@ -225,6 +232,10 @@ std::shared_ptr<const PreparedIr> PreparedIr::createSynthetic(
         }
 
         // Evict oldest entries to satisfy 64MB budget (R1)
+        // Guard: single oversized entry must never breach budget (B-01)
+        if (entrySize > SYNTHETIC_CACHE_BUDGET_BYTES) {
+            return created; // usable but uncached — prevents 77MB Cathedral@352.8k / 169MB@768k from over-budgeting
+        }
         while (sCurrentCacheBytes + entrySize > SYNTHETIC_CACHE_BUDGET_BYTES && !sIrCacheLruList.empty()) {
             const auto oldestKey = sIrCacheLruList.back();
             auto mapIt = sIrCacheMap.find(oldestKey);
@@ -233,6 +244,9 @@ std::shared_ptr<const PreparedIr> PreparedIr::createSynthetic(
                 sIrCacheMap.erase(mapIt);
             }
             sIrCacheLruList.pop_back();
+        }
+        if (sCurrentCacheBytes + entrySize > SYNTHETIC_CACHE_BUDGET_BYTES) {
+            return created; // still over after evicting everything → return uncached
         }
 
         sIrCacheLruList.push_front(key);
@@ -385,6 +399,11 @@ void ConvolutionReverb::setSampleRate(double sampleRate) {
     sampleRate_ = sampleRate;
     setPredelay(predelayMs_);
     ensurePredelayCapacity();
+    // B-05 note: direct-API callers that change SR without going through AudioDspEngine
+    // snapshot must manually call setPreset/updatePreparedIr to refresh the IR at the
+    // new rate. Engine path is masked: setSampleRateInternal() is called on the audio
+    // thread and must NOT allocate/FFT (would break RT zero-alloc). Snapshot's preparedIr
+    // (prewarmed on control thread) overwrites via applyParams immediately after.
 }
 
 void ConvolutionReverb::setPreset(ReverbPreset preset) {
@@ -460,7 +479,15 @@ void ConvolutionReverb::preparePartitions() {
         return;
     }
 
-    const int numPartitions = preparedIr_->numPartitions;
+    // B-06: RT-alloc guard — cap effective partitions to preallocated max (2048) to avoid
+    // unbounded allocation on the audio thread (Cathedral@768k = 7500 partitions → 245MB).
+    // Synthetic creation is already capped, but custom or stale cached IR may still exceed.
+    const int effectivePartitions = std::min(preparedIr_->numPartitions, MAX_PREALLOC_PARTITIONS);
+    if (preparedIr_->numPartitions > MAX_PREALLOC_PARTITIONS) {
+        // Defensive truncation: processed tail beyond MAX will be ignored, but RT safety is preserved.
+        // No log on RT thread to avoid I/O.
+    }
+    const int numPartitions = effectivePartitions;
     if (static_cast<int>(inputHistoryFreqL_.size()) < numPartitions) {
         inputHistoryFreqL_.resize(numPartitions, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
         inputHistoryFreqR_.resize(numPartitions, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
@@ -582,7 +609,8 @@ void ConvolutionReverb::process(const float* inL, const float* inR, float* outL,
     }
 
     // Textbook Uniform-Partitioned Overlap-Save FFT Convolution (for IR > 1024)
-    const int numPartitions = preparedIr_->numPartitions;
+    // B-06 clamp: keep effective partitions within preallocated max to guarantee RT safety
+    const int numPartitions = std::min(preparedIr_->numPartitions, MAX_PREALLOC_PARTITIONS);
     const auto& irFreqL = preparedIr_->irFreqL;
     const auto& irFreqR = preparedIr_->irFreqR;
 
