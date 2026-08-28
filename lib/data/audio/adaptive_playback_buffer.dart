@@ -1,5 +1,24 @@
 /// Dynamic buffer sizing calculator based on network speed, connection type, and track bitrate.
 class AdaptivePlaybackBuffer {
+  /// Calculates initial start buffer duration before playback begins.
+  /// Fast Wi-Fi (>=8 Mbps): 800ms
+  /// Standard Cellular (2-8 Mbps): 1200ms
+  /// Poor network (<2 Mbps): 2500ms
+  static Duration calculateStartBuffer({
+    required double networkSpeedMbps,
+    required bool isWifi,
+  }) {
+    final speed =
+        networkSpeedMbps <= 0 ? (isWifi ? 10.0 : 2.0) : networkSpeedMbps;
+    if (isWifi && speed >= 8.0) {
+      return const Duration(milliseconds: 800);
+    } else if (speed >= 2.0) {
+      return const Duration(milliseconds: 1200);
+    } else {
+      return const Duration(milliseconds: 2500);
+    }
+  }
+
   /// Calculates optimal buffer duration based on bitrate (kbps), network speed (Mbps),
   /// and whether the device is on Wi-Fi or Cellular network.
   static Duration calculateBuffer({

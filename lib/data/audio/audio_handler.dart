@@ -219,11 +219,24 @@ class PulsrAudioHandler extends BaseAudioHandler
       final leA = AndroidLoudnessEnhancer();
       final leB = AndroidLoudnessEnhancer();
 
+      final loadConfig = AudioLoadConfiguration(
+        androidLoadControl: AndroidLoadControl(
+          minBufferDuration: const Duration(seconds: 5),
+          maxBufferDuration: const Duration(seconds: 30),
+          bufferForPlaybackDuration: const Duration(milliseconds: 1000),
+          bufferForPlaybackAfterRebufferDuration:
+              const Duration(milliseconds: 1500),
+          prioritizeTimeOverSizeThresholds: true,
+        ),
+      );
+
       final playerA = AudioPlayer(
         audioPipeline: AudioPipeline(androidAudioEffects: [leA]),
+        audioLoadConfiguration: loadConfig,
       );
       final playerB = AudioPlayer(
         audioPipeline: AudioPipeline(androidAudioEffects: [leB]),
+        audioLoadConfiguration: loadConfig,
       );
       return PulsrAudioHandler._(
         repository: repository,

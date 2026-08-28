@@ -13,6 +13,23 @@ class AdaptiveBufferEngine {
 
   double get averageNetworkSpeedMbps => _avgNetworkSpeedMbps;
 
+  /// Calculates initial start buffer duration before playback begins.
+  Duration calculateStartBuffer({
+    required bool isWifi,
+    required bool isLocalFile,
+  }) {
+    if (isLocalFile) {
+      return const Duration(milliseconds: 100);
+    }
+    if (isWifi && _avgNetworkSpeedMbps >= 8.0) {
+      return const Duration(milliseconds: 800);
+    } else if (_avgNetworkSpeedMbps >= 2.0) {
+      return const Duration(milliseconds: 1200);
+    } else {
+      return const Duration(milliseconds: 2500);
+    }
+  }
+
   /// Calculates optimal buffer duration based on bitrate, network connection,
   /// and storage locality.
   Duration calculateOptimalBuffer({
