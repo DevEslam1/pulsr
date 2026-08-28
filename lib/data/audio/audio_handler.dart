@@ -16,6 +16,7 @@ import '../../core/di/injection.dart';
 import '../../core/errors/ytm_error_classifier.dart';
 import '../../core/services/battery_optimization_service.dart';
 import '../../core/services/ytm_service.dart';
+import '../../core/telemetry/playback_latency_tracker.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/models/audio_effects_config.dart';
 import '../../domain/models/eq_preset.dart';
@@ -152,6 +153,11 @@ class PulsrAudioHandler extends BaseAudioHandler
           : null;
   Stream<Duration?> get sleepTimerRemainingStream =>
       _sleepTimerManager.sleepTimerRemainingStream;
+
+  PlaybackLatencyTracker? get _latencyTracker =>
+      getIt.isRegistered<PlaybackLatencyTracker>()
+          ? getIt<PlaybackLatencyTracker>()
+          : null;
   int _lastPositionEmitMs = 0;
   double? _preCrossfadeVolume;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
@@ -1083,6 +1089,9 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<({String url, String? userAgent, String? cookies})> _resolveStreamUrl(
       SongsTableData song,
       {bool forceRefresh = false}) async {
+    try {
+      _latencyTracker?.markStage(PlaybackStage.resolutionRequested);
+    } catch (_) {}
     final videoId = song.remoteId;
     if (videoId == null || videoId.isEmpty) {
       throw const YtmException('YTM_UNAVAILABLE', 'Missing video id');
@@ -1108,6 +1117,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (!forceRefresh) {
       final cached = _streamCache[cacheKey];
       if (cached != null && cached.expires.isAfter(DateTime.now())) {
+        try {
+          _latencyTracker?.markStage(PlaybackStage.urlObtained);
+        } catch (_) {}
         return (
           url: cached.url,
           userAgent: cached.userAgent,
@@ -1115,6 +1127,10 @@ class PulsrAudioHandler extends BaseAudioHandler
         );
       }
     }
+    try {
+      _latencyTracker?.markStage(PlaybackStage.pluginEntered);
+      _latencyTracker?.markStage(PlaybackStage.clientRequestSent);
+    } catch (_) {}
     final stream = await _ytmService.resolveStream(videoId, quality: quality);
     if (stream.url.trim().isEmpty) {
       throw const YtmException(
@@ -1144,6 +1160,9 @@ class PulsrAudioHandler extends BaseAudioHandler
       ));
     }
     AudioMemoryManager.trimStreamCache(_streamCache);
+    try {
+      _latencyTracker?.markStage(PlaybackStage.urlObtained);
+    } catch (_) {}
     return (
       url: stream.url,
       userAgent: stream.userAgent,
@@ -1641,11 +1660,18 @@ class PulsrAudioHandler extends BaseAudioHandler
         initialPosition: initialPosition,
         preload: preload,
       );
+      try {
+        _latencyTracker?.markStage(PlaybackStage.sourceSet);
+      } catch (_) {}
       _gaplessSource = concat;
       if (generation != _playGeneration) return;
       await _activePlayer.setVolume(_calculateReplayGainVolume(song));
       if (preload) {
         await _activePlayer.play();
+        try {
+          _latencyTracker?.markStage(PlaybackStage.firstBytesReady);
+          _latencyTracker?.markStage(PlaybackStage.playing);
+        } catch (_) {}
         _consecutiveFailures = 0;
         _repository.recordPlayHistory(song.id);
       }

@@ -15,6 +15,7 @@ import 'xdm_backend_service.dart';
 import 'ytm_account_service.dart';
 import 'ytm_client_version_resolver.dart';
 import '../../domain/models/ytm_track.dart';
+import '../telemetry/playback_latency_tracker.dart';
 import '../utils/error_logger.dart';
 import '../utils/ytm_rate_limiter.dart';
 
@@ -489,20 +490,35 @@ class YtmService {
     return tracks;
   }
 
+  PlaybackLatencyTracker? get _tracker =>
+      getIt.isRegistered<PlaybackLatencyTracker>()
+          ? getIt<PlaybackLatencyTracker>()
+          : null;
+
   /// Resolves audio stream using multi-tier fallback:
   /// (1) Direct authenticated account stream (if logged in)
   /// (2) Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
   /// (3) Engine 3: Remote yt-dlp backend (XdmBackendService)
   Future<YtmStream> resolveStream(String videoId,
       {String quality = 'high'}) async {
+    try {
+      _tracker?.markStage(PlaybackStage.pluginEntered);
+    } catch (_) {}
     // 1. Try direct authenticated YouTube Music InnerTube Player API if logged in
     try {
       if (getIt.isRegistered<YtmAccountService>()) {
         final account = getIt<YtmAccountService>();
         if (account.isLoggedIn) {
+          try {
+            _tracker?.markStage(PlaybackStage.clientRequestSent);
+            _tracker?.markStage(PlaybackStage.poTokenNeeded);
+          } catch (_) {}
           final directStream =
               await account.resolvePlayerStream(videoId, quality: quality);
           if (directStream != null) {
+            try {
+              _tracker?.markStage(PlaybackStage.urlObtained);
+            } catch (_) {}
             return directStream;
           }
         }
@@ -516,6 +532,11 @@ class YtmService {
 
     // 2. Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
     try {
+      try {
+        _tracker?.markStage(PlaybackStage.clientRequestSent);
+        // Check poToken state heuristically: if we have a cached token, this is warm
+        _tracker?.markStage(PlaybackStage.poTokenNeeded);
+      } catch (_) {}
       final raw = await _guard(
         () => _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
           'videoId': videoId,
@@ -526,6 +547,9 @@ class YtmService {
 
       final stream = raw == null ? null : YtmStream.fromChannel(raw);
       if (stream != null) {
+        try {
+          _tracker?.markStage(PlaybackStage.urlObtained);
+        } catch (_) {}
         return stream;
       }
     } catch (e) {
@@ -535,6 +559,9 @@ class YtmService {
 
     // 3. Engine 3: Remote yt-dlp backend fallback if enabled and healthy
     try {
+      try {
+        _tracker?.markStage(PlaybackStage.clientRequestSent);
+      } catch (_) {}
       if (getIt.isRegistered<XdmBackendService>()) {
         final xdm = getIt<XdmBackendService>();
         if (await xdm.isEnabled()) {
@@ -547,6 +574,9 @@ class YtmService {
             cookies: account?.cookies,
           );
           if (remoteStream != null) {
+            try {
+              _tracker?.markStage(PlaybackStage.urlObtained);
+            } catch (_) {}
             return remoteStream;
           }
         }

@@ -11,7 +11,9 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path/path.dart' as p;
+import '../../core/di/injection.dart';
 import '../../core/services/ytm_cache_manager.dart';
+import '../../core/telemetry/playback_latency_tracker.dart';
 
 /// A [StreamAudioSource] for a YouTube Music track whose stream URL is resolved
 /// lazily, on the first byte request rather than up front.
@@ -57,6 +59,11 @@ class YtmResolvingSource extends StreamAudioSource {
 
   static final YtmCacheManager _cacheManager = YtmCacheManager();
 
+  PlaybackLatencyTracker? get _latency =>
+      getIt.isRegistered<PlaybackLatencyTracker>()
+          ? getIt<PlaybackLatencyTracker>()
+          : null;
+
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
     // 1. Proactive expiry check: if URL is within 5 minutes of expiring, discard & re-resolve
@@ -70,7 +77,11 @@ class YtmResolvingSource extends StreamAudioSource {
     try {
       final inner = await _ensureInner();
       try {
-        return await inner.request(start, end);
+        final res = await inner.request(start, end);
+        try {
+          _latency?.markStage(PlaybackStage.firstBytesReady);
+        } catch (_) {}
+        return res;
       } catch (byteErr) {
         final errStr = byteErr.toString().toLowerCase();
 
@@ -119,7 +130,13 @@ class YtmResolvingSource extends StreamAudioSource {
 
   Future<LockCachingAudioSource> _createInner(
       {bool forceRefresh = false}) async {
+    try {
+      _latency?.markStage(PlaybackStage.pluginEntered);
+    } catch (_) {}
     final url = await resolve(forceRefresh: forceRefresh);
+    try {
+      _latency?.markStage(PlaybackStage.urlObtained);
+    } catch (_) {}
 
     // Parse 'expire' Unix timestamp from query
     try {
@@ -174,6 +191,9 @@ class YtmResolvingSource extends StreamAudioSource {
         cacheFile: cacheFile,
       );
       _inner = inner;
+      try {
+        _latency?.markStage(PlaybackStage.sourceSet);
+      } catch (_) {}
 
       // Trigger asynchronous background cache pruning if exceeding size limit
       _cacheManager.pruneIfExceedsLimit().ignore();

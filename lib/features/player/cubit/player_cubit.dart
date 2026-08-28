@@ -12,6 +12,7 @@ import '../../../core/router/app_router.dart';
 import '../../../core/services/lrclib_service.dart';
 import '../../../core/services/scrobbler_service.dart';
 import '../../../core/services/ytm_account_service.dart';
+import '../../../core/telemetry/playback_latency_tracker.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/lrc_parser.dart';
 import '../../../data/audio/audio_handler.dart';
@@ -53,6 +54,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   final SettingsCubit? _settingsCubit;
   final WidgetService? _widgetService;
   final ScrobblerService? _scrobblerService;
+  final PlaybackLatencyTracker? _latencyTracker;
 
   StreamSubscription? _mediaItemSub;
   StreamSubscription? _playbackStateSub;
@@ -93,12 +95,17 @@ class PlayerCubit extends Cubit<PlayerState> {
     SettingsCubit? settingsCubit,
     WidgetService? widgetService,
     ScrobblerService? scrobblerService,
+    PlaybackLatencyTracker? latencyTracker,
   })  : _audioHandler = audioHandler,
         _repository = repository,
         _toggleFavoriteUseCase = toggleFavoriteUseCase,
         _settingsCubit = settingsCubit,
         _widgetService = widgetService,
         _scrobblerService = scrobblerService,
+        _latencyTracker = latencyTracker ??
+            (getIt.isRegistered<PlaybackLatencyTracker>()
+                ? getIt<PlaybackLatencyTracker>()
+                : null),
         super(const PlayerState()) {
     _listenToAudioService();
     _loadPlaybackSpeed();
@@ -439,6 +446,9 @@ class PlayerCubit extends Cubit<PlayerState> {
     });
 
     _errorSub = _audioHandler.errorStream.listen((err) {
+      try {
+        _latencyTracker?.finishWithError(err, stage: PlaybackStage.playing);
+      } catch (_) {}
       if (!isClosed) {
         emit(state.copyWith(errorMessage: err));
       }
@@ -496,6 +506,16 @@ class PlayerCubit extends Cubit<PlayerState> {
       };
 
       final isPlaying = playbackState.playing && !isCompleted;
+      // Task 0: mark first bytes / playing stages
+      if (isPlaying) {
+        try {
+          if (_latencyTracker?.hasActiveSession == true) {
+            // firstBytesReady precedes playing by one frame if not yet marked
+            _latencyTracker?.markStage(PlaybackStage.firstBytesReady);
+            _latencyTracker?.markStage(PlaybackStage.playing);
+          }
+        } catch (_) {}
+      }
       final effectivePos = isCompleted
           ? Duration.zero
           : (playbackState.position > Duration.zero
@@ -626,6 +646,12 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   Future<void> playSong(SongsTableData song,
       {List<SongsTableData>? queue, Duration? initialPosition}) async {
+    // Task 0: start latency tracking from tap
+    final videoIdForLatency = song.remoteId ?? song.id.toString();
+    try {
+      _latencyTracker?.start(videoId: videoIdForLatency);
+      _latencyTracker?.markStage(PlaybackStage.tap);
+    } catch (_) {}
     ++_mediaItemResolutionGen;
     final capturedGen = _mediaItemResolutionGen;
     // Mark restoration as done: any in-flight _restoreQueueSlots must abort
@@ -697,11 +723,24 @@ class PlayerCubit extends Cubit<PlayerState> {
       duration: Duration(milliseconds: targetSong.durationMs),
       errorMessage: null,
     ));
-    await _audioHandler.loadQueue(
-      effectiveQueue,
-      initialIndex: effectiveIndex,
-      initialPosition: startPos,
-    );
+    try {
+      _latencyTracker?.markStage(PlaybackStage.resolutionRequested);
+    } catch (_) {}
+    try {
+      await _audioHandler.loadQueue(
+        effectiveQueue,
+        initialIndex: effectiveIndex,
+        initialPosition: startPos,
+      );
+      try {
+        _latencyTracker?.markStage(PlaybackStage.sourceSet);
+      } catch (_) {}
+    } catch (e) {
+      try {
+        _latencyTracker?.finishWithError(e, stage: PlaybackStage.sourceSet);
+      } catch (_) {}
+      rethrow;
+    }
     _loadLyricsForSong(targetSong);
     _updateWidgetThrottled(force: true);
   }
