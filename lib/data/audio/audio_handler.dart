@@ -40,7 +40,9 @@ import 'optimized_dsp_pipeline.dart';
 import 'playback_analytics.dart';
 import 'seamless_queue_transition.dart';
 import 'smart_preload_scheduler.dart';
+import 'stream_pre_resolver.dart';
 import 'triple_buffer_pipeline.dart';
+import '../../core/services/ytm_url_cache.dart';
 
 @singleton
 class PulsrAudioHandler extends BaseAudioHandler
@@ -117,6 +119,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   late final TripleBufferPipeline _tripleBufferPipeline;
   late final BatteryAwarePlayback _batteryAwarePlayback;
   late final SeamlessQueueTransition _queueTransition;
+  late final StreamPreResolver _streamPreResolver;
 
   // Gapless engine: when crossfade is off, a ConcatenatingAudioSource on the
   // active player is the source of truth for track order/advance, and just_audio
@@ -194,6 +197,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   TripleBufferPipeline get tripleBufferPipeline => _tripleBufferPipeline;
   BatteryAwarePlayback get batteryAwarePlayback => _batteryAwarePlayback;
   SeamlessQueueTransition get queueTransition => _queueTransition;
+  StreamPreResolver get streamPreResolver => _streamPreResolver;
 
   int getOptimalBufferFrames({
     required bool isLocalFile,
@@ -626,6 +630,14 @@ class PulsrAudioHandler extends BaseAudioHandler
           _prefetchStream(song);
         }
       },
+    );
+
+    _streamPreResolver = StreamPreResolver(
+      resolveUrl: (videoId, {quality = 'high'}) =>
+          _ytmService.resolveStream(videoId, quality: quality),
+      urlCache: getIt.isRegistered<YtmUrlCache>()
+          ? getIt<YtmUrlCache>()
+          : YtmUrlCache(),
     );
 
     _formatDecoder = FormatAwareDecoder(
