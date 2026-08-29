@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../data/db/app_database.dart';
+import '../../../../domain/models/audio_output_info.dart';
 import '../../../../domain/models/audio_quality_info.dart';
+import '../../../../domain/models/ytm_audio_quality.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import 'audio_quality_sheet.dart';
 
@@ -21,11 +23,15 @@ class AudioQualityBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     if (song == null) return const SizedBox.shrink();
 
-    final settingsState = context.watch<SettingsCubit?>()?.state;
-    final streamingQuality = settingsState?.streamingQuality;
+    // F-14: select only the two settings fields this badge consumes instead
+    // of watching the whole SettingsCubit state (any settings mutation used
+    // to rebuild every badge in every player theme).
+    final streamingQuality =
+        context.select<SettingsCubit, YtmAudioQuality>((c) => c.state.streamingQuality);
+    final output =
+        context.select<SettingsCubit, AudioOutputInfo?>((c) => c.state.currentOutputDevice);
     final info =
         AudioQualityInfo.fromSong(song, streamingQuality: streamingQuality);
-    final output = settingsState?.currentOutputDevice;
     final isUsb = output?.isUsbDac == true;
     final isBitPerfect = output?.isBitPerfectActive == true;
 

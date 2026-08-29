@@ -1,6 +1,7 @@
-// lib/features/player/cubit/player_state.dart
+﻿// lib/features/player/cubit/player_state.dart
 import 'package:flutter/material.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import '../../../core/utils/list_content_diff.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/audio_effects_config.dart';
 import '../../../domain/models/eq_preset.dart';
@@ -62,6 +63,61 @@ abstract class PlayerState with _$PlayerState {
     int? audioSessionId,
     String? errorMessage,
   }) = _PlayerState;
+
+  /// True when every field other than [position] is equal to [other]'s, i.e.
+  /// the two states differ only by the ~200 ms playback position tick.
+  ///
+  /// Collections (`queue`, `lyrics`, `detectedOemEngines`) are compared with
+  /// O(1) [listContentDiffers] (length + first/last): freezed `copyWith` does NOT
+  /// preserve list reference identity (even a no-arg copyWith yields new list
+  /// instances), so identity checks would false-positive on every tick. This
+  /// keeps the check O(1) — unlike the generated [==], which deep-compares
+  /// those lists (O(queue size)) on every call.
+  bool differsFromBeyondPosition(PlayerState other) {
+    return currentSong != other.currentSong ||
+        isPlaying != other.isPlaying ||
+        duration != other.duration ||
+        isShuffle != other.isShuffle ||
+        repeatMode != other.repeatMode ||
+        listContentDiffers(queue, other.queue) ||
+        currentIndex != other.currentIndex ||
+        isExpanded != other.isExpanded ||
+        dominantColor != other.dominantColor ||
+        sleepTimerRemaining != other.sleepTimerRemaining ||
+        listContentDiffers(lyrics, other.lyrics) ||
+        lyricsSource != other.lyricsSource ||
+        isLoadingLyrics != other.isLoadingLyrics ||
+        isLyricsVisible != other.isLyricsVisible ||
+        isQueueVisible != other.isQueueVisible ||
+        eqPreset != other.eqPreset ||
+        isEqEnabled != other.isEqEnabled ||
+        isVirtualizerEnabled != other.isVirtualizerEnabled ||
+        virtualizerStrength != other.virtualizerStrength ||
+        isDynamicsEnabled != other.isDynamicsEnabled ||
+        dynamicsPreset != other.dynamicsPreset ||
+        selectedHeadphoneProfile != other.selectedHeadphoneProfile ||
+        isSpatializerSupported != other.isSpatializerSupported ||
+        isSpatializerEnabled != other.isSpatializerEnabled ||
+        volumeBoost != other.volumeBoost ||
+        isCrossfeedEnabled != other.isCrossfeedEnabled ||
+        crossfeedDelayUs != other.crossfeedDelayUs ||
+        crossfeedFeedDb != other.crossfeedFeedDb ||
+        isLimiterEnabled != other.isLimiterEnabled ||
+        limiterThresholdDb != other.limiterThresholdDb ||
+        limiterReleaseMs != other.limiterReleaseMs ||
+        isReverbEnabled != other.isReverbEnabled ||
+        reverbPreset != other.reverbPreset ||
+        reverbWetDry != other.reverbWetDry ||
+        stereoBalance != other.stereoBalance ||
+        monoMix != other.monoMix ||
+        isSincResamplerEnabled != other.isSincResamplerEnabled ||
+        hasOemAudio != other.hasOemAudio ||
+        listContentDiffers(detectedOemEngines, other.detectedOemEngines) ||
+        activeQueueSlot != other.activeQueueSlot ||
+        playbackSpeed != other.playbackSpeed ||
+        audioSessionId != other.audioSessionId ||
+        errorMessage != other.errorMessage;
+  }
 
   bool get isDspActive =>
       isVirtualizerEnabled ||

@@ -84,6 +84,7 @@ class _Session {
   final String videoId;
   final DateTime startTime;
   final Map<PlaybackStage, DateTime> stageTimes = {};
+  final Map<String, String> tags = {};
   ISentrySpan? transaction;
   final Map<PlaybackStage, ISentrySpan> stageSpans = {};
   bool closed = false;
@@ -134,6 +135,11 @@ class PlaybackLatencyTracker {
   String? get activePlayId => _active?.playId;
   String? get activeVideoId => _active?.videoId;
 
+  /// Visible for testing: classification tags on the active session.
+  @visibleForTesting
+  Map<String, String>? get activeTags =>
+      (_active != null && !_active!.closed) ? Map.unmodifiable(_active!.tags) : null;
+
   bool get hasActiveSession => _active != null && !_active!.closed;
 
   /// Starts a new playback measurement. Any previous unfinished session is
@@ -183,6 +189,44 @@ class PlaybackLatencyTracker {
       {Map<String, dynamic>? data}) {
     if (_active == null || _active!.closed) return null;
     return _markInternal(stage, at: timestamp, data: data);
+  }
+
+  /// Sets a cheap classification tag on the active Sentry playback
+  /// transaction (e.g. cacheHit, tierUsed). No-op without an active session.
+  void setTag(String name, String value) {
+    final session = _active;
+    if (session == null || session.closed) return;
+    session.tags[name] = value;
+    try {
+      session.transaction?.setTag(name, value);
+    } catch (_) {}
+  }
+
+  /// Attaches a native-side timing relayed one-way over the platform channel
+  /// (poToken.mint, ladder.client_attempt, rate_limiter.wait_player,
+  /// executor.queue_wait) to the active session as transaction data
+  /// attributes. Fire-and-forget: dropped when no session is active.
+  void markNativeTiming(String name, int durationMs,
+      {Map<String, dynamic>? attrs}) {
+    final session = _active;
+    if (session == null || session.closed) return;
+    try {
+      final key = 'native_$name';
+      // poTokenWasCold classification tag comes from the mint relay.
+      final cold = attrs?['cold'];
+      if (name == 'poToken.mint' && cold is bool) {
+        setTag('poTokenWasCold', cold ? 'true' : 'false');
+      }
+      final tx = session.transaction;
+      if (tx != null && Sentry.isEnabled) {
+        tx.setData('${key}_ms', durationMs);
+        if (attrs != null) {
+          for (final entry in attrs.entries) {
+            tx.setData('$key.${entry.key}', entry.value);
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   Duration _markInternal(PlaybackStage stage,
@@ -337,6 +381,10 @@ class PlaybackLatencyTracker {
         session.transaction!.setData('bucket', bucket.name);
         session.transaction!.setData('success', success);
         if (failureStage != null) session.transaction!.setData('failureStage', failureStage);
+        // Re-apply classification tags in case any setTag raced span creation.
+        for (final entry in session.tags.entries) {
+          session.transaction!.setTag(entry.key, entry.value);
+        }
         for (final entry in offsets.entries) {
           session.transaction!.setData('offset_${entry.key.name}_ms', entry.value.inMilliseconds);
         }

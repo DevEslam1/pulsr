@@ -233,103 +233,118 @@ class PlaylistDetailScreen extends StatelessWidget {
                               ? 'No tracks match the rules for this smart playlist.'
                               : 'No tracks in this playlist yet.',
                         )
-                      : ListView(
-                          padding: const EdgeInsets.only(bottom: 160),
-                          children: [
-                            // Header Controls
-                            Padding(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: Adaptive.pagePadding(context),
-                                  vertical: 12),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: ElevatedButton.icon(
-                                      onPressed: () {
-                                        context.read<PlayerCubit>().playSong(
-                                            songs.first,
-                                            queue: songs);
-                                      },
-                                      icon:
-                                          const Icon(Icons.play_arrow_rounded),
-                                      label: const Text('Play All'),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: OutlinedButton.icon(
-                                      onPressed: () {
-                                        final shuffled =
-                                            List<SongsTableData>.from(songs)
-                                              ..shuffle();
-                                        context.read<PlayerCubit>().playSong(
-                                            shuffled.first,
-                                            queue: shuffled);
-                                      },
-                                      icon: Icon(Icons.shuffle_rounded,
-                                          color: p.accent),
-                                      label: const Text('Shuffle'),
-                                    ),
-                                  ),
-                                  if (AppConfig.ytmEnabled) ...[
-                                    const SizedBox(width: 8),
-                                    IconButton.filledTonal(
-                                      onPressed: () =>
-                                          _downloadPlaylist(context, songs),
-                                      icon: const Icon(Icons.download_rounded,
-                                          size: 20),
-                                      style: IconButton.styleFrom(
-                                        backgroundColor:
-                                            p.accent.withValues(alpha: 0.15),
-                                        foregroundColor: p.accent,
+                      : CustomScrollView(
+                          // Builder-based slivers (F-04): header as a box
+                          // adapter, track list virtualized.
+                          slivers: [
+                            SliverToBoxAdapter(
+                              // Header Controls
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                    horizontal: Adaptive.pagePadding(context),
+                                    vertical: 12),
+                                child: Row(
+                                  children: [
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: () {
+                                          context.read<PlayerCubit>().playSong(
+                                              songs.first,
+                                              queue: songs);
+                                        },
+                                        icon: const Icon(
+                                            Icons.play_arrow_rounded),
+                                        label: const Text('Play All'),
                                       ),
-                                      tooltip:
-                                          'Download all offline (3 active downloads)',
                                     ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        onPressed: () {
+                                          final shuffled =
+                                              List<SongsTableData>.from(songs)
+                                                ..shuffle();
+                                          context.read<PlayerCubit>().playSong(
+                                              shuffled.first,
+                                              queue: shuffled);
+                                        },
+                                        icon: Icon(Icons.shuffle_rounded,
+                                            color: p.accent),
+                                        label: const Text('Shuffle'),
+                                      ),
+                                    ),
+                                    if (AppConfig.ytmEnabled) ...[
+                                      const SizedBox(width: 8),
+                                      IconButton.filledTonal(
+                                        onPressed: () =>
+                                            _downloadPlaylist(context, songs),
+                                        icon: const Icon(
+                                            Icons.download_rounded,
+                                            size: 20),
+                                        style: IconButton.styleFrom(
+                                          backgroundColor: p.accent
+                                              .withValues(alpha: 0.15),
+                                          foregroundColor: p.accent,
+                                        ),
+                                        tooltip:
+                                            'Download all offline (3 active downloads)',
+                                      ),
+                                    ],
                                   ],
-                                ],
+                                ),
                               ),
                             ),
 
                             // Tracks List
-                            for (int i = 0; i < songs.length; i++)
-                              SongTile(
-                                song: songs[i],
-                                index: i,
-                                subtitleOverride:
-                                    '${songs[i].artist} • ${songs[i].album}',
-                                onTap: () => context
-                                    .read<PlayerCubit>()
-                                    .playSong(songs[i], queue: songs),
-                                onMorePressed: () => showModalBottomSheet<void>(
-                                  context: context,
-                                  useRootNavigator: true,
-                                  isScrollControlled: true,
-                                  backgroundColor: Colors.transparent,
-                                  builder: (_) => SongInfoSheet(song: songs[i]),
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (AppConfig.ytmEnabled &&
-                                        songs[i].remoteId != null &&
-                                        songs[i].remoteId!.isNotEmpty)
-                                      YtmDownloadButton(song: songs[i]),
-                                    if (!playlist.isSmart)
-                                      IconButton(
-                                        icon: Icon(
-                                            Icons.remove_circle_outline_rounded,
-                                            size: 20,
-                                            color: p.textTertiary),
-                                        onPressed: () {
-                                          playlistUseCases
-                                              .removeSongFromPlaylist(
-                                                  playlist.id, songs[i].id);
-                                        },
-                                      ),
-                                  ],
-                                ),
+                            SliverPadding(
+                              padding:
+                                  const EdgeInsets.only(bottom: 160),
+                              sliver: SliverList.builder(
+                                itemCount: songs.length,
+                                itemBuilder: (context, index) {
+                                  final song = songs[index];
+                                  return SongTile(
+                                    song: song,
+                                    index: index,
+                                    subtitleOverride:
+                                        '${song.artist} • ${song.album}',
+                                    onTap: () => context
+                                        .read<PlayerCubit>()
+                                        .playSong(song, queue: songs),
+                                    onMorePressed: () =>
+                                        showModalBottomSheet<void>(
+                                      context: context,
+                                      useRootNavigator: true,
+                                      isScrollControlled: true,
+                                      backgroundColor: Colors.transparent,
+                                      builder: (_) => SongInfoSheet(song: song),
+                                    ),
+                                    trailing: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (AppConfig.ytmEnabled &&
+                                            song.remoteId != null &&
+                                            song.remoteId!.isNotEmpty)
+                                          YtmDownloadButton(song: song),
+                                        if (!playlist.isSmart)
+                                          IconButton(
+                                            icon: Icon(
+                                                Icons
+                                                    .remove_circle_outline_rounded,
+                                                size: 20,
+                                                color: p.textTertiary),
+                                            onPressed: () {
+                                              playlistUseCases
+                                                  .removeSongFromPlaylist(
+                                                      playlist.id, song.id);
+                                            },
+                                          ),
+                                      ],
+                                    ),
+                                  );
+                                },
                               ),
+                            ),
                           ],
                         ),
             ),

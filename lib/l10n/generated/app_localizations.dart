@@ -1588,6 +1588,18 @@ abstract class AppLocalizations {
   /// **'Audio & Playback'**
   String get audioAndPlayback;
 
+  /// No description provided for @playback.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback'**
+  String get playback;
+
+  /// No description provided for @audioAndSound.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio & Sound'**
+  String get audioAndSound;
+
   /// No description provided for @equalizerAndSoundEffects.
   ///
   /// In en, this message translates to:

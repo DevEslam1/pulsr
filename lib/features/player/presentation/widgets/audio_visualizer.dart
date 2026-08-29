@@ -59,6 +59,12 @@ class _AudioVisualizerState extends State<AudioVisualizer>
   final List<double> _targetData = List.filled(_numBands, 0.0);
   late final ValueNotifier<List<double>> _dataNotifier;
   DateTime _lastNativeDataTime = DateTime.fromMillisecondsSinceEpoch(0);
+  int _idleTicks = 0;
+
+  /// Consecutive unchanged ticks (~16 ms each) after which the tick loop
+  /// pauses itself (F-16b) when playback is stopped. Restarted by new native
+  /// FFT data, isPlaying/style changes and app-lifecycle resume.
+  static const int _idleTickLimit = 30;
 
   @override
   void initState() {
@@ -162,6 +168,10 @@ class _AudioVisualizerState extends State<AudioVisualizer>
             final val = (event[i] as num).toDouble();
             _targetData[i] = val.clamp(0.0, 1.0);
           }
+          // F-16b: restart the tick loop if it paused itself while idle.
+          if (widget.isPlaying && !_animController.isAnimating) {
+            _startAnimation();
+          }
         }
       },
       onError: (dynamic error) {
@@ -227,8 +237,18 @@ class _AudioVisualizerState extends State<AudioVisualizer>
       }
     }
 
+    // F-16b: skip the List.from allocation + notification when no band value
+    // changed (the notifier's identity-based notification would otherwise
+    // repaint every tick). After a stretch of idle ticks with playback
+    // stopped, pause the loop entirely; it restarts on new FFT data,
+    // isPlaying/style updates or app-lifecycle resume.
     if (hasChanged) {
+      _idleTicks = 0;
       _dataNotifier.value = List.from(_currentData);
+    } else if (widget.isPlaying) {
+      _idleTicks = 0;
+    } else if (++_idleTicks >= _idleTickLimit) {
+      _stopAnimation();
     }
   }
 
@@ -258,25 +278,33 @@ class _AudioVisualizerState extends State<AudioVisualizer>
         child: ValueListenableBuilder<List<double>>(
           valueListenable: _dataNotifier,
           builder: (context, data, _) {
-            return CustomPaint(
-              size: Size(widget.width, widget.height),
-              painter: switch (widget.style) {
-                VisualizerStyle.bar =>
-                  _BarVisualizerPainter(data: data, color: activeColor),
-                VisualizerStyle.wave =>
-                  _WaveVisualizerPainter(data: data, color: activeColor),
-                VisualizerStyle.circular =>
-                  _CircularVisualizerPainter(data: data, color: activeColor),
-                VisualizerStyle.particles =>
-                  _ParticlesVisualizerPainter(data: data, color: activeColor),
-                VisualizerStyle.terrain3D =>
-                  _Terrain3DVisualizerPainter(data: data, color: activeColor),
-                VisualizerStyle.albumArtReactive =>
-                  _AlbumArtReactivePainter(data: data, color: activeColor),
-                VisualizerStyle.custom =>
-                  _CustomJsonVisualizerPainter(data: data, color: activeColor),
-                VisualizerStyle.off => null,
-              },
+            // F-16a: repaints stay inside this boundary instead of
+            // invalidating up to the nearest ancestor layer (in the waveform
+            // theme, that is effectively the whole screen).
+            return RepaintBoundary(
+              child: CustomPaint(
+                size: Size(widget.width, widget.height),
+                painter: switch (widget.style) {
+                  VisualizerStyle.bar =>
+                    _BarVisualizerPainter(data: data, color: activeColor),
+                  VisualizerStyle.wave =>
+                    _WaveVisualizerPainter(data: data, color: activeColor),
+                  VisualizerStyle.circular =>
+                    _CircularVisualizerPainter(data: data, color: activeColor),
+                  VisualizerStyle.particles =>
+                    _ParticlesVisualizerPainter(
+                        data: data, color: activeColor),
+                  VisualizerStyle.terrain3D =>
+                    _Terrain3DVisualizerPainter(
+                        data: data, color: activeColor),
+                  VisualizerStyle.albumArtReactive =>
+                    _AlbumArtReactivePainter(data: data, color: activeColor),
+                  VisualizerStyle.custom =>
+                    _CustomJsonVisualizerPainter(
+                        data: data, color: activeColor),
+                  VisualizerStyle.off => null,
+                },
+              ),
             );
           },
         ),

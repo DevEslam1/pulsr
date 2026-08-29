@@ -683,13 +683,17 @@ class YtmAccountService {
     Object? body,
     int maxAttempts = 3,
     int baseTimeoutSeconds = 15,
+    // Native RateLimiter.Bucket name (SEARCH/BROWSE/PLAYER/STREAM/DOWNLOAD).
+    // Player-endpoint calls must use the PLAYER bucket (5 tokens / 2 per s /
+    // 200ms gap) so play-path requests are not paced behind browse traffic.
+    String bucket = 'BROWSE',
   }) async {
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
       final startTime = DateTime.now().millisecondsSinceEpoch;
       try {
         try {
           await _channel.invokeMethod<bool>('acquirePermit', {
-            'bucket': 'BROWSE',
+            'bucket': bucket,
           });
         } catch (_) {}
         final timeout = Duration(seconds: baseTimeoutSeconds + attempt * 5);
@@ -1504,6 +1508,7 @@ class YtmAccountService {
           headers: headers,
           body: body,
           baseTimeoutSeconds: 10,
+          bucket: 'PLAYER',
         );
 
         if (response.statusCode == 200) {

@@ -1,11 +1,14 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';
 import '../../../core/bloc/base_cubit.dart';
 
+import '../../../core/di/injection.dart';
 import '../../../core/errors/ytm_error_classifier.dart';
 import '../../../core/services/file_intent_handler.dart';
 import '../../../core/services/ytm_service.dart';
+import '../../../core/services/ytm_url_cache.dart';
 import '../../../domain/models/ytm_track.dart';
 import 'ytm_search_state.dart';
 
@@ -13,6 +16,10 @@ import 'ytm_search_state.dart';
 class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
   final YtmService _service;
   Timer? _debounceTimer;
+
+  /// TTFA: delay before pre-resolving the first search result so the warm-up
+  /// does not contend with the user's likely immediate tap on that result.
+  static const Duration _firstResultPreResolveDelay = Duration(milliseconds: 500);
 
   int _generation = 0;
 
@@ -68,6 +75,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
           );
           emit(state.copyWith(
               results: [track], isLoading: false, errorMessage: null));
+          _scheduleFirstResultPreResolve(track.videoId, generation);
           return;
         } catch (_) {
           // Fall through to regular search if resolving by ID fails
@@ -78,6 +86,9 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       if (generation != _generation || isClosed) return;
       emit(state.copyWith(
           results: results, isLoading: false, errorMessage: null));
+      if (results.isNotEmpty) {
+        _scheduleFirstResultPreResolve(results.first.videoId, generation);
+      }
     } on YtmException catch (e) {
       if (generation != _generation || isClosed) return;
 
@@ -98,6 +109,33 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       final errorInfo = YtmErrorClassifier.classify(e);
       emit(state.copyWith(
           isLoading: false, results: [], errorMessage: errorInfo.message));
+    }
+  }
+
+  /// TTFA: pre-resolves ONLY the first search result after a short delay so
+  /// the user's likely immediate tap finds a warm stream URL. Cheap and
+  /// cancellable: single timer per search generation (auto-cancelled on cubit
+  /// close), skipped on stale generations, and skipped when the URL is
+  /// already cached. Unawaited and fail-safe — never blocks or crashes.
+  void _scheduleFirstResultPreResolve(String videoId, int generation) {
+    if (videoId.isEmpty) return;
+    autoTimer(Timer(_firstResultPreResolveDelay, () {
+      if (generation != _generation || isClosed) return;
+      unawaited(_preResolveFirstResult(videoId));
+    }));
+  }
+
+  Future<void> _preResolveFirstResult(String videoId) async {
+    try {
+      final urlCache =
+          getIt.isRegistered<YtmUrlCache>() ? getIt<YtmUrlCache>() : null;
+      if (urlCache != null && urlCache.contains(videoId)) return;
+      final stream = await _service.resolveStream(videoId);
+      if (isClosed) return;
+      urlCache?.putStream(stream);
+    } catch (e) {
+      // Pre-resolution is best-effort; playback resolves lazily on tap.
+      debugPrint('[YtmSearchCubit] First-result pre-resolve failed: $e');
     }
   }
 

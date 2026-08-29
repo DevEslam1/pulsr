@@ -300,7 +300,9 @@ class _CachedArtworkState extends State<CachedArtwork> {
           icon: widget.fallbackIcon,
         );
 
-        final dpr = MediaQuery.of(context).devicePixelRatio;
+        // Fine-grained DPR dependency (F-11): full MediaQuery.of here would
+        // rebuild every artwork item on any MediaQuery change.
+        final dpr = MediaQuery.devicePixelRatioOf(context);
         final decodeDim = (effectiveSize * dpr).clamp(80, 600).round();
 
         final content = _cachedBytes != null
@@ -312,6 +314,9 @@ class _CachedArtworkState extends State<CachedArtwork> {
                 cacheHeight: decodeDim,
                 fit: BoxFit.cover,
                 filterQuality: FilterQuality.medium,
+                // Keep the previous frame while the new one decodes (F-11):
+                // no flicker on song change in NowPlaying.
+                gaplessPlayback: true,
                 errorBuilder: (context, error, stackTrace) => placeholder,
               )
             : placeholder;

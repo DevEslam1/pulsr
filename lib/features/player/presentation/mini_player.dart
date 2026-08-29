@@ -31,7 +31,15 @@ class MiniPlayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final settingsState = context.watch<SettingsCubit>().state;
+    // F-22: select only the two swipe settings instead of watching the whole
+    // SettingsCubit state (any settings change used to rebuild the mini
+    // player).
+    final swipeLeftAction =
+        context.select<SettingsCubit, MiniPlayerSwipeAction>(
+            (c) => c.state.miniPlayerSwipeLeft);
+    final swipeRightAction =
+        context.select<SettingsCubit, MiniPlayerSwipeAction>(
+            (c) => c.state.miniPlayerSwipeRight);
     final p = context.palette;
 
     return BlocBuilder<PlayerCubit, PlayerState>(
@@ -60,12 +68,10 @@ class MiniPlayer extends StatelessWidget {
             onHorizontalDragEnd: (d) {
               final v = d.primaryVelocity ?? 0;
               if (v < -200) {
-                _handleSwipe(cubit, settingsState.miniPlayerSwipeLeft,
-                    isLeft: true);
+                _handleSwipe(cubit, swipeLeftAction, isLeft: true);
               }
               if (v > 200) {
-                _handleSwipe(cubit, settingsState.miniPlayerSwipeRight,
-                    isLeft: false);
+                _handleSwipe(cubit, swipeRightAction, isLeft: false);
               }
             },
             child: Padding(

@@ -202,4 +202,55 @@ void main() {
       expect(json['totalMs'], equals(30));
     });
   });
+
+  group('PlaybackLatencyTracker — TTFA tags & native timing relay', () {
+    late FakeClock clock;
+    late PlaybackLatencyTracker tracker;
+
+    setUp(() {
+      clock = FakeClock(DateTime.fromMillisecondsSinceEpoch(1000000));
+      tracker = PlaybackLatencyTracker.withClock(clock);
+    });
+
+    tearDown(() {
+      tracker.debugReset();
+      tracker.dispose();
+    });
+
+    test('setTag records classification tags on the active session', () {
+      tracker.start(videoId: 'tagVid');
+      tracker.setTag('tierUsed', 'account');
+      tracker.setTag('cacheHit', 'false');
+      expect(tracker.activeTags?['tierUsed'], equals('account'));
+      expect(tracker.activeTags?['cacheHit'], equals('false'));
+
+      // Marks after finish must not resurrect the session.
+      tracker.markStage(PlaybackStage.playing);
+      tracker.setTag('tierUsed', 'native');
+      expect(tracker.activeTags, isNull);
+      expect(tracker.lastReport!.success, isTrue);
+    });
+
+    test('markNativeTiming classifies poTokenWasCold from the mint relay', () {
+      tracker.start(videoId: 'mintVid');
+      tracker.markNativeTiming('poToken.mint', 137, attrs: {'cold': true});
+      expect(tracker.activeTags?['poTokenWasCold'], equals('true'));
+
+      tracker.markNativeTiming('ladder.client_attempt', 42,
+          attrs: {'client': 'ANDROID_VR'});
+      expect(tracker.activeTags?['poTokenWasCold'], equals('true'),
+          reason: 'unrelated relays must not clobber the tag');
+
+      tracker.markNativeTiming('rate_limiter.wait_player', 15);
+      expect(tracker.activeTags?['poTokenWasCold'], equals('true'),
+          reason: 'relays without attrs must be no-ops for tags');
+    });
+
+    test('markNativeTiming is a no-op without an active session', () {
+      expect(tracker.activeTags, isNull);
+      tracker.markNativeTiming('executor.queue_wait', 3);
+      expect(tracker.activeTags, isNull);
+      expect(tracker.lastReport, isNull);
+    });
+  });
 }

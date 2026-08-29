@@ -129,7 +129,6 @@ class MinimalPlayerTheme extends StatelessWidget {
                                       key:
                                           const ValueKey('lyrics_view_minimal'),
                                       lyrics: state.lyrics,
-                                      currentPosition: state.position,
                                       isLoading: state.isLoadingLyrics,
                                       activeColor: activeColor,
                                       source: state.lyricsSource,
@@ -252,7 +251,6 @@ class MinimalPlayerTheme extends StatelessWidget {
 
                       // Seek Bar
                       PlayerSeekBar(
-                        position: state.position,
                         duration: state.duration,
                         activeColor: activeColor,
                         songId: state.currentSong?.id,

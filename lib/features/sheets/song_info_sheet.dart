@@ -192,7 +192,7 @@ class SongInfoSheet extends StatelessWidget {
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: Adaptive.sheetConstraints(context).maxWidth,
-          maxHeight: MediaQuery.of(context).size.height * 0.88,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.88,
         ),
         child: Material(
           color: p.surface,

@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -18,6 +18,7 @@ import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../core/utils/formatters.dart';
+import '../../../core/utils/list_content_diff.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../sheets/add_to_playlist_sheet.dart';
@@ -42,6 +43,42 @@ class _LibraryScreenState extends State<LibraryScreen>
   late TabController _tabController;
   final ScrollController _songsScrollController = ScrollController();
   int _favTabFilter = 0; // 0: Local, 1: Online
+
+  // F-06: memoized O(n) filter passes â€” recomputed only when the source list
+  // identity changes (freezed copyWith preserves references), never per build.
+  List<SongsTableData>? _songsCacheKey;
+  List<SongsTableData> _downloadedListCache = const [];
+  int _downloadedBadgeCountCache = 0;
+  List<SongsTableData>? _favoritesCacheKey;
+  List<SongsTableData> _localFavoritesCache = const [];
+  List<SongsTableData> _onlineFavoritesCache = const [];
+
+  void _ensureSongsDerivedCaches(LibraryState state) {
+    if (identical(_songsCacheKey, state.songs)) return;
+    _songsCacheKey = state.songs;
+    _downloadedListCache = state.songs.where(_isOnlineDownload).toList();
+    _downloadedBadgeCountCache =
+        state.songs.where((s) => s.isDownloaded == true).length;
+  }
+
+  List<SongsTableData> _downloadedOf(LibraryState state) {
+    _ensureSongsDerivedCaches(state);
+    return _downloadedListCache;
+  }
+
+  int _downloadedBadgeCountOf(LibraryState state) {
+    _ensureSongsDerivedCaches(state);
+    return _downloadedBadgeCountCache;
+  }
+
+  void _ensureFavoritesDerivedCaches(LibraryState state) {
+    if (identical(_favoritesCacheKey, state.favorites)) return;
+    _favoritesCacheKey = state.favorites;
+    _localFavoritesCache =
+        state.favorites.where((s) => !_isOnlineFavorite(s)).toList();
+    _onlineFavoritesCache =
+        state.favorites.where((s) => _isOnlineFavorite(s)).toList();
+  }
 
   @override
   void initState() {
@@ -74,6 +111,17 @@ class _LibraryScreenState extends State<LibraryScreen>
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<LibraryCubit, LibraryState>(
+      // F-06: the shell only depends on selection/view/sort state â€” data
+      // emissions (songs/albums/artists/genres/years/favorites) no longer
+      // rebuild the whole 8-tab scaffold. Each tab gets its own gated builder
+      // below, and the downloaded badge has a songs-identity builder of its
+      // own.
+      buildWhen: (a, b) =>
+          a.isMultiSelectMode != b.isMultiSelectMode ||
+          listContentDiffers(a.selectedSongIds, b.selectedSongIds) ||
+          a.viewMode != b.viewMode ||
+          a.sortBy != b.sortBy ||
+          a.ascending != b.ascending,
       builder: (context, state) {
         final cubit = context.read<LibraryCubit>();
         final playerCubit = context.read<PlayerCubit>();
@@ -179,27 +227,41 @@ class _LibraryScreenState extends State<LibraryScreen>
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(context.l10n.downloaded),
-                            if (state.songs
-                                .where((s) => s.isDownloaded == true)
-                                .isNotEmpty) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: p.accent.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  '${state.songs.where((s) => s.isDownloaded == true).length}',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: p.accent,
-                                  ),
-                                ),
-                              ),
-                            ],
+                            // F-06: songs-identity-scoped badge builder, so
+                            // the O(n) count runs once per songs change, not
+                            // twice per shell build.
+                            BlocBuilder<LibraryCubit, LibraryState>(
+                              buildWhen: (a, b) =>
+                                  listContentDiffers(a.songs, b.songs),
+                              builder: (context, songsState) {
+                                final count =
+                                    _downloadedBadgeCountOf(songsState);
+                                if (count == 0) return const SizedBox.shrink();
+                                return Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const SizedBox(width: 6),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: p.accent.withValues(alpha: 0.2),
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                      ),
+                                      child: Text(
+                                        '$count',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: p.accent,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
                           ],
                         ),
                       ),
@@ -217,15 +279,17 @@ class _LibraryScreenState extends State<LibraryScreen>
               constraints: Adaptive.contentConstraints(context),
               child: TabBarView(
                 controller: _tabController,
+                // F-06: per-tab gated builders â€” an emission touching one
+                // collection no longer rebuilds all eight tab subtrees.
                 children: [
-                  _buildSongsTab(context, state, cubit, playerCubit),
-                  _buildDownloadedTab(context, state, cubit, playerCubit),
-                  _buildAlbumsTab(context, state),
-                  _buildArtistsTab(context, state),
-                  _buildFavoritesTab(context, state, playerCubit),
+                  _songsTab(cubit, playerCubit),
+                  _downloadedTab(cubit, playerCubit),
+                  _albumsTab(),
+                  _artistsTab(),
+                  _favoritesTab(playerCubit),
                   const FolderBrowserTab(),
-                  _buildGenresTab(context, state),
-                  _buildYearsTab(context, state),
+                  _genresTab(),
+                  _yearsTab(),
                 ],
               ),
             ),
@@ -281,6 +345,80 @@ class _LibraryScreenState extends State<LibraryScreen>
           ),
         ],
       ),
+    );
+  }
+
+  // ================= PER-TAB GATED BUILDERS (F-06) =================
+  Widget _songsTab(LibraryCubit cubit, PlayerCubit playerCubit) {
+    return BlocBuilder<LibraryCubit, LibraryState>(
+      buildWhen: (a, b) =>
+          listContentDiffers(a.songs, b.songs) ||
+          a.viewMode != b.viewMode ||
+          listContentDiffers(a.selectedSongIds, b.selectedSongIds) ||
+          a.isMultiSelectMode != b.isMultiSelectMode ||
+          a.isLoading != b.isLoading,
+      builder: (context, state) =>
+          _buildSongsTab(context, state, cubit, playerCubit),
+    );
+  }
+
+  Widget _downloadedTab(LibraryCubit cubit, PlayerCubit playerCubit) {
+    return BlocBuilder<LibraryCubit, LibraryState>(
+      buildWhen: (a, b) =>
+          listContentDiffers(a.songs, b.songs) ||
+          listContentDiffers(a.selectedSongIds, b.selectedSongIds) ||
+          a.isMultiSelectMode != b.isMultiSelectMode ||
+          a.isLoading != b.isLoading,
+      builder: (context, state) =>
+          _buildDownloadedTab(context, state, cubit, playerCubit),
+    );
+  }
+
+  Widget _albumsTab() {
+    return BlocBuilder<LibraryCubit, LibraryState>(
+      buildWhen: (a, b) =>
+          listContentDiffers(a.albums, b.albums) ||
+          a.viewMode != b.viewMode ||
+          a.isLoading != b.isLoading,
+      builder: (context, state) => _buildAlbumsTab(context, state),
+    );
+  }
+
+  Widget _artistsTab() {
+    return BlocBuilder<LibraryCubit, LibraryState>(
+      buildWhen: (a, b) =>
+          listContentDiffers(a.artists, b.artists) ||
+          a.viewMode != b.viewMode ||
+          a.isLoading != b.isLoading,
+      builder: (context, state) => _buildArtistsTab(context, state),
+    );
+  }
+
+  Widget _favoritesTab(PlayerCubit playerCubit) {
+    return BlocBuilder<LibraryCubit, LibraryState>(
+      buildWhen: (a, b) =>
+          listContentDiffers(a.favorites, b.favorites) ||
+          a.viewMode != b.viewMode ||
+          listContentDiffers(a.selectedSongIds, b.selectedSongIds) ||
+          a.isMultiSelectMode != b.isMultiSelectMode ||
+          a.isLoading != b.isLoading,
+      builder: (context, state) => _buildFavoritesTab(context, state, playerCubit),
+    );
+  }
+
+  Widget _genresTab() {
+    return BlocBuilder<LibraryCubit, LibraryState>(
+      buildWhen: (a, b) =>
+          listContentDiffers(a.genres, b.genres) || a.isLoading != b.isLoading,
+      builder: (context, state) => _buildGenresTab(context, state),
+    );
+  }
+
+  Widget _yearsTab() {
+    return BlocBuilder<LibraryCubit, LibraryState>(
+      buildWhen: (a, b) =>
+          listContentDiffers(a.years, b.years) || a.isLoading != b.isLoading,
+      builder: (context, state) => _buildYearsTab(context, state),
     );
   }
 
@@ -523,7 +661,8 @@ class _LibraryScreenState extends State<LibraryScreen>
     PlayerCubit playerCubit,
   ) {
     final p = context.palette;
-    final downloaded = state.songs.where((s) => _isOnlineDownload(s)).toList();
+    // F-06: cached filter â€” recomputed only when state.songs identity changes.
+    final downloaded = _downloadedOf(state);
 
     if (downloaded.isEmpty) {
       return _buildEmpty(
@@ -767,7 +906,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                               fontSize: 13.5)),
                       const SizedBox(height: 2),
                       Text(
-                          '${album.artist} • ${Formatters.formatTrackCount(album.songCount)}',
+                          '${album.artist} â€¢ ${Formatters.formatTrackCount(album.songCount)}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -804,7 +943,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                               fontSize: 14,
                               color: p.textPrimary)),
                       subtitle: Text(
-                          '${album.artist} • ${Formatters.formatTrackCount(album.songCount)}',
+                          '${album.artist} â€¢ ${Formatters.formatTrackCount(album.songCount)}',
                           style:
                               TextStyle(color: p.textSecondary, fontSize: 12)),
                       trailing: Icon(Icons.chevron_right_rounded,
@@ -997,11 +1136,11 @@ class _LibraryScreenState extends State<LibraryScreen>
       BuildContext context, LibraryState state, PlayerCubit playerCubit) {
     final p = context.palette;
     final cubit = context.read<LibraryCubit>();
-    final allFavorites = state.favorites;
-    final localFavorites =
-        allFavorites.where((s) => !_isOnlineFavorite(s)).toList();
-    final onlineFavorites =
-        allFavorites.where((s) => _isOnlineFavorite(s)).toList();
+    // F-06: cached split â€” recomputed only when state.favorites identity
+    // changes, instead of two O(n) passes per build.
+    _ensureFavoritesDerivedCaches(state);
+    final localFavorites = _localFavoritesCache;
+    final onlineFavorites = _onlineFavoritesCache;
 
     final currentFavorites =
         _favTabFilter == 0 ? localFavorites : onlineFavorites;

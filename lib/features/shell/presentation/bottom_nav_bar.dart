@@ -63,35 +63,41 @@ class PulsrBottomNavBar extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: navRadius,
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-          child: Container(
-            decoration: BoxDecoration(
-              color: p.surface.withValues(alpha: p.isDark ? 0.90 : 0.96),
-              borderRadius: navRadius,
-            ),
-            child: SafeArea(
-              top: false,
-              child: Container(
-                height: 58,
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                child: Row(
-                  children: [
-                    for (int i = 0; i < _getItems(context).length; i++)
-                      Expanded(
-                        child: _NavTabItem(
-                          item: _getItems(context)[i],
-                          isSelected: currentIndex == i,
-                          p: p,
-                          onTap: () {
-                            if (currentIndex != i) {
-                              HapticFeedback.selectionClick();
-                              onTap(i);
-                            }
-                          },
+        // RepaintBoundary (F-05): isolates the permanent BackdropFilter layer
+        // so list scrolling above it does not re-rasterize the blur every
+        // frame. Blur sigmas and tint are untouched (visual lock).
+        child: RepaintBoundary(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+            child: Container(
+              decoration: BoxDecoration(
+                color: p.surface.withValues(alpha: p.isDark ? 0.90 : 0.96),
+                borderRadius: navRadius,
+              ),
+              child: SafeArea(
+                top: false,
+                child: Container(
+                  height: 58,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  child: Row(
+                    children: [
+                      for (int i = 0; i < _getItems(context).length; i++)
+                        Expanded(
+                          child: _NavTabItem(
+                            item: _getItems(context)[i],
+                            isSelected: currentIndex == i,
+                            p: p,
+                            onTap: () {
+                              if (currentIndex != i) {
+                                HapticFeedback.selectionClick();
+                                onTap(i);
+                              }
+                            },
+                          ),
                         ),
-                      ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

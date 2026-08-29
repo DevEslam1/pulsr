@@ -472,7 +472,26 @@ internal class InnertubeClient(
     fun requestPlayer(videoId: String, clientType: ClientType): JSONObject {
         val endpoint = "${clientType.endpointHost}/youtubei/v1/player?prettyPrint=false&key=$API_KEY"
         val payload = buildPlayerBody(videoId, clientType)
-        return postWithRetry(endpoint, payload, clientType, RateLimiter.Bucket.PLAYER)
+        // TTFA telemetry: report each ladder client attempt with its RTT so
+        // the Dart/Sentry layer can attribute resolve latency per client.
+        val start = System.currentTimeMillis()
+        return try {
+            val json = postWithRetry(endpoint, payload, clientType, RateLimiter.Bucket.PLAYER)
+            YtmMetricsRegistry.recordRelayed(
+                "ladder.client_attempt",
+                System.currentTimeMillis() - start,
+                attrs = mapOf("client" to clientType.name)
+            )
+            json
+        } catch (t: Throwable) {
+            YtmMetricsRegistry.recordRelayed(
+                "ladder.client_attempt",
+                System.currentTimeMillis() - start,
+                isError = true,
+                attrs = mapOf("client" to clientType.name)
+            )
+            throw t
+        }
     }
 
     fun requestBrowse(browseId: String, clientType: ClientType = ClientType.WEB_REMIX): JSONObject {
@@ -607,7 +626,10 @@ internal class InnertubeClient(
                 if (code in 500..599) {
                     Log.w(TAG, "[$traceId] Server error ($code) on attempt $attempt. Retrying...")
                     response.close()
-                    Thread.sleep((1000L shl attempt) + (0..500).random())
+                    // TTFA: the old 1s/2s/4s sleep ladder burned the
+                    // tap-to-audio budget on the synchronous play path. Cap
+                    // the 5xx backoff at <=300ms (plus small jitter).
+                    Thread.sleep(minOf(200L, 100L shl attempt) + (0..100).random())
                     continue
                 }
 

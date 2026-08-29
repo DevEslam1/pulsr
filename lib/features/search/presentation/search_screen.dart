@@ -48,7 +48,6 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(_onControllerChanged);
 
     // Reset to local tab if offline-only mode gets enabled
     _settingsSub = context.read<SettingsCubit?>()?.stream.listen((settings) {
@@ -58,14 +57,14 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
-  void _onControllerChanged() {
-    if (mounted) setState(() {});
-  }
+  // NOTE (F-03): no TextEditingController listener here — the whole screen no
+  // longer rebuilds per keystroke. The clear button watches the controller
+  // through a ValueListenableBuilder, and result updates are driven by the
+  // SearchCubit emit (onChanged below).
 
   @override
   void dispose() {
     _settingsSub?.cancel();
-    _searchController.removeListener(_onControllerChanged);
     _searchController.dispose();
     super.dispose();
   }
@@ -203,13 +202,19 @@ class _SearchScreenState extends State<SearchScreen> {
                               : context.l10n.searchPlaceholder,
                           prefixIcon:
                               Icon(Icons.search_rounded, color: p.textTertiary),
-                          suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: Icon(Icons.clear_rounded,
-                                      color: p.textTertiary),
-                                  onPressed: () => _clear(context),
-                                )
-                              : null,
+                          suffixIcon: ValueListenableBuilder<TextEditingValue>(
+                            valueListenable: _searchController,
+                            builder: (context, value, _) {
+                              if (value.text.isEmpty) {
+                                return const SizedBox.shrink();
+                              }
+                              return IconButton(
+                                icon: Icon(Icons.clear_rounded,
+                                    color: p.textTertiary),
+                                onPressed: () => _clear(context),
+                              );
+                            },
+                          ),
                         ),
                       ),
                     ),
@@ -419,23 +424,26 @@ class _SearchScreenState extends State<SearchScreen> {
         onPrimaryAction: () => _clear(context),
       );
     }
-    return ListView(
+    // Builder-based list: only the visible SongTiles are inflated per frame
+    // (F-03) instead of constructing every match up front.
+    return ListView.builder(
       padding: const EdgeInsets.only(bottom: 160, top: 4),
-      children: [
-        for (final song in state.results)
-          SongTile(
-            song: song,
-            subtitleOverride: '${song.artist} • ${song.album}',
-            onTap: () => playerCubit.playSong(song, queue: state.results),
-            onMorePressed: () => showModalBottomSheet<void>(
-              context: context,
-              useRootNavigator: true,
-              isScrollControlled: true,
-              backgroundColor: Colors.transparent,
-              builder: (_) => SongInfoSheet(song: song),
-            ),
+      itemCount: state.results.length,
+      itemBuilder: (context, index) {
+        final song = state.results[index];
+        return SongTile(
+          song: song,
+          subtitleOverride: '${song.artist} • ${song.album}',
+          onTap: () => playerCubit.playSong(song, queue: state.results),
+          onMorePressed: () => showModalBottomSheet<void>(
+            context: context,
+            useRootNavigator: true,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => SongInfoSheet(song: song),
           ),
-      ],
+        );
+      },
     );
   }
 }

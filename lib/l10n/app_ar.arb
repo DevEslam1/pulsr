@@ -312,6 +312,8 @@
   "autoMix": "مزيج تلقائي",
   "topPlayedTracks": "الأكثر استماعًا",
   "audioAndPlayback": "الصوت والتشغيل",
+  "playback": "التشغيل",
+  "audioAndSound": "الصوت والصوتيات",
   "equalizerAndSoundEffects": "معادل الصوت والتأثيرات",
   "themeAndAppearance": "المظهر والسمة",
   "accentColor": "اللون المميز",

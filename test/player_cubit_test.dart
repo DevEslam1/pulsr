@@ -4,6 +4,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:rxdart/rxdart.dart';
+import 'package:pulsr/core/telemetry/clock.dart';
+import 'package:pulsr/core/telemetry/playback_latency_tracker.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
 import 'package:pulsr/data/audio/equalizer_manager.dart';
 import 'package:pulsr/data/scanner/media_scanner_service.dart';
@@ -357,6 +359,48 @@ void main() {
       expect(cubit.state.isQueueVisible, false);
 
       cubit.close();
+    });
+
+    test(
+        'TTFA playing mark only fires when ExoPlayer is ready AND playing, '
+        'never while loading', () async {
+      final tracker = PlaybackLatencyTracker.withClock(const SystemClock());
+      final cubit = PlayerCubit(
+        audioHandler: testAudioHandler,
+        repository: mockRepository,
+        toggleFavoriteUseCase: mockToggleFavorite,
+        latencyTracker: tracker,
+      );
+      tracker.start(videoId: 'gateVid');
+
+      // Broadcast a "playing" state while still loading — the tracker session
+      // must NOT be completed (this was the premature-mark bug).
+      testAudioHandler._playbackStateController.add(PlaybackState(
+        processingState: AudioProcessingState.loading,
+        playing: true,
+      ));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(tracker.hasActiveSession, isTrue,
+          reason: 'loading must not mark playing');
+      expect(tracker.lastReport, isNull);
+
+      // Now ready + playing — real audible start completes the session.
+      testAudioHandler._playbackStateController.add(PlaybackState(
+        processingState: AudioProcessingState.ready,
+        playing: true,
+      ));
+      await Future<void>.delayed(Duration.zero);
+
+      expect(tracker.lastReport, isNotNull);
+      expect(tracker.lastReport!.success, isTrue);
+      expect(
+        tracker.lastReport!.stageOffsets.containsKey(PlaybackStage.playing),
+        isTrue,
+      );
+
+      await cubit.close();
+      tracker.dispose();
     });
 
     test('equalizer enabling and preset apply updates state and audio handler',

@@ -312,6 +312,8 @@
   "autoMix": "Auto-mix",
   "topPlayedTracks": "Top played",
   "audioAndPlayback": "Audio & Playback",
+  "playback": "Playback",
+  "audioAndSound": "Audio & Sound",
   "equalizerAndSoundEffects": "Equalizer & Sound Effects",
   "themeAndAppearance": "Theme & Appearance",
   "accentColor": "Accent Color",

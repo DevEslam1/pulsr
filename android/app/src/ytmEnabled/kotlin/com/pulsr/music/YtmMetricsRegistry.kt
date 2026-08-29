@@ -63,11 +63,40 @@ object YtmMetricsRegistry {
 
     private val metricsMap = ConcurrentHashMap<String, OpMetrics>()
 
+    /**
+     * One-way relay for key native timings to the Dart/Sentry TTFA telemetry
+     * layer, wired by [YtmExtractorPlugin] at engine startup. Invoked inline
+     * from [recordRelayed]; the relay implementation must be non-blocking
+     * (posts to the platform main handler). No-ops when null.
+     */
+    @Volatile
+    var timingRelay: ((name: String, durationMs: Long, isError: Boolean, attrs: Map<String, Any?>?) -> Unit)? = null
+
     private fun getOp(name: String): OpMetrics =
         metricsMap.computeIfAbsent(name) { OpMetrics() }
 
     fun record(operation: String, durationMs: Long, isError: Boolean = false) {
         getOp(operation).record(durationMs, isError)
+    }
+
+    /**
+     * Records a metric AND relays it one-way to Dart with optional
+     * attributes. Used only for the small set of TTFA-critical timings
+     * (poToken.mint, ladder.client_attempt, rate_limiter.wait_player,
+     * executor.queue_wait); regular metrics keep using [record].
+     */
+    fun recordRelayed(
+        operation: String,
+        durationMs: Long,
+        isError: Boolean = false,
+        attrs: Map<String, Any?>? = null
+    ) {
+        record(operation, durationMs, isError)
+        try {
+            timingRelay?.invoke(operation, durationMs, isError, attrs)
+        } catch (_: Throwable) {
+            // Telemetry relay must never affect playback.
+        }
     }
 
     inline fun <T> measure(operation: String, block: () -> T): T {

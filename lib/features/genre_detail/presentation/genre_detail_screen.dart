@@ -86,118 +86,137 @@ class _GenreDetailScreenState extends State<GenreDetailScreen> {
           return Center(
             child: ConstrainedBox(
               constraints: Adaptive.contentConstraints(context),
-              child: ListView(
-                padding: const EdgeInsets.only(bottom: 160),
-                children: [
-                  const SizedBox(height: 16),
-                  Center(
-                    child: Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        color: p.accentContainer,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: p.hairline),
-                        boxShadow: [
-                          BoxShadow(
-                              color: p.glow,
-                              blurRadius: 24,
-                              spreadRadius: -4,
-                              offset: const Offset(0, 8)),
-                        ],
-                      ),
-                      child: Icon(
-                        Icons.style_rounded,
-                        size: 48,
-                        color: p.accent,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Center(
-                    child: Text(
-                      genreItem.name,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Center(
-                    child: Text(
-                      Formatters.formatTrackCount(songs.length),
-                      style: TextStyle(color: p.textSecondary, fontSize: 13),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Action Buttons (Play All, Shuffle)
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: Adaptive.pagePadding(context)),
-                    child: Row(
+              // Builder-based slivers (F-04): the header stays a single box
+              // adapter and the track list is a virtualized SliverList.builder
+              // — same visual order/spacing as the former ListView(children:).
+              child: CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: songs.isNotEmpty
-                                ? () => context
-                                    .read<PlayerCubit>()
-                                    .playSong(songs.first, queue: songs)
-                                : null,
-                            icon: const Icon(Icons.play_arrow_rounded),
-                            label: Text(context.l10n.playAll),
+                        const SizedBox(height: 16),
+                        Center(
+                          child: Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              color: p.accentContainer,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: p.hairline),
+                              boxShadow: [
+                                BoxShadow(
+                                    color: p.glow,
+                                    blurRadius: 24,
+                                    spreadRadius: -4,
+                                    offset: const Offset(0, 8)),
+                              ],
+                            ),
+                            child: Icon(
+                              Icons.style_rounded,
+                              size: 48,
+                              color: p.accent,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: songs.isNotEmpty
-                                ? () {
-                                    final shuffled =
-                                        List<SongsTableData>.from(songs)
-                                          ..shuffle();
-                                    context.read<PlayerCubit>().playSong(
-                                        shuffled.first,
-                                        queue: shuffled);
-                                  }
-                                : null,
-                            icon: Icon(Icons.shuffle_rounded, color: p.accent),
-                            label: Text(context.l10n.shuffle),
+                        const SizedBox(height: 16),
+                        Center(
+                          child: Text(
+                            genreItem.name,
+                            textAlign: TextAlign.center,
+                            style:
+                                Theme.of(context).textTheme.headlineSmall,
                           ),
                         ),
+                        const SizedBox(height: 4),
+                        Center(
+                          child: Text(
+                            Formatters.formatTrackCount(songs.length),
+                            style: TextStyle(
+                                color: p.textSecondary, fontSize: 13),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Action Buttons (Play All, Shuffle)
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: Adaptive.pagePadding(context)),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: songs.isNotEmpty
+                                      ? () => context
+                                          .read<PlayerCubit>()
+                                          .playSong(songs.first, queue: songs)
+                                      : null,
+                                  icon: const Icon(Icons.play_arrow_rounded),
+                                  label: Text(context.l10n.playAll),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: songs.isNotEmpty
+                                      ? () {
+                                          final shuffled =
+                                              List<SongsTableData>.from(songs)
+                                                ..shuffle();
+                                          context.read<PlayerCubit>().playSong(
+                                              shuffled.first,
+                                              queue: shuffled);
+                                        }
+                                      : null,
+                                  icon: Icon(Icons.shuffle_rounded,
+                                      color: p.accent),
+                                  label: Text(context.l10n.shuffle),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // Songs List
+                        if (songs.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.all(32),
+                            child: EmptyStateWidget(
+                              icon: Icons.music_off_rounded,
+                              title: 'No Tracks',
+                              subtitle: 'No tracks found in this genre.',
+                            ),
+                          ),
                       ],
                     ),
                   ),
-
-                  const SizedBox(height: 20),
-
-                  // Songs List
-                  if (songs.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: EmptyStateWidget(
-                        icon: Icons.music_off_rounded,
-                        title: 'No Tracks',
-                        subtitle: 'No tracks found in this genre.',
-                      ),
-                    )
-                  else
-                    for (int i = 0; i < songs.length; i++)
-                      SongTile(
-                        song: songs[i],
-                        index: i,
-                        subtitleOverride:
-                            '${songs[i].artist} • ${songs[i].album}',
-                        onTap: () => context
-                            .read<PlayerCubit>()
-                            .playSong(songs[i], queue: songs),
-                        onMorePressed: () => showModalBottomSheet<void>(
-                          context: context,
-                          useRootNavigator: true,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (_) => SongInfoSheet(song: songs[i]),
-                        ),
-                      ),
+                  if (songs.isNotEmpty)
+                    SliverList.builder(
+                      itemCount: songs.length,
+                      itemBuilder: (context, index) {
+                        final song = songs[index];
+                        return SongTile(
+                          song: song,
+                          index: index,
+                          subtitleOverride: '${song.artist} • ${song.album}',
+                          onTap: () => context
+                              .read<PlayerCubit>()
+                              .playSong(song, queue: songs),
+                          onMorePressed: () => showModalBottomSheet<void>(
+                            context: context,
+                            useRootNavigator: true,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (_) => SongInfoSheet(song: song),
+                          ),
+                        );
+                      },
+                    ),
+                  // Bottom padding kept unconditional (matches the former
+                  // ListView padding, as in artist/playlist detail).
+                  const SliverPadding(padding: EdgeInsets.only(bottom: 160)),
                 ],
               ),
             ),

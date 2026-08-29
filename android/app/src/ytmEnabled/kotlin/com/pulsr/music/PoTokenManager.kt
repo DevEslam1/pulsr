@@ -267,13 +267,27 @@ object PoTokenManager {
 
             val gen = generator
             if (gen != null && !gen.isExpired()) {
+                // TTFA telemetry: mint duration + cold/warm flag (warm = a
+                // valid generator already existed).
+                val mintStart = System.currentTimeMillis()
                 return try {
                     val minted = gen.generatePoToken(identifier)
+                    YtmMetricsRegistry.recordRelayed(
+                        "poToken.mint",
+                        System.currentTimeMillis() - mintStart,
+                        attrs = mapOf("cold" to false)
+                    )
                     synchronized(tokenLru) {
                         tokenLru.put(identifier, CachedToken(minted, visitorData, Instant.now().epochSecond))
                     }
                     minted
                 } catch (t: Throwable) {
+                    YtmMetricsRegistry.recordRelayed(
+                        "poToken.mint",
+                        System.currentTimeMillis() - mintStart,
+                        isError = true,
+                        attrs = mapOf("cold" to false)
+                    )
                     Log.w(TAG, "Minting poToken failed with warm generator: ${t.message}", t)
                     synchronized(tokenLru) {
                         tokenLru.get(identifier)?.token ?: streamingPoToken
@@ -288,6 +302,7 @@ object PoTokenManager {
             }
 
             // 6. Cold path fallback: synchronous generation
+            val coldMintStart = System.currentTimeMillis()
             ensureReadySync()
 
             val activeGen = generator
@@ -299,11 +314,24 @@ object PoTokenManager {
 
             return try {
                 val minted = activeGen.generatePoToken(identifier)
+                // TTFA telemetry: cold mint (generator had to be created on
+                // the synchronous path — the expensive first-play case).
+                YtmMetricsRegistry.recordRelayed(
+                    "poToken.mint",
+                    System.currentTimeMillis() - coldMintStart,
+                    attrs = mapOf("cold" to true)
+                )
                 synchronized(tokenLru) {
                     tokenLru.put(identifier, CachedToken(minted, visitorData, Instant.now().epochSecond))
                 }
                 minted
             } catch (t: Throwable) {
+                YtmMetricsRegistry.recordRelayed(
+                    "poToken.mint",
+                    System.currentTimeMillis() - coldMintStart,
+                    isError = true,
+                    attrs = mapOf("cold" to true)
+                )
                 Log.w(TAG, "Minting poToken failed for $identifier: ${t.message}", t)
                 synchronized(tokenLru) {
                     tokenLru.get(identifier)?.token ?: streamingPoToken

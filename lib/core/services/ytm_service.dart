@@ -86,11 +86,51 @@ class YtmException implements Exception {
 class YtmService {
   static const String channelName = PulsrChannels.ytm;
   static const Duration _defaultSearchTimeout = Duration(seconds: 25);
-  static const Duration _defaultResolveTimeout = Duration(seconds: 25);
+
+  // TTFA hard budget: tier-1 (account) gets a ~3s wall-clock deadline at the
+  // resolveStream level so a slow account resolve falls through to the native
+  // extractor instead of burning its internal 25s timeout.
+  static const Duration _tier1Deadline = Duration(seconds: 3);
+
+  // TTFA hard budget: reduced first-attempt timeout + single retry for the
+  // play path (native tier-2). Other call sites keep the default 25s/2-retry
+  // ladder.
+  static const Duration _resolveFirstAttemptTimeout = Duration(seconds: 8);
 
   final MethodChannel _channel = const MethodChannel(channelName);
   final StreamController<void> _authExpiredController =
       StreamController<void>.broadcast();
+
+  YtmService() {
+    // TTFA telemetry: one-way relay of key native timings (poToken mint,
+    // ladder client attempts, rate-limiter waits, executor queue wait) pushed
+    // by the Kotlin side over the same channel. Purely passive — the native
+    // side never waits on a reply.
+    _channel.setMethodCallHandler(_handleNativeCall);
+  }
+
+  Future<dynamic> _handleNativeCall(MethodCall call) async {
+    if (call.method == 'nativeTiming') {
+      _relayNativeTiming(call.arguments);
+    }
+    return null;
+  }
+
+  void _relayNativeTiming(dynamic arguments) {
+    try {
+      if (arguments is! Map) return;
+      final name = arguments['name']?.toString();
+      final durationMs = (arguments['durationMs'] as num?)?.toInt();
+      if (name == null || name.isEmpty || durationMs == null) return;
+      final attrs = arguments['attrs'] is Map
+          ? (arguments['attrs'] as Map)
+              .map((k, v) => MapEntry(k.toString(), v))
+          : null;
+      _tracker?.markNativeTiming(name, durationMs, attrs: attrs);
+    } catch (_) {
+      // Telemetry must never affect playback.
+    }
+  }
 
   bool? _available;
 
@@ -545,6 +585,7 @@ class YtmService {
       if (cachedEntry != null && !cachedEntry.isExpired()) {
         try {
           _tracker?.markStage(PlaybackStage.urlObtained);
+          _tracker?.setTag('cacheHit', 'true');
         } catch (_) {}
         return cachedEntry.toStream(quality: quality);
       }
@@ -553,6 +594,7 @@ class YtmService {
     return _runCoalesced('resolve:$videoId:$quality', () async {
       try {
         _tracker?.markStage(PlaybackStage.pluginEntered);
+        _tracker?.setTag('cacheHit', 'false');
       } catch (_) {}
       // 1. Try direct authenticated YouTube Music InnerTube Player API if logged in
       try {
@@ -563,13 +605,15 @@ class YtmService {
               _tracker?.markStage(PlaybackStage.clientRequestSent);
               _tracker?.markStage(PlaybackStage.poTokenNeeded);
             } catch (_) {}
-            final directStream = await account.resolvePlayerStream(
-              videoId,
-              quality: quality,
-            );
+            // Hard ~3s wall-clock deadline: a slow tier-1 must fall through to
+            // the native extractor instead of burning its internal 25s budget.
+            final directStream = await account
+                .resolvePlayerStream(videoId, quality: quality)
+                .timeout(_tier1Deadline);
             if (directStream != null) {
               try {
                 _tracker?.markStage(PlaybackStage.urlObtained);
+                _tracker?.setTag('tierUsed', 'account');
               } catch (_) {}
               urlCache?.put(
                 videoId,
@@ -598,18 +642,22 @@ class YtmService {
           // Check poToken state heuristically: if we have a cached token, this is warm
           _tracker?.markStage(PlaybackStage.poTokenNeeded);
         } catch (_) {}
+        // TTFA play path: bounded ladder (8s first attempt, one retry) instead
+        // of the default 25s × 2-retry ladder.
         final raw = await _guard(
           () => _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
             'videoId': videoId,
             'quality': quality,
           }),
-          timeout: _defaultResolveTimeout,
+          timeout: _resolveFirstAttemptTimeout,
+          maxRetries: 1,
         );
 
         final stream = raw == null ? null : YtmStream.fromChannel(raw);
         if (stream != null) {
           try {
             _tracker?.markStage(PlaybackStage.urlObtained);
+            _tracker?.setTag('tierUsed', 'native');
           } catch (_) {}
           urlCache?.put(
             videoId,
@@ -645,6 +693,7 @@ class YtmService {
             if (remoteStream != null) {
               try {
                 _tracker?.markStage(PlaybackStage.urlObtained);
+                _tracker?.setTag('tierUsed', 'xdm');
               } catch (_) {}
               urlCache?.put(
                 videoId,

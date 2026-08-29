@@ -160,7 +160,6 @@ class ClassicPlayerTheme extends StatelessWidget {
                           ? LyricsView(
                               key: const ValueKey('lyrics_view'),
                               lyrics: state.lyrics,
-                              currentPosition: state.position,
                               isLoading: state.isLoadingLyrics,
                               activeColor: activeColor,
                               source: state.lyricsSource,
@@ -311,7 +310,6 @@ class ClassicPlayerTheme extends StatelessWidget {
 
                       // Seek Bar
                       PlayerSeekBar(
-                        position: state.position,
                         duration: state.duration,
                         activeColor: activeColor,
                         songId: state.currentSong?.id,

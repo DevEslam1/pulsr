@@ -1,5 +1,6 @@
-// lib/features/queue/presentation/queue_screen.dart
+﻿// lib/features/queue/presentation/queue_screen.dart
 import 'package:flutter/material.dart';
+import '../../../core/utils/list_content_diff.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../../../core/constants/app_radii.dart';
@@ -94,7 +95,7 @@ class QueueScreen extends StatelessWidget {
         // Rebuild only when the queue itself changes; position ticks at 10Hz
         // must not rebuild the whole queue list.
         buildWhen: (a, b) =>
-            !identical(a.queue, b.queue) ||
+            listContentDiffers(a.queue, b.queue) ||
             a.queue.length != b.queue.length ||
             a.currentSong?.id != b.currentSong?.id ||
             a.currentIndex != b.currentIndex,
@@ -127,7 +128,7 @@ class QueueScreen extends StatelessWidget {
                   vertical: 8,
                 ).copyWith(bottom: 160),
                 itemCount: queue.length,
-                // ignore: deprecated_member_use — onReorderItem is 3.41+; keep onReorder for stable channel compat
+                // ignore: deprecated_member_use â€” onReorderItem is 3.41+; keep onReorder for stable channel compat
                 onReorder: (oldIdx, newIdx) => context.read<PlayerCubit>().reorderQueue(oldIdx, newIdx),
                 itemBuilder: (context, index) {
                   final song = queue[index];
@@ -175,7 +176,7 @@ class QueueScreen extends StatelessWidget {
                             ),
                           ),
                           subtitle: Text(
-                            '${song.artist} • ${Formatters.formatDuration(Duration(milliseconds: song.durationMs))}',
+                            '${song.artist} â€¢ ${Formatters.formatDuration(Duration(milliseconds: song.durationMs))}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style:

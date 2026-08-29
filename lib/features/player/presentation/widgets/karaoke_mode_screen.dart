@@ -14,28 +14,36 @@ class KaraokeModeScreen extends StatelessWidget {
 
   const KaraokeModeScreen({super.key, required this.lyrics});
 
+  /// O(n) scan mapping a position to the active line index (last line whose
+  /// timestamp is <= position). Used as a [BlocSelector] output so the lyric
+  /// subtree only rebuilds when the active line actually changes.
+  static int _activeIndexOf(Duration pos, List<LyricsLine> lines) {
+    int activeIdx = 0;
+    for (int i = 0; i < lines.length; i++) {
+      if (pos >= lines[i].timestamp) {
+        activeIdx = i;
+      } else {
+        break;
+      }
+    }
+    return activeIdx;
+  }
+
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
 
+    // Gate the scaffold against position ticks: only song/isPlaying/duration
+    // changes rebuild it. The active line and the elapsed time subscribe to
+    // position themselves via [BlocSelector] leaves below.
     return BlocBuilder<PlayerCubit, PlayerState>(
+      buildWhen: (a, b) =>
+          a.currentSong?.id != b.currentSong?.id ||
+          a.currentSong?.title != b.currentSong?.title ||
+          a.isPlaying != b.isPlaying ||
+          a.duration != b.duration,
       builder: (context, state) {
-        final pos = state.position;
         final song = state.currentSong;
-
-        // Determine current active line index
-        int activeIdx = 0;
-        for (int i = 0; i < lyrics.length; i++) {
-          if (pos >= lyrics[i].timestamp) {
-            activeIdx = i;
-          } else {
-            break;
-          }
-        }
-
-        final activeLine = lyrics.isNotEmpty ? lyrics[activeIdx] : null;
-        final nextLine =
-            activeIdx + 1 < lyrics.length ? lyrics[activeIdx + 1] : null;
 
         return Scaffold(
           backgroundColor: const Color(0xFF08090E),
@@ -80,65 +88,93 @@ class KaraokeModeScreen extends StatelessWidget {
           body: Column(
             children: [
               const Spacer(),
-              // Active Lyric Line with Glow & Tap-to-Seek
-              if (activeLine != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 32),
-                  child: InkWell(
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      context.read<PlayerCubit>().seek(activeLine.timestamp);
-                    },
-                    borderRadius: BorderRadius.circular(16),
-                    splashColor: p.primary.withValues(alpha: 0.2),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 8, horizontal: 12),
-                      child: Text(
-                        activeLine.text,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.w900,
-                          color: p.primary,
-                          shadows: [
-                            Shadow(
-                              color: p.primary.withValues(alpha: 0.8),
-                              blurRadius: 28,
+              // Active / upcoming lyric lines — rebuild only when the active
+              // line index changes, not on every position tick.
+              BlocSelector<PlayerCubit, PlayerState,
+                  ({LyricsLine? active, LyricsLine? next})>(
+                selector: (s) {
+                  if (lyrics.isEmpty) {
+                    return (active: null, next: null);
+                  }
+                  final idx = _activeIndexOf(s.position, lyrics);
+                  return (
+                    active: lyrics[idx],
+                    next: idx + 1 < lyrics.length ? lyrics[idx + 1] : null,
+                  );
+                },
+                builder: (context, lines) {
+                  final activeLine = lines.active;
+                  final nextLine = lines.next;
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Active Lyric Line with Glow & Tap-to-Seek
+                      if (activeLine != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 32),
+                          child: InkWell(
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              context
+                                  .read<PlayerCubit>()
+                                  .seek(activeLine.timestamp);
+                            },
+                            borderRadius: BorderRadius.circular(16),
+                            splashColor: p.primary.withValues(alpha: 0.2),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 8, horizontal: 12),
+                              child: Text(
+                                activeLine.text,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w900,
+                                  color: p.primary,
+                                  shadows: [
+                                    Shadow(
+                                      color: p.primary.withValues(alpha: 0.8),
+                                      blurRadius: 28,
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
-                ),
-              const SizedBox(height: 24),
-              // Next Upcoming Line (Tappable)
-              if (nextLine != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 36),
-                  child: InkWell(
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      context.read<PlayerCubit>().seek(nextLine.timestamp);
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    splashColor: p.primary.withValues(alpha: 0.15),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 6, horizontal: 12),
-                      child: Text(
-                        nextLine.text,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white.withValues(alpha: 0.45),
+                      const SizedBox(height: 24),
+                      // Next Upcoming Line (Tappable)
+                      if (nextLine != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 36),
+                          child: InkWell(
+                            onTap: () {
+                              HapticFeedback.selectionClick();
+                              context
+                                  .read<PlayerCubit>()
+                                  .seek(nextLine.timestamp);
+                            },
+                            borderRadius: BorderRadius.circular(12),
+                            splashColor: p.primary.withValues(alpha: 0.15),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  vertical: 6, horizontal: 12),
+                              child: Text(
+                                nextLine.text,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white.withValues(alpha: 0.45),
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
-                    ),
-                  ),
-                ),
+                    ],
+                  );
+                },
+              ),
               const Spacer(),
 
               // Audio / Mic Level Visualizer
@@ -153,25 +189,32 @@ class KaraokeModeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
 
-              // Bottom Progress Bar & Time
+              // Bottom Progress Bar & Time — position-driven leaf so the
+              // elapsed label still ticks without rebuilding the scaffold.
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 28),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      Formatters.formatDuration(pos),
-                      style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.7),
-                          fontSize: 13),
-                    ),
-                    Text(
-                      Formatters.formatDuration(state.duration),
-                      style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.7),
-                          fontSize: 13),
-                    ),
-                  ],
+                child: BlocSelector<PlayerCubit, PlayerState,
+                    ({Duration position, Duration duration})>(
+                  selector: (s) => (position: s.position, duration: s.duration),
+                  builder: (context, progress) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          Formatters.formatDuration(progress.position),
+                          style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.7),
+                              fontSize: 13),
+                        ),
+                        Text(
+                          Formatters.formatDuration(progress.duration),
+                          style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.7),
+                              fontSize: 13),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 32),

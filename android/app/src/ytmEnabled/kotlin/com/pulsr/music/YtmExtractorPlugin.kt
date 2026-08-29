@@ -49,7 +49,13 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
     private var channel: MethodChannel? = null
     private var context: Context? = null
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val executor: ExecutorService = Executors.newFixedThreadPool(3)
+    // TTFA (Item: plugin executor width): acquirePermit parks a pool thread
+    // per blocked caller, so a 3-thread pool starves whenever >3 YTM calls
+    // overlap (e.g. play resolve + search + pre-resolution + rate-limited
+    // browse calls). 6 threads = the OkHttp Dispatcher maxRequestsPerHost
+    // budget; each parked waiter is a parked semaphore await (no spinning),
+    // so the extra threads cost idle-time only.
+    private val executor: ExecutorService = Executors.newFixedThreadPool(6)
 
     companion object {
         private const val TAG = "YtmExtractorPlugin"
@@ -68,6 +74,9 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             plugin.channel = channel
             channel.setMethodCallHandler(plugin)
             context?.let { PoTokenManager.init(it) }
+            // TTFA telemetry: one-way relay of key native timings to Dart
+            // (attached to the Sentry playback transaction). Non-blocking.
+            YtmMetricsRegistry.timingRelay = plugin::relayTiming
             return plugin
         }
     }
@@ -316,7 +325,12 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
     }
 
     private fun runOffMainThread(result: MethodChannel.Result, work: () -> Any?) {
+        val submittedAt = System.currentTimeMillis()
         executor.execute {
+            // TTFA telemetry: cheap measure of how long the call waited for a
+            // pool thread before running.
+            val queueWaitMs = System.currentTimeMillis() - submittedAt
+            YtmMetricsRegistry.recordRelayed("executor.queue_wait", queueWaitMs)
             try {
                 ensureExtractorReady()
                 val value = work()
@@ -331,6 +345,29 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 }
                 mainHandler.post { runCatching { result.error(code, e.message, details) } }
             }
+        }
+    }
+
+    /**
+     * TTFA telemetry: forwards one key native timing over the plugin channel
+     * to Dart (playback_latency_tracker attaches it to the Sentry playback
+     * transaction). Safe from any thread — the invoke is posted to
+     * [mainHandler] and never blocks the caller.
+     */
+    private fun relayTiming(
+        name: String,
+        durationMs: Long,
+        isError: Boolean,
+        attrs: Map<String, Any?>?
+    ) {
+        val ch = channel ?: return
+        val payload = HashMap<String, Any?>(8)
+        payload["name"] = name
+        payload["durationMs"] = durationMs
+        payload["isError"] = isError
+        if (!attrs.isNullOrEmpty()) payload["attrs"] = attrs
+        mainHandler.post {
+            runCatching { ch.invokeMethod("nativeTiming", payload) }
         }
     }
 

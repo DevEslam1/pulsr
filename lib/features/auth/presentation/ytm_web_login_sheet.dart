@@ -1,13 +1,16 @@
 // lib/features/auth/presentation/ytm_web_login_sheet.dart
 import 'dart:async';
+import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import '../../../core/constants/embedded_browser_ua.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/ytm_account_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../utils/google_login_recovery.dart';
 
 class YtmWebLoginSheet extends StatefulWidget {
   static const String googleSignInUrl =
@@ -52,7 +55,12 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   InAppWebViewController? _webViewController;
   InAppWebViewSettings? _settings;
   bool _isLoading = true;
-  double _progress = 0.0;
+
+  // F-17: WebView progress ticks arrive many times per page load; they feed
+  // this notifier and rebuild only the small progress bar, not the whole
+  // ~1000-line sheet.
+  final ValueNotifier<double> _progressNotifier = ValueNotifier<double>(0.0);
+
   bool _isLoggedIn = false;
   String? _detectedCookies;
   bool _showHint = false;
@@ -88,10 +96,41 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   /// reload straight back to CookieMismatch forever.
   int _mismatchAutoNavCount = 0;
 
-  static const String mobileUserAgent =
-      'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36';
-  static const String desktopUserAgent =
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36';
+  // --- Google "This browser or app may not be secure" block recovery ---
+  // UAs live in EmbeddedBrowserUa (single source; keep bumped — see file).
+  static String get mobileUserAgent => EmbeddedBrowserUa.mobile;
+  static String get desktopUserAgent => EmbeddedBrowserUa.desktop;
+
+  /// JS shim injected at document start on Google sign-in pages: defines a
+  /// minimal `window.chrome` shape if missing. Cheap, harmless, closes one
+  /// embedded-WebView fingerprint gap Google checks for.
+  static const String _chromeShimJs =
+      "try { window.chrome = window.chrome || { app: { isInstalled: false }, runtime: {} }; } catch (e) {}";
+
+  static const List<String> _blockPhrases = [
+    "couldn't sign you in",
+    'this browser or app may not be secure',
+  ];
+
+  final GoogleBlockRecovery _blockRecovery = GoogleBlockRecovery();
+
+  /// Non-null while the automatic recovery ladder is running (drives the
+  /// inline status banner); prevents re-entry so the ladder never loops.
+  String? _blockStatus;
+
+  /// True after the 2 automatic retries were exhausted → recovery card.
+  bool _blockExhausted = false;
+
+  /// Identity override chosen by the ladder or the recovery card. Null =
+  /// use the default isYtm URL-based selection.
+  BrowserIdentity? _uaIdentityOverride;
+
+  /// Throttle for the block-page JS text scan (once per 2.5 s per page).
+  DateTime _lastBlockScanAt = DateTime.fromMillisecondsSinceEpoch(0);
+
+  String _uaFor(BrowserIdentity identity) => identity == BrowserIdentity.desktop
+      ? EmbeddedBrowserUa.desktop
+      : EmbeddedBrowserUa.mobile;
 
   @override
   void initState() {
@@ -185,6 +224,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     _hintTimer?.cancel();
     _authPollTimer?.cancel();
     _cookieMismatchDebounce?.cancel();
+    _progressNotifier.dispose();
     super.dispose();
   }
 
@@ -247,13 +287,19 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       final accountService = getIt<YtmAccountService>();
       // Scoped wipe: only YouTube/Google sign-in cookies, never the whole
       // device WebView cookie jar.
-      await accountService.clearSessionWebViewCookies();
+      await _clearWebViewCookiesAndCache();
       await accountService.logout();
-      await InAppWebViewController.clearAllCache();
       _isLoggedIn = false;
       _detectedCookies = null;
       _hadSuccessfulYtLoad = false;
       _mismatchAutoNavCount = 0;
+      // Manual "start over" also dismisses the block recovery card.
+      if (mounted && (_blockExhausted || _blockStatus != null)) {
+        setState(() {
+          _blockExhausted = false;
+          _blockStatus = null;
+        });
+      }
       final target =
           widget.isBrowseMode ? 'https://music.youtube.com' : googleSignInUrl;
       unawaited(_navigateTo(target));
@@ -271,12 +317,157 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     }
   }
 
+  /// Shared cookie+cache wipe used by the toolbar button and the block
+  /// recovery ladder. Clears the scoped session cookies and the WebView cache
+  /// only — no session flags or navigation.
+  Future<void> _clearWebViewCookiesAndCache() async {
+    try {
+      final accountService = getIt<YtmAccountService>();
+      await accountService.clearSessionWebViewCookies();
+      await InAppWebViewController.clearAllCache();
+    } catch (e) {
+      debugPrint('[YtmWebLogin] Failed to clear WebView cookies/cache: $e');
+    }
+  }
+
+  // ---------- Google block detection & recovery ladder ----------
+
+  /// URL-level block signals: the dedicated `signin/blocked` path, or the
+  /// ServiceLogin / signin pages carrying an explicit error parameter.
+  bool _matchesBlockedUrl(Uri? uri) {
+    if (uri == null) return false;
+    final path = uri.path.toLowerCase();
+    if (path.contains('signin/blocked')) return true;
+    final hasErrorParam = uri.queryParameters.containsKey('error') ||
+        uri.queryParameters.containsKey('errorCode');
+    if (hasErrorParam &&
+        (path.contains('servicelogin') || path.contains('signin'))) {
+      return true;
+    }
+    return false;
+  }
+
+  bool _shouldScanForBlockPage() {
+    final now = DateTime.now();
+    if (now.difference(_lastBlockScanAt) <
+        const Duration(milliseconds: 2500)) {
+      return false;
+    }
+    _lastBlockScanAt = now;
+    return true;
+  }
+
+  /// Lightweight throttled JS evaluation: looks for Google's block-page
+  /// phrases in the document title/body text (first 4 KB, lowercased).
+  Future<bool> _scanPageForBlockText(InAppWebViewController controller) async {
+    try {
+      final raw = await controller.evaluateJavascript(source: '''
+(() => {
+  try {
+    var t = (document.title || '');
+    var b = '';
+    try { b = (document.body && document.body.innerText) || ''; } catch (e) {}
+    return (t + '|' + b).slice(0, 4000).toLowerCase();
+  } catch (e) { return ''; }
+})()''');
+      final text = raw?.toString().toLowerCase() ?? '';
+      for (final phrase in _blockPhrases) {
+        if (text.contains(phrase)) return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  /// Entry point of the automatic recovery ladder (max 2 retries, then the
+  /// manual recovery card — never loops).
+  void _handleGoogleBlock() {
+    if (!mounted || widget.isBrowseMode) return;
+    // Already recovering, or exhausted → stop; the card handles it manually.
+    if (_blockStatus != null || _blockExhausted) return;
+
+    final step = _blockRecovery.onBlocked();
+    if (step == null) {
+      debugPrint('[YtmWebLogin] Google block: retries exhausted.');
+      setState(() {
+        _blockExhausted = true;
+        _blockStatus = null;
+      });
+      return;
+    }
+    debugPrint('[YtmWebLogin] Google block detected → ladder attempt '
+        '${_blockRecovery.attempt}/${_blockRecovery.maxAttempts} '
+        '→ identity ${step.nextIdentity.name}');
+    setState(() {
+      _blockStatus =
+          'Google blocked the embedded browser — retrying with different browser identity (${_blockRecovery.attempt}/${_blockRecovery.maxAttempts})…';
+    });
+    unawaited(_runBlockRecoveryStep(step));
+  }
+
+  Future<void> _runBlockRecoveryStep(BlockRecoveryStep step) async {
+    try {
+      // 1. Clear cookies + cache, 2. switch browser identity, 3. reload.
+      await _clearWebViewCookiesAndCache();
+      _uaIdentityOverride = step.nextIdentity;
+      try {
+        await _webViewController?.setSettings(
+          settings: InAppWebViewSettings(
+              userAgent: _uaFor(step.nextIdentity)),
+        );
+      } catch (_) {}
+      final target =
+          widget.isBrowseMode ? 'https://music.youtube.com' : googleSignInUrl;
+      await _webViewController?.loadUrl(
+          urlRequest: URLRequest(url: WebUri(target)));
+    } catch (e) {
+      debugPrint('[YtmWebLogin] Block recovery step failed: $e');
+    } finally {
+      if (mounted) setState(() => _blockStatus = null);
+    }
+  }
+
+  /// Recovery card "Retry": manual full ladder — reset attempts, clean
+  /// session, default identity selection, reload.
+  Future<void> _manualRetryFromBlock() async {
+    _blockRecovery.reset();
+    _uaIdentityOverride = null;
+    _hadSuccessfulYtLoad = false;
+    _mismatchAutoNavCount = 0;
+    if (mounted) {
+      setState(() {
+        _blockExhausted = false;
+        _blockStatus = 'Retrying sign-in with a clean session…';
+      });
+    }
+    await _clearWebViewCookiesAndCache();
+    await _navigateTo(
+        widget.isBrowseMode ? 'https://music.youtube.com' : googleSignInUrl);
+    if (mounted) setState(() => _blockStatus = null);
+  }
+
+  /// Recovery card identity toggle: switch UA mode and reload in place.
+  Future<void> _switchIdentityManually(BrowserIdentity identity) async {
+    _uaIdentityOverride = identity;
+    if (mounted) {
+      setState(() {
+        _blockExhausted = false;
+        _blockStatus =
+            'Reloading with ${identity.name} browser identity…';
+      });
+    }
+    await _navigateTo(
+        widget.isBrowseMode ? 'https://music.youtube.com' : googleSignInUrl);
+    if (mounted) setState(() => _blockStatus = null);
+  }
+
   Future<void> _navigateTo(String url) async {
     _pollIntervalSeconds = 2;
     _scheduleNextAuthPoll();
     final isYtm = url.contains('music.youtube.com') ||
         (url.contains('youtube.com') && !url.contains('accounts.youtube.com'));
-    final targetUa = isYtm ? desktopUserAgent : mobileUserAgent;
+    final targetUa = _uaIdentityOverride != null
+        ? _uaFor(_uaIdentityOverride!)
+        : (isYtm ? desktopUserAgent : mobileUserAgent);
     try {
       await _webViewController?.setSettings(
         settings: InAppWebViewSettings(userAgent: targetUa),
@@ -855,23 +1046,83 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                       ),
                     ),
 
-                  if (_isLoading || _progress < 1.0)
-                    LinearProgressIndicator(
-                      value: _isLoading ? null : _progress,
-                      backgroundColor: p.surfaceContainer,
-                      color: p.accent,
-                      minHeight: 2.5,
+                  // Inline status banner during the block recovery ladder.
+                  if (!isBrowse && _blockStatus != null)
+                    Container(
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border:
+                            Border.all(color: p.accent.withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: p.accent),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _blockStatus!,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: p.textPrimary),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  if (_isLoading || _progressNotifier.value < 1.0)
+                    ValueListenableBuilder<double>(
+                      valueListenable: _progressNotifier,
+                      builder: (context, progress, _) {
+                        if (!_isLoading && progress >= 1.0) {
+                          return const SizedBox.shrink();
+                        }
+                        return LinearProgressIndicator(
+                          value: _isLoading ? null : progress,
+                          backgroundColor: p.surfaceContainer,
+                          color: p.accent,
+                          minHeight: 2.5,
+                        );
+                      },
                     ),
                   const Divider(height: 1),
 
-                  // WebView Body
+                  // WebView Body — replaced by the recovery card once the
+                  // automatic retries against Google's block page are spent.
                   Expanded(
-                    child: ClipRRect(
+                    child: (!isBrowse && _blockExhausted)
+                        ? _buildBlockRecoveryCard(p)
+                        : ClipRRect(
                       child: InAppWebView(
                         initialUrlRequest: URLRequest(
                           url: WebUri(_currentUrl),
                         ),
                         initialSettings: _settings,
+                        // window.chrome fingerprint shim, injected before page
+                        // scripts run on Google sign-in pages only.
+                        initialUserScripts: UnmodifiableListView<UserScript>([
+                          UserScript(
+                            source: _chromeShimJs,
+                            injectionTime:
+                                UserScriptInjectionTime.AT_DOCUMENT_START,
+                            forMainFrameOnly: true,
+                            allowedOriginRules: const {
+                              'https://accounts.google.com',
+                              'https://accounts.youtube.com',
+                            },
+                          ),
+                        ]),
                         gestureRecognizers: const <Factory<
                             OneSequenceGestureRecognizer>>{
                           Factory<OneSequenceGestureRecognizer>(
@@ -929,8 +1180,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                               (urlStr.contains('youtube.com') &&
                                   !urlStr.contains('accounts.youtube.com') &&
                                   !_isAuthInProgressUrl(urlStr));
-                          final targetUa =
-                              isYtm ? desktopUserAgent : mobileUserAgent;
+                          final targetUa = _uaIdentityOverride != null
+                              ? _uaFor(_uaIdentityOverride!)
+                              : (isYtm ? desktopUserAgent : mobileUserAgent);
                           try {
                             await controller.setSettings(
                               settings:
@@ -939,14 +1191,39 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                           } catch (_) {}
                         },
                         onProgressChanged: (controller, progress) {
-                          if (mounted) {
-                            setState(() => _progress = progress / 100);
-                          }
+                          // F-17: no setState — progress ticks only rebuild
+                          // the ValueListenableBuilder bar above.
+                          _progressNotifier.value = progress / 100;
                         },
                         onLoadStop: (controller, url) async {
                           if (mounted) setState(() => _isLoading = false);
                           await _updateNavState();
                           final urlStr = url?.toString() ?? '';
+                          final parsedUrl = Uri.tryParse(urlStr);
+                          final host = parsedUrl?.host ?? '';
+
+                          // --- Google block detection ("This browser or app
+                          // may not be secure") ---
+                          if (host == 'accounts.google.com' ||
+                              host == 'accounts.youtube.com') {
+                            // Defensive re-injection of the window.chrome shim
+                            // (idempotent; covers engines without
+                            // DOCUMENT_START_SCRIPT support).
+                            try {
+                              await controller.evaluateJavascript(
+                                  source: _chromeShimJs);
+                            } catch (_) {}
+                            final blockedByUrl = _matchesBlockedUrl(parsedUrl);
+                            final blockedByText = blockedByUrl
+                                ? false
+                                : (_shouldScanForBlockPage()
+                                    ? await _scanPageForBlockText(controller)
+                                    : false);
+                            if (blockedByUrl || blockedByText) {
+                              _handleGoogleBlock();
+                              return;
+                            }
+                          }
 
                           // Only bounce if Google navigated to an actual CookieMismatch or block error page.
                           if (_isCookieMismatchUrl(urlStr)) {
@@ -959,7 +1236,6 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                             return;
                           }
 
-                          final host = Uri.tryParse(urlStr)?.host ?? '';
                           // Do not capture on Google Sign-In or EU consent screens before the user finishes
                           if (_isAuthInProgressUrl(urlStr) ||
                               host == 'consent.youtube.com' ||
@@ -1000,6 +1276,113 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// Shown in place of the WebView once both automatic retries against
+  /// Google's embedded-browser block were exhausted.
+  Widget _buildBlockRecoveryCard(PulsrPalette p) {
+    final currentIdentity = _uaIdentityOverride ?? BrowserIdentity.desktop;
+    final otherIdentity = currentIdentity == BrowserIdentity.desktop
+        ? BrowserIdentity.mobile
+        : BrowserIdentity.desktop;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: p.error.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: p.error.withValues(alpha: 0.35)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.gpp_bad_rounded, color: p.error, size: 22),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        "Google is blocking this sign-in",
+                        style: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  "Google blocks sign-in inside embedded browsers for some "
+                  "accounts, and the automatic retries (clearing cookies and "
+                  "switching the browser identity) didn't get past it.\n\n"
+                  "Pulsr captures your YouTube Music session from this "
+                  "embedded browser's cookies, so the sign-in has to happen "
+                  "here — signing in inside the app is required for the "
+                  "connection to be detected.",
+                  style: TextStyle(
+                      color: p.textSecondary, fontSize: 12.5, height: 1.4),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Current browser identity: ${currentIdentity.name} Chrome',
+                  style: TextStyle(
+                      color: p.textTertiary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            onPressed: _manualRetryFromBlock,
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text('Retry',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+            style: FilledButton.styleFrom(
+              backgroundColor: p.accent,
+              foregroundColor: p.onAccent,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () => _switchIdentityManually(otherIdentity),
+            icon: Icon(
+                otherIdentity == BrowserIdentity.mobile
+                    ? Icons.smartphone_rounded
+                    : Icons.desktop_windows_rounded,
+                size: 18),
+            label: Text(
+                otherIdentity == BrowserIdentity.mobile
+                    ? 'Use Mobile browser identity'
+                    : 'Use Desktop browser identity',
+                style: const TextStyle(fontWeight: FontWeight.w700)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: p.textPrimary,
+              side: BorderSide(color: p.hairline),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Tip: the toolbar "Clear cache & reset cookies" button performs the '
+            'same reset as Retry at any time.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: p.textTertiary, fontSize: 11),
+          ),
+        ],
       ),
     );
   }

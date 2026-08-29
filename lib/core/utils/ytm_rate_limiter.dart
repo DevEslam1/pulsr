@@ -26,6 +26,11 @@ class YtmRateLimiter {
   static const String _keyBackendLastRefill = 'ytm_rate_limiter_backend_last_refill';
   static const String _keyBackendBackoffUntil = 'ytm_rate_limiter_backend_backoff_until';
 
+  /// TTFA: backoff restored from a previous session is clamped to this at
+  /// launch so a prior session's 429 spiral cannot silently delay the first
+  /// play. In-session adaptive AIMD backoff is unaffected.
+  static const Duration launchBackoffClamp = Duration(seconds: 2);
+
   SharedPreferences? _prefs;
 
   // Native YTM pacing bucket
@@ -88,8 +93,10 @@ class YtmRateLimiter {
       }
       if (savedBackoff != null) {
         final deadline = DateTime.fromMillisecondsSinceEpoch(savedBackoff);
+        final clamp = DateTime.now().add(launchBackoffClamp);
         if (deadline.isAfter(DateTime.now())) {
-          _backoffUntil = deadline;
+          // Clamp at launch: never restore more than launchBackoffClamp.
+          _backoffUntil = deadline.isBefore(clamp) ? deadline : clamp;
         }
       }
 
@@ -104,8 +111,10 @@ class YtmRateLimiter {
       }
       if (savedBBackoff != null) {
         final deadline = DateTime.fromMillisecondsSinceEpoch(savedBBackoff);
+        final clamp = DateTime.now().add(launchBackoffClamp);
         if (deadline.isAfter(DateTime.now())) {
-          _backendBackoffUntil = deadline;
+          // Clamp at launch: never restore more than launchBackoffClamp.
+          _backendBackoffUntil = deadline.isBefore(clamp) ? deadline : clamp;
         }
       }
     } catch (_) {}

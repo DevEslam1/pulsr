@@ -90,6 +90,46 @@ Future<void> main() async {
         error: e, stackTrace: st, category: 'Startup');
   }
 
+  // TTFA: pre-warm the native BotGuard WebView + capability matrix right after
+  // DI is ready so the first stream resolve never pays cold WebView startup.
+  // Never blocks app startup: unawaited, fail-safe.
+  void preWarmYtm() {
+    try {
+      if (!getIt.isRegistered<YtmService>()) return;
+      getIt<YtmService>()
+          .preWarm()
+          .timeout(const Duration(seconds: 12))
+          .catchError((Object e, StackTrace st) {
+            ErrorLogger.log('YtmService preWarm failed or timed out',
+                error: e, stackTrace: st, category: 'Startup');
+          });
+    } catch (e, st) {
+      ErrorLogger.log('YtmService preWarm could not be started',
+          error: e, stackTrace: st, category: 'Startup');
+    }
+  }
+
+  // TTFA: kick off YtmAccountService.init() right after preWarm instead of
+  // deferring 10s, so cookie/dataSyncId state is ready before a typical first
+  // tap. Still fully background/unawaited — the WebView CookieManager read no
+  // longer races the first-interaction window because preWarm loads the
+  // WebView first; loginState listeners update reactively when this completes.
+  void initYtmAccount() {
+    try {
+      if (!getIt.isRegistered<YtmAccountService>()) return;
+      getIt<YtmAccountService>()
+          .init()
+          .timeout(const Duration(seconds: 8))
+          .catchError((Object e, StackTrace st) {
+            ErrorLogger.log('YtmAccountService init failed or timed out',
+                error: e, stackTrace: st, category: 'Startup');
+          });
+    } catch (e, st) {
+      ErrorLogger.log('YtmAccountService init could not be started',
+          error: e, stackTrace: st, category: 'Startup');
+    }
+  }
+
   // Defer heavy post-DI tasks to AFTER runApp to eliminate Davey! 1223ms jank on OnePlus
   // Previously awaited 3x8s before first frame -> Skipped 121 frames. Now fire-and-forget.
   void firePostStartupTasks() {
@@ -112,21 +152,8 @@ Future<void> main() async {
       }
     });
 
-    // STARTUP-JANK FIX: YtmAccountService.init() reads the WebView CookieManager
-    // (native android.webkit.CookieManager), which force-loads the whole WebView
-    // framework on first touch - measured as a 2.16s Davey frame + 124 skipped
-    // frames right after launch (logcat 2026-08-29). No first-run screen needs YTM
-    // login state; loginState listeners (PlaylistCubit, home) update reactively
-    // when this completes. Defer past the first-interaction window.
-    Future<void>.delayed(const Duration(seconds: 10), () {
-      getIt<YtmAccountService>()
-          .init()
-          .timeout(const Duration(seconds: 8))
-          .catchError((Object e, StackTrace st) {
-            ErrorLogger.log('YtmAccountService init failed or timed out',
-                error: e, stackTrace: st, category: 'Startup');
-          });
-    });
+    preWarmYtm();
+    initYtmAccount();
   }
 
   if (AppConfig.sentryDsn.isNotEmpty) {

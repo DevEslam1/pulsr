@@ -57,6 +57,15 @@ class _HomeScreenState extends State<HomeScreen> {
   final Map<String, DateTime> _categoryFetchTimestamps = {};
   static const Duration _categoryTtl = Duration(minutes: 10);
 
+  // DB watch streams cached so setState-driven rebuilds do not hand
+  // StreamBuilder a fresh Stream (which tears down and re-subscribes the
+  // drift watch — re-issuing a DB query per rebuild). Lazy finals keep the
+  // first-access timing identical to the previous build-time call.
+  late final Stream<Result<List<SongsTableData>>> _recentlyPlayedStream =
+      _getSongsUseCase.watchRecentlyPlayed();
+  late final Stream<Result<List<SongsTableData>>> _recentlyAddedStream =
+      _getSongsUseCase.watchRecentlyAdded();
+
   List<String> get _onlineCategories {
     final isLoggedIn = _ytmAccountService.isLoggedIn;
     if (isLoggedIn) {
@@ -233,13 +242,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   });
                 }
               },
-              child: ListView(
+              // CustomScrollView so the Top Charts tiles below virtualize
+              // (F-13) instead of inflating eagerly as ListView children.
+              child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(
                     parent: BouncingScrollPhysics()),
-                padding: const EdgeInsets.only(bottom: 160),
-                children: [
+                slivers: [
                   // ---------- Header ----------
-                  Padding(
+                  SliverToBoxAdapter(child: Padding(
                     padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context),
                         16, Adaptive.pagePadding(context), 0),
                     child: Row(
@@ -288,12 +298,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ],
                     ),
-                  ),
+                  )),
 
                   // ---------- Segmented Tab Selector (Local vs Online) ----------
                   if (showOnlineTab) ...[
-                    const SizedBox(height: 16),
-                    Container(
+                    const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                    SliverToBoxAdapter(child: Container(
                       margin: EdgeInsets.symmetric(
                           horizontal: Adaptive.pagePadding(context)),
                       padding: const EdgeInsets.all(4),
@@ -326,11 +336,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                     ),
+                  ),
                   ],
 
                   // ---------- Quick Discovery Tools Row ----------
-                  const SizedBox(height: 12),
-                  SizedBox(
+                  const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                  SliverToBoxAdapter(child: SizedBox(
                     height: 38,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
@@ -376,15 +387,19 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 14),
+                  )),
+                  const SliverToBoxAdapter(child: SizedBox(height: 14)),
 
                   // ---------- Content (Local vs Online) ----------
                   if (currentTab == 0)
-                    _buildLocalView(
-                        context, p, getSongsUseCase, playerCubit, isTablet)
+                    SliverToBoxAdapter(
+                        child: _buildLocalView(
+                            context, p, getSongsUseCase, playerCubit, isTablet))
                   else if (showOnlineTab)
-                    _buildOnlineView(context, p, playerCubit, isTablet),
+                    ..._buildOnlineView(context, p, playerCubit, isTablet),
+                  // Bottom spacing preserved from the previous ListView's
+                  // `padding: EdgeInsets.only(bottom: 160)`.
+                  const SliverToBoxAdapter(child: SizedBox(height: 160)),
                 ],
               ),
             ),
@@ -512,7 +527,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // ---------- Recently played ----------
         StreamBuilder<Result<List<SongsTableData>>>(
-          stream: getSongsUseCase.watchRecentlyPlayed(),
+          stream: _recentlyPlayedStream,
           builder: (context, snapshot) {
             if (snapshot.hasError) {
               return _SectionError(onRetry: () => setState(() {}));
@@ -616,7 +631,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // ---------- Recently added ----------
         StreamBuilder<Result<List<SongsTableData>>>(
-          stream: getSongsUseCase.watchRecentlyAdded(),
+          stream: _recentlyAddedStream,
           builder: (context, snapshot) {
             if (snapshot.hasError) {
               return _SectionError(onRetry: () => setState(() {}));
@@ -649,17 +664,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildOnlineView(
+  /// Returns slivers (F-13): the Top Charts tiles of the category section
+  /// below are virtualized through [SliverList.builder].
+  List<Widget> _buildOnlineView(
     BuildContext context,
     PulsrPalette p,
     PlayerCubit playerCubit,
     bool isTablet,
   ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // ---------- Search YouTube Music Action Banner ----------
-        Padding(
+    return <Widget>[
+      // ---------- Search YouTube Music Action Banner ----------
+      SliverToBoxAdapter(child: Padding(
           padding: EdgeInsets.symmetric(
               horizontal: Adaptive.pagePadding(context), vertical: 12),
           child: InkWell(
@@ -720,10 +735,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-        ),
+        )),
 
         // ---------- Quick Moods & Vibe Cards ----------
-        Padding(
+        SliverToBoxAdapter(child: Padding(
           padding: EdgeInsets.symmetric(
               horizontal: Adaptive.pagePadding(context), vertical: 6),
           child: Row(
@@ -763,12 +778,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-        ),
+        )),
 
-        const SizedBox(height: 10),
+        const SliverToBoxAdapter(child: SizedBox(height: 10)),
 
         // ---------- Category Chips ----------
-        SingleChildScrollView(
+        SliverToBoxAdapter(child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           physics: const BouncingScrollPhysics(),
           padding:
@@ -814,9 +829,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
             ],
           ),
-        ),
+        )),
 
-        const SizedBox(height: 8),
+        const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
         // ---------- Online Category Content (Carousel + Top Charts) ----------
         _OnlineCategorySection(
@@ -830,8 +845,7 @@ class _HomeScreenState extends State<HomeScreen> {
           playerCubit: playerCubit,
           onRetry: () => _retryCategory(_selectedOnlineCategory),
         ),
-      ],
-    );
+    ];
   }
 }
 
@@ -859,7 +873,7 @@ class _OnlineCategorySection extends StatelessWidget {
       future: future,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return Column(
+          return SliverToBoxAdapter(child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SectionHeader(title: title),
@@ -919,11 +933,11 @@ class _OnlineCategorySection extends StatelessWidget {
                 ),
               ),
             ],
-          );
+          ));
         }
 
         if (snapshot.hasError || (snapshot.data ?? const []).isEmpty) {
-          return Padding(
+          return SliverToBoxAdapter(child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
             child: Center(
               child: Column(
@@ -944,51 +958,58 @@ class _OnlineCategorySection extends StatelessWidget {
                 ],
               ),
             ),
-          );
+          ));
         }
 
         final tracks = snapshot.data!;
         final songs = [for (final track in tracks) track.toSongData()];
         return BlocProvider<YtmDownloadCubit>(
           create: (_) => getIt<YtmDownloadCubit>(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SectionHeader(title: title),
-              SizedBox(
-                height: isTablet ? 232 : 212,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: EdgeInsets.symmetric(
-                      horizontal: Adaptive.pagePadding(context)),
-                  itemCount: songs.length,
-                  itemBuilder: (context, index) {
-                    final song = songs[index];
-                    return _TrendingCard(
-                      song: song,
-                      onTap: () => playerCubit.playSong(song, queue: songs),
-                    );
-                  },
-                ),
+          // Sliver group (F-13): the Top Charts tiles below are built lazily
+          // by SliverList.builder instead of inflating eagerly as Column
+          // children of the outer scroll view.
+          child: SliverMainAxisGroup(slivers: [
+            SliverToBoxAdapter(child: SectionHeader(title: title)),
+            SliverToBoxAdapter(child: SizedBox(
+              height: isTablet ? 232 : 212,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: EdgeInsets.symmetric(
+                    horizontal: Adaptive.pagePadding(context)),
+                itemCount: songs.length,
+                itemBuilder: (context, index) {
+                  final song = songs[index];
+                  return _TrendingCard(
+                    song: song,
+                    onTap: () => playerCubit.playSong(song, queue: songs),
+                  );
+                },
               ),
-              const SizedBox(height: 16),
-              SectionHeader(title: 'Top Charts & Songs (${songs.length})'),
-              for (int i = 0; i < songs.length; i++)
-                SongTile(
-                  song: songs[i],
-                  index: i + 1,
-                  onTap: () => playerCubit.playSong(songs[i], queue: songs),
-                  trailing: YtmDownloadButton(song: songs[i]),
+            )),
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+            SliverToBoxAdapter(
+                child:
+                    SectionHeader(title: 'Top Charts & Songs (${songs.length})')),
+            SliverList.builder(
+              itemCount: songs.length,
+              itemBuilder: (context, index) {
+                final song = songs[index];
+                return SongTile(
+                  song: song,
+                  index: index + 1,
+                  onTap: () => playerCubit.playSong(song, queue: songs),
+                  trailing: YtmDownloadButton(song: song),
                   onMorePressed: () => showModalBottomSheet<void>(
                     context: context,
                     useRootNavigator: true,
                     isScrollControlled: true,
                     backgroundColor: Colors.transparent,
-                    builder: (_) => SongInfoSheet(song: songs[i]),
+                    builder: (_) => SongInfoSheet(song: song),
                   ),
-                ),
-            ],
-          ),
+                );
+              },
+            ),
+          ]),
         );
       },
     );

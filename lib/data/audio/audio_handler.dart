@@ -1697,6 +1697,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     queue.add(mediaItems);
 
     if (_songs.isEmpty) return;
+    // TTFA: pre-resolve current + next as soon as the queue is known, in
+    // parallel with player source setup (unawaited, fail-safe).
+    _preResolveCurrentAndNext();
     if (_gaplessMode) {
       await _loadGaplessQueue(initialPosition: initialPosition);
     } else {
@@ -1766,10 +1769,16 @@ class PulsrAudioHandler extends BaseAudioHandler
       await _activePlayer.setVolume(_calculateReplayGainVolume(song));
       if (preload) {
         await _activePlayer.play();
-        try {
-          _latencyTracker?.markStage(PlaybackStage.firstBytesReady);
-          _latencyTracker?.markStage(PlaybackStage.playing);
-        } catch (_) {}
+        // TTFA telemetry: mark audible start only when ExoPlayer is actually
+        // ready AND playing. While still loading/buffering, the eventual
+        // ready broadcast (PlayerCubit listener) performs the marks instead.
+        if (_activePlayer.processingState == ProcessingState.ready &&
+            _activePlayer.playing) {
+          try {
+            _latencyTracker?.markStage(PlaybackStage.firstBytesReady);
+            _latencyTracker?.markStage(PlaybackStage.playing);
+          } catch (_) {}
+        }
         _consecutiveFailures = 0;
         unawaited(_repository.recordPlayHistory(song.id));
       }
@@ -1898,16 +1907,29 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
 
     // Trigger StreamPreResolver to pre-resolve stream URL for next track in queue (<300ms latency)
-    _streamPreResolver.onTrackStarted(
-      queue: _songs,
-      currentIndex: index,
-      isShuffle: playbackState.value.shuffleMode == AudioServiceShuffleMode.all,
-    );
-
+    _preResolveCurrentAndNext();
 
     // Notify sleep timer of track completion for endOfTrack / afterNTracks modes (fixes silent never-fire)
     unawaited(_sleepTimerManager.onTrackCompleted());
 
+  }
+
+  /// TTFA: feeds the StreamPreResolver on EVERY path that makes a track
+  /// current — queue loads, explicit plays, and natural gapless advances —
+  /// so current+next stream URLs are warm before the user's tap completes.
+  /// Synchronous trigger; the resolver resolves unawaited in the background
+  /// and swallows its own errors, so playback is never delayed or crashed.
+  void _preResolveCurrentAndNext() {
+    try {
+      _streamPreResolver.onTrackStarted(
+        queue: _songs,
+        currentIndex: _currentIndex,
+        isShuffle: playbackState.value.shuffleMode == AudioServiceShuffleMode.all,
+      );
+    } catch (e, st) {
+      ErrorLogger.log('StreamPreResolver trigger failed',
+          error: e, stackTrace: st, category: 'AudioHandler');
+    }
   }
 
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {
@@ -1929,6 +1951,10 @@ class PulsrAudioHandler extends BaseAudioHandler
     final generation = ++_playGeneration;
     _pendingLazyPosition = null;
     _currentIndex = index;
+
+    // TTFA: explicit plays feed pre-resolution too (current + next), not just
+    // natural gapless advances. Unawaited, never delays play().
+    _preResolveCurrentAndNext();
 
     final song = _songs[index];
     final fastArtUri =

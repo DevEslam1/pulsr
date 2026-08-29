@@ -85,119 +85,138 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
           return Center(
             child: ConstrainedBox(
               constraints: Adaptive.contentConstraints(context),
-              child: ListView(
-                padding: const EdgeInsets.only(bottom: 160),
-                children: [
-                  const SizedBox(height: 16),
-                  Center(
-                    child: Container(
-                      width: 100,
-                      height: 100,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF40C4FF).withValues(alpha: 0.15),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: p.hairline),
-                        boxShadow: [
-                          BoxShadow(
-                              color: const Color(0xFF40C4FF)
-                                  .withValues(alpha: 0.25),
-                              blurRadius: 24,
-                              spreadRadius: -4,
-                              offset: const Offset(0, 8)),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.calendar_today_rounded,
-                        size: 44,
-                        color: Color(0xFF40C4FF),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Center(
-                    child: Text(
-                      '${yearItem.year}',
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Center(
-                    child: Text(
-                      Formatters.formatTrackCount(songs.length),
-                      style: TextStyle(color: p.textSecondary, fontSize: 13),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Action Buttons (Play All, Shuffle)
-                  Padding(
-                    padding: EdgeInsets.symmetric(
-                        horizontal: Adaptive.pagePadding(context)),
-                    child: Row(
+              // Builder-based slivers (F-04): header as a box adapter, track
+              // list virtualized — same order/spacing as ListView(children:).
+              child: CustomScrollView(
+                slivers: [
+                  SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: songs.isNotEmpty
-                                ? () => context
-                                    .read<PlayerCubit>()
-                                    .playSong(songs.first, queue: songs)
-                                : null,
-                            icon: const Icon(Icons.play_arrow_rounded),
-                            label: const Text('Play All'),
+                        const SizedBox(height: 16),
+                        Center(
+                          child: Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF40C4FF)
+                                  .withValues(alpha: 0.15),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: p.hairline),
+                              boxShadow: [
+                                BoxShadow(
+                                    color: const Color(0xFF40C4FF)
+                                        .withValues(alpha: 0.25),
+                                    blurRadius: 24,
+                                    spreadRadius: -4,
+                                    offset: const Offset(0, 8)),
+                              ],
+                            ),
+                            child: const Icon(
+                              Icons.calendar_today_rounded,
+                              size: 44,
+                              color: Color(0xFF40C4FF),
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: songs.isNotEmpty
-                                ? () {
-                                    final shuffled =
-                                        List<SongsTableData>.from(songs)
-                                          ..shuffle();
-                                    context.read<PlayerCubit>().playSong(
-                                        shuffled.first,
-                                        queue: shuffled);
-                                  }
-                                : null,
-                            icon: Icon(Icons.shuffle_rounded, color: p.accent),
-                            label: const Text('Shuffle'),
+                        const SizedBox(height: 16),
+                        Center(
+                          child: Text(
+                            '${yearItem.year}',
+                            textAlign: TextAlign.center,
+                            style:
+                                Theme.of(context).textTheme.headlineSmall,
                           ),
                         ),
+                        const SizedBox(height: 4),
+                        Center(
+                          child: Text(
+                            Formatters.formatTrackCount(songs.length),
+                            style: TextStyle(
+                                color: p.textSecondary, fontSize: 13),
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+
+                        // Action Buttons (Play All, Shuffle)
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: Adaptive.pagePadding(context)),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: songs.isNotEmpty
+                                      ? () => context
+                                          .read<PlayerCubit>()
+                                          .playSong(songs.first, queue: songs)
+                                      : null,
+                                  icon: const Icon(Icons.play_arrow_rounded),
+                                  label: const Text('Play All'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: songs.isNotEmpty
+                                      ? () {
+                                          final shuffled =
+                                              List<SongsTableData>.from(songs)
+                                                ..shuffle();
+                                          context.read<PlayerCubit>().playSong(
+                                              shuffled.first,
+                                              queue: shuffled);
+                                        }
+                                      : null,
+                                  icon: Icon(Icons.shuffle_rounded,
+                                      color: p.accent),
+                                  label: const Text('Shuffle'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(height: 20),
+
+                        // Songs List
+                        if (songs.isEmpty)
+                          const Padding(
+                            padding: EdgeInsets.all(32),
+                            child: EmptyStateWidget(
+                              icon: Icons.music_off_rounded,
+                              title: 'No Tracks',
+                              subtitle: 'No tracks found for this year.',
+                            ),
+                          ),
                       ],
                     ),
                   ),
-
-                  const SizedBox(height: 20),
-
-                  // Songs List
-                  if (songs.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(32),
-                      child: EmptyStateWidget(
-                        icon: Icons.music_off_rounded,
-                        title: 'No Tracks',
-                        subtitle: 'No tracks found for this year.',
-                      ),
-                    )
-                  else
-                    for (int i = 0; i < songs.length; i++)
-                      SongTile(
-                        song: songs[i],
-                        index: i,
-                        subtitleOverride:
-                            '${songs[i].artist} • ${songs[i].album}',
-                        onTap: () => context
-                            .read<PlayerCubit>()
-                            .playSong(songs[i], queue: songs),
-                        onMorePressed: () => showModalBottomSheet<void>(
-                          context: context,
-                          useRootNavigator: true,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (_) => SongInfoSheet(song: songs[i]),
-                        ),
-                      ),
+                  if (songs.isNotEmpty)
+                    SliverList.builder(
+                      itemCount: songs.length,
+                      itemBuilder: (context, index) {
+                        final song = songs[index];
+                        return SongTile(
+                          song: song,
+                          index: index,
+                          subtitleOverride: '${song.artist} • ${song.album}',
+                          onTap: () => context
+                              .read<PlayerCubit>()
+                              .playSong(song, queue: songs),
+                          onMorePressed: () => showModalBottomSheet<void>(
+                            context: context,
+                            useRootNavigator: true,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (_) => SongInfoSheet(song: song),
+                          ),
+                        );
+                      },
+                    ),
+                  // Bottom padding kept unconditional (matches the former
+                  // ListView padding, as in artist/playlist detail).
+                  const SliverPadding(padding: EdgeInsets.only(bottom: 160)),
                 ],
               ),
             ),

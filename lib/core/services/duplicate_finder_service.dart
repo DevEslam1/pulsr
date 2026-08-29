@@ -1,3 +1,5 @@
+import 'dart:isolate';
+
 import 'package:injectable/injectable.dart';
 import '../../data/db/app_database.dart';
 
@@ -16,7 +18,19 @@ class DuplicateGroup {
 @singleton
 class DuplicateFinderService {
   /// Scans songs and finds duplicate sets based on normalized title/artist and duration match.
-  List<DuplicateGroup> findDuplicates(List<SongsTableData> allSongs) {
+  List<DuplicateGroup> findDuplicates(List<SongsTableData> allSongs) =>
+      _findDuplicatesSync(allSongs);
+
+  /// Same scan as [findDuplicates], executed on a background isolate (F-08):
+  /// the ~10 regex normalization passes per song freeze the UI isolate for
+  /// tens-to-hundreds of ms on large libraries. Result contents and ordering
+  /// are identical to the synchronous variant.
+  Future<List<DuplicateGroup>> findDuplicatesAsync(
+          List<SongsTableData> allSongs) =>
+      Isolate.run(() => _findDuplicatesSync(allSongs));
+
+  static List<DuplicateGroup> _findDuplicatesSync(
+      List<SongsTableData> allSongs) {
     final Map<String, List<SongsTableData>> byTitleArtist = {};
     final Map<String, List<SongsTableData>> byDurationSize = {};
 
@@ -67,7 +81,7 @@ class DuplicateFinderService {
     return result;
   }
 
-  String _normalizeString(String str) {
+  static String _normalizeString(String str) {
     var s = str
         .toLowerCase()
         .replaceAll(RegExp(r'\([^)]*\)'),

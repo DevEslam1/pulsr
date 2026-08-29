@@ -796,6 +796,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get audioAndPlayback => 'الصوت والتشغيل';
 
   @override
+  String get playback => 'التشغيل';
+
+  @override
+  String get audioAndSound => 'الصوت والصوتيات';
+
+  @override
   String get equalizerAndSoundEffects => 'معادل الصوت والتأثيرات';
 
   @override

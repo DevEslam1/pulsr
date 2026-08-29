@@ -499,8 +499,12 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       };
 
       final isPlaying = playbackState.playing && !isCompleted;
-      // Task 0: mark first bytes / playing stages
-      if (isPlaying) {
+      // Task 0: mark first bytes / playing stages — TTFA telemetry must
+      // reflect real audible start, so only mark when ExoPlayer is actually
+      // ready (just_audio processingState == ready) AND playing, never while
+      // still loading/buffering.
+      if (isPlaying &&
+          playbackState.processingState == AudioProcessingState.ready) {
         try {
           if (_latencyTracker?.hasActiveSession == true) {
             // firstBytesReady precedes playing by one frame if not yet marked

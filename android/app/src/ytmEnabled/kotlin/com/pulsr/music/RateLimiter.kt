@@ -79,7 +79,11 @@ class RateLimiter(
         val nowWall = clock.currentTimeMillis()
         if (savedBackoff > nowWall) {
             val remainingMs = savedBackoff - nowWall
-            backoffUntilTimestamp.set(clock.elapsedRealtime() + remainingMs)
+            // TTFA: clamp restored backoff at launch so a prior session's 429
+            // spiral cannot silently delay the first play. In-session adaptive
+            // AIMD backoff (onRateLimited) is unaffected.
+            val clampedMs = remainingMs.coerceAtMost(LAUNCH_BACKOFF_CLAMP_MS)
+            backoffUntilTimestamp.set(clock.elapsedRealtime() + clampedMs)
         }
     }
 
@@ -154,7 +158,13 @@ class RateLimiter(
                     state.lastRequest = now
                     val waitTotal = clock.elapsedRealtime() - startWait
                     if (waitTotal > 10) {
-                        YtmMetricsRegistry.record("rate_limiter.wait_${bucket.name.lowercase()}", waitTotal)
+                        if (bucket == Bucket.PLAYER) {
+                            // TTFA telemetry: player-bucket waits ride the
+                            // one-way relay into the Sentry playback span.
+                            YtmMetricsRegistry.recordRelayed("rate_limiter.wait_player", waitTotal)
+                        } else {
+                            YtmMetricsRegistry.record("rate_limiter.wait_${bucket.name.lowercase()}", waitTotal)
+                        }
                     }
                     return
                 }
@@ -235,6 +245,9 @@ class RateLimiter(
     companion object {
         private const val PREFS_NAME = "ytm_ratelimiter_prefs"
         private const val KEY_BACKOFF_UNTIL = "key_backoff_until"
+
+        /** TTFA: cap on backoff restored from prefs at launch (see [initPrefs]). */
+        private const val LAUNCH_BACKOFF_CLAMP_MS = 2_000L
 
         val shared: RateLimiter by lazy { RateLimiter() }
     }

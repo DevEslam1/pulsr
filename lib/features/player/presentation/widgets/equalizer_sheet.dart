@@ -1,4 +1,4 @@
-// lib/features/player/presentation/widgets/equalizer_sheet.dart
+﻿// lib/features/player/presentation/widgets/equalizer_sheet.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -11,6 +11,7 @@ import '../../../../domain/models/audio_effects_config.dart';
 import '../../../../domain/models/eq_preset.dart';
 import '../../../../domain/models/headphone_profile.dart';
 import '../../cubit/player_cubit.dart';
+import '../../../../core/utils/list_content_diff.dart';
 import '../../cubit/player_state.dart';
 import 'dart:async';
 
@@ -186,14 +187,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     );
     if (name != null && name.isNotEmpty) {
       final id = 'custom_${DateTime.now().millisecondsSinceEpoch}';
+      // Read from the cubit at tap time: with the F-10 gating, this build's
+      // captured `state` may predate the latest band-drag gains.
+      final currentEq = cubit.state.eqPreset;
       final profile = HeadphoneProfile(
         id: id,
         name: name,
         brand: 'User Custom',
         model: name,
         category: 'Custom',
-        gains: List<double>.from(state.eqPreset.gains),
-        bassBoost: state.eqPreset.bassBoost,
+        gains: List<double>.from(currentEq.gains),
+        bassBoost: currentEq.bassBoost,
       );
       await _headphoneRepo.addCustomProfile(profile);
       await cubit.applyHeadphoneProfile(profile);
@@ -266,9 +270,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       child: BlocBuilder<PlayerCubit, PlayerState>(
         // DSP sheet ignores playback/position fields entirely - position ticks at
         // 10Hz were rebuilding the whole equalizer UI for nothing.
+        //
+        // F-10: eqPreset identity changes on EVERY band-drag delta. The gains
+        // are consumed exclusively by per-band BlocSelectors and the curve
+        // selector further down, so only the preset's name/bassBoost gate this
+        // full-sheet rebuild - a drag rebuilds just the dragged slider + curve.
         buildWhen: (a, b) =>
             a.isEqEnabled != b.isEqEnabled ||
-            a.eqPreset != b.eqPreset ||
+            a.eqPreset.name != b.eqPreset.name ||
+            a.eqPreset.bassBoost != b.eqPreset.bassBoost ||
             a.isVirtualizerEnabled != b.isVirtualizerEnabled ||
             a.virtualizerStrength != b.virtualizerStrength ||
             a.isDynamicsEnabled != b.isDynamicsEnabled ||
@@ -290,7 +300,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             a.reverbWetDry != b.reverbWetDry ||
             a.isSincResamplerEnabled != b.isSincResamplerEnabled ||
             a.hasOemAudio != b.hasOemAudio ||
-            !identical(a.detectedOemEngines, b.detectedOemEngines) ||
+            listContentDiffers(a.detectedOemEngines, b.detectedOemEngines) ||
             a.errorMessage != b.errorMessage,
         builder: (context, state) {
           final cubit = context.read<PlayerCubit>();
@@ -711,7 +721,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 children: [
                   IconButton(icon: Icon(Icons.info_outline_rounded, size: 18, color: p.accent), onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.equalizer, conflictReason: dspBlocked)),
                   const SizedBox(width: 4),
-                  Expanded(child: Text('DSP disabled by Bit-Perfect bypass. Disable Bit-Perfect or âBypass DSPâ in Settings to re-enable.', style: TextStyle(color: p.textSecondary, fontSize: 11))),
+                  Expanded(child: Text('DSP disabled by Bit-Perfect bypass. Disable Bit-Perfect or Ã¢Â€ÂœBypass DSPÃ¢Â€Â in Settings to re-enable.', style: TextStyle(color: p.textSecondary, fontSize: 11))),
                 ],
               ),
             ),
@@ -1001,7 +1011,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           ),
                         ),
                         Text(
-                          '${state.selectedHeadphoneProfile!.brand} â¢ '
+                          '${state.selectedHeadphoneProfile!.brand} Ã¢Â€Â¢ '
                           'Preamp: ${state.selectedHeadphoneProfile!.preampGain.toStringAsFixed(1)} dB',
                           style: TextStyle(fontSize: 10, color: p.textTertiary),
                         ),
@@ -1023,7 +1033,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             const SizedBox(height: 12),
           ],
 
-          // Real-time Frequency Response Curve Visualizer
+          // Real-time Frequency Response Curve Visualizer.
+          // F-10/F-24: the gains come from a dedicated BlocSelector (band
+          // drags repaint only the curve), and the RepaintBoundary keeps the
+          // curve repaint inside its own layer instead of propagating to the
+          // ancestor layers during drags.
           Container(
             height: 64,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -1032,10 +1046,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               borderRadius: AppRadii.cardRadius,
               border: Border.all(color: p.hairline),
             ),
-            child: EqCurveVisualizer(
-              gains: preset.gains,
-              activeColor: effectiveEnabled ? p.accent : p.textTertiary,
-              height: 52,
+            child: BlocSelector<PlayerCubit, PlayerState, List<double>>(
+              selector: (s) => s.eqPreset.gains,
+              builder: (context, gains) => RepaintBoundary(
+                child: EqCurveVisualizer(
+                  gains: gains,
+                  activeColor: effectiveEnabled ? p.accent : p.textTertiary,
+                  height: 52,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 14),
@@ -1051,29 +1070,35 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: List.generate(_bandLabels.length, (index) {
-                final gain =
-                    index < preset.gains.length ? preset.gains[index] : 0.0;
+                // F-10: each band subscribes to its own gain via
+                // BlocSelector, so a band-drag delta rebuilds only the
+                // dragged slider (plus the curve) instead of the whole sheet.
                 return Expanded(
-                  child: RepaintBoundary(
-                    child: _VerticalEqSlider(
-                      value: gain,
-                      label: _bandLabels[index],
-                      isEnabled: effectiveEnabled,
-                      accentColor: p.accent,
-                      trackColor: p.hairline,
-                      surfaceColor: p.surface,
-                      textColor: p.textPrimary,
-                      onInteraction: () {
-                        if (!state.isEqEnabled) {
-                          cubit.setEqualizerEnabled(true);
-                        }
-                      },
-                      onChanged: (val) {
-                        if (!state.isEqEnabled) {
-                          cubit.setEqualizerEnabled(true);
-                        }
-                        cubit.setBandGain(index, val);
-                      },
+                  child: BlocSelector<PlayerCubit, PlayerState, double>(
+                    selector: (s) => index < s.eqPreset.gains.length
+                        ? s.eqPreset.gains[index]
+                        : 0.0,
+                    builder: (context, gain) => RepaintBoundary(
+                      child: _VerticalEqSlider(
+                        value: gain,
+                        label: _bandLabels[index],
+                        isEnabled: effectiveEnabled,
+                        accentColor: p.accent,
+                        trackColor: p.hairline,
+                        surfaceColor: p.surface,
+                        textColor: p.textPrimary,
+                        onInteraction: () {
+                          if (!state.isEqEnabled) {
+                            cubit.setEqualizerEnabled(true);
+                          }
+                        },
+                        onChanged: (val) {
+                          if (!state.isEqEnabled) {
+                            cubit.setEqualizerEnabled(true);
+                          }
+                          cubit.setBandGain(index, val);
+                        },
+                      ),
                     ),
                   ),
                 );
@@ -1651,7 +1676,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        '${profile.brand} â¢ ${profile.category}',
+                                        '${profile.brand} Ã¢Â€Â¢ ${profile.category}',
                                         style: TextStyle(
                                             fontSize: 11,
                                             color: p.textTertiary),
@@ -2240,7 +2265,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               color: p.textSecondary,
                               fontWeight: FontWeight.w600)),
                       Text(
-                        '${state.crossfeedDelayUs.round()} Âµs',
+                        '${state.crossfeedDelayUs.round()} Ã‚Âµs',
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,

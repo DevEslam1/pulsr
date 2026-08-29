@@ -18,6 +18,7 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
   final DuplicateFinderService _finder = DuplicateFinderService();
   List<DuplicateGroup> _duplicateGroups = [];
   bool _isScanning = true;
+  int _scanGeneration = 0;
 
   @override
   void initState() {
@@ -25,10 +26,14 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     _scan();
   }
 
-  void _scan() {
+  Future<void> _scan() async {
+    final generation = ++_scanGeneration;
     setState(() => _isScanning = true);
     final songs = context.read<LibraryCubit>().state.songs;
-    final duplicates = _finder.findDuplicates(songs);
+    // F-08: the regex-heavy scan runs on a background isolate so the first
+    // open / refresh does not freeze the UI isolate.
+    final duplicates = await _finder.findDuplicatesAsync(songs);
+    if (!mounted || generation != _scanGeneration) return;
     setState(() {
       _duplicateGroups = duplicates;
       _isScanning = false;

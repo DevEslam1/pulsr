@@ -790,6 +790,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get audioAndPlayback => 'Audio & Playback';
 
   @override
+  String get playback => 'Playback';
+
+  @override
+  String get audioAndSound => 'Audio & Sound';
+
+  @override
   String get equalizerAndSoundEffects => 'Equalizer & Sound Effects';
 
   @override
