@@ -79,7 +79,7 @@ class SettingsScreen extends StatelessWidget {
                           ? context.l10n.equalizerSubtitle
                           : 'Not available on this platform',
                       onTap: PlatformCapabilities.hasEqualizer
-                          ? () => showModalBottomSheet(
+                          ? () => showModalBottomSheet<void>(
                               context: context,
                               useRootNavigator: true,
                               isScrollControlled: true,
@@ -106,7 +106,7 @@ class SettingsScreen extends StatelessWidget {
                         Icons.timer_outlined,
                         context.l10n.sleepTimer,
                         context.l10n.sleepTimerSubtitle,
-                        onTap: () => showModalBottomSheet(
+                        onTap: () => showModalBottomSheet<void>(
                             context: context,
                             useRootNavigator: true,
                             isScrollControlled: true,
@@ -737,7 +737,7 @@ class SettingsScreen extends StatelessWidget {
                             : 'Manage excluded directories',
                         onTap: () => Navigator.push(
                             context,
-                            MaterialPageRoute(
+                            MaterialPageRoute<void>(
                                 builder: (_) => const HiddenFoldersScreen()))),
                     _divider(p),
                     _navTile(
@@ -1021,7 +1021,7 @@ class SettingsScreen extends StatelessWidget {
 
   void _showFeatureInfo(BuildContext context, AudioFeatureInfo info, {String? conflictReason}) {
     final p = context.palette;
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: p.surface,
@@ -1181,7 +1181,7 @@ class SettingsScreen extends StatelessWidget {
       BuildContext context, SettingsCubit cubit, int currentSec) {
     int selected = currentSec;
     final primaryColor = Theme.of(context).colorScheme.primary;
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Theme.of(context).colorScheme.surface,
@@ -1273,7 +1273,7 @@ class SettingsScreen extends StatelessWidget {
       ('auto', context.l10n.dspEngineAuto, 'Automatically bypass OEM sound effects when DSP active'),
     ];
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       backgroundColor: p.surface,
       shape: const RoundedRectangleBorder(
@@ -1387,7 +1387,7 @@ class SettingsScreen extends StatelessWidget {
       ),
     ];
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
       backgroundColor: surfaceColor,
@@ -1514,7 +1514,7 @@ class SettingsScreen extends StatelessWidget {
       ),
     ];
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
       backgroundColor: surfaceColor,
@@ -1635,7 +1635,7 @@ class SettingsScreen extends StatelessWidget {
       ),
     ];
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
       backgroundColor: surfaceColor,
@@ -1752,7 +1752,7 @@ class SettingsScreen extends StatelessWidget {
       ),
     ];
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
       backgroundColor: surfaceColor,
@@ -1900,7 +1900,7 @@ class SettingsScreen extends StatelessWidget {
       ),
     ];
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
       backgroundColor: surfaceColor,
@@ -2005,7 +2005,7 @@ class SettingsScreen extends StatelessWidget {
       ),
     ];
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
       backgroundColor: surfaceColor,
@@ -2097,7 +2097,7 @@ class SettingsScreen extends StatelessWidget {
       ),
     ];
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
       backgroundColor: surfaceColor,
@@ -2220,7 +2220,7 @@ class SettingsScreen extends StatelessWidget {
       ),
     ];
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
       backgroundColor: surfaceColor,
@@ -2325,7 +2325,7 @@ class SettingsScreen extends StatelessWidget {
       ),
     ];
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
       backgroundColor: surfaceColor,
@@ -2537,7 +2537,7 @@ class SettingsScreen extends StatelessWidget {
 
   void _showYtmWebOptionsSheet(BuildContext context) {
     final p = context.palette;
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
       isScrollControlled: true,
@@ -2722,7 +2722,7 @@ class SettingsScreen extends StatelessWidget {
   void _showYtmAccountDisconnectDialog(BuildContext context) {
     final account = getIt<YtmAccountService>();
     final p = context.palette;
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: p.surfaceContainerHigh,
@@ -2775,7 +2775,7 @@ class SettingsScreen extends StatelessWidget {
     final tokenController =
         TextEditingController(text: state.ytdlpBackendToken);
 
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (ctx) {
         return BlocBuilder<SettingsCubit, SettingsState>(
@@ -3116,7 +3116,7 @@ class _CacheSectionState extends State<_CacheSection>
     final p = context.palette;
     final options = [50, 100, 250, 500];
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       backgroundColor: p.surfaceContainer,
       shape: const RoundedRectangleBorder(
@@ -3174,7 +3174,7 @@ class _CacheSectionState extends State<_CacheSection>
 void _showScrobblerSettingsModal(BuildContext context) {
   final p = context.palette;
 
-  showModalBottomSheet(
+  showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: p.surfaceContainer,

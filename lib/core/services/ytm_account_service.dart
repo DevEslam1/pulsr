@@ -274,7 +274,7 @@ class YtmAccountService {
 
     // Warm session in background & harvest any Set-Cookie headers
     unawaited(
-      _warmSession().catchError((e) {
+      _warmSession().catchError((Object e) {
         debugPrint('[YTM_ACCOUNT] Session warming failed (non-fatal): $e');
       }),
     );
@@ -721,7 +721,7 @@ class YtmAccountService {
             '[YTM_ACCOUNT] HTTP ${res.statusCode} encountered. Backing off for ${backoffSec}s (attempt ${attempt + 1}/$maxAttempts)',
           );
           if (attempt < maxAttempts - 1) {
-            await Future.delayed(Duration(seconds: backoffSec));
+            await Future<void>.delayed(Duration(seconds: backoffSec));
             continue;
           }
           if (res.statusCode == 429) {
@@ -1758,7 +1758,7 @@ class YtmAccountService {
           .then((p) {
             p.setString(_dataSyncIdPrefKey, dsid);
           })
-          .catchError((e) {
+          .catchError((Object e) {
             debugPrint('[YTM_ACCOUNT] Failed to persist dataSyncId: $e');
           });
       getIt<YtmService>().setDataSyncId(dsid);

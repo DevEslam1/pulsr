@@ -29,7 +29,7 @@ class HiResAudioService {
   void _init() {
     try {
       _eventSubscription =
-          _eventChannel.receiveBroadcastStream().handleError((e, st) {
+          _eventChannel.receiveBroadcastStream().handleError((Object e, StackTrace st) {
         // Ignore missing plugin exception in unit tests or platforms without native implementation
         if (e is! MissingPluginException) {
           ErrorLogger.log('HiRes DAC event stream error',

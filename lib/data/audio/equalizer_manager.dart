@@ -204,7 +204,7 @@ class EqualizerManager {
       // Batch native effect enables to avoid sound-drop dropout (requires EQ off/on to fix)
       // Previously each await toggled DynamicsProcessing causing 20+ JNI hops on audio thread during playback.
       // Now batch independent effects together and defer DynamicsProcessing last to prevent double-processing bypass churn.
-      final pendingFutures = <Future>[];
+      final pendingFutures = <Future<void>>[];
       if (isEnabled) {
         // Apply preset first without enabling, then enable atomically
         await applyCurrentPreset();
@@ -238,7 +238,7 @@ class EqualizerManager {
       if (pendingFutures.isNotEmpty) await Future.wait(pendingFutures);
       if (isDynamicsEnabled && !_isDynamicsBypassed) {
         // Small delay lets AudioTrack stabilize before DynamicsProcessing rebuild (fixes sound drops needing EQ toggle)
-        await Future.delayed(const Duration(milliseconds: 120));
+        await Future<void>.delayed(const Duration(milliseconds: 120));
         await _effectsChannel.setDynamicsPreset(dynamicsPreset, true);
       }
     } catch (e, st) {
@@ -314,7 +314,7 @@ class EqualizerManager {
         );
       } catch (_) {
         await _effectsChannel.setNativeEqBandCount(targetFreqs.length);
-        final futures = <Future>[];
+        final futures = <Future<void>>[];
         for (int i = 0; i < targetFreqs.length; i++) {
           futures.add(_effectsChannel.setNativeEqBand(
             i,
@@ -429,7 +429,7 @@ class EqualizerManager {
       // Fallback to legacy per-band if bulk unavailable (old APK)
       if (is32BandMode) {
         await _effectsChannel.setNativeEqBandCount(targetFreqs.length);
-        final futures = <Future>[];
+        final futures = <Future<void>>[];
         for (int i = 0; i < targetFreqs.length; i++) {
           futures.add(_effectsChannel.setNativeEqBand(i, targetFreqs[i], currentPreset.gains[i], 1.414));
           if (futures.length >= 8) { await Future.wait(futures); futures.clear(); }
@@ -439,7 +439,7 @@ class EqualizerManager {
         await _effectsChannel.setEqBands(targetFreqs);
         await _effectsChannel.setEqBandGains(currentPreset.gains);
         await _effectsChannel.setNativeEqBandCount(targetFreqs.length);
-        final futures2 = <Future>[];
+        final futures2 = <Future<void>>[];
         for (int i = 0; i < targetFreqs.length; i++) {
           futures2.add(_effectsChannel.setNativeEqBand(i, targetFreqs[i], currentPreset.gains[i], 1.414));
           if (futures2.length >= 8) { await Future.wait(futures2); futures2.clear(); }
@@ -511,7 +511,7 @@ class EqualizerManager {
     final flatGains = List<double>.filled(targetFreqs.length, 0.0);
     if (Platform.isAndroid) {
       if (is32BandMode) {
-        final futures = <Future>[];
+        final futures = <Future<void>>[];
         for (int i = 0; i < targetFreqs.length; i++) {
           futures.add(_effectsChannel.setNativeEqBand(i, targetFreqs[i], 0.0, 1.414));
         }
@@ -530,7 +530,7 @@ class EqualizerManager {
       final targetFreqs = is32BandMode ? custom32Frequencies : customFrequencies;
       if (Platform.isAndroid) {
         if (is32BandMode) {
-          final futures = <Future>[];
+          final futures = <Future<void>>[];
           for (int i = 0; i < _abComparisonGains.length; i++) {
             futures.add(_effectsChannel.setNativeEqBand(i, targetFreqs[i], _abComparisonGains[i], 1.414));
           }
@@ -868,7 +868,7 @@ class EqualizerManager {
           monoMix;
       if (!anyActive) return;
 
-      final futures = <Future>[];
+      final futures = <Future<void>>[];
 
       if (isEnabled) {
         await applyCurrentPreset();

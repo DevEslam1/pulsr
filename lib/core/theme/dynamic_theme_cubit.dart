@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import '../bloc/base_cubit.dart';
 import 'package:injectable/injectable.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:palette_generator/palette_generator.dart';
@@ -49,7 +49,7 @@ class DynamicThemeState {
 }
 
 @singleton
-class DynamicThemeCubit extends Cubit<DynamicThemeState> {
+class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   static const int _maxCacheSize = 50;
   final LinkedHashMap<String, DynamicThemeState> _cachedPalettes =
@@ -89,12 +89,12 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
     }
 
     _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 500), () {
+    _debounceTimer = autoTimer(Timer(const Duration(milliseconds: 500), () {
       _extractPalette(
           songId: songId,
           remoteArtworkUrl: remoteArtworkUrl,
           cacheKey: cacheKey);
-    });
+    }));
   }
 
   Future<void> _extractPalette(
@@ -225,7 +225,7 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
 
   @override
   Future<void> close() {
-    _debounceTimer?.cancel();
+    // Debounce timer is registered with PulsrCubit; cancelled automatically.
     _cachedPalettes.clear();
     return super.close();
   }

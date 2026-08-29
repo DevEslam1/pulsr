@@ -1,4 +1,6 @@
 // lib/features/sheets/add_to_playlist_sheet.dart
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../../core/di/injection.dart';
 import '../../core/theme/aura_theme.dart';
@@ -27,7 +29,7 @@ class AddToPlaylistSheet extends StatelessWidget {
   void _showNewPlaylistDialog(BuildContext context) {
     final p = context.palette;
     final controller = TextEditingController();
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: p.surface,
@@ -55,8 +57,8 @@ class AddToPlaylistSheet extends StatelessWidget {
               final name = controller.text.trim();
               if (name.isNotEmpty) {
                 final result = await _useCases.createPlaylist(name);
-                result.fold(
-                  (failure) {
+                unawaited(result.fold(
+                  (failure) async {
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         SnackBar(content: Text(failure.message)),
@@ -77,7 +79,7 @@ class AddToPlaylistSheet extends StatelessWidget {
                       );
                     }
                   },
-                );
+                ));
               }
             },
             child: Text(context.l10n.save),

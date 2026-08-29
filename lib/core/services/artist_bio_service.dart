@@ -53,9 +53,9 @@ class ArtistBioService {
         final list = data['data'] as List<dynamic>?;
         if (list != null && list.isNotEmpty) {
           final first = list.first;
-          pictureUrl = first['picture_xl'] ??
-              first['picture_big'] ??
-              first['picture_medium'];
+          pictureUrl = (first['picture_xl'] ??
+                  first['picture_big'] ??
+                  first['picture_medium']) as String?;
           fanCount = (first['nb_fan'] as num?)?.toInt();
         }
       }

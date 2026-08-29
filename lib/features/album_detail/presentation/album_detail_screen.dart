@@ -153,7 +153,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                         onTap: () => context
                             .read<PlayerCubit>()
                             .playSong(songs[index], queue: songs),
-                        onMorePressed: () => showModalBottomSheet(
+                        onMorePressed: () => showModalBottomSheet<void>(
                           context: context,
                           useRootNavigator: true,
                           isScrollControlled: true,

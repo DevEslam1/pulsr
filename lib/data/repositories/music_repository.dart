@@ -99,7 +99,7 @@ class MusicRepository implements IMusicRepository {
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
           .handleError(
-            (e) => Left<AppFailure, List<SongsTableData>>(
+            (Object e) => Left<AppFailure, List<SongsTableData>>(
                 DatabaseFailure('Failed to watch songs', e)),
           );
     } catch (e) {
@@ -271,7 +271,7 @@ class MusicRepository implements IMusicRepository {
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+          .handleError((Object e) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch favorites', e)));
     } catch (e) {
       return Stream.value(
@@ -356,7 +356,7 @@ class MusicRepository implements IMusicRepository {
             ..limit(limit))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+          .handleError((Object e) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch recently played', e)));
     } catch (e) {
       return Stream.value(
@@ -401,7 +401,7 @@ class MusicRepository implements IMusicRepository {
             ..limit(limit))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+          .handleError((Object e) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch recently added', e)));
     } catch (e) {
       return Stream.value(
@@ -425,7 +425,7 @@ class MusicRepository implements IMusicRepository {
             ..limit(limit))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+          .handleError((Object e) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch top played', e)));
     } catch (e) {
       return Stream.value(
@@ -521,7 +521,7 @@ class MusicRepository implements IMusicRepository {
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((albums) => Right<AppFailure, List<AlbumsTableData>>(albums))
-          .handleError((e) => Left<AppFailure, List<AlbumsTableData>>(
+          .handleError((Object e) => Left<AppFailure, List<AlbumsTableData>>(
               DatabaseFailure('Failed to watch albums', e)));
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch albums', e)));
@@ -545,7 +545,7 @@ class MusicRepository implements IMusicRepository {
             ]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+          .handleError((Object e) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch album songs', e)));
     } catch (e) {
       return Stream.value(
@@ -597,7 +597,7 @@ class MusicRepository implements IMusicRepository {
             ..orderBy([(t) => OrderingTerm(expression: t.name)]))
           .watch()
           .map((artists) => Right<AppFailure, List<ArtistsTableData>>(artists))
-          .handleError((e) => Left<AppFailure, List<ArtistsTableData>>(
+          .handleError((Object e) => Left<AppFailure, List<ArtistsTableData>>(
               DatabaseFailure('Failed to watch artists', e)));
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch artists', e)));
@@ -615,7 +615,7 @@ class MusicRepository implements IMusicRepository {
                 t.path.like('ytmusic://%').not()))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+          .handleError((Object e) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch artist songs', e)));
     } catch (e) {
       return Stream.value(
@@ -659,7 +659,7 @@ class MusicRepository implements IMusicRepository {
             ..where((t) => t.artistId.equals(artistId)))
           .watch()
           .map((albums) => Right<AppFailure, List<AlbumsTableData>>(albums))
-          .handleError((e) => Left<AppFailure, List<AlbumsTableData>>(
+          .handleError((Object e) => Left<AppFailure, List<AlbumsTableData>>(
               DatabaseFailure('Failed to watch artist albums', e)));
     } catch (e) {
       return Stream.value(
@@ -676,7 +676,7 @@ class MusicRepository implements IMusicRepository {
           .watch()
           .map((playlists) =>
               Right<AppFailure, List<PlaylistsTableData>>(playlists))
-          .handleError((e) => Left<AppFailure, List<PlaylistsTableData>>(
+          .handleError((Object e) => Left<AppFailure, List<PlaylistsTableData>>(
               DatabaseFailure('Failed to watch playlists', e)));
     } catch (e) {
       return Stream.value(
@@ -776,7 +776,7 @@ class MusicRepository implements IMusicRepository {
           .watch()
           .map((rows) => Right<AppFailure, List<SongsTableData>>(
               rows.map((row) => row.readTable(_db.songsTable)).toList()))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+          .handleError((Object e) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch playlist songs', e)));
     } catch (e) {
       return Stream.value(
@@ -909,7 +909,7 @@ class MusicRepository implements IMusicRepository {
           .watch()
           .map((folders) =>
               Right<AppFailure, List<ExcludedFoldersTableData>>(folders))
-          .handleError((e) => Left<AppFailure, List<ExcludedFoldersTableData>>(
+          .handleError((Object e) => Left<AppFailure, List<ExcludedFoldersTableData>>(
               DatabaseFailure('Failed to watch excluded folders', e)));
     } catch (e) {
       return Stream.value(
@@ -1425,6 +1425,10 @@ class MusicRepository implements IMusicRepository {
         survivingId = targetId;
 
         if (oldRow == null || oldRow.id == targetId) return;
+        // Null-safe aliases: type promotion is invalidated by the awaits inside the
+        // try/catch below, so downstream code must use these non-null locals.
+        final oldData = oldRow;
+        final newData = newRow;
 
         try {
           final duplicatePlaylists =
@@ -1468,34 +1472,34 @@ class MusicRepository implements IMusicRepository {
 
         // Merge stats (don't clobber — the scanned row may predate the download).
         final int? mergedLastPlayed;
-        if (oldRow.lastPlayed != null && newRow.lastPlayed != null) {
-          mergedLastPlayed = oldRow.lastPlayed! > newRow.lastPlayed!
-              ? oldRow.lastPlayed
-              : newRow.lastPlayed;
+        if (oldData.lastPlayed != null && newData.lastPlayed != null) {
+          mergedLastPlayed = oldData.lastPlayed! > newData.lastPlayed!
+              ? oldData.lastPlayed
+              : newData.lastPlayed;
         } else {
-          mergedLastPlayed = oldRow.lastPlayed ?? newRow.lastPlayed;
+          mergedLastPlayed = oldData.lastPlayed ?? newData.lastPlayed;
         }
         final keepOldPosition =
-            (oldRow.lastPlayed ?? 0) > (newRow.lastPlayed ?? 0);
+            (oldData.lastPlayed ?? 0) > (newData.lastPlayed ?? 0);
 
-        final String effectiveTitle = (oldRow.title.isNotEmpty &&
-                !oldRow.title.toLowerCase().startsWith('ytdl_'))
-            ? oldRow.title
-            : newRow.title;
-        final String effectiveArtist = (oldRow.artist.isNotEmpty &&
-                oldRow.artist != '<unknown>' &&
-                oldRow.artist != 'Unknown')
-            ? oldRow.artist
-            : newRow.artist;
-        final String effectiveAlbum = (oldRow.album.isNotEmpty &&
-                oldRow.album != '<unknown>' &&
-                oldRow.album != 'Unknown')
-            ? oldRow.album
-            : newRow.album;
-        final String? effectiveRemoteArt = (oldRow.remoteArtworkUrl != null &&
-                oldRow.remoteArtworkUrl!.isNotEmpty)
-            ? oldRow.remoteArtworkUrl
-            : newRow.remoteArtworkUrl;
+        final String effectiveTitle = (oldData.title.isNotEmpty &&
+                !oldData.title.toLowerCase().startsWith('ytdl_'))
+            ? oldData.title
+            : newData.title;
+        final String effectiveArtist = (oldData.artist.isNotEmpty &&
+                oldData.artist != '<unknown>' &&
+                oldData.artist != 'Unknown')
+            ? oldData.artist
+            : newData.artist;
+        final String effectiveAlbum = (oldData.album.isNotEmpty &&
+                oldData.album != '<unknown>' &&
+                oldData.album != 'Unknown')
+            ? oldData.album
+            : newData.album;
+        final String? effectiveRemoteArt = (oldData.remoteArtworkUrl != null &&
+                oldData.remoteArtworkUrl!.isNotEmpty)
+            ? oldData.remoteArtworkUrl
+            : newData.remoteArtworkUrl;
 
         await (_db.update(_db.songsTable)..where((t) => t.id.equals(targetId)))
             .write(
@@ -1503,15 +1507,15 @@ class MusicRepository implements IMusicRepository {
             title: Value(effectiveTitle),
             artist: Value(effectiveArtist),
             album: Value(effectiveAlbum),
-            genre: Value(oldRow.genre ?? newRow.genre),
-            isFavorite: Value(oldRow.isFavorite || newRow.isFavorite),
-            playCount: Value(oldRow.playCount + newRow.playCount),
+            genre: Value(oldData.genre ?? newData.genre),
+            isFavorite: Value(oldData.isFavorite || newData.isFavorite),
+            playCount: Value(oldData.playCount + newData.playCount),
             lastPlayed: Value(mergedLastPlayed),
             lastPositionMs: Value(keepOldPosition
-                ? oldRow.lastPositionMs
-                : newRow.lastPositionMs),
+                ? oldData.lastPositionMs
+                : newData.lastPositionMs),
             // Carry the video id and online remoteArtworkUrl
-            remoteId: Value(oldRow.remoteId ?? newRow.remoteId),
+            remoteId: Value(oldData.remoteId ?? newData.remoteId),
             remoteArtworkUrl: Value(effectiveRemoteArt),
             source: const Value(SongSource.local),
             isDownloaded: const Value(true),
@@ -1521,7 +1525,7 @@ class MusicRepository implements IMusicRepository {
 
         // FIX: Remove any other duplicate path rows that the scanner may have inserted in parallel
         // This guarantees a single entry per file path after download, fixing "repeats twice on local"
-        final newRowPath = newRow.path;
+        final newRowPath = newData.path;
         final duplicateOthers = await (_db.select(_db.songsTable)
               ..where((t) =>
                   t.path.lower().equals(newRowPath.toLowerCase()) &
@@ -1630,7 +1634,7 @@ class MusicRepository implements IMusicRepository {
             .where((g) => g.name.isNotEmpty)
             .toList();
         return Right<AppFailure, List<GenreItem>>(list);
-      }).handleError((e) => Left<AppFailure, List<GenreItem>>(
+      }).handleError((Object e) => Left<AppFailure, List<GenreItem>>(
           DatabaseFailure('Failed to watch genres', e)));
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch genres', e)));
@@ -1678,7 +1682,7 @@ class MusicRepository implements IMusicRepository {
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+          .handleError((Object e) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch genre songs', e)));
     } catch (e) {
       return Stream.value(
@@ -1730,7 +1734,7 @@ class MusicRepository implements IMusicRepository {
             .where((y) => y.year > 0)
             .toList();
         return Right<AppFailure, List<YearItem>>(list);
-      }).handleError((e) => Left<AppFailure, List<YearItem>>(
+      }).handleError((Object e) => Left<AppFailure, List<YearItem>>(
           DatabaseFailure('Failed to watch years', e)));
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch years', e)));
@@ -1749,7 +1753,7 @@ class MusicRepository implements IMusicRepository {
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
+          .handleError((Object e) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch year songs', e)));
     } catch (e) {
       return Stream.value(

@@ -1,13 +1,16 @@
 // lib/features/library/cubit/library_cubit.dart
 import 'dart:async';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../core/bloc/base_cubit.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/ytm_account_service.dart';
+import '../../../core/errors/failures.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/ytm_track.dart';
+import '../../../domain/models/genre_item.dart';
+import '../../../domain/models/year_item.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../../domain/usecases/get_albums_usecase.dart';
@@ -20,7 +23,7 @@ import '../../../domain/usecases/folder_usecases.dart';
 import 'library_state.dart';
 
 @injectable
-class LibraryCubit extends Cubit<LibraryState> {
+class LibraryCubit extends PulsrCubit<LibraryState> {
   final GetSongsUseCase _getSongsUseCase;
   final GetAlbumsUseCase _getAlbumsUseCase;
   final GetArtistsUseCase _getArtistsUseCase;
@@ -31,12 +34,12 @@ class LibraryCubit extends Cubit<LibraryState> {
   final FolderUseCases _folderUseCases;
   final IMusicRepository? _musicRepository;
 
-  StreamSubscription? _songsSub;
-  StreamSubscription? _albumsSub;
-  StreamSubscription? _artistsSub;
-  StreamSubscription? _genresSub;
-  StreamSubscription? _yearsSub;
-  StreamSubscription? _favoritesSub;
+  StreamSubscription<void>? _songsSub;
+  StreamSubscription<void>? _albumsSub;
+  StreamSubscription<void>? _artistsSub;
+  StreamSubscription<void>? _genresSub;
+  StreamSubscription<void>? _yearsSub;
+  StreamSubscription<void>? _favoritesSub;
   bool _initialized = false;
   int? _lastEmittedSongCount;
 
@@ -105,7 +108,7 @@ class LibraryCubit extends Cubit<LibraryState> {
     _subscribeGenres();
     _subscribeYears();
     _subscribeFavorites();
-    loadFolders();
+    unawaited(loadFolders());
   }
 
   /// Refreshes all data streams without re-reading stored preferences or
@@ -119,7 +122,7 @@ class LibraryCubit extends Cubit<LibraryState> {
     _subscribeGenres();
     _subscribeYears();
     _subscribeFavorites();
-    loadFolders();
+    unawaited(loadFolders());
   }
 
   void clearError() {
@@ -127,17 +130,17 @@ class LibraryCubit extends Cubit<LibraryState> {
   }
 
   Future<void> _subscribeSongs() async {
-    _songsSub?.cancel();
+    unawaited(_songsSub?.cancel());
     final excludedRes = await _folderUseCases.getExcludedFolders();
     if (isClosed) return;
     final excluded = excludedRes.fold((l) => <String>[], (r) => r);
-    _songsSub = _getSongsUseCase
-        .watchSongs(
-      sortBy: state.sortBy,
-      ascending: state.ascending,
-      excludedFolders: excluded,
-    )
-        .listen((result) {
+    _songsSub = autoSub<Result<List<SongsTableData>>>(
+      _getSongsUseCase.watchSongs(
+        sortBy: state.sortBy,
+        ascending: state.ascending,
+        excludedFolders: excluded,
+      ),
+      (result) {
       if (isClosed) return;
       result.fold(
         (failure) {
@@ -165,7 +168,7 @@ class LibraryCubit extends Cubit<LibraryState> {
 
   void _subscribeAlbums() {
     _albumsSub?.cancel();
-    _albumsSub = _getAlbumsUseCase.watchAlbums().listen((result) {
+    _albumsSub = autoSub<Result<List<AlbumsTableData>>>(_getAlbumsUseCase.watchAlbums(), (result) {
       if (isClosed) return;
       result.fold(
         (failure) => emit(state.copyWith(errorMessage: failure.message)),
@@ -176,7 +179,7 @@ class LibraryCubit extends Cubit<LibraryState> {
 
   void _subscribeArtists() {
     _artistsSub?.cancel();
-    _artistsSub = _getArtistsUseCase.watchArtists().listen((result) {
+    _artistsSub = autoSub<Result<List<ArtistsTableData>>>(_getArtistsUseCase.watchArtists(), (result) {
       if (isClosed) return;
       result.fold(
         (failure) => emit(state.copyWith(errorMessage: failure.message)),
@@ -187,7 +190,7 @@ class LibraryCubit extends Cubit<LibraryState> {
 
   void _subscribeGenres() {
     _genresSub?.cancel();
-    _genresSub = _getGenresUseCase.watchGenres().listen((result) {
+    _genresSub = autoSub<Result<List<GenreItem>>>(_getGenresUseCase.watchGenres(), (result) {
       if (isClosed) return;
       result.fold(
         (failure) => emit(state.copyWith(errorMessage: failure.message)),
@@ -198,7 +201,7 @@ class LibraryCubit extends Cubit<LibraryState> {
 
   void _subscribeYears() {
     _yearsSub?.cancel();
-    _yearsSub = _getYearsUseCase.watchYears().listen((result) {
+    _yearsSub = autoSub<Result<List<YearItem>>>(_getYearsUseCase.watchYears(), (result) {
       if (isClosed) return;
       result.fold(
         (failure) => emit(state.copyWith(errorMessage: failure.message)),
@@ -209,7 +212,7 @@ class LibraryCubit extends Cubit<LibraryState> {
 
   void _subscribeFavorites() {
     _favoritesSub?.cancel();
-    _favoritesSub = _getFavoritesUseCase.watchFavorites().listen((result) {
+    _favoritesSub = autoSub<Result<List<SongsTableData>>>(_getFavoritesUseCase.watchFavorites(), (result) {
       if (isClosed) return;
       result.fold(
         (failure) => emit(state.copyWith(errorMessage: failure.message)),
@@ -235,7 +238,7 @@ class LibraryCubit extends Cubit<LibraryState> {
         await prefs.setString('library_sort_by', sortBy);
         await prefs.setBool('library_sort_ascending', ascending);
       } catch (e, st) { ErrorLogger.log('Failed to persist library sort', error: e, stackTrace: st, category: 'LibraryCubit'); }
-    }).catchError((e, st) { ErrorLogger.log('Failed to persist library sort', error: e, stackTrace: st, category: 'LibraryCubit'); });
+    }).catchError((Object e, StackTrace st) { ErrorLogger.log('Failed to persist library sort', error: e, stackTrace: st, category: 'LibraryCubit'); });
   }
 
   void toggleViewMode() {
@@ -245,7 +248,7 @@ class LibraryCubit extends Cubit<LibraryState> {
     emit(state.copyWith(viewMode: nextMode));
     SharedPreferences.getInstance().then((prefs) async {
       try { await prefs.setString('library_view_mode', nextMode.name); } catch (e, st) { ErrorLogger.log('Failed to persist view mode', error: e, stackTrace: st, category: 'LibraryCubit'); }
-    }).catchError((e, st) { ErrorLogger.log('Failed to persist view mode', error: e, stackTrace: st, category: 'LibraryCubit'); });
+    }).catchError((Object e, StackTrace st) { ErrorLogger.log('Failed to persist view mode', error: e, stackTrace: st, category: 'LibraryCubit'); });
   }
 
   int _favoriteOpGen = 0;
@@ -285,7 +288,7 @@ class LibraryCubit extends Cubit<LibraryState> {
       (_) async {
         await loadFolders();
         if (isClosed) return;
-        _subscribeSongs();
+        unawaited(_subscribeSongs());
       },
     );
   }
@@ -353,14 +356,4 @@ class LibraryCubit extends Cubit<LibraryState> {
     }
   }
 
-  @override
-  Future<void> close() {
-    _songsSub?.cancel();
-    _albumsSub?.cancel();
-    _artistsSub?.cancel();
-    _genresSub?.cancel();
-    _yearsSub?.cancel();
-    _favoritesSub?.cancel();
-    return super.close();
-  }
 }

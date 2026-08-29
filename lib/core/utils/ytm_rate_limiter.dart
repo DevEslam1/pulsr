@@ -160,7 +160,7 @@ class YtmRateLimiter {
       final result = await future;
       return result;
     } finally {
-      _inFlightRequests.remove(key);
+      unawaited(_inFlightRequests.remove(key));
     }
   }
 

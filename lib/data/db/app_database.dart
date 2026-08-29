@@ -1,5 +1,6 @@
 // lib/data/db/app_database.dart
 import 'package:drift/drift.dart';
+import '../../core/utils/error_logger.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:injectable/injectable.dart';
 import 'tables.dart';
@@ -185,6 +186,17 @@ class AppDatabase extends _$AppDatabase {
           await customStatement('PRAGMA journal_mode = WAL;');
           await customStatement('PRAGMA synchronous = NORMAL;');
           await customStatement('PRAGMA case_sensitive_like = OFF;');
+          // SELF-HEAL: re-assert indexes on every open. All statements are
+          // CREATE ... IF NOT EXISTS (near-zero cost), and this guarantees
+          // installs created before the idx_songs_path_nocase SQL fix gain
+          // the corrected index without a schema bump.
+          try {
+            await _createIndexes(customStatement);
+            await _createRemoteSourceIndexes(customStatement);
+          } catch (e, st) {
+            ErrorLogger.log('Index self-heal failed',
+                error: e, stackTrace: st, category: 'Database');
+          }
         },
       );
 }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
@@ -173,7 +174,7 @@ class _HomeScreenState extends State<HomeScreen> {
           final query = _categoryQueries[category] ?? '$category songs';
           return await _ytmService.searchWithFallback(query, limit: 25);
         } catch (e) {
-          _categoryFutures.remove(category);
+          unawaited(_categoryFutures.remove(category));
           _categoryFetchTimestamps.remove(category);
           rethrow;
         }
@@ -632,7 +633,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   SongTile(
                     song: song,
                     onTap: () => playerCubit.playSong(song, queue: songs),
-                    onMorePressed: () => showModalBottomSheet(
+                    onMorePressed: () => showModalBottomSheet<void>(
                       context: context,
                       useRootNavigator: true,
                       isScrollControlled: true,
@@ -978,7 +979,7 @@ class _OnlineCategorySection extends StatelessWidget {
                   index: i + 1,
                   onTap: () => playerCubit.playSong(songs[i], queue: songs),
                   trailing: YtmDownloadButton(song: songs[i]),
-                  onMorePressed: () => showModalBottomSheet(
+                  onMorePressed: () => showModalBottomSheet<void>(
                     context: context,
                     useRootNavigator: true,
                     isScrollControlled: true,

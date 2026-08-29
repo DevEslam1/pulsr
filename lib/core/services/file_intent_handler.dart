@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -115,7 +116,7 @@ class FileIntentHandler {
 
       final song = track.toSongData();
       await _playerCubit.playSong(song);
-      rootNavigatorKey.currentContext?.push('/now-playing');
+      unawaited(rootNavigatorKey.currentContext?.push('/now-playing'));
     } catch (e, st) {
       ErrorLogger.log('Failed to resolve YouTube link: $videoId',
           error: e, stackTrace: st, category: 'FileIntentHandler');
@@ -184,7 +185,7 @@ class FileIntentHandler {
               if (proxies.isNotEmpty) {
                 final navCtx = rootNavigatorKey.currentContext;
                 if (navCtx != null && navCtx.mounted) {
-                  navCtx.push('/proxy-settings', extra: content);
+                  unawaited(navCtx.push('/proxy-settings', extra: content));
                 }
                 return;
               }
@@ -195,7 +196,7 @@ class FileIntentHandler {
           if (parsedProxies.isNotEmpty) {
             final navCtx = rootNavigatorKey.currentContext;
             if (navCtx != null && navCtx.mounted) {
-              navCtx.push('/proxy-settings', extra: uriOrPath);
+              unawaited(navCtx.push('/proxy-settings', extra: uriOrPath));
             }
             return;
           }
@@ -226,7 +227,7 @@ class FileIntentHandler {
         await _playerCubit.playSong(match);
         final navCtx = rootNavigatorKey.currentContext;
         if (navCtx != null && navCtx.mounted) {
-          navCtx.push('/now-playing');
+          unawaited(navCtx.push('/now-playing'));
         }
         return;
       }
@@ -292,7 +293,7 @@ class FileIntentHandler {
       await _playerCubit.playSong(tempSong);
       final navCtx = rootNavigatorKey.currentContext;
       if (navCtx != null && navCtx.mounted) {
-        navCtx.push('/now-playing');
+        unawaited(navCtx.push('/now-playing'));
       }
     } catch (e, st) {
       final context = rootNavigatorKey.currentContext;

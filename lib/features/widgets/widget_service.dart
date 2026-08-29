@@ -167,7 +167,7 @@ class WidgetService {
                           .timeout(const Duration(seconds: 5));
                   if (fetched.isNotEmpty) {
                     rawBytes = fetched;
-                    ArtworkCacheManager().put(targetUrl, fetched);
+                    unawaited(ArtworkCacheManager().put(targetUrl, fetched));
                   }
                 }
               }

@@ -2,9 +2,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/widgets.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
+import '../../../core/bloc/base_cubit.dart';
+import '../../../core/errors/failures.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../data/db/app_database.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/ytm_account_service.dart';
@@ -119,12 +121,12 @@ class YtmOnlineState {
 // ---------------------------------------------------------------------------
 
 @injectable
-class PlaylistCubit extends Cubit<PlaylistState> {
+class PlaylistCubit extends PulsrCubit<PlaylistState> {
   static const String _onlineCacheKey = 'ytm_cached_online_playlists_v1';
   final PlaylistUseCases _playlistUseCases;
-  StreamSubscription? _playlistsSub;
-  StreamSubscription? _playlistSongsSub;
-  final Map<int, StreamSubscription> _smartSubscriptions = {};
+  StreamSubscription<void>? _playlistsSub;
+  StreamSubscription<void>? _playlistSongsSub;
+  final Map<int, StreamSubscription<void> > _smartSubscriptions = {};
   bool _isSeedingChecked = false;
 
   /// Reactive online-playlist state. Widgets use [ValueListenableBuilder]
@@ -140,7 +142,7 @@ class PlaylistCubit extends Cubit<PlaylistState> {
   void _init() {
     _loadOnlineCache();
 
-    _playlistsSub = _playlistUseCases.watchPlaylists().listen((result) {
+    _playlistsSub = autoSub<Result<List<PlaylistsTableData>>>(_playlistUseCases.watchPlaylists(), (result) {
       if (isClosed) return;
       result.fold(
         (failure) => emit(state.copyWith(errorMessage: failure.message)),
@@ -240,7 +242,7 @@ class PlaylistCubit extends Cubit<PlaylistState> {
     }
   }
 
-  Future<void> _checkSeeding(List playlists) async {
+  Future<void> _checkSeeding(List<PlaylistsTableData> playlists) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final seeded = prefs.getBool('smart_playlists_seeded') ?? false;
@@ -257,7 +259,7 @@ class PlaylistCubit extends Cubit<PlaylistState> {
     }
   }
 
-  void _updateSmartCounts(List playlists) {
+  void _updateSmartCounts(List<PlaylistsTableData> playlists) {
     final currentSmartIds = <int>{};
     for (final playlist in playlists) {
       if (playlist.isSmart && playlist.smartCriteria != null) {
@@ -324,7 +326,7 @@ class PlaylistCubit extends Cubit<PlaylistState> {
   }
 
   Future<void> deletePlaylist(int playlistId) async {
-    _smartSubscriptions[playlistId]?.cancel();
+    unawaited(_smartSubscriptions[playlistId]?.cancel());
     _smartSubscriptions.remove(playlistId);
     final updatedCounts = Map<int, int>.from(state.smartPlaylistCounts)
       ..remove(playlistId);
@@ -448,7 +450,7 @@ class PlaylistCubit extends Cubit<PlaylistState> {
             : null,
       );
       if (tracks.isNotEmpty) {
-        _saveOnlineCache();
+        unawaited(_saveOnlineCache());
       }
     } on YtmException catch (e) {
       ytmOnline.value = ytmOnline.value.copyWith(
@@ -490,7 +492,7 @@ class PlaylistCubit extends Cubit<PlaylistState> {
         clearAccountError: true,
       );
       if (playlists.isNotEmpty) {
-        _saveOnlineCache();
+        unawaited(_saveOnlineCache());
       }
     } on YtmException catch (e) {
       ytmOnline.value = ytmOnline.value.copyWith(
@@ -562,7 +564,7 @@ class PlaylistCubit extends Cubit<PlaylistState> {
         customPlaylists: updated,
         clearCustomError: true,
       );
-      _saveOnlineCache();
+      unawaited(_saveOnlineCache());
     } catch (e) {
       ytmOnline.value = ytmOnline.value.copyWith(
         customStatus: YtmFetchStatus.error,

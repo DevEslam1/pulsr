@@ -74,7 +74,7 @@ class MissingArtworkService {
       onProgress?.call(processed, total);
 
       if (i + 5 < albums.length) {
-        await Future.delayed(const Duration(milliseconds: 500));
+        await Future<void>.delayed(const Duration(milliseconds: 500));
       }
     }
 

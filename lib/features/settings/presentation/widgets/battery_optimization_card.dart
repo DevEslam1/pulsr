@@ -117,7 +117,7 @@ class _BatteryOptimizationCardState extends State<BatteryOptimizationCard> {
                     final guideUrl =
                         BatteryOptimizationService.getDontKillMyAppUrl(
                             _manufacturer);
-                    showDialog(
+                    showDialog<void>(
                       context: context,
                       builder: (ctx) => AlertDialog(
                         title: Text(

@@ -1,6 +1,6 @@
 // lib/features/smart_playlist_builder/smart_playlist_builder_cubit.dart
 import 'dart:async';
-import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../core/bloc/base_cubit.dart';
 import 'package:injectable/injectable.dart';
 import '../../data/db/app_database.dart';
 import '../../domain/models/smart_playlist_criteria.dart';
@@ -9,10 +9,10 @@ import '../../domain/usecases/playlist_usecases.dart';
 import 'smart_playlist_builder_state.dart';
 
 @injectable
-class SmartPlaylistBuilderCubit extends Cubit<SmartPlaylistBuilderState> {
+class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
   final ISmartPlaylistEngine _engine;
   final PlaylistUseCases _playlistUseCases;
-  StreamSubscription? _previewSub;
+  StreamSubscription<void>? _previewSub;
 
   SmartPlaylistBuilderCubit(this._engine, this._playlistUseCases)
       : super(const SmartPlaylistBuilderState()) {
@@ -85,16 +85,13 @@ class SmartPlaylistBuilderCubit extends Cubit<SmartPlaylistBuilderState> {
 
   void _updatePreview() {
     _previewSub?.cancel();
-    _previewSub = _engine.watchCriteria(state.criteria).listen(
-      (songs) {
+    _previewSub = autoSub<List<SongsTableData>>(_engine.watchCriteria(state.criteria), (songs) {
         if (isClosed) return;
         emit(state.copyWith(previewSongs: songs));
-      },
-      onError: (_) {
+      }, onError: (Object e, StackTrace st) {
         if (isClosed) return;
         emit(state.copyWith(previewSongs: []));
-      },
-    );
+      });
   }
 
   Future<bool> savePlaylist() async {
@@ -129,9 +126,4 @@ class SmartPlaylistBuilderCubit extends Cubit<SmartPlaylistBuilderState> {
     }
   }
 
-  @override
-  Future<void> close() {
-    _previewSub?.cancel();
-    return super.close();
-  }
 }

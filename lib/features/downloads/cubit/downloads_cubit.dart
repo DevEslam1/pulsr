@@ -72,6 +72,13 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     safeEmit(state.clearTransient());
   }
 
+  /// One-shot failure surfacing: typed Failure stays in state (retryability,
+  /// inline surfaces); the toast is a transient effect consumed exactly once.
+  void _notifyFailure(String? message) {
+    if (message == null || message.isEmpty) return;
+    emitEffect(ShowToastEffect(message));
+  }
+
   bool _isActive(DownloadStatus? s) =>
       s == DownloadStatus.queued ||
       s == DownloadStatus.downloading ||
@@ -150,6 +157,7 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
           (failure) {
             safeEmit(state.copyWith(
                 errorMessage: failure.message, failure: failure));
+          _notifyFailure(failure.message);
           },
           (_) {},
         );
@@ -170,6 +178,7 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
           errorMessage: firstFailure?.message ?? 'Batch download completed with failures',
           failure: firstFailure,
         ));
+        _notifyFailure(firstFailure?.message);
       }
       return res;
     }
@@ -231,8 +240,11 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
       try {
         final result = await _pauseDownloadUseCase(videoId);
         result.fold(
-          (failure) => safeEmit(
-              state.copyWith(errorMessage: failure.message, failure: failure)),
+          (failure) {
+            safeEmit(state.copyWith(
+                errorMessage: failure.message, failure: failure));
+            _notifyFailure(failure.message);
+          },
           (_) {},
         );
       } catch (e, st) {
@@ -247,8 +259,11 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
       try {
         final result = await _resumeDownloadUseCase(videoId);
         result.fold(
-          (failure) => safeEmit(
-              state.copyWith(errorMessage: failure.message, failure: failure)),
+          (failure) {
+            safeEmit(state.copyWith(
+                errorMessage: failure.message, failure: failure));
+            _notifyFailure(failure.message);
+          },
           (_) {},
         );
       } catch (e, st) {
@@ -263,8 +278,11 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
       try {
         final result = await _retryDownloadUseCase(videoId);
         result.fold(
-          (failure) => safeEmit(
-              state.copyWith(errorMessage: failure.message, failure: failure)),
+          (failure) {
+            safeEmit(state.copyWith(
+                errorMessage: failure.message, failure: failure));
+            _notifyFailure(failure.message);
+          },
           (_) {},
         );
       } catch (e, st) {
@@ -279,8 +297,11 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
       try {
         final result = await _deleteDownloadUseCase(videoId);
         result.fold(
-          (failure) => safeEmit(
-              state.copyWith(errorMessage: failure.message, failure: failure)),
+          (failure) {
+            safeEmit(state.copyWith(
+                errorMessage: failure.message, failure: failure));
+            _notifyFailure(failure.message);
+          },
           (_) {
             final remaining = Map<String, DownloadTask>.from(state.tasks)
               ..removeWhere((k, v) => k == videoId || v.videoId == videoId || v.id == videoId);
@@ -303,8 +324,11 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
         try {
           final result = await useCase(videoId);
           result.fold(
-            (failure) => safeEmit(
-                state.copyWith(errorMessage: failure.message, failure: failure)),
+            (failure) {
+              safeEmit(state.copyWith(
+                  errorMessage: failure.message, failure: failure));
+              _notifyFailure(failure.message);
+            },
             (_) {},
           );
         } catch (e, st) {
@@ -345,8 +369,11 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
       try {
         final result = await useCase(orderedVideoIds);
         result.fold(
-          (failure) => safeEmit(
-              state.copyWith(errorMessage: failure.message, failure: failure)),
+          (failure) {
+            safeEmit(state.copyWith(
+                errorMessage: failure.message, failure: failure));
+            _notifyFailure(failure.message);
+          },
           (_) {},
         );
       } catch (e, st) {

@@ -301,7 +301,7 @@ class PlaylistDetailScreen extends StatelessWidget {
                                 onTap: () => context
                                     .read<PlayerCubit>()
                                     .playSong(songs[i], queue: songs),
-                                onMorePressed: () => showModalBottomSheet(
+                                onMorePressed: () => showModalBottomSheet<void>(
                                   context: context,
                                   useRootNavigator: true,
                                   isScrollControlled: true,

@@ -714,14 +714,14 @@ class PulsrAudioHandler extends BaseAudioHandler
     );
 
     _subscriptions.add(
-      Stream.periodic(const Duration(seconds: 45)).listen((_) async {
+      Stream<void>.periodic(const Duration(seconds: 45)).listen((_) async {
         final level = await BatteryOptimizationService.getBatteryLevel();
         _batteryAwarePlayback.onBatteryLevelChanged(level);
       }),
     );
-    BatteryOptimizationService.getBatteryLevel().then((level) {
+    unawaited(BatteryOptimizationService.getBatteryLevel().then((level) {
       _batteryAwarePlayback.onBatteryLevelChanged(level);
-    }).catchError((_) {});
+    }).catchError((_) {}));
 
     _queueTransition = SeamlessQueueTransition(
       buildConcatSource: (songs) => _buildConcat(songs),
@@ -752,7 +752,7 @@ class PulsrAudioHandler extends BaseAudioHandler
               _broadcastState(event);
             }
           },
-          onError: (e, st) {
+          onError: (Object e, StackTrace st) {
             ErrorLogger.log('Player playbackEventStream error',
                 error: e, stackTrace: st, category: 'AudioHandler');
           },
@@ -769,7 +769,7 @@ class PulsrAudioHandler extends BaseAudioHandler
               }
             }
           },
-          onError: (e, st) {
+          onError: (Object e, StackTrace st) {
             ErrorLogger.log('Player durationStream error',
                 error: e, stackTrace: st, category: 'AudioHandler');
           },
@@ -795,11 +795,11 @@ class PulsrAudioHandler extends BaseAudioHandler
                   state.processingState == ProcessingState.completed &&
                   !_crossfadeManager.isCrossfading) {
                 unawaited(_sleepTimerManager.onTrackCompleted());
-                skipToNext();
+                unawaited(skipToNext());
               }
             }
           },
-          onError: (e, st) {
+          onError: (Object e, StackTrace st) {
             ErrorLogger.log('Player playerStateStream error',
                 error: e, stackTrace: st, category: 'AudioHandler');
           },
@@ -836,7 +836,7 @@ class PulsrAudioHandler extends BaseAudioHandler
               }
             }
           },
-          onError: (e, st) {
+          onError: (Object e, StackTrace st) {
             ErrorLogger.log('Player positionStream error',
                 error: e, stackTrace: st, category: 'AudioHandler');
           },
@@ -856,7 +856,7 @@ class PulsrAudioHandler extends BaseAudioHandler
               unawaited(_equalizerManager.reapplyToSession(sessionId));
             }
           },
-          onError: (e, st) {
+          onError: (Object e, StackTrace st) {
             ErrorLogger.log('Player androidAudioSessionIdStream error',
                 error: e, stackTrace: st, category: 'AudioHandler');
           },
@@ -876,7 +876,7 @@ class PulsrAudioHandler extends BaseAudioHandler
               _onGaplessIndexChanged(index);
             }
           },
-          onError: (e, st) {
+          onError: (Object e, StackTrace st) {
             ErrorLogger.log('Player currentIndexStream error',
                 error: e, stackTrace: st, category: 'AudioHandler');
           },
@@ -1010,7 +1010,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (errStr.contains('403') ||
         errStr.contains('bot') ||
         (error is YtmException && error.isBotBlocked)) {
-      _ytmService.invalidatePoToken().catchError((e, st) {
+      _ytmService.invalidatePoToken().catchError((Object e, StackTrace st) {
         ErrorLogger.log('poToken invalidation failed',
             error: e, stackTrace: st, category: 'AudioHandler');
       });
@@ -1526,7 +1526,7 @@ class PulsrAudioHandler extends BaseAudioHandler
 
         final currentSessionId = _activePlayer.androidAudioSessionId;
         if (currentSessionId != null) {
-          AudioEffectsChannel().setAudioSessionId(currentSessionId);
+          unawaited(AudioEffectsChannel().setAudioSessionId(currentSessionId));
           _currentAudioSessionId = currentSessionId;
           _audioSessionIdSubject.add(currentSessionId);
         }
@@ -1537,7 +1537,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         AudioEffectsChannel().resyncForTrack(nextSr, channels: 2).ignore();
 
         mediaItem.add(_songToMediaItem(nextSong, artUri));
-        _repository.recordPlayHistory(nextSong.id);
+        unawaited(_repository.recordPlayHistory(nextSong.id));
         _broadcastState(_activePlayer.playbackEvent);
 
         await active.stop();
@@ -1771,19 +1771,19 @@ class PulsrAudioHandler extends BaseAudioHandler
           _latencyTracker?.markStage(PlaybackStage.playing);
         } catch (_) {}
         _consecutiveFailures = 0;
-        _repository.recordPlayHistory(song.id);
+        unawaited(_repository.recordPlayHistory(song.id));
       }
       _saveCurrentPosition();
 
       // Resolve high-res artwork off the hot path, like the crossfade engine.
-      ArtworkUriResolver.resolveArtworkUri(song).then((artUri) {
+      unawaited(ArtworkUriResolver.resolveArtworkUri(song).then((artUri) {
         if (artUri != null &&
             artUri != fastArtUri &&
             generation == _playGeneration &&
             currentSong?.id == song.id) {
           mediaItem.add(_songToMediaItem(song, artUri));
         }
-      }).catchError((_) {});
+      }).catchError((_) {}));
     } on YtmException catch (e, st) {
       if (generation != _playGeneration) return;
       final info = YtmErrorClassifier.classify(e);
@@ -1874,11 +1874,11 @@ class PulsrAudioHandler extends BaseAudioHandler
         song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
     mediaItem.add(_songToMediaItem(song, fastArtUri));
     await _activePlayer.setVolume(_calculateReplayGainVolume(song));
-    _repository.recordPlayHistory(song.id);
+    unawaited(_repository.recordPlayHistory(song.id));
     _broadcastState(_activePlayer.playbackEvent);
     _saveCurrentPosition();
 
-    ArtworkUriResolver.resolveArtworkUri(song).then((artUri) {
+    unawaited(ArtworkUriResolver.resolveArtworkUri(song).then((artUri) {
       if (artUri != null &&
           artUri != fastArtUri &&
           _currentIndex == index &&
@@ -1886,7 +1886,7 @@ class PulsrAudioHandler extends BaseAudioHandler
           currentSong?.id == song.id) {
         mediaItem.add(_songToMediaItem(song, artUri));
       }
-    }).catchError((_) {});
+    }).catchError((_) {}));
 
     if (_songs.length > index + 1) {
       unawaited(_tripleBufferPipeline.preloadNext(_songs[index + 1]));
@@ -1937,14 +1937,14 @@ class PulsrAudioHandler extends BaseAudioHandler
     mediaItem.add(item);
 
     // Resolve high-res artwork in background without blocking audio source loading
-    ArtworkUriResolver.resolveArtworkUri(song).then((artUri) {
+    unawaited(ArtworkUriResolver.resolveArtworkUri(song).then((artUri) {
       if (artUri != null &&
           artUri != fastArtUri &&
           generation == _playGeneration &&
           currentSong?.id == song.id) {
         mediaItem.add(_songToMediaItem(song, artUri));
       }
-    }).catchError((_) {});
+    }).catchError((_) {}));
 
     // Kick off background prefetch for next track immediately so next skip is instant
     if (index + 1 < _songs.length) {
@@ -1996,7 +1996,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         unawaited(_equalizerManager.reapplyToSession(sessionId));
       }
       _consecutiveFailures = 0;
-      _repository.recordPlayHistory(song.id);
+      unawaited(_repository.recordPlayHistory(song.id));
       _saveCurrentPosition();
 
       // Early prefetch next streams for Gapless 2.0
@@ -2868,7 +2868,7 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   @override
   Future<void> onTaskRemoved() async {
-    saveCurrentPositionImmediate();
+    unawaited(saveCurrentPositionImmediate());
     await super.onTaskRemoved();
   }
 

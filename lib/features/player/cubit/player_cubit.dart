@@ -56,7 +56,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   final ScrobblerService? _scrobblerService;
   final PlaybackLatencyTracker? _latencyTracker;
 
-  StreamSubscription? _widgetClickSub;
+  StreamSubscription<void>? _widgetClickSub;
   DateTime? _lastWidgetUpdateTime;
   int _mediaItemResolutionGen = 0;
 
@@ -162,9 +162,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
   void _debouncedPersistQueueSlots() {
     _persistQueueDebounce?.cancel();
-    _persistQueueDebounce = Timer(const Duration(seconds: 2), () {
+    _persistQueueDebounce = autoTimer(Timer(const Duration(seconds: 2), () {
       _persistQueueSlots();
-    });
+    }));
   }
 
   Future<void> _persistQueueSlots() async {
@@ -258,7 +258,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     }
 
     // Minor progress tick: schedule debounced flush
-    _scrobbleDebounce ??= Timer(_scrobbleInterval, () {
+    _scrobbleDebounce ??= autoTimer(Timer(_scrobbleInterval, () {
       if (isClosed) return;
       _scrobblerService?.notifyPlaybackState(
         id: song.id,
@@ -270,7 +270,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
         isPlaying: isPlaying,
       );
       _scrobbleDebounce = null;
-    });
+    }));
   }
 
   void _listenToWidgetClicks() {
@@ -429,8 +429,8 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
             if (gen != _mediaItemResolutionGen || isClosed) return;
 
             if (!isSameSong) {
-              _loadLyricsForSong(resolvedSong!);
-              _enrichAudioQuality(resolvedSong!, gen);
+              unawaited(_loadLyricsForSong(resolvedSong!));
+              unawaited(_enrichAudioQuality(resolvedSong!, gen));
             }
             if (gen != _mediaItemResolutionGen || isClosed) return;
             _updateWidgetThrottled(force: true);
@@ -534,7 +534,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
     autoSub(
       _audioHandler.positionStream
-          .throttleTime(const Duration(milliseconds: 100), trailing: true),
+          .throttleTime(const Duration(milliseconds: 200), trailing: true),
       (pos) {
         safeEmit(state.copyWith(position: pos));
         if (state.isPlaying) {
@@ -733,7 +733,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       } catch (_) {}
       rethrow;
     }
-    _loadLyricsForSong(targetSong);
+    unawaited(_loadLyricsForSong(targetSong));
     _updateWidgetThrottled(force: true);
   }
 
@@ -858,7 +858,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
         await _audioHandler.pause();
         safeEmit(state.copyWith(isPlaying: false));
       }
-      _loadLyricsForSong(song);
+      unawaited(_loadLyricsForSong(song));
     } finally {
       _isSwitchingSlot = false;
     }

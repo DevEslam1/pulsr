@@ -5,7 +5,10 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:pulsr/core/errors/failures.dart';
+import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/data/downloads/yt_download_service.dart';
 import 'package:pulsr/features/ytm_search/cubit/ytm_download_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
@@ -28,8 +31,30 @@ DownloadTask _task(String videoId, DownloadStatus status) => DownloadTask(
       status: status,
     );
 
+SongsTableData _song(int id, String title, {String? remoteId}) =>
+    SongsTableData(
+      id: id,
+      title: title,
+      artist: 'Artist',
+      album: 'Album',
+      durationMs: 1000,
+      path: 'ytmusic://vid',
+      source: SongSource.youtube,
+      remoteId: remoteId,
+      isFavorite: false,
+      isMissing: false,
+      isDownloaded: false,
+      playCount: 0,
+      lastPositionMs: 0,
+    );
+
+class _FakeSongsTableData extends Fake implements SongsTableData {}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUpAll(() {
+    registerFallbackValue(_FakeSongsTableData());
+  });
 
   late MockYtDownloadService mockService;
   late MockPlayerCubit mockPlayerCubit;
@@ -77,6 +102,22 @@ void main() {
 
       expect(cubit.state.itemFor('vid_1').status, YtDownloadStatus.done,
           reason: 'terminal done must not be downgraded to queued');
+    });
+
+    test('fresh download after cancel resets the terminal state', () async {
+      final cubit = YtmDownloadCubit(mockService, mockPlayerCubit, mockRepo);
+      addTearDown(cubit.close);
+      cubit.cancelDownload('vid_1');
+      expect(cubit.state.itemFor('vid_1').status, YtDownloadStatus.canceled);
+
+      when(() => mockService.download(any(),
+              onProgress: any(named: 'onProgress')))
+          .thenAnswer((_) async => const Left(DownloadFailure('x')));
+      await cubit.download(_song(5, 'Song', remoteId: 'vid_1'));
+
+      expect(cubit.state.itemFor('vid_1').status, YtDownloadStatus.failed,
+          reason: 'a fresh download attempt must reset the canceled state; '
+              'the mock failure then lands as failed');
     });
 
     test('non-terminal items still update normally (no over-guard)', () async {

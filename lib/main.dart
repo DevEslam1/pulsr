@@ -72,7 +72,7 @@ Future<void> main() async {
   ErrorLogger.initialize();
 
   // System Chrome configuration for true edge-to-edge UI
-  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -97,11 +97,11 @@ Future<void> main() async {
     Future.microtask(() async {
       try {
         await Future.wait([
-          YtmRateLimiter.shared.restore().timeout(const Duration(seconds: 8)).catchError((e, st) {
+          YtmRateLimiter.shared.restore().timeout(const Duration(seconds: 8)).catchError((Object e, StackTrace st) {
             ErrorLogger.log('YtmRateLimiter restore failed or timed out',
                 error: e, stackTrace: st, category: 'Startup');
           }),
-          getIt<AuthService>().initialize().timeout(const Duration(seconds: 8)).catchError((e, st) {
+          getIt<AuthService>().initialize().timeout(const Duration(seconds: 8)).catchError((Object e, StackTrace st) {
             ErrorLogger.log('AuthService initialize failed or timed out',
                 error: e, stackTrace: st, category: 'Startup');
           }),
@@ -118,11 +118,11 @@ Future<void> main() async {
     // frames right after launch (logcat 2026-08-29). No first-run screen needs YTM
     // login state; loginState listeners (PlaylistCubit, home) update reactively
     // when this completes. Defer past the first-interaction window.
-    Future.delayed(const Duration(seconds: 10), () {
+    Future<void>.delayed(const Duration(seconds: 10), () {
       getIt<YtmAccountService>()
           .init()
           .timeout(const Duration(seconds: 8))
-          .catchError((e, st) {
+          .catchError((Object e, StackTrace st) {
             ErrorLogger.log('YtmAccountService init failed or timed out',
                 error: e, stackTrace: st, category: 'Startup');
           });
@@ -250,7 +250,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
       if (!mounted) return;
       // Defer media scan and restore reconciliation by 2 seconds after first frame
       // so first launch and relaunch render instantly without dropped frames or thread contention.
-      await Future.delayed(const Duration(seconds: 2));
+      await Future<void>.delayed(const Duration(seconds: 2));
       if (!mounted) return;
       try {
         final scanner = getIt<MediaScannerService>();

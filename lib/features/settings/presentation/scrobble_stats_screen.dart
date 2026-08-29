@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../data/db/app_database.dart';
-import '../../../domain/repositories/music_repository_interface.dart';
+import '../../../domain/usecases/get_songs_usecase.dart';
 
 class ScrobbleStatsScreen extends StatefulWidget {
   const ScrobbleStatsScreen({super.key});
@@ -31,9 +31,9 @@ class _ScrobbleStatsScreenState extends State<ScrobbleStatsScreen> {
     final lastTime = prefs.getInt('last_scrobble_time') ?? 0;
     final total = prefs.getInt('total_scrobble_count') ?? 0;
 
-    // Load top artists from music repository play counts
-    final repo = getIt<IMusicRepository>();
-    final songsRes = await repo.getAllSongs();
+    // Load top artists from play counts (via the domain use case; the
+    // presentation layer must not touch repositories directly).
+    final songsRes = await getIt<GetSongsUseCase>().getAllSongs();
     final allSongs = songsRes.fold((l) => <SongsTableData>[], (r) => r);
 
     final artistCounts = <String, int>{};

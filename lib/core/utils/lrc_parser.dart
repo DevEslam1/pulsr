@@ -219,12 +219,12 @@ class LrcParser {
         artist.isNotEmpty) {
       try {
         if (lrclibService != null) {
-          resolved = await (lrclibService as dynamic).fetchLyrics(
+          resolved = await ((lrclibService as dynamic).fetchLyrics(
             trackName: trackTitle,
             artistName: artist,
             albumName: album,
             durationSeconds: durationSec,
-          );
+          )) as LyricsResult?;
         }
       } catch (e, st) {
         ErrorLogger.log('Failed to fetch lyrics from LRCLIB for $trackTitle',

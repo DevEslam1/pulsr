@@ -1,16 +1,18 @@
 // lib/features/auth/cubit/auth_cubit.dart
 import 'dart:async';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+import '../../../core/bloc/base_cubit.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/cloud_sync_service.dart';
 import 'auth_state.dart';
 
 @injectable
-class AuthCubit extends Cubit<AuthState> {
+class AuthCubit extends PulsrCubit<AuthState> {
   final AuthService _authService;
   final CloudSyncService _cloudSyncService;
-  StreamSubscription? _authSubscription;
+  StreamSubscription<void>? _authSubscription;
 
   AuthCubit(this._authService, this._cloudSyncService)
       : super(AuthState(lastSyncedAt: _cloudSyncService.lastSyncTime)) {
@@ -18,7 +20,7 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   void _init() {
-    _authSubscription = _authService.authStateChanges.listen((user) {
+    _authSubscription = autoSub<User?>(_authService.authStateChanges, (user) {
       if (isClosed) return;
       if (user != null) {
         emit(state.copyWith(

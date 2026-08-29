@@ -126,8 +126,8 @@ class YtDownloadService {
     final completer = Completer<Result<int>>();
     final active = _activeDownloads[videoId];
     if (active != null) {
-      active.completer.future
-          .then(completer.complete, onError: completer.completeError);
+      unawaited(active.completer.future
+          .then(completer.complete, onError: completer.completeError));
       return completer.future;
     }
 
@@ -169,7 +169,7 @@ class YtDownloadService {
       _activeDownloads[videoId] = task;
       _executeDownload(task).then((result) {
         task.completer.complete(result);
-      }).catchError((e) {
+      }).catchError((Object e) {
         task.completer.complete(Left(DownloadFailure('Download error: $e')));
       }).whenComplete(() {
         _activeDownloads.remove(videoId);
@@ -265,7 +265,7 @@ class YtDownloadService {
               ErrorLogger.log('Artwork download attempt $attempt failed',
                   error: e, category: 'YTM');
               if (attempt < 2) {
-                await Future.delayed(const Duration(seconds: 1));
+                await Future<void>.delayed(const Duration(seconds: 1));
               }
             }
           }
@@ -355,7 +355,7 @@ class YtDownloadService {
       // on local. Do not rescan the whole library here; deduplication is handled inside reconcile.
       // If needed, a lightweight single-file rescan can be done, but the reconciled row is sufficient.
 
-      return reconciled.fold(
+      return await reconciled.fold(
         (f) => Left(f),
         (newId) {
           if (newId == null) {
@@ -512,7 +512,7 @@ class YtDownloadService {
           final backoffMs = retrySec != null
               ? retrySec * 1000
               : (1000 * (1 << (attempts - 1))).clamp(1000, 15000) + (attempts * 137 % 400);
-          await Future.delayed(Duration(milliseconds: backoffMs));
+          await Future<void>.delayed(Duration(milliseconds: backoffMs));
         }
 
         // Transparent 403 / failure re-resolution via same engine chain (poToken rotation mid-download)

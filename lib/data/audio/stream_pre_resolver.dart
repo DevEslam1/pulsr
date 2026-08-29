@@ -143,7 +143,7 @@ class StreamPreResolver {
       if (_disposed || !identical(_activeResolution, completer)) return;
       urlCache.putStream(stream);
       debugPrint('[StreamPreResolver] Successfully pre-resolved next track ($videoId)');
-    }).catchError((e) {
+    }).catchError((Object e) {
       if (_disposed || !identical(_activeResolution, completer)) return;
       debugPrint('[StreamPreResolver] Pre-resolution failed for $videoId non-fatally: $e');
     }).whenComplete(() {

@@ -1,12 +1,15 @@
 // lib/features/downloads/presentation/downloads_screen.dart
 // DL-22: Dismissible × Reorderable conflict resolution & 5s soft-delete undo snackbar.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../domain/models/download_task.dart';
 import '../../../../l10n/generated/app_localizations.dart';
+import '../../../core/bloc/base_cubit.dart';
 import '../cubit/downloads_cubit.dart';
 import '../cubit/downloads_state.dart';
 import 'widgets/download_tile.dart';
@@ -21,6 +24,32 @@ class DownloadsScreen extends StatefulWidget {
 
 class _DownloadsScreenState extends State<DownloadsScreen> {
   DownloadTask? _recentlyDeletedTask;
+  StreamSubscription<UiEffect>? _effectSub;
+
+  @override
+  void initState() {
+    super.initState();
+    // Consume one-shot effects exactly once; effects are never stored in state,
+    // so rebuilds can never re-fire a consumed toast.
+    _effectSub =
+        context.read<DownloadsCubit>().effects.listen((effect) {
+      if (!mounted) return;
+      if (effect is ShowToastEffect) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(
+            content: Text(effect.message),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _effectSub?.cancel();
+    super.dispose();
+  }
 
   void _handleDelete(BuildContext context, DownloadTask task) {
     HapticFeedback.mediumImpact();

@@ -250,7 +250,7 @@ class YtmService {
     try {
       return await future;
     } finally {
-      _inFlightCalls.remove(key);
+      unawaited(_inFlightCalls.remove(key));
     }
   }
 
@@ -694,7 +694,7 @@ class YtmService {
           ErrorLogger.log('YTM network failure (offline): $e', category: 'YTM');
           throw YtmException('YTM_OFFLINE', 'No internet: ${e.message}');
         }
-        await Future.delayed(Duration(milliseconds: 800 * (1 << attempt)));
+        await Future<void>.delayed(Duration(milliseconds: 800 * (1 << attempt)));
       } on PlatformException catch (e) {
         final isFatalCode =
             e.code == 'YTM_DISABLED' ||
@@ -714,7 +714,7 @@ class YtmService {
           }
           throw YtmException(e.code, e.message);
         }
-        await Future.delayed(Duration(milliseconds: 500 * (1 << attempt)));
+        await Future<void>.delayed(Duration(milliseconds: 500 * (1 << attempt)));
       }
     }
     throw const YtmException('YTM_FAILED', 'Max retries exhausted');

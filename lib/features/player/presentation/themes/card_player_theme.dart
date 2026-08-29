@@ -148,7 +148,7 @@ class CardPlayerTheme extends StatelessWidget {
                           Icon(Icons.more_vert_rounded, color: textTitleColor),
                       onPressed: () {
                         if (song != null) {
-                          showModalBottomSheet(
+                          showModalBottomSheet<void>(
                             context: context,
                             builder: (_) => SongInfoSheet(song: song),
                           );
@@ -436,7 +436,7 @@ class CardPlayerTheme extends StatelessWidget {
                                       : iconActionColor,
                                 ),
                                 onPressed: () {
-                                  showModalBottomSheet(
+                                  showModalBottomSheet<void>(
                                     context: context,
                                     isScrollControlled: true,
                                     backgroundColor: Colors.transparent,
@@ -469,7 +469,7 @@ class CardPlayerTheme extends StatelessWidget {
                                       : iconActionColor,
                                 ),
                                 onPressed: () {
-                                  showModalBottomSheet(
+                                  showModalBottomSheet<void>(
                                     context: context,
                                     useRootNavigator: true,
                                     isScrollControlled: true,
@@ -484,7 +484,7 @@ class CardPlayerTheme extends StatelessWidget {
                                     color: iconActionColor),
                                 onPressed: () {
                                   if (song != null) {
-                                    showModalBottomSheet(
+                                    showModalBottomSheet<void>(
                                       context: context,
                                       useRootNavigator: true,
                                       isScrollControlled: true,

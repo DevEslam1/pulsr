@@ -146,7 +146,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                     icon: Icon(Icons.more_vert_rounded, color: p.textPrimary),
                     onPressed: () {
                       if (song != null) {
-                        showModalBottomSheet(
+                        showModalBottomSheet<void>(
                           context: context,
                           builder: (_) => SongInfoSheet(song: song),
                         );
@@ -445,7 +445,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                     : p.textSecondary,
                               ),
                               onPressed: () {
-                                showModalBottomSheet(
+                                showModalBottomSheet<void>(
                                   context: context,
                                   isScrollControlled: true,
                                   backgroundColor: Colors.transparent,
@@ -478,7 +478,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                     : p.textSecondary,
                               ),
                               onPressed: () {
-                                showModalBottomSheet(
+                                showModalBottomSheet<void>(
                                   context: context,
                                   useRootNavigator: true,
                                   isScrollControlled: true,
@@ -493,7 +493,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                   color: p.textSecondary),
                               onPressed: () {
                                 if (song != null) {
-                                  showModalBottomSheet(
+                                  showModalBottomSheet<void>(
                                     context: context,
                                     useRootNavigator: true,
                                     isScrollControlled: true,

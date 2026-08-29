@@ -1,4 +1,5 @@
 // lib/features/settings/presentation/widgets/backup_section.dart
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -207,7 +208,7 @@ class _BackupSectionState extends State<BackupSection> {
 
         if (!context.mounted) return;
 
-        showDialog(
+        unawaited(showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
             backgroundColor: Theme.of(context).colorScheme.surface,
@@ -249,7 +250,7 @@ class _BackupSectionState extends State<BackupSection> {
               ),
             ],
           ),
-        );
+        ));
       }
     } catch (e) {
       if (context.mounted) {

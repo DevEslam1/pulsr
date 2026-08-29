@@ -256,7 +256,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       _mismatchAutoNavCount = 0;
       final target =
           widget.isBrowseMode ? 'https://music.youtube.com' : googleSignInUrl;
-      _navigateTo(target);
+      unawaited(_navigateTo(target));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -282,9 +282,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         settings: InAppWebViewSettings(userAgent: targetUa),
       );
     } catch (_) {}
-    _webViewController?.loadUrl(
-      urlRequest: URLRequest(url: WebUri(url)),
-    );
+    final loadUrlFuture = _webViewController?.loadUrl(
+        urlRequest: URLRequest(url: WebUri(url)));
+    if (loadUrlFuture != null) unawaited(loadUrlFuture);
   }
 
   Future<bool> _checkIfLoggedIn([String? url]) {
@@ -333,7 +333,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       for (final domain in domains) {
         final cookies = await cookieManager.getCookies(url: WebUri(domain));
         for (final c in cookies) {
-          jar[c.name] = c.value;
+          jar[c.name] = c.value as String? ?? '';
         }
       }
       final combinedCookies =
@@ -348,7 +348,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
             setState(() {});
             // Navigate to music.youtube.com to complete the OAuth redirect
             // and ensure music.youtube.com domain cookies are also set.
-            _navigateTo('https://music.youtube.com');
+            unawaited(_navigateTo('https://music.youtube.com'));
           }
         }
         return true;
@@ -366,7 +366,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         await accountService.saveSession(cookies);
         if (mounted) {
           setState(() {});
-          _navigateTo('https://music.youtube.com');
+          unawaited(_navigateTo('https://music.youtube.com'));
         }
       }
       return true;
@@ -395,7 +395,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
             await accountService.saveSession(cookieStr);
             if (mounted) {
               setState(() {});
-              _navigateTo('https://music.youtube.com');
+              unawaited(_navigateTo('https://music.youtube.com'));
             }
           }
           return true;
@@ -428,7 +428,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           final domainCookies =
               await cookieManager.getCookies(url: WebUri(domain));
           for (final c in domainCookies) {
-            jar[c.name] = c.value;
+            jar[c.name] = c.value as String? ?? '';
           }
         }
         if (jar.isNotEmpty) {
@@ -908,9 +908,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                               (urlStr.contains('google.com/url') &&
                                   urlStr.contains('play.google.com'))) {
                             if (!widget.isBrowseMode) {
-                              _navigateTo(googleSignInUrl);
+                              unawaited(_navigateTo(googleSignInUrl));
                             } else {
-                              _navigateTo('https://music.youtube.com');
+                              unawaited(_navigateTo('https://music.youtube.com'));
                             }
                             return NavigationActionPolicy.CANCEL;
                           }

@@ -62,7 +62,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
 
   @override
   Future<List<DownloadTask>> getAllDownloads() async {
-    await (_bootReconciliationFuture ?? Future.value());
+    await (_bootReconciliationFuture ?? Future<void>.value());
     return _tasks.values.toList();
   }
 
@@ -138,7 +138,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         _queue.add(videoId);
       }
 
-      await _safeInvoke('startDownloadForeground', {
+      await _safeInvoke<void>('startDownloadForeground', {
         'videoId': videoId,
         'title': task.title,
       });
@@ -537,11 +537,11 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         }
 
         _activeVideoIds.add(videoId);
-        _executeTask(task);
+        unawaited(_executeTask(task));
       }
       if (_activeVideoIds.isEmpty && _queue.isEmpty) {
         try {
-          _downloadChannel.invokeMethod('stopDownloadForeground');
+          unawaited(_downloadChannel.invokeMethod('stopDownloadForeground'));
         } catch (_) {}
       }
     });

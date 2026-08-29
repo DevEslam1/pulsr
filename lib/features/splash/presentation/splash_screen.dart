@@ -20,7 +20,7 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkNextScreen() async {
-    await Future.delayed(const Duration(milliseconds: 1600));
+    await Future<void>.delayed(const Duration(milliseconds: 1600));
     if (!mounted) return;
     final prefs = await SharedPreferences.getInstance();
     final onboardingDone = prefs.getBool('onboarding_completed') ?? false;

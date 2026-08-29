@@ -12,18 +12,26 @@ include: package:flutter_lints/flutter.yaml
 analyzer:
   errors:
     invalid_annotation_target: error
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
   language:
-    strict-casts: false
-    strict-inference: false
-    strict-raw-types: false
+    strict-casts: true
+    strict-inference: true
+    strict-raw-types: true
 
 linter:
   rules:
     avoid_print: false
     avoid_empty_else: true
-    cancel_subscriptions: false
-    close_sinks: false
-    unawaited_futures: false
+    cancel_subscriptions: true
+    close_sinks: true
+    unawaited_futures: true
     use_key_in_widget_constructors: false
     prefer_single_quotes: false
     require_trailing_commas: false

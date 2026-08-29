@@ -361,14 +361,14 @@ class ScrobblerService {
           return true;
         } else if (resp.statusCode == 429 || resp.statusCode >= 500) {
           if (attempt == maxAttempts) return false;
-          await Future.delayed(Duration(milliseconds: 500 * attempt));
+          await Future<void>.delayed(Duration(milliseconds: 500 * attempt));
           continue;
         } else if (resp.statusCode >= 400 && resp.statusCode < 500) {
           return false;
         }
       } catch (e) {
         if (attempt == maxAttempts) return false;
-        await Future.delayed(Duration(milliseconds: 250 * attempt));
+        await Future<void>.delayed(Duration(milliseconds: 250 * attempt));
       }
     }
     return false;
@@ -620,7 +620,7 @@ class ScrobblerService {
       final queueJson = prefs.getString(_keyOfflineQueue);
       if (queueJson == null || queueJson.isEmpty) return;
 
-      final List<dynamic> list = jsonDecode(queueJson);
+      final list = jsonDecode(queueJson) as List<dynamic>;
       final remaining = <Map<String, dynamic>>[];
       const batchSize = 5;
 
@@ -659,7 +659,7 @@ class ScrobblerService {
         }
 
         if (end < list.length) {
-          await Future.delayed(const Duration(milliseconds: 200));
+          await Future<void>.delayed(const Duration(milliseconds: 200));
         }
       }
 

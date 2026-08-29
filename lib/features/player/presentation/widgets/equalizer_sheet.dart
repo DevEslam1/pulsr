@@ -113,7 +113,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
 
   void _showFeatureInfo(BuildContext context, AudioFeatureInfo info, {String? conflictReason}) {
     final p = context.palette;
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: p.surface,
@@ -885,7 +885,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                   onPressed: () {
-                    showModalBottomSheet(
+                    showModalBottomSheet<void>(
                       context: context,
                       useRootNavigator: true,
                       isScrollControlled: true,
@@ -910,7 +910,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                   onPressed: () {
-                    showModalBottomSheet(
+                    showModalBottomSheet<void>(
                       context: context,
                       useRootNavigator: true,
                       isScrollControlled: true,

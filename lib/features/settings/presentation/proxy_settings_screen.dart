@@ -1,4 +1,5 @@
 // lib/features/settings/presentation/proxy_settings_screen.dart
+import 'dart:async';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -732,7 +733,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                       ),
                     );
                     if (confirm == true && mounted) {
-                      context.read<SettingsCubit>().clearProxyList();
+                      unawaited(context.read<SettingsCubit>().clearProxyList());
                     }
                   },
                   borderRadius: BorderRadius.circular(6),

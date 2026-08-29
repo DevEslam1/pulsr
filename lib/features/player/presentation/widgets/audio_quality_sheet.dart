@@ -24,7 +24,7 @@ class AudioQualitySheet extends StatelessWidget {
   static void show(
       BuildContext context, SongsTableData song, Color activeColor) {
     HapticFeedback.mediumImpact();
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
       backgroundColor: Colors.transparent,
@@ -830,7 +830,7 @@ class AudioQualitySheet extends StatelessWidget {
                           visualDensity: VisualDensity.compact,
                           tooltip: 'About Bit-Perfect',
                           onPressed: () {
-                            showDialog(
+                            showDialog<void>(
                               context: context,
                               builder: (ctx) => AlertDialog(
                                 backgroundColor: p.surface,

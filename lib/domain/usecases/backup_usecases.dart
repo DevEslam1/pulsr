@@ -157,13 +157,13 @@ class ImportBackupUseCase {
   Future<ImportResult> executeFromFile(Object file) async {
     if (file is! String) {
       try {
-        final len = await (file as dynamic).length();
+        final len = await (file as dynamic).length() as int;
         if (len > maxBackupSizeBytes) {
           throw const FormatException(
               'Backup file exceeds maximum allowed size of 10 MB');
         }
-        final content = await (file as dynamic).readAsString();
-        return execute(content);
+        final content = await (file as dynamic).readAsString() as String;
+        return await execute(content);
       } catch (e) {
         if (e is FormatException) rethrow;
         throw FormatException('Failed reading backup file: $e');
@@ -435,18 +435,18 @@ class ImportBackupUseCase {
             'setting_eq_preset', jsonEncode(settings['eqPreset']));
       }
       // Restore extended settings with validation
-      if (settings['replayGainMode'] is String) await prefs.setString('setting_replay_gain_mode', settings['replayGainMode']);
+      if (settings['replayGainMode'] is String) await prefs.setString('setting_replay_gain_mode', settings['replayGainMode'] as String);
       if (settings['replayGainPreampWithRg'] is num) await prefs.setDouble('setting_replay_gain_preamp_with_rg', (settings['replayGainPreampWithRg'] as num).toDouble());
       if (settings['replayGainPreampWithoutRg'] is num) await prefs.setDouble('setting_replay_gain_preamp_without_rg', (settings['replayGainPreampWithoutRg'] as num).toDouble());
-      if (settings['wifiOnlyMode'] is bool) await prefs.setBool('setting_wifi_only_mode', settings['wifiOnlyMode']);
-      if (settings['offlineOnlyMode'] is bool) await prefs.setBool('setting_offline_only_mode', settings['offlineOnlyMode']);
-      if (settings['bitPerfectMode'] is bool) await prefs.setBool('setting_bit_perfect', settings['bitPerfectMode']);
-      if (settings['dspPreference'] is String) await prefs.setString('setting_dsp_preference', settings['dspPreference']);
-      if (settings['streamingQuality'] is String) await prefs.setString('setting_streaming_quality', settings['streamingQuality']);
-      if (settings['downloadQuality'] is String) await prefs.setString('setting_download_quality', settings['downloadQuality']);
-      if (settings['isLosslessMode'] is bool) await prefs.setBool('setting_lossless', settings['isLosslessMode']);
-      if (settings['eqEnabled'] is bool) await prefs.setBool('setting_eq_enabled', settings['eqEnabled']);
-      if (settings['eqGains'] is String) await prefs.setString('setting_eq_gains', settings['eqGains']);
+      if (settings['wifiOnlyMode'] is bool) await prefs.setBool('setting_wifi_only_mode', settings['wifiOnlyMode'] as bool);
+      if (settings['offlineOnlyMode'] is bool) await prefs.setBool('setting_offline_only_mode', settings['offlineOnlyMode'] as bool);
+      if (settings['bitPerfectMode'] is bool) await prefs.setBool('setting_bit_perfect', settings['bitPerfectMode'] as bool);
+      if (settings['dspPreference'] is String) await prefs.setString('setting_dsp_preference', settings['dspPreference'] as String);
+      if (settings['streamingQuality'] is String) await prefs.setString('setting_streaming_quality', settings['streamingQuality'] as String);
+      if (settings['downloadQuality'] is String) await prefs.setString('setting_download_quality', settings['downloadQuality'] as String);
+      if (settings['isLosslessMode'] is bool) await prefs.setBool('setting_lossless', settings['isLosslessMode'] as bool);
+      if (settings['eqEnabled'] is bool) await prefs.setBool('setting_eq_enabled', settings['eqEnabled'] as bool);
+      if (settings['eqGains'] is String) await prefs.setString('setting_eq_gains', settings['eqGains'] as String);
       if (settings['playbackSpeed'] is num) await prefs.setDouble('setting_playback_speed', (settings['playbackSpeed'] as num).toDouble());
 
       restoredSettingsCount = settings.length;

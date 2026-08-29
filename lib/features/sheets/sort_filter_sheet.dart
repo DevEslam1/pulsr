@@ -7,7 +7,7 @@ import '../../core/utils/l10n_extensions.dart';
 class SortFilterSheet extends StatelessWidget {
   final String currentSort;
   final bool ascending;
-  final Function(String sortBy, bool ascending) onApply;
+  final void Function(String sortBy, bool ascending) onApply;
 
   const SortFilterSheet({
     super.key,

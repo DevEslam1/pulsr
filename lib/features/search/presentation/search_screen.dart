@@ -30,7 +30,7 @@ class _SearchScreenState extends State<SearchScreen> {
 
   /// 0 = Local Music, 1 = Online Stream
   int _selectedTab = 0;
-  StreamSubscription? _settingsSub;
+  StreamSubscription<void>? _settingsSub;
 
   bool _isOnlineAvailable(BuildContext context) {
     final offlineOnly =
@@ -427,7 +427,7 @@ class _SearchScreenState extends State<SearchScreen> {
             song: song,
             subtitleOverride: '${song.artist} • ${song.album}',
             onTap: () => playerCubit.playSong(song, queue: state.results),
-            onMorePressed: () => showModalBottomSheet(
+            onMorePressed: () => showModalBottomSheet<void>(
               context: context,
               useRootNavigator: true,
               isScrollControlled: true,

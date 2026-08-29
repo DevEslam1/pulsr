@@ -1,7 +1,7 @@
 import 'dart:async';
 
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
+import '../../../core/bloc/base_cubit.dart';
 
 import '../../../core/errors/ytm_error_classifier.dart';
 import '../../../core/services/file_intent_handler.dart';
@@ -10,7 +10,7 @@ import '../../../domain/models/ytm_track.dart';
 import 'ytm_search_state.dart';
 
 @injectable
-class YtmSearchCubit extends Cubit<YtmSearchState> {
+class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
   final YtmService _service;
   Timer? _debounceTimer;
 
@@ -23,9 +23,9 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
   void onQueryChanged(String query) {
     emit(state.copyWith(query: query));
     _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 250), () {
+    _debounceTimer = autoTimer(Timer(const Duration(milliseconds: 250), () {
       _executeSearch(query);
-    });
+    }));
   }
 
   void clearQuery() {
@@ -101,9 +101,5 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
     }
   }
 
-  @override
-  Future<void> close() {
-    _debounceTimer?.cancel();
-    return super.close();
-  }
+  // Debounce timer is registered with PulsrCubit; cancelled automatically.
 }

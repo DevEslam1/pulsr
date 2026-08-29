@@ -25,7 +25,7 @@ class ArtworkUriResolver {
           if (exists) {
             File(oldestUri.toFilePath()).delete().ignore();
           }
-        }).catchError((e, st) {
+        }).catchError((Object e, StackTrace st) {
           ErrorLogger.log('Failed to delete evicted artwork temp file',
               error: e, stackTrace: st, category: 'ArtworkUriResolver');
         });

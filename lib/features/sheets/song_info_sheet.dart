@@ -1,4 +1,5 @@
 // lib/features/sheets/song_info_sheet.dart
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -28,11 +29,11 @@ class SongInfoSheet extends StatelessWidget {
     if (song.path.isNotEmpty && !song.path.startsWith('ytmusic://')) {
       final exists = await File(song.path).exists();
       if (exists) {
-        Share.shareXFiles([XFile(song.path)], text: text);
+        unawaited(Share.shareXFiles([XFile(song.path)], text: text));
         return;
       }
     }
-    Share.share(text);
+    unawaited(Share.share(text));
   }
 
   Future<void> _setRingtone(BuildContext context, String type) async {
@@ -116,7 +117,7 @@ class SongInfoSheet extends StatelessWidget {
 
   void _showRingtoneOptions(BuildContext context) {
     final p = context.palette;
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       useRootNavigator: true,
       backgroundColor: p.surface,

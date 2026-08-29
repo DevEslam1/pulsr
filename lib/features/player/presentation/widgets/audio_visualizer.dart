@@ -51,7 +51,7 @@ class _AudioVisualizerState extends State<AudioVisualizer>
   static const EventChannel _eventChannel =
       EventChannel(PulsrChannels.visualizerStream);
 
-  StreamSubscription? _subscription;
+  StreamSubscription<void>? _subscription;
   late AnimationController _animController;
 
   static const int _numBands = 32;

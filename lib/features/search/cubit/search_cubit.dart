@@ -1,19 +1,20 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:math' as math;
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
+import '../../../core/bloc/base_cubit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/errors/failures.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/folder_usecases.dart';
 import '../../../domain/usecases/search_music_usecase.dart';
 import 'search_state.dart';
 
 @injectable
-class SearchCubit extends Cubit<SearchState> {
+class SearchCubit extends PulsrCubit<SearchState> {
   final SearchMusicUseCase _searchUseCase;
   final FolderUseCases _folderUseCases;
-  StreamSubscription? _searchSub;
+  StreamSubscription<void>? _searchSub;
   Timer? _debounceTimer;
 
   SearchCubit({
@@ -47,9 +48,9 @@ class SearchCubit extends Cubit<SearchState> {
   void onQueryChanged(String query) {
     emit(state.copyWith(query: query));
     _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 250), () {
+    _debounceTimer = autoTimer(Timer(const Duration(milliseconds: 250), () {
       _executeSearch(query);
-    });
+    }));
   }
 
   int _generation = 0;
@@ -80,7 +81,7 @@ class SearchCubit extends Cubit<SearchState> {
 
   Future<void> _executeSearch(String query, {String? filterOverride}) async {
     final generation = ++_generation;
-    _searchSub?.cancel();
+    unawaited(_searchSub?.cancel());
     _searchSub = null;
     final trimmed = query.trim();
     if (trimmed.isEmpty) {
@@ -107,9 +108,8 @@ class SearchCubit extends Cubit<SearchState> {
 
     final excluded = _cachedExcludedFolders ?? const <String>[];
 
-    _searchSub = _searchUseCase
-        .searchSongs(boundedQuery, excludedFolders: excluded)
-        .listen((result) {
+    _searchSub = autoSub<Result<List<SongsTableData>>>(_searchUseCase
+        .searchSongs(boundedQuery, excludedFolders: excluded), (result) {
       if (generation != _generation || isClosed) return;
       result.fold(
         (failure) => emit(
@@ -259,10 +259,6 @@ class SearchCubit extends Cubit<SearchState> {
         query: '', results: [], isLoading: false, errorMessage: null));
   }
 
-  @override
-  Future<void> close() {
-    _debounceTimer?.cancel();
-    _searchSub?.cancel();
-    return super.close();
-  }
+  // Debounce timer + search subscription are registered with PulsrCubit and
+  // cancelled automatically in close().
 }

@@ -1,4 +1,5 @@
 // lib/core/services/artwork_cache_manager.dart
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
@@ -48,7 +49,7 @@ class ArtworkCacheManager {
     _maxCacheSizeMb = mb;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_prefMaxCacheSizeMb, mb);
-    _enforceDiskLimit();
+    unawaited(_enforceDiskLimit());
   }
 
   /// Hashes cache key into a safe filesystem name
@@ -77,7 +78,7 @@ class ArtworkCacheManager {
           if (bytes.isNotEmpty) {
             _putMemory(key, bytes);
             // Touch file to update lastModified for LRU eviction
-            file.setLastModified(DateTime.now()).catchError((_) => file);
+            unawaited(file.setLastModified(DateTime.now()).catchError((_) => file));
             return bytes;
           }
         }
@@ -102,7 +103,7 @@ class ArtworkCacheManager {
         await file.writeAsBytes(bytes, flush: false);
         _putCount++;
         if (_putCount % _enforceEvery == 0) {
-          _enforceDiskLimit();
+          unawaited(_enforceDiskLimit());
         }
       }
     } catch (e) {

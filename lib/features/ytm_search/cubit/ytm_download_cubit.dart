@@ -102,7 +102,7 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
               );
             }
           })
-          .catchError((e, st) {
+          .catchError((Object e, StackTrace st) {
             ErrorLogger.log(
               'YtmDownloadCubit getAllDownloads failed',
               error: e,
@@ -167,7 +167,10 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
       return;
     }
 
-    _set(
+    // Fresh user intent: a previous failed/canceled attempt must not block a
+    // new download. This reset deliberately bypasses the terminal guard in
+    // _set (which only protects the observation path from STALE downgrades).
+    _forceSet(
       videoId,
       const YtDownloadItem(status: YtDownloadStatus.queued, progress: 0),
     );
@@ -263,7 +266,7 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
               );
             }
           })
-          .catchError((e, st) {
+          .catchError((Object e, StackTrace st) {
             ErrorLogger.log(
               'Batch download in YtmDownloadCubit failed',
               error: e,
@@ -278,6 +281,16 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
     }
 
     return queuedCount;
+  }
+
+  /// Unguarded write used ONLY for fresh user intent (a new download after a
+  /// failed/canceled attempt). Everything event-driven goes through [_set].
+  void _forceSet(String videoId, YtDownloadItem item) {
+    safeEmit(
+      YtmDownloadState(
+        items: Map.unmodifiable({...state.items, videoId: item}),
+      ),
+    );
   }
 
   void _set(String videoId, YtDownloadItem item) {

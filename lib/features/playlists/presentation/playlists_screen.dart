@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -33,7 +34,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
 
   void _showCreateDialog(BuildContext context, PlaylistCubit cubit) {
     final controller = TextEditingController();
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(context.l10n.createPlaylist,
@@ -90,7 +91,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
         );
       },
       (importResult) {
-        showDialog(
+        showDialog<void>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: Text(context.l10n.playlistImported,
@@ -110,7 +111,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
 
   void _showAddOnlinePlaylistDialog(BuildContext context, PlaylistCubit cubit) {
     final controller = TextEditingController();
-    showDialog(
+    showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(context.l10n.addYouTubePlaylist,
@@ -469,7 +470,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
           await ytmService.getPlaylistTracks(playlist.playlistId, limit: 200);
       if (tracks.isNotEmpty) {
         final songs = tracks.map((t) => t.toSongData()).toList();
-        playerCubit.playSong(songs.first, queue: songs);
+        unawaited(playerCubit.playSong(songs.first, queue: songs));
       } else {
         scaffoldMessenger.showSnackBar(
           const SnackBar(
@@ -637,7 +638,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                       onPressed: () async {
                         final ok = await YtmWebLoginSheet.show(context);
                         if (ok == true) {
-                          cubit.autoFetchOnlineLibrary(force: true);
+                          unawaited(cubit.autoFetchOnlineLibrary(force: true));
                         }
                       },
                       icon: const Icon(Icons.login_rounded, size: 18),

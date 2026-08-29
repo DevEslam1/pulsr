@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -97,7 +98,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       onPressed: () {
                         final selected = cubit.getSelectedSongs();
                         if (selected.isNotEmpty) {
-                          showModalBottomSheet(
+                          showModalBottomSheet<void>(
                             context: context,
                             useRootNavigator: true,
                             isScrollControlled: true,
@@ -116,7 +117,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                         if (selected.isNotEmpty) {
                           cubit.clearSelection();
                           Navigator.of(context).push(
-                            MaterialPageRoute(
+                            MaterialPageRoute<void>(
                               builder: (_) => TagEditorScreen(
                                 song: selected.first,
                                 batchSongs: selected,
@@ -153,7 +154,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     ),
                     IconButton(
                       icon: const Icon(Icons.sort_rounded),
-                      onPressed: () => showModalBottomSheet(
+                      onPressed: () => showModalBottomSheet<void>(
                         context: context,
                         useRootNavigator: true,
                         isScrollControlled: true,
@@ -362,7 +363,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                             shape: const CircleBorder(),
                             child: InkWell(
                               customBorder: const CircleBorder(),
-                              onTap: () => showModalBottomSheet(
+                              onTap: () => showModalBottomSheet<void>(
                                 context: context,
                                 useRootNavigator: true,
                                 isScrollControlled: true,
@@ -450,9 +451,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                 ),
                 confirmDismiss: (direction) async {
                   if (direction == DismissDirection.startToEnd) {
-                    playerCubit.playNext(song);
+                    unawaited(playerCubit.playNext(song));
                   } else {
-                    cubit.toggleFavorite(song.id);
+                    unawaited(cubit.toggleFavorite(song.id));
                   }
                   return false;
                 },
@@ -467,7 +468,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                     }
                   },
                   onLongPress: () => cubit.toggleSongSelection(song.id),
-                  onMorePressed: () => showModalBottomSheet(
+                  onMorePressed: () => showModalBottomSheet<void>(
                     context: context,
                     useRootNavigator: true,
                     isScrollControlled: true,
@@ -662,9 +663,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                   ),
                   confirmDismiss: (direction) async {
                     if (direction == DismissDirection.startToEnd) {
-                      playerCubit.playNext(song);
+                      unawaited(playerCubit.playNext(song));
                     } else {
-                      cubit.toggleFavorite(song.id);
+                      unawaited(cubit.toggleFavorite(song.id));
                     }
                     return false;
                   },
@@ -680,7 +681,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       }
                     },
                     onLongPress: () => cubit.toggleSongSelection(song.id),
-                    onMorePressed: () => showModalBottomSheet(
+                    onMorePressed: () => showModalBottomSheet<void>(
                       context: context,
                       useRootNavigator: true,
                       isScrollControlled: true,
@@ -1215,9 +1216,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                             ),
                             confirmDismiss: (direction) async {
                               if (direction == DismissDirection.startToEnd) {
-                                playerCubit.playNext(song);
+                                unawaited(playerCubit.playNext(song));
                               } else {
-                                cubit.toggleFavorite(song.id);
+                                unawaited(cubit.toggleFavorite(song.id));
                               }
                               return false;
                             },
@@ -1235,7 +1236,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                               },
                               onLongPress: () =>
                                   cubit.toggleSongSelection(song.id),
-                              onMorePressed: () => showModalBottomSheet(
+                              onMorePressed: () => showModalBottomSheet<void>(
                                 context: context,
                                 useRootNavigator: true,
                                 isScrollControlled: true,
@@ -1403,7 +1404,7 @@ class _LibraryScreenState extends State<LibraryScreen>
           ),
         );
         try {
-          authCubit.syncNow();
+          unawaited(authCubit.syncNow());
         } catch (_) {}
       }
     } catch (e) {
@@ -1443,7 +1444,7 @@ class _LibraryScreenState extends State<LibraryScreen>
     bool isLoading = false;
     String? errorText;
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useRootNavigator: true,
@@ -1609,7 +1610,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                               );
                               // Trigger cloud sync if authenticated
                               try {
-                                authCubit.syncNow();
+                                unawaited(authCubit.syncNow());
                               } catch (_) {}
                             }
                           } catch (e) {

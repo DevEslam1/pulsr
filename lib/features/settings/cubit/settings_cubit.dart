@@ -3,10 +3,10 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/bloc/base_cubit.dart';
 import '../../../core/constants/channels.dart';
 import '../../../core/constants/prefs_keys.dart';
 import '../../../core/di/injection.dart';
@@ -23,10 +23,9 @@ import '../../player/presentation/widgets/audio_visualizer.dart';
 import 'settings_state.dart';
 
 @singleton
-class SettingsCubit extends Cubit<SettingsState> {
+class SettingsCubit extends PulsrCubit<SettingsState> {
   final MediaScannerService _scannerService;
   final HiResAudioService _hiResAudioService;
-  StreamSubscription<AudioOutputInfo>? _deviceSub;
   static const MethodChannel _proxyChannel = MethodChannel(PulsrChannels.proxy);
 
   static const String _keyGapless = 'setting_gapless';
@@ -102,7 +101,7 @@ class SettingsCubit extends Cubit<SettingsState> {
                 ? getIt<HiResAudioService>()
                 : HiResAudioService()),
         super(const SettingsState()) {
-    _deviceSub = _hiResAudioService.outputDeviceStream.listen((device) {
+    autoSub(_hiResAudioService.outputDeviceStream, (device) {
       if (isClosed) return;
       final savedSampleRate = state.currentOutputDevice?.targetSampleRate ?? 0;
       final savedBitDepth = state.currentOutputDevice?.targetBitDepth ?? 0;
@@ -1120,9 +1119,4 @@ class SettingsCubit extends Cubit<SettingsState> {
         'setting_lookahead_limiter_lookahead_ms', newLookahead);
   }
 
-  @override
-  Future<void> close() {
-    _deviceSub?.cancel();
-    return super.close();
-  }
 }

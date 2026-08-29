@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/di/injection.dart';
@@ -54,14 +55,14 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
     await _folderUseCases.toggleExcludeFolder(path);
     await _loadFolders();
     if (mounted) {
-      context.read<LibraryCubit>().loadFolders();
+      unawaited(context.read<LibraryCubit>().loadFolders());
     }
   }
 
   Future<void> _showAddCustomFolderDialog(
       BuildContext context, PulsrPalette p) async {
     _customPathController.clear();
-    await showDialog(
+    await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: p.surfaceContainer,

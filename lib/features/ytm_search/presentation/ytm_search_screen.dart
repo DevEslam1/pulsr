@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/di/injection.dart';
@@ -146,8 +147,8 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
     final songs = [for (final track in state.results) track.toSongData()];
     return RefreshIndicator(
       onRefresh: () async {
-        cubit.retry();
-        await Future.delayed(const Duration(milliseconds: 300));
+        unawaited(cubit.retry());
+        await Future<void>.delayed(const Duration(milliseconds: 300));
       },
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),
