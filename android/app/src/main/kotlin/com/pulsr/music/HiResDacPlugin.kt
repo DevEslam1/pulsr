@@ -10,6 +10,7 @@ import android.media.AudioDeviceCallback
 import android.media.AudioDeviceInfo
 import android.media.AudioFormat
 import android.media.AudioManager
+import android.media.AudioTrack
 import android.os.Build
 import android.util.Log
 import io.flutter.plugin.common.BinaryMessenger

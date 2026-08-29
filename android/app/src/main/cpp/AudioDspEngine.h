@@ -86,8 +86,38 @@ public:
 
     // Combined pipeline latency (lookahead + resampler group delay + reverb partitioned delay) in frames
     int getPipelineLatencyFrames() const {
-        return limiter_.getLatencyFrames() + resampler_.getLatencyFrames() + reverb_.getReverbLatencyFrames();
+        int latency = 0;
+        auto snap = getParams();
+        if (!snap) return 0;
+        if (snap->limiter.enabled) {
+            latency += limiter_.getLatencyFrames();
+        }
+        if (snap->resampler.enabled) {
+            latency += resampler_.getLatencyFrames();
+        }
+        if (snap->reverb.enabled) {
+            latency += reverb_.getReverbLatencyFrames();
+        }
+        return latency;
     }
+
+    // Auto-Degrade Safety Net: tracks stages bypassed due to budget exhaustion
+    uint32_t getAutoDegradedStages() const { return autoDegradedStages_.load(); }
+    void triggerStageAutoDegrade(uint32_t stageBitmask) { autoDegradedStages_.fetch_or(stageBitmask); }
+    void recoverStageAutoDegrade(uint32_t stageBitmask) { autoDegradedStages_.fetch_and(~stageBitmask); }
+    void clearAutoDegradedStages() {
+        autoDegradedStages_.store(0);
+        degradeConsecutiveBlocks_ = 0;
+        recoveryConsecutiveBlocks_ = 0;
+        rtfCount_ = 0;
+        rtfRingHead_ = 0;
+    }
+
+    // In-Engine Auto-Degrade Nervous System controls & test hooks
+    void setAutoDegradeMonitorEnabled(bool enabled) { autoDegradeMonitorEnabled_.store(enabled); }
+    bool isAutoDegradeMonitorEnabled() const { return autoDegradeMonitorEnabled_.load(); }
+    void setSimulatedBlockRtf(double rtf) { simulatedBlockRtf_.store(rtf); }
+    double getRollingRtf() const { return rollingRtf_.load(); }
 
     int processInterleaved(float* buffer, int frames, int channels = 2);
     void reset();
@@ -99,6 +129,19 @@ private:
     double sampleRate_ = 48000.0;
     std::atomic<uint64_t> snapshotGeneration_{1};
     std::atomic<uint64_t> lastAppliedGeneration_{0};
+    std::atomic<uint32_t> autoDegradedStages_{0};
+
+    // Rolling RTF monitor (zero heap allocation, preallocated fixed ring buffer)
+    static constexpr int kRtfWindowSize = 20;
+    static constexpr int kRtfRecoveryWindowSize = 40;
+    std::atomic<bool> autoDegradeMonitorEnabled_{true};
+    std::atomic<double> simulatedBlockRtf_{-1.0}; // < 0 means measure actual wall-clock
+    std::atomic<double> rollingRtf_{0.0};
+    float rtfRingBuffer_[kRtfWindowSize] = {};
+    int rtfRingHead_ = 0;
+    int rtfCount_ = 0;
+    int degradeConsecutiveBlocks_ = 0;
+    int recoveryConsecutiveBlocks_ = 0;
 
     // Thread-safe immutable parameter snapshot pointer (C++20 atomic shared_ptr)
     AtomicSharedPtr<const DspParamSnapshot> currentParams_;

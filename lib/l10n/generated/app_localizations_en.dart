@@ -1255,4 +1255,27 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dspEngineAuto => 'Automatic (Prefer Native)';
+
+  @override
+  String audioStageDegraded(String stage) {
+    return 'Audio stage \"$stage\" was bypassed to prevent stutter under high load.';
+  }
+
+  @override
+  String get stageEq => 'Parametric EQ';
+
+  @override
+  String get stageReverb => 'Convolution Reverb';
+
+  @override
+  String get stageCrossfeed => 'Crossfeed';
+
+  @override
+  String get stageLimiter => 'Lookahead Limiter';
+
+  @override
+  String get stageResampler => 'Resampler';
+
+  @override
+  String get stagePanner => 'Spatial Panner';
 }

@@ -62,4 +62,25 @@ abstract class PlayerState with _$PlayerState {
     int? audioSessionId,
     String? errorMessage,
   }) = _PlayerState;
+
+  bool get isDspActive =>
+      isVirtualizerEnabled ||
+      isDynamicsEnabled ||
+      isSpatializerEnabled ||
+      isCrossfeedEnabled ||
+      isLimiterEnabled ||
+      isReverbEnabled ||
+      volumeBoost > 0.01;
+
+  int get activeDspStagesCount {
+    int count = 0;
+    if (isVirtualizerEnabled) count++;
+    if (isDynamicsEnabled) count++;
+    if (isSpatializerEnabled) count++;
+    if (isCrossfeedEnabled) count++;
+    if (isLimiterEnabled) count++;
+    if (isReverbEnabled) count++;
+    if (volumeBoost > 0.01) count++;
+    return count;
+  }
 }

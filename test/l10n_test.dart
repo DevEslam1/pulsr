@@ -188,5 +188,32 @@ void main() {
         expect(esJson[key].toString().trim(), isNotEmpty, reason: 'Key $key empty in app_es.arb');
       }
     });
+
+    test('All auto-degrade safety net l10nKeys resolve in app_en.arb, app_ar.arb, app_es.arb', () async {
+      final enJson = jsonDecode(await File('lib/l10n/app_en.arb').readAsString()) as Map<String, dynamic>;
+      final arJson = jsonDecode(await File('lib/l10n/app_ar.arb').readAsString()) as Map<String, dynamic>;
+      final esJson = jsonDecode(await File('lib/l10n/app_es.arb').readAsString()) as Map<String, dynamic>;
+
+      const degradeKeys = [
+        'audioStageDegraded',
+        'stageEq',
+        'stageReverb',
+        'stageCrossfeed',
+        'stageLimiter',
+        'stageResampler',
+        'stagePanner',
+      ];
+
+      for (final key in degradeKeys) {
+        expect(enJson[key], isNotNull, reason: 'Key $key missing from app_en.arb');
+        expect(enJson[key].toString().trim(), isNotEmpty, reason: 'Key $key empty in app_en.arb');
+
+        expect(arJson[key], isNotNull, reason: 'Key $key missing from app_ar.arb');
+        expect(arJson[key].toString().trim(), isNotEmpty, reason: 'Key $key empty in app_ar.arb');
+
+        expect(esJson[key], isNotNull, reason: 'Key $key missing from app_es.arb');
+        expect(esJson[key].toString().trim(), isNotEmpty, reason: 'Key $key empty in app_es.arb');
+      }
+    });
   });
 }

@@ -245,156 +245,371 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           final dspBlockedGlobal = _dspBlockedReason(context);
 
           return Align(
-          alignment: Alignment.bottomCenter,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: Adaptive.sheetConstraints(context).maxWidth,
-              maxHeight: MediaQuery.sizeOf(context).height *
-                  (context.isLandscape ? 0.95 : 0.84),
-            ),
-            child: Material(
-              color: p.surface,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(28)),
-              clipBehavior: Clip.antiAlias,
-              child: SafeArea(
-                top: false,
-                child: Column(
-                  children: [
-                    // Top Handle
-                    const SizedBox(height: 12),
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: p.hairline,
-                          borderRadius: BorderRadius.circular(2),
+            alignment: Alignment.bottomCenter,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: Adaptive.sheetConstraints(context).maxWidth,
+                maxHeight: MediaQuery.sizeOf(context).height *
+                    (context.isLandscape ? 0.95 : 0.84),
+              ),
+              child: Material(
+                color: p.surface,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(28)),
+                clipBehavior: Clip.antiAlias,
+                child: SafeArea(
+                  top: false,
+                  child: Column(
+                    children: [
+                      // Top Handle
+                      const SizedBox(height: 12),
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: p.hairline,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 12),
+                      const SizedBox(height: 12),
 
-                    // Header Title + Global EQ Toggle
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: p.accent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(Icons.graphic_eq_rounded,
-                                color: p.accent, size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: Text(
-                                        'Audio Engine & Effects',
-                                        style: TextStyle(
-                                            fontSize: 17,
-                                            fontWeight: FontWeight.w800,
-                                            color: p.textPrimary),
-                                      ),
-                                    ),
-                                    IconButton(
-                                      icon: Icon(Icons.info_outline_rounded, size: 18, color: p.textTertiary),
-                                      visualDensity: VisualDensity.compact,
-                                      tooltip: 'About Audio Engine',
-                                      onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.equalizer, conflictReason: dspBlockedGlobal),
-                                    ),
-                                  ],
+                      // Separated EQ and DSP Master Toggles
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          children: [
+                            // 1. Equalizer (EQ) Toggle Card
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: state.isEqEnabled
+                                    ? p.accent.withValues(alpha: 0.08)
+                                    : p.surfaceContainer,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: state.isEqEnabled
+                                      ? p.accent.withValues(alpha: 0.35)
+                                      : p.hairline,
                                 ),
-                                Text(
-                                  dspBlockedGlobal != null
-                                      ? 'Blocked: Bit-Perfect bypass active'
-                                      : (state.isEqEnabled
-                                          ? (state.selectedHeadphoneProfile != null
-                                              ? 'Tuned for ${state.selectedHeadphoneProfile!.name}'
-                                              : 'Preset: ${state.eqPreset.name}')
-                                          : 'Audio effects bypassed'),
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      color: dspBlockedGlobal != null ? p.error : p.textTertiary,
-                                      fontWeight: FontWeight.w500),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: state.isEqEnabled
+                                          ? p.accent.withValues(alpha: 0.2)
+                                          : p.surfaceContainerHigh,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      Icons.graphic_eq_rounded,
+                                      color: state.isEqEnabled
+                                          ? p.accent
+                                          : p.textSecondary,
+                                      size: 18,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Text(
+                                              'Equalizer (EQ)',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w700,
+                                                color: p.textPrimary,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 5,
+                                                      vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: state.isEqEnabled
+                                                    ? (dspBlockedGlobal != null
+                                                        ? p.error.withValues(
+                                                            alpha: 0.15)
+                                                        : p.accent.withValues(
+                                                            alpha: 0.2))
+                                                    : p.surfaceContainerHigh,
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                dspBlockedGlobal != null
+                                                    ? 'BLOCKED'
+                                                    : (state.isEqEnabled
+                                                        ? 'ON'
+                                                        : 'OFF'),
+                                                style: TextStyle(
+                                                  fontSize: 9.5,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: dspBlockedGlobal != null
+                                                      ? p.error
+                                                      : (state.isEqEnabled
+                                                          ? p.accent
+                                                          : p.textTertiary),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          dspBlockedGlobal != null
+                                              ? 'Blocked: Bit-Perfect bypass active'
+                                              : (state.isEqEnabled
+                                                  ? (state.selectedHeadphoneProfile !=
+                                                          null
+                                                      ? 'Tuned for ${state.selectedHeadphoneProfile!.name}'
+                                                      : 'Preset: ${state.eqPreset.name}')
+                                                  : 'Equalizer curves bypassed'),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: dspBlockedGlobal != null
+                                                ? p.error
+                                                : p.textTertiary,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(Icons.info_outline_rounded,
+                                        size: 16, color: p.textTertiary),
+                                    visualDensity: VisualDensity.compact,
+                                    tooltip: 'About Equalizer',
+                                    onPressed: () => _showFeatureInfo(
+                                      context,
+                                      AudioFeatureRegistry.equalizer,
+                                      conflictReason: dspBlockedGlobal,
+                                    ),
+                                  ),
+                                  Opacity(
+                                    opacity: dspBlockedGlobal != null &&
+                                            !state.isEqEnabled
+                                        ? 0.45
+                                        : 1.0,
+                                    child: Switch.adaptive(
+                                      value: state.isEqEnabled,
+                                      activeTrackColor: p.accent,
+                                      activeThumbColor: p.onAccent,
+                                      onChanged: dspBlockedGlobal != null &&
+                                              !state.isEqEnabled
+                                          ? null
+                                          : (val) =>
+                                              cubit.setEqualizerEnabled(val),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          Opacity(
-                            opacity: dspBlockedGlobal != null && !state.isEqEnabled ? 0.45 : 1.0,
-                            child: Switch.adaptive(
-                              value: state.isEqEnabled,
-                              activeTrackColor: p.accent,
-                              activeThumbColor: p.onAccent,
-                              onChanged: dspBlockedGlobal != null && !state.isEqEnabled ? null : (val) => cubit.setEqualizerEnabled(val),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
+                            const SizedBox(height: 6),
 
-                    // Tabs Navigation
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Container(
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(19),
-                          border: Border.all(color: p.hairline),
-                        ),
-                        child: TabBar(
-                          controller: _tabController,
-                          tabAlignment: TabAlignment.fill,
-                          indicator: BoxDecoration(
-                            color: p.accent,
-                            borderRadius: BorderRadius.circular(19),
-                          ),
-                          indicatorSize: TabBarIndicatorSize.tab,
-                          labelColor: p.onAccent,
-                          unselectedLabelColor: p.textSecondary,
-                          labelStyle: const TextStyle(
-                              fontWeight: FontWeight.w700, fontSize: 12),
-                          dividerColor: Colors.transparent,
-                          tabs: const [
-                            Tab(text: 'Equalizer'),
-                            Tab(text: 'AutoEq'),
-                            Tab(text: 'Spatial & DSP'),
+                            // 2. DSP & Spatial Effects Toggle Card
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: state.isDspActive
+                                    ? p.accent.withValues(alpha: 0.08)
+                                    : p.surfaceContainer,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: state.isDspActive
+                                      ? p.accent.withValues(alpha: 0.35)
+                                      : p.hairline,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: state.isDspActive
+                                          ? p.accent.withValues(alpha: 0.2)
+                                          : p.surfaceContainerHigh,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      Icons.multitrack_audio_rounded,
+                                      color: state.isDspActive
+                                          ? p.accent
+                                          : p.textSecondary,
+                                      size: 18,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Text(
+                                              'DSP & Spatial Effects',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w700,
+                                                color: p.textPrimary,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 5,
+                                                      vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: state.isDspActive
+                                                    ? (dspBlockedGlobal != null
+                                                        ? p.error.withValues(
+                                                            alpha: 0.15)
+                                                        : p.accent.withValues(
+                                                            alpha: 0.2))
+                                                    : p.surfaceContainerHigh,
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                dspBlockedGlobal != null
+                                                    ? 'BLOCKED'
+                                                    : (state.isDspActive
+                                                        ? 'ON'
+                                                        : 'OFF'),
+                                                style: TextStyle(
+                                                  fontSize: 9.5,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: dspBlockedGlobal != null
+                                                      ? p.error
+                                                      : (state.isDspActive
+                                                          ? p.accent
+                                                          : p.textTertiary),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          dspBlockedGlobal != null
+                                              ? 'Blocked: Bit-Perfect bypass active'
+                                              : (state.isDspActive
+                                                  ? '${state.activeDspStagesCount} active effects (Reverb, Limiter...)'
+                                                  : 'All DSP effects bypassed'),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: dspBlockedGlobal != null
+                                                ? p.error
+                                                : p.textTertiary,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(Icons.info_outline_rounded,
+                                        size: 16, color: p.textTertiary),
+                                    visualDensity: VisualDensity.compact,
+                                    tooltip: 'About DSP Engine',
+                                    onPressed: () => _showFeatureInfo(
+                                      context,
+                                      AudioFeatureRegistry.spatializer,
+                                      conflictReason: dspBlockedGlobal,
+                                    ),
+                                  ),
+                                  Opacity(
+                                    opacity: dspBlockedGlobal != null &&
+                                            !state.isDspActive
+                                        ? 0.45
+                                        : 1.0,
+                                    child: Switch.adaptive(
+                                      value: state.isDspActive,
+                                      activeTrackColor: p.accent,
+                                      activeThumbColor: p.onAccent,
+                                      onChanged: dspBlockedGlobal != null &&
+                                              !state.isDspActive
+                                          ? null
+                                          : (val) =>
+                                              cubit.setDspEffectsEnabled(val),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
+                      const SizedBox(height: 10),
 
-                    // Tab Content
-                    Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildEqualizerTab(context, cubit, state, p),
-                          _buildAutoEqTab(context, cubit, state, p),
-                          _buildSpatialDynamicsTab(context, cubit, state, p),
-                        ],
+                      // Tabs Navigation
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Container(
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: p.surfaceContainer,
+                            borderRadius: BorderRadius.circular(19),
+                            border: Border.all(color: p.hairline),
+                          ),
+                          child: TabBar(
+                            controller: _tabController,
+                            tabAlignment: TabAlignment.fill,
+                            indicator: BoxDecoration(
+                              color: p.accent,
+                              borderRadius: BorderRadius.circular(19),
+                            ),
+                            indicatorSize: TabBarIndicatorSize.tab,
+                            labelColor: p.onAccent,
+                            unselectedLabelColor: p.textSecondary,
+                            labelStyle: const TextStyle(
+                                fontWeight: FontWeight.w700, fontSize: 12),
+                            dividerColor: Colors.transparent,
+                            tabs: const [
+                              Tab(text: 'Equalizer'),
+                              Tab(text: 'AutoEq'),
+                              Tab(text: 'Spatial & DSP'),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+
+                      // Tab Content
+                      Expanded(
+                        child: TabBarView(
+                          controller: _tabController,
+                          children: [
+                            _buildEqualizerTab(context, cubit, state, p),
+                            _buildAutoEqTab(context, cubit, state, p),
+                            _buildSpatialDynamicsTab(context, cubit, state, p),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        );
+          );
         },
       ),
     );

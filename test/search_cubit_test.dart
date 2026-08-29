@@ -65,7 +65,7 @@ void main() {
       );
 
       cubit.onQueryChanged('Beat');
-      await Future.delayed(const Duration(milliseconds: 300));
+      await Future.delayed(const Duration(milliseconds: 350));
 
       expect(cubit.state.query, equals('Beat'));
       expect(cubit.state.results.length, equals(1));

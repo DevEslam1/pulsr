@@ -1,7 +1,7 @@
 package com.pulsr.music
 
 open class PoTokenException(message: String, cause: Throwable? = null) : Exception(message, cause) {
-    class WebViewUnavailable(message: String = "System WebView is unavailable or damaged", cause: Throwable? = null) : PoTokenException(message, cause)
+    open class WebViewUnavailable(message: String = "System WebView is unavailable or damaged", cause: Throwable? = null) : PoTokenException(message, cause)
     class JsError(message: String, cause: Throwable? = null) : PoTokenException(message, cause)
     class Timeout(message: String = "PoToken generation timed out", cause: Throwable? = null) : PoTokenException(message, cause)
     class Invalidated(message: String = "PoToken state was invalidated due to bot signal", cause: Throwable? = null) : PoTokenException(message, cause)

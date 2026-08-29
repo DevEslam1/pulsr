@@ -449,5 +449,12 @@
   "dspEnginePreferenceSubtitle": "اختر محرك الاستوديو المدمج أو مؤثرات النظام الأصلية",
   "dspEngineNative": "محرك DSP استوديو مدمج (بدون تأخير)",
   "dspEngineOem": "مؤثرات نظام الجهاز / OEM",
-  "dspEngineAuto": "تلقائي (تفضيل المدمج)"
+  "dspEngineAuto": "تلقائي (تفضيل المدمج)",
+  "audioStageDegraded": "تم تجاوز مرحلة الصوت \"{stage}\" لمنع التقطيع بسبب الحمل العالي.",
+  "stageEq": "معادل الصوت البارامتري",
+  "stageReverb": "صدى الالتفاف",
+  "stageCrossfeed": "التغذية المتقاطعة",
+  "stageLimiter": "محدد الذروة الاستباقي",
+  "stageResampler": "إعادة تشكيل العينات",
+  "stagePanner": "التوجيه المكاني"
 }

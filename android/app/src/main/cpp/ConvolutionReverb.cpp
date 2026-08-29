@@ -547,7 +547,6 @@ void ConvolutionReverb::preparePartitions() {
     // B-06: RT-alloc guard — cap effective partitions to preallocated max (2048) to avoid
     // unbounded allocation on the audio thread (Cathedral@768k = 7500 partitions → 245MB).
     // Synthetic creation is already capped, but custom or stale cached IR may still exceed.
-    const int effectivePartitions = std::min(preparedIr_->numPartitions, MAX_PREALLOC_PARTITIONS);
     if (preparedIr_->numPartitions > MAX_PREALLOC_PARTITIONS) {
         // A3 (N-02): Log warning when partitions exceed max preallocated cap
 #if defined(__ANDROID__)

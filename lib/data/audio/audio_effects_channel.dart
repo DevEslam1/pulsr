@@ -1,4 +1,5 @@
 // lib/data/audio/audio_effects_channel.dart
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import '../../core/constants/channels.dart';
@@ -542,6 +543,41 @@ class AudioEffectsChannel {
       ErrorLogger.log('Failed to resync DSP for track ($sampleRate Hz)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
     }
+  }
+
+  /// Configures native synthetic IR LRU cache budget (16MB on low RAM devices, 64MB default).
+  Future<void> setCacheBudgetBytes(int budgetBytes) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('setCacheBudgetBytes', {'budgetBytes': budgetBytes});
+    } catch (_) {}
+  }
+
+  /// Gets the current bitmask of auto-degraded stages from the native DSP engine.
+  Future<int> getAutoDegradedStages() async {
+    if (!Platform.isAndroid) return 0;
+    try {
+      final res = await _channel.invokeMethod<int>('getAutoDegradedStages');
+      final stages = res ?? 0;
+      _handleAutoDegradeTransition(stages);
+      return stages;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  final _autoDegradeStreamController = StreamController<int>.broadcast();
+  int _lastKnownDegradedStages = 0;
+
+  /// Stream that emits the auto-degraded stage mask EXACTLY ONCE per 0 -> nonzero transition.
+  /// No spam within the same degraded session; re-notifies only after full recovery to 0.
+  Stream<int> get onAutoDegradedSessionStarted => _autoDegradeStreamController.stream;
+
+  void _handleAutoDegradeTransition(int currentStages) {
+    if (_lastKnownDegradedStages == 0 && currentStages != 0) {
+      _autoDegradeStreamController.add(currentStages);
+    }
+    _lastKnownDegradedStages = currentStages;
   }
 
   /// Retrieves internal DSP status for assertions/testing.

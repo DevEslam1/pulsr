@@ -49,6 +49,7 @@ object ProxyManager {
 
     @Volatile
     var pinnedIpFamily: String? = null // "ipv4" or "ipv6"
+        private set
 
     fun setPinnedIpFamily(family: String?) {
         pinnedIpFamily = family?.lowercase()?.trim()

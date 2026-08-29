@@ -2,9 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:audio_service/audio_service.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
+import 'package:rxdart/rxdart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/bloc/base_cubit.dart';
 import '../../../core/constants/prefs_keys.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/lrclib_service.dart';
@@ -43,7 +44,7 @@ class _QueueSlotData {
 }
 
 @singleton
-class PlayerCubit extends Cubit<PlayerState> {
+class PlayerCubit extends PulsrCubit<PlayerState> {
   static const int _maxQueueSize = 500;
   static const Duration _scrobbleInterval = Duration(seconds: 5);
 
@@ -55,15 +56,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   final ScrobblerService? _scrobblerService;
   final PlaybackLatencyTracker? _latencyTracker;
 
-  StreamSubscription? _mediaItemSub;
-  StreamSubscription? _playbackStateSub;
-  StreamSubscription? _positionSub;
-  StreamSubscription? _queueSub;
-  StreamSubscription? _settingsSub;
   StreamSubscription? _widgetClickSub;
-  StreamSubscription? _sleepTimerSub;
-  StreamSubscription? _audioSessionIdSub;
-  StreamSubscription? _errorSub;
   DateTime? _lastWidgetUpdateTime;
   int _mediaItemResolutionGen = 0;
 
@@ -116,7 +109,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   }
 
   void _syncAudioEffects() {
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       isEqEnabled: _audioHandler.isEqualizerEnabled,
       eqPreset: _audioHandler.currentPreset,
       isVirtualizerEnabled: _audioHandler.isVirtualizerEnabled,
@@ -145,7 +138,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   }
 
   void clearError() {
-    emit(state.copyWith(errorMessage: null));
+    safeEmit(state.copyWith(errorMessage: null));
   }
 
   void _listenToSettings() {
@@ -156,7 +149,7 @@ class PlayerCubit extends Cubit<PlayerState> {
             milliseconds:
                 (settingsCubit.state.crossfadeSeconds * 1000).round()),
       );
-      _settingsSub = settingsCubit.stream.listen((settingsState) {
+      autoSub(settingsCubit.stream, (settingsState) {
         _audioHandler.setCrossfadeDuration(
           Duration(
               milliseconds: (settingsState.crossfadeSeconds * 1000).round()),
@@ -191,7 +184,7 @@ class PlayerCubit extends Cubit<PlayerState> {
     } catch (e, st) {
       ErrorLogger.log('Failed to persist queue slots',
           error: e, stackTrace: st, category: 'PlayerCubit');
-      if (!isClosed) emit(state.copyWith(errorMessage: 'Failed to save queue'));
+      if (!isClosed) safeEmit(state.copyWith(errorMessage: 'Failed to save queue'));
     }
   }
 
@@ -301,7 +294,7 @@ class PlayerCubit extends Cubit<PlayerState> {
             break;
           case 'open':
           case 'main':
-            emit(state.copyWith(isExpanded: true));
+            safeEmit(state.copyWith(isExpanded: true));
             break;
         }
       }
@@ -377,7 +370,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   }
 
   void _listenToAudioService() {
-    _mediaItemSub = _audioHandler.mediaItem.listen((item) async {
+    autoSub(_audioHandler.mediaItem, (item) async {
       if (item != null) {
         final gen = ++_mediaItemResolutionGen;
         final id = int.tryParse(item.id);
@@ -424,7 +417,7 @@ class PlayerCubit extends Cubit<PlayerState> {
                         : state.duration);
             final isSameSong = state.currentSong?.id == resolvedSong!.id;
 
-            emit(
+            safeEmit(
               state.copyWith(
                 currentSong: resolvedSong,
                 duration: duration,
@@ -447,16 +440,14 @@ class PlayerCubit extends Cubit<PlayerState> {
       }
     });
 
-    _errorSub = _audioHandler.errorStream.listen((err) {
+    autoSub(_audioHandler.errorStream, (err) {
       try {
         _latencyTracker?.finishWithError(err, stage: PlaybackStage.playing);
       } catch (_) {}
-      if (!isClosed) {
-        emit(state.copyWith(errorMessage: err));
-      }
+      safeEmit(state.copyWith(errorMessage: err));
     });
 
-    _queueSub = _audioHandler.queue.listen((mediaItems) async {
+    autoSub(_audioHandler.queue, (mediaItems) async {
       if (mediaItems.isNotEmpty &&
           (state.queue.isEmpty || state.queue.length != mediaItems.length)) {
         final ids =
@@ -491,12 +482,12 @@ class PlayerCubit extends Cubit<PlayerState> {
           }
         }
         if (restoredSongs.isNotEmpty && !isClosed) {
-          emit(state.copyWith(queue: restoredSongs));
+          safeEmit(state.copyWith(queue: restoredSongs));
         }
       }
     });
 
-    _playbackStateSub = _audioHandler.playbackState.listen((playbackState) {
+    autoSub(_audioHandler.playbackState, (playbackState) {
       final isCompleted =
           playbackState.processingState == AudioProcessingState.completed;
       final repeat = switch (playbackState.repeatMode) {
@@ -520,7 +511,7 @@ class PlayerCubit extends Cubit<PlayerState> {
       }
       final effectivePos = isCompleted ? Duration.zero : playbackState.position;
 
-      emit(
+      safeEmit(
         state.copyWith(
           isPlaying: isPlaying,
           position: effectivePos,
@@ -541,25 +532,26 @@ class PlayerCubit extends Cubit<PlayerState> {
       }
     });
 
-    _positionSub = _audioHandler.positionStream
-        .distinct((a, b) => (a.inMilliseconds - b.inMilliseconds).abs() < 100)
-        .listen((pos) {
-      emit(state.copyWith(position: pos));
-      if (state.isPlaying) {
-        _updateWidgetProgressThrottled();
-      }
-    });
+    autoSub(
+      _audioHandler.positionStream
+          .throttleTime(const Duration(milliseconds: 100), trailing: true),
+      (pos) {
+        safeEmit(state.copyWith(position: pos));
+        if (state.isPlaying) {
+          _updateWidgetProgressThrottled();
+        }
+      },
+    );
 
-    _sleepTimerSub =
-        _audioHandler.sleepTimerRemainingStream.listen((remaining) {
-      emit(state.copyWith(sleepTimerRemaining: remaining));
+    autoSub(_audioHandler.sleepTimerRemainingStream, (remaining) {
+      safeEmit(state.copyWith(sleepTimerRemaining: remaining));
     });
 
     if (_audioHandler.currentAudioSessionId != null) {
-      emit(state.copyWith(audioSessionId: _audioHandler.currentAudioSessionId));
+      safeEmit(state.copyWith(audioSessionId: _audioHandler.currentAudioSessionId));
     }
-    _audioSessionIdSub = _audioHandler.audioSessionIdStream.listen((id) {
-      emit(state.copyWith(audioSessionId: id));
+    autoSub(_audioHandler.audioSessionIdStream, (id) {
+      safeEmit(state.copyWith(audioSessionId: id));
     });
   }
 
@@ -584,14 +576,14 @@ class PlayerCubit extends Cubit<PlayerState> {
           !isClosed &&
           gen == _mediaItemResolutionGen &&
           state.currentSong?.id == updated.id) {
-        emit(state.copyWith(currentSong: updated));
+        safeEmit(state.copyWith(currentSong: updated));
       }
     } catch (_) {}
   }
 
   Future<void> _loadLyricsForSong(SongsTableData song) async {
     if (isClosed) return;
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       isLoadingLyrics: true,
       lyrics: [],
       lyricsSource: LyricsSource.none,
@@ -635,7 +627,7 @@ class PlayerCubit extends Cubit<PlayerState> {
     }
 
     if (isClosed || state.currentSong?.id != song.id) return;
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       isLoadingLyrics: false,
       lyrics: lyricsResult?.lines ?? [],
       lyricsSource: lyricsResult?.source ?? LyricsSource.none,
@@ -715,7 +707,7 @@ class PlayerCubit extends Cubit<PlayerState> {
     );
     _debouncedPersistQueueSlots();
 
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       queue: effectiveQueue,
       currentIndex: effectiveIndex,
       currentSong: targetSong,
@@ -747,7 +739,7 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   Future<void> playNext(SongsTableData song) async {
     if (state.queue.length >= _maxQueueSize) {
-      emit(state.copyWith(errorMessage: 'Queue full ($_maxQueueSize) — cannot add more'));
+      safeEmit(state.copyWith(errorMessage: 'Queue full ($_maxQueueSize) — cannot add more'));
       return;
     }
     await _audioHandler.insertNextInQueue(song);
@@ -761,12 +753,12 @@ class PlayerCubit extends Cubit<PlayerState> {
       speed: state.playbackSpeed,
     );
     _debouncedPersistQueueSlots();
-    emit(state.copyWith(queue: updatedQueue));
+    safeEmit(state.copyWith(queue: updatedQueue));
   }
 
   Future<void> addToQueue(SongsTableData song) async {
     if (state.queue.length >= _maxQueueSize) {
-      emit(state.copyWith(errorMessage: 'Queue full ($_maxQueueSize) — cannot add more'));
+      safeEmit(state.copyWith(errorMessage: 'Queue full ($_maxQueueSize) — cannot add more'));
       return;
     }
     await _audioHandler.addToQueueEnd(song);
@@ -778,7 +770,7 @@ class PlayerCubit extends Cubit<PlayerState> {
       speed: state.playbackSpeed,
     );
     _debouncedPersistQueueSlots();
-    emit(state.copyWith(queue: updatedQueue));
+    safeEmit(state.copyWith(queue: updatedQueue));
   }
 
   Future<void> reorderQueue(int oldIndex, int newIndex) async {
@@ -794,7 +786,7 @@ class PlayerCubit extends Cubit<PlayerState> {
       speed: state.playbackSpeed,
     );
     _debouncedPersistQueueSlots();
-    emit(state.copyWith(queue: updatedQueue));
+    safeEmit(state.copyWith(queue: updatedQueue));
   }
 
   Future<void> removeQueueItem(int index) async {
@@ -808,7 +800,7 @@ class PlayerCubit extends Cubit<PlayerState> {
       speed: state.playbackSpeed,
     );
     _debouncedPersistQueueSlots();
-    emit(state.copyWith(queue: updatedQueue));
+    safeEmit(state.copyWith(queue: updatedQueue));
   }
 
   bool _isSwitchingSlot = false;
@@ -837,7 +829,7 @@ class PlayerCubit extends Cubit<PlayerState> {
       _debouncedPersistQueueSlots();
 
       if (validSongs.isEmpty) {
-        emit(state.copyWith(
+        safeEmit(state.copyWith(
           activeQueueSlot: slot,
           queue: [],
           errorMessage: 'Queue slot is empty',
@@ -845,11 +837,11 @@ class PlayerCubit extends Cubit<PlayerState> {
         return;
       }
 
-      emit(state.copyWith(activeQueueSlot: slot, queue: validSongs));
+      safeEmit(state.copyWith(activeQueueSlot: slot, queue: validSongs));
 
       final safeIdx = targetSlot.currentIndex.clamp(0, validSongs.length - 1);
       final song = validSongs[safeIdx];
-      emit(state.copyWith(
+      safeEmit(state.copyWith(
         currentIndex: safeIdx,
         currentSong: song,
         duration: Duration(milliseconds: song.durationMs),
@@ -864,7 +856,7 @@ class PlayerCubit extends Cubit<PlayerState> {
       );
       if (!wasPlaying) {
         await _audioHandler.pause();
-        emit(state.copyWith(isPlaying: false));
+        safeEmit(state.copyWith(isPlaying: false));
       }
       _loadLyricsForSong(song);
     } finally {
@@ -894,7 +886,7 @@ class PlayerCubit extends Cubit<PlayerState> {
     _debouncedPersistQueueSlots();
 
     if (state.queue.any((s) => s.id == oldId)) {
-      emit(state.copyWith(
+      safeEmit(state.copyWith(
         queue: state.queue.map((s) => s.id == oldId ? newSong : s).toList(),
         currentSong:
             state.currentSong?.id == oldId ? newSong : state.currentSong,
@@ -939,7 +931,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   Future<void> toggleFavorite(int songId) async {
     final result = await _toggleFavoriteUseCase(songId);
     result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
+      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
       (isFav) {
         // Propagate to queue so SongTile favorite stars update immediately
         final updatedQueue = state.queue
@@ -953,7 +945,7 @@ class PlayerCubit extends Cubit<PlayerState> {
               speed: v.speed,
             ));
         if (state.currentSong != null && state.currentSong!.id == songId) {
-          emit(
+          safeEmit(
             state.copyWith(
               currentSong: state.currentSong!.copyWith(isFavorite: isFav),
               queue: updatedQueue,
@@ -962,7 +954,7 @@ class PlayerCubit extends Cubit<PlayerState> {
           );
           _updateWidgetThrottled(force: true);
         } else if (updatedQueue != state.queue) {
-          emit(state.copyWith(queue: updatedQueue, errorMessage: null));
+          safeEmit(state.copyWith(queue: updatedQueue, errorMessage: null));
         }
       },
     );
@@ -981,7 +973,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   bool _guardDsp(String feature, {bool showError = true}) {
     final reason = _dspBlockedReason();
     if (reason != null) {
-      if (showError) emit(state.copyWith(errorMessage: '$feature blocked: $reason'));
+      if (showError) safeEmit(state.copyWith(errorMessage: '$feature blocked: $reason'));
       return false;
     }
     return true;
@@ -990,13 +982,13 @@ class PlayerCubit extends Cubit<PlayerState> {
   // Equalizer & Audio Effects
   Future<void> setEqualizerEnabled(bool enabled) async {
     if (enabled && !_guardDsp('EQ')) return;
-    emit(state.copyWith(isEqEnabled: enabled, errorMessage: null));
+    safeEmit(state.copyWith(isEqEnabled: enabled, errorMessage: null));
     await _audioHandler.setEqualizerEnabled(enabled);
   }
 
   Future<void> applyPreset(EqPreset preset) async {
     if (!_guardDsp('Preset')) return;
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       isEqEnabled: true,
       eqPreset: preset,
       selectedHeadphoneProfile: null,
@@ -1009,7 +1001,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   Future<void> applyHeadphoneProfile(HeadphoneProfile? profile) async {
     if (profile != null && !_guardDsp('AutoEQ')) return;
     if (profile != null) {
-      emit(state.copyWith(
+      safeEmit(state.copyWith(
         isEqEnabled: true,
         eqPreset: EqPreset(
           name: profile.name,
@@ -1021,7 +1013,7 @@ class PlayerCubit extends Cubit<PlayerState> {
       ));
       await _audioHandler.setEqualizerEnabled(true);
     } else {
-      emit(state.copyWith(
+      safeEmit(state.copyWith(
         eqPreset: EqPreset.defaultPresets.first,
         selectedHeadphoneProfile: null,
       ));
@@ -1036,7 +1028,7 @@ class PlayerCubit extends Cubit<PlayerState> {
     if (bandIndex >= 0 && bandIndex < gains.length) {
       final hadProfile = state.selectedHeadphoneProfile != null;
       gains[bandIndex] = clamped;
-      emit(state.copyWith(
+      safeEmit(state.copyWith(
         eqPreset: EqPreset(
           name: 'Custom',
           gains: gains,
@@ -1049,7 +1041,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   }
 
   Future<void> resetToFlat() async {
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       eqPreset: EqPreset.defaultPresets.first,
       selectedHeadphoneProfile: null,
     ));
@@ -1067,7 +1059,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   Future<void> setBassBoost(double amount) async {
     if (amount > 0.01 && !_guardDsp('Bass Boost')) return;
     final clamped = amount.clamp(0.0, 1.0);
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       eqPreset: EqPreset(
           name: state.eqPreset.name,
           gains: state.eqPreset.gains,
@@ -1079,14 +1071,14 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   Future<void> set32BandMode(bool enabled) async {
     await _audioHandler.set32BandMode(enabled);
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       eqPreset: _audioHandler.currentPreset,
     ));
   }
 
   Future<void> switchComparisonSlot(ComparisonSlot slot) async {
     await _audioHandler.switchComparisonSlot(slot);
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       eqPreset: _audioHandler.currentPreset,
     ));
   }
@@ -1096,7 +1088,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   Future<bool> importPresetFromJson(String jsonStr) async {
     final ok = await _audioHandler.importPresetFromJson(jsonStr);
     if (ok) {
-      emit(state.copyWith(
+      safeEmit(state.copyWith(
         eqPreset: _audioHandler.currentPreset,
       ));
     }
@@ -1105,20 +1097,20 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   Future<void> setVirtualizerEnabled(bool enabled) async {
     if (enabled && !_guardDsp('Virtualizer')) return;
-    emit(state.copyWith(isVirtualizerEnabled: enabled, errorMessage: null));
+    safeEmit(state.copyWith(isVirtualizerEnabled: enabled, errorMessage: null));
     await _audioHandler.setVirtualizerEnabled(enabled);
   }
 
   Future<void> setVirtualizerStrength(double strength) async {
     if (!_guardDsp('Virtualizer', showError: false)) return;
-    emit(state.copyWith(virtualizerStrength: strength));
+    safeEmit(state.copyWith(virtualizerStrength: strength));
     await _audioHandler.setVirtualizerStrength(strength);
   }
 
   Future<void> setDynamicsPreset(DynamicsPreset preset, {bool? enabled}) async {
     final isEnabled = enabled ?? (preset != DynamicsPreset.off);
     if (isEnabled && !_guardDsp('Dynamics')) return;
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       dynamicsPreset: preset,
       isDynamicsEnabled: isEnabled,
       errorMessage: null,
@@ -1128,10 +1120,47 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   Future<void> toggleDynamicsBypass() async {
     await _audioHandler.toggleDynamicsBypass();
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       isDynamicsEnabled: !_audioHandler.isDynamicsBypassed &&
           state.dynamicsPreset != DynamicsPreset.off,
     ));
+  }
+
+  Future<void> setDspEffectsEnabled(bool enabled) async {
+    if (enabled && !_guardDsp('DSP Engine')) return;
+    if (!enabled) {
+      safeEmit(state.copyWith(
+        isSpatializerEnabled: false,
+        isVirtualizerEnabled: false,
+        isDynamicsEnabled: false,
+        isCrossfeedEnabled: false,
+        isLimiterEnabled: false,
+        isReverbEnabled: false,
+        volumeBoost: 0.0,
+      ));
+      await _audioHandler.setSpatializerEnabled(false);
+      await _audioHandler.setVirtualizerEnabled(false);
+      await _audioHandler.setDynamicsPreset(DynamicsPreset.off, enabled: false);
+      await _audioHandler.setCrossfeed(false);
+      await _audioHandler.setLookaheadLimiter(false);
+      await _audioHandler.setReverb(false);
+      await _audioHandler.setVolumeBoost(0.0);
+    } else {
+      safeEmit(state.copyWith(
+        isLimiterEnabled: true,
+        isDynamicsEnabled: true,
+        dynamicsPreset: state.dynamicsPreset == DynamicsPreset.off
+            ? DynamicsPreset.studioPunch
+            : state.dynamicsPreset,
+      ));
+      await _audioHandler.setLookaheadLimiter(true);
+      await _audioHandler.setDynamicsPreset(
+        state.dynamicsPreset == DynamicsPreset.off
+            ? DynamicsPreset.studioPunch
+            : state.dynamicsPreset,
+        enabled: true,
+      );
+    }
   }
 
   Future<void> setVolumeBoost(double value) async {
@@ -1142,14 +1171,14 @@ class PlayerCubit extends Cubit<PlayerState> {
     if ((preampDb + safeValue * 10.0) > 6.0) {
       safeValue = ((6.0 - preampDb) / 10.0).clamp(0.0, 1.0);
     }
-    emit(state.copyWith(volumeBoost: safeValue, errorMessage: null));
+    safeEmit(state.copyWith(volumeBoost: safeValue, errorMessage: null));
     await _audioHandler.setVolumeBoost(safeValue);
   }
 
   Future<void> setSpatializerEnabled(bool enabled) async {
     if (enabled && !_guardDsp('Spatializer')) return;
     await _audioHandler.setSpatializerEnabled(enabled);
-    emit(state.copyWith(isSpatializerEnabled: enabled, errorMessage: null));
+    safeEmit(state.copyWith(isSpatializerEnabled: enabled, errorMessage: null));
   }
 
   // --- NATIVE DSP METHODS ---
@@ -1157,7 +1186,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   Future<void> setCrossfeed(bool enabled,
       {double? delayUs, double? feedDb}) async {
     if (enabled && !_guardDsp('Crossfeed')) return;
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       isCrossfeedEnabled: enabled,
       crossfeedDelayUs: delayUs ?? state.crossfeedDelayUs,
       crossfeedFeedDb: feedDb ?? state.crossfeedFeedDb,
@@ -1169,7 +1198,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   Future<void> setLookaheadLimiter(bool enabled,
       {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {
     if (enabled && !_guardDsp('Limiter')) return;
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       isLimiterEnabled: enabled,
       limiterThresholdDb: thresholdDb ?? state.limiterThresholdDb,
       limiterReleaseMs: releaseMs ?? state.limiterReleaseMs,
@@ -1183,7 +1212,7 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {
     if (enabled && !_guardDsp('Reverb')) return;
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       isReverbEnabled: enabled,
       reverbPreset: preset ?? state.reverbPreset,
       reverbWetDry: wetDry ?? state.reverbWetDry,
@@ -1193,7 +1222,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   }
 
   Future<void> loadCustomImpulseResponse(List<double> irSamples) async {
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       isReverbEnabled: true,
       reverbPreset: 4, // Custom
     ));
@@ -1203,19 +1232,19 @@ class PlayerCubit extends Cubit<PlayerState> {
   Future<void> setStereoBalance(double balance) async {
     if (balance.abs() > 0.01 && !_guardDsp('Stereo Balance', showError: false)) return;
     final clamped = balance.clamp(-1.0, 1.0);
-    emit(state.copyWith(stereoBalance: clamped));
+    safeEmit(state.copyWith(stereoBalance: clamped));
     await _audioHandler.setStereoBalance(clamped);
   }
 
   Future<void> setMonoMix(bool mono) async {
     if (mono && !_guardDsp('Mono Mix')) return;
-    emit(state.copyWith(monoMix: mono, errorMessage: null));
+    safeEmit(state.copyWith(monoMix: mono, errorMessage: null));
     await _audioHandler.setMonoMix(mono);
   }
 
   Future<void> setSincResampler(bool enabled) async {
     if (enabled && !_guardDsp('Resampler', showError: false)) return;
-    emit(state.copyWith(isSincResamplerEnabled: enabled));
+    safeEmit(state.copyWith(isSincResamplerEnabled: enabled));
     await _audioHandler.setSincResampler(enabled);
   }
 
@@ -1223,31 +1252,31 @@ class PlayerCubit extends Cubit<PlayerState> {
   void startSleepTimer(int minutes) {
     final duration = Duration(minutes: minutes);
     _audioHandler.startSleepTimer(duration);
-    emit(state.copyWith(sleepTimerRemaining: duration));
+    safeEmit(state.copyWith(sleepTimerRemaining: duration));
   }
 
   void startAbsoluteSleepTimer(DateTime stopTime) {
     _audioHandler.startAbsoluteSleepTimer(stopTime);
     final diff = stopTime.difference(DateTime.now());
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
         sleepTimerRemaining:
             diff.isNegative ? diff + const Duration(days: 1) : diff));
   }
 
   void startEndOfTrackTimer() {
     _audioHandler.startEndOfTrackTimer();
-    emit(state.copyWith(sleepTimerRemaining: const Duration(minutes: 1)));
+    safeEmit(state.copyWith(sleepTimerRemaining: const Duration(minutes: 1)));
   }
 
   void startAfterNTracksTimer(int trackCount) {
     _audioHandler.startAfterNTracksTimer(trackCount);
-    emit(
+    safeEmit(
         state.copyWith(sleepTimerRemaining: Duration(minutes: trackCount * 3)));
   }
 
   void cancelSleepTimer() {
     _audioHandler.cancelSleepTimer();
-    emit(state.copyWith(sleepTimerRemaining: null));
+    safeEmit(state.copyWith(sleepTimerRemaining: null));
   }
 
   // Playback Speed
@@ -1256,7 +1285,7 @@ class PlayerCubit extends Cubit<PlayerState> {
       final prefs = await SharedPreferences.getInstance();
       final speed = prefs.getDouble(PrefsKeys.playbackSpeed) ?? 1.0;
       await _audioHandler.setSpeed(speed);
-      emit(state.copyWith(playbackSpeed: speed));
+      safeEmit(state.copyWith(playbackSpeed: speed));
     } catch (e, st) {
       ErrorLogger.log('Failed to load playback speed from SharedPreferences',
           error: e, stackTrace: st, category: 'PlayerCubit');
@@ -1265,7 +1294,7 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   Future<void> setPlaybackSpeed(double speed) async {
     await _audioHandler.setSpeed(speed);
-    emit(state.copyWith(playbackSpeed: speed));
+    safeEmit(state.copyWith(playbackSpeed: speed));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(PrefsKeys.playbackSpeed, speed);
     _queueSlots[state.activeQueueSlot] = _QueueSlotData(
@@ -1290,14 +1319,14 @@ class PlayerCubit extends Cubit<PlayerState> {
 
   // Overlay toggles (Lyrics / Queue)
   void toggleLyricsVisibility() {
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       isLyricsVisible: !state.isLyricsVisible,
       isQueueVisible: false,
     ));
   }
 
   void toggleQueueVisibility() {
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       isQueueVisible: !state.isQueueVisible,
       isLyricsVisible: false,
     ));
@@ -1307,15 +1336,7 @@ class PlayerCubit extends Cubit<PlayerState> {
   Future<void> close() {
     _persistQueueDebounce?.cancel();
     _scrobbleDebounce?.cancel();
-    _mediaItemSub?.cancel();
-    _queueSub?.cancel();
-    _errorSub?.cancel();
-    _playbackStateSub?.cancel();
-    _positionSub?.cancel();
-    _settingsSub?.cancel();
     _widgetClickSub?.cancel();
-    _sleepTimerSub?.cancel();
-    _audioSessionIdSub?.cancel();
     return super.close();
   }
 }

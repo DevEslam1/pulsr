@@ -171,7 +171,28 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeProcessAudio(buffer: FloatArray, frames: Int, channels: Int): Int
     private external fun nativeDecodeDsd(dsdL: ByteArray, dsdR: ByteArray, byteCount: Int, dsdRate: Int, targetPcmSampleRate: Int, bitOrder: Int): FloatArray?
     private external fun nativeSetActiveStages(bitmask: Int)
+    private external fun nativeSetCacheBudgetBytes(budgetBytes: Long)
+    private external fun nativeGetAutoDegradedStages(): Int
     private external fun nativeReset()
+
+    fun configureNativeMemoryBudget(ctx: Context) {
+        if (!isNativeDspLoaded) return
+        try {
+            val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
+            val memoryInfo = android.app.ActivityManager.MemoryInfo()
+            am?.getMemoryInfo(memoryInfo)
+            val isLowRam = am?.isLowRamDevice == true || (memoryInfo.totalMem > 0 && memoryInfo.totalMem < 4L * 1024 * 1024 * 1024)
+            // Low-RAM budget (<=4GB total device RAM or isLowRamDevice) is set to 16MB.
+            // 16MB comfortably fits the active synthetic IR (~10MB for Cathedral) + 1 cached preset.
+            // Inactive presets are evicted and regenerated on-demand (~2-5ms CPU cost upon preset switch).
+            // Tradeoff: Memory footprint strictly constrained (<48MB peak RSS) at the cost of transient on-demand CPU synthesis.
+            val budgetBytes = if (isLowRam) 16L * 1024 * 1024 else 64L * 1024 * 1024
+            nativeSetCacheBudgetBytes(budgetBytes)
+            Log.i(TAG, "Configured Native IR cache budget: ${budgetBytes / (1024 * 1024)} MB (isLowRam=$isLowRam)")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to configure native memory budget: ${e.message}")
+        }
+    }
 
     private var activeDspStages: Int = STAGE_EQ or STAGE_CROSSFEED or STAGE_REVERB or STAGE_PANNER or STAGE_LIMITER or STAGE_RESAMPLER
 
@@ -434,6 +455,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         context = binding.applicationContext
         methodChannel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME)
         methodChannel.setMethodCallHandler(this)
+        configureNativeMemoryBudget(binding.applicationContext)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val audioManager = binding.applicationContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
@@ -876,6 +898,32 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     }
                 }
 
+                "setCacheBudgetBytes" -> {
+                    val bytes = (call.argument<Number>("budgetBytes"))?.toLong() ?: (64L * 1024 * 1024)
+                    if (isNativeDspLoaded) {
+                        try {
+                            nativeSetCacheBudgetBytes(bytes)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetCacheBudgetBytes failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                "getAutoDegradedStages" -> {
+                    if (isNativeDspLoaded) {
+                        try {
+                            val stages = nativeGetAutoDegradedStages()
+                            result.success(stages)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeGetAutoDegradedStages failed: ${e.message}")
+                            result.success(0)
+                        }
+                    } else {
+                        result.success(0)
+                    }
+                }
+
                 // Stereo Balance & Mono Mix
                 "setStereoBalance" -> {
                     val balance = call.argument<Double>("balance") ?: 0.0
@@ -916,6 +964,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         try {
                             nativeSetSincResamplerEnabled(enabled)
                         } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetSincResamplerEnabled failed: ${e.message}")
+                        }
+                    }
+                    recalculateActiveStages()
+                    result.success(true)
+                }
+
                 "setSincResamplerRates" -> {
                     val inRate = call.argument<Double>("inRate") ?: 44100.0
                     val outRate = call.argument<Double>("outRate") ?: 48000.0

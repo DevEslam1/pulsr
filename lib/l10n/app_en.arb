@@ -515,5 +515,19 @@
   "dspEnginePreferenceSubtitle": "Choose real-time DSP engine or OEM system sound effects",
   "dspEngineNative": "Native Studio DSP (Zero Latency)",
   "dspEngineOem": "OEM / System AudioFX",
-  "dspEngineAuto": "Automatic (Prefer Native)"
+  "dspEngineAuto": "Automatic (Prefer Native)",
+  "audioStageDegraded": "Audio stage \"{stage}\" was bypassed to prevent stutter under high load.",
+  "@audioStageDegraded": {
+    "placeholders": {
+      "stage": {
+        "type": "String"
+      }
+    }
+  },
+  "stageEq": "Parametric EQ",
+  "stageReverb": "Convolution Reverb",
+  "stageCrossfeed": "Crossfeed",
+  "stageLimiter": "Lookahead Limiter",
+  "stageResampler": "Resampler",
+  "stagePanner": "Spatial Panner"
 }

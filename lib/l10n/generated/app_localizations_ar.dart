@@ -1265,4 +1265,27 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get dspEngineAuto => 'تلقائي (تفضيل المدمج)';
+
+  @override
+  String audioStageDegraded(String stage) {
+    return 'تم تجاوز مرحلة الصوت \"$stage\" لمنع التقطيع بسبب الحمل العالي.';
+  }
+
+  @override
+  String get stageEq => 'معادل الصوت البارامتري';
+
+  @override
+  String get stageReverb => 'صدى الالتفاف';
+
+  @override
+  String get stageCrossfeed => 'التغذية المتقاطعة';
+
+  @override
+  String get stageLimiter => 'محدد الذروة الاستباقي';
+
+  @override
+  String get stageResampler => 'إعادة تشكيل العينات';
+
+  @override
+  String get stagePanner => 'التوجيه المكاني';
 }

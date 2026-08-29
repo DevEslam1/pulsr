@@ -388,9 +388,21 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetActiveStages(
 }
 
 JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetCacheBudgetBytes(
+        JNIEnv* /* env */, jobject /* thiz */, jlong budgetBytes) {
+    PreparedIr::setCacheBudgetBytes(static_cast<size_t>(budgetBytes));
+}
+
+JNIEXPORT void JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeReset(
         JNIEnv* /* env */, jobject /* thiz */) {
     AudioDspEngine::instance().reset();
+}
+
+JNIEXPORT jint JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeGetAutoDegradedStages(
+        JNIEnv* /* env */, jobject /* thiz */) {
+    return static_cast<jint>(AudioDspEngine::instance().getAutoDegradedStages());
 }
 
 } // extern "C"

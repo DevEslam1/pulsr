@@ -449,5 +449,12 @@
   "dspEnginePreferenceSubtitle": "Elija el motor DSP nativo o los efectos del sistema OEM",
   "dspEngineNative": "DSP nativo de estudio (Cero latencia)",
   "dspEngineOem": "AudioFX del sistema / OEM",
-  "dspEngineAuto": "Automático (Preferir nativo)"
+  "dspEngineAuto": "Automático (Preferir nativo)",
+  "audioStageDegraded": "La etapa de audio \"{stage}\" se omitió para evitar interrupciones por alta carga.",
+  "stageEq": "Ecualizador paramétrico",
+  "stageReverb": "Reverberación de convolución",
+  "stageCrossfeed": "Crossfeed",
+  "stageLimiter": "Limitador predictivo",
+  "stageResampler": "Remuestreador",
+  "stagePanner": "Panoramizador espacial"
 }

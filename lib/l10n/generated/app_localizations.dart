@@ -2415,6 +2415,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Automatic (Prefer Native)'**
   String get dspEngineAuto;
+
+  /// No description provided for @audioStageDegraded.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio stage \"{stage}\" was bypassed to prevent stutter under high load.'**
+  String audioStageDegraded(String stage);
+
+  /// No description provided for @stageEq.
+  ///
+  /// In en, this message translates to:
+  /// **'Parametric EQ'**
+  String get stageEq;
+
+  /// No description provided for @stageReverb.
+  ///
+  /// In en, this message translates to:
+  /// **'Convolution Reverb'**
+  String get stageReverb;
+
+  /// No description provided for @stageCrossfeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Crossfeed'**
+  String get stageCrossfeed;
+
+  /// No description provided for @stageLimiter.
+  ///
+  /// In en, this message translates to:
+  /// **'Lookahead Limiter'**
+  String get stageLimiter;
+
+  /// No description provided for @stageResampler.
+  ///
+  /// In en, this message translates to:
+  /// **'Resampler'**
+  String get stageResampler;
+
+  /// No description provided for @stagePanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Spatial Panner'**
+  String get stagePanner;
 }
 
 class _AppLocalizationsDelegate

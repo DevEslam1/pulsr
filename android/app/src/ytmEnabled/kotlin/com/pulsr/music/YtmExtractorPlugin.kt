@@ -740,7 +740,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 if (streamUrl != null) {
                     val uriHost = runCatching { java.net.URI(streamUrl).host }.getOrNull()
                     if (uriHost != null) {
-                        val pinnedFamily = YtmHttpClient.resolvedIpFamilies[uriHost]
+                        val pinnedFamily = YtmHttpClient.getPinnedIpFamily(uriHost)
                         ProxyManager.setPinnedIpFamily(pinnedFamily)
                     }
                 }
