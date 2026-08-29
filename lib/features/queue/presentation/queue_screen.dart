@@ -7,12 +7,11 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/cached_artwork.dart';
-import '../../../core/di/injection.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/utils/formatters.dart';
-import '../../../domain/repositories/music_repository_interface.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../player/cubit/player_state.dart';
+import '../../playlists/cubit/playlist_cubit.dart';
 
 class QueueScreen extends StatelessWidget {
   const QueueScreen({super.key});
@@ -24,7 +23,12 @@ class QueueScreen extends StatelessWidget {
       appBar: AppBar(
         title: Text(context.l10n.queue),
         actions: [
-          BlocBuilder<PlayerCubit, PlayerState>(builder: (context, state) {
+          BlocBuilder<PlayerCubit, PlayerState>(
+            // Menu visibility depends only on queue presence, not 10Hz position ticks.
+            buildWhen: (a, b) =>
+                (a.queue.isEmpty) != (b.queue.isEmpty) ||
+                a.currentSong?.id != b.currentSong?.id,
+            builder: (context, state) {
             if (state.queue.isEmpty) return const SizedBox.shrink();
             return PopupMenuButton<String>(
               onSelected: (v) async {
@@ -50,36 +54,22 @@ class QueueScreen extends StatelessWidget {
                     if (name != null && name.isNotEmpty) {
                       if (!context.mounted) break;
                       try {
-                        final repo = getIt<IMusicRepository>();
-                        final createRes = await repo.createPlaylist(name);
-                        await createRes.fold(
-                          (failure) async {
-                            if (!context.mounted) return;
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text('Failed to create playlist: ${failure.message}')),
-                            );
-                          },
-                          (playlistId) async {
-                            final ids = state.queue.map((s) => s.id).toList();
-                            if (ids.isEmpty) {
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Queue saved as "$name" (0 tracks)')),
-                              );
-                              return;
-                            }
-                            final addRes = await repo.addSongsToPlaylist(playlistId, ids);
-                            if (!context.mounted) return;
-                            addRes.fold(
-                              (failure) => ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Failed to add songs: ${failure.message}')),
-                              ),
-                              (_) => ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text('Queue saved as "$name" (${state.queue.length} tracks)')),
-                              ),
-                            );
-                          },
-                        );
+                        // Route through PlaylistCubit (single state owner); the
+                        // presentation layer must not hit repositories directly.
+                        final ids = state.queue.map((s) => s.id).toList();
+                        final playlistId = await
+                            context.read<PlaylistCubit>().createPlaylistWithSongs(name, ids);
+                        if (!context.mounted) break;
+                        if (playlistId == null) {
+                          final err = context.read<PlaylistCubit>().state.errorMessage;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Failed to create playlist: ${err ?? "unknown error"}')),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Queue saved as "$name" (${state.queue.length} tracks)')),
+                          );
+                        }
                       } catch (e) {
                         if (!context.mounted) break;
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -101,6 +91,13 @@ class QueueScreen extends StatelessWidget {
         ],
       ),
       body: BlocBuilder<PlayerCubit, PlayerState>(
+        // Rebuild only when the queue itself changes; position ticks at 10Hz
+        // must not rebuild the whole queue list.
+        buildWhen: (a, b) =>
+            !identical(a.queue, b.queue) ||
+            a.queue.length != b.queue.length ||
+            a.currentSong?.id != b.currentSong?.id ||
+            a.currentIndex != b.currentIndex,
         builder: (context, state) {
           final queue = state.queue;
           final currentSong = state.currentSong;

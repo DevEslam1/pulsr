@@ -53,7 +53,7 @@ class AppDatabase extends _$AppDatabase {
     await executeSql(
         'CREATE INDEX IF NOT EXISTS idx_songs_path ON songs (path);');
     await executeSql(
-        'CREATE INDEX IF NOT EXISTS idx_songs_path_nocase ON songs (path COLLATE NOCASE) WHERE path != "" AND path NOT LIKE "ytmusic://%";');
+        "CREATE INDEX IF NOT EXISTS idx_songs_path_nocase ON songs (path COLLATE NOCASE) WHERE path != '' AND path NOT LIKE 'ytmusic://%';");
     await executeSql(
         'CREATE INDEX IF NOT EXISTS idx_songs_genre ON songs (genre);');
     await executeSql(
@@ -169,7 +169,7 @@ class AppDatabase extends _$AppDatabase {
             // Add NOCASE path index for duplicate prevention (10/10 hardening)
             try {
               await customStatement(
-                  'CREATE INDEX IF NOT EXISTS idx_songs_path_nocase ON songs (path COLLATE NOCASE) WHERE path != "" AND path NOT LIKE "ytmusic://%";');
+                  "CREATE INDEX IF NOT EXISTS idx_songs_path_nocase ON songs (path COLLATE NOCASE) WHERE path != '' AND path NOT LIKE 'ytmusic://%';");
             } catch (_) {}
             // FTS rebuild is cheap and fixes any corrupt trigger from v9
             try {

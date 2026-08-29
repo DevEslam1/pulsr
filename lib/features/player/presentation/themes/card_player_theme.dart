@@ -448,12 +448,7 @@ class CardPlayerTheme extends StatelessWidget {
                               IconButton(
                                 icon: Icon(Icons.speed_rounded,
                                     color: iconActionColor),
-                                onPressed: () {
-                                  showModalBottomSheet(
-                                    context: context,
-                                    builder: (_) => const SpeedPickerSheet(),
-                                  );
-                                },
+                                onPressed: () => SpeedPickerSheet.show(context),
                                 tooltip: context.l10n.playbackSpeed,
                               ),
                               IconButton(

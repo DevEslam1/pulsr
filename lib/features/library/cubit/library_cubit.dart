@@ -38,6 +38,7 @@ class LibraryCubit extends Cubit<LibraryState> {
   StreamSubscription? _yearsSub;
   StreamSubscription? _favoritesSub;
   bool _initialized = false;
+  int? _lastEmittedSongCount;
 
   LibraryCubit({
     required GetSongsUseCase getSongsUseCase,
@@ -139,8 +140,25 @@ class LibraryCubit extends Cubit<LibraryState> {
         .listen((result) {
       if (isClosed) return;
       result.fold(
-        (failure) => emit(state.copyWith(errorMessage: failure.message)),
-        (songs) => emit(state.copyWith(songs: songs, errorMessage: null)),
+        (failure) {
+          ErrorLogger.log(
+              'LibraryCubit.watchSongs emitted failure',
+              error: failure,
+              category: 'LibraryCubit');
+          emit(state.copyWith(errorMessage: failure.message));
+        },
+        (songs) {
+          // SCAN-DEBUG: first emission + size changes are the key evidence
+          // for 'scan count > 0 but library UI empty' reports.
+          if (_lastEmittedSongCount == null ||
+              songs.length != _lastEmittedSongCount) {
+            ErrorLogger.addBreadcrumb(
+                'LibraryCubit.watchSongs emitted ${songs.length} songs (prev: $_lastEmittedSongCount)',
+                category: 'LibraryCubit');
+          }
+          _lastEmittedSongCount = songs.length;
+          emit(state.copyWith(songs: songs, errorMessage: null));
+        },
       );
     });
   }

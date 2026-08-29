@@ -47,23 +47,55 @@ subprojects {
     }
 }
 
-// Enforce JVM 17 for Java and Kotlin — fixes :home_widget 1.8 vs 17 (AGP 9 + KGP)
+// JVM 17 + Kotlin language 2.0 alignment: plugin modules (home_widget, sentry_flutter,
+// on_audio_query_android, ...) pin Java 1.8 / old Kotlin in their own build.gradle while
+// AGP 9 defaults Kotlin to JVM 17 -> the AGP 9 Java/Kotlin consistency check fails.
+//
+// Ordering: the plugin's build.gradle runs during ITS evaluation and would overwrite any
+// DSL value set before it. afterEvaluate runs after evaluation -> final DSL win.
+// :app is force-evaluated early (evaluationDependsOn) and already sets 17 itself, so skipped.
 subprojects {
-    tasks.withType<JavaCompile>().configureEach {
-        sourceCompatibility = JavaVersion.VERSION_17.toString()
-        targetCompatibility = JavaVersion.VERSION_17.toString()
-    }
-    tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-            languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
-            apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
+    if (project.name == "app") return@subprojects
+
+    fun applyJvmAlignment(project: Project) {
+        project.plugins.withId("com.android.library") {
+            project.extensions
+                .findByType(com.android.build.gradle.LibraryExtension::class.java)
+                ?.compileOptions?.apply {
+                    sourceCompatibility = JavaVersion.VERSION_17
+                    targetCompatibility = JavaVersion.VERSION_17
+                }
         }
+        project.plugins.withId("com.android.application") {
+            project.extensions
+                .findByType(com.android.build.gradle.AppExtension::class.java)
+                ?.compileOptions?.apply {
+                    sourceCompatibility = JavaVersion.VERSION_17
+                    targetCompatibility = JavaVersion.VERSION_17
+                }
+        }
+        project.tasks.withType<JavaCompile>().configureEach {
+            sourceCompatibility = JavaVersion.VERSION_17.toString()
+            targetCompatibility = JavaVersion.VERSION_17.toString()
+        }
+        project.tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>()
+            .configureEach {
+                compilerOptions {
+                    jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+                    // Old plugins (on_audio_query pins Kotlin 1.6.10) would otherwise
+                    // compile with language 1.6, which KGP 2.3+ rejects.
+                    languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
+                    apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
+                }
+            }
+    }
+
+    if (project.state.executed) {
+        applyJvmAlignment(project)
+    } else {
+        project.afterEvaluate { applyJvmAlignment(project) }
     }
 }
-
-// tasks.withType handles any late-created JavaCompile tasks that escape the DSL above
-// (kept for completeness; the android.compileOptions fix above is primary).
 
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)

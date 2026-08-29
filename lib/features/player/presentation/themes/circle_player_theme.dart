@@ -457,12 +457,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                             IconButton(
                               icon: Icon(Icons.speed_rounded,
                                   color: p.textSecondary),
-                              onPressed: () {
-                                showModalBottomSheet(
-                                  context: context,
-                                  builder: (_) => const SpeedPickerSheet(),
-                                );
-                              },
+                              onPressed: () => SpeedPickerSheet.show(context),
                               tooltip: context.l10n.playbackSpeed,
                             ),
                             IconButton(

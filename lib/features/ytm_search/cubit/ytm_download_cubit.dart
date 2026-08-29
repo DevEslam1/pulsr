@@ -281,6 +281,20 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
   }
 
   void _set(String videoId, YtDownloadItem item) {
+    // Never downgrade a terminal status (done/failed/canceled) back to a
+    // running/queued state: stale optimistic writes or a throttled repository
+    // event racing them would otherwise leave buttons stuck on "downloading".
+    final current = state.items[videoId];
+    const terminal = {
+      YtDownloadStatus.done,
+      YtDownloadStatus.failed,
+      YtDownloadStatus.canceled,
+    };
+    if (current != null &&
+        terminal.contains(current.status) &&
+        !terminal.contains(item.status)) {
+      return;
+    }
     safeEmit(
       YtmDownloadState(
         items: Map.unmodifiable({...state.items, videoId: item}),

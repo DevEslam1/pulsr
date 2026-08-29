@@ -5,12 +5,16 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/audio/headphone_profiles_repository.dart';
 import '../../../../domain/models/audio_effects_config.dart';
 import '../../../../domain/models/eq_preset.dart';
 import '../../../../domain/models/headphone_profile.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
+import 'dart:async';
+
+import '../../../../data/audio/audio_effects_channel.dart';
 import '../../../../data/audio/equalizer_manager.dart';
 import 'eq_curve_visualizer.dart';
 import 'autoeq_search_sheet.dart';
@@ -32,6 +36,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   final TextEditingController _searchController = TextEditingController();
   final HeadphoneProfilesRepository _headphoneRepo =
       HeadphoneProfilesRepository();
+
+  StreamSubscription<int>? _degradedSessionSub;
+  bool _degradeSnackQueued = false;
 
   String _selectedCategory = 'All';
   String _searchQuery = '';
@@ -56,6 +63,22 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _loadHeadphoneProfiles();
+    _listenForDspAutoDegrade();
+  }
+
+  /// Surfaces the native DSP auto-degrade safety net: when the engine bypasses
+  /// stages to prevent stutter, show ONE snack per degraded session (re-arms after
+  /// full recovery) so the user understands why effects stopped.
+  void _listenForDspAutoDegrade() {
+    try {
+      _degradedSessionSub = AudioEffectsChannel().onAutoDegradedSessionStarted.listen(
+        (mask) {
+          if (!mounted) return;
+          _degradeSnackQueued = true;
+          setState(() {});
+        },
+      );
+    } catch (_) {}
   }
 
   Future<void> _loadHeadphoneProfiles() async {
@@ -69,6 +92,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
 
   @override
   void dispose() {
+    _degradedSessionSub?.cancel();
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
@@ -240,9 +264,51 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         }
       },
       child: BlocBuilder<PlayerCubit, PlayerState>(
+        // DSP sheet ignores playback/position fields entirely - position ticks at
+        // 10Hz were rebuilding the whole equalizer UI for nothing.
+        buildWhen: (a, b) =>
+            a.isEqEnabled != b.isEqEnabled ||
+            a.eqPreset != b.eqPreset ||
+            a.isVirtualizerEnabled != b.isVirtualizerEnabled ||
+            a.virtualizerStrength != b.virtualizerStrength ||
+            a.isDynamicsEnabled != b.isDynamicsEnabled ||
+            a.dynamicsPreset != b.dynamicsPreset ||
+            a.selectedHeadphoneProfile != b.selectedHeadphoneProfile ||
+            a.isSpatializerEnabled != b.isSpatializerEnabled ||
+            a.isSpatializerSupported != b.isSpatializerSupported ||
+            a.volumeBoost != b.volumeBoost ||
+            a.stereoBalance != b.stereoBalance ||
+            a.monoMix != b.monoMix ||
+            a.isCrossfeedEnabled != b.isCrossfeedEnabled ||
+            a.crossfeedDelayUs != b.crossfeedDelayUs ||
+            a.crossfeedFeedDb != b.crossfeedFeedDb ||
+            a.isLimiterEnabled != b.isLimiterEnabled ||
+            a.limiterThresholdDb != b.limiterThresholdDb ||
+            a.limiterReleaseMs != b.limiterReleaseMs ||
+            a.isReverbEnabled != b.isReverbEnabled ||
+            a.reverbPreset != b.reverbPreset ||
+            a.reverbWetDry != b.reverbWetDry ||
+            a.isSincResamplerEnabled != b.isSincResamplerEnabled ||
+            a.hasOemAudio != b.hasOemAudio ||
+            !identical(a.detectedOemEngines, b.detectedOemEngines) ||
+            a.errorMessage != b.errorMessage,
         builder: (context, state) {
           final cubit = context.read<PlayerCubit>();
           final dspBlockedGlobal = _dspBlockedReason(context);
+
+          // One snack per DSP auto-degrade session (re-arms after recovery).
+          if (_degradeSnackQueued) {
+            _degradeSnackQueued = false;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                SnackBar(
+                  content: Text(context.l10n.audioStageDegraded('DSP')),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            });
+          }
 
           return Align(
             alignment: Alignment.bottomCenter,
@@ -645,7 +711,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                 children: [
                   IconButton(icon: Icon(Icons.info_outline_rounded, size: 18, color: p.accent), onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.equalizer, conflictReason: dspBlocked)),
                   const SizedBox(width: 4),
-                  Expanded(child: Text('DSP disabled by Bit-Perfect bypass. Disable Bit-Perfect or “Bypass DSP” in Settings to re-enable.', style: TextStyle(color: p.textSecondary, fontSize: 11))),
+                  Expanded(child: Text('DSP disabled by Bit-Perfect bypass. Disable Bit-Perfect or âBypass DSPâ in Settings to re-enable.', style: TextStyle(color: p.textSecondary, fontSize: 11))),
                 ],
               ),
             ),
@@ -935,7 +1001,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           ),
                         ),
                         Text(
-                          '${state.selectedHeadphoneProfile!.brand} • '
+                          '${state.selectedHeadphoneProfile!.brand} â¢ '
                           'Preamp: ${state.selectedHeadphoneProfile!.preampGain.toStringAsFixed(1)} dB',
                           style: TextStyle(fontSize: 10, color: p.textTertiary),
                         ),
@@ -1585,7 +1651,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        '${profile.brand} • ${profile.category}',
+                                        '${profile.brand} â¢ ${profile.category}',
                                         style: TextStyle(
                                             fontSize: 11,
                                             color: p.textTertiary),
@@ -2174,7 +2240,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               color: p.textSecondary,
                               fontWeight: FontWeight.w600)),
                       Text(
-                        '${state.crossfeedDelayUs.round()} µs',
+                        '${state.crossfeedDelayUs.round()} Âµs',
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,

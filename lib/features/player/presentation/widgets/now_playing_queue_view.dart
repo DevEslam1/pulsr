@@ -16,6 +16,14 @@ class NowPlayingQueueView extends StatelessWidget {
     final p = context.palette;
 
     return BlocBuilder<PlayerCubit, PlayerState>(
+      // Queue view only cares about queue contents + slot/index; position ticks
+      // (10Hz while playing) must not rebuild this subtree.
+      buildWhen: (a, b) =>
+          !identical(a.queue, b.queue) ||
+          a.queue.length != b.queue.length ||
+          a.activeQueueSlot != b.activeQueueSlot ||
+          a.currentIndex != b.currentIndex ||
+          a.currentSong?.id != b.currentSong?.id,
       builder: (context, state) {
         final cubit = context.read<PlayerCubit>();
         final queue = state.queue;

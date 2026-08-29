@@ -158,8 +158,15 @@ class FileIntentHandler {
         }
       }
 
-      // 1. Check if it's a PLAYABLE audio file FIRST (fast-path)
-      if (AudioFormats.isSupportedExtension(cleanPath)) {
+      // 1. Check if it's a PLAYABLE audio file FIRST (fast-path).
+      // content:// URIs skip the extension gate: file managers and media providers
+      // frequently hand out extension-less URIs (content://media/.../<id>, msf:<id>)
+      // that ARE audio (MainActivity.isAudioIntent already gated by intent mime type
+      // audio/* before invoking Dart). The extension check would falsely reject them
+      // with "Format not supported" and the song would never play.
+      final isContentUri =
+          cleanPath.startsWith('content:') || uriOrPath.startsWith('content:');
+      if (isContentUri || AudioFormats.isSupportedExtension(cleanPath)) {
         // Proceed directly to audio handling below
       } else {
         // 2. Only check for proxy/text files if NOT audio
@@ -237,7 +244,20 @@ class FileIntentHandler {
             : null;
         if (segment != null && segment.isNotEmpty) {
           final decoded = Uri.decodeComponent(segment);
-          title = p.withoutExtension(decoded);
+          // Media-provider URIs end in opaque ids ("1000000123", "msf:1000000123").
+          // Prefer a readable display name from query params when present,
+          // otherwise fall back to a generic title instead of the raw id.
+          final qpTitle = parsedUri?.queryParameters['displayName'] ??
+              parsedUri?.queryParameters['title'];
+          if (qpTitle != null && qpTitle.trim().isNotEmpty) {
+            title = p.withoutExtension(qpTitle.trim());
+          } else if (decoded.contains('.') &&
+              !decoded.endsWith('.') &&
+              !decoded.contains(':')) {
+            title = p.withoutExtension(decoded);
+          } else {
+            title = 'Audio Track';
+          }
         }
       } else {
         final file = File(cleanPath);

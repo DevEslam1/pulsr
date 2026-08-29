@@ -174,7 +174,11 @@ class PlaylistCubit extends Cubit<PlaylistState> {
   }
 
   void _onYtmLoginStateChanged() {
-    if (!getIt<YtmAccountService>().isLoggedIn) {
+    if (getIt<YtmAccountService>().isLoggedIn) {
+      // YTM account init completes asynchronously after startup (deferred for jank);
+      // refresh the online library reactively once login becomes available.
+      autoFetchOnlineLibrary(force: true);
+    } else {
       clearOnlinePlaylists();
     }
   }
@@ -341,6 +345,34 @@ class PlaylistCubit extends Cubit<PlaylistState> {
       (failure) => emit(state.copyWith(errorMessage: failure.message)),
       (_) => null,
     );
+  }
+
+  /// Creates a playlist and bulk-adds songs in one flow (used by "Save queue
+  /// as playlist"). Keeps presentation free of direct repository access.
+  Future<int?> createPlaylistWithSongs(String name, List<int> songIds) async {
+    final createResult = await _playlistUseCases.createPlaylist(name);
+    final playlistId = createResult.fold((_) => null, (id) => id);
+    if (playlistId == null) {
+      if (!isClosed) {
+        emit(state.copyWith(
+          errorMessage: createResult.fold((f) => f.message, (_) => null),
+        ));
+      }
+      return null;
+    }
+    if (songIds.isNotEmpty) {
+      final addResult =
+          await _playlistUseCases.addSongsToPlaylist(playlistId, songIds);
+      addResult.fold(
+        (failure) {
+          if (!isClosed) {
+            emit(state.copyWith(errorMessage: failure.message));
+          }
+        },
+        (_) => null,
+      );
+    }
+    return playlistId;
   }
 
   Future<void> addSongsToPlaylist(int playlistId, List<int> songIds) async {

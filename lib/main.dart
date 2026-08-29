@@ -105,15 +105,27 @@ Future<void> main() async {
             ErrorLogger.log('AuthService initialize failed or timed out',
                 error: e, stackTrace: st, category: 'Startup');
           }),
-          getIt<YtmAccountService>().init().timeout(const Duration(seconds: 8)).catchError((e, st) {
-            ErrorLogger.log('YtmAccountService init failed or timed out',
-                error: e, stackTrace: st, category: 'Startup');
-          }),
         ]);
       } catch (e, st) {
         ErrorLogger.log('Parallel startup init failed',
             error: e, stackTrace: st, category: 'Startup');
       }
+    });
+
+    // STARTUP-JANK FIX: YtmAccountService.init() reads the WebView CookieManager
+    // (native android.webkit.CookieManager), which force-loads the whole WebView
+    // framework on first touch - measured as a 2.16s Davey frame + 124 skipped
+    // frames right after launch (logcat 2026-08-29). No first-run screen needs YTM
+    // login state; loginState listeners (PlaylistCubit, home) update reactively
+    // when this completes. Defer past the first-interaction window.
+    Future.delayed(const Duration(seconds: 10), () {
+      getIt<YtmAccountService>()
+          .init()
+          .timeout(const Duration(seconds: 8))
+          .catchError((e, st) {
+            ErrorLogger.log('YtmAccountService init failed or timed out',
+                error: e, stackTrace: st, category: 'Startup');
+          });
     });
   }
 

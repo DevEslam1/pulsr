@@ -1036,6 +1036,12 @@ class MusicRepository implements IMusicRepository {
         batch.insertAllOnConflictUpdate(_db.songsTable, reconciledSongs);
         batch.insertAllOnConflictUpdate(_db.albumsTable, albums);
         batch.insertAllOnConflictUpdate(_db.artistsTable, artists);
+
+      // SCAN-DEBUG: commit point of a scan sync (pairs with LibraryCubit
+      // watchSongs breadcrumbs for the 'count > 0 but UI empty' investigation).
+      ErrorLogger.addBreadcrumb(
+          'syncScannedMusic committed: songs=${songs.length} albums=${albums.length} artists=${artists.length}',
+          category: 'scanner');
       });
 
       // 4. Deduplicate duplicate paths in a dedicated transaction (no batch inside)

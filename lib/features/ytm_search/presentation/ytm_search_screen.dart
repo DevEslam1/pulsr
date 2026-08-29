@@ -18,8 +18,12 @@ class YtmSearchScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
+        // YtmSearchCubit is factory-registered: fresh instance owned + closed by this screen.
         BlocProvider(create: (_) => getIt<YtmSearchCubit>()),
-        BlocProvider(create: (_) => getIt<YtmDownloadCubit>()),
+        // YtmDownloadCubit is an app-lifetime @singleton provided at root (main.dart).
+        // BlocProvider.value does NOT take ownership, so leaving this screen can never
+        // close the shared singleton (use-after-close would kill download UI updates).
+        BlocProvider<YtmDownloadCubit>.value(value: getIt<YtmDownloadCubit>()),
       ],
       child: const _YtmSearchView(),
     );
