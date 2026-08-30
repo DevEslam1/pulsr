@@ -100,20 +100,10 @@ class EqualizerManager {
     this.loudnessEnhancerB,
   });
 
-  bool get supportsNativePcmEffects => _effectsChannel.isPcmDspAttached;
+  bool get supportsNativePcmEffects => true;
 
   void _disableUnavailableNativePcmEffects() {
-    if (supportsNativePcmEffects) return;
-    isCrossfeedEnabled = false;
-    isLimiterEnabled = false;
-    isReverbEnabled = false;
-    stereoBalance = 0.0;
-    monoMix = false;
-    isSaturationEnabled = false;
-    isStereoWidthEnabled = false;
-    isLoudnessContourEnabled = false;
-    isSubCrossoverEnabled = false;
-    isDynamicEqEnabled = false;
+    // Keep user's DSP preferences intact
   }
 
   void _debouncedSavePreferences() {

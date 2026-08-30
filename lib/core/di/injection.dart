@@ -5,6 +5,7 @@ import 'package:get_it/get_it.dart';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 
+import '../services/room_correction_service.dart';
 import 'injection.config.dart';
 
 final GetIt getIt = GetIt.instance;
@@ -12,6 +13,10 @@ final GetIt getIt = GetIt.instance;
 @InjectableInit()
 Future<void> configureDependencies() async {
   getIt.init();
+  if (!getIt.isRegistered<RoomCorrectionService>()) {
+    getIt.registerLazySingleton<RoomCorrectionService>(
+        () => RoomCorrectionService());
+  }
   await getIt.allReady();
 }
 

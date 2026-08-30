@@ -14,7 +14,7 @@ import '../utils/google_login_recovery.dart';
 
 class YtmWebLoginSheet extends StatefulWidget {
   static const String googleSignInUrl =
-      'https://accounts.google.com/ServiceLogin?service=youtube&passive=true&continue=https%3A%2F%2Fmusic.youtube.com%2F&hl=en';
+      'https://accounts.google.com/signin/v2/identifier?service=youtube&continue=https%3A%2F%2Fmusic.youtube.com%2F&hl=en';
 
   final String? initialUrl;
   final String? title;
@@ -164,7 +164,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
     _settings = InAppWebViewSettings(
       userAgent: initialUa,
-      useHybridComposition: false,
+      useHybridComposition: true,
       javaScriptEnabled: true,
       javaScriptCanOpenWindowsAutomatically: true,
       supportMultipleWindows: true,
@@ -976,6 +976,14 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                               const SizedBox(width: 4),
                               IconButton(
                                 icon: const Icon(
+                                    Icons.vpn_key_rounded,
+                                    size: 20),
+                                tooltip: 'Import cookies manually',
+                                onPressed: () => _showManualCookieDialog(context),
+                              ),
+                              const SizedBox(width: 4),
+                              IconButton(
+                                icon: const Icon(
                                     Icons.cleaning_services_rounded,
                                     size: 20),
                                 tooltip: 'Clear cache & reset cookies',
@@ -1362,10 +1370,23 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                   borderRadius: BorderRadius.circular(12)),
             ),
           ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () => _showManualCookieDialog(context),
+            icon: const Icon(Icons.vpn_key_rounded, size: 18),
+            label: const Text('Import Cookies / Token Manually',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: p.textPrimary,
+              side: BorderSide(color: p.hairline),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
           const SizedBox(height: 10),
           Text(
-            'Tip: the toolbar "Clear cache & reset cookies" button performs the '
-            'same reset as Retry at any time.',
+            'Tip: if Google continues to block in-app sign-in on this device, paste your cookies from your browser using the button above.',
             textAlign: TextAlign.center,
             style: TextStyle(color: p.textTertiary, fontSize: 11),
           ),
@@ -1406,6 +1427,109 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                 fontSize: 11,
                 fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showManualCookieDialog(BuildContext context) async {
+    final p = context.palette;
+    final textController = TextEditingController();
+    String? errorText;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: p.surface,
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: p.accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.vpn_key_rounded, color: p.accent, size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Import Cookies Manually',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'If Google blocks embedded browser login on this device, you can paste your raw cookie string (e.g. from browser DevTools on desktop) or cURL cookie header directly:',
+                  style: TextStyle(color: p.textSecondary, fontSize: 12.5, height: 1.4),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: textController,
+                  maxLines: 4,
+                  style: TextStyle(color: p.textPrimary, fontSize: 12, fontFamily: 'monospace'),
+                  decoration: InputDecoration(
+                    hintText: 'SAPISID=...; __Secure-3PSID=...; SID=...',
+                    hintStyle: TextStyle(color: p.textTertiary, fontSize: 11),
+                    filled: true,
+                    fillColor: p.surfaceContainer,
+                    errorText: errorText,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: p.hairline),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: p.accent,
+                foregroundColor: p.onAccent,
+              ),
+              onPressed: () async {
+                final input = textController.text.trim();
+                if (input.isEmpty) {
+                  setDialogState(() => errorText = 'Please enter cookie text');
+                  return;
+                }
+                final accountService = getIt<YtmAccountService>();
+                String cookieStr = input;
+                if (cookieStr.toLowerCase().contains('cookie:')) {
+                  final idx = cookieStr.toLowerCase().indexOf('cookie:');
+                  cookieStr = cookieStr.substring(idx + 7).trim();
+                }
+                await accountService.saveSession(cookieStr);
+                final valid = await accountService.validateSession();
+                if (valid) {
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (context.mounted) {
+                    setState(() {
+                      _isLoggedIn = true;
+                      _detectedCookies = cookieStr;
+                    });
+                    Navigator.of(context).pop(true);
+                  }
+                } else {
+                  setDialogState(() => errorText = 'Invalid or expired cookies (must include SAPISID and PSID)');
+                }
+              },
+              child: const Text('Connect'),
             ),
           ],
         ),

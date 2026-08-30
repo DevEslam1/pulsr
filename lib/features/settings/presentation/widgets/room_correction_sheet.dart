@@ -1,3 +1,4 @@
+// ignore_for_file: experimental_member_use
 // lib/features/settings/presentation/widgets/room_correction_sheet.dart
 import 'dart:async';
 import 'dart:math' as math;
@@ -9,11 +10,8 @@ import 'package:just_audio/just_audio.dart' hide PlayerState;
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/di/injection.dart';
-import '../../../../core/services/hires_audio_service.dart';
 import '../../../../core/services/room_correction_service.dart';
 import '../../../../core/utils/l10n_extensions.dart';
-import '../../../../domain/models/audio_output_info.dart';
-import '../../../../domain/models/eq_preset.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
 
@@ -53,12 +51,14 @@ class RoomCorrectionSheet extends StatefulWidget {
 }
 
 class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
-  final RoomCorrectionService _service = getIt<RoomCorrectionService>();
+  late final RoomCorrectionService _service =
+      getIt.isRegistered<RoomCorrectionService>()
+          ? getIt<RoomCorrectionService>()
+          : RoomCorrectionService();
   AudioPlayer? _player;
   _RcPhase _phase = _RcPhase.idle;
   double _progress = 0.0;
   List<double>? _responseDb;
-  List<double> _tones = const [];
   List<double>? _gains;
   String? _error;
 
@@ -135,7 +135,6 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
       final gains = RoomCorrectionService.fitCorrection(response, tones);
       if (!mounted) return;
       setState(() {
-        _tones = tones;
         _responseDb = response;
         _gains = gains;
         _phase = _RcPhase.result;

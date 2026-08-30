@@ -245,9 +245,11 @@ class AudioConflicts {
     required bool bypassDspOnBitPerfect,
     required AudioOutputInfo? device,
   }) {
-    final active = bitPerfectOutput && bypassDspOnBitPerfect && (device?.isBitPerfectActive == true || (bitPerfectOutput && (device?.isUsbDac == true || device?.isDirectSupported == true)));
+    if (!bitPerfectOutput || !bypassDspOnBitPerfect) return null;
+    if (device?.isBluetooth == true) return null;
+    final active = device?.isBitPerfectActive == true ||
+        (device?.isUsbDac == true && bitPerfectOutput);
     if (!active) return null;
-    // When armed but not yet active (e.g. waiting for USB), still warn but allow? We block to prevent surprise.
     return 'Disabled: Bit-Perfect bypass is ON — this DSP would alter the exclusive bitstream. Turn off Bit-Perfect or disable “Bypass DSP” to enable.';
   }
 

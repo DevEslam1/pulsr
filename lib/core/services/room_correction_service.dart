@@ -1,6 +1,5 @@
 // lib/core/services/room_correction_service.dart
 import 'dart:async';
-import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
 
@@ -196,7 +195,7 @@ class RoomCorrectionService {
 
   // --- capture plumbing ---
 
-  StreamSubscription? _captureSub;
+  StreamSubscription<dynamic>? _captureSub;
   final BytesBuilder _pcmBuffer = BytesBuilder(copy: true);
   bool _capturing = false;
 
@@ -210,7 +209,7 @@ class RoomCorrectionService {
         if (data is Map && data['pcm'] is Uint8List) {
           _pcmBuffer.add(data['pcm'] as Uint8List);
         }
-      }, onError: (e) {
+      }, onError: (Object e) {
         ErrorLogger.log('Room-correction capture stream error',
             error: e, category: 'RoomCorrection');
       });

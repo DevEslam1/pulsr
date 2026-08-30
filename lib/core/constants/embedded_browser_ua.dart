@@ -2,31 +2,33 @@
 //
 // Single source of truth for the User-Agent strings and anti-fingerprint JS
 // used by the embedded sign-in / YouTube Music WebView.
-//
-// Google OAuth blocks Android WebView via two mechanisms:
-//   1. The X-Requested-With header (suppressed via requestedWithHeaderOriginAllowList: {}).
-//   2. navigator.userAgentData (the User-Agent Client Hints API) — present in
-//      Chromium/Android WebView but NOT in Safari. Google reads it at sign-in
-//      to detect embedded browsers even when the UA string claims to be Safari.
-//
-// The [antiFingerprint] script is injected at AT_DOCUMENT_START and deletes
-// navigator.userAgentData plus aligns platform/vendor with the spoofed Safari UA.
+
 class EmbeddedBrowserUa {
   EmbeddedBrowserUa._();
 
-  /// iOS 18.5 Safari Mobile User-Agent (updated 2025)
-  static const String mobile =
-      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Mobile/15E148 Safari/604.1';
+  /// Firefox 135 Mobile User-Agent on Android (Highly resilient against Google OAuth blocks)
+  static const String firefoxMobile =
+      'Mozilla/5.0 (Android 14; Mobile; rv:135.0) Gecko/135.0 Firefox/135.0';
 
-  /// macOS 15.5 Safari Desktop User-Agent (updated 2025)
-  static const String desktop =
-      'Mozilla/5.0 (Macintosh; Intel Mac OS X 15_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15';
+  /// Firefox 135 Desktop User-Agent (Windows 11)
+  static const String firefoxDesktop =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:135.0) Gecko/20100101 Firefox/135.0';
 
-  /// JavaScript injected at AT_DOCUMENT_START.
-  ///
-  /// Removes the Chromium-only [navigator.userAgentData] property and aligns
-  /// other navigator fingerprint fields with genuine Safari behaviour so that
-  /// Google's sign-in page cannot distinguish the WebView from a real Safari.
+  /// Chrome 133 Mobile User-Agent on Android (Clean without wv/Version-4.0 tokens)
+  static const String chromeMobile =
+      'Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.6943.122 Mobile Safari/537.36';
+
+  /// Chrome 133 Desktop User-Agent (Windows 11)
+  static const String chromeDesktop =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.6943.122 Safari/537.36';
+
+  /// Default mobile sign-in UA: Firefox Mobile (most resilient against Google OAuth WebView block)
+  static const String mobile = firefoxMobile;
+
+  /// Default desktop browsing UA: Chrome Desktop (full YouTube Music web experience)
+  static const String desktop = chromeDesktop;
+
+  /// JavaScript injected at AT_DOCUMENT_START to normalize browser environment.
   static const String antiFingerprint = r'''
 (function () {
   'use strict';
@@ -40,37 +42,44 @@ class EmbeddedBrowserUa {
     } catch (e) {}
   }
 
-  // ── 1. Delete navigator.userAgentData ───────────────────────────────────────
-  // Chrome/Android WebView exposes this; Safari does not. Google uses its
-  // presence to detect embedded browsers even when the UA string is spoofed.
+  // ── 1. Normalize webdriver ──────────────────────────────────────────────────
   try {
-    Object.defineProperty(navigator, 'userAgentData', {
-      get: function () { return undefined; },
+    Object.defineProperty(navigator, 'webdriver', {
+      get: function () { return false; },
       configurable: true,
-      enumerable: false
+      enumerable: true
     });
   } catch (e) {}
 
-  // ── 2. Align platform / vendor ──────────────────────────────────────────────
   var ua = (navigator.userAgent || '');
-  var isIphone = ua.indexOf('iPhone') !== -1;
-  tryDefine(navigator, 'platform', isIphone ? 'iPhone' : 'MacIntel');
-  tryDefine(navigator, 'vendor', 'Apple Computer, Inc.');
+  var isFirefox = ua.indexOf('Firefox') !== -1;
+  var isMobile = ua.indexOf('Mobile') !== -1 || ua.indexOf('Android') !== -1;
 
-  // ── 3. Remove WebView-specific extension APIs that Safari never ships ────────
-  try { delete window.chrome; } catch (e) {}
-
-  // ── 4. Suppress the High-Entropy Client-Hints permission ────────────────────
-  // navigator.userAgentData.getHighEntropyValues() is a giveaway; it won't
-  // exist once we've deleted userAgentData above, but belt-and-suspenders.
-  try {
-    var nav = window.navigator;
-    if (nav && nav.userAgentData && nav.userAgentData.getHighEntropyValues) {
-      nav.userAgentData.getHighEntropyValues = function () {
-        return Promise.resolve({});
+  if (isFirefox) {
+    // Firefox environment emulation
+    try {
+      Object.defineProperty(navigator, 'userAgentData', {
+        get: function () { return undefined; },
+        configurable: true,
+        enumerable: false
+      });
+    } catch (e) {}
+    tryDefine(navigator, 'vendor', '');
+    tryDefine(navigator, 'platform', isMobile ? 'Linux armv8l' : 'Win32');
+    tryDefine(navigator, 'oscpu', isMobile ? 'Linux armv8l' : 'Windows NT 10.0; Win64; x64');
+  } else {
+    // Chromium / Chrome environment normalization
+    tryDefine(navigator, 'vendor', 'Google Inc.');
+    tryDefine(navigator, 'platform', isMobile ? 'Linux armv8l' : 'Win32');
+    if (!window.chrome) {
+      window.chrome = {
+        app: { isInstalled: false },
+        csi: function () {},
+        loadTimes: function () {},
+        runtime: {}
       };
     }
-  } catch (e) {}
+  }
 })();
 ''';
 }

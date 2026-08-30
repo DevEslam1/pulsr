@@ -10,6 +10,7 @@ import '../../../../core/utils/platform_capabilities.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/presentation/widgets/audio_quality_sheet.dart';
 import '../../../player/presentation/widgets/equalizer_sheet.dart';
+import '../../../player/presentation/widgets/dsp_inspector_sheet.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
 import 'battery_optimization_card.dart';
@@ -212,9 +213,14 @@ class AudioSoundSection extends StatelessWidget {
           Icons.tune_rounded,
           'Bypass DSP in Bit-Perfect Mode',
           'Bypasses Equalizer and virtualizer for an uncolored, pure audio bitstream to the DAC',
-          value: state.bypassDspOnBitPerfect,
+          value: state.bitPerfectOutput && state.bypassDspOnBitPerfect,
           featureInfo: AudioFeatureRegistry.bypassDsp,
-          onChanged: cubit.setBypassDspOnBitPerfect,
+          disabledReason: !state.bitPerfectOutput
+              ? 'Enable Bit-Perfect USB Pass-Through first'
+              : null,
+          onChanged: !state.bitPerfectOutput
+              ? (v) {}
+              : cubit.setBypassDspOnBitPerfect,
         ),
         settingsCardDivider(p),
         // ReplayGain / Loudness Normalization Suite
@@ -482,6 +488,19 @@ class AudioSoundSection extends StatelessWidget {
               backgroundColor: Colors.transparent,
               builder: (_) => const RoomCorrectionSheet(),
             ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.sensors_rounded),
+            title: const Text('DSP Signal Inspector & Debug',
+                style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text('Inspect live active DSP stages, HAL effects & engine state',
+                style: TextStyle(color: p.textSecondary, fontSize: 12)),
+            trailing: Icon(Icons.chevron_right_rounded, color: p.textSecondary),
+            onTap: () => DspInspectorSheet.show(context),
           ),
         ),
         const BatteryOptimizationCard(),

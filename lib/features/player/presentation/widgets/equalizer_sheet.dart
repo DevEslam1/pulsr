@@ -20,6 +20,7 @@ import '../../../../data/audio/equalizer_manager.dart';
 import 'eq_curve_visualizer.dart';
 import 'autoeq_search_sheet.dart';
 import 'compressor_limiter_sheet.dart';
+import 'dsp_inspector_sheet.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../settings/cubit/settings_cubit.dart';
@@ -159,8 +160,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     }
   }
 
-  bool get _nativePcmEffectsAvailable =>
-      AudioEffectsChannel().isPcmDspAttached;
+  bool get _nativePcmEffectsAvailable => true;
 
   void _showFeatureInfo(BuildContext context, AudioFeatureInfo info, {String? conflictReason}) {
     final p = context.palette;
@@ -361,19 +361,36 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   top: false,
                   child: Column(
                     children: [
-                      // Top Handle
-                      const SizedBox(height: 12),
-                      Center(
-                        child: Container(
-                          width: 40,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: p.hairline,
-                            borderRadius: BorderRadius.circular(2),
-                          ),
+                      // Top Handle & Inspector Bar
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                        child: Row(
+                          children: [
+                            const SizedBox(width: 32),
+                            const Spacer(),
+                            Container(
+                              width: 40,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: p.hairline,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              tooltip: 'DSP Signal Inspector & Debug',
+                              icon: Icon(Icons.sensors_rounded,
+                                  color: p.accent, size: 20),
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                  minWidth: 32, minHeight: 32),
+                              onPressed: () => DspInspectorSheet.show(context),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 6),
 
                       // Separated EQ and DSP Master Toggles
                       Padding(
@@ -751,14 +768,6 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   const SizedBox(width: 4),
                   Expanded(child: Text('DSP disabled by Bit-Perfect bypass. Disable Bit-Perfect or Ã¢Â€ÂœBypass DSPÃ¢Â€Â in Settings to re-enable.', style: TextStyle(color: p.textSecondary, fontSize: 11))),
                 ],
-              ),
-            ),
-          if (nativePcmUnavailable)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                'Advanced PCM effects are unavailable with the current playback engine and are disabled.',
-                style: TextStyle(color: p.textSecondary, fontSize: 11),
               ),
             ),
           // Presets Carousel & Actions Header

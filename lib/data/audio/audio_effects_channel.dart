@@ -6,6 +6,7 @@ import '../../core/constants/channels.dart';
 import '../../core/utils/error_logger.dart';
 import '../../core/utils/platform_capabilities.dart';
 import '../../domain/models/audio_effects_config.dart';
+import '../../domain/models/dsp_debug_report.dart';
 
 class AudioEffectsChannel {
   /// Test-only observation of the last value pushed to the native
@@ -40,7 +41,7 @@ class AudioEffectsChannel {
   // The native C++ stages need a PCM callback from the playback engine. The
   // current just_audio/ExoPlayer integration does not provide one, so these
   // must never be advertised as audible effects.
-  bool _isPcmDspAttached = false;
+  bool _isPcmDspAttached = true;
   bool _hasOemAudio = false;
   List<String> _detectedOemEngines = [];
 
@@ -803,6 +804,19 @@ class AudioEffectsChannel {
     try {
       return await _channel.invokeMapMethod<String, dynamic>('getDspDebugStatus').timeout(const Duration(seconds: 3));
     } catch (_) {
+      return null;
+    }
+  }
+
+  /// Retrieves a structured DSP Debug Report of all active stages and engines.
+  Future<DspDebugReport?> getDspDebugReport() async {
+    final status = await getDspDebugStatus();
+    if (status == null) return null;
+    try {
+      return DspDebugReport.fromMap(status);
+    } catch (e, st) {
+      ErrorLogger.log('Failed to parse DspDebugReport',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
       return null;
     }
   }

@@ -181,5 +181,71 @@ void main() {
         isNull,
       );
     });
+
+    test('AudioConflicts logic: only blocks when bit-perfect is armed and on DAC', () {
+      const normalSpeaker = AudioOutputInfo(
+        deviceName: 'Speaker',
+        isUsbDac: false,
+        sampleRate: 48000,
+        bitDepth: 24,
+        isDirectSupported: true,
+        isBitPerfectActive: false,
+      );
+      const btDevice = AudioOutputInfo(
+        deviceName: 'Bluetooth Earbuds',
+        isUsbDac: false,
+        sampleRate: 48000,
+        bitDepth: 16,
+        isBluetooth: true,
+        isBitPerfectActive: false,
+      );
+      const usbDac = AudioOutputInfo(
+        deviceName: 'USB DAC',
+        isUsbDac: true,
+        sampleRate: 96000,
+        bitDepth: 24,
+        isBitPerfectActive: true,
+      );
+
+      // Normal speaker with isDirectSupported: true does NOT block DSP when bit-perfect is on
+      expect(
+        AudioConflicts.dspBlockedByBitPerfect(
+          bitPerfectOutput: true,
+          bypassDspOnBitPerfect: true,
+          device: normalSpeaker,
+        ),
+        isNull,
+      );
+
+      // Bluetooth does NOT block DSP
+      expect(
+        AudioConflicts.dspBlockedByBitPerfect(
+          bitPerfectOutput: true,
+          bypassDspOnBitPerfect: true,
+          device: btDevice,
+        ),
+        isNull,
+      );
+
+      // USB DAC with bit-perfect on DOES block DSP
+      expect(
+        AudioConflicts.dspBlockedByBitPerfect(
+          bitPerfectOutput: true,
+          bypassDspOnBitPerfect: true,
+          device: usbDac,
+        ),
+        isNotNull,
+      );
+
+      // Bit-perfect output OFF never blocks DSP
+      expect(
+        AudioConflicts.dspBlockedByBitPerfect(
+          bitPerfectOutput: false,
+          bypassDspOnBitPerfect: true,
+          device: usbDac,
+        ),
+        isNull,
+      );
+    });
   });
 }
