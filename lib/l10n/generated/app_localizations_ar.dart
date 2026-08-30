@@ -1377,4 +1377,28 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get blockedByBitPerfectShort => 'محظور بواسطة وضع البت المثالي';
+
+  @override
+  String get deviceProfilesTitle => 'ملفات إعدادات الأجهزة';
+
+  @override
+  String get deviceProfilesSubtitle => 'تذكّر إعدادات الصوت لكل جهاز إخراج';
+
+  @override
+  String get autoDeviceSwitch => 'تبديل تلقائي عند تغيير الجهاز';
+
+  @override
+  String get noDevicesSeen => 'لم يتم اكتشاف أي أجهزة إخراج بعد';
+
+  @override
+  String get applyProfileNow => 'تطبيق';
+
+  @override
+  String get forgetDevice => 'حذف';
+
+  @override
+  String get currentDeviceBadge => 'الحالي';
+
+  @override
+  String get profileDropdownLabel => 'الملف';
 }

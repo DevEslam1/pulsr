@@ -484,5 +484,13 @@
   "dspDynamicEqAttack": "Ataque",
   "dspDynamicEqRelease": "Liberación",
   "dspDynamicEqMaxCut": "Corte máximo",
-  "blockedByBitPerfectShort": "Bloqueado por Bit-Perfect"
+  "blockedByBitPerfectShort": "Bloqueado por Bit-Perfect",
+  "deviceProfilesTitle": "Perfiles de dispositivo",
+  "deviceProfilesSubtitle": "Ajustes de sonido recordados por dispositivo de salida",
+  "autoDeviceSwitch": "Cambio automático al cambiar de dispositivo",
+  "noDevicesSeen": "Aún no se han detectado dispositivos de salida",
+  "applyProfileNow": "Aplicar",
+  "forgetDevice": "Olvidar",
+  "currentDeviceBadge": "Actual",
+  "profileDropdownLabel": "Perfil"
 }

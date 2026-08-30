@@ -17,6 +17,15 @@ class SettingsProfile {
   final bool bitPerfectEnabled;
   final String playerTheme;
 
+  // Phase 3: optional per-profile DSP stage management. Null = "this profile
+  // does not manage the stage", which keeps previously saved JSON and the
+  // bundled default profiles back-compatible.
+  final bool? saturationEnabled;
+  final bool? stereoWidthEnabled;
+  final bool? loudnessContourEnabled;
+  final bool? subCrossoverEnabled;
+  final bool? dynamicEqEnabled;
+
   const SettingsProfile({
     required this.id,
     required this.name,
@@ -27,6 +36,11 @@ class SettingsProfile {
     this.crossfadeSeconds = 0.0,
     this.bitPerfectEnabled = false,
     this.playerTheme = 'classic',
+    this.saturationEnabled,
+    this.stereoWidthEnabled,
+    this.loudnessContourEnabled,
+    this.subCrossoverEnabled,
+    this.dynamicEqEnabled,
   });
 
   Map<String, dynamic> toJson() => {
@@ -39,6 +53,11 @@ class SettingsProfile {
         'crossfadeSeconds': crossfadeSeconds,
         'bitPerfectEnabled': bitPerfectEnabled,
         'playerTheme': playerTheme,
+        'saturationEnabled': saturationEnabled,
+        'stereoWidthEnabled': stereoWidthEnabled,
+        'loudnessContourEnabled': loudnessContourEnabled,
+        'subCrossoverEnabled': subCrossoverEnabled,
+        'dynamicEqEnabled': dynamicEqEnabled,
       };
 
   factory SettingsProfile.fromJson(Map<String, dynamic> json) =>
@@ -55,6 +74,11 @@ class SettingsProfile {
         crossfadeSeconds: (json['crossfadeSeconds'] as num?)?.toDouble() ?? 0.0,
         bitPerfectEnabled: json['bitPerfectEnabled'] as bool? ?? false,
         playerTheme: json['playerTheme'] as String? ?? 'classic',
+        saturationEnabled: json['saturationEnabled'] as bool?,
+        stereoWidthEnabled: json['stereoWidthEnabled'] as bool?,
+        loudnessContourEnabled: json['loudnessContourEnabled'] as bool?,
+        subCrossoverEnabled: json['subCrossoverEnabled'] as bool?,
+        dynamicEqEnabled: json['dynamicEqEnabled'] as bool?,
       );
 
   static const List<SettingsProfile> defaultProfiles = [

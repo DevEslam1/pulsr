@@ -8,6 +8,7 @@ import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
 import 'widgets/appearance_section.dart';
 import 'widgets/audio_sound_section.dart';
+import 'widgets/device_profiles_section.dart';
 import 'widgets/cache_section.dart';
 import 'widgets/cloud_sync_card.dart';
 import 'widgets/gestures_section.dart';
@@ -66,6 +67,11 @@ class SettingsScreen extends StatelessWidget {
                     const CloudSyncCard(),
                     PlaybackSection(state: state),
                     AudioSoundSection(state: state),
+                    SettingsSection(
+                      icon: Icons.speaker_group_rounded,
+                      title: context.l10n.deviceProfilesTitle,
+                      children: const [DeviceProfilesSection()],
+                    ),
                     AppearanceSection(state: state),
                     GesturesSection(state: state),
                     LibrarySection(state: state),

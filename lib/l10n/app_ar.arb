@@ -484,5 +484,13 @@
   "dspDynamicEqAttack": "زمن الهجوم",
   "dspDynamicEqRelease": "زمن التحرر",
   "dspDynamicEqMaxCut": "أقصى خفض",
-  "blockedByBitPerfectShort": "محظور بواسطة وضع البت المثالي"
+  "blockedByBitPerfectShort": "محظور بواسطة وضع البت المثالي",
+  "deviceProfilesTitle": "ملفات إعدادات الأجهزة",
+  "deviceProfilesSubtitle": "تذكّر إعدادات الصوت لكل جهاز إخراج",
+  "autoDeviceSwitch": "تبديل تلقائي عند تغيير الجهاز",
+  "noDevicesSeen": "لم يتم اكتشاف أي أجهزة إخراج بعد",
+  "applyProfileNow": "تطبيق",
+  "forgetDevice": "حذف",
+  "currentDeviceBadge": "الحالي",
+  "profileDropdownLabel": "الملف"
 }

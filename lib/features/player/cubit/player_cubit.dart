@@ -25,6 +25,10 @@ import '../../../domain/models/headphone_profile.dart';
 import '../../../domain/models/lyrics_line.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../domain/usecases/toggle_favorite_usecase.dart';
+import '../../../core/services/device_profile_service.dart';
+import '../../../core/services/hires_audio_service.dart';
+import '../../../core/services/settings_profiles_service.dart';
+import '../../../domain/models/audio_output_info.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../widgets/widget_service.dart';
 import 'player_state.dart';
@@ -55,6 +59,10 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   final WidgetService? _widgetService;
   final ScrobblerService? _scrobblerService;
   final PlaybackLatencyTracker? _latencyTracker;
+  final SettingsProfilesService? _settingsProfilesService;
+  final DeviceProfileService? _deviceProfileService;
+  final HiResAudioService? _hiResAudioService;
+  String? _lastAutoAppliedDeviceKey;
 
   StreamSubscription<void>? _widgetClickSub;
   DateTime? _lastWidgetUpdateTime;
@@ -87,6 +95,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     SettingsCubit? settingsCubit,
     WidgetService? widgetService,
     ScrobblerService? scrobblerService,
+    SettingsProfilesService? settingsProfilesService,
+    DeviceProfileService? deviceProfileService,
+    HiResAudioService? hiResAudioService,
     PlaybackLatencyTracker? latencyTracker,
   })  : _audioHandler = audioHandler,
         _repository = repository,
@@ -94,6 +105,18 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
         _settingsCubit = settingsCubit,
         _widgetService = widgetService,
         _scrobblerService = scrobblerService,
+        _settingsProfilesService = settingsProfilesService ??
+            (getIt.isRegistered<SettingsProfilesService>()
+                ? getIt<SettingsProfilesService>()
+                : null),
+        _deviceProfileService = deviceProfileService ??
+            (getIt.isRegistered<DeviceProfileService>()
+                ? getIt<DeviceProfileService>()
+                : null),
+        _hiResAudioService = hiResAudioService ??
+            (getIt.isRegistered<HiResAudioService>()
+                ? getIt<HiResAudioService>()
+                : null),
         _latencyTracker = latencyTracker ??
             (getIt.isRegistered<PlaybackLatencyTracker>()
                 ? getIt<PlaybackLatencyTracker>()
@@ -104,7 +127,14 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     _listenToSettings();
     _listenToWidgetClicks();
     _syncAudioEffects();
+    // Re-sync effect state once the handler finishes its async init: the
+    // sync above can race the preference restore and read pre-restore
+    // defaults, leaving toggles showing OFF for saved-ON stages.
+    _audioHandler.effectsReady.then((_) {
+      if (!isClosed) _syncAudioEffects();
+    }).ignore();
     _restoreQueueSlots();
+    _startDeviceProfileWatcher();
     _updateWidgetThrottled(force: true);
   }
 
@@ -1334,6 +1364,91 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     bands[index] = band;
     safeEmit(state.copyWith(dynamicEqBands: bands));
     await _audioHandler.setDynamicEqBand(index, band);
+  }
+
+  // --- PHASE 3: PER-DEVICE PROFILE AUTOSWITCH ---
+
+  void _startDeviceProfileWatcher() {
+    final service = _deviceProfileService;
+    final hiRes = _hiResAudioService;
+    if (service == null || hiRes == null) return;
+    autoSub(hiRes.outputDeviceStream, (device) {
+      _onOutputDeviceChanged(device);
+    });
+  }
+
+  Future<void> _onOutputDeviceChanged(AudioOutputInfo device) async {
+    final service = _deviceProfileService;
+    final profilesService = _settingsProfilesService;
+    if (service == null || profilesService == null || isClosed) return;
+    try {
+      final key = DeviceProfileService.deviceKeyFromInfo(device);
+      await service.rememberDevice(key, device.deviceName);
+      // De-dup: the output stream also fires on format changes (sample rate,
+      // bit depth) for the same device; only switch when the device changes.
+      if (_lastAutoAppliedDeviceKey == key) return;
+      _lastAutoAppliedDeviceKey = key;
+      if (!await service.isAutoSwitchEnabled()) return;
+      final link = await service.linkForDeviceKey(key);
+      if (link == null) return;
+      final profiles = await profilesService.getProfiles();
+      SettingsProfile? profile;
+      for (final p in profiles) {
+        if (p.id == link.profileId) {
+          profile = p;
+          break;
+        }
+      }
+      if (profile == null) return;
+      await applyProfile(profile);
+    } catch (e, st) {
+      ErrorLogger.log('Device profile auto-switch failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }
+  }
+
+  /// Applies a settings profile through the cubit's guarded setters so
+  /// handler, persisted prefs and UI state stay consistent. Order matters:
+  /// DSP stages are applied BEFORE bit-perfect so its bypass conflict rules
+  /// evaluate against the pre-switch state, and bit-perfect is re-asserted
+  /// last (its bypass then zeroes stages per the saved policy).
+  Future<void> applyProfile(SettingsProfile profile, {bool manual = false}) async {
+    try {
+      EqPreset preset = EqPreset.defaultPresets.first;
+      for (final p in EqPreset.defaultPresets) {
+        if (p.name == profile.eqPresetName) {
+          preset = p;
+          break;
+        }
+      }
+      await setEqualizerEnabled(true);
+      await applyPreset(preset);
+      await setVolumeBoost(profile.volumeBoost);
+      if (profile.saturationEnabled != null) {
+        await setSaturation(profile.saturationEnabled!);
+      }
+      if (profile.stereoWidthEnabled != null) {
+        await setStereoWidth(profile.stereoWidthEnabled!);
+      }
+      if (profile.loudnessContourEnabled != null) {
+        await setLoudnessContour(profile.loudnessContourEnabled!);
+      }
+      if (profile.subCrossoverEnabled != null) {
+        await setSubCrossover(profile.subCrossoverEnabled!);
+      }
+      if (profile.dynamicEqEnabled != null) {
+        await setDynamicEq(profile.dynamicEqEnabled!);
+      }
+      final settings = _settingsCubit;
+      if (settings != null) {
+        await settings.setCrossfade(
+            profile.crossfadeEnabled ? profile.crossfadeSeconds : 0.0);
+        await settings.setBitPerfectOutput(profile.bitPerfectEnabled);
+      }
+    } catch (e, st) {
+      ErrorLogger.log('Failed to apply settings profile',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }
   }
 
   // Sleep Timer

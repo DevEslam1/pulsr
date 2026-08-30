@@ -417,6 +417,12 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       if (newState.bitPerfectOutput) {
         await _hiResAudioService.setBitPerfectMode(true);
       }
+      if (newState.bitPerfectOutput && newState.bypassDspOnBitPerfect) {
+        // Re-assert the DSP-bypass policy at boot: without this the Kotlin
+        // effects plugin keeps its default (bypass off) after a restart and
+        // the saved bit-perfect conflict rule is not enforced this session.
+        await AudioEffectsChannel().setBypassDspForBitPerfect(true);
+      }
       final savedSampleRate = prefs.getInt('target_output_sample_rate') ?? 0;
       final savedBitDepth = prefs.getInt('target_output_bit_depth') ?? 0;
       if (savedSampleRate > 0 || savedBitDepth > 0) {

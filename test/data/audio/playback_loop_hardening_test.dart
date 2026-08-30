@@ -136,6 +136,8 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> setDynamicEqBand(int index, DynamicEqBandConfig band) async {}
   @override
+  Future<void> get effectsReady => Future<void>.value();
+  @override
   Duration get crossfadeDuration => Duration.zero;
   @override
   Stream<Duration> get positionStream => _positionController.stream;

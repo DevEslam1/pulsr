@@ -219,6 +219,8 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   Future<void> setDynamicEq(bool enabled) async {}
   @override
   Future<void> setDynamicEqBand(int index, DynamicEqBandConfig band) async {}
+  @override
+  Future<void> get effectsReady => Future<void>.value();
 
   @override
   Future<void> setCrossfeed(bool enabled,

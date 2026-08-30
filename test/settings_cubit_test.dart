@@ -2,6 +2,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/network/proxy_config.dart';
+import 'package:pulsr/data/audio/audio_effects_channel.dart';
 import 'package:pulsr/data/scanner/media_scanner_service.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
@@ -277,6 +278,38 @@ void main() {
       expect(cubitSession2.state.proxyUsername, 'qmyizdto');
 
       await cubitSession2.close();
+    });
+  });
+
+  group('SettingsCubit boot DSP-bypass policy', () {
+    setUp(() {
+      AudioEffectsChannel.lastPushedBypassDspForBitPerfect = null;
+    });
+    test('restore re-asserts setBypassDspForBitPerfect(true) when saved ON', () async {
+      SharedPreferences.setMockInitialValues({
+        'setting_bit_perfect_output': true,
+        'setting_bypass_dsp_on_bit_perfect': true,
+      });
+      final cubit = SettingsCubit(scannerService: mockScannerService);
+      addTearDown(cubit.close);
+      await pumpEventQueue();
+
+      expect(cubit.state.bitPerfectOutput, isTrue);
+      expect(cubit.state.bypassDspOnBitPerfect, isTrue);
+      expect(AudioEffectsChannel.lastPushedBypassDspForBitPerfect, isTrue);
+    });
+
+    test('restore does not push bypass when bit-perfect is saved OFF', () async {
+      SharedPreferences.setMockInitialValues({
+        'setting_bit_perfect_output': false,
+        'setting_bypass_dsp_on_bit_perfect': true,
+      });
+      final cubit = SettingsCubit(scannerService: mockScannerService);
+      addTearDown(cubit.close);
+      await pumpEventQueue();
+
+      expect(cubit.state.bitPerfectOutput, isFalse);
+      expect(AudioEffectsChannel.lastPushedBypassDspForBitPerfect, isNull);
     });
   });
 }

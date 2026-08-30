@@ -1,12 +1,18 @@
 // lib/data/audio/audio_effects_channel.dart
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import '../../core/constants/channels.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/models/audio_effects_config.dart';
 
 class AudioEffectsChannel {
+  /// Test-only observation of the last value pushed to the native
+  /// bit-perfect DSP-bypass switch (null = nothing pushed yet).
+  @visibleForTesting
+  static bool? lastPushedBypassDspForBitPerfect;
+
   static const MethodChannel _channel =
       MethodChannel(PulsrChannels.audioEffects);
 
@@ -295,6 +301,7 @@ class AudioEffectsChannel {
 
   /// Unified bypass for all DSP stages when bit-perfect is active.
   Future<void> setBypassDspForBitPerfect(bool bypass) async {
+    lastPushedBypassDspForBitPerfect = bypass;
     if (!Platform.isAndroid) return;
     try {
       await _channel.invokeMethod('setBypassDspForBitPerfect', {'bypass': bypass});

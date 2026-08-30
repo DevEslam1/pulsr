@@ -1376,4 +1376,29 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get blockedByBitPerfectShort => 'Bloqueado por Bit-Perfect';
+
+  @override
+  String get deviceProfilesTitle => 'Perfiles de dispositivo';
+
+  @override
+  String get deviceProfilesSubtitle =>
+      'Ajustes de sonido recordados por dispositivo de salida';
+
+  @override
+  String get autoDeviceSwitch => 'Cambio automático al cambiar de dispositivo';
+
+  @override
+  String get noDevicesSeen => 'Aún no se han detectado dispositivos de salida';
+
+  @override
+  String get applyProfileNow => 'Aplicar';
+
+  @override
+  String get forgetDevice => 'Olvidar';
+
+  @override
+  String get currentDeviceBadge => 'Actual';
+
+  @override
+  String get profileDropdownLabel => 'Perfil';
 }

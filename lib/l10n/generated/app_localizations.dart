@@ -2625,6 +2625,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Blocked by Bit-Perfect'**
   String get blockedByBitPerfectShort;
+
+  /// No description provided for @deviceProfilesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Device Profiles'**
+  String get deviceProfilesTitle;
+
+  /// No description provided for @deviceProfilesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sound settings remembered per output device'**
+  String get deviceProfilesSubtitle;
+
+  /// No description provided for @autoDeviceSwitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-switch on device change'**
+  String get autoDeviceSwitch;
+
+  /// No description provided for @noDevicesSeen.
+  ///
+  /// In en, this message translates to:
+  /// **'No output devices seen yet'**
+  String get noDevicesSeen;
+
+  /// No description provided for @applyProfileNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get applyProfileNow;
+
+  /// No description provided for @forgetDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Forget'**
+  String get forgetDevice;
+
+  /// No description provided for @currentDeviceBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get currentDeviceBadge;
+
+  /// No description provided for @profileDropdownLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get profileDropdownLabel;
 }
 
 class _AppLocalizationsDelegate

@@ -184,8 +184,16 @@ class PulsrAudioHandler extends BaseAudioHandler
       getIt.unregister<EqualizerManager>();
     }
     getIt.registerSingleton<EqualizerManager>(_equalizerManager);
-    _init();
+    _initFuture = _init();
   }
+
+  Future<void>? _initFuture;
+
+  /// Completes when the async [_init] (AudioSession configuration,
+  /// equalizer preference restore and engine apply) has finished. Consumers
+  /// that mirror effect state (e.g. PlayerCubit._syncAudioEffects) must
+  /// re-read after this completes to avoid racing the preference restore.
+  Future<void> get effectsReady => _initFuture ?? Future<void>.value();
 
   EqualizerManager get equalizerManager => _equalizerManager;
   AdaptiveBufferEngine get adaptiveBufferEngine => _adaptiveBufferEngine;

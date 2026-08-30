@@ -216,7 +216,10 @@ class TestPulsrAudioHandler extends BaseAudioHandler
 
   // Phase 1 DSP expansion stage surface (mirror PulsrAudioHandler)
   @override
-  bool get isSaturationEnabled => false;
+  bool persistedSaturationEnabled = false;
+
+  @override
+  bool get isSaturationEnabled => persistedSaturationEnabled;
   @override
   double get saturationDrive => 0.0;
   @override
@@ -257,6 +260,9 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   Future<void> setDynamicEq(bool enabled) async {}
   @override
   Future<void> setDynamicEqBand(int index, DynamicEqBandConfig band) async {}
+  @override
+  Completer<void>? readyGate;
+  Future<void> get effectsReady => readyGate?.future ?? Future<void>.value();
 
   @override
   Future<void> setCrossfeed(bool enabled,
@@ -1036,6 +1042,29 @@ void main() {
       expect(cubit.state.queue.isNotEmpty, isTrue);
 
       await cubit.close();
+    });
+  });
+
+  group('PlayerCubit DSP state sync', () {
+    test('re-syncs audio effects after handler effectsReady completes', () async {
+      testAudioHandler.readyGate = Completer<void>();
+      final cubit = PlayerCubit(
+        audioHandler: testAudioHandler,
+        repository: mockRepository,
+        toggleFavoriteUseCase: mockToggleFavorite,
+      );
+      addTearDown(cubit.close);
+
+      // Pre-restore snapshot: handler defaults read as OFF.
+      expect(cubit.state.isSaturationEnabled, isFalse);
+
+      // Preference restore lands after the first sync: persisted ON state
+      // becomes visible only through the effectsReady re-sync.
+      testAudioHandler.persistedSaturationEnabled = true;
+      testAudioHandler.readyGate!.complete();
+      await pumpEventQueue();
+
+      expect(cubit.state.isSaturationEnabled, isTrue);
     });
   });
 }
