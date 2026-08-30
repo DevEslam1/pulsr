@@ -27,6 +27,7 @@ import '../db/app_database.dart';
 import 'artwork_uri_resolver.dart';
 import 'audio_effects_channel.dart';
 import 'crossfade_manager.dart';
+import 'replay_gain_math.dart';
 import 'equalizer_manager.dart';
 import 'sleep_timer_manager.dart';
 import 'ytm_resolving_source.dart';
@@ -320,64 +321,21 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   double _calculateReplayGainVolume(SongsTableData? song) {
     if (song == null) return _volume;
-
     final prefs = _cachedPrefs;
     if (prefs == null) return _volume; // Null guard
 
     final modeStr = prefs.getString(PrefsKeys.replayGainMode) ?? 'track';
-    final preampWithRg =
-        prefs.getDouble(PrefsKeys.replayGainPreampWithRg) ?? 0.0;
-    final preampWithoutRg =
-        prefs.getDouble(PrefsKeys.replayGainPreampWithoutRg) ?? -3.0;
-
-    double? gainDb;
-    double? peak;
-
-    switch (modeStr) {
-      case 'track':
-        gainDb = song.replayGainTrack;
-        peak = song.replayGainTrackPeak;
-        break;
-      case 'album':
-        gainDb = song.replayGainAlbum ?? song.replayGainTrack;
-        peak = song.replayGainAlbumPeak ?? song.replayGainTrackPeak;
-        break;
-      case 'auto':
-        final isAlbumMode = _isConsecutiveAlbumPlayback();
-        if (isAlbumMode && song.replayGainAlbum != null) {
-          gainDb = song.replayGainAlbum;
-          peak = song.replayGainAlbumPeak ?? song.replayGainTrackPeak;
-        } else {
-          gainDb = song.replayGainTrack;
-          peak = song.replayGainTrackPeak;
-        }
-        break;
-      case 'off':
-      default:
-        return _volume;
-    }
-
-    double preampDb;
-    if (gainDb != null && gainDb != 0.0) {
-      preampDb = preampWithRg;
-    } else {
-      preampDb = preampWithoutRg;
-      gainDb = 0.0;
-    }
-
-    final totalGainDb = (gainDb) + preampDb;
-    var multiplier = math.pow(10.0, totalGainDb / 20.0).toDouble();
-
-    // Clipping prevention: limit gain so output <= 1.0 with 0.5 dB inter-sample peak headroom
-    final effectivePeak = (peak != null && peak > 0.0) ? peak : 1.0;
-    final interSampleHeadroom =
-        math.pow(10.0, -0.5 / 20.0).toDouble(); // ~0.944 (-0.5 dB)
-    final maxGain = interSampleHeadroom / effectivePeak;
-    if (multiplier > maxGain) {
-      multiplier = maxGain;
-    }
-
-    return (_volume * multiplier).clamp(0.0, 1.0).toDouble();
+    return ReplayGainMath.apply(
+      mode: modeStr,
+      volume: _volume,
+      trackGainDb: song.replayGainTrack,
+      trackPeak: song.replayGainTrackPeak,
+      albumGainDb: song.replayGainAlbum,
+      albumPeak: song.replayGainAlbumPeak,
+      albumContext: _isConsecutiveAlbumPlayback(),
+      preampWithRg: prefs.getDouble(PrefsKeys.replayGainPreampWithRg) ?? 0.0,
+      preampWithoutRg: prefs.getDouble(PrefsKeys.replayGainPreampWithoutRg) ?? -3.0,
+    );
   }
 
   Future<void> setVolume(double volume) async {
@@ -1486,6 +1444,18 @@ class PulsrAudioHandler extends BaseAudioHandler
         }
         _broadcastState(_activePlayer.playbackEvent);
         _positionSubject.add(pos);
+
+        // ReplayGain fix: apply the RG-adjusted volume for the restored
+        // track. Without this the restored session ran at raw volume until a
+        // settings change re-triggered gain application (toggles looked
+        // 'enabled' but had no audible effect).
+        try {
+          await _activePlayer
+              .setVolume(_calculateReplayGainVolume(currentSong));
+        } catch (e2, st2) {
+          ErrorLogger.log('Failed to apply ReplayGain on restored session',
+              error: e2, stackTrace: st2, category: 'AudioHandler');
+        }
       }
     } catch (e, st) {
       ErrorLogger.log('Error restoring last playback session',
@@ -1592,7 +1562,9 @@ class PulsrAudioHandler extends BaseAudioHandler
         _broadcastState(_activePlayer.playbackEvent);
 
         await active.stop();
-        await active.setVolume(_volume);
+        // ReplayGain fix: recompute for the now-current song instead of
+        // writing the raw volume (which silently dropped RG after crossfade).
+        await active.setVolume(_calculateReplayGainVolume(currentSong));
       } catch (e, st) {
         ErrorLogger.log('Error during crossfade playback',
             error: e, stackTrace: st, category: 'AudioHandler');

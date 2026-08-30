@@ -37,6 +37,7 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 
   double _vol = 1.0;
+  int setVolumeCallCount = 0;
   @override
   double get volume => _vol;
   @override
@@ -46,6 +47,7 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> setVolume(double volume) async {
     _vol = volume;
+    setVolumeCallCount += 1;
   }
 
   bool eqEnabled = false;
@@ -1065,6 +1067,9 @@ void main() {
       await pumpEventQueue();
 
       expect(cubit.state.isSaturationEnabled, isTrue);
+      // The same re-sync must re-apply the ReplayGain-adjusted volume so a
+      // restored 'on' gain mode is audible, not just displayed.
+      expect(testAudioHandler.setVolumeCallCount, greaterThan(0));
     });
   });
 }

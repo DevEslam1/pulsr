@@ -130,8 +130,13 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     // Re-sync effect state once the handler finishes its async init: the
     // sync above can race the preference restore and read pre-restore
     // defaults, leaving toggles showing OFF for saved-ON stages.
-    _audioHandler.effectsReady.then((_) {
-      if (!isClosed) _syncAudioEffects();
+    _audioHandler.effectsReady.then((_) async {
+      if (isClosed) return;
+      _syncAudioEffects();
+      // ReplayGain re-apply: with the fully restored session (song tags +
+      // cached prefs) a restored 'on' gain mode must be actually audible,
+      // not just displayed as enabled.
+      await _audioHandler.setVolume(_audioHandler.volume);
     }).ignore();
     _restoreQueueSlots();
     _startDeviceProfileWatcher();
