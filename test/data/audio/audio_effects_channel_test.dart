@@ -15,12 +15,12 @@ void main() {
       log.clear();
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .setMockMethodCallHandler(channel, (MethodCall call) async {
-        log.add(call);
-        if (call.method == 'setCacheBudgetBytes') {
-          return true;
-        }
-        return null;
-      });
+            log.add(call);
+            if (call.method == 'setCacheBudgetBytes') {
+              return true;
+            }
+            return null;
+          });
     });
 
     tearDown(() {
@@ -28,30 +28,38 @@ void main() {
           .setMockMethodCallHandler(channel, null);
     });
 
-    test('[A-D5] setCacheBudgetBytes sends correct budget over platform channel', () async {
-      final effectsChannel = AudioEffectsChannel();
-      const budget16Mb = 16 * 1024 * 1024;
-      const budget64Mb = 64 * 1024 * 1024;
+    test(
+      '[A-D5] setCacheBudgetBytes sends correct budget over platform channel',
+      () async {
+        final effectsChannel = AudioEffectsChannel();
+        const budget16Mb = 16 * 1024 * 1024;
+        const budget64Mb = 64 * 1024 * 1024;
 
-      await effectsChannel.setCacheBudgetBytes(budget16Mb);
-      await effectsChannel.setCacheBudgetBytes(budget64Mb);
+        await effectsChannel.setCacheBudgetBytes(budget16Mb);
+        await effectsChannel.setCacheBudgetBytes(budget64Mb);
 
-      expect(effectsChannel, isNotNull);
-    });
+        expect(effectsChannel, isNotNull);
+      },
+    );
 
-    test('[E1] onAutoDegradedSessionStarted fires exactly once per 0->nonzero transition', () async {
-      final effectsChannel = AudioEffectsChannel();
-      final transitions = <int>[];
-      final sub = effectsChannel.onAutoDegradedSessionStarted.listen(transitions.add);
+    test(
+      '[E1] onAutoDegradedSessionStarted fires exactly once per 0->nonzero transition',
+      () async {
+        final effectsChannel = AudioEffectsChannel();
+        final transitions = <int>[];
+        final sub = effectsChannel.onAutoDegradedSessionStarted.listen(
+          transitions.add,
+        );
 
-      // Simulate transitions: 0 -> 8 (reverb degraded) -> 10 (reverb+crossfeed degraded) -> 0 (recovered) -> 8 (re-degraded)
-      effectsChannel.getAutoDegradedStages(); // 0
-      
-      // Directly exercise transition handler
-      effectsChannel.getAutoDegradedStages(); // 0
-      expect(transitions, isEmpty);
+        // Simulate transitions: 0 -> 8 (reverb degraded) -> 10 (reverb+crossfeed degraded) -> 0 (recovered) -> 8 (re-degraded)
+        await effectsChannel.getAutoDegradedStages(); // 0
 
-      await sub.cancel();
-    });
+        // Directly exercise transition handler
+        await effectsChannel.getAutoDegradedStages(); // 0
+        expect(transitions, isEmpty);
+
+        await sub.cancel();
+      },
+    );
   });
 }

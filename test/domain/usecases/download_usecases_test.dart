@@ -14,6 +14,7 @@ import 'package:pulsr/domain/usecases/queue_download.dart';
 import 'package:pulsr/domain/usecases/reorder_downloads.dart';
 import 'package:pulsr/domain/usecases/resume_download.dart';
 import 'package:pulsr/domain/usecases/retry_download.dart';
+import 'package:pulsr/core/errors/failures.dart';
 
 class MockDownloadRepository extends Mock implements IDownloadRepository {}
 
@@ -53,65 +54,65 @@ void main() {
   group('Download UseCases', () {
     test('QueueDownloadUseCase delegates to repository', () async {
       when(() => mockRepo.queueDownload(testTask))
-          .thenAnswer((_) async => const Right('test_id_1'));
+          .thenAnswer((_) async => const Right<AppFailure, String>('test_id_1'));
 
       final result = await queueUseCase(testTask);
-      expect(result, const Right('test_id_1'));
+      expect(result, const Right<AppFailure, String>('test_id_1'));
       verify(() => mockRepo.queueDownload(testTask)).called(1);
     });
 
     test('PauseDownloadUseCase delegates to repository', () async {
       when(() => mockRepo.pauseDownload('vid_123'))
-          .thenAnswer((_) async => const Right(unit));
+          .thenAnswer((_) async => const Right<AppFailure, Unit>(unit));
 
       final result = await pauseUseCase('vid_123');
-      expect(result, const Right(unit));
+      expect(result, const Right<AppFailure, Unit>(unit));
       verify(() => mockRepo.pauseDownload('vid_123')).called(1);
     });
 
     test('ResumeDownloadUseCase delegates to repository', () async {
       when(() => mockRepo.resumeDownload('vid_123'))
-          .thenAnswer((_) async => const Right(unit));
+          .thenAnswer((_) async => const Right<AppFailure, Unit>(unit));
 
       final result = await resumeUseCase('vid_123');
-      expect(result, const Right(unit));
+      expect(result, const Right<AppFailure, Unit>(unit));
       verify(() => mockRepo.resumeDownload('vid_123')).called(1);
     });
 
     test('RetryDownloadUseCase delegates to repository', () async {
       when(() => mockRepo.retryDownload('vid_123'))
-          .thenAnswer((_) async => const Right(unit));
+          .thenAnswer((_) async => const Right<AppFailure, Unit>(unit));
 
       final result = await retryUseCase('vid_123');
-      expect(result, const Right(unit));
+      expect(result, const Right<AppFailure, Unit>(unit));
       verify(() => mockRepo.retryDownload('vid_123')).called(1);
     });
 
     test('DeleteDownloadUseCase delegates to repository', () async {
       when(() => mockRepo.deleteDownload('vid_123'))
-          .thenAnswer((_) async => const Right(unit));
+          .thenAnswer((_) async => const Right<AppFailure, Unit>(unit));
 
       final result = await deleteUseCase('vid_123');
-      expect(result, const Right(unit));
+      expect(result, const Right<AppFailure, Unit>(unit));
       verify(() => mockRepo.deleteDownload('vid_123')).called(1);
     });
 
     test('PrioritizeDownloadUseCase delegates to repository', () async {
       when(() => mockRepo.prioritizeDownload('vid_123'))
-          .thenAnswer((_) async => const Right(unit));
+          .thenAnswer((_) async => const Right<AppFailure, Unit>(unit));
 
       final result = await prioritizeUseCase('vid_123');
-      expect(result, const Right(unit));
+      expect(result, const Right<AppFailure, Unit>(unit));
       verify(() => mockRepo.prioritizeDownload('vid_123')).called(1);
     });
 
     test('ReorderDownloadsUseCase delegates to repository', () async {
       const ids = ['vid_1', 'vid_2', 'vid_3'];
       when(() => mockRepo.reorderQueue(ids))
-          .thenAnswer((_) async => const Right(unit));
+          .thenAnswer((_) async => const Right<AppFailure, Unit>(unit));
 
       final result = await reorderUseCase(ids);
-      expect(result, const Right(unit));
+      expect(result, const Right<AppFailure, Unit>(unit));
       verify(() => mockRepo.reorderQueue(ids)).called(1);
     });
 
@@ -121,7 +122,7 @@ void main() {
           .thenAnswer((_) => controller.stream);
 
       final stream = observeUseCase();
-      expectLater(stream, emits(testTask));
+      unawaited(expectLater(stream, emits(testTask)));
       controller.add(testTask);
       await controller.close();
     });
@@ -134,10 +135,10 @@ void main() {
         downloadedSongsCount: 5,
       );
       when(() => mockRepo.getStorageStats())
-          .thenAnswer((_) async => const Right(stats));
+          .thenAnswer((_) async => const Right<AppFailure, StorageStats>(stats));
 
       final result = await storageStatsUseCase();
-      expect(result, const Right(stats));
+      expect(result, const Right<AppFailure, StorageStats>(stats));
       verify(() => mockRepo.getStorageStats()).called(1);
     });
   });

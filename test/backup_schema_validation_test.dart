@@ -41,17 +41,17 @@ void main() {
 
     test('rejects payload with missing or invalid version', () async {
       expect(
-        () => importUseCase.execute(jsonEncode({'favorites': []})),
+        () => importUseCase.execute(jsonEncode({'favorites': <dynamic>[]})),
         throwsA(isA<FormatException>()),
       );
       expect(
         () => importUseCase
-            .execute(jsonEncode({'version': '1', 'favorites': []})),
+            .execute(jsonEncode({'version': '1', 'favorites': <dynamic>[]})),
         throwsA(isA<FormatException>()),
       );
       expect(
         () =>
-            importUseCase.execute(jsonEncode({'version': 0, 'favorites': []})),
+            importUseCase.execute(jsonEncode({'version': 0, 'favorites': <dynamic>[]})),
         throwsA(isA<FormatException>()),
       );
     });
@@ -107,8 +107,8 @@ void main() {
           'gaplessPlayback': true,
           'crossfadeSeconds': 4.0,
         },
-        'playHistory': [],
-        'excludedFolders': [],
+        'playHistory': <dynamic>[],
+        'excludedFolders': <dynamic>[],
       };
 
       final result = await importUseCase.execute(jsonEncode(validPayload));

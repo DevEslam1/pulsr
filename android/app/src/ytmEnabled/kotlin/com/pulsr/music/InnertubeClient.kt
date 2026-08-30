@@ -155,6 +155,18 @@ internal class InnertubeClient(
     ) : Exception("[$traceId] [${signal.name}] $message", cause)
 
     /**
+     * Thrown when the ladder aborts early because
+     * [LadderAbortPolicy.DEFAULT_THRESHOLD] consecutive clients returned
+     * LOGIN_REQUIRED - a device/IP-level gate where walking the remaining
+     * clients cannot succeed. Surfaces to Dart as YTM_SIGNIN_REQUIRED so the
+     * UI can offer sign-in instead of a misleading timeout.
+     */
+    class YtmSignInRequiredAbortException(
+        val clientsTried: Int,
+        traceId: String,
+    ) : Exception("[$traceId] Ladder aborted after $clientsTried consecutive LOGIN_REQUIRED client responses")
+
+    /**
      * Resolves audio stream formats for [videoId] through dynamic fallback ladder:
      * 1. Consults ResolutionStrategy for eligible client chain
      * 2. Executes parallel race for high-priority tier
@@ -180,10 +192,18 @@ internal class InnertubeClient(
         var lastSignal: YtmBlockSignal = YtmBlockSignal.RateLimited
         val traceId = UUID.randomUUID().toString()
 
+        // TTFA fast-fail: several consecutive LOGIN_REQUIRED responses from
+        // different clients indicate a device/IP-level gate. Walking the rest
+        // of the chain cannot succeed and only burns the executor, the rate
+        // limiter and the user's time - abort with a typed signal instead.
+        val loginAbortPolicy = LadderAbortPolicy()
+        val clientsAttempted = java.util.concurrent.atomic.AtomicInteger(0)
+
         fun attemptClient(client: ClientType): Map<String, Any?>? {
             if (Thread.currentThread().isInterrupted) return null
             try {
                 Log.d(TAG, "[$traceId] Attempting player resolution for $videoId using client: ${client.name}")
+                clientsAttempted.incrementAndGet()
                 val playerJson = requestPlayer(videoId, client)
                 if (Thread.currentThread().isInterrupted) return null
 
@@ -196,6 +216,7 @@ internal class InnertubeClient(
                     val parsedSignal = YtmBlockSignal.parse(200, status, playability)
                     lastSignal = parsedSignal
                     Log.w(TAG, "[$traceId] Client ${client.name} returned status $status -> $parsedSignal")
+                    loginAbortPolicy.onLoginRequired(status.equals("LOGIN_REQUIRED", ignoreCase = true))
                     if ((parsedSignal == YtmBlockSignal.BotChallenge || parsedSignal == YtmBlockSignal.PoTokenInvalid) &&
                         (client == ClientType.ANDROID_MUSIC || client == ClientType.WEB_REMIX)) {
                         val now = System.currentTimeMillis()
@@ -231,6 +252,7 @@ internal class InnertubeClient(
 
                 if (audioFormats.isEmpty()) {
                     lastSignal = YtmBlockSignal.PoTokenInvalid
+                    loginAbortPolicy.onLoginRequired(false)
                     return null
                 }
 
@@ -289,6 +311,7 @@ internal class InnertubeClient(
             } catch (t: Throwable) {
                 Log.w(TAG, "[$traceId] Failed resolving with ${client.name}: ${t.message}")
                 lastException = t
+                loginAbortPolicy.onLoginRequired(false)
                 return null
             }
         }
@@ -362,6 +385,10 @@ internal class InnertubeClient(
                     } else {
                         winnerStore.recordFailure(trackType, client)
                         activeFutures.remove(done)
+                        if (loginAbortPolicy.shouldAbort()) {
+                            for (f in activeFutures) f.cancel(true)
+                            activeFutures.clear()
+                        }
                     }
                 } catch (_: Throwable) {
                     activeFutures.remove(done)
@@ -379,6 +406,7 @@ internal class InnertubeClient(
         // Fallback: sequential check on remaining candidates in chain
         val remainingClients = clientChain.drop(2)
         for (client in remainingClients) {
+            if (loginAbortPolicy.shouldAbort()) break
             val res = attemptClient(client)
             if (res != null) {
                 winnerStore.recordWinningClient(trackType, client)
@@ -386,6 +414,13 @@ internal class InnertubeClient(
             } else {
                 winnerStore.recordFailure(trackType, client)
             }
+        }
+
+        if (loginAbortPolicy.shouldAbort()) {
+            throw YtmSignInRequiredAbortException(
+                clientsTried = clientsAttempted.get(),
+                traceId = traceId,
+            )
         }
 
         throw InnertubeException(

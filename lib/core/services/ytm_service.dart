@@ -97,6 +97,14 @@ class YtmService {
   // ladder.
   static const Duration _resolveFirstAttemptTimeout = Duration(seconds: 8);
 
+  /// TTFA: device-level negative cache — when the native ladder returns
+  /// LOGIN_REQUIRED or BotChallenge from every client, the block is at the
+  /// device/IP level, not per-video. A single global flag fast-fails ALL
+  /// subsequent resolves during the block window instead of re-burning the
+  /// full 8–9s dead ladder for each different song.
+  static const Duration _signinAbortTtl = Duration(minutes: 3);
+  static DateTime? _globalBlockUntil;
+
   final MethodChannel _channel = const MethodChannel(channelName);
   final StreamController<void> _authExpiredController =
       StreamController<void>.broadcast();
@@ -591,7 +599,23 @@ class YtmService {
       }
     }
 
+    // TTFA: fast-fail while a device/IP-level bot-block is still fresh.
+    // The block is global (all videos share the same IP), so we use a single
+    // timestamp rather than a per-videoId map.
+    final globalBlock = _globalBlockUntil;
+    if (globalBlock != null) {
+      if (DateTime.now().isBefore(globalBlock)) {
+        throw const YtmException(
+          'YTM_SIGNIN_REQUIRED',
+          'Sign in to YouTube Music - Google is currently blocking playback '
+          'from this device or network',
+        );
+      }
+      _globalBlockUntil = null; // block expired, clear it
+    }
+
     return _runCoalesced('resolve:$videoId:$quality', () async {
+      var signInRequiredAbort = false;
       try {
         _tracker?.markStage(PlaybackStage.pluginEntered);
         _tracker?.setTag('cacheHit', 'false');
@@ -636,21 +660,24 @@ class YtmService {
       }
 
       // 2. Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
+      //
+      // maxRetries: 0 — the native Kotlin ladder already tries every client
+      // internally (IOS_MUSIC → ANDROID_MUSIC → ANDROID_VR → …). Adding an
+      // external retry just re-runs a ladder that already told us every client
+      // is gate-blocked (LOGIN_REQUIRED / BotChallenge), wasting ~9 extra
+      // seconds before falling through to tier-3.
       try {
         try {
           _tracker?.markStage(PlaybackStage.clientRequestSent);
-          // Check poToken state heuristically: if we have a cached token, this is warm
           _tracker?.markStage(PlaybackStage.poTokenNeeded);
         } catch (_) {}
-        // TTFA play path: bounded ladder (8s first attempt, one retry) instead
-        // of the default 25s × 2-retry ladder.
         final raw = await _guard(
           () => _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
             'videoId': videoId,
             'quality': quality,
           }),
           timeout: _resolveFirstAttemptTimeout,
-          maxRetries: 1,
+          maxRetries: 0, // no external retry — ladder is internal
         );
 
         final stream = raw == null ? null : YtmStream.fromChannel(raw);
@@ -670,7 +697,25 @@ class YtmService {
         }
       } catch (e) {
         debugPrint('[YTM_SERVICE] Native stream resolution failed: $e');
-        if (e is YtmException && e.isAuth) rethrow;
+        if (e is YtmException &&
+            (e.code == 'YTM_SIGNIN_REQUIRED' ||
+                e.code == 'YTM_TIMEOUT' ||
+                e.isBotBlocked ||
+                e.isAuth)) {
+          signInRequiredAbort = true;
+          // Write the global block NOW before any rethrow so the next play
+          // fast-fails. For bot/IP-level gates we always want to fall through
+          // to tier-3 (XDM backend) rather than hard-failing here, so only
+          // hard-rethrow on a pure session-expiry (isAuth but NOT isBotBlocked).
+          if (e.isBotBlocked || e.code == 'YTM_SIGNIN_REQUIRED') {
+            _globalBlockUntil = DateTime.now().add(_signinAbortTtl);
+            debugPrint('[YTM_SERVICE] Global block set for '
+                '${_signinAbortTtl.inMinutes}m '
+                '(device/IP-level LOGIN_REQUIRED / BotChallenge)');
+          }
+          // Pure session expiry (e.g. cookie revoked) → surface immediately.
+          if (e.isAuth && !e.isBotBlocked) rethrow;
+        }
       }
 
       // 3. Engine 3: Remote yt-dlp backend fallback if enabled and healthy
@@ -715,6 +760,18 @@ class YtmService {
         }
       }
 
+      if (signInRequiredAbort) {
+        // Device/IP-level gate — write a global block so every subsequent
+        // play fast-fails without re-running the dead ladder.
+        _globalBlockUntil = DateTime.now().add(_signinAbortTtl);
+        debugPrint('[YTM_SERVICE] Global block set for ${_signinAbortTtl.inMinutes}m '
+            '(LOGIN_REQUIRED / BotChallenge on all clients)');
+        throw const YtmException(
+          'YTM_SIGNIN_REQUIRED',
+          'Sign in to YouTube Music - Google is blocking playback from this '
+          'device or network',
+        );
+      }
       throw const YtmException(
         'YTM_FAILED',
         'No stream returned from any engine',
@@ -751,7 +808,8 @@ class YtmService {
             e.code == 'YTM_BOT_BLOCKED' ||
             e.code == 'YTM_RECAPTCHA' ||
             e.code == 'LOGIN_REQUIRED' ||
-            e.code == 'YTM_AUTH';
+            e.code == 'YTM_AUTH' ||
+            e.code == 'YTM_SIGNIN_REQUIRED';
 
         if (attempt == maxRetries || isFatalCode) {
           ErrorLogger.log(

@@ -1,8 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pulsr/data/audio/audio_handler.dart';
 import 'package:pulsr/domain/models/audio_effects_config.dart';
-import 'package:pulsr/domain/models/eq_preset.dart';
-import 'package:pulsr/domain/models/headphone_profile.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/player/presentation/widgets/equalizer_sheet.dart';
 

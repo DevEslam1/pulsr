@@ -145,7 +145,7 @@ void main() {
         expect(find.byKey(const ValueKey('task_low_q_456')), findsOneWidget);
         expect(find.byType(DownloadTile), findsNWidgets(2));
 
-        cubit.close();
+        await cubit.close();
       },
     );
   });

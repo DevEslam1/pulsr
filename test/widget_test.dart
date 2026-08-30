@@ -389,7 +389,7 @@ void main() {
       expect(find.byType(PulsrApp), findsOneWidget);
       // Splash shows first
       expect(find.text('Pulsr Music'), findsOneWidget);
-      await Future.delayed(const Duration(milliseconds: 100));
+      await Future<void>.delayed(const Duration(milliseconds: 100));
       await tester.pump();
       await tester.pumpWidget(const SizedBox());
       await tester.pump();

@@ -121,3 +121,23 @@ internal class ResolutionStrategy(
         }
     }
 }
+
+/**
+ * Pure policy for the stream ladder's early abort: when [threshold] consecutive
+ * clients answer LOGIN_REQUIRED, the device/IP is almost certainly gated and
+ * walking the rest of the chain cannot succeed. Kept pure for unit testing.
+ */
+internal class LadderAbortPolicy(private val threshold: Int = DEFAULT_THRESHOLD) {
+    private var consecutiveLoginRequired = 0
+
+    /** Records one client outcome; [loginRequired] = playability status was LOGIN_REQUIRED. */
+    fun onLoginRequired(loginRequired: Boolean) {
+        consecutiveLoginRequired = if (loginRequired) consecutiveLoginRequired + 1 else 0
+    }
+
+    fun shouldAbort(): Boolean = consecutiveLoginRequired >= threshold
+
+    companion object {
+        const val DEFAULT_THRESHOLD = 3
+    }
+}

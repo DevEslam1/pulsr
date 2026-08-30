@@ -404,7 +404,7 @@ void main() {
         }();
 
         pool.add(fut);
-        fut.whenComplete(() => pool.remove(fut));
+        unawaited(fut.whenComplete(() => pool.remove(fut)));
         if (pool.length >= maxConcurrency) {
           await Future.any(pool);
         }

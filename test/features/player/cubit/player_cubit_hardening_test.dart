@@ -376,7 +376,7 @@ void main() {
       await cubit.playSong(sampleSong1);
 
       // Wait for debounce timer (2s)
-      await Future.delayed(const Duration(milliseconds: 2100));
+      await Future<void>.delayed(const Duration(milliseconds: 2100));
 
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(PrefsKeys.queueSlots);

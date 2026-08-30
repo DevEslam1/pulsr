@@ -143,7 +143,7 @@ class MainActivity : AudioServiceActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         tagEditorPlugin = TagEditorPlugin.registerWith(flutterEngine, applicationContext)
-        visualizerPlugin = VisualizerPlugin.registerWith(flutterEngine)
+        visualizerPlugin = VisualizerPlugin.registerWith(flutterEngine, applicationContext)
         ringtonePlugin = RingtonePlugin.registerWith(flutterEngine, applicationContext)
         audioEffectsPlugin = AudioEffectsPlugin.registerWith(flutterEngine, applicationContext)
         scrobblerPlugin = ScrobblerPlugin.registerWith(flutterEngine, applicationContext)

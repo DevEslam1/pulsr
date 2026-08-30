@@ -22,8 +22,10 @@ class FakeSearchMusicUseCase implements SearchMusicUseCase {
   @override
   Stream<Result<List<SongsTableData>>> searchSongs(String query,
       {List<String> excludedFolders = const []}) {
+    // ignore: close_sinks
     final existing = streams[query];
     if (existing != null) return existing.stream;
+    // ignore: close_sinks
     final controller = StreamController<Result<List<SongsTableData>>>();
     streams[query] = controller;
     return controller.stream;
@@ -31,6 +33,13 @@ class FakeSearchMusicUseCase implements SearchMusicUseCase {
 
   void emitFor(String query, Result<List<SongsTableData>> result) {
     streams[query]?.add(result);
+  }
+
+  void close() {
+    for (final controller in streams.values) {
+      controller.close();
+    }
+    streams.clear();
   }
 
   @override
@@ -66,6 +75,10 @@ void main() {
     mockFolders = MockFolderUseCases();
     when(() => mockFolders.getExcludedFolders())
         .thenAnswer((_) async => const Right([]));
+  });
+
+  tearDown(() {
+    fakeSearch.close();
   });
 
   test('slow response 1 never overwrites fast response 2', () async {

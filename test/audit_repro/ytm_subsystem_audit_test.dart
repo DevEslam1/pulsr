@@ -115,9 +115,9 @@ void main() {
       '[C-10] InnerTube JSON parser resilience against empty/malformed responses',
       () {
         final malformedPayloads = [
-          {},
-          {'contents': null},
-          {'contents': []},
+          <String, dynamic>{},
+          <String, dynamic>{'contents': null},
+          <String, dynamic>{'contents': <dynamic>[]},
           {
             'contents': {
               'tabbedSearchResultsRenderer': {
@@ -129,7 +129,7 @@ void main() {
                           'contents': [
                             {
                               'musicResponsiveListItemRenderer': {
-                                'flexColumns': [], // empty flexColumns
+                                                                 'flexColumns': <dynamic>[], // empty flexColumns
                               },
                             },
                           ],

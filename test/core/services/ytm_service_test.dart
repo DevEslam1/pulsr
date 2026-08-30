@@ -395,5 +395,55 @@ void main() {
       final stream = await YtmService().resolveStream('dQw4w9WgXcQ');
       expect(stream.url, equals('https://native.example/audio.m4a'));
     });
+  });
+  group('YtmService sign-in-required fast-fail', () {
+    test('native YTM_SIGNIN_REQUIRED abort surfaces typed, not as auth', () async {
+      var calls = 0;
+      _mockChannel((call) async {
+        if (call.method == 'resolveStream') {
+          calls++;
+          throw PlatformException(code: 'YTM_SIGNIN_REQUIRED', message: 'Ladder aborted');
+        }
+        return null;
+      });
+
+      await expectLater(
+        YtmService().resolveStream('AAAAAAAAAAA'),
+        throwsA(
+          isA<YtmException>()
+              .having((e) => e.code, 'code', 'YTM_SIGNIN_REQUIRED')
+              // A device/IP gate for a guest is NOT a session-expiry verdict:
+              // it must not trigger the global auth-expired UI path.
+              .having((e) => e.isAuth, 'isAuth', isFalse),
+        ),
+      );
+      expect(calls, 1);
+    });
+
+    test('immediate retry within the negative-cache TTL fails fast', () async {
+      var calls = 0;
+      _mockChannel((call) async {
+        if (call.method == 'resolveStream') {
+          calls++;
+          throw PlatformException(code: 'YTM_SIGNIN_REQUIRED', message: 'Ladder aborted');
+        }
+        return null;
+      });
+
+      await expectLater(
+        YtmService().resolveStream('BBBBBBBBBBB'),
+        throwsA(
+          isA<YtmException>().having((e) => e.code, 'code', 'YTM_SIGNIN_REQUIRED'),
+        ),
+      );
+      await expectLater(
+        YtmService().resolveStream('BBBBBBBBBBB'),
+        throwsA(
+          isA<YtmException>().having((e) => e.code, 'code', 'YTM_SIGNIN_REQUIRED'),
+        ),
+      );
+      // The retry must not reach the native ladder again.
+      expect(calls, 1);
+    });
   });
 }

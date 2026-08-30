@@ -27,8 +27,13 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
         const val METHOD_CHANNEL = "com.pulsr.music/visualizer"
         const val EVENT_CHANNEL = "com.pulsr.music/visualizer_stream"
 
-        fun registerWith(flutterEngine: FlutterEngine): VisualizerPlugin {
+        fun registerWith(flutterEngine: FlutterEngine, appContext: android.content.Context): VisualizerPlugin {
             val plugin = VisualizerPlugin()
+            // Manual registration path: onAttachedToEngine never fires for
+            // plugins registered via registerWith, so the context must be
+            // provided here. Previously it stayed null and the visualizer
+            // could never start ("Context is null, cannot start visualizer").
+            plugin.context = appContext.applicationContext
             plugin.methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, METHOD_CHANNEL)
             plugin.methodChannel.setMethodCallHandler(plugin)
 

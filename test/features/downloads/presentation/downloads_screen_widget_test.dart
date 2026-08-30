@@ -24,14 +24,26 @@ import 'package:pulsr/features/downloads/presentation/widgets/storage_stats_head
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 class MockQueueDownloadUseCase extends Mock implements QueueDownloadUseCase {}
+
 class MockPauseDownloadUseCase extends Mock implements PauseDownloadUseCase {}
+
 class MockResumeDownloadUseCase extends Mock implements ResumeDownloadUseCase {}
+
 class MockRetryDownloadUseCase extends Mock implements RetryDownloadUseCase {}
+
 class MockDeleteDownloadUseCase extends Mock implements DeleteDownloadUseCase {}
-class MockObserveDownloadsUseCase extends Mock implements ObserveDownloadsUseCase {}
-class MockGetDownloadStorageStatsUseCase extends Mock implements GetDownloadStorageStatsUseCase {}
-class MockReorderDownloadsUseCase extends Mock implements ReorderDownloadsUseCase {}
-class MockPrioritizeDownloadUseCase extends Mock implements PrioritizeDownloadUseCase {}
+
+class MockObserveDownloadsUseCase extends Mock
+    implements ObserveDownloadsUseCase {}
+
+class MockGetDownloadStorageStatsUseCase extends Mock
+    implements GetDownloadStorageStatsUseCase {}
+
+class MockReorderDownloadsUseCase extends Mock
+    implements ReorderDownloadsUseCase {}
+
+class MockPrioritizeDownloadUseCase extends Mock
+    implements PrioritizeDownloadUseCase {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -59,14 +71,20 @@ void main() {
     mockPrioritize = MockPrioritizeDownloadUseCase();
     downloadStreamController = StreamController<DownloadTask>.broadcast();
 
-    when(() => mockObserve()).thenAnswer((_) => downloadStreamController.stream);
+    when(
+      () => mockObserve(),
+    ).thenAnswer((_) => downloadStreamController.stream);
     when(() => mockObserve.getAll()).thenAnswer((_) async => []);
-    when(() => mockStorageStats()).thenAnswer((_) async => const Right(StorageStats(
+    when(() => mockStorageStats()).thenAnswer(
+      (_) async => const Right(
+        StorageStats(
           usedBytes: 104857600, // 100 MB
           freeBytes: 10737418240, // 10 GB
           totalBytes: 21474836480, // 20 GB
           downloadedSongsCount: 15,
-        )));
+        ),
+      ),
+    );
   });
 
   tearDown(() {
@@ -88,7 +106,10 @@ void main() {
     );
   }
 
-  Widget createTestWidget(DownloadsCubit cubit, {Locale locale = const Locale('en')}) {
+  Widget createTestWidget(
+    DownloadsCubit cubit, {
+    Locale locale = const Locale('en'),
+  }) {
     return BlocProvider<DownloadsCubit>.value(
       value: cubit,
       child: MaterialApp(
@@ -100,12 +121,14 @@ void main() {
           GlobalCupertinoLocalizations.delegate,
         ],
         supportedLocales: AppLocalizations.supportedLocales,
-        theme: AuraTheme.customTheme(const Color(0xFF00E5FF), brightness: Brightness.dark),
+        theme: AuraTheme.customTheme(
+          const Color(0xFF00E5FF),
+          brightness: Brightness.dark,
+        ),
         home: const DownloadsScreen(),
       ),
     );
   }
-
 
   group('DownloadsScreen Widget Tests', () {
     testWidgets('Renders empty state when no tasks exist', (tester) async {
@@ -116,11 +139,12 @@ void main() {
       expect(find.byType(DownloadsScreen), findsOneWidget);
       expect(find.byType(StorageStatsHeader), findsOneWidget);
       expect(find.byIcon(Icons.download_done_rounded), findsOneWidget);
-      cubit.close();
+      await cubit.close();
     });
 
-
-    testWidgets('Renders active downloads with progress, speed and ETA', (tester) async {
+    testWidgets('Renders active downloads with progress, speed and ETA', (
+      tester,
+    ) async {
       final activeTask = DownloadTask(
         id: 'task_1',
         videoId: 'vid_1',
@@ -142,10 +166,12 @@ void main() {
       expect(find.byType(DownloadTile), findsOneWidget);
       expect(find.textContaining('65%'), findsOneWidget);
       expect(find.textContaining('512'), findsOneWidget);
-      cubit.close();
+      await cubit.close();
     });
 
-    testWidgets('Renders Arabic script and RTL without flex overflow', (tester) async {
+    testWidgets('Renders Arabic script and RTL without flex overflow', (
+      tester,
+    ) async {
       final arabicTask = DownloadTask(
         id: 'task_ar',
         videoId: 'vid_ar',
@@ -157,74 +183,84 @@ void main() {
       );
 
       final cubit = createCubit([arabicTask]);
-      await tester.pumpWidget(createTestWidget(cubit, locale: const Locale('ar')));
+      await tester.pumpWidget(
+        createTestWidget(cubit, locale: const Locale('ar')),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('مخاصمني ومش بيكلمني حبيبي يا ناس'), findsOneWidget);
       expect(find.byType(DownloadTile), findsOneWidget);
       expect(tester.takeException(), isNull); // Zero layout overflows
-      cubit.close();
+      await cubit.close();
     });
 
-    testWidgets('Swipe to delete triggers deleteDownload and shows undo snackbar', (tester) async {
-      final task = DownloadTask(
-        id: 'task_del',
-        videoId: 'vid_del',
-        title: 'Track To Delete',
-        artist: 'Artist',
-        status: DownloadStatus.complete,
-        progress: 1.0,
-        createdAt: DateTime(2026, 1, 1),
-      );
+    testWidgets(
+      'Swipe to delete triggers deleteDownload and shows undo snackbar',
+      (tester) async {
+        final task = DownloadTask(
+          id: 'task_del',
+          videoId: 'vid_del',
+          title: 'Track To Delete',
+          artist: 'Artist',
+          status: DownloadStatus.complete,
+          progress: 1.0,
+          createdAt: DateTime(2026, 1, 1),
+        );
 
-      when(() => mockDelete('vid_del')).thenAnswer((_) async => const Right(unit));
+        when(
+          () => mockDelete('vid_del'),
+        ).thenAnswer((_) async => const Right(unit));
 
-      final cubit = createCubit([task]);
-      await tester.pumpWidget(createTestWidget(cubit));
-      await tester.pumpAndSettle();
+        final cubit = createCubit([task]);
+        await tester.pumpWidget(createTestWidget(cubit));
+        await tester.pumpAndSettle();
 
-      expect(find.text('Track To Delete'), findsOneWidget);
+        expect(find.text('Track To Delete'), findsOneWidget);
 
-      // Swipe dismissible
-      await tester.drag(find.byType(Dismissible), const Offset(-500, 0));
-      await tester.pumpAndSettle();
+        // Swipe dismissible
+        await tester.drag(find.byType(Dismissible), const Offset(-500, 0));
+        await tester.pumpAndSettle();
 
-      verify(() => mockDelete('vid_del')).called(1);
-      expect(find.text('Deleted "Track To Delete"'), findsOneWidget);
-      expect(find.text('Undo'), findsOneWidget);
-      cubit.close();
-    });
+        verify(() => mockDelete('vid_del')).called(1);
+        expect(find.text('Deleted "Track To Delete"'), findsOneWidget);
+        expect(find.text('Undo'), findsOneWidget);
+        await cubit.close();
+      },
+    );
 
-    testWidgets('[B6] Two tasks sharing videoId at different qualities render simultaneously without key collision', (tester) async {
-      final flacTask = DownloadTask(
-        id: 'task_vid_123_flac',
-        videoId: 'vid_123',
-        title: 'Song (FLAC)',
-        artist: 'Artist',
-        status: DownloadStatus.complete,
-        progress: 1.0,
-        createdAt: DateTime(2026, 1, 1),
-      );
+    testWidgets(
+      '[B6] Two tasks sharing videoId at different qualities render simultaneously without key collision',
+      (tester) async {
+        final flacTask = DownloadTask(
+          id: 'task_vid_123_flac',
+          videoId: 'vid_123',
+          title: 'Song (FLAC)',
+          artist: 'Artist',
+          status: DownloadStatus.complete,
+          progress: 1.0,
+          createdAt: DateTime(2026, 1, 1),
+        );
 
-      final opusTask = DownloadTask(
-        id: 'task_vid_123_opus',
-        videoId: 'vid_123',
-        title: 'Song (Opus)',
-        artist: 'Artist',
-        status: DownloadStatus.downloading,
-        progress: 0.5,
-        createdAt: DateTime(2026, 1, 2),
-      );
+        final opusTask = DownloadTask(
+          id: 'task_vid_123_opus',
+          videoId: 'vid_123',
+          title: 'Song (Opus)',
+          artist: 'Artist',
+          status: DownloadStatus.downloading,
+          progress: 0.5,
+          createdAt: DateTime(2026, 1, 2),
+        );
 
-      final cubit = createCubit([flacTask, opusTask]);
-      await tester.pumpWidget(createTestWidget(cubit));
-      await tester.pumpAndSettle();
+        final cubit = createCubit([flacTask, opusTask]);
+        await tester.pumpWidget(createTestWidget(cubit));
+        await tester.pumpAndSettle();
 
-      expect(find.byType(DownloadTile), findsNWidgets(2));
-      expect(find.text('Song (FLAC)'), findsOneWidget);
-      expect(find.text('Song (Opus)'), findsOneWidget);
-      expect(tester.takeException(), isNull);
-      cubit.close();
-    });
+        expect(find.byType(DownloadTile), findsNWidgets(2));
+        expect(find.text('Song (FLAC)'), findsOneWidget);
+        expect(find.text('Song (Opus)'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await cubit.close();
+      },
+    );
   });
 }

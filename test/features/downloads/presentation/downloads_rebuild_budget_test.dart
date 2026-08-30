@@ -65,8 +65,9 @@ void main() {
     repoEvents = StreamController<DownloadTask>.broadcast();
     when(() => mockObserve.getAll()).thenAnswer((_) async => []);
     when(() => mockObserve.call()).thenAnswer((_) => repoEvents.stream);
-    when(() => mockStats.call())
-        .thenAnswer((_) async => const Right(StorageStats()));
+    when(
+      () => mockStats.call(),
+    ).thenAnswer((_) async => const Right(StorageStats()));
   });
 
   tearDown(() {
@@ -74,80 +75,100 @@ void main() {
   });
 
   testWidgets(
-      'progress storm rebuilds the UI layer a bounded number of times',
-      (tester) async {
-    final cubit = DownloadsCubit(mockQueue, mockPause, mockResume, mockRetry,
-        mockDelete, mockObserve, mockStats);
-    addTearDown(cubit.close);
+    'progress storm rebuilds the UI layer a bounded number of times',
+    (tester) async {
+      final cubit = DownloadsCubit(
+        mockQueue,
+        mockPause,
+        mockResume,
+        mockRetry,
+        mockDelete,
+        mockObserve,
+        mockStats,
+      );
+      addTearDown(cubit.close);
 
-    var uiDeliveries = 0;
-    Object? lastStateHash;
+      var uiDeliveries = 0;
+      Object? lastStateHash;
 
-    await tester.pumpWidget(
-      BlocProvider<DownloadsCubit>.value(
-        value: cubit,
-        child: MaterialApp(
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          theme: AuraTheme.customTheme(const Color(0xFF00E5FF),
-              brightness: Brightness.dark),
-          home: BlocBuilder<DownloadsCubit, DownloadsState>(
-            // Counts how many state changes actually REACH the UI layer.
-            builder: (context, state) {
-              if (!identical(lastStateHash, state)) {
-                lastStateHash = state;
-                uiDeliveries++;
-              }
-              return const DownloadsScreen();
-            },
+      await tester.pumpWidget(
+        BlocProvider<DownloadsCubit>.value(
+          value: cubit,
+          child: MaterialApp(
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: AuraTheme.customTheme(
+              const Color(0xFF00E5FF),
+              brightness: Brightness.dark,
+            ),
+            home: BlocBuilder<DownloadsCubit, DownloadsState>(
+              // Counts how many state changes actually REACH the UI layer.
+              builder: (context, state) {
+                if (!identical(lastStateHash, state)) {
+                  lastStateHash = state;
+                  uiDeliveries++;
+                }
+                return const DownloadsScreen();
+              },
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
-    final baseline = uiDeliveries;
+      );
+      await tester.pumpAndSettle();
+      final baseline = uiDeliveries;
 
-    // 100 progress events for one task. Without the 200ms coalescing this
-    // would deliver ~100 state changes to the UI; with it, only a few.
-    for (var i = 0; i < 100; i++) {
-      repoEvents.add(DownloadTask(
-        id: 'id_v1',
-        videoId: 'v1',
-        title: 'Song',
-        artist: 'Artist',
-        createdAt: DateTime.now(),
-        status: DownloadStatus.downloading,
-        progress: i / 100,
-      ));
-    }
-    repoEvents.add(DownloadTask(
-      id: 'id_v1',
-      videoId: 'v1',
-      title: 'Song',
-      artist: 'Artist',
-      createdAt: DateTime.now(),
-      status: DownloadStatus.complete,
-      progress: 1,
-    ));
+      // 100 progress events for one task. Without the 200ms coalescing this
+      // would deliver ~100 state changes to the UI; with it, only a few.
+      for (var i = 0; i < 100; i++) {
+        repoEvents.add(
+          DownloadTask(
+            id: 'id_v1',
+            videoId: 'v1',
+            title: 'Song',
+            artist: 'Artist',
+            createdAt: DateTime.now(),
+            status: DownloadStatus.downloading,
+            progress: i / 100,
+          ),
+        );
+      }
+      repoEvents.add(
+        DownloadTask(
+          id: 'id_v1',
+          videoId: 'v1',
+          title: 'Song',
+          artist: 'Artist',
+          createdAt: DateTime.now(),
+          status: DownloadStatus.complete,
+          progress: 1,
+        ),
+      );
 
-    // Drain the throttle window.
-    await tester.pump(const Duration(milliseconds: 700));
-    await tester.pump(const Duration(milliseconds: 700));
-    await tester.pump(const Duration(milliseconds: 700));
+      // Drain the throttle window.
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.pump(const Duration(milliseconds: 700));
 
-    final deliveries = uiDeliveries - baseline;
-    // Budget: 100 events must deliver at most 10 UI-level updates
-    // (200ms coalescing yields ~3-4; margin for the initial load).
-    expect(deliveries, lessThanOrEqualTo(10),
-        reason: '100 progress events delivered $deliveries UI updates');
-    expect(deliveries, greaterThanOrEqualTo(1),
-        reason: 'the completed task must actually reach the UI');
+      final deliveries = uiDeliveries - baseline;
+      // Budget: 100 events must deliver at most 10 UI-level updates
+      // (200ms coalescing yields ~3-4; margin for the initial load).
+      expect(
+        deliveries,
+        lessThanOrEqualTo(10),
+        reason: '100 progress events delivered $deliveries UI updates',
+      );
+      expect(
+        deliveries,
+        greaterThanOrEqualTo(1),
+        reason: 'the completed task must actually reach the UI',
+      );
 
-    repoEvents.close();
-  });
+      await repoEvents.close();
+    },
+  );
 }

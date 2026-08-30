@@ -11,9 +11,7 @@ import 'dart:math';
 
 import 'package:fpdart/fpdart.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:pulsr/core/errors/failures.dart';
 import 'package:pulsr/domain/models/download_task.dart';
 import 'package:pulsr/domain/usecases/delete_download.dart';
 import 'package:pulsr/domain/usecases/get_download_storage_stats.dart';

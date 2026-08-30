@@ -1726,6 +1726,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         return eq
     }
 
+    // DynamicsProcessing is unsupported on some devices/emulator audio HALs
+    // ("AudioEffect: bad parameter value"). After repeated build failures for
+    // the same audio session, stop retrying: each failed construction costs
+    // time in the audio path and spams the log on every EQ interaction. The
+    // latch resets automatically when the audio session changes.
+    private var dpBuildFailures = 0
+    private var dpBuildFailureSessionId = 0
+    private val dpBuildFailureLimit = 3
+
     private fun buildDynamicsProcessing() {
         val oldDp = dynamicsProcessing
         dynamicsProcessing = null
@@ -1737,6 +1746,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
         val dynamicsActive = isDynamicsEnabled && currentDynamicsPreset != "off"
         if (!isEqEnabled && !dynamicsActive) {
+            try { oldDp?.release() } catch (_: Exception) {}
+            return
+        }
+
+        if (dpBuildFailureSessionId != currentAudioSessionId) {
+            dpBuildFailures = 0
+            dpBuildFailureSessionId = currentAudioSessionId
+        }
+        if (dpBuildFailures >= dpBuildFailureLimit) {
             try { oldDp?.release() } catch (_: Exception) {}
             return
         }
@@ -1768,7 +1786,16 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             dp.enabled = isEqEnabled || dynamicsActive
             dynamicsProcessing = dp
         } catch (e: Exception) {
-            Log.w(TAG, "DynamicsProcessing build failed: ${e.message}")
+            dpBuildFailures++
+            if (dpBuildFailures == 1 || dpBuildFailures == dpBuildFailureLimit) {
+                val suffix =
+                    if (dpBuildFailures >= dpBuildFailureLimit) {
+                        " - unsupported on this device/session, suppressing further attempts"
+                    } else {
+                        ""
+                    }
+                Log.w(TAG, "DynamicsProcessing build failed$suffix: ${e.message}")
+            }
             dynamicsProcessing = null
         } finally {
             try { oldDp?.release() } catch (_: Exception) {}

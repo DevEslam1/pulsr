@@ -99,7 +99,7 @@ void main() {
         isShuffle: false,
       );
 
-      await Future.delayed(const Duration(milliseconds: 20));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
 
       expect(resolveCallCount, 1);
       expect(resolvedVideoIds, ['vid_2']);
@@ -125,7 +125,7 @@ void main() {
         shuffleIndices: shuffleIndices,
       );
 
-      await Future.delayed(const Duration(milliseconds: 20));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
 
       // Next in shuffle after index 0 is index 3 (Song 4 => 'vid_4')
       expect(resolveCallCount, 1);
@@ -145,7 +145,7 @@ void main() {
         isShuffle: false,
       );
 
-      await Future.delayed(const Duration(milliseconds: 20));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
 
       expect(resolveCallCount, 1);
       expect(resolvedVideoIds, ['vid_1']);
@@ -164,7 +164,7 @@ void main() {
         isShuffle: false,
       );
 
-      await Future.delayed(const Duration(milliseconds: 20));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
 
       expect(resolveCallCount, 0);
       expect(resolvedVideoIds.isEmpty, isTrue);
@@ -188,7 +188,7 @@ void main() {
         isShuffle: false,
       );
 
-      await Future.delayed(const Duration(milliseconds: 20));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
 
       expect(resolveCallCount, 0); // Reused cached stream without network request
     });
@@ -220,7 +220,7 @@ void main() {
       );
 
       // Wait for debounce duration
-      await Future.delayed(const Duration(milliseconds: 80));
+      await Future<void>.delayed(const Duration(milliseconds: 80));
 
       expect(resolveCallCount, 1);
       expect(resolvedVideoIds, ['vid_3']);
@@ -248,7 +248,7 @@ void main() {
         isShuffle: false,
       );
 
-      await Future.delayed(const Duration(milliseconds: 40));
+      await Future<void>.delayed(const Duration(milliseconds: 40));
       expect(urlCache.contains('vid_2'), isFalse);
       failingResolver.dispose();
     });

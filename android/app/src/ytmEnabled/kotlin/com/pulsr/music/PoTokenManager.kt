@@ -431,8 +431,34 @@ object PoTokenManager {
         }
     }
 
+    /**
+     * Deterministic NewPipe statics guard: [YoutubeParsingHelper.getClientVersion]
+     * scrapes HTML through NewPipe's global Downloader, which is null until
+     * [NewPipe.init] runs. The plugin's ensureExtractorReady() does that on
+     * extractor calls, but a PoToken refresh can fire first (preWarm /
+     * ensurePoTokenReady) - previously that raced into:
+     * "Downloader.get(...) on a null object reference" NPEs inside
+     * YoutubeParsingHelper. Idempotent, thread-safe, no-op after init.
+     */
+    private fun ensureNewPipeDownloader(ctx: Context) {
+        if (NewPipe.getDownloader() != null) return
+        synchronized(this) {
+            if (NewPipe.getDownloader() != null) return
+            val locale = java.util.Locale.getDefault()
+            NewPipe.init(
+                PulsrDownloader(ctx),
+                org.schabi.newpipe.extractor.localization.Localization.fromLocale(locale),
+                org.schabi.newpipe.extractor.localization.ContentCountry(
+                    locale.country.ifBlank { "US" }
+                ),
+            )
+            Log.i(TAG, "NewPipe downloader initialized on demand for PoToken refresh")
+        }
+    }
+
     private fun refreshInternal() {
         val ctx = appContext ?: throw IllegalStateException("PoTokenManager is not initialized with Context")
+        ensureNewPipeDownloader(ctx)
 
         val oldGen = generator
         generator = null

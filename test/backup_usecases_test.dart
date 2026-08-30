@@ -46,8 +46,8 @@ void main() {
       final decoded = jsonDecode(exported) as Map<String, dynamic>;
       expect(decoded['version'], equals(1));
       expect(decoded['favorites'], contains('/storage/music/song1.mp3'));
-      expect(decoded['settings'], isA<Map>());
-      expect(decoded['playHistory'], isA<List>());
+      expect(decoded['settings'], isA<Map<String, dynamic>>());
+      expect(decoded['playHistory'], isA<List<dynamic>>());
     });
 
     test('Import restores favorites, playlists, history, and excluded folders',

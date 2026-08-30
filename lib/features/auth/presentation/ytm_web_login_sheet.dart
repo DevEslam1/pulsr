@@ -1,5 +1,6 @@
 // lib/features/auth/presentation/ytm_web_login_sheet.dart
 import 'dart:async';
+import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -99,6 +100,19 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   // UAs live in EmbeddedBrowserUa (single source; keep bumped — see file).
   static String get mobileUserAgent => EmbeddedBrowserUa.mobile;
   static String get desktopUserAgent => EmbeddedBrowserUa.desktop;
+
+  /// Returns the [UserScript] list to inject at AT_DOCUMENT_START.
+  ///
+  /// The script deletes navigator.userAgentData (Chromium-only, absent in
+  /// Safari) and aligns platform/vendor so Google's sign-in cannot fingerprint
+  /// the embedded WebView even after the UA string has been spoofed.
+  static UnmodifiableListView<UserScript> get _antiFingerPrintScripts =>
+      UnmodifiableListView([
+        UserScript(
+          source: EmbeddedBrowserUa.antiFingerprint,
+          injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+        ),
+      ]);
 
   static const List<String> _blockPhrases = [
     "couldn't sign you in",
@@ -1102,6 +1116,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                           url: WebUri(_currentUrl),
                         ),
                         initialSettings: _settings,
+                        initialUserScripts: _antiFingerPrintScripts,
                         gestureRecognizers: const <Factory<
                             OneSequenceGestureRecognizer>>{
                           Factory<OneSequenceGestureRecognizer>(

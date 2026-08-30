@@ -34,72 +34,78 @@ void main() {
       cubit.close();
     });
 
-    test('setResumeAfterInterruption updates state and SharedPreferences',
-        () async {
-      final cubit = SettingsCubit(scannerService: mockScannerService);
+    test(
+      'setResumeAfterInterruption updates state and SharedPreferences',
+      () async {
+        final cubit = SettingsCubit(scannerService: mockScannerService);
 
-      await cubit.setResumeAfterInterruption(false);
-      expect(cubit.state.resumeAfterInterruption, false);
+        await cubit.setResumeAfterInterruption(false);
+        expect(cubit.state.resumeAfterInterruption, false);
 
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getBool('setting_resume_after_interruption'), false);
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getBool('setting_resume_after_interruption'), false);
 
-      cubit.close();
-    });
+        await cubit.close();
+      },
+    );
 
     test(
-        'setGapless, setCrossfade, setMinDuration, setDynamicTheming update state',
-        () async {
-      final cubit = SettingsCubit(scannerService: mockScannerService);
+      'setGapless, setCrossfade, setMinDuration, setDynamicTheming update state',
+      () async {
+        final cubit = SettingsCubit(scannerService: mockScannerService);
 
-      await cubit.setGapless(false);
-      expect(cubit.state.gaplessPlayback, false);
+        await cubit.setGapless(false);
+        expect(cubit.state.gaplessPlayback, false);
 
-      await cubit.setMinDuration(15);
-      expect(cubit.state.minDurationSec, 15);
+        await cubit.setMinDuration(15);
+        expect(cubit.state.minDurationSec, 15);
 
-      await cubit.setDynamicTheming(false);
-      expect(cubit.state.dynamicThemingEnabled, false);
+        await cubit.setDynamicTheming(false);
+        expect(cubit.state.dynamicThemingEnabled, false);
 
-      cubit.close();
-    });
-
-    test('setAutoHideSystemMedia updates state and SharedPreferences',
-        () async {
-      final cubit = SettingsCubit(scannerService: mockScannerService);
-
-      await cubit.setAutoHideSystemMedia(false);
-      expect(cubit.state.autoHideSystemMedia, false);
-
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getBool('setting_auto_hide_system_media'), false);
-
-      await cubit.setAutoHideSystemMedia(true);
-      expect(cubit.state.autoHideSystemMedia, true);
-
-      cubit.close();
-    });
+        await cubit.close();
+      },
+    );
 
     test(
-        'setWifiOnlyMode and setOfflineOnlyMode update state and SharedPreferences',
-        () async {
-      final cubit = SettingsCubit(scannerService: mockScannerService);
+      'setAutoHideSystemMedia updates state and SharedPreferences',
+      () async {
+        final cubit = SettingsCubit(scannerService: mockScannerService);
 
-      expect(cubit.state.wifiOnlyMode, false);
-      expect(cubit.state.offlineOnlyMode, false);
+        await cubit.setAutoHideSystemMedia(false);
+        expect(cubit.state.autoHideSystemMedia, false);
 
-      await cubit.setWifiOnlyMode(true);
-      expect(cubit.state.wifiOnlyMode, true);
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getBool('setting_auto_hide_system_media'), false);
 
-      final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getBool('setting_wifi_only_mode'), true);
+        await cubit.setAutoHideSystemMedia(true);
+        expect(cubit.state.autoHideSystemMedia, true);
 
-      await cubit.setOfflineOnlyMode(true);
-      expect(cubit.state.offlineOnlyMode, true);
-      expect(prefs.getBool('setting_offline_only_mode'), true);
+        await cubit.close();
+      },
+    );
 
-      cubit.close();
-    });
+    test(
+      'setWifiOnlyMode and setOfflineOnlyMode update state and SharedPreferences',
+      () async {
+        final cubit = SettingsCubit(scannerService: mockScannerService);
+
+        expect(cubit.state.wifiOnlyMode, false);
+        expect(cubit.state.offlineOnlyMode, false);
+
+        await cubit.setWifiOnlyMode(true);
+        expect(cubit.state.wifiOnlyMode, true);
+
+        final prefs = await SharedPreferences.getInstance();
+        expect(prefs.getBool('setting_wifi_only_mode'), true);
+
+        await cubit.setOfflineOnlyMode(true);
+        expect(cubit.state.offlineOnlyMode, true);
+        expect(prefs.getBool('setting_offline_only_mode'), true);
+
+        await cubit.close();
+      },
+    );
 
     test('proxy settings update state and SharedPreferences', () async {
       final cubit = SettingsCubit(scannerService: mockScannerService);
@@ -135,181 +141,216 @@ void main() {
       expect(cubit.state.proxyEnabled, false);
       expect(prefs.getBool('setting_proxy_enabled'), false);
 
-      cubit.close();
+      await cubit.close();
     });
 
     test(
-        'MediaScannerService.isSystemIgnoredPath accurately detects recordings & messenger media',
-        () {
-      // WhatsApp Voice Notes & Audio
-      expect(
+      'MediaScannerService.isSystemIgnoredPath accurately detects recordings & messenger media',
+      () {
+        // WhatsApp Voice Notes & Audio
+        expect(
           MediaScannerService.isSystemIgnoredPath(
-              '/storage/emulated/0/WhatsApp/Media/WhatsApp Voice Notes/2023/PTT-123.opus'),
-          true);
-      expect(
+            '/storage/emulated/0/WhatsApp/Media/WhatsApp Voice Notes/2023/PTT-123.opus',
+          ),
+          true,
+        );
+        expect(
           MediaScannerService.isSystemIgnoredPath(
-              '/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Audio/AUD-20230501-WA0001.mp3'),
-          true);
+            '/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Audio/AUD-20230501-WA0001.mp3',
+          ),
+          true,
+        );
 
-      // Telegram Audio / Voice
-      expect(
+        // Telegram Audio / Voice
+        expect(
           MediaScannerService.isSystemIgnoredPath(
-              '/storage/emulated/0/Telegram/Telegram Audio/voice_message.ogg'),
-          true);
-      expect(
+            '/storage/emulated/0/Telegram/Telegram Audio/voice_message.ogg',
+          ),
+          true,
+        );
+        expect(
           MediaScannerService.isSystemIgnoredPath(
-              '/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Voice/audio.ogg'),
-          true);
+            '/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Voice/audio.ogg',
+          ),
+          true,
+        );
 
-      // Voice & Call Recorders
-      expect(
+        // Voice & Call Recorders
+        expect(
           MediaScannerService.isSystemIgnoredPath(
-              '/storage/emulated/0/Recordings/Call/Call_20230401.m4a'),
-          true);
-      expect(
+            '/storage/emulated/0/Recordings/Call/Call_20230401.m4a',
+          ),
+          true,
+        );
+        expect(
           MediaScannerService.isSystemIgnoredPath(
-              '/storage/emulated/0/MIUI/sound_recorder/rec_01.mp3'),
-          true);
-      expect(
+            '/storage/emulated/0/MIUI/sound_recorder/rec_01.mp3',
+          ),
+          true,
+        );
+        expect(
           MediaScannerService.isSystemIgnoredPath(
-              '/storage/emulated/0/VoiceRecorder/note.m4a'),
-          true);
+            '/storage/emulated/0/VoiceRecorder/note.m4a',
+          ),
+          true,
+        );
 
-      // System Tones & Hidden folders
-      expect(
+        // System Tones & Hidden folders
+        expect(
           MediaScannerService.isSystemIgnoredPath(
-              '/storage/emulated/0/Notifications/ping.mp3'),
-          true);
-      expect(
+            '/storage/emulated/0/Notifications/ping.mp3',
+          ),
+          true,
+        );
+        expect(
           MediaScannerService.isSystemIgnoredPath(
-              '/storage/emulated/0/Ringtones/marimba.mp3'),
-          true);
-      expect(
+            '/storage/emulated/0/Ringtones/marimba.mp3',
+          ),
+          true,
+        );
+        expect(
           MediaScannerService.isSystemIgnoredPath(
-              '/storage/emulated/0/.thumbnails/cache.mp3'),
-          true);
+            '/storage/emulated/0/.thumbnails/cache.mp3',
+          ),
+          true,
+        );
 
-      // Legitimate Music Files should NOT be ignored
-      expect(
+        // Legitimate Music Files should NOT be ignored
+        expect(
           MediaScannerService.isSystemIgnoredPath(
-              '/storage/emulated/0/Music/Daft Punk - Discovery/01 - One More Time.flac'),
-          false);
-      expect(
+            '/storage/emulated/0/Music/Daft Punk - Discovery/01 - One More Time.flac',
+          ),
+          false,
+        );
+        expect(
           MediaScannerService.isSystemIgnoredPath(
-              '/storage/emulated/0/Download/Pink Floyd - Time.mp3'),
-          false);
-    });
+            '/storage/emulated/0/Download/Pink Floyd - Time.mp3',
+          ),
+          false,
+        );
+      },
+    );
 
     test(
-        'importProxiesFromText, selectProxyEntry, removeProxyEntry and sortProxiesByLatency work correctly',
-        () async {
-      final cubit = SettingsCubit(scannerService: mockScannerService);
+      'importProxiesFromText, selectProxyEntry, removeProxyEntry and sortProxiesByLatency work correctly',
+      () async {
+        final cubit = SettingsCubit(scannerService: mockScannerService);
 
-      const rawText = '''
+        const rawText = '''
 31.59.20.176:6754:qmyizdto:n5fui7pyec1q
 45.38.107.97:6014:qmyizdto:n5fui7pyec1q
 198.105.121.200:6462:qmyizdto:n5fui7pyec1q
 ''';
 
-      final count =
-          await cubit.importProxiesFromText(rawText, autoSelectFirst: true);
-      expect(count, 3);
-      expect(cubit.state.proxyList.length, 3);
-      expect(cubit.state.proxyEnabled, true);
-      expect(cubit.state.proxyHost, '31.59.20.176');
-      expect(cubit.state.proxyPort, 6754);
-      expect(cubit.state.proxyUsername, 'qmyizdto');
+        final count = await cubit.importProxiesFromText(
+          rawText,
+          autoSelectFirst: true,
+        );
+        expect(count, 3);
+        expect(cubit.state.proxyList.length, 3);
+        expect(cubit.state.proxyEnabled, true);
+        expect(cubit.state.proxyHost, '31.59.20.176');
+        expect(cubit.state.proxyPort, 6754);
+        expect(cubit.state.proxyUsername, 'qmyizdto');
 
-      // Select another proxy
-      final second = cubit.state.proxyList[1];
-      await cubit.selectProxyEntry(second);
-      expect(cubit.state.proxyHost, '45.38.107.97');
-      expect(cubit.state.proxyPort, 6014);
+        // Select another proxy
+        final second = cubit.state.proxyList[1];
+        await cubit.selectProxyEntry(second);
+        expect(cubit.state.proxyHost, '45.38.107.97');
+        expect(cubit.state.proxyPort, 6014);
 
-      // Remove third proxy
-      final thirdId = cubit.state.proxyList[2].id;
-      await cubit.removeProxyEntry(thirdId);
-      expect(cubit.state.proxyList.length, 2);
+        // Remove third proxy
+        final thirdId = cubit.state.proxyList[2].id;
+        await cubit.removeProxyEntry(thirdId);
+        expect(cubit.state.proxyList.length, 2);
 
-      // Add with latency and sort
-      await cubit.addProxyEntry(
-        const ProxyEntry(
-          id: 'fast_proxy',
-          host: '1.1.1.1',
-          port: 8080,
-          isWorking: true,
-          latencyMs: 50,
-        ),
-      );
+        // Add with latency and sort
+        await cubit.addProxyEntry(
+          const ProxyEntry(
+            id: 'fast_proxy',
+            host: '1.1.1.1',
+            port: 8080,
+            isWorking: true,
+            latencyMs: 50,
+          ),
+        );
 
-      await cubit.sortProxiesByLatency();
-      expect(cubit.state.proxyList.first.host, '1.1.1.1');
+        await cubit.sortProxiesByLatency();
+        expect(cubit.state.proxyList.first.host, '1.1.1.1');
 
-      cubit.close();
-    });
+        await cubit.close();
+      },
+    );
 
     test(
-        'proxy list and active proxy settings persist across simulated app relaunch',
-        () async {
-      // 1. First app session: import proxies and select one
-      final cubitSession1 = SettingsCubit(scannerService: mockScannerService);
-      const rawText = '''
+      'proxy list and active proxy settings persist across simulated app relaunch',
+      () async {
+        // 1. First app session: import proxies and select one
+        final cubitSession1 = SettingsCubit(scannerService: mockScannerService);
+        const rawText = '''
 31.59.20.176:6754:qmyizdto:n5fui7pyec1q
 45.38.107.97:6014:qmyizdto:n5fui7pyec1q
 ''';
-      await cubitSession1.importProxiesFromText(rawText);
-      await cubitSession1.selectProxyEntry(cubitSession1.state.proxyList[1]);
-      await cubitSession1.close();
+        await cubitSession1.importProxiesFromText(rawText);
+        await cubitSession1.selectProxyEntry(cubitSession1.state.proxyList[1]);
+        await cubitSession1.close();
 
-      // 2. Second app session (relaunch): creates a new cubit instance reading from SharedPreferences
-      final cubitSession2 = SettingsCubit(scannerService: mockScannerService);
-      // Wait for initial asynchronous _loadPreferences to complete and emit
-      await expectLater(
-        cubitSession2.stream,
-        emits(predicate<SettingsState>((s) => s.proxyList.length == 2)),
-      );
+        // 2. Second app session (relaunch): creates a new cubit instance reading from SharedPreferences
+        final cubitSession2 = SettingsCubit(scannerService: mockScannerService);
+        // Wait for initial asynchronous _loadPreferences to complete and emit
+        await expectLater(
+          cubitSession2.stream,
+          emits(predicate<SettingsState>((s) => s.proxyList.length == 2)),
+        );
 
-      expect(cubitSession2.state.proxyList.length, 2);
-      expect(cubitSession2.state.proxyList[0].host, '31.59.20.176');
-      expect(cubitSession2.state.proxyList[1].host, '45.38.107.97');
-      expect(cubitSession2.state.proxyEnabled, true);
-      expect(cubitSession2.state.proxyHost, '45.38.107.97');
-      expect(cubitSession2.state.proxyPort, 6014);
-      expect(cubitSession2.state.proxyUsername, 'qmyizdto');
+        expect(cubitSession2.state.proxyList.length, 2);
+        expect(cubitSession2.state.proxyList[0].host, '31.59.20.176');
+        expect(cubitSession2.state.proxyList[1].host, '45.38.107.97');
+        expect(cubitSession2.state.proxyEnabled, true);
+        expect(cubitSession2.state.proxyHost, '45.38.107.97');
+        expect(cubitSession2.state.proxyPort, 6014);
+        expect(cubitSession2.state.proxyUsername, 'qmyizdto');
 
-      await cubitSession2.close();
-    });
+        await cubitSession2.close();
+      },
+    );
   });
 
   group('SettingsCubit boot DSP-bypass policy', () {
     setUp(() {
       AudioEffectsChannel.lastPushedBypassDspForBitPerfect = null;
     });
-    test('restore re-asserts setBypassDspForBitPerfect(true) when saved ON', () async {
-      SharedPreferences.setMockInitialValues({
-        'setting_bit_perfect_output': true,
-        'setting_bypass_dsp_on_bit_perfect': true,
-      });
-      final cubit = SettingsCubit(scannerService: mockScannerService);
-      addTearDown(cubit.close);
-      await pumpEventQueue();
+    test(
+      'restore re-asserts setBypassDspForBitPerfect(true) when saved ON',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'setting_bit_perfect_output': true,
+          'setting_bypass_dsp_on_bit_perfect': true,
+        });
+        final cubit = SettingsCubit(scannerService: mockScannerService);
+        addTearDown(cubit.close);
+        await pumpEventQueue();
 
-      expect(cubit.state.bitPerfectOutput, isTrue);
-      expect(cubit.state.bypassDspOnBitPerfect, isTrue);
-      expect(AudioEffectsChannel.lastPushedBypassDspForBitPerfect, isTrue);
-    });
+        expect(cubit.state.bitPerfectOutput, isTrue);
+        expect(cubit.state.bypassDspOnBitPerfect, isTrue);
+        expect(AudioEffectsChannel.lastPushedBypassDspForBitPerfect, isTrue);
+      },
+    );
 
-    test('restore does not push bypass when bit-perfect is saved OFF', () async {
-      SharedPreferences.setMockInitialValues({
-        'setting_bit_perfect_output': false,
-        'setting_bypass_dsp_on_bit_perfect': true,
-      });
-      final cubit = SettingsCubit(scannerService: mockScannerService);
-      addTearDown(cubit.close);
-      await pumpEventQueue();
+    test(
+      'restore does not push bypass when bit-perfect is saved OFF',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'setting_bit_perfect_output': false,
+          'setting_bypass_dsp_on_bit_perfect': true,
+        });
+        final cubit = SettingsCubit(scannerService: mockScannerService);
+        addTearDown(cubit.close);
+        await pumpEventQueue();
 
-      expect(cubit.state.bitPerfectOutput, isFalse);
-      expect(AudioEffectsChannel.lastPushedBypassDspForBitPerfect, isNull);
-    });
+        expect(cubit.state.bitPerfectOutput, isFalse);
+        expect(AudioEffectsChannel.lastPushedBypassDspForBitPerfect, isNull);
+      },
+    );
   });
 }

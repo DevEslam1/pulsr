@@ -372,6 +372,9 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
     }
 
     private fun errorCodeFor(e: Throwable): String {
+        if (e is InnertubeClient.YtmSignInRequiredAbortException) {
+            return "YTM_SIGNIN_REQUIRED"
+        }
         if (e is InnertubeClient.InnertubeException) {
             return e.signal.code
         }
