@@ -176,6 +176,24 @@ class DynamicEqBandConfig {
     this.enabled = true,
   });
 
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DynamicEqBandConfig &&
+          runtimeType == other.runtimeType &&
+          frequency == other.frequency &&
+          q == other.q &&
+          thresholdDb == other.thresholdDb &&
+          ratio == other.ratio &&
+          attackMs == other.attackMs &&
+          releaseMs == other.releaseMs &&
+          maxCutDb == other.maxCutDb &&
+          enabled == other.enabled;
+
+  @override
+  int get hashCode => Object.hash(frequency, q, thresholdDb, ratio, attackMs,
+      releaseMs, maxCutDb, enabled);
+
   DynamicEqBandConfig copyWith({
     double? frequency,
     double? q,

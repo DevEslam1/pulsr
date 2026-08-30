@@ -1,4 +1,4 @@
-﻿// lib/features/player/presentation/widgets/equalizer_sheet.dart
+// lib/features/player/presentation/widgets/equalizer_sheet.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -23,6 +23,53 @@ import 'compressor_limiter_sheet.dart';
 import '../../../../core/di/injection.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../settings/cubit/settings_cubit.dart';
+
+// Rebuild gate for the whole DSP sheet. Every user-facing toggle/slider field
+// MUST be listed here or its switch will not flip until the sheet is reopened
+// (state emits, engine applies, but BlocBuilder skips the rebuild).
+// Position/playback fields stay excluded on purpose (10 Hz ticks).
+bool dspSheetRebuildGate(PlayerState a, PlayerState b) {
+  return a.isEqEnabled != b.isEqEnabled ||
+      a.eqPreset.name != b.eqPreset.name ||
+      a.eqPreset.bassBoost != b.eqPreset.bassBoost ||
+      a.isVirtualizerEnabled != b.isVirtualizerEnabled ||
+      a.virtualizerStrength != b.virtualizerStrength ||
+      a.isDynamicsEnabled != b.isDynamicsEnabled ||
+      a.dynamicsPreset != b.dynamicsPreset ||
+      a.selectedHeadphoneProfile != b.selectedHeadphoneProfile ||
+      a.isSpatializerEnabled != b.isSpatializerEnabled ||
+      a.isSpatializerSupported != b.isSpatializerSupported ||
+      a.volumeBoost != b.volumeBoost ||
+      a.stereoBalance != b.stereoBalance ||
+      a.monoMix != b.monoMix ||
+      a.isCrossfeedEnabled != b.isCrossfeedEnabled ||
+      a.crossfeedDelayUs != b.crossfeedDelayUs ||
+      a.crossfeedFeedDb != b.crossfeedFeedDb ||
+      a.isLimiterEnabled != b.isLimiterEnabled ||
+      a.limiterThresholdDb != b.limiterThresholdDb ||
+      a.limiterReleaseMs != b.limiterReleaseMs ||
+      a.isReverbEnabled != b.isReverbEnabled ||
+      a.reverbPreset != b.reverbPreset ||
+      a.reverbWetDry != b.reverbWetDry ||
+      a.isSincResamplerEnabled != b.isSincResamplerEnabled ||
+      a.hasOemAudio != b.hasOemAudio ||
+      listContentDiffers(a.detectedOemEngines, b.detectedOemEngines) ||
+      a.isSaturationEnabled != b.isSaturationEnabled ||
+      a.saturationDrive != b.saturationDrive ||
+      a.saturationMix != b.saturationMix ||
+      a.saturationTilt != b.saturationTilt ||
+      a.isStereoWidthEnabled != b.isStereoWidthEnabled ||
+      a.stereoWidth != b.stereoWidth ||
+      a.isLoudnessContourEnabled != b.isLoudnessContourEnabled ||
+      a.loudnessContourIntensity != b.loudnessContourIntensity ||
+      a.isSubCrossoverEnabled != b.isSubCrossoverEnabled ||
+      a.subCrossoverCornerHz != b.subCrossoverCornerHz ||
+      a.subCrossoverSlopeDbPerOct != b.subCrossoverSlopeDbPerOct ||
+      a.subCrossoverGain != b.subCrossoverGain ||
+      a.isDynamicEqEnabled != b.isDynamicEqEnabled ||
+      listContentDiffers(a.dynamicEqBands, b.dynamicEqBands) ||
+      a.errorMessage != b.errorMessage;
+}
 
 class EqualizerSheet extends StatefulWidget {
   const EqualizerSheet({super.key});
@@ -275,33 +322,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         // are consumed exclusively by per-band BlocSelectors and the curve
         // selector further down, so only the preset's name/bassBoost gate this
         // full-sheet rebuild - a drag rebuilds just the dragged slider + curve.
-        buildWhen: (a, b) =>
-            a.isEqEnabled != b.isEqEnabled ||
-            a.eqPreset.name != b.eqPreset.name ||
-            a.eqPreset.bassBoost != b.eqPreset.bassBoost ||
-            a.isVirtualizerEnabled != b.isVirtualizerEnabled ||
-            a.virtualizerStrength != b.virtualizerStrength ||
-            a.isDynamicsEnabled != b.isDynamicsEnabled ||
-            a.dynamicsPreset != b.dynamicsPreset ||
-            a.selectedHeadphoneProfile != b.selectedHeadphoneProfile ||
-            a.isSpatializerEnabled != b.isSpatializerEnabled ||
-            a.isSpatializerSupported != b.isSpatializerSupported ||
-            a.volumeBoost != b.volumeBoost ||
-            a.stereoBalance != b.stereoBalance ||
-            a.monoMix != b.monoMix ||
-            a.isCrossfeedEnabled != b.isCrossfeedEnabled ||
-            a.crossfeedDelayUs != b.crossfeedDelayUs ||
-            a.crossfeedFeedDb != b.crossfeedFeedDb ||
-            a.isLimiterEnabled != b.isLimiterEnabled ||
-            a.limiterThresholdDb != b.limiterThresholdDb ||
-            a.limiterReleaseMs != b.limiterReleaseMs ||
-            a.isReverbEnabled != b.isReverbEnabled ||
-            a.reverbPreset != b.reverbPreset ||
-            a.reverbWetDry != b.reverbWetDry ||
-            a.isSincResamplerEnabled != b.isSincResamplerEnabled ||
-            a.hasOemAudio != b.hasOemAudio ||
-            listContentDiffers(a.detectedOemEngines, b.detectedOemEngines) ||
-            a.errorMessage != b.errorMessage,
+        buildWhen: dspSheetRebuildGate,
         builder: (context, state) {
           final cubit = context.read<PlayerCubit>();
           final dspBlockedGlobal = _dspBlockedReason(context);
