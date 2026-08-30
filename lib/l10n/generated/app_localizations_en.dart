@@ -1369,6 +1369,44 @@ class AppLocalizationsEn extends AppLocalizations {
   String get blockedByBitPerfectShort => 'Blocked by Bit-Perfect';
 
   @override
+  String get rcTitle => 'Room Correction';
+
+  @override
+  String get rcSubtitle =>
+      'Measure your room with a short tone sweep and fit an EQ that flattens the response';
+
+  @override
+  String get rcStart => 'Start measurement';
+
+  @override
+  String get rcMeasuring => 'Measuring - stay quiet...';
+
+  @override
+  String get rcResult =>
+      'Measured response (top) and fitted correction (bottom)';
+
+  @override
+  String get rcApply => 'Apply';
+
+  @override
+  String get rcDiscard => 'Discard';
+
+  @override
+  String get rcMicNeeded =>
+      'Microphone permission is required for the measurement';
+
+  @override
+  String get rcQuietHint =>
+      'Keep the room quiet and let the sweep play out loud at your normal listening level';
+
+  @override
+  String get rcKeepPlayerPaused =>
+      'Music playback stays paused while Room Correction is active';
+
+  @override
+  String get rcApplied => 'Room Correction preset applied';
+
+  @override
   String get deviceProfilesTitle => 'Device Profiles';
 
   @override

@@ -159,6 +159,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     }
   }
 
+  bool get _nativePcmEffectsAvailable =>
+      AudioEffectsChannel().isPcmDspAttached;
+
   void _showFeatureInfo(BuildContext context, AudioFeatureInfo info, {String? conflictReason}) {
     final p = context.palette;
     showDialog<void>(
@@ -502,7 +505,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                         ? 0.45
                                         : 1.0,
                                     child: Switch.adaptive(
-                                      value: state.isEqEnabled,
+                                      // Keep saved choices for restoration, but never
+                                      // display an active switch while bit-perfect
+                                      // output is bypassing the processing path.
+                                      value: dspBlockedGlobal == null && state.isEqEnabled,
                                       activeTrackColor: p.accent,
                                       activeThumbColor: p.onAccent,
                                       onChanged: dspBlockedGlobal != null &&
@@ -722,6 +728,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     final preset = state.eqPreset;
     final isEnabled = state.isEqEnabled;
     final dspBlocked = _dspBlockedReason(context);
+    final nativePcmUnavailable = !_nativePcmEffectsAvailable;
     final effectiveEnabled = isEnabled && dspBlocked == null;
 
     // Gain staging calculations for Volume Boost
@@ -744,6 +751,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   const SizedBox(width: 4),
                   Expanded(child: Text('DSP disabled by Bit-Perfect bypass. Disable Bit-Perfect or Ã¢Â€ÂœBypass DSPÃ¢Â€Â in Settings to re-enable.', style: TextStyle(color: p.textSecondary, fontSize: 11))),
                 ],
+              ),
+            ),
+          if (nativePcmUnavailable)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(
+                'Advanced PCM effects are unavailable with the current playback engine and are disabled.',
+                style: TextStyle(color: p.textSecondary, fontSize: 11),
               ),
             ),
           // Presets Carousel & Actions Header
@@ -1438,10 +1453,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   ),
                 ),
                 Switch.adaptive(
-                  value: state.isSpatializerEnabled,
+                  value: dspBlocked == null && state.isSpatializerEnabled,
                   activeTrackColor: p.accent,
                   activeThumbColor: p.onAccent,
-                  onChanged: (val) => cubit.setSpatializerEnabled(val),
+                  onChanged: dspBlocked != null
+                      ? null
+                      : (val) => cubit.setSpatializerEnabled(val),
                 ),
               ],
             ),
@@ -1929,7 +1946,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Spatializer', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.spatializer, conflictReason: dspBlocked)),
                   const SizedBox(width: 4),
                   Switch.adaptive(
-                    value: state.isSpatializerEnabled,
+                    value: dspBlocked == null && state.isSpatializerEnabled,
                     activeTrackColor: p.accent,
                     activeThumbColor: p.onAccent,
                     onChanged: dspBlocked != null ? null : (val) => cubit.setSpatializerEnabled(val),
@@ -1998,7 +2015,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Virtualizer', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.virtualizer, conflictReason: dspBlocked)),
                     const SizedBox(width: 4),
                     Switch.adaptive(
-                      value: state.isVirtualizerEnabled,
+                      value: dspBlocked == null && state.isVirtualizerEnabled,
                       activeTrackColor: p.accent,
                       activeThumbColor: p.onAccent,
                       onChanged: dspBlocked != null ? null : (val) => cubit.setVirtualizerEnabled(val),
@@ -2112,7 +2129,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Dynamics', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.dynamics, conflictReason: dspBlocked)),
                     const SizedBox(width: 4),
                     Switch.adaptive(
-                      value: state.isDynamicsEnabled,
+                      value: dspBlocked == null && state.isDynamicsEnabled,
                       activeTrackColor: p.accent,
                       activeThumbColor: p.onAccent,
                       onChanged: dspBlocked != null ? null : (val) {
@@ -2266,10 +2283,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Crossfeed', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.crossfeed, conflictReason: dspBlocked)),
                     const SizedBox(width: 4),
                     Switch.adaptive(
-                      value: state.isCrossfeedEnabled,
+                      value: dspBlocked == null && state.isCrossfeedEnabled,
                       activeTrackColor: p.accent,
                       activeThumbColor: p.onAccent,
-                      onChanged: dspBlocked != null ? null : (val) => cubit.setCrossfeed(val),
+                      onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                          ? null
+                          : (val) => cubit.setCrossfeed(val),
                     ),
                   ],
                 ),
@@ -2409,10 +2428,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Limiter', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.limiter, conflictReason: dspBlocked)),
                     const SizedBox(width: 4),
                     Switch.adaptive(
-                      value: state.isLimiterEnabled,
+                      value: dspBlocked == null && state.isLimiterEnabled,
                       activeTrackColor: p.accent,
                       activeThumbColor: p.onAccent,
-                      onChanged: dspBlocked != null ? null : (val) => cubit.setLookaheadLimiter(val),
+                      onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                          ? null
+                          : (val) => cubit.setLookaheadLimiter(val),
                     ),
                   ],
                 ),
@@ -2567,10 +2588,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                     : p.textSecondary)),
                         const SizedBox(width: 4),
                         Switch.adaptive(
-                          value: state.monoMix,
+                          value: dspBlocked == null && state.monoMix,
                           activeTrackColor: p.accent,
                           activeThumbColor: p.onAccent,
-                          onChanged: dspBlocked != null ? null : (val) => cubit.setMonoMix(val),
+                          onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                              ? null
+                              : (val) => cubit.setMonoMix(val),
                         ),
                       ],
                     ),
@@ -2682,10 +2705,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Reverb', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.reverb, conflictReason: dspBlocked)),
                     const SizedBox(width: 4),
                     Switch.adaptive(
-                      value: state.isReverbEnabled,
+                      value: dspBlocked == null && state.isReverbEnabled,
                       activeTrackColor: p.accent,
                       activeThumbColor: p.onAccent,
-                      onChanged: dspBlocked != null ? null : (val) => cubit.setReverb(val),
+                      onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                          ? null
+                          : (val) => cubit.setReverb(val),
                     ),
                   ],
                 ),
@@ -2900,11 +2925,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       conflictReason: dspBlocked)),
               const SizedBox(width: 4),
               Switch.adaptive(
-                value: state.isSaturationEnabled,
+                value: dspBlocked == null && state.isSaturationEnabled,
                 activeTrackColor: p.accent,
                 activeThumbColor: p.onAccent,
-                onChanged:
-                    dspBlocked != null ? null : (val) => cubit.setSaturation(val),
+                onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                    ? null
+                    : (val) => cubit.setSaturation(val),
               ),
             ],
           ),
@@ -3018,11 +3044,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       conflictReason: dspBlocked)),
               const SizedBox(width: 4),
               Switch.adaptive(
-                value: state.isStereoWidthEnabled,
+                value: dspBlocked == null && state.isStereoWidthEnabled,
                 activeTrackColor: p.accent,
                 activeThumbColor: p.onAccent,
-                onChanged:
-                    dspBlocked != null ? null : (val) => cubit.setStereoWidth(val),
+                onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                    ? null
+                    : (val) => cubit.setStereoWidth(val),
               ),
             ],
           ),
@@ -3113,10 +3140,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       conflictReason: dspBlocked)),
               const SizedBox(width: 4),
               Switch.adaptive(
-                value: state.isSubCrossoverEnabled,
+                value: dspBlocked == null && state.isSubCrossoverEnabled,
                 activeTrackColor: p.accent,
                 activeThumbColor: p.onAccent,
-                onChanged: dspBlocked != null
+                onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
                     ? null
                     : (val) => cubit.setSubCrossover(val),
               ),
@@ -3228,11 +3255,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       conflictReason: dspBlocked)),
               const SizedBox(width: 4),
               Switch.adaptive(
-                value: state.isDynamicEqEnabled,
+                value: dspBlocked == null && state.isDynamicEqEnabled,
                 activeTrackColor: p.accent,
                 activeThumbColor: p.onAccent,
-                onChanged:
-                    dspBlocked != null ? null : (val) => cubit.setDynamicEq(val),
+                onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                    ? null
+                    : (val) => cubit.setDynamicEq(val),
               ),
             ],
           ),

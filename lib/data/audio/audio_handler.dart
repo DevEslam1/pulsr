@@ -1615,9 +1615,10 @@ class PulsrAudioHandler extends BaseAudioHandler
         _broadcastState(_activePlayer.playbackEvent);
 
         await active.stop();
-        // ReplayGain fix: recompute for the now-current song instead of
-        // writing the raw volume (which silently dropped RG after crossfade).
-        await active.setVolume(_calculateReplayGainVolume(currentSong));
+        // [active] is now the old, stopped player. Re-apply to the newly
+        // active incoming player; applying it to [active] made ReplayGain
+        // disappear after a crossfade while its setting still showed enabled.
+        await _activePlayer.setVolume(_calculateReplayGainVolume(currentSong));
       } catch (e, st) {
         ErrorLogger.log('Error during crossfade playback',
             error: e, stackTrace: st, category: 'AudioHandler');

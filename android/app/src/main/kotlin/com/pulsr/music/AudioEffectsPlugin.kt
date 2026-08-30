@@ -7,6 +7,7 @@ import android.media.AudioManager
 import android.media.audiofx.AudioEffect
 import android.media.audiofx.BassBoost
 import android.media.audiofx.DynamicsProcessing
+import android.media.audiofx.Equalizer
 import android.media.audiofx.LoudnessEnhancer
 import android.media.audiofx.Virtualizer
 import android.os.Build
@@ -54,6 +55,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private var virtualizer: Virtualizer? = null
     private var dynamicsProcessing: DynamicsProcessing? = null
+    // DynamicsProcessing is absent or broken on a sizeable number of Android
+    // audio HALs. Keep a session-bound platform EQ as a real-output fallback;
+    // the C++ engine is configured here too, but it is not in ExoPlayer's PCM
+    // callback and must never be the only audible EQ path.
+    private var legacyEqualizer: Equalizer? = null
     private var loudnessEnhancer: LoudnessEnhancer? = null
     private var bassBoost: BassBoost? = null
 
@@ -1394,13 +1400,22 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val preference = call.argument<String>("preference") ?: "native"
                     dspPreference = preference
                     recalculateActiveStages()
-                    // When switching to native, tear down DynamicsProcessing postEq to avoid dual-EQ double processing
-                    if (preference == "native" && isNativeDspLoaded) {
-                        try { dynamicsProcessing?.release() } catch (_: Exception) {}
-                        dynamicsProcessing = null
-                        cachedSupportedEffects = null
+                    // Do not tear down the Android session EQ here. The native
+                    // engine is used by explicit PCM clients, while ExoPlayer's
+                    // output reaches the earbuds through this AudioEffect
+                    // session. Releasing it made the default "native" setting
+                    // silently turn the audible EQ off.
+                    if (isEqEnabled || (isDynamicsEnabled && currentDynamicsPreset != "off")) {
+                        buildDynamicsProcessing()
                     }
                     result.success(true)
+                }
+
+                // The native engine is configured by this plugin but is not
+                // yet called from just_audio/ExoPlayer's PCM callback. Report
+                // that honestly so Flutter can disable non-audible controls.
+                "getProcessingCapabilities" -> {
+                    result.success(mapOf("isPcmDspAttached" to false))
                 }
 
                 "getDspPreference" -> {
@@ -1558,7 +1573,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     // ---- Graphic EQ + Dynamics Engine ------------------------------------
 
     private fun updateEqInPlace() {
-        val dp = dynamicsProcessing ?: return buildDynamicsProcessing()
+        val dp = dynamicsProcessing ?: run {
+            buildDynamicsProcessing()
+            if (dynamicsProcessing == null) updateLegacyEqualizer()
+            return
+        }
         try {
             for (ch in 0 until CHANNEL_COUNT) {
                 val eq = dp.getPostEqByChannelIndex(ch)
@@ -1676,6 +1695,44 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         } else {
             buildDynamicsProcessing()
         }
+        // A disabled EQ must be inaudible immediately, and an enabled EQ must
+        // still work on devices that reject DynamicsProcessing.
+        updateLegacyEqualizer()
+    }
+
+    private fun updateLegacyEqualizer() {
+        if (!isEqEnabled || currentAudioSessionId == 0 || dynamicsProcessing != null) {
+            try { legacyEqualizer?.enabled = false } catch (_: Exception) {}
+            if (dynamicsProcessing != null) {
+                try { legacyEqualizer?.release() } catch (_: Exception) {}
+                legacyEqualizer = null
+            }
+            return
+        }
+        try {
+            val eq = legacyEqualizer ?: Equalizer(0, currentAudioSessionId).also {
+                legacyEqualizer = it
+            }
+            val range = eq.bandLevelRange
+            for (band in 0 until eq.numberOfBands.toInt()) {
+                val hz = eq.getCenterFreq(band.toShort()) / 1000.0
+                val nearest = eqCenterFreqs.indices.minByOrNull {
+                    abs(kotlin.math.ln(eqCenterFreqs[it] / hz))
+                } ?: 0
+                // Equalizer has no independent preamp control. Apply it to
+                // every band in the fallback so its response matches the
+                // DynamicsProcessing implementation as closely as Android
+                // permits.
+                val levelMb = ((eqBandGains[nearest] + eqPreampDb) * 100.0).toInt()
+                    .coerceIn(range[0].toInt(), range[1].toInt())
+                eq.setBandLevel(band.toShort(), levelMb.toShort())
+            }
+            eq.enabled = true
+        } catch (e: Exception) {
+            Log.w(TAG, "Platform Equalizer fallback unavailable: ${e.message}")
+            try { legacyEqualizer?.release() } catch (_: Exception) {}
+            legacyEqualizer = null
+        }
     }
 
     private fun setEqBandsLayout(freqs: List<Double>?) {
@@ -1713,6 +1770,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private fun setEqPreampValue(preampDb: Double) {
         eqPreampDb = preampDb
         updatePreampInPlace()
+        updateLegacyEqualizer()
     }
 
     private fun buildPostEq(): DynamicsProcessing.Eq {
@@ -1741,12 +1799,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
         if (currentAudioSessionId == 0) {
             try { oldDp?.release() } catch (_: Exception) {}
+            updateLegacyEqualizer()
             return
         }
 
         val dynamicsActive = isDynamicsEnabled && currentDynamicsPreset != "off"
         if (!isEqEnabled && !dynamicsActive) {
             try { oldDp?.release() } catch (_: Exception) {}
+            updateLegacyEqualizer()
             return
         }
 
@@ -1756,6 +1816,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
         if (dpBuildFailures >= dpBuildFailureLimit) {
             try { oldDp?.release() } catch (_: Exception) {}
+            updateLegacyEqualizer()
             return
         }
 
@@ -1785,6 +1846,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
             dp.enabled = isEqEnabled || dynamicsActive
             dynamicsProcessing = dp
+            updateLegacyEqualizer()
         } catch (e: Exception) {
             dpBuildFailures++
             if (dpBuildFailures == 1 || dpBuildFailures == dpBuildFailureLimit) {
@@ -1797,6 +1859,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 Log.w(TAG, "DynamicsProcessing build failed$suffix: ${e.message}")
             }
             dynamicsProcessing = null
+            updateLegacyEqualizer()
         } finally {
             try { oldDp?.release() } catch (_: Exception) {}
         }
@@ -1858,11 +1921,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         try { loudnessEnhancer?.release() } catch (_: Exception) {}
         try { bassBoost?.release() } catch (_: Exception) {}
         try { dynamicsProcessing?.release() } catch (_: Exception) {}
+        try { legacyEqualizer?.release() } catch (_: Exception) {}
 
         virtualizer = null
         loudnessEnhancer = null
         bassBoost = null
         dynamicsProcessing = null
+        legacyEqualizer = null
         cachedSupportedEffects = runCatching { AudioEffect.queryEffects() }.getOrNull()
 
         if (isVirtualizerEnabled || virtualizerStrength > 0) {
@@ -1918,6 +1983,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             Log.w(TAG, "DynamicsProcessing cleanup error: ${e.message}")
         }
         dynamicsProcessing = null
+
+        try {
+            legacyEqualizer?.enabled = false
+            legacyEqualizer?.release()
+        } catch (e: Exception) {
+            Log.w(TAG, "Equalizer fallback cleanup error: ${e.message}")
+        }
+        legacyEqualizer = null
         cachedSupportedEffects = null
     }
 

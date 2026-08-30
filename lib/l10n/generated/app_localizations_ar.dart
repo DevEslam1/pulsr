@@ -1379,6 +1379,42 @@ class AppLocalizationsAr extends AppLocalizations {
   String get blockedByBitPerfectShort => 'محظور بواسطة وضع البت المثالي';
 
   @override
+  String get rcTitle => 'تصحيح الغرفة';
+
+  @override
+  String get rcSubtitle =>
+      'قِس استجابة غرفتك بنغمة قصيرة وطبّق معادِلاً يخفّض الانحرافات';
+
+  @override
+  String get rcStart => 'ابدأ القياس';
+
+  @override
+  String get rcMeasuring => 'جارٍ القياس - ابقَ هادئاً...';
+
+  @override
+  String get rcResult => 'الاستجابة المقاسة (أعلى) والتصحيح المُقترَح (أسفل)';
+
+  @override
+  String get rcApply => 'تطبيق';
+
+  @override
+  String get rcDiscard => 'تجاهل';
+
+  @override
+  String get rcMicNeeded => 'إذن الميكروفون مطلوب للقياس';
+
+  @override
+  String get rcQuietHint =>
+      'أبقِ الغرفة هادئة ودع النغمة تعمل بمستوى الاستماع المعتاد عبر مكبرات الصوت';
+
+  @override
+  String get rcKeepPlayerPaused =>
+      'يبقى تشغيل الموسيقى متوقفاً أثناء تصحيح الغرفة';
+
+  @override
+  String get rcApplied => 'تم تطبيق إعداد تصحيح الغرفة';
+
+  @override
   String get deviceProfilesTitle => 'ملفات إعدادات الأجهزة';
 
   @override

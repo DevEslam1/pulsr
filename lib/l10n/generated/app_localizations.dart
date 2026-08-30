@@ -2626,6 +2626,72 @@ abstract class AppLocalizations {
   /// **'Blocked by Bit-Perfect'**
   String get blockedByBitPerfectShort;
 
+  /// No description provided for @rcTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Room Correction'**
+  String get rcTitle;
+
+  /// No description provided for @rcSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Measure your room with a short tone sweep and fit an EQ that flattens the response'**
+  String get rcSubtitle;
+
+  /// No description provided for @rcStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start measurement'**
+  String get rcStart;
+
+  /// No description provided for @rcMeasuring.
+  ///
+  /// In en, this message translates to:
+  /// **'Measuring - stay quiet...'**
+  String get rcMeasuring;
+
+  /// No description provided for @rcResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Measured response (top) and fitted correction (bottom)'**
+  String get rcResult;
+
+  /// No description provided for @rcApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get rcApply;
+
+  /// No description provided for @rcDiscard.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get rcDiscard;
+
+  /// No description provided for @rcMicNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone permission is required for the measurement'**
+  String get rcMicNeeded;
+
+  /// No description provided for @rcQuietHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the room quiet and let the sweep play out loud at your normal listening level'**
+  String get rcQuietHint;
+
+  /// No description provided for @rcKeepPlayerPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Music playback stays paused while Room Correction is active'**
+  String get rcKeepPlayerPaused;
+
+  /// No description provided for @rcApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Room Correction preset applied'**
+  String get rcApplied;
+
   /// No description provided for @deviceProfilesTitle.
   ///
   /// In en, this message translates to:

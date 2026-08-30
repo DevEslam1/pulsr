@@ -131,6 +131,14 @@ class AudioFeatureRegistry {
     conflictsWith: 'Bit-Perfect bypass',
   );
 
+  static const roomCorrection = AudioFeatureInfo(
+    id: 'roomCorrection',
+    title: 'Room Correction Wizard',
+    subtitle: 'Stepped-sine measurement + EQ fit',
+    description:
+        'Plays a short tone sweep through your speakers, records it with the microphone and fits a Room Correction EQ preset that flattens the measured response (clamped to the +/-15 dB EQ range with adjacent-band smoothing). Applied through the normal EQ pipeline, so it participates in Bit-Perfect bypass like any EQ preset. Not a replacement for acoustic treatment.',
+  );
+
   static const dsdNative = AudioFeatureInfo(
     id: 'dsdNative',
     title: 'DSD (Native / DoP)',

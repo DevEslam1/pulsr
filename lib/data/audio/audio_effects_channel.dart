@@ -37,6 +37,10 @@ class AudioEffectsChannel {
   bool _isBassBoostSupported = false;
   bool _isFloatOutputSupported = true;
   bool _isHardwareOffloadSupported = true;
+  // The native C++ stages need a PCM callback from the playback engine. The
+  // current just_audio/ExoPlayer integration does not provide one, so these
+  // must never be advertised as audible effects.
+  bool _isPcmDspAttached = false;
   bool _hasOemAudio = false;
   List<String> _detectedOemEngines = [];
 
@@ -48,6 +52,7 @@ class AudioEffectsChannel {
   bool get isBassBoostSupported => _isBassBoostSupported;
   bool get isFloatOutputSupported => _isFloatOutputSupported;
   bool get isHardwareOffloadSupported => _isHardwareOffloadSupported;
+  bool get isPcmDspAttached => _isPcmDspAttached;
   bool get hasOemAudio => _hasOemAudio;
   List<String> get detectedOemEngines => List.unmodifiable(_detectedOemEngines);
 
@@ -74,6 +79,15 @@ class AudioEffectsChannel {
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to getCapabilities',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+    try {
+      final pipeline = await _channel
+          .invokeMapMethod<String, dynamic>('getProcessingCapabilities')
+          .timeout(const Duration(seconds: 2));
+      _isPcmDspAttached = pipeline?['isPcmDspAttached'] == true;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to get DSP processing capabilities',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
     }
     try {

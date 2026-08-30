@@ -552,12 +552,218 @@
   "dspDynamicEqTitle": "Dynamic EQ",
   "dspDynamicEqSubtitle": "Cuts resonances only when band energy exceeds the threshold",
   "dspDynamicEqFrequency": "Band Frequency",
+"downloadQuality": "Download Quality",
+  "extractionEngine": "Extraction Engine",
+  "ytdlpConfig": "yt-dlp Server Config",
+  "storageAndCache": "Storage & Cache",
+  "privacyAndData": "Privacy & Data",
+  "privacyGuaranteeSubtitle": "100% offline. Zero telemetry, zero tracking.",
+  "aboutAppSubtitle": "Version 1.0.0 • Pure Offline Sound",
+  "signIn": "Sign In",
+  "lastSyncedJustNow": "Last synced: Just now",
+  "lastSyncedMinutesAgo": "Last synced: {minutes}m ago",
+  "@lastSyncedMinutesAgo": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "lastSyncedHoursAgo": "Last synced: {hours}h ago",
+  "@lastSyncedHoursAgo": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "connectedReadyToSync": "Connected • Ready to sync",
+  "downloaded": "Downloaded",
+  "exploreOnlineMusic": "Explore Online Music",
+  "noDownloadsYet": "No Downloads Yet",
+  "noDownloadsYetSubtitle": "Download your favorite songs from YouTube Music to listen offline anywhere.",
+  "offlineDownloads": "Offline Downloads",
+  "local": "Local",
+  "online": "Online",
+  "syncYouTubeMusic": "Sync YouTube Music",
+  "importByPlaylistLink": "Import by Playlist Link",
+  "noLocalFavorites": "No Local Favorites",
+  "noLocalFavoritesSubtitle": "Tap the heart icon on any of your local tracks to add them here.",
+  "noOnlineFavorites": "No Online Favorites",
+  "scanStorage": "Scan Storage",
+  "noFoldersFound": "No Folders Found",
+  "noFoldersSubtitle": "Scan device storage to discover music directories and organize by path.",
+  "playNext": "Play Next",
+  "favorite": "Favorite",
+  "all": "All",
+  "importM3u": "Import M3U",
+  "syncOnlineLibrary": "Sync Online Library",
+  "addPlaylistUrl": "Add Playlist URL",
+  "addYouTubePlaylist": "Add YouTube Playlist",
+  "playlistImported": "Playlist Imported",
+  "tracksMatched": "{matched} of {total} tracks matched.",
+  "@tracksMatched": {
+    "placeholders": {
+      "matched": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "fetch": "Fetch",
+  "ok": "OK",
+  "tracksCountPlural": "{count} {count, plural, =1{track} other{tracks}}",
+  "@tracksCountPlural": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "noTrackSelected": "No Track Selected",
+  "playbackSpeed": "Playback Speed",
+  "vinylCircle": "Vinyl Circle",
+  "sortAndFilter": "Sort & Filter",
+  "title": "Title",
+  "duration": "Duration",
+  "qualityAndCodec": "QUALITY & CODEC",
+  "audioFormat": "Audio Format",
+  "channels": "Channels",
+  "playCount": "Play Count",
+  "ringtone": "Ringtone",
+  "editTags": "Edit Tags",
+  "setAudioAs": "Set Audio As",
+  "phoneRingtone": "Phone Ringtone",
+  "notificationSound": "Notification Sound",
+  "alarmSound": "Alarm Sound",
+  "turnOff": "Turn Off",
+  "presets": "Presets",
+  "customTime": "Custom Time",
+  "stopAtSpecificTime": "Stop at specific time",
+  "currentSpeed": "Current speed: {speed}",
+  "@currentSpeed": {
+    "placeholders": {
+      "speed": {
+        "type": "String"
+      }
+    }
+  },
+  "addedTo": "Added to {name}",
+  "@addedTo": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "playCountTimes": "{count} {count, plural, =1{time} other{times}}",
+  "@playCountTimes": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "pastePlaylistUrl": "Paste YouTube Playlist URL or ID",
+  "hideCustomFolder": "Hide Custom Folder",
+  "hideFolderDesc": "Enter the full directory path you want to hide from your music library:",
+  "hideFolder": "Hide Folder",
+  "confirmRestore": "Confirm Restore",
+  "confirmRestoreDesc": "Are you sure you want to restore backup data from this file?",
+  "existingLibraryUpdateNotice": "Existing library matching tracks will be updated.",
+  "audioVisualizerPermission": "Audio Visualizer Permission",
+  "audioVisualizerPermissionDesc": "The visualizer reads audio output, not your microphone. Android requires the Record Audio permission to process frequency data.",
+  "useSimulation": "Use Simulation",
+  "visualizerSimulationNotice": "Visualizer permission denied — showing a simulated animation instead.",
+  "ytmAccount": "YouTube Music Account",
+  "disconnect": "Disconnect",
+  "openWebPlayer": "Open Web Player",
+  "ytdlpServerConfig": "yt-dlp Server Config",
+  "ytdlpServerDesc": "Connects Pulsr to a remote yt-dlp backend with rotating proxies to bypass YouTube bot detection and IP bans.",
+  "downloadsTitle": "Downloads",
+  "noDownloadsTitle": "No downloads yet",
+  "noDownloadsSubtitle": "Songs downloaded for offline playback will appear here.",
+  "statusQueued": "Queued",
+  "statusDownloading": "Downloading",
+  "statusPaused": "Paused",
+  "statusCompleted": "Completed",
+  "statusFailed": "Failed",
+  "storageUsed": "Storage Used",
+  "storageFree": "Free Space",
+  "resume": "Resume",
+  "downloadErrorNoSpace": "Storage full — free up space and retry",
+  "downloadErrorStorage": "Storage full — free up space and retry",
+  "downloadErrorPermission": "Storage permission denied. Please grant permission in Settings.",
+  "downloadErrorInterrupted": "Download was interrupted. Tap to resume.",
+  "downloadErrorDisabled": "Downloads are disabled or unavailable in this build.",
+  "downloadErrorTransition": "Invalid download state transition.",
+  "downloadErrorRateLimited": "YouTube is busy. Cooling down…",
+  "downloadErrorNetwork": "No connection. Check your network.",
+  "downloadErrorBotChallenge": "YouTube verification triggered. Retrying…",
+  "downloadErrorUnavailable": "This track is unavailable.",
+  "downloadWifiOnly": "Wi-Fi Only Mode is active. Connect to Wi-Fi to download.",
+  "downloadErrorAlreadyQueued": "This song is already in the download queue.",
+  "downloadErrorCorrupt": "Downloaded file was corrupted or incomplete. Please retry.",
+  "downloadErrorInvalidTransition": "Invalid download state transition.",
+  "downloadErrorTimeout": "Download timed out. Please retry.",
+  "dspEnginePreference": "DSP Engine Preference",
+  "dspEnginePreferenceSubtitle": "Choose real-time DSP engine or OEM system sound effects",
+  "dspEngineNative": "Native Studio DSP (Zero Latency)",
+  "dspEngineOem": "OEM / System AudioFX",
+  "dspEngineAuto": "Automatic (Prefer Native)",
+  "audioStageDegraded": "Audio stage \"{stage}\" was bypassed to prevent stutter under high load.",
+  "@audioStageDegraded": {
+    "placeholders": {
+      "stage": {
+        "type": "String"
+      }
+    }
+  },
+  "stageEq": "Parametric EQ",
+  "stageReverb": "Convolution Reverb",
+  "stageCrossfeed": "Crossfeed",
+  "stageLimiter": "Lookahead Limiter",
+  "stageResampler": "Resampler",
+  "stagePanner": "Spatial Panner",
+  "dspSaturationTitle": "Harmonic Saturation",
+  "dspSaturationSubtitle": "Tube/tape-style harmonic exciter",
+  "dspSaturationDrive": "Drive",
+  "dspSaturationMix": "Mix",
+  "dspSaturationTilt": "Tilt Emphasis",
+  "dspStereoWidthTitle": "Stereo Width",
+  "dspStereoWidthSubtitle": "Independent Mid/Side field control",
+  "dspStereoWidthAmount": "Width",
+  "dspLoudnessTitle": "Loudness Contour",
+  "dspLoudnessSubtitle": "Fletcher–Munson volume-linked tone compensation",
+  "dspLoudnessIntensity": "Intensity",
+  "dspLoudnessReplayGainNote": "Complements ReplayGain: ReplayGain levels loudness across tracks, while this contour adapts tone to your listening volume.",
+  "dspSubCrossoverTitle": "Subwoofer Crossover",
+  "dspSubCrossoverSubtitle": "Bass redirection into a summed mono sub tap",
+  "dspSubCrossoverCorner": "Crossover Corner",
+  "dspSubCrossoverSubLevel": "Sub Level",
+  "dspSubCrossoverNote": "Bass redirection: a low-passed mono sum is added to both channels — this is not true multichannel LFE routing.",
+  "dspDynamicEqTitle": "Dynamic EQ",
+  "dspDynamicEqSubtitle": "Cuts resonances only when band energy exceeds the threshold",
+  "dspDynamicEqFrequency": "Band Frequency",
   "dspDynamicEqThreshold": "Threshold",
   "dspDynamicEqRatio": "Ratio",
   "dspDynamicEqAttack": "Attack",
   "dspDynamicEqRelease": "Release",
   "dspDynamicEqMaxCut": "Max Cut",
   "blockedByBitPerfectShort": "Blocked by Bit-Perfect",
+  "rcTitle": "Room Correction",
+  "rcSubtitle": "Measure your room with a short tone sweep and fit an EQ that flattens the response",
+  "rcStart": "Start measurement",
+  "rcMeasuring": "Measuring - stay quiet...",
+  "rcResult": "Measured response (top) and fitted correction (bottom)",
+  "rcApply": "Apply",
+  "rcDiscard": "Discard",
+  "rcMicNeeded": "Microphone permission is required for the measurement",
+  "rcQuietHint": "Keep the room quiet and let the sweep play out loud at your normal listening level",
+  "rcKeepPlayerPaused": "Music playback stays paused while Room Correction is active",
+  "rcApplied": "Room Correction preset applied",
   "deviceProfilesTitle": "Device Profiles",
   "deviceProfilesSubtitle": "Sound settings remembered per output device",
   "autoDeviceSwitch": "Auto-switch on device change",

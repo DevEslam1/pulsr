@@ -1378,6 +1378,43 @@ class AppLocalizationsEs extends AppLocalizations {
   String get blockedByBitPerfectShort => 'Bloqueado por Bit-Perfect';
 
   @override
+  String get rcTitle => 'Corrección de sala';
+
+  @override
+  String get rcSubtitle =>
+      'Mide tu sala con un barrido de tonos y ajusta una EQ que aplane la respuesta';
+
+  @override
+  String get rcStart => 'Iniciar medición';
+
+  @override
+  String get rcMeasuring => 'Midiendo - guarda silencio...';
+
+  @override
+  String get rcResult =>
+      'Respuesta medida (arriba) y corrección ajustada (abajo)';
+
+  @override
+  String get rcApply => 'Aplicar';
+
+  @override
+  String get rcDiscard => 'Descartar';
+
+  @override
+  String get rcMicNeeded => 'Se necesita permiso de micrófono para la medición';
+
+  @override
+  String get rcQuietHint =>
+      'Mantén la sala en silencio y deja que el barrido suene a tu nivel de escucha habitual';
+
+  @override
+  String get rcKeepPlayerPaused =>
+      'La música permanece en pausa mientras la corrección de sala está activa';
+
+  @override
+  String get rcApplied => 'Preset de corrección de sala aplicado';
+
+  @override
   String get deviceProfilesTitle => 'Perfiles de dispositivo';
 
   @override

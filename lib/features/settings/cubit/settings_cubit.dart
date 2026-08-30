@@ -586,23 +586,26 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         return;
       }
     }
-    emit(state.copyWith(replayGainMode: mode, errorMessage: null));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyReplayGainMode, mode.name);
+    // PlayerCubit reacts to this state emission by re-applying the gain. Save
+    // first so AudioHandler's cached preferences cannot calculate using the
+    // previous mode (which made ReplayGain look enabled but sound unchanged).
+    emit(state.copyWith(replayGainMode: mode, errorMessage: null));
   }
 
   Future<void> setReplayGainPreampWithRg(double db) async {
     final clamped = db.clamp(-15.0, 15.0);
-    emit(state.copyWith(replayGainPreampWithRg: clamped));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(_keyReplayGainPreampWithRg, clamped);
+    emit(state.copyWith(replayGainPreampWithRg: clamped));
   }
 
   Future<void> setReplayGainPreampWithoutRg(double db) async {
     final clamped = db.clamp(-15.0, 15.0);
-    emit(state.copyWith(replayGainPreampWithoutRg: clamped));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(_keyReplayGainPreampWithoutRg, clamped);
+    emit(state.copyWith(replayGainPreampWithoutRg: clamped));
   }
 
   Future<void> setStreamingQuality(YtmAudioQuality quality) async {
@@ -986,8 +989,8 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       } catch (_) {}
       // Also force ReplayGain off — software gain breaks bit-perfect
       if (state.replayGainMode != ReplayGainMode.off) {
-        emit(state.copyWith(replayGainMode: ReplayGainMode.off, errorMessage: 'ReplayGain disabled: not compatible with Bit-Perfect bypass.'));
         await prefs.setString(_keyReplayGainMode, ReplayGainMode.off.name);
+        emit(state.copyWith(replayGainMode: ReplayGainMode.off, errorMessage: 'ReplayGain disabled: not compatible with Bit-Perfect bypass.'));
       }
     } else if (!enabled) {
       try {

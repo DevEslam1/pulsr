@@ -13,6 +13,7 @@ import '../../../player/presentation/widgets/equalizer_sheet.dart';
 import '../../cubit/settings_cubit.dart';
 import '../../cubit/settings_state.dart';
 import 'battery_optimization_card.dart';
+import 'room_correction_sheet.dart';
 import 'settings_conflict_card.dart';
 import 'settings_section.dart';
 import 'settings_slider_row.dart';
@@ -465,6 +466,24 @@ class AudioSoundSection extends StatelessWidget {
             ),
           );
         }),
+        Padding(
+          padding: const EdgeInsets.only(top: 4),
+          child: ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.graphic_eq_rounded),
+            title: Text(context.l10n.rcTitle,
+                style: Theme.of(context).textTheme.bodyLarge),
+            subtitle: Text(context.l10n.rcSubtitle,
+                style: Theme.of(context).textTheme.bodySmall),
+            onTap: () => showModalBottomSheet<void>(
+              context: context,
+              useRootNavigator: true,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (_) => const RoomCorrectionSheet(),
+            ),
+          ),
+        ),
         const BatteryOptimizationCard(),
       ],
     );

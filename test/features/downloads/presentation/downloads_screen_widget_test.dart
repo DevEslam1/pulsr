@@ -13,6 +13,7 @@ import 'package:pulsr/domain/usecases/get_download_storage_stats.dart';
 import 'package:pulsr/domain/usecases/observe_downloads.dart';
 import 'package:pulsr/domain/usecases/pause_download.dart';
 import 'package:pulsr/domain/usecases/prioritize_download.dart';
+import 'package:pulsr/core/errors/failures.dart';
 import 'package:pulsr/domain/usecases/queue_download.dart';
 import 'package:pulsr/domain/usecases/reorder_downloads.dart';
 import 'package:pulsr/domain/usecases/resume_download.dart';
@@ -93,6 +94,18 @@ void main() {
 
   DownloadsCubit createCubit([List<DownloadTask> initialTasks = const []]) {
     when(() => mockObserve.getAll()).thenAnswer((_) async => initialTasks);
+    // _init() calls these too; without stubs mocktail throws mid-init and
+    // isLoading stays true forever (spinner -> 10-minute pumpAndSettle
+    // timeouts). Stub them so init completes deterministically.
+    when(() => mockObserve()).thenAnswer(
+        (_) => const Stream<DownloadTask>.empty());
+    when(() => mockStorageStats()).thenAnswer((_) async =>
+        Either<AppFailure, StorageStats>.right(const StorageStats(
+          usedBytes: 100,
+          freeBytes: 900,
+          totalBytes: 1000,
+          downloadedSongsCount: 0,
+        )));
     return DownloadsCubit(
       mockQueue,
       mockPause,
@@ -133,13 +146,32 @@ void main() {
   group('DownloadsScreen Widget Tests', () {
     testWidgets('Renders empty state when no tasks exist', (tester) async {
       final cubit = createCubit();
+
       await tester.pumpWidget(createTestWidget(cubit));
-      await tester.pumpAndSettle();
+
+      await tester.pump();
+
+      await tester.pump();
+
+      await tester.pump(const Duration(milliseconds: 400));
+
+      await tester.pump(const Duration(milliseconds: 400));
+
+      await tester.pump();
+
+      // The tile's indeterminate progress bar animates forever: bounded pumps
+      // instead of pumpAndSettle, which would wedge for 10 minutes.
+      await tester.pump(const Duration(milliseconds: 300));
+
 
       expect(find.byType(DownloadsScreen), findsOneWidget);
       expect(find.byType(StorageStatsHeader), findsOneWidget);
       expect(find.byIcon(Icons.download_done_rounded), findsOneWidget);
-      await cubit.close();
+            // Awaiting close() inside the fake-async test zone can deadlock (close
+      // races the bloc's pending-emit machinery, and timeout timers never
+      // advance without pumps). Fire-and-forget instead: the zone teardown
+      // reclaims the bloc with the test.
+      unawaited(cubit.close().catchError((_) {}));
     });
 
     testWidgets('Renders active downloads with progress, speed and ETA', (
@@ -159,14 +191,22 @@ void main() {
 
       final cubit = createCubit([activeTask]);
       await tester.pumpWidget(createTestWidget(cubit));
-      await tester.pumpAndSettle();
+      await tester.pump();
+
+      // The tile's indeterminate progress bar animates forever: bounded pumps
+      // instead of pumpAndSettle, which would wedge for 10 minutes.
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('Marthnash'), findsOneWidget);
       expect(find.text('Bahaa Sultan'), findsOneWidget);
       expect(find.byType(DownloadTile), findsOneWidget);
       expect(find.textContaining('65%'), findsOneWidget);
       expect(find.textContaining('512'), findsOneWidget);
-      await cubit.close();
+            // Awaiting close() inside the fake-async test zone can deadlock (close
+      // races the bloc's pending-emit machinery, and timeout timers never
+      // advance without pumps). Fire-and-forget instead: the zone teardown
+      // reclaims the bloc with the test.
+      unawaited(cubit.close().catchError((_) {}));
     });
 
     testWidgets('Renders Arabic script and RTL without flex overflow', (
@@ -186,12 +226,20 @@ void main() {
       await tester.pumpWidget(
         createTestWidget(cubit, locale: const Locale('ar')),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
+
+      // The tile's indeterminate progress bar animates forever: bounded pumps
+      // instead of pumpAndSettle, which would wedge for 10 minutes.
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('مخاصمني ومش بيكلمني حبيبي يا ناس'), findsOneWidget);
       expect(find.byType(DownloadTile), findsOneWidget);
       expect(tester.takeException(), isNull); // Zero layout overflows
-      await cubit.close();
+            // Awaiting close() inside the fake-async test zone can deadlock (close
+      // races the bloc's pending-emit machinery, and timeout timers never
+      // advance without pumps). Fire-and-forget instead: the zone teardown
+      // reclaims the bloc with the test.
+      unawaited(cubit.close().catchError((_) {}));
     });
 
     testWidgets(
@@ -213,18 +261,33 @@ void main() {
 
         final cubit = createCubit([task]);
         await tester.pumpWidget(createTestWidget(cubit));
-        await tester.pumpAndSettle();
+        await tester.pump();
+
+      // The tile's indeterminate progress bar animates forever: bounded pumps
+      // instead of pumpAndSettle, which would wedge for 10 minutes.
+      await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.text('Track To Delete'), findsOneWidget);
 
-        // Swipe dismissible
+        // Swipe dismissible: pump through the dismiss + resize animation so
+        // onDismissed fires, then the snackbar entrance frame.
         await tester.drag(find.byType(Dismissible), const Offset(-500, 0));
-        await tester.pumpAndSettle();
+        await tester.pump(const Duration(milliseconds: 350));
+        await tester.pump(const Duration(milliseconds: 350));
+        await tester.pump(const Duration(milliseconds: 350));
+
+      // The tile's indeterminate progress bar animates forever: bounded pumps
+      // instead of pumpAndSettle, which would wedge for 10 minutes.
+      await tester.pump(const Duration(milliseconds: 300));
 
         verify(() => mockDelete('vid_del')).called(1);
         expect(find.text('Deleted "Track To Delete"'), findsOneWidget);
         expect(find.text('Undo'), findsOneWidget);
-        await cubit.close();
+              // Awaiting close() inside the fake-async test zone can deadlock (close
+      // races the bloc's pending-emit machinery, and timeout timers never
+      // advance without pumps). Fire-and-forget instead: the zone teardown
+      // reclaims the bloc with the test.
+      unawaited(cubit.close().catchError((_) {}));
       },
     );
 
@@ -253,13 +316,21 @@ void main() {
 
         final cubit = createCubit([flacTask, opusTask]);
         await tester.pumpWidget(createTestWidget(cubit));
-        await tester.pumpAndSettle();
+        await tester.pump();
+
+      // The tile's indeterminate progress bar animates forever: bounded pumps
+      // instead of pumpAndSettle, which would wedge for 10 minutes.
+      await tester.pump(const Duration(milliseconds: 300));
 
         expect(find.byType(DownloadTile), findsNWidgets(2));
         expect(find.text('Song (FLAC)'), findsOneWidget);
         expect(find.text('Song (Opus)'), findsOneWidget);
         expect(tester.takeException(), isNull);
-        await cubit.close();
+              // Awaiting close() inside the fake-async test zone can deadlock (close
+      // races the bloc's pending-emit machinery, and timeout timers never
+      // advance without pumps). Fire-and-forget instead: the zone teardown
+      // reclaims the bloc with the test.
+      unawaited(cubit.close().catchError((_) {}));
       },
     );
   });

@@ -1179,9 +1179,14 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     ));
   }
 
+  PlayerState? _dspSnapshot;
+
   Future<void> setDspEffectsEnabled(bool enabled) async {
     if (enabled && !_guardDsp('DSP Engine')) return;
     if (!enabled) {
+      if (state.isDspActive) {
+        _dspSnapshot = state;
+      }
       safeEmit(state.copyWith(
         isSpatializerEnabled: false,
         isVirtualizerEnabled: false,
@@ -1189,6 +1194,11 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
         isCrossfeedEnabled: false,
         isLimiterEnabled: false,
         isReverbEnabled: false,
+        isSaturationEnabled: false,
+        isStereoWidthEnabled: false,
+        isLoudnessContourEnabled: false,
+        isSubCrossoverEnabled: false,
+        isDynamicEqEnabled: false,
         volumeBoost: 0.0,
       ));
       await _audioHandler.setSpatializerEnabled(false);
@@ -1197,22 +1207,97 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       await _audioHandler.setCrossfeed(false);
       await _audioHandler.setLookaheadLimiter(false);
       await _audioHandler.setReverb(false);
+      await _audioHandler.setSaturation(false);
+      await _audioHandler.setStereoWidth(false);
+      await _audioHandler.setLoudnessContour(false);
+      await _audioHandler.setSubCrossover(false);
+      await _audioHandler.setDynamicEq(false);
       await _audioHandler.setVolumeBoost(0.0);
     } else {
-      safeEmit(state.copyWith(
-        isLimiterEnabled: true,
-        isDynamicsEnabled: true,
-        dynamicsPreset: state.dynamicsPreset == DynamicsPreset.off
-            ? DynamicsPreset.studioPunch
-            : state.dynamicsPreset,
-      ));
-      await _audioHandler.setLookaheadLimiter(true);
-      await _audioHandler.setDynamicsPreset(
-        state.dynamicsPreset == DynamicsPreset.off
-            ? DynamicsPreset.studioPunch
-            : state.dynamicsPreset,
-        enabled: true,
-      );
+      final snap = _dspSnapshot;
+      if (snap != null && snap.isDspActive) {
+        safeEmit(state.copyWith(
+          isSpatializerEnabled: snap.isSpatializerEnabled,
+          isVirtualizerEnabled: snap.isVirtualizerEnabled,
+          virtualizerStrength: snap.virtualizerStrength,
+          isDynamicsEnabled: snap.isDynamicsEnabled,
+          dynamicsPreset: snap.dynamicsPreset,
+          isCrossfeedEnabled: snap.isCrossfeedEnabled,
+          crossfeedDelayUs: snap.crossfeedDelayUs,
+          crossfeedFeedDb: snap.crossfeedFeedDb,
+          isLimiterEnabled: snap.isLimiterEnabled,
+          limiterThresholdDb: snap.limiterThresholdDb,
+          limiterReleaseMs: snap.limiterReleaseMs,
+          isReverbEnabled: snap.isReverbEnabled,
+          reverbPreset: snap.reverbPreset,
+          reverbWetDry: snap.reverbWetDry,
+          isSaturationEnabled: snap.isSaturationEnabled,
+          saturationDrive: snap.saturationDrive,
+          saturationMix: snap.saturationMix,
+          saturationTilt: snap.saturationTilt,
+          isStereoWidthEnabled: snap.isStereoWidthEnabled,
+          stereoWidth: snap.stereoWidth,
+          isLoudnessContourEnabled: snap.isLoudnessContourEnabled,
+          loudnessContourIntensity: snap.loudnessContourIntensity,
+          isSubCrossoverEnabled: snap.isSubCrossoverEnabled,
+          subCrossoverCornerHz: snap.subCrossoverCornerHz,
+          subCrossoverSlopeDbPerOct: snap.subCrossoverSlopeDbPerOct,
+          subCrossoverGain: snap.subCrossoverGain,
+          isDynamicEqEnabled: snap.isDynamicEqEnabled,
+          dynamicEqBands: snap.dynamicEqBands,
+          volumeBoost: snap.volumeBoost,
+        ));
+        if (snap.isSpatializerEnabled) await _audioHandler.setSpatializerEnabled(true);
+        if (snap.isVirtualizerEnabled) {
+          await _audioHandler.setVirtualizerEnabled(true);
+          await _audioHandler.setVirtualizerStrength(snap.virtualizerStrength);
+        }
+        if (snap.isDynamicsEnabled && snap.dynamicsPreset != DynamicsPreset.off) {
+          await _audioHandler.setDynamicsPreset(snap.dynamicsPreset, enabled: true);
+        }
+        if (snap.isCrossfeedEnabled) {
+          await _audioHandler.setCrossfeed(true, delayUs: snap.crossfeedDelayUs, feedDb: snap.crossfeedFeedDb);
+        }
+        if (snap.isLimiterEnabled) {
+          await _audioHandler.setLookaheadLimiter(true, thresholdDb: snap.limiterThresholdDb, releaseMs: snap.limiterReleaseMs);
+        }
+        if (snap.isReverbEnabled) {
+          await _audioHandler.setReverb(true, preset: snap.reverbPreset, wetDry: snap.reverbWetDry);
+        }
+        if (snap.isSaturationEnabled) {
+          await _audioHandler.setSaturation(true, drive: snap.saturationDrive, mix: snap.saturationMix, tilt: snap.saturationTilt);
+        }
+        if (snap.isStereoWidthEnabled) {
+          await _audioHandler.setStereoWidth(true, width: snap.stereoWidth);
+        }
+        if (snap.isLoudnessContourEnabled) {
+          await _audioHandler.setLoudnessContour(true, intensity: snap.loudnessContourIntensity);
+        }
+        if (snap.isSubCrossoverEnabled) {
+          await _audioHandler.setSubCrossover(true, cornerHz: snap.subCrossoverCornerHz, slopeDbPerOct: snap.subCrossoverSlopeDbPerOct, gain: snap.subCrossoverGain);
+        }
+        if (snap.isDynamicEqEnabled) {
+          await _audioHandler.setDynamicEq(true);
+        }
+        if (snap.volumeBoost > 0.0) {
+          await _audioHandler.setVolumeBoost(snap.volumeBoost);
+        }
+      } else {
+        safeEmit(state.copyWith(
+          isLimiterEnabled: true,
+          isDynamicsEnabled: true,
+          dynamicsPreset: state.dynamicsPreset == DynamicsPreset.off
+              ? DynamicsPreset.studioPunch
+              : state.dynamicsPreset,
+        ));
+        await _audioHandler.setLookaheadLimiter(true);
+        await _audioHandler.setDynamicsPreset(
+          state.dynamicsPreset == DynamicsPreset.off
+              ? DynamicsPreset.studioPunch
+              : state.dynamicsPreset,
+          enabled: true,
+        );
+      }
     }
   }
 

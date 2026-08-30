@@ -31,6 +31,7 @@ class MainActivity : AudioServiceActivity() {
     private var waveformPlugin: WaveformPlugin? = null
     private var proxyPlugin: ProxyPlugin? = null
     private var hiResDacPlugin: HiResDacPlugin? = null
+    private var roomCorrectionPlugin: RoomCorrectionPlugin? = null
     private val lyricsExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
     // Compiled proxy regex to avoid per-call recompilation DOS
     private val proxyPattern = Regex("""\b(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3}):(\d{2,5})\b""")
@@ -152,6 +153,7 @@ class MainActivity : AudioServiceActivity() {
         waveformPlugin = WaveformPlugin.registerWith(flutterEngine, applicationContext)
         proxyPlugin = ProxyPlugin.registerWith(flutterEngine, applicationContext)
         hiResDacPlugin = HiResDacPlugin(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
+        roomCorrectionPlugin = RoomCorrectionPlugin.registerWith(flutterEngine, applicationContext)
  
         val fileChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FILE_OPENER_CHANNEL)
         fileOpenerChannel = fileChannel
