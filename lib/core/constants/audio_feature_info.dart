@@ -131,6 +131,14 @@ class AudioFeatureRegistry {
     conflictsWith: 'Bit-Perfect bypass',
   );
 
+  static const dsdNative = AudioFeatureInfo(
+    id: 'dsdNative',
+    title: 'DSD (Native / DoP)',
+    subtitle: 'Detection-only in this build',
+    description:
+        'DSD files (DSF/DFF) decode to PCM through the native DSD decoder and then follow the normal DSP pipeline. DoP framing exists as a future transport; raw native-DSD USB streaming is not implemented, so this feature reports DAC class diagnostics (UAC1/UAC2/UAC3) without claiming native-DSD capability.',
+  );
+
   static const gapless = AudioFeatureInfo(
     id: 'gapless',
     title: 'Gapless Playback',

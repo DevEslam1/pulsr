@@ -211,6 +211,75 @@ class AudioQualitySheet extends StatelessWidget {
                   _buildOutputDevicesSelector(
                       context, outputDevice, settingsCubit, p, activeColor),
 
+                  // --- PHASE 4: OUTPUT PATH DIAGNOSTICS ---
+                  const SizedBox(height: 10),
+                  Builder(builder: (context) {
+                    final uac = outputDevice?.usbAudioClass ?? 0;
+                    final uacLabel = uac == 0 ? 'unknown' : 'UAC$uac';
+                    final direct = outputDevice?.directFormats ?? const [];
+                    final supported =
+                        direct.where((f) => f.supported).toList();
+                    final maxRate = supported.isEmpty
+                        ? null
+                        : supported
+                            .map((f) => f.sampleRate)
+                            .reduce((a, b) => a > b ? a : b);
+                    final bits = supported.map((f) => f.encoding).toSet();
+                    final bitsLabel = bits.isEmpty
+                        ? '-'
+                        : bits.contains('24')
+                            ? (bits.contains('float') || bits.contains('32')
+                                ? '32f/24'
+                                : '24')
+                            : (bits.contains('float') || bits.contains('32')
+                                ? '32f'
+                                : '-');
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'OUTPUT PATH DIAGNOSTICS',
+                          style: TextStyle(
+                            fontSize: 11,
+                            letterSpacing: 1.4,
+                            fontWeight: FontWeight.w800,
+                            color: p.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          outputDevice?.isUsbDac == true
+                              ? 'USB DAC: ${outputDevice?.usbDacLabel ?? "-"} ($uacLabel)'
+                              : 'USB DAC: none attached',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: p.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          maxRate == null
+                              ? 'DIRECT PLAYBACK: not reported'
+                              : 'DIRECT PLAYBACK: up to $maxRate Hz / $bitsLabel',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: p.textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'DSD files decode to PCM; native DSD streaming is not supported yet',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: p.textSecondary,
+                          ),
+                        ),
+                      ],
+                    );
+                  }),
+
                   const SizedBox(height: 20),
 
                   // --- SECTION 2: OUTPUT SAMPLE RATE CONTROL ---

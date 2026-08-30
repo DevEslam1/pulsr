@@ -79,6 +79,40 @@ class HiResAudioService {
     return fallback;
   }
 
+  /// Phase 4: per-format direct-playback capability probe (API 29+; older
+  /// Android levels report every entry as unsupported - no fabricated claims).
+  Future<List<AudioDirectFormat>> getDirectCapabilities() async {
+    try {
+      final Map<dynamic, dynamic>? res = await _methodChannel
+          .invokeMapMethod<dynamic, dynamic>('getDirectCapabilities');
+      final raw = res?['directFormats'];
+      final out = <AudioDirectFormat>[];
+      if (raw is List) {
+        for (final d in raw) {
+          if (d is Map) out.add(AudioDirectFormat.fromMap(d));
+        }
+      }
+      return out;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to getDirectCapabilities',
+          error: e, stackTrace: st, category: 'HiResAudio');
+      return const [];
+    }
+  }
+
+  /// Phase 4: USB DAC diagnostics (advertised UAC version + label).
+  /// Returns null when no audio USB device is present or off Android.
+  Future<Map<String, Object?>?> getUsbDacCapabilities() async {
+    try {
+      return await _methodChannel
+          .invokeMapMethod<String, Object?>('getUsbDacCapabilities');
+    } catch (e) {
+      ErrorLogger.log('Failed to getUsbDacCapabilities',
+          error: e, category: 'HiResAudio');
+      return null;
+    }
+  }
+
   Future<bool> isBitPerfectSupported() async {
     try {
       final bool? supported =

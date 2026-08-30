@@ -1,5 +1,31 @@
 // lib/domain/models/audio_output_info.dart
 
+/// Per-format direct-playback capability (from Android's
+/// isDirectPlaybackSupported probe).
+class AudioDirectFormat {
+  final String encoding; // 'float' | '24' | '32'
+  final int sampleRate;
+  final bool supported;
+
+  const AudioDirectFormat({
+    required this.encoding,
+    required this.sampleRate,
+    required this.supported,
+  });
+
+  factory AudioDirectFormat.fromMap(Map<dynamic, dynamic> map) => AudioDirectFormat(
+        encoding: map['encoding'] as String? ?? '',
+        sampleRate: (map['sampleRate'] as num?)?.toInt() ?? 0,
+        supported: (map['supported'] as bool?) ?? false,
+      );
+
+  Map<String, dynamic> toMap() => {
+        'encoding': encoding,
+        'sampleRate': sampleRate,
+        'supported': supported,
+      };
+}
+
 class AudioDeviceEntry {
   final int id;
   final String name;
@@ -71,6 +97,11 @@ class AudioOutputInfo {
   final String activeDeviceType; // usb/wired/bt/builtin/hdmi
   final bool isBluetooth;
 
+  // Phase 4: output-path capability diagnostics
+  final List<AudioDirectFormat> directFormats;
+  final int usbAudioClass; // 0 = none/unknown, 1 = UAC1, 2 = UAC2, 3 = UAC3
+  final String? usbDacLabel;
+
   const AudioOutputInfo({
     required this.deviceName,
     required this.isUsbDac,
@@ -89,6 +120,9 @@ class AudioOutputInfo {
     this.bitPerfectFailureReason,
     this.activeDeviceType = 'builtin',
     this.isBluetooth = false,
+    this.directFormats = const [],
+    this.usbAudioClass = 0,
+    this.usbDacLabel,
   });
 
   factory AudioOutputInfo.fromMap(Map<dynamic, dynamic> map) {
@@ -127,6 +161,18 @@ class AudioOutputInfo {
       bitPerfectFailureReason: map['bitPerfectFailureReason'] as String?,
       activeDeviceType: (map['activeDeviceType'] as String?) ?? 'builtin',
       isBluetooth: (map['isBluetooth'] as bool?) ?? false,
+      directFormats: () {
+        final raw = map['directFormats'];
+        final out = <AudioDirectFormat>[];
+        if (raw is List) {
+          for (final d in raw) {
+            if (d is Map) out.add(AudioDirectFormat.fromMap(d));
+          }
+        }
+        return out;
+      }(),
+      usbAudioClass: (map['usbAudioClass'] as num?)?.toInt() ?? 0,
+      usbDacLabel: map['usbDacLabel'] as String?,
     );
   }
 
@@ -149,6 +195,9 @@ class AudioOutputInfo {
       'bitPerfectFailureReason': bitPerfectFailureReason,
       'activeDeviceType': activeDeviceType,
       'isBluetooth': isBluetooth,
+      'directFormats': directFormats.map((d) => d.toMap()).toList(),
+      'usbAudioClass': usbAudioClass,
+      'usbDacLabel': usbDacLabel,
     };
   }
 
@@ -170,6 +219,9 @@ class AudioOutputInfo {
     String? bitPerfectFailureReason,
     String? activeDeviceType,
     bool? isBluetooth,
+    List<AudioDirectFormat>? directFormats,
+    int? usbAudioClass,
+    String? usbDacLabel,
   }) {
     return AudioOutputInfo(
       deviceName: deviceName ?? this.deviceName,
@@ -190,6 +242,9 @@ class AudioOutputInfo {
       bitPerfectFailureReason: bitPerfectFailureReason ?? this.bitPerfectFailureReason,
       activeDeviceType: activeDeviceType ?? this.activeDeviceType,
       isBluetooth: isBluetooth ?? this.isBluetooth,
+      directFormats: directFormats ?? this.directFormats,
+      usbAudioClass: usbAudioClass ?? this.usbAudioClass,
+      usbDacLabel: usbDacLabel ?? this.usbDacLabel,
     );
   }
 

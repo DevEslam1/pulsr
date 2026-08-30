@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.hardware.usb.UsbConstants
 import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.media.AudioDeviceCallback
@@ -177,7 +178,14 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 notifyDeviceChange()
                 result.success(true)
             }
-            "setTargetOutputFormat", "configureTargetAudio" -> {
+            "getUsbDacCapabilities" -> {
+            val (uac, label) = probeUsbDac()
+            result.success(mapOf("usbAudioClass" to uac, "usbDacLabel" to label))
+        }
+        "getDirectCapabilities" -> {
+            result.success(mapOf("directFormats" to probeDirectFormats()))
+        }
+        "setTargetOutputFormat", "configureTargetAudio" -> {
                 val sampleRate = call.argument<Int>("sampleRate") ?: 0
                 val bitDepth = call.argument<Int>("bitDepth") ?: 0
                 targetSampleRate = sampleRate
@@ -357,6 +365,60 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         return true
     }
 
+    /** Phase 4: enumerate USB audio devices and report the advertised UAC
+     * version + label (diagnostics only - never claims native-DSD support). */
+    private fun probeUsbDac(): Pair<Int, String?> {
+        return try {
+            val usbAudioDevice = usbManager?.deviceList?.values?.firstOrNull { device ->
+                (0 until device.interfaceCount).any {
+                    device.getInterface(it).interfaceClass == UsbConstants.USB_CLASS_AUDIO
+                }
+            } ?: return Pair(UsbDacDiagnostics.UAC_NONE, null)
+            val label = listOfNotNull(usbAudioDevice.manufacturerName, usbAudioDevice.productName)
+                .joinToString(" ").trim().ifEmpty { null }
+            val interfacePairs = (0 until usbAudioDevice.interfaceCount).map {
+                val iface = usbAudioDevice.getInterface(it)
+                Pair(iface.interfaceSubclass, iface.interfaceProtocol)
+            }
+            val uac = try {
+                UsbDacDiagnostics.uacVersionFromUsbInterfaces(interfacePairs)
+            } catch (_: Throwable) {
+                UsbDacDiagnostics.UAC_NONE
+            }
+            Pair(uac, label)
+        } catch (_: Throwable) {
+            Pair(UsbDacDiagnostics.UAC_NONE, null)
+        }
+    }
+
+    /** Phase 4: per-format direct-playback capability probe (API 29+). */
+    private fun probeDirectFormats(): List<Map<String, Any?>> {
+        return UsbDacDiagnostics.directFormatsFor { tag, rate ->
+            if (Build.VERSION.SDK_INT < 29) {
+                null
+            } else {
+                try {
+                    val encoding = when (tag) {
+                        "float" -> AudioFormat.ENCODING_PCM_FLOAT
+                        "24" -> AudioFormat.ENCODING_PCM_24BIT_PACKED
+                        "32" -> AudioFormat.ENCODING_PCM_32BIT
+                        else -> return@directFormatsFor null
+                    }
+                    val fmt = AudioFormat.Builder().setEncoding(encoding)
+                        .setSampleRate(rate)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO).build()
+                    val attr = android.media.AudioAttributes.Builder()
+                        .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                        .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build()
+                    AudioTrack.isDirectPlaybackSupported(fmt, attr)
+                } catch (_: Throwable) {
+                    null
+                }
+            }
+        }
+    }
+
     private fun getAudioOutputDetails(): Map<String, Any?> {
         val result = mutableMapOf<String, Any?>()
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M || audioManager == null) {
@@ -367,6 +429,9 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             result["isBitPerfectActive"] = false
             result["isBitPerfectSupported"] = false
             result["supportedSampleRates"] = listOf(44100, 48000)
+            result["usbAudioClass"] = UsbDacDiagnostics.UAC_NONE
+            result["usbDacLabel"] = null
+            result["directFormats"] = emptyList<Map<String, Any?>>()
             return result
         }
 
@@ -504,6 +569,11 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         result["isOffloadSupported"] = isOffloadSupported
         result["isBluetooth"] = isBluetooth
         result["activeDeviceType"] = activeType
+        // Phase 4: USB Audio Class + direct-format diagnostics
+        val (usbAudioClass, usbDacLabel) = probeUsbDac()
+        result["usbAudioClass"] = usbAudioClass
+        result["usbDacLabel"] = usbDacLabel
+        result["directFormats"] = probeDirectFormats()
         result["supportedSampleRates"] = if (sampleRates.isNotEmpty()) sampleRates else listOf(44100, 48000, 88200, 96000, 176400, 192000, 384000)
         result["availableDevices"] = availableList
         result["targetSampleRate"] = targetSampleRate
