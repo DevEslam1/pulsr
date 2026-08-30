@@ -376,6 +376,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     _volume = volume.clamp(0.0, 1.0);
     final song = currentSong;
     await _activePlayer.setVolume(_calculateReplayGainVolume(song));
+    // Keep the loudness contour synced to the current volume-stage value so
+    // the Fletcher-Munson lift tracks the listening level.
+    await _equalizerManager.updateLoudnessVolume(_volume);
   }
 
   bool get isEqualizerEnabled => _equalizerManager.isEnabled;
@@ -519,6 +522,46 @@ class PulsrAudioHandler extends BaseAudioHandler
   bool get isSincResamplerEnabled => _equalizerManager.isSincResamplerEnabled;
   Future<void> setSincResampler(bool enabled) =>
       _equalizerManager.setSincResampler(enabled);
+
+  // Phase 1 DSP expansion stages
+  bool get isSaturationEnabled => _equalizerManager.isSaturationEnabled;
+  double get saturationDrive => _equalizerManager.saturationDrive;
+  double get saturationMix => _equalizerManager.saturationMix;
+  double get saturationTilt => _equalizerManager.saturationTilt;
+  Future<void> setSaturation(bool enabled,
+          {double? drive, double? mix, double? tilt}) =>
+      _equalizerManager.setSaturation(enabled,
+          drive: drive, mix: mix, tilt: tilt);
+
+  bool get isStereoWidthEnabled => _equalizerManager.isStereoWidthEnabled;
+  double get stereoWidth => _equalizerManager.stereoWidth;
+  Future<void> setStereoWidth(bool enabled, {double? width}) =>
+      _equalizerManager.setStereoWidth(enabled, width: width);
+
+  bool get isLoudnessContourEnabled =>
+      _equalizerManager.isLoudnessContourEnabled;
+  double get loudnessContourIntensity =>
+      _equalizerManager.loudnessContourIntensity;
+  Future<void> setLoudnessContour(bool enabled, {double? intensity}) =>
+      _equalizerManager.setLoudnessContour(enabled, intensity: intensity);
+
+  bool get isSubCrossoverEnabled => _equalizerManager.isSubCrossoverEnabled;
+  double get subCrossoverCornerHz => _equalizerManager.subCrossoverCornerHz;
+  double get subCrossoverSlopeDbPerOct =>
+      _equalizerManager.subCrossoverSlopeDbPerOct;
+  double get subCrossoverGain => _equalizerManager.subCrossoverGain;
+  Future<void> setSubCrossover(bool enabled,
+          {double? cornerHz, double? slopeDbPerOct, double? gain}) =>
+      _equalizerManager.setSubCrossover(enabled,
+          cornerHz: cornerHz, slopeDbPerOct: slopeDbPerOct, gain: gain);
+
+  bool get isDynamicEqEnabled => _equalizerManager.isDynamicEqEnabled;
+  List<DynamicEqBandConfig> get dynamicEqBands =>
+      _equalizerManager.dynamicEqBands;
+  Future<void> setDynamicEq(bool enabled) =>
+      _equalizerManager.setDynamicEq(enabled);
+  Future<void> setDynamicEqBand(int index, DynamicEqBandConfig band) =>
+      _equalizerManager.setDynamicEqBand(index, band);
 
   Future<int> getPipelineLatencyFrames() =>
       _equalizerManager.getPipelineLatencyFrames();

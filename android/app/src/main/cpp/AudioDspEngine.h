@@ -9,6 +9,11 @@
 #include "SincResampler.h"
 #include "DsdDecoder.h"
 #include "SpatialPanner.h"
+#include "HarmonicSaturation.h"
+#include "StereoWidth.h"
+#include "LoudnessContour.h"
+#include "SubCrossover.h"
+#include "DynamicEQ.h"
 
 #include <vector>
 #include <memory>
@@ -22,6 +27,12 @@ enum DspStageMask {
     STAGE_PANNER = 1 << 3,
     STAGE_LIMITER = 1 << 4,
     STAGE_RESAMPLER = 1 << 5,
+    // Phase 1 DSP-expansion stages
+    STAGE_SATURATION = 1 << 6,
+    STAGE_WIDTH = 1 << 7,
+    STAGE_LOUDNESS = 1 << 8,
+    STAGE_CROSSOVER = 1 << 9,
+    STAGE_DYNEQ = 1 << 10,
 };
 
 template<typename T>
@@ -83,6 +94,11 @@ public:
     SincResampler& resampler() { return resampler_; }
     SpatialPanner& panner() { return panner_; }
     DsdDecoder& dsdDecoder() { return dsdDecoder_; }
+    HarmonicSaturation& saturation() { return saturation_; }
+    StereoWidth& stereoWidth() { return stereoWidth_; }
+    LoudnessContour& loudnessContour() { return loudnessContour_; }
+    SubCrossover& subCrossover() { return subCrossover_; }
+    DynamicEQ& dynamicEq() { return dynamicEq_; }
 
     // Combined pipeline latency (lookahead + resampler group delay + reverb partitioned delay) in frames
     int getPipelineLatencyFrames() const {
@@ -154,4 +170,11 @@ private:
     SincResampler resampler_;
     SpatialPanner panner_;
     DsdDecoder dsdDecoder_;
+    // Phase 1 DSP-expansion stages (all zero-latency IIR/pointwise, so they
+    // contribute nothing to getPipelineLatencyFrames)
+    HarmonicSaturation saturation_;
+    StereoWidth stereoWidth_;
+    LoudnessContour loudnessContour_;
+    SubCrossover subCrossover_;
+    DynamicEQ dynamicEq_;
 };

@@ -60,4 +60,22 @@ class PrefsKeys {
   static const String stereoBalance = 'setting_stereo_balance';
   static const String monoMix = 'setting_mono_mix';
   static const String sincResamplerEnabled = 'setting_sinc_resampler_enabled';
+  // Phase 1 DSP expansion stages
+  static const String saturationEnabled = 'setting_saturation_enabled';
+  static const String saturationDrive = 'setting_saturation_drive';
+  static const String saturationMix = 'setting_saturation_mix';
+  static const String saturationTilt = 'setting_saturation_tilt';
+  static const String stereoWidthEnabled = 'setting_stereo_width_enabled';
+  static const String stereoWidth = 'setting_stereo_width';
+  static const String loudnessContourEnabled =
+      'setting_loudness_contour_enabled';
+  static const String loudnessContourIntensity =
+      'setting_loudness_contour_intensity';
+  static const String subCrossoverEnabled = 'setting_sub_crossover_enabled';
+  static const String subCrossoverCornerHz = 'setting_sub_crossover_corner_hz';
+  static const String subCrossoverSlopeDbPerOct =
+      'setting_sub_crossover_slope_db_per_oct';
+  static const String subCrossoverGain = 'setting_sub_crossover_gain';
+  static const String dynamicEqEnabled = 'setting_dynamic_eq_enabled';
+  static const String dynamicEqBands = 'setting_dynamic_eq_bands';
 }

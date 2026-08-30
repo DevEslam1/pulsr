@@ -367,6 +367,104 @@ class AudioSoundSection extends StatelessWidget {
             ),
           );
         }),
+        // Loudness Contour (Fletcher–Munson) — volume-linked tone compensation.
+        // Complementary to ReplayGain (gain-domain): RG levels tracks, the
+        // contour adapts tone to the listening level. See conflict copy.
+        Builder(builder: (cntx) {
+          final l10n = context.l10n;
+          final playerCubit = context.watch<PlayerCubit>();
+          final playerState = playerCubit.state;
+          final lcBlocked = AudioConflicts.dspBlockedByBitPerfect(
+            bitPerfectOutput: state.bitPerfectOutput,
+            bypassDspOnBitPerfect: state.bypassDspOnBitPerfect,
+            device: state.currentOutputDevice,
+          );
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.hearing_rounded,
+                        color: lcBlocked != null ? p.textTertiary : p.accent,
+                        size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  l10n.dspLoudnessTitle,
+                                  style: TextStyle(
+                                    color: lcBlocked != null
+                                        ? p.textTertiary
+                                        : p.textPrimary,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.info_outline_rounded,
+                                    size: 18, color: p.textTertiary),
+                                visualDensity: VisualDensity.compact,
+                                onPressed: () => showAudioFeatureInfoDialog(
+                                    context, AudioFeatureRegistry.loudnessContour,
+                                    conflictReason: lcBlocked),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            lcBlocked ?? l10n.dspLoudnessSubtitle,
+                            style: TextStyle(
+                              color:
+                                  lcBlocked != null ? p.error : p.textSecondary,
+                              fontSize: 12,
+                              fontWeight: lcBlocked != null
+                                  ? FontWeight.w600
+                                  : FontWeight.normal,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Switch.adaptive(
+                      value: playerState.isLoudnessContourEnabled,
+                      activeTrackColor: p.accent,
+                      activeThumbColor: p.onAccent,
+                      onChanged: lcBlocked != null
+                          ? null
+                          : (val) => playerCubit.setLoudnessContour(val),
+                    ),
+                  ],
+                ),
+                if (lcBlocked == null && playerState.isLoudnessContourEnabled) ...[
+                  const SizedBox(height: 4),
+                  SettingSliderRow(
+                    label: l10n.dspLoudnessIntensity,
+                    value: playerState.loudnessContourIntensity,
+                    min: 0.0,
+                    max: 1.0,
+                    divisions: 20,
+                    defaultValue: 0.0,
+                    formatValue: (v) => '${(v * 100).round()}%',
+                    onChanged: (v) =>
+                        playerCubit.setLoudnessContour(true, intensity: v),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    l10n.dspLoudnessReplayGainNote,
+                    style: TextStyle(color: p.textTertiary, fontSize: 10),
+                  ),
+                ],
+              ],
+            ),
+          );
+        }),
         const BatteryOptimizationCard(),
       ],
     );

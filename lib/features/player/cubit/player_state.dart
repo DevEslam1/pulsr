@@ -56,6 +56,20 @@ abstract class PlayerState with _$PlayerState {
     @Default(0.0) double stereoBalance,
     @Default(false) bool monoMix,
     @Default(true) bool isSincResamplerEnabled,
+    @Default(false) bool isSaturationEnabled,
+    @Default(0.3) double saturationDrive,
+    @Default(0.5) double saturationMix,
+    @Default(0.3) double saturationTilt,
+    @Default(false) bool isStereoWidthEnabled,
+    @Default(1.0) double stereoWidth,
+    @Default(false) bool isLoudnessContourEnabled,
+    @Default(0.0) double loudnessContourIntensity,
+    @Default(false) bool isSubCrossoverEnabled,
+    @Default(80.0) double subCrossoverCornerHz,
+    @Default(24.0) double subCrossoverSlopeDbPerOct,
+    @Default(0.8) double subCrossoverGain,
+    @Default(false) bool isDynamicEqEnabled,
+    @Default([]) List<DynamicEqBandConfig> dynamicEqBands,
     @Default(false) bool hasOemAudio,
     @Default([]) List<String> detectedOemEngines,
     @Default(0) int activeQueueSlot,
@@ -111,6 +125,20 @@ abstract class PlayerState with _$PlayerState {
         stereoBalance != other.stereoBalance ||
         monoMix != other.monoMix ||
         isSincResamplerEnabled != other.isSincResamplerEnabled ||
+        isSaturationEnabled != other.isSaturationEnabled ||
+        saturationDrive != other.saturationDrive ||
+        saturationMix != other.saturationMix ||
+        saturationTilt != other.saturationTilt ||
+        isStereoWidthEnabled != other.isStereoWidthEnabled ||
+        stereoWidth != other.stereoWidth ||
+        isLoudnessContourEnabled != other.isLoudnessContourEnabled ||
+        loudnessContourIntensity != other.loudnessContourIntensity ||
+        isSubCrossoverEnabled != other.isSubCrossoverEnabled ||
+        subCrossoverCornerHz != other.subCrossoverCornerHz ||
+        subCrossoverSlopeDbPerOct != other.subCrossoverSlopeDbPerOct ||
+        subCrossoverGain != other.subCrossoverGain ||
+        isDynamicEqEnabled != other.isDynamicEqEnabled ||
+        listContentDiffers(dynamicEqBands, other.dynamicEqBands) ||
         hasOemAudio != other.hasOemAudio ||
         listContentDiffers(detectedOemEngines, other.detectedOemEngines) ||
         activeQueueSlot != other.activeQueueSlot ||
@@ -126,6 +154,11 @@ abstract class PlayerState with _$PlayerState {
       isCrossfeedEnabled ||
       isLimiterEnabled ||
       isReverbEnabled ||
+      isSaturationEnabled ||
+      isStereoWidthEnabled ||
+      isLoudnessContourEnabled ||
+      isSubCrossoverEnabled ||
+      isDynamicEqEnabled ||
       volumeBoost > 0.01;
 
   int get activeDspStagesCount {
@@ -136,6 +169,11 @@ abstract class PlayerState with _$PlayerState {
     if (isCrossfeedEnabled) count++;
     if (isLimiterEnabled) count++;
     if (isReverbEnabled) count++;
+    if (isSaturationEnabled) count++;
+    if (isStereoWidthEnabled) count++;
+    if (isLoudnessContourEnabled) count++;
+    if (isSubCrossoverEnabled) count++;
+    if (isDynamicEqEnabled) count++;
     if (volumeBoost > 0.01) count++;
     return count;
   }

@@ -174,6 +174,51 @@ class AudioFeatureRegistry {
         'Hardware LoudnessEnhancer gain (0–1000 mB). Capped at +6 dB combined with headphone preamp to avoid clipping. Disabled during Bit-Perfect bypass (hardware DAC volume only).',
     conflictsWith: 'Bit-Perfect bypass',
   );
+
+  static const saturation = AudioFeatureInfo(
+    id: 'saturation',
+    title: 'Harmonic Saturation / Exciter',
+    subtitle: 'Tube/tape tanh waveshaping, drive · mix · tilt',
+    description:
+        'Generates harmonics via tanh waveshaping with a tape-style HF tilt emphasis and wet/dry mix. Zero latency. Adds density and warmth; excessive drive increases THD. Disabled during Bit-Perfect.',
+    conflictsWith: 'Bit-Perfect bypass',
+  );
+
+  static const stereoWidth = AudioFeatureInfo(
+    id: 'stereoWidth',
+    title: 'Stereo Width (Mid/Side)',
+    subtitle: '0 = mono · 1 = normal · 2 = widest',
+    description:
+        'Mid/Side matrix that scales the side signal (L−R). Independent from Crossfeed and the Virtualizer: width 0 collapses to mono, values above 1 widen the field. Zero latency. Disabled during Bit-Perfect.',
+    conflictsWith: 'Bit-Perfect bypass',
+  );
+
+  static const loudnessContour = AudioFeatureInfo(
+    id: 'loudnessContour',
+    title: 'Loudness Contour (Fletcher–Munson)',
+    subtitle: 'Volume-linked bass & treble compensation',
+    description:
+        'Equal-loudness approximation: as playback volume decreases, a gentle low-shelf (~100 Hz) and smaller high-shelf (~8 kHz) lift is applied, vanishing at full volume. Gain-domain but complementary to ReplayGain — ReplayGain levels tracks to a common target, while this contour adapts tone to the listening level; both can be ON together. Disabled during Bit-Perfect.',
+    conflictsWith: 'Bit-Perfect bypass',
+  );
+
+  static const subCrossover = AudioFeatureInfo(
+    id: 'subCrossover',
+    title: 'Subwoofer Crossover (Bass Redirection)',
+    subtitle: '60–150 Hz low-pass, 12/24 dB/oct, summed mono tap',
+    description:
+        'Bass redirection for stereo rigs: a Linkwitz-Riley-style low-passed mono sum is mixed back into both channels at user gain. Mains keep full range — this is not true multichannel LFE routing. Disabled during Bit-Perfect.',
+    conflictsWith: 'Bit-Perfect bypass',
+  );
+
+  static const dynamicEq = AudioFeatureInfo(
+    id: 'dynamicEq',
+    title: 'Dynamic EQ',
+    subtitle: 'Frequency bands that cut only when energy exceeds threshold',
+    description:
+        'Per-band dynamic cut: engages only while signal energy inside the band exceeds its threshold (threshold/ratio/attack/release per band, capped max cut). Tames resonances without static EQ coloration. Note: it interacts with the OEM DynamicsProcessing compressor — using both may double-compress the same band. Disabled during Bit-Perfect.',
+    conflictsWith: 'Bit-Perfect bypass',
+  );
 }
 
 /// Pure-logic conflict checker. Returns null if allowed, otherwise a human reason why the action must be blocked.

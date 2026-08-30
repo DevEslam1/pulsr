@@ -8,11 +8,15 @@ import 'package:pulsr/data/scanner/media_scanner_service.dart';
 import 'package:pulsr/domain/models/audio_output_info.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
+import 'package:pulsr/features/player/cubit/player_cubit.dart';
+import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/settings/presentation/widgets/audio_sound_section.dart';
 import 'package:pulsr/features/settings/presentation/widgets/playback_section.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockMediaScannerService extends Mock implements MediaScannerService {}
+
+class MockPlayerCubit extends Mock implements PlayerCubit {}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -117,6 +121,9 @@ void main() {
         (tester) async {
       final cubit = SettingsCubit(scannerService: mockScanner);
       addTearDown(cubit.close);
+      final playerCubit = MockPlayerCubit();
+      when(() => playerCubit.state).thenReturn(const PlayerState());
+      when(() => playerCubit.stream).thenAnswer((_) => const Stream.empty());
       const state = SettingsState(
         bitPerfectOutput: true,
         bypassDspOnBitPerfect: true,
@@ -141,7 +148,10 @@ void main() {
 
       await tester.pumpWidget(host(BlocProvider<SettingsCubit>.value(
         value: cubit,
-        child: const AudioSoundSection(state: state),
+        child: BlocProvider<PlayerCubit>.value(
+          value: playerCubit,
+          child: const AudioSoundSection(state: state),
+        ),
       )));
 
       expect(find.text('Disable Bit-Perfect bypass'), findsOneWidget);

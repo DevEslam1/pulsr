@@ -1294,4 +1294,87 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get stagePanner => 'التوجيه المكاني';
+
+  @override
+  String get dspSaturationTitle => 'التشبع التوافقي';
+
+  @override
+  String get dspSaturationSubtitle => 'مُثير توافقي بأسلوب الأنبوب والشريط';
+
+  @override
+  String get dspSaturationDrive => 'مقدار الدفع';
+
+  @override
+  String get dspSaturationMix => 'نسبة المزج';
+
+  @override
+  String get dspSaturationTilt => 'إبراز الحدة';
+
+  @override
+  String get dspStereoWidthTitle => 'عرض الاستريو';
+
+  @override
+  String get dspStereoWidthSubtitle => 'تحكم مستقل بحقل متوسط/جانبي (Mid/Side)';
+
+  @override
+  String get dspStereoWidthAmount => 'العرض';
+
+  @override
+  String get dspLoudnessTitle => 'منحنى الجهارة';
+
+  @override
+  String get dspLoudnessSubtitle =>
+      'تعويض نبرة مرتبط بمستوى الصوت (فليتشر-مونسون)';
+
+  @override
+  String get dspLoudnessIntensity => 'الشدة';
+
+  @override
+  String get dspLoudnessReplayGainNote =>
+      'مكمّل لـ ReplayGain: يعاير ReplayGain الجهارة بين المقاطع، وهذا المنحنى يكيّف النبرة مع مستوى استماعك.';
+
+  @override
+  String get dspSubCrossoverTitle => 'كروس أوفر السابووفر';
+
+  @override
+  String get dspSubCrossoverSubtitle =>
+      'إعادة توجيه الباس إلى نقطة ساب أحادية مجمّعة';
+
+  @override
+  String get dspSubCrossoverCorner => 'تردد التقاطع';
+
+  @override
+  String get dspSubCrossoverSubLevel => 'مستوى الساب';
+
+  @override
+  String get dspSubCrossoverNote =>
+      'إعادة توجيه باس: يُضاف مجموع أحادي مُرشَّح تمرير منخفض إلى القناتين؛ وليس توجيهاً حقيقياً متعدد القنوات (LFE).';
+
+  @override
+  String get dspDynamicEqTitle => 'المعادل الديناميكي';
+
+  @override
+  String get dspDynamicEqSubtitle =>
+      'يخفض الرنينات فقط عند تجاوز طاقة النطاق للعتبة';
+
+  @override
+  String get dspDynamicEqFrequency => 'تردد النطاق';
+
+  @override
+  String get dspDynamicEqThreshold => 'العتبة';
+
+  @override
+  String get dspDynamicEqRatio => 'نسبة الضغط';
+
+  @override
+  String get dspDynamicEqAttack => 'زمن الهجوم';
+
+  @override
+  String get dspDynamicEqRelease => 'زمن التحرر';
+
+  @override
+  String get dspDynamicEqMaxCut => 'أقصى خفض';
+
+  @override
+  String get blockedByBitPerfectShort => 'محظور بواسطة وضع البت المثالي';
 }

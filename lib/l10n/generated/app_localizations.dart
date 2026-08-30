@@ -2469,6 +2469,162 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Spatial Panner'**
   String get stagePanner;
+
+  /// No description provided for @dspSaturationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Harmonic Saturation'**
+  String get dspSaturationTitle;
+
+  /// No description provided for @dspSaturationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tube/tape-style harmonic exciter'**
+  String get dspSaturationSubtitle;
+
+  /// No description provided for @dspSaturationDrive.
+  ///
+  /// In en, this message translates to:
+  /// **'Drive'**
+  String get dspSaturationDrive;
+
+  /// No description provided for @dspSaturationMix.
+  ///
+  /// In en, this message translates to:
+  /// **'Mix'**
+  String get dspSaturationMix;
+
+  /// No description provided for @dspSaturationTilt.
+  ///
+  /// In en, this message translates to:
+  /// **'Tilt Emphasis'**
+  String get dspSaturationTilt;
+
+  /// No description provided for @dspStereoWidthTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stereo Width'**
+  String get dspStereoWidthTitle;
+
+  /// No description provided for @dspStereoWidthSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Independent Mid/Side field control'**
+  String get dspStereoWidthSubtitle;
+
+  /// No description provided for @dspStereoWidthAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Width'**
+  String get dspStereoWidthAmount;
+
+  /// No description provided for @dspLoudnessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Loudness Contour'**
+  String get dspLoudnessTitle;
+
+  /// No description provided for @dspLoudnessSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fletcher–Munson volume-linked tone compensation'**
+  String get dspLoudnessSubtitle;
+
+  /// No description provided for @dspLoudnessIntensity.
+  ///
+  /// In en, this message translates to:
+  /// **'Intensity'**
+  String get dspLoudnessIntensity;
+
+  /// No description provided for @dspLoudnessReplayGainNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Complements ReplayGain: ReplayGain levels loudness across tracks, while this contour adapts tone to your listening volume.'**
+  String get dspLoudnessReplayGainNote;
+
+  /// No description provided for @dspSubCrossoverTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Subwoofer Crossover'**
+  String get dspSubCrossoverTitle;
+
+  /// No description provided for @dspSubCrossoverSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bass redirection into a summed mono sub tap'**
+  String get dspSubCrossoverSubtitle;
+
+  /// No description provided for @dspSubCrossoverCorner.
+  ///
+  /// In en, this message translates to:
+  /// **'Crossover Corner'**
+  String get dspSubCrossoverCorner;
+
+  /// No description provided for @dspSubCrossoverSubLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sub Level'**
+  String get dspSubCrossoverSubLevel;
+
+  /// No description provided for @dspSubCrossoverNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Bass redirection: a low-passed mono sum is added to both channels — this is not true multichannel LFE routing.'**
+  String get dspSubCrossoverNote;
+
+  /// No description provided for @dspDynamicEqTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Dynamic EQ'**
+  String get dspDynamicEqTitle;
+
+  /// No description provided for @dspDynamicEqSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cuts resonances only when band energy exceeds the threshold'**
+  String get dspDynamicEqSubtitle;
+
+  /// No description provided for @dspDynamicEqFrequency.
+  ///
+  /// In en, this message translates to:
+  /// **'Band Frequency'**
+  String get dspDynamicEqFrequency;
+
+  /// No description provided for @dspDynamicEqThreshold.
+  ///
+  /// In en, this message translates to:
+  /// **'Threshold'**
+  String get dspDynamicEqThreshold;
+
+  /// No description provided for @dspDynamicEqRatio.
+  ///
+  /// In en, this message translates to:
+  /// **'Ratio'**
+  String get dspDynamicEqRatio;
+
+  /// No description provided for @dspDynamicEqAttack.
+  ///
+  /// In en, this message translates to:
+  /// **'Attack'**
+  String get dspDynamicEqAttack;
+
+  /// No description provided for @dspDynamicEqRelease.
+  ///
+  /// In en, this message translates to:
+  /// **'Release'**
+  String get dspDynamicEqRelease;
+
+  /// No description provided for @dspDynamicEqMaxCut.
+  ///
+  /// In en, this message translates to:
+  /// **'Max Cut'**
+  String get dspDynamicEqMaxCut;
+
+  /// No description provided for @blockedByBitPerfectShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked by Bit-Perfect'**
+  String get blockedByBitPerfectShort;
 }
 
 class _AppLocalizationsDelegate

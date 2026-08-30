@@ -19,6 +19,11 @@ add_library(pulsr_dsp SHARED
     SincResampler.cpp
     DsdDecoder.cpp
     SpatialPanner.cpp
+    HarmonicSaturation.cpp
+    StereoWidth.cpp
+    LoudnessContour.cpp
+    SubCrossover.cpp
+    DynamicEQ.cpp
     AudioDspEngine.cpp
     eq_jni_bridge.cpp
 )

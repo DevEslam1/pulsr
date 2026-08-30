@@ -1292,4 +1292,88 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get stagePanner => 'Panoramizador espacial';
+
+  @override
+  String get dspSaturationTitle => 'Saturación Armónica';
+
+  @override
+  String get dspSaturationSubtitle => 'Exciter armónico estilo válvula/cinta';
+
+  @override
+  String get dspSaturationDrive => 'Nivel de excitación';
+
+  @override
+  String get dspSaturationMix => 'Mezcla';
+
+  @override
+  String get dspSaturationTilt => 'Énfasis de agudos';
+
+  @override
+  String get dspStereoWidthTitle => 'Ancho Estéreo';
+
+  @override
+  String get dspStereoWidthSubtitle =>
+      'Control independiente de campo Mid/Side';
+
+  @override
+  String get dspStereoWidthAmount => 'Ancho';
+
+  @override
+  String get dspLoudnessTitle => 'Contorno de Sonoridad';
+
+  @override
+  String get dspLoudnessSubtitle =>
+      'Compensación de tono según el volumen (Fletcher–Munson)';
+
+  @override
+  String get dspLoudnessIntensity => 'Intensidad';
+
+  @override
+  String get dspLoudnessReplayGainNote =>
+      'Complementa ReplayGain: ReplayGain iguala la sonoridad entre pistas, mientras este contorno adapta el tono a tu volumen de escucha.';
+
+  @override
+  String get dspSubCrossoverTitle => 'Cruce de Subwoofer';
+
+  @override
+  String get dspSubCrossoverSubtitle =>
+      'Redirección de graves a una suma mono tipo sub';
+
+  @override
+  String get dspSubCrossoverCorner => 'Frecuencia de cruce';
+
+  @override
+  String get dspSubCrossoverSubLevel => 'Nivel del sub';
+
+  @override
+  String get dspSubCrossoverNote =>
+      'Redirección de graves: se suma una señal mono filtrada en paso bajo a ambos canales; no es un enrutado multicanal LFE real.';
+
+  @override
+  String get dspDynamicEqTitle => 'Ecualizador Dinámico';
+
+  @override
+  String get dspDynamicEqSubtitle =>
+      'Corta resonancias solo cuando la energía de la banda supera el umbral';
+
+  @override
+  String get dspDynamicEqFrequency => 'Frecuencia de banda';
+
+  @override
+  String get dspDynamicEqThreshold => 'Umbral';
+
+  @override
+  String get dspDynamicEqRatio => 'Relación';
+
+  @override
+  String get dspDynamicEqAttack => 'Ataque';
+
+  @override
+  String get dspDynamicEqRelease => 'Liberación';
+
+  @override
+  String get dspDynamicEqMaxCut => 'Corte máximo';
+
+  @override
+  String get blockedByBitPerfectShort => 'Bloqueado por Bit-Perfect';
 }

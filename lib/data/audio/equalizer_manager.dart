@@ -60,6 +60,27 @@ class EqualizerManager {
   bool monoMix = false;
   bool isSincResamplerEnabled = true;
 
+  // Phase 1 DSP expansion stages
+  bool isSaturationEnabled = false;
+  double saturationDrive = 0.3; // 0.0 - 1.0
+  double saturationMix = 0.5; // 0.0 - 1.0 wet/dry
+  double saturationTilt = 0.3; // 0.0 - 1.0 HF pre-emphasis
+
+  bool isStereoWidthEnabled = false;
+  double stereoWidth = 1.0; // 0.0 mono … 1.0 normal … 2.0 widened
+
+  bool isLoudnessContourEnabled = false;
+  double loudnessContourIntensity = 0.0; // 0.0 - 1.0
+  double loudnessVolumeLinear = 1.0; // current volume-stage value (0..1)
+
+  bool isSubCrossoverEnabled = false;
+  double subCrossoverCornerHz = 80.0; // 60 - 150 Hz
+  double subCrossoverSlopeDbPerOct = 24.0; // 12 or 24 dB/oct
+  double subCrossoverGain = 0.8; // 0.0 - 1.0
+
+  bool isDynamicEqEnabled = false;
+  List<DynamicEqBandConfig> dynamicEqBands = const [DynamicEqBandConfig()];
+
   HeadphoneProfile? selectedHeadphoneProfile;
 
   List<double> customFrequencies = List.from(EqPreset.centerFrequencies);
@@ -194,6 +215,45 @@ class EqualizerManager {
       isSincResamplerEnabled =
           prefs.getBool(PrefsKeys.sincResamplerEnabled) ?? true;
 
+      // Phase 1 DSP expansion stages (missing keys = neutral defaults)
+      isSaturationEnabled =
+          prefs.getBool(PrefsKeys.saturationEnabled) ?? false;
+      saturationDrive = prefs.getDouble(PrefsKeys.saturationDrive) ?? 0.3;
+      saturationMix = prefs.getDouble(PrefsKeys.saturationMix) ?? 0.5;
+      saturationTilt = prefs.getDouble(PrefsKeys.saturationTilt) ?? 0.3;
+
+      isStereoWidthEnabled =
+          prefs.getBool(PrefsKeys.stereoWidthEnabled) ?? false;
+      stereoWidth = prefs.getDouble(PrefsKeys.stereoWidth) ?? 1.0;
+
+      isLoudnessContourEnabled =
+          prefs.getBool(PrefsKeys.loudnessContourEnabled) ?? false;
+      loudnessContourIntensity =
+          prefs.getDouble(PrefsKeys.loudnessContourIntensity) ?? 0.0;
+
+      isSubCrossoverEnabled =
+          prefs.getBool(PrefsKeys.subCrossoverEnabled) ?? false;
+      subCrossoverCornerHz =
+          prefs.getDouble(PrefsKeys.subCrossoverCornerHz) ?? 80.0;
+      subCrossoverSlopeDbPerOct =
+          prefs.getDouble(PrefsKeys.subCrossoverSlopeDbPerOct) ?? 24.0;
+      subCrossoverGain = prefs.getDouble(PrefsKeys.subCrossoverGain) ?? 0.8;
+
+      isDynamicEqEnabled = prefs.getBool(PrefsKeys.dynamicEqEnabled) ?? false;
+      final dynEqJson = prefs.getString(PrefsKeys.dynamicEqBands);
+      if (dynEqJson != null) {
+        try {
+          final decoded = (json.decode(dynEqJson) as List<dynamic>)
+              .whereType<Map<String, dynamic>>()
+              .map(DynamicEqBandConfig.fromJson)
+              .toList();
+          if (decoded.isNotEmpty) dynamicEqBands = decoded;
+        } catch (e, st) {
+          ErrorLogger.log('Failed to decode dynamic EQ bands from prefs',
+              error: e, stackTrace: st, category: 'EqualizerManager');
+        }
+      }
+
       final profileId = prefs.getString(PrefsKeys.eqHeadphoneProfileId);
       if (profileId != null) {
         await HeadphoneProfilesRepository().loadProfiles();
@@ -234,6 +294,29 @@ class EqualizerManager {
       if (stereoBalance != 0.0) pendingFutures.add(_effectsChannel.setStereoBalance(stereoBalance));
       if (monoMix) pendingFutures.add(_effectsChannel.setMonoMix(true));
       if (!isSincResamplerEnabled) pendingFutures.add(_effectsChannel.setSincResamplerEnabled(false));
+      if (isSaturationEnabled) {
+        pendingFutures.add(_effectsChannel.setSaturationParams(
+            saturationDrive, saturationMix, saturationTilt));
+        pendingFutures.add(_effectsChannel.setSaturationEnabled(true));
+      }
+      if (isStereoWidthEnabled) {
+        pendingFutures.add(_effectsChannel.setStereoWidthParams(stereoWidth));
+        pendingFutures.add(_effectsChannel.setStereoWidthEnabled(true));
+      }
+      if (isLoudnessContourEnabled) {
+        pendingFutures.add(_effectsChannel
+            .setLoudnessContourParams(loudnessContourIntensity, loudnessVolumeLinear));
+        pendingFutures.add(_effectsChannel.setLoudnessContourEnabled(true));
+      }
+      if (isSubCrossoverEnabled) {
+        pendingFutures.add(_effectsChannel.setSubCrossoverParams(
+            subCrossoverCornerHz, subCrossoverSlopeDbPerOct, subCrossoverGain));
+        pendingFutures.add(_effectsChannel.setSubCrossoverEnabled(true));
+      }
+      if (isDynamicEqEnabled) {
+        pendingFutures.add(_pushDynamicEqConfig());
+        pendingFutures.add(_effectsChannel.setDynamicEqEnabled(true));
+      }
       // Dynamics last — it triggers recalculateActiveStages which disables OEM engine; doing it last prevents intermediate dropout
       if (pendingFutures.isNotEmpty) await Future.wait(pendingFutures);
       if (isDynamicsEnabled && !_isDynamicsBypassed) {
@@ -285,6 +368,26 @@ class EqualizerManager {
       await prefs.setBool(PrefsKeys.monoMix, monoMix);
       await prefs.setBool(
           PrefsKeys.sincResamplerEnabled, isSincResamplerEnabled);
+
+      // Phase 1 DSP expansion stages
+      await prefs.setBool(PrefsKeys.saturationEnabled, isSaturationEnabled);
+      await prefs.setDouble(PrefsKeys.saturationDrive, saturationDrive);
+      await prefs.setDouble(PrefsKeys.saturationMix, saturationMix);
+      await prefs.setDouble(PrefsKeys.saturationTilt, saturationTilt);
+      await prefs.setBool(PrefsKeys.stereoWidthEnabled, isStereoWidthEnabled);
+      await prefs.setDouble(PrefsKeys.stereoWidth, stereoWidth);
+      await prefs.setBool(
+          PrefsKeys.loudnessContourEnabled, isLoudnessContourEnabled);
+      await prefs.setDouble(
+          PrefsKeys.loudnessContourIntensity, loudnessContourIntensity);
+      await prefs.setBool(PrefsKeys.subCrossoverEnabled, isSubCrossoverEnabled);
+      await prefs.setDouble(PrefsKeys.subCrossoverCornerHz, subCrossoverCornerHz);
+      await prefs.setDouble(
+          PrefsKeys.subCrossoverSlopeDbPerOct, subCrossoverSlopeDbPerOct);
+      await prefs.setDouble(PrefsKeys.subCrossoverGain, subCrossoverGain);
+      await prefs.setBool(PrefsKeys.dynamicEqEnabled, isDynamicEqEnabled);
+      await prefs.setString(PrefsKeys.dynamicEqBands,
+          json.encode(dynamicEqBands.map((b) => b.toJson()).toList()));
 
       if (selectedHeadphoneProfile != null) {
         await prefs.setString(
@@ -774,6 +877,124 @@ class EqualizerManager {
     _debouncedSavePreferences();
   }
 
+  // --- PHASE 1 DSP EXPANSION STAGES ---
+
+  Future<void> setSaturation(bool enabled,
+      {double? drive, double? mix, double? tilt}) async {
+    isSaturationEnabled = enabled;
+    if (drive != null) saturationDrive = drive.clamp(0.0, 1.0);
+    if (mix != null) saturationMix = mix.clamp(0.0, 1.0);
+    if (tilt != null) saturationTilt = tilt.clamp(0.0, 1.0);
+    if (Platform.isAndroid) {
+      await _effectsChannel.setSaturationParams(
+          saturationDrive, saturationMix, saturationTilt);
+      await _effectsChannel.setSaturationEnabled(enabled);
+    }
+    _debouncedSavePreferences();
+  }
+
+  Future<void> setStereoWidth(bool enabled, {double? width}) async {
+    isStereoWidthEnabled = enabled;
+    if (width != null) stereoWidth = width.clamp(0.0, 2.0);
+    if (Platform.isAndroid) {
+      await _effectsChannel.setStereoWidthParams(stereoWidth);
+      await _effectsChannel.setStereoWidthEnabled(enabled);
+    }
+    _debouncedSavePreferences();
+  }
+
+  /// Sets the loudness contour. The contour lift is computed against
+  /// [loudnessVolumeLinear], which is kept in sync with the playback volume
+  /// stage via [updateLoudnessVolume].
+  Future<void> setLoudnessContour(bool enabled, {double? intensity}) async {
+    isLoudnessContourEnabled = enabled;
+    if (intensity != null) loudnessContourIntensity = intensity.clamp(0.0, 1.0);
+    if (Platform.isAndroid) {
+      await _effectsChannel.setLoudnessContourParams(
+          loudnessContourIntensity, loudnessVolumeLinear);
+      await _effectsChannel.setLoudnessContourEnabled(enabled);
+    }
+    _debouncedSavePreferences();
+  }
+
+  /// Pushes the current volume-stage value to the engine so the loudness
+  /// contour follows the listening level. Called by AudioHandler on volume
+  /// changes and applied on session reattach.
+  Future<void> updateLoudnessVolume(double volumeLinear) async {
+    loudnessVolumeLinear = volumeLinear.clamp(0.0, 1.0);
+    if (Platform.isAndroid && isLoudnessContourEnabled) {
+      await _effectsChannel.setLoudnessContourParams(
+          loudnessContourIntensity, loudnessVolumeLinear);
+    }
+  }
+
+  Future<void> setSubCrossover(bool enabled,
+      {double? cornerHz, double? slopeDbPerOct, double? gain}) async {
+    isSubCrossoverEnabled = enabled;
+    if (cornerHz != null) subCrossoverCornerHz = cornerHz.clamp(60.0, 150.0);
+    if (slopeDbPerOct != null) {
+      subCrossoverSlopeDbPerOct = slopeDbPerOct < 18.0 ? 12.0 : 24.0;
+    }
+    if (gain != null) subCrossoverGain = gain.clamp(0.0, 1.0);
+    if (Platform.isAndroid) {
+      await _effectsChannel.setSubCrossoverParams(
+          subCrossoverCornerHz, subCrossoverSlopeDbPerOct, subCrossoverGain);
+      await _effectsChannel.setSubCrossoverEnabled(enabled);
+    }
+    _debouncedSavePreferences();
+  }
+
+  Future<void> setDynamicEq(bool enabled) async {
+    isDynamicEqEnabled = enabled;
+    if (Platform.isAndroid) {
+      await _pushDynamicEqConfig();
+      await _effectsChannel.setDynamicEqEnabled(enabled);
+    }
+    _debouncedSavePreferences();
+  }
+
+  Future<void> setDynamicEqBand(int index, DynamicEqBandConfig band) async {
+    if (index < 0 || index >= dynamicEqBands.length) return;
+    final bands = List<DynamicEqBandConfig>.from(dynamicEqBands);
+    bands[index] = band;
+    dynamicEqBands = bands;
+    if (Platform.isAndroid && isDynamicEqEnabled) {
+      await _effectsChannel.setDynamicEqBand(
+        index,
+        frequency: band.frequency,
+        q: band.q,
+        thresholdDb: band.thresholdDb,
+        ratio: band.ratio,
+        attackMs: band.attackMs,
+        releaseMs: band.releaseMs,
+        maxCutDb: band.maxCutDb,
+        enabled: band.enabled,
+      );
+    }
+    _debouncedSavePreferences();
+  }
+
+  /// Pushes band count + every band (bulk) so the native DynamicEQ stage
+  /// matches the Dart-side band list atomically.
+  Future<void> _pushDynamicEqConfig() async {
+    if (!Platform.isAndroid) return;
+    await _effectsChannel.setDynamicEqBandCount(dynamicEqBands.length);
+    for (int i = 0; i < dynamicEqBands.length; i++) {
+      final band = dynamicEqBands[i];
+      await _effectsChannel.setDynamicEqBand(
+        i,
+        frequency: band.frequency,
+        q: band.q,
+        thresholdDb: band.thresholdDb,
+        ratio: band.ratio,
+        attackMs: band.attackMs,
+        releaseMs: band.releaseMs,
+        maxCutDb: band.maxCutDb,
+        enabled: band.enabled,
+      );
+    }
+  }
+
   Future<void> setBypassDspForBitPerfect(bool bypass) async {
     if (Platform.isAndroid) {
       await _effectsChannel.setBypassDspForBitPerfect(bypass);
@@ -862,6 +1083,11 @@ class EqualizerManager {
           isCrossfeedEnabled ||
           isLimiterEnabled ||
           isReverbEnabled ||
+          isSaturationEnabled ||
+          isStereoWidthEnabled ||
+          isLoudnessContourEnabled ||
+          isSubCrossoverEnabled ||
+          isDynamicEqEnabled ||
           volumeBoost > 0 ||
           currentPreset.bassBoost > 0 ||
           stereoBalance != 0.0 ||
@@ -906,6 +1132,29 @@ class EqualizerManager {
         futures.add(_effectsChannel.setStereoBalance(stereoBalance));
       }
       if (monoMix) futures.add(_effectsChannel.setMonoMix(true));
+      if (isSaturationEnabled) {
+        futures.add(_effectsChannel.setSaturationParams(
+            saturationDrive, saturationMix, saturationTilt));
+        futures.add(_effectsChannel.setSaturationEnabled(true));
+      }
+      if (isStereoWidthEnabled) {
+        futures.add(_effectsChannel.setStereoWidthParams(stereoWidth));
+        futures.add(_effectsChannel.setStereoWidthEnabled(true));
+      }
+      if (isLoudnessContourEnabled) {
+        futures.add(_effectsChannel.setLoudnessContourParams(
+            loudnessContourIntensity, loudnessVolumeLinear));
+        futures.add(_effectsChannel.setLoudnessContourEnabled(true));
+      }
+      if (isSubCrossoverEnabled) {
+        futures.add(_effectsChannel.setSubCrossoverParams(
+            subCrossoverCornerHz, subCrossoverSlopeDbPerOct, subCrossoverGain));
+        futures.add(_effectsChannel.setSubCrossoverEnabled(true));
+      }
+      if (isDynamicEqEnabled) {
+        futures.add(_pushDynamicEqConfig());
+        futures.add(_effectsChannel.setDynamicEqEnabled(true));
+      }
 
       if (futures.isNotEmpty) await Future.wait(futures);
 

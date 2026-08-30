@@ -405,4 +405,131 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeGetAutoDegradedStages(
     return static_cast<jint>(AudioDspEngine::instance().getAutoDegradedStages());
 }
 
+// ---- Phase 1 DSP expansion: Harmonic Saturation / Exciter ----
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSaturationEnabled(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->saturation.enabled = enabled;
+    AudioDspEngine::instance().publishParams(updated);
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSaturationParams(
+        JNIEnv* /* env */, jobject /* thiz */, jdouble drive, jdouble mix, jdouble tilt) {
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->saturation.drive = drive;
+    updated->saturation.mix = mix;
+    updated->saturation.tilt = tilt;
+    AudioDspEngine::instance().publishParams(updated);
+}
+
+// ---- Phase 1 DSP expansion: Stereo Width (Mid/Side) ----
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetStereoWidthEnabled(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->stereoWidth.enabled = enabled;
+    AudioDspEngine::instance().publishParams(updated);
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetStereoWidthParams(
+        JNIEnv* /* env */, jobject /* thiz */, jdouble width) {
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->stereoWidth.width = width;
+    AudioDspEngine::instance().publishParams(updated);
+}
+
+// ---- Phase 1 DSP expansion: Loudness Contour (Fletcher-Munson) ----
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetLoudnessContourEnabled(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->loudness.enabled = enabled;
+    AudioDspEngine::instance().publishParams(updated);
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetLoudnessContourParams(
+        JNIEnv* /* env */, jobject /* thiz */, jdouble intensity, jdouble volumeLinear) {
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->loudness.intensity = intensity;
+    updated->loudness.volumeLinear = volumeLinear;
+    AudioDspEngine::instance().publishParams(updated);
+}
+
+// ---- Phase 1 DSP expansion: Subwoofer / LFE Crossover (bass redirection) ----
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSubCrossoverEnabled(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->subCrossover.enabled = enabled;
+    AudioDspEngine::instance().publishParams(updated);
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSubCrossoverParams(
+        JNIEnv* /* env */, jobject /* thiz */, jdouble cornerHz, jdouble slopeDbPerOct, jdouble subGain) {
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->subCrossover.cornerHz = cornerHz;
+    updated->subCrossover.slopeDbPerOct = slopeDbPerOct;
+    updated->subCrossover.subGain = subGain;
+    AudioDspEngine::instance().publishParams(updated);
+}
+
+// ---- Phase 1 DSP expansion: Dynamic EQ ----
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDynamicEqEnabled(
+        JNIEnv* /* env */, jobject /* thiz */, jboolean enabled) {
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->dynamicEq.enabled = enabled;
+    AudioDspEngine::instance().publishParams(updated);
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDynamicEqBandCount(
+        JNIEnv* /* env */, jobject /* thiz */, jint count) {
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->dynamicEq.bandCount = std::clamp(static_cast<int>(count), 0, DynamicEqParamSet::MAX_BANDS);
+    AudioDspEngine::instance().publishParams(updated);
+}
+
+JNIEXPORT void JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDynamicEqBand(
+        JNIEnv* /* env */, jobject /* thiz */,
+        jint index, jdouble freq, jdouble q, jdouble thresholdDb, jdouble ratio,
+        jdouble attackMs, jdouble releaseMs, jdouble maxCutDb, jboolean enabled) {
+    if (index < 0 || index >= DynamicEqParamSet::MAX_BANDS) return;
+    auto current = AudioDspEngine::instance().getParams();
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    if (index >= updated->dynamicEq.bandCount) updated->dynamicEq.bandCount = index + 1;
+
+    auto& band = updated->dynamicEq.bands[index];
+    band.frequency = freq;
+    band.q = q;
+    band.thresholdDb = thresholdDb;
+    band.ratio = ratio;
+    band.attackMs = attackMs;
+    band.releaseMs = releaseMs;
+    band.maxCutDb = maxCutDb;
+    band.enabled = enabled;
+    AudioDspEngine::instance().publishParams(updated);
+}
+
 } // extern "C"

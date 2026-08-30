@@ -1284,4 +1284,87 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get stagePanner => 'Spatial Panner';
+
+  @override
+  String get dspSaturationTitle => 'Harmonic Saturation';
+
+  @override
+  String get dspSaturationSubtitle => 'Tube/tape-style harmonic exciter';
+
+  @override
+  String get dspSaturationDrive => 'Drive';
+
+  @override
+  String get dspSaturationMix => 'Mix';
+
+  @override
+  String get dspSaturationTilt => 'Tilt Emphasis';
+
+  @override
+  String get dspStereoWidthTitle => 'Stereo Width';
+
+  @override
+  String get dspStereoWidthSubtitle => 'Independent Mid/Side field control';
+
+  @override
+  String get dspStereoWidthAmount => 'Width';
+
+  @override
+  String get dspLoudnessTitle => 'Loudness Contour';
+
+  @override
+  String get dspLoudnessSubtitle =>
+      'Fletcher–Munson volume-linked tone compensation';
+
+  @override
+  String get dspLoudnessIntensity => 'Intensity';
+
+  @override
+  String get dspLoudnessReplayGainNote =>
+      'Complements ReplayGain: ReplayGain levels loudness across tracks, while this contour adapts tone to your listening volume.';
+
+  @override
+  String get dspSubCrossoverTitle => 'Subwoofer Crossover';
+
+  @override
+  String get dspSubCrossoverSubtitle =>
+      'Bass redirection into a summed mono sub tap';
+
+  @override
+  String get dspSubCrossoverCorner => 'Crossover Corner';
+
+  @override
+  String get dspSubCrossoverSubLevel => 'Sub Level';
+
+  @override
+  String get dspSubCrossoverNote =>
+      'Bass redirection: a low-passed mono sum is added to both channels — this is not true multichannel LFE routing.';
+
+  @override
+  String get dspDynamicEqTitle => 'Dynamic EQ';
+
+  @override
+  String get dspDynamicEqSubtitle =>
+      'Cuts resonances only when band energy exceeds the threshold';
+
+  @override
+  String get dspDynamicEqFrequency => 'Band Frequency';
+
+  @override
+  String get dspDynamicEqThreshold => 'Threshold';
+
+  @override
+  String get dspDynamicEqRatio => 'Ratio';
+
+  @override
+  String get dspDynamicEqAttack => 'Attack';
+
+  @override
+  String get dspDynamicEqRelease => 'Release';
+
+  @override
+  String get dspDynamicEqMaxCut => 'Max Cut';
+
+  @override
+  String get blockedByBitPerfectShort => 'Blocked by Bit-Perfect';
 }

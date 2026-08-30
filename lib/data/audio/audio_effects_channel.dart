@@ -447,6 +447,160 @@ class AudioEffectsChannel {
     }
   }
 
+  // --- PHASE 1 DSP EXPANSION: HARMONIC SATURATION / EXCITER ---
+
+  Future<void> setSaturationEnabled(bool enabled) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('setSaturationEnabled', {'enabled': enabled});
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set saturation enabled ($enabled)',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+  }
+
+  Future<void> setSaturationParams(double drive, double mix, double tilt) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('setSaturationParams', {
+        'drive': drive,
+        'mix': mix,
+        'tilt': tilt,
+      });
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set saturation params',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+  }
+
+  // --- PHASE 1 DSP EXPANSION: STEREO WIDTH (MID/SIDE) ---
+
+  Future<void> setStereoWidthEnabled(bool enabled) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('setStereoWidthEnabled', {'enabled': enabled});
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set stereo width enabled ($enabled)',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+  }
+
+  Future<void> setStereoWidthParams(double width) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('setStereoWidthParams', {'width': width});
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set stereo width ($width)',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+  }
+
+  // --- PHASE 1 DSP EXPANSION: LOUDNESS CONTOUR (FLETCHER-MUNSON) ---
+
+  Future<void> setLoudnessContourEnabled(bool enabled) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel
+          .invokeMethod('setLoudnessContourEnabled', {'enabled': enabled});
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set loudness contour enabled ($enabled)',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+  }
+
+  Future<void> setLoudnessContourParams(
+      double intensity, double volumeLinear) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('setLoudnessContourParams', {
+        'intensity': intensity,
+        'volumeLinear': volumeLinear,
+      });
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set loudness contour params',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+  }
+
+  // --- PHASE 1 DSP EXPANSION: SUBWOOFER / LFE CROSSOVER ---
+
+  Future<void> setSubCrossoverEnabled(bool enabled) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('setSubCrossoverEnabled', {'enabled': enabled});
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set sub crossover enabled ($enabled)',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+  }
+
+  Future<void> setSubCrossoverParams(
+      double cornerHz, double slopeDbPerOct, double subGain) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('setSubCrossoverParams', {
+        'cornerHz': cornerHz,
+        'slopeDbPerOct': slopeDbPerOct,
+        'subGain': subGain,
+      });
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set sub crossover params',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+  }
+
+  // --- PHASE 1 DSP EXPANSION: DYNAMIC EQ ---
+
+  Future<void> setDynamicEqEnabled(bool enabled) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('setDynamicEqEnabled', {'enabled': enabled});
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set dynamic EQ enabled ($enabled)',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+  }
+
+  Future<void> setDynamicEqBandCount(int count) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('setDynamicEqBandCount', {'count': count});
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set dynamic EQ band count ($count)',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+  }
+
+  Future<void> setDynamicEqBand(
+    int index, {
+    required double frequency,
+    required double q,
+    required double thresholdDb,
+    required double ratio,
+    required double attackMs,
+    required double releaseMs,
+    required double maxCutDb,
+    bool enabled = true,
+  }) async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _channel.invokeMethod('setDynamicEqBand', {
+        'index': index,
+        'frequency': frequency,
+        'q': q,
+        'thresholdDb': thresholdDb,
+        'ratio': ratio,
+        'attackMs': attackMs,
+        'releaseMs': releaseMs,
+        'maxCutDb': maxCutDb,
+        'enabled': enabled,
+      });
+    } catch (e, st) {
+      ErrorLogger.log('Failed to set dynamic EQ band $index',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+  }
+
   // --- DSD DECODING ---
 
   Future<List<double>?> decodeDsd(List<int> dsdL, List<int> dsdR,

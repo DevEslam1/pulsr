@@ -214,6 +214,50 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   @override
   List<String> get detectedOemEngines => const [];
 
+  // Phase 1 DSP expansion stage surface (mirror PulsrAudioHandler)
+  @override
+  bool get isSaturationEnabled => false;
+  @override
+  double get saturationDrive => 0.0;
+  @override
+  double get saturationMix => 0.5;
+  @override
+  double get saturationTilt => 0.0;
+  @override
+  bool get isStereoWidthEnabled => false;
+  @override
+  double get stereoWidth => 1.0;
+  @override
+  bool get isLoudnessContourEnabled => false;
+  @override
+  double get loudnessContourIntensity => 0.0;
+  @override
+  bool get isSubCrossoverEnabled => false;
+  @override
+  double get subCrossoverCornerHz => 80.0;
+  @override
+  double get subCrossoverSlopeDbPerOct => 24.0;
+  @override
+  double get subCrossoverGain => 0.8;
+  @override
+  bool get isDynamicEqEnabled => false;
+  @override
+  List<DynamicEqBandConfig> get dynamicEqBands => const [];
+  @override
+  Future<void> setSaturation(bool enabled,
+          {double? drive, double? mix, double? tilt}) async {}
+  @override
+  Future<void> setStereoWidth(bool enabled, {double? width}) async {}
+  @override
+  Future<void> setLoudnessContour(bool enabled, {double? intensity}) async {}
+  @override
+  Future<void> setSubCrossover(bool enabled,
+          {double? cornerHz, double? slopeDbPerOct, double? gain}) async {}
+  @override
+  Future<void> setDynamicEq(bool enabled) async {}
+  @override
+  Future<void> setDynamicEqBand(int index, DynamicEqBandConfig band) async {}
+
   @override
   Future<void> setCrossfeed(bool enabled,
       {double? delayUs, double? feedDb}) async {}

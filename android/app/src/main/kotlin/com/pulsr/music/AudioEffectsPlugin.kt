@@ -97,6 +97,27 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var stereoBalance = 0.0
     private var monoMix = false
 
+    // Phase 1 DSP expansion stages
+    private var isSaturationEnabled = false
+    private var saturationDrive = 0.3
+    private var saturationMix = 0.5
+    private var saturationTilt = 0.3
+
+    private var isStereoWidthEnabled = false
+    private var stereoWidth = 1.0
+
+    private var isLoudnessContourEnabled = false
+    private var loudnessIntensity = 0.0
+    private var loudnessVolumeLinear = 1.0
+
+    private var isSubCrossoverEnabled = false
+    private var subCrossoverCornerHz = 80.0
+    private var subCrossoverSlopeDbPerOct = 24.0
+    private var subCrossoverGain = 0.8
+
+    private var isDynamicEqEnabled = false
+    private var dynamicEqBandCount = 1
+
     private var isSincResamplerEnabled = true
     private var resamplerInRate = 48000.0
     private var resamplerOutRate = 48000.0
@@ -123,6 +144,16 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var lastNativeMonoMix: Boolean? = null
     private var lastNativeResamplerEnabled: Boolean? = null
     private var lastNativeResamplerRates: String? = null
+    private var lastNativeSaturationEnabled: Boolean? = null
+    private var lastNativeSaturationParams: String? = null
+    private var lastNativeStereoWidthEnabled: Boolean? = null
+    private var lastNativeStereoWidthParams: Double? = null
+    private var lastNativeLoudnessEnabled: Boolean? = null
+    private var lastNativeLoudnessParams: String? = null
+    private var lastNativeSubCrossoverEnabled: Boolean? = null
+    private var lastNativeSubCrossoverParams: String? = null
+    private var lastNativeDynamicEqEnabled: Boolean? = null
+    private val lastNativeDynamicEqBands = mutableMapOf<Int, String>()
 
     init {
         try {
@@ -168,6 +199,20 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private external fun nativeSetMonoMix(mono: Boolean)
     private external fun nativeSetSincResamplerEnabled(enabled: Boolean)
     private external fun nativeSetSincResamplerRates(inRate: Double, outRate: Double)
+    private external fun nativeSetSaturationEnabled(enabled: Boolean)
+    private external fun nativeSetSaturationParams(drive: Double, mix: Double, tilt: Double)
+    private external fun nativeSetStereoWidthEnabled(enabled: Boolean)
+    private external fun nativeSetStereoWidthParams(width: Double)
+    private external fun nativeSetLoudnessContourEnabled(enabled: Boolean)
+    private external fun nativeSetLoudnessContourParams(intensity: Double, volumeLinear: Double)
+    private external fun nativeSetSubCrossoverEnabled(enabled: Boolean)
+    private external fun nativeSetSubCrossoverParams(cornerHz: Double, slopeDbPerOct: Double, subGain: Double)
+    private external fun nativeSetDynamicEqEnabled(enabled: Boolean)
+    private external fun nativeSetDynamicEqBandCount(count: Int)
+    private external fun nativeSetDynamicEqBand(
+        index: Int, freq: Double, q: Double, thresholdDb: Double, ratio: Double,
+        attackMs: Double, releaseMs: Double, maxCutDb: Double, enabled: Boolean
+    )
     private external fun nativeProcessAudio(buffer: FloatArray, frames: Int, channels: Int): Int
     private external fun nativeDecodeDsd(dsdL: ByteArray, dsdR: ByteArray, byteCount: Int, dsdRate: Int, targetPcmSampleRate: Int, bitOrder: Int): FloatArray?
     private external fun nativeSetActiveStages(bitmask: Int)
@@ -194,7 +239,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
     }
 
-    private var activeDspStages: Int = STAGE_EQ or STAGE_CROSSFEED or STAGE_REVERB or STAGE_PANNER or STAGE_LIMITER or STAGE_RESAMPLER
+    private var activeDspStages: Int = STAGE_EQ or STAGE_CROSSFEED or STAGE_REVERB or STAGE_PANNER or STAGE_LIMITER or STAGE_RESAMPLER or STAGE_SATURATION or STAGE_WIDTH or STAGE_LOUDNESS or STAGE_CROSSOVER or STAGE_DYNEQ
 
     fun recalculateActiveStages() {
         // Bit-perfect bypass: force zero stages regardless of toggles
@@ -226,6 +271,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         if (isSincResamplerEnabled && Math.abs(resamplerInRate - resamplerOutRate) > 1.0) {
             mask = mask or STAGE_RESAMPLER
         }
+        // Phase 1 DSP expansion stages
+        if (isSaturationEnabled) mask = mask or STAGE_SATURATION
+        if (isStereoWidthEnabled) mask = mask or STAGE_WIDTH
+        // Loudness contour needs both a non-zero intensity and a known volume-stage value
+        if (isLoudnessContourEnabled && loudnessIntensity > 0.001) mask = mask or STAGE_LOUDNESS
+        if (isSubCrossoverEnabled) mask = mask or STAGE_CROSSOVER
+        if (isDynamicEqEnabled && dynamicEqBandCount > 0) mask = mask or STAGE_DYNEQ
         activeDspStages = mask
 
         if (isNativeDspLoaded) {
@@ -256,6 +308,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         const val STAGE_PANNER = 1 shl 3
         const val STAGE_LIMITER = 1 shl 4
         const val STAGE_RESAMPLER = 1 shl 5
+        // Phase 1 DSP expansion stages (must mirror DspStageMask in AudioDspEngine.h)
+        const val STAGE_SATURATION = 1 shl 6
+        const val STAGE_WIDTH = 1 shl 7
+        const val STAGE_LOUDNESS = 1 shl 8
+        const val STAGE_CROSSOVER = 1 shl 9
+        const val STAGE_DYNEQ = 1 shl 10
 
         const val TAG = "AudioEffectsPlugin"
         const val CHANNEL_NAME = "com.pulsr.music/audio_effects"
@@ -991,6 +1049,201 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(true)
                 }
 
+                // ---- Phase 1 DSP expansion: Harmonic Saturation / Exciter ----
+                "setSaturationEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    isSaturationEnabled = enabled
+                    if (isNativeDspLoaded && lastNativeSaturationEnabled != enabled) {
+                        lastNativeSaturationEnabled = enabled
+                        try {
+                            nativeSetSaturationEnabled(enabled)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetSaturationEnabled failed: ${e.message}")
+                        }
+                    }
+                    recalculateActiveStages()
+                    result.success(true)
+                }
+
+                "setSaturationParams" -> {
+                    val drive = call.argument<Double>("drive") ?: 0.3
+                    val mix = call.argument<Double>("mix") ?: 0.5
+                    val tilt = call.argument<Double>("tilt") ?: 0.3
+                    saturationDrive = drive
+                    saturationMix = mix
+                    saturationTilt = tilt
+                    if (isNativeDspLoaded) {
+                        val key = "$drive:$mix:$tilt"
+                        if (lastNativeSaturationParams != key) {
+                            lastNativeSaturationParams = key
+                            try {
+                                nativeSetSaturationParams(drive, mix, tilt)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "nativeSetSaturationParams failed: ${e.message}")
+                            }
+                        }
+                    }
+                    result.success(true)
+                }
+
+                // ---- Phase 1 DSP expansion: Stereo Width (Mid/Side) ----
+                "setStereoWidthEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    isStereoWidthEnabled = enabled
+                    if (isNativeDspLoaded && lastNativeStereoWidthEnabled != enabled) {
+                        lastNativeStereoWidthEnabled = enabled
+                        try {
+                            nativeSetStereoWidthEnabled(enabled)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetStereoWidthEnabled failed: ${e.message}")
+                        }
+                    }
+                    recalculateActiveStages()
+                    result.success(true)
+                }
+
+                "setStereoWidthParams" -> {
+                    val width = call.argument<Double>("width") ?: 1.0
+                    stereoWidth = width
+                    if (isNativeDspLoaded && lastNativeStereoWidthParams != width) {
+                        lastNativeStereoWidthParams = width
+                        try {
+                            nativeSetStereoWidthParams(width)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetStereoWidthParams failed: ${e.message}")
+                        }
+                    }
+                    result.success(true)
+                }
+
+                // ---- Phase 1 DSP expansion: Loudness Contour (Fletcher-Munson) ----
+                "setLoudnessContourEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    isLoudnessContourEnabled = enabled
+                    if (isNativeDspLoaded && lastNativeLoudnessEnabled != enabled) {
+                        lastNativeLoudnessEnabled = enabled
+                        try {
+                            nativeSetLoudnessContourEnabled(enabled)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetLoudnessContourEnabled failed: ${e.message}")
+                        }
+                    }
+                    recalculateActiveStages()
+                    result.success(true)
+                }
+
+                "setLoudnessContourParams" -> {
+                    val intensity = call.argument<Double>("intensity") ?: 0.0
+                    val volumeLinear = call.argument<Double>("volumeLinear") ?: 1.0
+                    loudnessIntensity = intensity
+                    loudnessVolumeLinear = volumeLinear
+                    if (isNativeDspLoaded) {
+                        val key = "$intensity:$volumeLinear"
+                        if (lastNativeLoudnessParams != key) {
+                            lastNativeLoudnessParams = key
+                            try {
+                                nativeSetLoudnessContourParams(intensity, volumeLinear)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "nativeSetLoudnessContourParams failed: ${e.message}")
+                            }
+                        }
+                    }
+                    recalculateActiveStages()
+                    result.success(true)
+                }
+
+                // ---- Phase 1 DSP expansion: Subwoofer / LFE Crossover ----
+                "setSubCrossoverEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    isSubCrossoverEnabled = enabled
+                    if (isNativeDspLoaded && lastNativeSubCrossoverEnabled != enabled) {
+                        lastNativeSubCrossoverEnabled = enabled
+                        try {
+                            nativeSetSubCrossoverEnabled(enabled)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetSubCrossoverEnabled failed: ${e.message}")
+                        }
+                    }
+                    recalculateActiveStages()
+                    result.success(true)
+                }
+
+                "setSubCrossoverParams" -> {
+                    val cornerHz = call.argument<Double>("cornerHz") ?: 80.0
+                    val slopeDbPerOct = call.argument<Double>("slopeDbPerOct") ?: 24.0
+                    val subGain = call.argument<Double>("subGain") ?: 0.8
+                    subCrossoverCornerHz = cornerHz
+                    subCrossoverSlopeDbPerOct = slopeDbPerOct
+                    subCrossoverGain = subGain
+                    if (isNativeDspLoaded) {
+                        val key = "$cornerHz:$slopeDbPerOct:$subGain"
+                        if (lastNativeSubCrossoverParams != key) {
+                            lastNativeSubCrossoverParams = key
+                            try {
+                                nativeSetSubCrossoverParams(cornerHz, slopeDbPerOct, subGain)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "nativeSetSubCrossoverParams failed: ${e.message}")
+                            }
+                        }
+                    }
+                    result.success(true)
+                }
+
+                // ---- Phase 1 DSP expansion: Dynamic EQ ----
+                "setDynamicEqEnabled" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    isDynamicEqEnabled = enabled
+                    if (isNativeDspLoaded && lastNativeDynamicEqEnabled != enabled) {
+                        lastNativeDynamicEqEnabled = enabled
+                        try {
+                            nativeSetDynamicEqEnabled(enabled)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetDynamicEqEnabled failed: ${e.message}")
+                        }
+                    }
+                    recalculateActiveStages()
+                    result.success(true)
+                }
+
+                "setDynamicEqBandCount" -> {
+                    val count = call.argument<Int>("count") ?: 1
+                    val changed = dynamicEqBandCount != count
+                    dynamicEqBandCount = count
+                    if (isNativeDspLoaded && changed) {
+                        try {
+                            nativeSetDynamicEqBandCount(count)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "nativeSetDynamicEqBandCount failed: ${e.message}")
+                        }
+                    }
+                    recalculateActiveStages()
+                    result.success(true)
+                }
+
+                "setDynamicEqBand" -> {
+                    val index = call.argument<Int>("index") ?: 0
+                    val freq = call.argument<Double>("frequency") ?: 1000.0
+                    val q = call.argument<Double>("q") ?: 2.0
+                    val thresholdDb = call.argument<Double>("thresholdDb") ?: -30.0
+                    val ratio = call.argument<Double>("ratio") ?: 3.0
+                    val attackMs = call.argument<Double>("attackMs") ?: 5.0
+                    val releaseMs = call.argument<Double>("releaseMs") ?: 120.0
+                    val maxCutDb = call.argument<Double>("maxCutDb") ?: -12.0
+                    val enabled = call.argument<Boolean>("enabled") ?: true
+                    if (isNativeDspLoaded) {
+                        val key = "$freq:$q:$thresholdDb:$ratio:$attackMs:$releaseMs:$maxCutDb:$enabled"
+                        if (lastNativeDynamicEqBands[index] != key) {
+                            lastNativeDynamicEqBands[index] = key
+                            try {
+                                nativeSetDynamicEqBand(index, freq, q, thresholdDb, ratio, attackMs, releaseMs, maxCutDb, enabled)
+                            } catch (e: Exception) {
+                                Log.w(TAG, "nativeSetDynamicEqBand failed: ${e.message}")
+                            }
+                        }
+                    }
+                    result.success(true)
+                }
+
                 // DSD Decoding
                 "decodeDsd" -> {
                     val dsdL = call.argument<ByteArray>("dsdL")
@@ -1051,6 +1304,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         "hasConvolutionReverb" to isNativeDspLoaded,
                         "hasSincResampler" to isNativeDspLoaded,
                         "hasDsdDecoder" to isNativeDspLoaded,
+                        "hasHarmonicSaturation" to isNativeDspLoaded,
+                        "hasStereoWidth" to isNativeDspLoaded,
+                        "hasLoudnessContour" to isNativeDspLoaded,
+                        "hasSubCrossover" to isNativeDspLoaded,
+                        "hasDynamicEq" to isNativeDspLoaded,
                         "eqBandCount" to if (isNativeDspLoaded) 32 else (if (dynamicsSupported) eqBandCount else 0),
                         "eqCenterFrequencies" to eqCenterFreqs.toList(),
                         "hasAudioEffects" to true,
@@ -1589,7 +1847,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 isLimiterEnabled ||
                 isReverbEnabled ||
                 (abs(stereoBalance) > 0.001) ||
-                monoMix
+                monoMix ||
+                isSaturationEnabled ||
+                isStereoWidthEnabled ||
+                isLoudnessContourEnabled ||
+                isSubCrossoverEnabled ||
+                isDynamicEqEnabled
     }
 
     private fun isEffectTypeSupported(effectType: UUID): Boolean {

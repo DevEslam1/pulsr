@@ -2726,6 +2726,22 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               ],
             ),
           ),
+          const SizedBox(height: 16),
+
+          // 3. Harmonic Saturation / Exciter (Phase 1 DSP expansion)
+          _buildSaturationCard(context, state, cubit, dspBlocked, p),
+          const SizedBox(height: 16),
+
+          // 4. Stereo Width — Mid/Side (Phase 1 DSP expansion)
+          _buildStereoWidthCard(context, state, cubit, dspBlocked, p),
+          const SizedBox(height: 16),
+
+          // 5. Subwoofer Crossover — bass redirection (Phase 1 DSP expansion)
+          _buildSubCrossoverCard(context, state, cubit, dspBlocked, p),
+          const SizedBox(height: 16),
+
+          // 6. Dynamic EQ (Phase 1 DSP expansion)
+          _buildDynamicEqCard(context, state, cubit, dspBlocked, p),
         ],
       ),
     );
@@ -2748,6 +2764,543 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         fontSize: 11,
       ),
       onSelected: (_) => cubit.setReverb(true, preset: presetIdx),
+    );
+  }
+
+  // ---- Phase 1 DSP expansion cards ----
+
+  /// Shared label/value header + slider row used by the expansion cards,
+  /// matching the visual style of the Crossfeed/Limiter sliders above.
+  Widget _buildDspSliderRow({
+    required BuildContext context,
+    required PulsrPalette p,
+    required String label,
+    required String valueText,
+    required double value,
+    required double min,
+    required double max,
+    int? divisions,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label,
+                style: TextStyle(
+                    fontSize: 12,
+                    color: p.textSecondary,
+                    fontWeight: FontWeight.w600)),
+            Text(valueText,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: p.accent)),
+          ],
+        ),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            trackHeight: 4,
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+            activeTrackColor: p.accent,
+            inactiveTrackColor: p.surface,
+            thumbColor: p.accent,
+          ),
+          child: Slider(
+            value: value.clamp(min, max),
+            min: min,
+            max: max,
+            divisions: divisions,
+            onChanged: onChanged,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSaturationCard(BuildContext context, PlayerState state,
+      PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
+    final l10n = context.l10n;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: AppRadii.cardRadius,
+        border: Border.all(color: p.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.waves_rounded, color: p.accent, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(l10n.dspSaturationTitle,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: p.textPrimary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          Text(l10n.dspSaturationSubtitle,
+                              style: TextStyle(
+                                  fontSize: 11, color: p.textTertiary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                  icon: Icon(Icons.info_outline_rounded,
+                      size: 16, color: p.textTertiary),
+                  visualDensity: VisualDensity.compact,
+                  tooltip: l10n.dspSaturationTitle,
+                  onPressed: () => _showFeatureInfo(
+                      context, AudioFeatureRegistry.saturation,
+                      conflictReason: dspBlocked)),
+              const SizedBox(width: 4),
+              Switch.adaptive(
+                value: state.isSaturationEnabled,
+                activeTrackColor: p.accent,
+                activeThumbColor: p.onAccent,
+                onChanged:
+                    dspBlocked != null ? null : (val) => cubit.setSaturation(val),
+              ),
+            ],
+          ),
+          if (dspBlocked != null)
+            Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(l10n.blockedByBitPerfectShort,
+                    style: TextStyle(
+                        color: p.error,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600))),
+          if (dspBlocked == null && state.isSaturationEnabled) ...[
+            const SizedBox(height: 14),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspSaturationDrive,
+              valueText: '${(state.saturationDrive * 100).round()}%',
+              value: state.saturationDrive,
+              min: 0.0,
+              max: 1.0,
+              divisions: 20,
+              onChanged: (val) => cubit.setSaturation(true, drive: val),
+            ),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspSaturationMix,
+              valueText: '${(state.saturationMix * 100).round()}% Wet',
+              value: state.saturationMix,
+              min: 0.0,
+              max: 1.0,
+              divisions: 20,
+              onChanged: (val) => cubit.setSaturation(true, mix: val),
+            ),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspSaturationTilt,
+              valueText: '${(state.saturationTilt * 100).round()}%',
+              value: state.saturationTilt,
+              min: 0.0,
+              max: 1.0,
+              divisions: 20,
+              onChanged: (val) => cubit.setSaturation(true, tilt: val),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStereoWidthCard(BuildContext context, PlayerState state,
+      PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
+    final l10n = context.l10n;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: AppRadii.cardRadius,
+        border: Border.all(color: p.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.compare_arrows_rounded,
+                          color: p.accent, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(l10n.dspStereoWidthTitle,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: p.textPrimary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          Text(l10n.dspStereoWidthSubtitle,
+                              style: TextStyle(
+                                  fontSize: 11, color: p.textTertiary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                  icon: Icon(Icons.info_outline_rounded,
+                      size: 16, color: p.textTertiary),
+                  visualDensity: VisualDensity.compact,
+                  tooltip: l10n.dspStereoWidthTitle,
+                  onPressed: () => _showFeatureInfo(
+                      context, AudioFeatureRegistry.stereoWidth,
+                      conflictReason: dspBlocked)),
+              const SizedBox(width: 4),
+              Switch.adaptive(
+                value: state.isStereoWidthEnabled,
+                activeTrackColor: p.accent,
+                activeThumbColor: p.onAccent,
+                onChanged:
+                    dspBlocked != null ? null : (val) => cubit.setStereoWidth(val),
+              ),
+            ],
+          ),
+          if (dspBlocked != null)
+            Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(l10n.blockedByBitPerfectShort,
+                    style: TextStyle(
+                        color: p.error,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600))),
+          if (dspBlocked == null && state.isStereoWidthEnabled) ...[
+            const SizedBox(height: 14),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspStereoWidthAmount,
+              valueText: state.stereoWidth.toStringAsFixed(2),
+              value: state.stereoWidth,
+              min: 0.0,
+              max: 2.0,
+              divisions: 40,
+              onChanged: (val) => cubit.setStereoWidth(true, width: val),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubCrossoverCard(BuildContext context, PlayerState state,
+      PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
+    final l10n = context.l10n;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: AppRadii.cardRadius,
+        border: Border.all(color: p.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.speaker_rounded, color: p.accent, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(l10n.dspSubCrossoverTitle,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: p.textPrimary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          Text(l10n.dspSubCrossoverSubtitle,
+                              style: TextStyle(
+                                  fontSize: 11, color: p.textTertiary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                  icon: Icon(Icons.info_outline_rounded,
+                      size: 16, color: p.textTertiary),
+                  visualDensity: VisualDensity.compact,
+                  tooltip: l10n.dspSubCrossoverTitle,
+                  onPressed: () => _showFeatureInfo(
+                      context, AudioFeatureRegistry.subCrossover,
+                      conflictReason: dspBlocked)),
+              const SizedBox(width: 4),
+              Switch.adaptive(
+                value: state.isSubCrossoverEnabled,
+                activeTrackColor: p.accent,
+                activeThumbColor: p.onAccent,
+                onChanged: dspBlocked != null
+                    ? null
+                    : (val) => cubit.setSubCrossover(val),
+              ),
+            ],
+          ),
+          if (dspBlocked != null)
+            Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(l10n.blockedByBitPerfectShort,
+                    style: TextStyle(
+                        color: p.error,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600))),
+          if (dspBlocked == null && state.isSubCrossoverEnabled) ...[
+            const SizedBox(height: 14),
+            // Honest copy: this is bass redirection, not multichannel LFE.
+            Text(l10n.dspSubCrossoverNote,
+                style: TextStyle(fontSize: 10, color: p.textTertiary)),
+            const SizedBox(height: 10),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspSubCrossoverCorner,
+              valueText: '${state.subCrossoverCornerHz.round()} Hz',
+              value: state.subCrossoverCornerHz,
+              min: 60.0,
+              max: 150.0,
+              divisions: 18,
+              onChanged: (val) => cubit.setSubCrossover(true, cornerHz: val),
+            ),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspSubCrossoverSubLevel,
+              valueText: '${(state.subCrossoverGain * 100).round()}%',
+              value: state.subCrossoverGain,
+              min: 0.0,
+              max: 1.0,
+              divisions: 20,
+              onChanged: (val) => cubit.setSubCrossover(true, gain: val),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDynamicEqCard(BuildContext context, PlayerState state,
+      PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
+    final l10n = context.l10n;
+    final band = state.dynamicEqBands.isNotEmpty
+        ? state.dynamicEqBands.first
+        : const DynamicEqBandConfig();
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: AppRadii.cardRadius,
+        border: Border.all(color: p.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.graphic_eq_rounded,
+                          color: p.accent, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(l10n.dspDynamicEqTitle,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: p.textPrimary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          Text(l10n.dspDynamicEqSubtitle,
+                              style: TextStyle(
+                                  fontSize: 11, color: p.textTertiary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                  icon: Icon(Icons.info_outline_rounded,
+                      size: 16, color: p.textTertiary),
+                  visualDensity: VisualDensity.compact,
+                  tooltip: l10n.dspDynamicEqTitle,
+                  onPressed: () => _showFeatureInfo(
+                      context, AudioFeatureRegistry.dynamicEq,
+                      conflictReason: dspBlocked)),
+              const SizedBox(width: 4),
+              Switch.adaptive(
+                value: state.isDynamicEqEnabled,
+                activeTrackColor: p.accent,
+                activeThumbColor: p.onAccent,
+                onChanged:
+                    dspBlocked != null ? null : (val) => cubit.setDynamicEq(val),
+              ),
+            ],
+          ),
+          if (dspBlocked != null)
+            Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(l10n.blockedByBitPerfectShort,
+                    style: TextStyle(
+                        color: p.error,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600))),
+          if (dspBlocked == null && state.isDynamicEqEnabled) ...[
+            const SizedBox(height: 14),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspDynamicEqFrequency,
+              valueText:
+                  '${band.frequency.round()} Hz',
+              value: band.frequency,
+              min: 60.0,
+              max: 12000.0,
+              divisions: 64,
+              onChanged: (val) =>
+                  cubit.setDynamicEqBand(0, band.copyWith(frequency: val)),
+            ),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspDynamicEqThreshold,
+              valueText: '${band.thresholdDb.toStringAsFixed(0)} dB',
+              value: band.thresholdDb,
+              min: -60.0,
+              max: 0.0,
+              divisions: 60,
+              onChanged: (val) =>
+                  cubit.setDynamicEqBand(0, band.copyWith(thresholdDb: val)),
+            ),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspDynamicEqRatio,
+              valueText: '${band.ratio.toStringAsFixed(1)} : 1',
+              value: band.ratio,
+              min: 1.0,
+              max: 8.0,
+              divisions: 35,
+              onChanged: (val) =>
+                  cubit.setDynamicEqBand(0, band.copyWith(ratio: val)),
+            ),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspDynamicEqAttack,
+              valueText: '${band.attackMs.toStringAsFixed(1)} ms',
+              value: band.attackMs,
+              min: 0.1,
+              max: 50.0,
+              divisions: 50,
+              onChanged: (val) =>
+                  cubit.setDynamicEqBand(0, band.copyWith(attackMs: val)),
+            ),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspDynamicEqRelease,
+              valueText: '${band.releaseMs.round()} ms',
+              value: band.releaseMs,
+              min: 20.0,
+              max: 1000.0,
+              divisions: 49,
+              onChanged: (val) =>
+                  cubit.setDynamicEqBand(0, band.copyWith(releaseMs: val)),
+            ),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspDynamicEqMaxCut,
+              valueText: '${band.maxCutDb.toStringAsFixed(0)} dB',
+              value: band.maxCutDb,
+              min: -24.0,
+              max: 0.0,
+              divisions: 24,
+              onChanged: (val) =>
+                  cubit.setDynamicEqBand(0, band.copyWith(maxCutDb: val)),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

@@ -1,6 +1,5 @@
 // lib/features/auth/presentation/ytm_web_login_sheet.dart
 import 'dart:async';
-import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -100,12 +99,6 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   // UAs live in EmbeddedBrowserUa (single source; keep bumped — see file).
   static String get mobileUserAgent => EmbeddedBrowserUa.mobile;
   static String get desktopUserAgent => EmbeddedBrowserUa.desktop;
-
-  /// JS shim injected at document start on Google sign-in pages: defines a
-  /// minimal `window.chrome` shape if missing. Cheap, harmless, closes one
-  /// embedded-WebView fingerprint gap Google checks for.
-  static const String _chromeShimJs =
-      "try { window.chrome = window.chrome || { app: { isInstalled: false }, runtime: {} }; } catch (e) {}";
 
   static const List<String> _blockPhrases = [
     "couldn't sign you in",
@@ -1109,20 +1102,6 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                           url: WebUri(_currentUrl),
                         ),
                         initialSettings: _settings,
-                        // window.chrome fingerprint shim, injected before page
-                        // scripts run on Google sign-in pages only.
-                        initialUserScripts: UnmodifiableListView<UserScript>([
-                          UserScript(
-                            source: _chromeShimJs,
-                            injectionTime:
-                                UserScriptInjectionTime.AT_DOCUMENT_START,
-                            forMainFrameOnly: true,
-                            allowedOriginRules: const {
-                              'https://accounts.google.com',
-                              'https://accounts.youtube.com',
-                            },
-                          ),
-                        ]),
                         gestureRecognizers: const <Factory<
                             OneSequenceGestureRecognizer>>{
                           Factory<OneSequenceGestureRecognizer>(
@@ -1206,13 +1185,6 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                           // may not be secure") ---
                           if (host == 'accounts.google.com' ||
                               host == 'accounts.youtube.com') {
-                            // Defensive re-injection of the window.chrome shim
-                            // (idempotent; covers engines without
-                            // DOCUMENT_START_SCRIPT support).
-                            try {
-                              await controller.evaluateJavascript(
-                                  source: _chromeShimJs);
-                            } catch (_) {}
                             final blockedByUrl = _matchesBlockedUrl(parsedUrl);
                             final blockedByText = blockedByUrl
                                 ? false
@@ -1331,7 +1303,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Current browser identity: ${currentIdentity.name} Chrome',
+                  'Current browser identity: ${currentIdentity.name} Safari',
                   style: TextStyle(
                       color: p.textTertiary,
                       fontSize: 11,

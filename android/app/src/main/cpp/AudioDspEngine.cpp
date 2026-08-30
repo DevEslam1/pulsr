@@ -27,6 +27,10 @@ void AudioDspEngine::setSampleRateInternal(double sampleRate) {
     crossfeed_.setSampleRate(sampleRate_);
     limiter_.setSampleRate(sampleRate_);
     resampler_.setRates(sampleRate_, sampleRate_);
+    saturation_.setSampleRate(sampleRate_);
+    loudnessContour_.setSampleRate(sampleRate_);
+    subCrossover_.setSampleRate(sampleRate_);
+    dynamicEq_.setSampleRate(sampleRate_);
 }
 
 void AudioDspEngine::setSampleRate(double sampleRate) {
@@ -224,6 +228,11 @@ void AudioDspEngine::resetInternal() {
     resampler_.reset();
     panner_.reset();
     dsdDecoder_.reset();
+    saturation_.reset();
+    stereoWidth_.reset();
+    loudnessContour_.reset();
+    subCrossover_.reset();
+    dynamicEq_.reset();
 }
 
 void AudioDspEngine::reset() {
@@ -261,6 +270,11 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         crossfeed_.applyParams(snapshot->crossfeed);
         resampler_.applyParams(snapshot->resampler);
         limiter_.applyParams(snapshot->limiter);
+        saturation_.applyParams(snapshot->saturation);
+        stereoWidth_.applyParams(snapshot->stereoWidth);
+        loudnessContour_.applyParams(snapshot->loudness);
+        subCrossover_.applyParams(snapshot->subCrossover);
+        dynamicEq_.applyParams(snapshot->dynamicEq);
 
         lastAppliedGeneration_.store(snapshot->generation);
     }
@@ -274,27 +288,57 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             eq_.processInterleaved(buffer, frames, channels);
         }
 
-        // 2. Spatial Panner & Balance (All channels) — positioner before reverb for natural acoustics
+        // 2. Dynamic EQ Stage — adjacent to the parametric EQ so band energy
+        //    is detected on the tonally-shaped (but not yet spatialized) signal
+        if (stages & STAGE_DYNEQ) {
+            dynamicEq_.processInterleaved(buffer, frames, channels);
+        }
+
+        // 3. Spatial Panner & Balance (All channels) — positioner before reverb for natural acoustics
         if (stages & STAGE_PANNER) {
             panner_.processInterleaved(buffer, frames, channels);
         }
 
-        // 3. Crossfeed Stage (Stereo only)
+        // 4. Crossfeed Stage (Stereo only)
         if ((stages & STAGE_CROSSFEED) && channels == 2) {
             crossfeed_.processInterleaved(buffer, frames);
         }
 
-        // 4. Convolution Reverb Stage (Stereo only)
+        // 5. Convolution Reverb Stage (Stereo only)
         if ((stages & STAGE_REVERB) && channels == 2) {
             reverb_.processInterleaved(buffer, frames, channels);
         }
 
-        // 5. Polyphase Sinc Resampler (Fixed-frame streaming contract)
+        // 6. Harmonic Saturation / Exciter Stage — after tonal + spatial shaping,
+        //    before the limiter, so added harmonics stay under peak control
+        if (stages & STAGE_SATURATION) {
+            saturation_.processInterleaved(buffer, frames, channels);
+        }
+
+        // 7. Stereo Width Stage (M/S, stereo only) — after crossfeed/reverb so
+        //    the widened field is not re-collapsed by later spatial stages
+        if ((stages & STAGE_WIDTH) && channels == 2) {
+            stereoWidth_.processInterleaved(buffer, frames, channels);
+        }
+
+        // 8. Subwoofer / LFE Crossover Stage (bass redirection sum, stereo pairs)
+        if (stages & STAGE_CROSSOVER) {
+            subCrossover_.processInterleaved(buffer, frames, channels);
+        }
+
+        // 9. Polyphase Sinc Resampler (Fixed-frame streaming contract)
         if ((stages & STAGE_RESAMPLER) && std::abs(resampler_.getRatio() - 1.0) > 1e-5) {
             resampler_.processInterleaved(buffer, frames, channels);
         }
 
-        // 6. Lookahead Limiter Stage (Multichannel / stereo / mono) — true-peak limiter is final
+        // 10. Loudness Contour Stage — computed against the current volume-stage
+        //     value (pushed from Dart). Applied pre-limiter so the limiter still
+        //     guards the contour-boosted peaks.
+        if (stages & STAGE_LOUDNESS) {
+            loudnessContour_.processInterleaved(buffer, frames, channels);
+        }
+
+        // 11. Lookahead Limiter Stage (Multichannel / stereo / mono) — true-peak limiter is final
         if (stages & STAGE_LIMITER) {
             limiter_.processInterleaved(buffer, frames, channels);
         }
@@ -334,9 +378,25 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             // Sustained high load (RTF > 0.80 over window): degrade ONE stage at a time in cost order
             if (avgRtf > 0.80f) {
                 recoveryConsecutiveBlocks_ = 0;
-                // Cost order: REVERB -> CROSSFEED -> PANNER -> EQ
+                // Cost order: REVERB -> SATURATION -> DYNEQ -> CROSSOVER -> WIDTH -> CROSSFEED -> PANNER -> EQ
                 if ((rawStages & STAGE_REVERB) && !(currentDegraded & STAGE_REVERB)) {
                     triggerStageAutoDegrade(STAGE_REVERB);
+                    rtfCount_ = 0;
+                    rtfRingHead_ = 0;
+                } else if ((rawStages & STAGE_SATURATION) && !(currentDegraded & STAGE_SATURATION)) {
+                    triggerStageAutoDegrade(STAGE_SATURATION);
+                    rtfCount_ = 0;
+                    rtfRingHead_ = 0;
+                } else if ((rawStages & STAGE_DYNEQ) && !(currentDegraded & STAGE_DYNEQ)) {
+                    triggerStageAutoDegrade(STAGE_DYNEQ);
+                    rtfCount_ = 0;
+                    rtfRingHead_ = 0;
+                } else if ((rawStages & STAGE_CROSSOVER) && !(currentDegraded & STAGE_CROSSOVER)) {
+                    triggerStageAutoDegrade(STAGE_CROSSOVER);
+                    rtfCount_ = 0;
+                    rtfRingHead_ = 0;
+                } else if ((rawStages & STAGE_WIDTH) && !(currentDegraded & STAGE_WIDTH)) {
+                    triggerStageAutoDegrade(STAGE_WIDTH);
                     rtfCount_ = 0;
                     rtfRingHead_ = 0;
                 } else if ((rawStages & STAGE_CROSSFEED) && !(currentDegraded & STAGE_CROSSFEED)) {
@@ -362,13 +422,21 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
                 recoveryConsecutiveBlocks_++;
                 if (recoveryConsecutiveBlocks_ >= kRtfRecoveryWindowSize) {
                     recoveryConsecutiveBlocks_ = 0;
-                    // Reverse cost order: EQ -> PANNER -> CROSSFEED -> REVERB -> LIMITER
+                    // Reverse cost order: EQ -> PANNER -> CROSSFEED -> WIDTH -> CROSSOVER -> DYNEQ -> SATURATION -> REVERB -> LIMITER
                     if (currentDegraded & STAGE_EQ) {
                         recoverStageAutoDegrade(STAGE_EQ);
                     } else if (currentDegraded & STAGE_PANNER) {
                         recoverStageAutoDegrade(STAGE_PANNER);
                     } else if (currentDegraded & STAGE_CROSSFEED) {
                         recoverStageAutoDegrade(STAGE_CROSSFEED);
+                    } else if (currentDegraded & STAGE_WIDTH) {
+                        recoverStageAutoDegrade(STAGE_WIDTH);
+                    } else if (currentDegraded & STAGE_CROSSOVER) {
+                        recoverStageAutoDegrade(STAGE_CROSSOVER);
+                    } else if (currentDegraded & STAGE_DYNEQ) {
+                        recoverStageAutoDegrade(STAGE_DYNEQ);
+                    } else if (currentDegraded & STAGE_SATURATION) {
+                        recoverStageAutoDegrade(STAGE_SATURATION);
                     } else if (currentDegraded & STAGE_REVERB) {
                         recoverStageAutoDegrade(STAGE_REVERB);
                     } else if (currentDegraded & STAGE_LIMITER) {

@@ -132,6 +132,20 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       stereoBalance: _audioHandler.stereoBalance,
       monoMix: _audioHandler.monoMix,
       isSincResamplerEnabled: _audioHandler.isSincResamplerEnabled,
+      isSaturationEnabled: _audioHandler.isSaturationEnabled,
+      saturationDrive: _audioHandler.saturationDrive,
+      saturationMix: _audioHandler.saturationMix,
+      saturationTilt: _audioHandler.saturationTilt,
+      isStereoWidthEnabled: _audioHandler.isStereoWidthEnabled,
+      stereoWidth: _audioHandler.stereoWidth,
+      isLoudnessContourEnabled: _audioHandler.isLoudnessContourEnabled,
+      loudnessContourIntensity: _audioHandler.loudnessContourIntensity,
+      isSubCrossoverEnabled: _audioHandler.isSubCrossoverEnabled,
+      subCrossoverCornerHz: _audioHandler.subCrossoverCornerHz,
+      subCrossoverSlopeDbPerOct: _audioHandler.subCrossoverSlopeDbPerOct,
+      subCrossoverGain: _audioHandler.subCrossoverGain,
+      isDynamicEqEnabled: _audioHandler.isDynamicEqEnabled,
+      dynamicEqBands: _audioHandler.dynamicEqBands,
       hasOemAudio: _audioHandler.hasOemAudio,
       detectedOemEngines: _audioHandler.detectedOemEngines,
     ));
@@ -1250,6 +1264,76 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     if (enabled && !_guardDsp('Resampler', showError: false)) return;
     safeEmit(state.copyWith(isSincResamplerEnabled: enabled));
     await _audioHandler.setSincResampler(enabled);
+  }
+
+  // --- PHASE 1 DSP EXPANSION METHODS ---
+
+  Future<void> setSaturation(bool enabled,
+      {double? drive, double? mix, double? tilt}) async {
+    if (enabled && !_guardDsp('Harmonic Saturation')) return;
+    safeEmit(state.copyWith(
+      isSaturationEnabled: enabled,
+      saturationDrive: drive ?? state.saturationDrive,
+      saturationMix: mix ?? state.saturationMix,
+      saturationTilt: tilt ?? state.saturationTilt,
+      errorMessage: null,
+    ));
+    await _audioHandler.setSaturation(enabled,
+        drive: drive, mix: mix, tilt: tilt);
+  }
+
+  Future<void> setStereoWidth(bool enabled, {double? width}) async {
+    if (enabled && !_guardDsp('Stereo Width')) return;
+    safeEmit(state.copyWith(
+      isStereoWidthEnabled: enabled,
+      stereoWidth: width ?? state.stereoWidth,
+      errorMessage: null,
+    ));
+    await _audioHandler.setStereoWidth(enabled, width: width);
+  }
+
+  Future<void> setLoudnessContour(bool enabled, {double? intensity}) async {
+    if (enabled && !_guardDsp('Loudness Contour')) return;
+    safeEmit(state.copyWith(
+      isLoudnessContourEnabled: enabled,
+      loudnessContourIntensity: intensity ?? state.loudnessContourIntensity,
+      errorMessage: null,
+    ));
+    await _audioHandler.setLoudnessContour(enabled, intensity: intensity);
+  }
+
+  Future<void> setSubCrossover(bool enabled,
+      {double? cornerHz, double? slopeDbPerOct, double? gain}) async {
+    if (enabled && !_guardDsp('Sub Crossover')) return;
+    safeEmit(state.copyWith(
+      isSubCrossoverEnabled: enabled,
+      subCrossoverCornerHz: cornerHz ?? state.subCrossoverCornerHz,
+      subCrossoverSlopeDbPerOct: slopeDbPerOct ?? state.subCrossoverSlopeDbPerOct,
+      subCrossoverGain: gain ?? state.subCrossoverGain,
+      errorMessage: null,
+    ));
+    await _audioHandler.setSubCrossover(enabled,
+        cornerHz: cornerHz, slopeDbPerOct: slopeDbPerOct, gain: gain);
+  }
+
+  Future<void> setDynamicEq(bool enabled) async {
+    if (enabled && !_guardDsp('Dynamic EQ')) return;
+    safeEmit(state.copyWith(
+      isDynamicEqEnabled: enabled,
+      errorMessage: null,
+    ));
+    await _audioHandler.setDynamicEq(enabled);
+  }
+
+  Future<void> setDynamicEqBand(int index, DynamicEqBandConfig band) async {
+    var bands = List<DynamicEqBandConfig>.from(state.dynamicEqBands);
+    // Seed with neutral defaults if the state list has not been synced yet
+    while (bands.length <= index) {
+      bands.add(const DynamicEqBandConfig());
+    }
+    bands[index] = band;
+    safeEmit(state.copyWith(dynamicEqBands: bands));
+    await _audioHandler.setDynamicEqBand(index, band);
   }
 
   // Sleep Timer
