@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
@@ -69,13 +71,17 @@ class TagEditorCubit extends Cubit<TagEditorState> {
 
   Future<void> loadTags() async {
     if (isClosed) return;
+    if (!Platform.isAndroid) {
+      emit(state.copyWith(status: TagEditorStatus.loaded));
+      return;
+    }
     emit(state.copyWith(status: TagEditorStatus.loading));
     try {
       final Map<dynamic, dynamic>? tags =
           await _channel.invokeMapMethod<dynamic, dynamic>(
         'readTags',
         {'path': state.song.path},
-      );
+      ).timeout(const Duration(seconds: 5));
       if (isClosed) return;
 
       if (tags != null) {
@@ -339,7 +345,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
               'lyrics': _batchLyricsEdited ? state.lyrics : null,
               'artworkPath': state.newArtworkPath,
               'removeArtwork': state.removeArtwork,
-            });
+            }).timeout(const Duration(seconds: 10));
             if (isClosed) return;
             await _scannerService.rescanSingleFile(s.path);
           } catch (e, st) {
@@ -384,7 +390,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
         'lyrics': lyrics,
         'artworkPath': state.newArtworkPath,
         'removeArtwork': state.removeArtwork,
-      });
+      }).timeout(const Duration(seconds: 10));
       if (isClosed) return;
 
       // Update Drift DB and clear cached parsed lyrics

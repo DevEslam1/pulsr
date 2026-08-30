@@ -1,4 +1,5 @@
 // lib/core/services/waveform_service.dart
+import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
@@ -8,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../constants/channels.dart';
 import '../utils/error_logger.dart';
+import '../utils/platform_capabilities.dart';
 import '../utils/waveform_generator.dart';
 
 /// Produces waveform samples (0..1) for the seek bar.
@@ -111,16 +113,20 @@ class WaveformService {
   }
 
   Future<List<double>?> _decodeNative(String path, int count) async {
+    if (!PlatformCapabilities.isAndroid) return null;
     try {
       final res = await _channel.invokeMethod<List<dynamic>>(
         'decode',
         {'path': path, 'count': count},
-      );
+      ).timeout(const Duration(seconds: 8));
       return res?.map((e) => (e as num).toDouble()).toList();
+    } on TimeoutException {
+      ErrorLogger.log('Waveform decode timeout for $path', category: 'Waveform');
+      return null;
     } on PlatformException {
-      return null; // undecodable file / codec error → caller falls back
+      return null;
     } on MissingPluginException {
-      return null; // non-Android / plugin missing
+      return null;
     }
   }
 

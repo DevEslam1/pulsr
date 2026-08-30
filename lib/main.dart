@@ -51,6 +51,8 @@ import 'domain/repositories/download_repository_interface.dart';
 import 'features/downloads/cubit/downloads_cubit.dart';
 import 'core/bloc/app_bloc_observer.dart';
 
+bool _diFailedGlobal = false;
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   Bloc.observer = AppBlocObserver();
@@ -83,12 +85,21 @@ Future<void> main() async {
     ),
   );
 
+  bool diFailed = false;
   try {
     await configureDependencies().timeout(const Duration(seconds: 15));
   } catch (e, st) {
+    diFailed = true;
     ErrorLogger.log('DI configureDependencies failed or timed out',
         error: e, stackTrace: st, category: 'Startup');
+    // Don't rethrow here - let PulsrApp show fallback UI if critical services missing
   }
+  // If critical services not registered after DI, mark failed for UI
+  if (!getIt.isRegistered<PulsrAudioHandler>() || !getIt.isRegistered<AppDatabase>()) {
+    diFailed = true;
+  }
+  // Pass flag to app via global
+  _diFailedGlobal = diFailed;
 
   // TTFA: pre-warm the native BotGuard WebView + capability matrix right after
   // DI is ready so the first stream resolve never pays cold WebView startup.
@@ -279,6 +290,17 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
       // so first launch and relaunch render instantly without dropped frames or thread contention.
       await Future<void>.delayed(const Duration(seconds: 2));
       if (!mounted) return;
+      // Serialize with audio handler restore to avoid deleting YTM placeholder rows while queue is being restored
+      try {
+        if (getIt.isRegistered<PulsrAudioHandler>()) {
+          try {
+            await getIt<PulsrAudioHandler>().effectsReady.timeout(const Duration(seconds: 5));
+          } catch (_) {}
+          // Small grace period to let restoreLastPlaybackSession's DB read finish
+          await Future<void>.delayed(const Duration(milliseconds: 300));
+        }
+      } catch (_) {}
+      if (!mounted) return;
       try {
         final scanner = getIt<MediaScannerService>();
         await RestoreDetectionService.checkAndHandleRestore(scanner);
@@ -303,6 +325,36 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    if (_diFailedGlobal) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          backgroundColor: const Color(0xFF0A0C12),
+          body: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 48),
+                  const SizedBox(height: 16),
+                  const Text('Pulsr failed to initialize',
+                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 8),
+                  const Text('Core services did not start. Please restart the app. If this persists, clear app data or reinstall.',
+                      style: TextStyle(color: Colors.white70, fontSize: 14), textAlign: TextAlign.center),
+                  const SizedBox(height: 24),
+                  ElevatedButton(
+                    onPressed: () => SystemNavigator.pop(),
+                    child: const Text('Close App'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider<AppDatabase>.value(value: getIt<AppDatabase>()),
@@ -318,8 +370,6 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
             value: getIt<GetAlbumsUseCase>()),
         RepositoryProvider<GetArtistsUseCase>.value(
             value: getIt<GetArtistsUseCase>()),
-        RepositoryProvider<GetFavoritesUseCase>.value(
-            value: getIt<GetFavoritesUseCase>()),
         RepositoryProvider<ToggleFavoriteUseCase>.value(
             value: getIt<ToggleFavoriteUseCase>()),
         RepositoryProvider<SearchMusicUseCase>.value(

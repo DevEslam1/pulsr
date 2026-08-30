@@ -31,8 +31,20 @@ class MediaScannerService {
   Future<bool> checkPermission() async {
     if (Platform.isAndroid) {
       final audio = await Permission.audio.status;
-      final storage = await Permission.storage.status;
-      return audio.isGranted || storage.isGranted;
+      // On Android 13+ Permission.storage is auto-denied; only audio matters. Also handle limited grant.
+      if (audio.isGranted || audio.isLimited) return true;
+      // Legacy fallback for Android <=12
+      try {
+        final sdkInt = (await const MethodChannel(PulsrChannels.audioEffects)
+                .invokeMethod<int>('getSdkInt')
+                .timeout(const Duration(milliseconds: 800))) ??
+            33;
+        if (sdkInt <= 32) {
+          final storage = await Permission.storage.status;
+          return storage.isGranted;
+        }
+      } catch (_) {}
+      return false;
     } else if (Platform.isIOS) {
       final status = await Permission.mediaLibrary.status;
       return status.isGranted;
@@ -50,7 +62,7 @@ class MediaScannerService {
       // Only request legacy storage on Android <=12; on 13+ it is auto-denied and triggers Play warning
       try {
         final sdkInt = (await const MethodChannel(PulsrChannels.audioEffects)
-                .invokeMethod<int>('getSdkInt')) ??
+                .invokeMethod<int>('getSdkInt').timeout(const Duration(seconds: 2))) ??
             33;
         if (sdkInt <= 32 && !audioStatus.isPermanentlyDenied) {
           final storageStatus = await Permission.storage.request();
@@ -70,7 +82,16 @@ class MediaScannerService {
     return true;
   }
 
-  bool get shouldShowPermissionRationaleSync => false; // use Permission.audio.shouldShowRequestRationale via caller if needed
+  Future<bool> shouldShowAudioPermissionRationale() async {
+    if (!Platform.isAndroid) return false;
+    try {
+      return await Permission.audio.shouldShowRequestRationale;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  bool get shouldShowPermissionRationaleSync => false; // deprecated, use shouldShowAudioPermissionRationale() async
 
   static const List<String> systemIgnoredPathPatterns = [
     '/whatsapp/media/whatsapp voice notes/',
@@ -104,8 +125,18 @@ class MediaScannerService {
     final normalized = filePath.toLowerCase().replaceAll('\\', '/');
     final segments = normalized.split('/').where((s) => s.isNotEmpty).toList();
 
+    // Segment-aware check to avoid false positives like "/Music/my recordings fav/"
+    // where substring "recordings" appears but not as a dedicated folder segment.
     for (final pattern in systemIgnoredPathPatterns) {
-      if (normalized.contains(pattern)) return true;
+      final trimmed = pattern.replaceAll('/', '');
+      if (trimmed.isEmpty) continue;
+      if (segments.contains(trimmed)) return true;
+      // Fallback to contains for multi-segment patterns like "whatsapp/media/whatsapp voice notes"
+      if (pattern.contains('/') && normalized.contains(pattern)) {
+        // Double-check segment containment for the last component to reduce false positive
+        final lastSeg = pattern.split('/').where((s) => s.isNotEmpty).last;
+        if (segments.contains(lastSeg)) return true;
+      }
     }
 
     final fileName = segments.lastOrNull ?? '';
@@ -131,7 +162,7 @@ class MediaScannerService {
     int minDurationSec = 30,
     bool autoHideSystemMedia = true,
   }) async {
-    _progressController.add(0.0);
+    if (!_progressController.isClosed) _progressController.add(0.0);
     try {
       final hasPermission = await checkPermission();
       if (!hasPermission) {
@@ -139,7 +170,7 @@ class MediaScannerService {
         if (!granted) return 0;
       }
 
-      _progressController.add(0.1);
+      if (!_progressController.isClosed) _progressController.add(0.1);
       final excludedRes = await _repository.getExcludedFolderPaths();
       final excludedFolders = excludedRes.fold((l) => <String>[], (r) => r);
 
@@ -163,7 +194,7 @@ class MediaScannerService {
           'Scanner started with ${songs.length} raw MediaStore songs',
           category: 'scanner');
 
-      _progressController.add(0.3);
+      if (!_progressController.isClosed) _progressController.add(0.3);
 
       // Offload CPU-heavy metadata parsing and aggregation to background isolate
       final parseInput = _ScanMediaInput(
@@ -176,7 +207,7 @@ class MediaScannerService {
 
       final parseResult =
           await compute(_parseScannedMediaInIsolate, parseInput);
-      _progressController.add(0.7);
+      if (!_progressController.isClosed) _progressController.add(0.7);
 
       await _repository.syncScannedMusic(
         songs: parseResult.songs,
@@ -184,11 +215,11 @@ class MediaScannerService {
         artists: parseResult.artists,
       );
 
-      _progressController.add(0.9);
+      if (!_progressController.isClosed) _progressController.add(0.9);
 
       // Clean up orphaned entries
       await _repository.cleanupOrphanedSongs(parseResult.validSongIds);
-      _progressController.add(1.0);
+      if (!_progressController.isClosed) _progressController.add(1.0);
 
       ErrorLogger.addBreadcrumb(
           'Scanner completed: ${parseResult.songs.length} valid songs indexed',
@@ -203,13 +234,14 @@ class MediaScannerService {
   }
 
   Future<void> rescanSingleFile(String path) async {
+    if (!Platform.isAndroid) return;
     const channel = MethodChannel(PulsrChannels.tagEditor);
     try {
       final Map<dynamic, dynamic>? tags =
           await channel.invokeMapMethod<dynamic, dynamic>('readTags', {
         'path': path,
         'includeArtwork': false,
-      });
+      }).timeout(const Duration(seconds: 5));
       if (tags != null) {
         final title = (tags['title'] as String?)?.trim();
         final artist = (tags['artist'] as String?)?.trim();
@@ -261,7 +293,7 @@ class MediaScannerService {
           await channel.invokeMapMethod<dynamic, dynamic>('readTags', {
         'path': path,
         'includeArtwork': false,
-      });
+      }).timeout(const Duration(seconds: 5));
       if (tags == null) return;
 
       final sampleRate = _asInt(tags['sampleRate']);
@@ -309,6 +341,7 @@ class MediaScannerService {
     int processed = 0;
 
     for (final song in eligible) {
+      if (_progressController.isClosed) break;
       await enrichAudioQuality(song.id, song.path);
       processed++;
       onProgress?.call(processed, total);

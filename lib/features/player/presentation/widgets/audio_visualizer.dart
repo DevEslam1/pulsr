@@ -140,14 +140,38 @@ class _AudioVisualizerState extends State<AudioVisualizer>
 
     try {
       var status = await Permission.microphone.status;
-      if (status.isDenied) {
-        status = await Permission.microphone.request();
-      }
-      if (!mounted) return;
       if (status.isGranted) {
+        if (!mounted) return;
         _subscribeToStream();
+        return;
+      }
+      if (status.isPermanentlyDenied) {
+        // Don't re-request; OS will not show dialog. Fall back to synthetic waveform (handled via _onTick isStale).
+        ErrorLogger.log('Visualizer microphone permanently denied, using synthetic fallback',
+            category: 'Visualizer');
+        return;
+      }
+      if (status.isDenied) {
+        // On Android 13+, show rationale before second request if needed
+        final shouldShowRationale = await Permission.microphone.shouldShowRequestRationale;
+        if (shouldShowRationale) {
+          // Caller could show UI hint; we just proceed to request
+          ErrorLogger.addBreadcrumb('Showing microphone rationale for visualizer', category: 'Visualizer');
+        }
+        status = await Permission.microphone.request();
+        if (!mounted) return;
+        if (status.isGranted) {
+          _subscribeToStream();
+        } else if (status.isPermanentlyDenied) {
+          ErrorLogger.log('Visualizer microphone denied permanently after request',
+              category: 'Visualizer');
+        }
       }
     } catch (e, st) {
+      // Handle MissingPluginException on desktop/Web where channel absent - swallow, use synthetic
+      if (e.toString().contains('MissingPluginException')) {
+        return;
+      }
       ErrorLogger.log('Failed to init visualizer',
           error: e, stackTrace: st, category: 'Visualizer');
     }

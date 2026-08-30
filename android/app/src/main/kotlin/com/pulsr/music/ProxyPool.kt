@@ -78,7 +78,7 @@ object ProxyPool {
 
     private val proxies = CopyOnWriteArrayList<ProxyNode>()
     private val failureCounts = ConcurrentHashMap<String, Int>()
-    private var activeProxyIndex = 0
+    private val activeProxyIndex = java.util.concurrent.atomic.AtomicInteger(0)
     private var autoRotateEnabled = true
     private val executor = Executors.newFixedThreadPool(2)
 
@@ -86,11 +86,25 @@ object ProxyPool {
     var currentPathLabel: String = "DIRECT"
         private set
 
-    @Volatile
-    private var onPathChangeListener: ((String) -> Unit)? = null
+    private val pathChangeListeners = CopyOnWriteArrayList<(String) -> Unit>()
 
     fun setOnPathChangeListener(listener: (String) -> Unit) {
-        onPathChangeListener = listener
+        pathChangeListeners.clear()
+        pathChangeListeners.add(listener)
+    }
+
+    fun addOnPathChangeListener(listener: (String) -> Unit) {
+        pathChangeListeners.add(listener)
+    }
+
+    fun removeOnPathChangeListener(listener: (String) -> Unit) {
+        pathChangeListeners.remove(listener)
+    }
+
+    private fun notifyPathChange(label: String) {
+        for (l in pathChangeListeners) {
+            try { l.invoke(label) } catch (_: Exception) {}
+        }
     }
 
     fun setAutoRotate(enabled: Boolean) {
@@ -100,7 +114,7 @@ object ProxyPool {
     fun setProxies(list: List<ProxyNode>) {
         proxies.clear()
         proxies.addAll(list)
-        activeProxyIndex = 0
+        activeProxyIndex.set(0)
         logI(TAG, "Proxy pool updated with ${list.size} proxies")
     }
 
@@ -113,22 +127,23 @@ object ProxyPool {
             return null
         }
 
-        val selected = aliveList[activeProxyIndex % aliveList.size]
+        val idx = Math.floorMod(activeProxyIndex.get(), aliveList.size)
+        val selected = aliveList[idx]
         currentPathLabel = "${selected.type.name}:${selected.host}:${selected.port}"
 
-        // Set authenticator if required
-        if (selected.username.isNotEmpty()) {
-            Authenticator.setDefault(object : Authenticator() {
-                override fun getPasswordAuthentication(): PasswordAuthentication? {
-                    if (requestorType == RequestorType.PROXY) {
-                        return PasswordAuthentication(selected.username, selected.password.toCharArray())
-                    }
-                    return null
-                }
-            })
-        }
+        // Authenticator is JVM-wide; avoid overwriting with per-proxy creds.
+        // Prefer per-connection Proxy-Authorization header set by ProxyManager wrapper.
+        // Only set default authenticator if no global ProxyManager authenticator is active.
+        // We intentionally do NOT set Authenticator here to prevent race with ProxyManager.
 
         return selected.toJavaProxy()
+    }
+
+    /** Builds Proxy-Authorization header value for [node] if credentials present. */
+    fun proxyAuthHeader(node: ProxyNode): String? {
+        if (node.username.isEmpty()) return null
+        val creds = "${node.username}:${node.password}"
+        return "Basic " + android.util.Base64.encodeToString(creds.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
     }
 
     /**
@@ -139,23 +154,26 @@ object ProxyPool {
 
         val aliveList = proxies.filter { it.isAlive }
         if (aliveList.isNotEmpty()) {
-            val failing = aliveList[activeProxyIndex % aliveList.size]
-            failing.consecutiveFailures++
-
-            if (failing.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-                failing.deadUntilTimestamp = nowMs() + DEAD_TIMEOUT_MS
-                logW(TAG, "Proxy ${failing.host}:${failing.port} tripped circuit breaker; disabled for 15m")
+            val idx = Math.floorMod(activeProxyIndex.get(), aliveList.size)
+            val failing = aliveList[idx]
+            synchronized(failing) {
+                failing.consecutiveFailures++
+                if (failing.consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                    failing.deadUntilTimestamp = nowMs() + DEAD_TIMEOUT_MS
+                    logW(TAG, "Proxy ${failing.host}:${failing.port} tripped circuit breaker; disabled for 15m")
+                }
             }
 
             if (autoRotateEnabled) {
-                activeProxyIndex = (activeProxyIndex + 1) % aliveList.size
+                // atomic increment with wraparound
+                val nextIdx = Math.floorMod(activeProxyIndex.incrementAndGet(), aliveList.size.coerceAtLeast(1))
                 val newActive = proxies.filter { it.isAlive }.let {
-                    if (it.isNotEmpty()) it[activeProxyIndex % it.size] else null
+                    if (it.isNotEmpty()) it[Math.floorMod(nextIdx, it.size)] else null
                 }
                 val newLabel = newActive?.let { "${it.type.name}:${it.host}:${it.port}" } ?: "DIRECT"
                 currentPathLabel = newLabel
                 logI(TAG, "Rotated proxy path to $newLabel")
-                onPathChangeListener?.invoke(newLabel)
+                notifyPathChange(newLabel)
             }
         }
     }
@@ -164,8 +182,9 @@ object ProxyPool {
         if (proxies.isNotEmpty()) {
             val aliveList = proxies.filter { it.isAlive }
             if (aliveList.isNotEmpty()) {
-                val current = aliveList[activeProxyIndex % aliveList.size]
-                current.consecutiveFailures = 0
+                val idx = Math.floorMod(activeProxyIndex.get(), aliveList.size)
+                val current = aliveList[idx]
+                synchronized(current) { current.consecutiveFailures = 0 }
             }
         }
     }

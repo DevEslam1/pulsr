@@ -125,7 +125,22 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var _oemWarningLogged = false
     private var isBitPerfectBypassActive = false
     private var bypassSavedStages: Int? = null
-    private val reverbExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+    @Volatile private var reverbExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+
+    private fun safeReverbExecute(action: () -> Unit) {
+        try {
+            reverbExecutor.execute { try { action() } catch (_: Exception) {} }
+        } catch (e: java.util.concurrent.RejectedExecutionException) {
+            try {
+                reverbExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+                reverbExecutor.execute { try { action() } catch (_: Exception) {} }
+            } catch (_: Exception) {
+                android.util.Log.w(TAG, "Reverb executor rejected after recreate: ${e.message}")
+            }
+        } catch (e: Exception) {
+            android.util.Log.w(TAG, "safeReverbExecute failed: ${e.message}")
+        }
+    }
 
     // Deduplication caches for native effect parameter pushes (W7)
     private var lastNativeEqPreamp: Double? = null
@@ -226,12 +241,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             val am = ctx.getSystemService(Context.ACTIVITY_SERVICE) as? android.app.ActivityManager
             val memoryInfo = android.app.ActivityManager.MemoryInfo()
             am?.getMemoryInfo(memoryInfo)
-            val isLowRam = am?.isLowRamDevice == true || (memoryInfo.totalMem > 0 && memoryInfo.totalMem < 4L * 1024 * 1024 * 1024)
-            // Low-RAM budget (<=4GB total device RAM or isLowRamDevice) is set to 16MB.
+            val memClass = am?.memoryClass ?: 256
+            val isLowRam = am?.isLowRamDevice == true || memClass < 128 || (memoryInfo.totalMem > 0 && memoryInfo.totalMem < 3L * 1024 * 1024 * 1024)
+            // Low-RAM (isLowRamDevice or memoryClass <128 or <3GB) -> 16MB; else 32MB conservative.
             // 16MB comfortably fits the active synthetic IR (~10MB for Cathedral) + 1 cached preset.
             // Inactive presets are evicted and regenerated on-demand (~2-5ms CPU cost upon preset switch).
             // Tradeoff: Memory footprint strictly constrained (<48MB peak RSS) at the cost of transient on-demand CPU synthesis.
-            val budgetBytes = if (isLowRam) 16L * 1024 * 1024 else 64L * 1024 * 1024
+            val budgetBytes = if (isLowRam) 16L * 1024 * 1024 else 32L * 1024 * 1024
             nativeSetCacheBudgetBytes(budgetBytes)
             Log.i(TAG, "Configured Native IR cache budget: ${budgetBytes / (1024 * 1024)} MB (isLowRam=$isLowRam)")
         } catch (e: Exception) {
@@ -241,6 +257,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     private var activeDspStages: Int = STAGE_EQ or STAGE_CROSSFEED or STAGE_REVERB or STAGE_PANNER or STAGE_LIMITER or STAGE_RESAMPLER or STAGE_SATURATION or STAGE_WIDTH or STAGE_LOUDNESS or STAGE_CROSSOVER or STAGE_DYNEQ
 
+    @Synchronized
     fun recalculateActiveStages() {
         // Bit-perfect bypass: force zero stages regardless of toggles
         if (isBitPerfectBypassActive) {
@@ -513,7 +530,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         context = binding.applicationContext
         methodChannel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME)
         methodChannel.setMethodCallHandler(this)
+        // Recreate executor if previously shut down
+        if (reverbExecutor.isShutdown || reverbExecutor.isTerminated) {
+            reverbExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+        }
         configureNativeMemoryBudget(binding.applicationContext)
+        // Prefetch OEM info off main thread
+        Thread { try { getCachedOemInfo(binding.applicationContext) } catch (_: Exception) {} }.start()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val audioManager = binding.applicationContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
@@ -555,10 +578,42 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             mainHandler.removeCallbacks(it)
             volumeBoostRetryRunnable = null
         }
+        eqUpdateRunnable?.let {
+            mainHandler.removeCallbacks(it)
+            eqUpdateRunnable = null
+        }
         volumeBoostRetryCount = 0
+        // Don't shutdown executor permanently; just remove queued tasks for detach
         try { reverbExecutor.shutdown() } catch (_: Exception) {}
+        // Clear dedup caches so post-reset values are resent
+        lastNativeEqPreamp = null
+        lastNativeEqBands.clear()
+        lastNativeEqBandCount = null
+        lastNativeEqEnabled = null
+        lastNativeCrossfeedEnabled = null
+        lastNativeCrossfeedParams = null
+        lastNativeLimiterEnabled = null
+        lastNativeLimiterParams = null
+        lastNativeReverbEnabled = null
+        lastNativeReverbPreset = null
+        lastNativeReverbWetDry = null
+        lastNativeReverbParams = null
+        lastNativeStereoBalance = null
+        lastNativeMonoMix = null
+        lastNativeResamplerEnabled = null
+        lastNativeResamplerRates = null
+        lastNativeSaturationEnabled = null
+        lastNativeSaturationParams = null
+        lastNativeStereoWidthEnabled = null
+        lastNativeStereoWidthParams = null
+        lastNativeLoudnessEnabled = null
+        lastNativeLoudnessParams = null
+        lastNativeSubCrossoverEnabled = null
+        lastNativeSubCrossoverParams = null
+        lastNativeDynamicEqEnabled = null
+        lastNativeDynamicEqBands.clear()
         releaseEffects()
-        methodChannel.setMethodCallHandler(null)
+        try { methodChannel.setMethodCallHandler(null) } catch (_: Exception) {}
         context = null
     }
 
@@ -889,7 +944,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     if (isNativeDspLoaded && lastNativeReverbPreset != preset) {
                         lastNativeReverbPreset = preset
                         // Offload IR synthesis off main thread to avoid 50-120ms ANR on Cathedral presets
-                        reverbExecutor.execute {
+                        safeReverbExecute {
                             try {
                                 nativeSetReverbPreset(preset)
                             } catch (e: Exception) {
@@ -922,7 +977,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         if (lastNativeReverbParams != key) {
                             lastNativeReverbParams = key
                             // Damping triggers IR resynthesis — offload
-                            reverbExecutor.execute {
+                            safeReverbExecute {
                                 try {
                                     nativeSetReverbPredelay(predelayMs)
                                     nativeSetReverbDamping(damping)
@@ -941,7 +996,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     if (irList != null && isNativeDspLoaded) {
                         // Large IR offloaded to avoid blocking MethodChannel (up to 1M taps)
                         val copy = irList.toList() // detach from Dart memory
-                        reverbExecutor.execute {
+                        safeReverbExecute {
                             try {
                                 val floatArray = FloatArray(copy.size) { copy[it].toFloat() }
                                 val loaded = nativeLoadImpulseResponse(floatArray, channels)
@@ -1354,6 +1409,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
                 "setBypassDspForBitPerfect" -> {
                     val bypass = call.argument<Boolean>("bypass") ?: false
+                    synchronized(this) {
                     if (bypass != isBitPerfectBypassActive) {
                         if (bypass) bypassSavedStages = activeDspStages
                         isBitPerfectBypassActive = bypass
@@ -1370,6 +1426,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             try { dynamicsProcessing?.enabled = isEqEnabled || isDynamicsEnabled } catch (_: Exception) {}
                         }
                         recalculateActiveStages()
+                    }
                     }
                     result.success(true)
                 }
@@ -1837,6 +1894,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         cachedSupportedEffects = null
     }
 
+    @Synchronized
     fun hasActiveEffects(): Boolean {
         return isEqEnabled ||
                 (isDynamicsEnabled && currentDynamicsPreset != "off") ||

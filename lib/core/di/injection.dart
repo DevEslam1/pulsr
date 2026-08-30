@@ -23,9 +23,9 @@ FutureOr<void> disposeHttpClient(HttpClient client) {
 abstract class NetworkModule {
   @Singleton(dispose: disposeHttpClient)
   HttpClient get httpClient => HttpClient()
-    ..maxConnectionsPerHost = 15
+    ..maxConnectionsPerHost = 6
     ..connectionTimeout = const Duration(seconds: 15)
-    ..idleTimeout = const Duration(seconds: 90);
+    ..idleTimeout = const Duration(seconds: 10);
 
   @singleton
   http.Client get pkgHttpClient => http.Client();

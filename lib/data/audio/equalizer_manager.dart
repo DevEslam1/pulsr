@@ -318,7 +318,10 @@ class EqualizerManager {
         pendingFutures.add(_effectsChannel.setDynamicEqEnabled(true));
       }
       // Dynamics last — it triggers recalculateActiveStages which disables OEM engine; doing it last prevents intermediate dropout
-      if (pendingFutures.isNotEmpty) await Future.wait(pendingFutures);
+      // Wrap each future to prevent one failing stage (e.g., setLimiterEnabled timeout) from rejecting entire batch
+      if (pendingFutures.isNotEmpty) {
+        await Future.wait(pendingFutures.map((f) => f.catchError((_) {})));
+      }
       if (isDynamicsEnabled && !_isDynamicsBypassed) {
         // Small delay lets AudioTrack stabilize before DynamicsProcessing rebuild (fixes sound drops needing EQ toggle)
         await Future<void>.delayed(const Duration(milliseconds: 120));
@@ -1102,9 +1105,14 @@ class EqualizerManager {
         futures.add(_effectsChannel.setNativeEqEnabled(true));
       }
       if (currentPreset.bassBoost > 0) {
-        futures.add(setBassBoost(currentPreset.bassBoost));
+        // Direct channel call to avoid _debouncedSavePreferences thrash on hot path (track change)
+        final milliBels = (currentPreset.bassBoost.clamp(0.0, 1.0) * 1000).round();
+        futures.add(_effectsChannel.setBassBoost(milliBels));
       }
-      if (volumeBoost > 0) futures.add(setVolumeBoost(volumeBoost));
+      if (volumeBoost > 0) {
+        final milliBels = (volumeBoost.clamp(0.0, 1.0) * 1000).round();
+        futures.add(_effectsChannel.setVolumeBoost(milliBels));
+      }
       if (isVirtualizerEnabled) {
         futures.add(_effectsChannel.setVirtualizerEnabled(true));
         futures.add(

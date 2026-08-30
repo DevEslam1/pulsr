@@ -90,11 +90,12 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
       repo
           .getAllDownloads()
           .then((tasks) {
+            if (isClosed) return;
             final initialMap = <String, YtDownloadItem>{};
             for (final t in tasks) {
               initialMap[t.videoId] = _mapTaskToItem(t);
             }
-            if (initialMap.isNotEmpty) {
+            if (initialMap.isNotEmpty && !isClosed) {
               safeEmit(
                 YtmDownloadState(
                   items: Map.unmodifiable({...state.items, ...initialMap}),
@@ -227,9 +228,8 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
     void Function(BatchResult)? onCompleted,
   }) {
     int queuedCount = 0;
-    int failureCount = 0;
     final total = songs.length;
-    final futures = <Future<void>>[];
+    final futures = <Future<bool>>[];
 
     for (final song in songs) {
       final videoId = song.remoteId;
@@ -247,16 +247,18 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
 
       queuedCount++;
       futures.add(
-        download(song).catchError((e) {
-          failureCount++;
-        }),
+        download(song).then((_) {
+          final item = state.itemFor(videoId);
+          return item.status == YtDownloadStatus.failed;
+        }).catchError((e) => true),
       );
     }
 
     if (futures.isNotEmpty) {
       Future.wait(futures)
-          .then((_) {
+          .then((results) {
             if (!isClosed) {
+              final failureCount = results.where((e) => e == true).length;
               onCompleted?.call(
                 BatchResult(
                   totalCount: total,

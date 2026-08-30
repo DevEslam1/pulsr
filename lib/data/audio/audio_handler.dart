@@ -5,6 +5,7 @@ import 'dart:io';
 import 'dart:math' as math;
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
@@ -92,6 +93,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   int _currentIndex = 0;
   bool _queueDirty = false;
   double? _preDuckVolume;
+  bool _isDucked = false;
   int _consecutiveFailures = 0;
   DateTime? _lastGaplessChangeTime;
   int _rapidGaplessChangeCount = 0;
@@ -221,7 +223,7 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   factory PulsrAudioHandler(
       IMusicRepository repository, YtmService ytmService) {
-    if (Platform.isAndroid) {
+    if (!kIsWeb && Platform.isAndroid) {
       // The 10-band EQ now runs natively (DynamicsProcessing postEq). Only the
       // loudness enhancers remain in the just_audio pipeline, as inert anchors
       // that make ExoPlayer allocate the audio session the native effects bind to.
@@ -366,8 +368,8 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (wasGapless != isGapless &&
         _songs.isNotEmpty &&
         _currentIndex >= 0 &&
-        _currentIndex < _songs.length &&
-        _activePlayer.playing) {
+        _currentIndex < _songs.length) {
+      // Switch engine even when paused so next play() uses correct engine; avoid double-switch when already switching
       _switchingEngine = true;
       unawaited(_switchPlaybackEngine(toGapless: isGapless).whenComplete(() => _switchingEngine = false));
     }
@@ -908,8 +910,12 @@ class PulsrAudioHandler extends BaseAudioHandler
             if (_wasPlayingBeforeInterruption) {
               switch (event.type) {
                 case AudioInterruptionType.duck:
-                  _preDuckVolume = _activePlayer.volume;
-                  await _activePlayer.setVolume(0.3 * (_preDuckVolume ?? 1.0));
+                  // Guard against nested duck overwriting original volume
+                  if (!_isDucked) {
+                    _preDuckVolume = _activePlayer.volume;
+                    _isDucked = true;
+                    await _activePlayer.setVolume(0.3 * (_preDuckVolume ?? 1.0));
+                  }
                   break;
                 case AudioInterruptionType.pause:
                 case AudioInterruptionType.unknown:
@@ -920,12 +926,17 @@ class PulsrAudioHandler extends BaseAudioHandler
           } else {
             switch (event.type) {
               case AudioInterruptionType.duck:
-                if (_preDuckVolume != null) {
+                if (_isDucked && _preDuckVolume != null) {
+                  // Unconditionally restore to original volume if we ducked; user volume changes during duck are rare and should be honored via next setVolume
+                  // Use small tolerance to avoid fighting user manual change: if volume is still at ducked level, restore; otherwise respect user change
                   final expectedDucked = 0.3 * (_preDuckVolume ?? 1.0);
-                  if ((_activePlayer.volume - expectedDucked).abs() < 0.05) {
+                  final currentVol = _activePlayer.volume;
+                  // If user changed volume significantly during duck, keep their choice; else restore
+                  if ((currentVol - expectedDucked).abs() < 0.15) {
                     await _activePlayer.setVolume(_preDuckVolume ?? 1.0);
                   }
                   _preDuckVolume = null;
+                  _isDucked = false;
                 }
                 break;
               case AudioInterruptionType.pause:
@@ -940,10 +951,26 @@ class PulsrAudioHandler extends BaseAudioHandler
                   }
                 }
                 _preDuckVolume = null;
+                _isDucked = false;
                 break;
               case AudioInterruptionType.unknown:
+                // Treat unknown like pause if we were playing and resume is enabled
+                if (_wasPlayingBeforeInterruption) {
+                  final prefs =
+                      _cachedPrefs ?? await SharedPreferences.getInstance();
+                  final resume =
+                      prefs.getBool(PrefsKeys.resumeAfterInterruption) ?? true;
+                  if (resume && !_activePlayer.playing) {
+                    // Small delay to avoid fighting OS finishing interruption
+                    await Future<void>.delayed(const Duration(milliseconds: 300));
+                    if (!_activePlayer.playing) {
+                      await _activePlayer.play();
+                    }
+                  }
+                }
                 _wasPlayingBeforeInterruption = false;
                 _preDuckVolume = null;
+                _isDucked = false;
                 break;
             }
           }
@@ -953,8 +980,9 @@ class PulsrAudioHandler extends BaseAudioHandler
       _subscriptions.add(
         session.becomingNoisyEventStream.listen((_) {
           if (_crossfadeManager.isCrossfading) {
+            final rgVol = _calculateReplayGainVolume(currentSong);
             _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
-                restoreVolume: _volume);
+                restoreVolume: rgVol);
           }
           pause();
         }),
@@ -1524,12 +1552,16 @@ class PulsrAudioHandler extends BaseAudioHandler
         final fadeDuration = _crossfadeManager.duration;
 
         final targetNextVolume = _calculateReplayGainVolume(nextSong);
-        await Future.wait([
-          _crossfadeManager.fadeVolume(
-              active, initialActiveVolume, 0.0, fadeDuration, currentFadeId),
-          _crossfadeManager.fadeVolume(
-              inactive, 0.0, targetNextVolume, fadeDuration, currentFadeId),
-        ]);
+        final isRepeatOne = _songs.isNotEmpty && _currentIndex == nextIndex;
+        await _crossfadeManager.crossfadePair(
+          active,
+          inactive,
+          initialActiveVolume,
+          targetNextVolume,
+          fadeDuration,
+          currentFadeId,
+          isRepeatOne: isRepeatOne,
+        );
 
         if (_crossfadeManager.currentFadeId != currentFadeId) {
           try {
@@ -1573,7 +1605,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         } catch (_) {}
         if (_crossfadeManager.currentFadeId == currentFadeId) {
           await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
-              restoreVolume: _volume);
+              restoreVolume: _calculateReplayGainVolume(currentSong));
           try {
             await playSongAt(nextIndex);
           } catch (fallbackError, fallbackSt) {
@@ -2117,6 +2149,11 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> play() async {
     ErrorLogger.addBreadcrumb('Playback started', category: 'player');
+    // Ensure audio session is active before play (handles resume after interruption/background)
+    try {
+      final session = await AudioSession.instance;
+      await session.setActive(true);
+    } catch (_) {}
     // A restored YouTube session in the crossfade engine is left with no source
     // loaded (see restoreLastPlaybackSession); resolve and start it on the first
     // play. The gapless engine instead sets a non-preloaded concat at restore,
@@ -2149,10 +2186,24 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<void> seek(Duration position) async {
     ErrorLogger.addBreadcrumb('Playback seek to ${position.inSeconds}s',
         category: 'player');
+    final rgVol = _calculateReplayGainVolume(currentSong);
     await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
-        restoreVolume: _volume);
-    await _activePlayer.seek(position);
-    _positionSubject.add(position);
+        restoreVolume: rgVol);
+    // Clamp to duration to avoid seek out-of-bounds on some tracks
+    Duration clamped = position;
+    final dur = _activePlayer.duration;
+    if (dur != null && dur > Duration.zero) {
+      if (clamped > dur) clamped = dur;
+      if (clamped < Duration.zero) clamped = Duration.zero;
+    } else {
+      if (clamped < Duration.zero) clamped = Duration.zero;
+    }
+    if (_gaplessMode && _gaplessSource != null) {
+      await _activePlayer.seek(clamped, index: _currentIndex);
+    } else {
+      await _activePlayer.seek(clamped);
+    }
+    _positionSubject.add(clamped);
     _saveCurrentPosition();
   }
 

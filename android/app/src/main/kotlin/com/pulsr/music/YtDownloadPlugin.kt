@@ -92,9 +92,21 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
             }
             "getFreeDiskSpace" -> {
                 try {
-                    val musicDir = currentContext.getExternalFilesDir(Environment.DIRECTORY_MUSIC)
-                        ?: currentContext.filesDir
-                    val stat = android.os.StatFs(musicDir.path)
+                    // Query public Music volume where MediaStore will actually save (primary external storage),
+                    // fallback to app-private external files dir. This ensures preflight reflects real partition.
+                    var targetDir: File? = null
+                    try {
+                        @Suppress("DEPRECATION")
+                        val publicMusic = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
+                        if (publicMusic != null && publicMusic.exists()) {
+                            targetDir = publicMusic
+                        }
+                    } catch (_: Exception) {}
+                    if (targetDir == null) {
+                        targetDir = currentContext.getExternalFilesDir(Environment.DIRECTORY_MUSIC)
+                            ?: currentContext.filesDir
+                    }
+                    val stat = android.os.StatFs(targetDir.path)
                     val availableBytes = stat.availableBlocksLong * stat.blockSizeLong
                     result.success(availableBytes)
                 } catch (e: Exception) {

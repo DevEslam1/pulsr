@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -171,7 +172,10 @@ class ScrobblerService {
   }) async {
     // 1. Android Broadcast Intent
     try {
-      await _channel.invokeMethod('broadcastPlaybackState', {
+      if (!Platform.isAndroid) {
+        // Skip native broadcast on non-Android
+      } else {
+        await _channel.invokeMethod('broadcastPlaybackState', {
         'id': id,
         'artist': artist,
         'track': track,
@@ -179,7 +183,8 @@ class ScrobblerService {
         'duration': durationMs,
         'position': positionMs,
         'isPlaying': isPlaying,
-      });
+        }).timeout(const Duration(seconds: 2));
+      }
     } catch (e) {
       ErrorLogger.log('Failed to broadcast scrobble intent: $e',
           category: 'Scrobbler');

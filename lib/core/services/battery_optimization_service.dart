@@ -13,9 +13,15 @@ class BatteryOptimizationService {
     if (kIsWeb || !Platform.isAndroid) return true;
     try {
       final isIgnoring =
-          await _channel.invokeMethod<bool>('isIgnoringBatteryOptimizations');
-      return isIgnoring ?? false;
+          await _channel.invokeMethod<bool>('isIgnoringBatteryOptimizations').timeout(const Duration(seconds: 2));
+      // MIUI and some OEMs return null for non-standard POWER_SERVICE; treat null as whitelisted to avoid perpetual card
+      if (isIgnoring == null) return true;
+      return isIgnoring;
+    } on PlatformException {
+      // Platform channel missing or OEM quirk - assume whitelisted to avoid spam
+      return true;
     } catch (_) {
+      // Timeout after 2s - assume not whitelisted conservatively but avoid crash
       return false;
     }
   }
@@ -46,7 +52,7 @@ class BatteryOptimizationService {
   static Future<String> getDeviceManufacturer() async {
     if (kIsWeb || !Platform.isAndroid) return '';
     try {
-      final m = await _channel.invokeMethod<String>('getDeviceManufacturer');
+      final m = await _channel.invokeMethod<String>('getDeviceManufacturer').timeout(const Duration(seconds: 2));
       return m?.toLowerCase() ?? '';
     } catch (_) {
       return '';
@@ -56,7 +62,7 @@ class BatteryOptimizationService {
   static Future<int> getBatteryLevel() async {
     if (kIsWeb || !Platform.isAndroid) return 100;
     try {
-      final level = await _channel.invokeMethod<int>('getBatteryLevel');
+      final level = await _channel.invokeMethod<int>('getBatteryLevel').timeout(const Duration(seconds: 2));
       return level ?? 100;
     } catch (_) {
       return 100;

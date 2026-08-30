@@ -222,7 +222,7 @@ class CrossfadeManager {
     final stopwatch = Stopwatch()..start();
 
     late final Timer timer;
-    timer = Timer.periodic(const Duration(milliseconds: 33), (t) {
+    timer = Timer.periodic(const Duration(milliseconds: 16), (t) {
       if (_fadeId != fadeId) {
         t.cancel();
         _activeTimers.remove(t);
@@ -258,6 +258,63 @@ class CrossfadeManager {
       }
     });
 
+    _activeTimers.add(timer);
+    return completer.future;
+  }
+
+  /// Constant-power crossfade for two players using [evaluateGainPair] to avoid -3dB dip at 50%.
+  Future<void> crossfadePair(
+    AudioPlayer outgoing,
+    AudioPlayer incoming,
+    double fromVolume,
+    double toVolume,
+    Duration fadeDuration,
+    int fadeId, {
+    bool isRepeatOne = false,
+  }) async {
+    if (fadeDuration == Duration.zero) {
+      await outgoing.setVolume(0.0);
+      await incoming.setVolume(toVolume.clamp(0.0, 1.0));
+      return;
+    }
+    final totalMs = fadeDuration.inMilliseconds.toDouble();
+    if (totalMs <= 0) {
+      await outgoing.setVolume(0.0);
+      await incoming.setVolume(toVolume.clamp(0.0, 1.0));
+      return;
+    }
+    final completer = Completer<void>();
+    final stopwatch = Stopwatch()..start();
+    late final Timer timer;
+    timer = Timer.periodic(const Duration(milliseconds: 16), (t) {
+      if (_fadeId != fadeId) {
+        t.cancel();
+        _activeTimers.remove(t);
+        if (!completer.isCompleted) completer.complete();
+        return;
+      }
+      final elapsed = stopwatch.elapsedMilliseconds.toDouble();
+      final fraction = (elapsed / totalMs).clamp(0.0, 1.0);
+      final gains = evaluateGainPair(fraction, isRepeatOne: isRepeatOne);
+      final outVol = gains.$1 * fromVolume;
+      final inVol = gains.$2 * toVolume;
+      try {
+        outgoing.setVolume(outVol.clamp(0.0, 1.0));
+        incoming.setVolume(inVol.clamp(0.0, 1.0));
+      } catch (e, st) {
+        ErrorLogger.log('Error adjusting volume during crossfadePair',
+            error: e, stackTrace: st, category: 'CrossfadeManager');
+        t.cancel();
+        _activeTimers.remove(t);
+        if (!completer.isCompleted) completer.complete();
+        return;
+      }
+      if (fraction >= 1.0) {
+        t.cancel();
+        _activeTimers.remove(t);
+        if (!completer.isCompleted) completer.complete();
+      }
+    });
     _activeTimers.add(timer);
     return completer.future;
   }
@@ -341,6 +398,12 @@ class CrossfadeManager {
     _fadeId++;
     _fadeTimer?.cancel();
     _fadeTimer = null;
+    for (final t in _activeTimers) {
+      t.cancel();
+    }
+    _activeTimers.clear();
+    isCrossfading = false;
+    pendingIndex = null;
     if (_crossfadeCompleter != null && !_crossfadeCompleter!.isCompleted) {
       _crossfadeCompleter!.complete();
     }

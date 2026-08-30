@@ -135,9 +135,16 @@ class ExportBackupUseCase {
 
     final rawJson = const JsonEncoder.withIndent('  ').convert(backupPayload);
     if (encrypt) {
+      if (passphrase == null || passphrase.isEmpty) {
+        throw ArgumentError(
+            'Passphrase required for encrypted backup (refusing insecure default salt)');
+      }
+      if (passphrase == BackupCrypto.defaultAppSalt) {
+        throw ArgumentError('Insecure passphrase rejected');
+      }
       final envelope = BackupCrypto.encryptBackup(
         rawJson,
-        passphrase: passphrase ?? BackupCrypto.defaultAppSalt,
+        passphrase: passphrase,
       );
       return const JsonEncoder.withIndent('  ').convert(envelope);
     }
@@ -155,31 +162,52 @@ class ImportBackupUseCase {
   ImportBackupUseCase(this._repository, this._db);
 
   Future<ImportResult> executeFromFile(Object file) async {
-    if (file is! String) {
-      try {
-        final len = await (file as dynamic).length() as int;
-        if (len > maxBackupSizeBytes) {
+    if (file is String) {
+      return execute(file);
+    }
+    try {
+      // Strongly typed handling for File and XFile/PlatformFile cases
+      String content;
+      int length;
+      if (file is List<int>) {
+        content = utf8.decode(file);
+        length = file.length;
+      } else {
+        // Attempt File-like interface via dynamic but with explicit type checks
+        final dynamic f = file;
+        try {
+          length = await f.length() as int;
+        } catch (_) {
+          // Fallback: try reading content directly and measure bytes
+          final c = await f.readAsString() as String;
+          length = utf8.encode(c).length;
+          if (length > maxBackupSizeBytes) {
+            throw const FormatException(
+                'Backup file exceeds maximum allowed size of 10 MB');
+          }
+          return await execute(c);
+        }
+        if (length > maxBackupSizeBytes) {
           throw const FormatException(
               'Backup file exceeds maximum allowed size of 10 MB');
         }
-        final content = await (file as dynamic).readAsString() as String;
-        return await execute(content);
-      } catch (e) {
-        if (e is FormatException) rethrow;
-        throw FormatException('Failed reading backup file: $e');
+        content = await f.readAsString() as String;
       }
-    }
-    return execute(file);
-  }
-
-  Future<ImportResult> execute(String jsonString, {String? passphrase}) async {
-    // Cheap length check first (chars) to avoid double alloc for size check — prevents OOM on low RAM
-    if (jsonString.length > maxBackupSizeBytes) {
-      if (utf8.encode(jsonString).length > maxBackupSizeBytes) {
+      if (utf8.encode(content).length > maxBackupSizeBytes) {
         throw const FormatException(
             'Backup file exceeds maximum allowed size of 10 MB');
       }
-    } else if (utf8.encode(jsonString).length > maxBackupSizeBytes) {
+      return await execute(content);
+    } catch (e) {
+      if (e is FormatException || e is ArgumentError) rethrow;
+      throw FormatException('Failed reading backup file: $e');
+    }
+  }
+
+  Future<ImportResult> execute(String jsonString, {String? passphrase}) async {
+    // Single utf8 encode to avoid double allocation on large payloads (10 MB)
+    final encoded = utf8.encode(jsonString);
+    if (encoded.length > maxBackupSizeBytes) {
       throw const FormatException(
           'Backup file exceeds maximum allowed size of 10 MB');
     }
@@ -198,8 +226,17 @@ class ImportBackupUseCase {
           'Invalid backup payload: root object must be a JSON map');
     }
 
-    // Version 2 Encrypted Backup Envelope handling ([S1])
-    if (decoded['version'] == 2 || decoded['format'] == BackupCrypto.formatV2) {
+    // Encrypted Backup Envelope handling: supports v2 (legacy) and v3 (AES-GCM)
+    final version = decoded['version'];
+    final format = decoded['format'];
+    final isEncryptedEnvelope = version == 2 ||
+        version == 3 ||
+        format == BackupCrypto.formatV2 ||
+        format == BackupCrypto.formatV3 ||
+        (decoded.containsKey('ciphertext') &&
+            decoded.containsKey('salt') &&
+            decoded.containsKey('iv'));
+    if (isEncryptedEnvelope) {
       final decryptedPlaintext = BackupCrypto.decryptBackup(
         decoded,
         passphrase: passphrase ?? BackupCrypto.defaultAppSalt,
@@ -248,14 +285,20 @@ class ImportBackupUseCase {
       final normPath = path.replaceAll('\\', '/').toLowerCase();
       final segments = normPath.split('/');
 
-      // 3. Parent + Filename fallback (lazy init)
+      // 3. Parent + Filename fallback (lazy init) - avoid repeated split/allocations
       if (segments.length >= 2) {
-        lazyParentFilenameMap ??= {
-          for (final s in allSongs)
-            if (s.path.replaceAll('\\', '/').split('/').length >= 2)
-              '${s.path.replaceAll('\\', '/').split('/')[s.path.replaceAll('\\', '/').split('/').length - 2].toLowerCase()}/${s.path.replaceAll('\\', '/').split('/').last.toLowerCase()}':
-                  s
-        };
+        lazyParentFilenameMap ??= () {
+          final map = <String, SongsTableData>{};
+          for (final s in allSongs) {
+            final norm = s.path.replaceAll('\\', '/').toLowerCase();
+            final parts = norm.split('/');
+            if (parts.length >= 2) {
+              final key = '${parts[parts.length - 2]}/${parts.last}';
+              map.putIfAbsent(key, () => s);
+            }
+          }
+          return map;
+        }();
         final parentAndFilename =
             '${segments[segments.length - 2]}/${segments.last}';
         final match = lazyParentFilenameMap![parentAndFilename];
@@ -311,13 +354,15 @@ class ImportBackupUseCase {
       });
     }
 
-    // 2. Restore Playlists (Transaction per playlist)
+    // 2. Restore Playlists (per-playlist, avoid nested drift transactions)
     int restoredPlaylistsCount = 0;
     if (data['playlists'] != null && data['playlists'] is List) {
       final playlistsList = data['playlists'] as List;
       for (final item in playlistsList) {
         if (item is Map<String, dynamic> && item.containsKey('name')) {
-          await _db.transaction(() async {
+          // No outer _db.transaction here: repository methods already handle
+          // their own transactions. Nesting would cause SQLITE_BUSY.
+          {
             final name = item['name'] as String? ?? 'Restored Playlist';
             final isSmart = item['isSmart'] as bool? ?? false;
             final smartCriteria = item['smartCriteria'] as String?;
@@ -371,7 +416,7 @@ class ImportBackupUseCase {
               }
               restoredPlaylistsCount++;
             }
-          });
+          }
         }
       }
     }

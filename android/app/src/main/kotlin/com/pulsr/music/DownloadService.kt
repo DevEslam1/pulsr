@@ -69,14 +69,39 @@ class DownloadService : Service() {
                 putExtra(EXTRA_TITLE, title)
                 putExtra(EXTRA_PROGRESS, progress)
             }
-            context.startService(intent)
+            try {
+                // For progress updates the service is already in foreground (started via ACTION_START).
+                // Use startService for delivery to avoid ForegroundServiceStartNotAllowedException on Android 14 background.
+                // Fallback to startForegroundService only if startService fails.
+                try {
+                    context.startService(intent)
+                } catch (_: Exception) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        context.startForegroundService(intent)
+                    } else {
+                        context.startService(intent)
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("DownloadService", "updateProgress start restricted: ${e.message}")
+            }
         }
 
         fun stop(context: Context) {
             val intent = Intent(context, DownloadService::class.java).apply {
                 action = ACTION_STOP
             }
-            context.startService(intent)
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("DownloadService", "stop start restricted: ${e.message}")
+                // Fallback to legacy startService for pre-O or when FGS not allowed
+                try { context.startService(intent) } catch (_: Exception) {}
+            }
         }
     }
 
@@ -186,18 +211,21 @@ class DownloadService : Service() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         }
         val currentVid = activeDownloads.keys.firstOrNull()
+        // Use per-video requestCode to avoid PendingIntent collision with concurrent downloads
+        val cancelRequestCode = currentVid?.hashCode()?.let { (REQUEST_CODE_CANCEL * 31 + it) and 0x7FFFFFFF } ?: REQUEST_CODE_CANCEL
+        val pauseRequestCode = currentVid?.hashCode()?.let { (REQUEST_CODE_PAUSE * 31 + it) and 0x7FFFFFFF } ?: REQUEST_CODE_PAUSE
         val cancelIntent = Intent(this, DownloadService::class.java).apply {
             action = ACTION_CANCEL
             putExtra(EXTRA_VIDEO_ID, currentVid)
         }
-        val cancelPending = PendingIntent.getService(this, REQUEST_CODE_CANCEL, cancelIntent,
+        val cancelPending = PendingIntent.getService(this, cancelRequestCode, cancelIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
         val pauseIntent = Intent(this, DownloadService::class.java).apply {
             action = ACTION_PAUSE
             putExtra(EXTRA_VIDEO_ID, currentVid)
         }
-        val pausePending = PendingIntent.getService(this, REQUEST_CODE_PAUSE, pauseIntent,
+        val pausePending = PendingIntent.getService(this, pauseRequestCode, pauseIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)

@@ -41,6 +41,12 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     private var targetBitDepth: Int = 0
     private var audioDeviceCallback: AudioDeviceCallback? = null
     private var usbReceiver: BroadcastReceiver? = null
+    // Cached reflection methods to avoid thrashing on every getAudioOutputDetails()
+    private var cachedMixerBehaviorMethod: java.lang.reflect.Method? = null
+    private var cachedGetSupportedMixerMethod: java.lang.reflect.Method? = null
+    private var cachedSetMixerMethod: java.lang.reflect.Method? = null
+    private var cachedClearMixerMethod: java.lang.reflect.Method? = null
+    private var cachedGetMixerMethod: java.lang.reflect.Method? = null
 
     init {
         methodChannel.setMethodCallHandler(this)
@@ -96,10 +102,12 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     }
 
     private fun notifyDeviceChange() {
-        val info = getAudioOutputDetails()
+        val info = try { getAudioOutputDetails() } catch (e: Exception) { return }
+        // Don't emit if no Dart listener yet; latest info will be sent on onListen
+        val sink = eventSink ?: return
         android.os.Handler(android.os.Looper.getMainLooper()).post {
             try {
-                eventSink?.success(info)
+                sink.success(info)
             } catch (_: Exception) {}
         }
     }
@@ -130,36 +138,40 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 val deviceId = call.argument<Int>("deviceId")
                 selectedDeviceId = deviceId
                 var success = false
+                var actualError: String? = null
                 if (audioManager != null && deviceId != null) {
                     val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
                     val target = devices.firstOrNull { it.id == deviceId }
                     if (target != null) {
-                        // Preferred path for media: AudioTrack.setPreferredDevice (API 23) + MediaRouter (API 34)
-                        // Fallback to setCommunicationDevice on S+ for VoIP compatibility
                         try {
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                                // Try media routing via AudioManager setPreferredDeviceForStrategy (API 33) for MUSIC
                                 if (Build.VERSION.SDK_INT >= 33) {
                                     try {
-                                        val strat = 0 // STRATEGY_MEDIA = 0
+                                        val strat = 0
                                         val m = AudioManager::class.java.getMethod("setPreferredDeviceForStrategy", Int::class.javaPrimitiveType, AudioDeviceInfo::class.java)
                                         success = (m.invoke(audioManager, strat, target) as? Boolean) ?: false
-                                    } catch (_: Exception) {}
+                                        if (!success) actualError = "setPreferredDeviceForStrategy returned false"
+                                    } catch (e: Exception) { actualError = e.message }
                                 }
-                                // Fallback: communication device still routes some OEMs
                                 if (!success && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                                     success = audioManager.setCommunicationDevice(target)
-                                }
-                                if (!success) {
-                                    // Last resort: success true if device exists — Dart will re-query
-                                    success = true
+                                    if (!success && actualError == null) actualError = "setCommunicationDevice returned false"
                                 }
                             }
-                        } catch (_: Exception) {}
+                        } catch (e: Exception) { actualError = e.message }
+                    } else {
+                        actualError = "device not found"
                     }
+                } else {
+                    actualError = "audioManager or deviceId null"
                 }
                 notifyDeviceChange()
-                result.success(success)
+                // Return actual success; don't lie when routing failed
+                if (!success && actualError != null) {
+                    result.success(mapOf("success" to false, "error" to actualError))
+                } else {
+                    result.success(success)
+                }
             }
             "clearOutputDevice" -> {
                 selectedDeviceId = null
@@ -206,16 +218,21 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         eventSink = null
     }
 
-    fun dispose() {
-        methodChannel.setMethodCallHandler(null)
-        eventChannel.setStreamHandler(null)
+     fun dispose() {
+        try { methodChannel.setMethodCallHandler(null) } catch (_: Exception) {}
+        try { eventChannel.setStreamHandler(null) } catch (_: Exception) {}
+        eventSink = null
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && audioManager != null && audioDeviceCallback != null) {
-            audioManager.unregisterAudioDeviceCallback(audioDeviceCallback)
+            try { audioManager.unregisterAudioDeviceCallback(audioDeviceCallback) } catch (_: Exception) {}
+            audioDeviceCallback = null
         }
         if (usbReceiver != null) {
             try {
                 context.unregisterReceiver(usbReceiver)
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+                try { context.unregisterReceiver(usbReceiver) } catch (_: Exception) {}
+            }
+            usbReceiver = null
         }
     }
 
@@ -261,6 +278,17 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         return hasDirectEncoding || hasHiResRate
     }
 
+    private fun getMixerBehaviorCached(attr: Any): Int? {
+        return try {
+            var m = cachedMixerBehaviorMethod
+            if (m == null || m.declaringClass != attr.javaClass) {
+                m = attr.javaClass.getMethod("getMixerBehavior")
+                cachedMixerBehaviorMethod = m
+            }
+            m.invoke(attr) as? Int
+        } catch (_: Exception) { null }
+    }
+
     private fun applyBitPerfectMode(enabled: Boolean): Boolean {
         if (audioManager == null) {
             lastBitPerfectReason = "audio_manager_unavailable"
@@ -285,8 +313,12 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 return false
             }
             return try {
-                val getSupportedMethod = AudioManager::class.java.getMethod("getSupportedAudioMixerAttributes", AudioDeviceInfo::class.java)
-                val supportedAttributes = getSupportedMethod.invoke(audioManager, usbDevice) as? List<*> ?: emptyList<Any>()
+                var getSupported = cachedGetSupportedMixerMethod
+                if (getSupported == null) {
+                    getSupported = AudioManager::class.java.getMethod("getSupportedAudioMixerAttributes", AudioDeviceInfo::class.java)
+                    cachedGetSupportedMixerMethod = getSupported
+                }
+                val supportedAttributes = getSupported.invoke(audioManager, usbDevice) as? List<*> ?: emptyList<Any>()
                 if (supportedAttributes.isEmpty()) {
                     lastBitPerfectReason = "no_supported_mixer_attributes"
                     return false
@@ -295,25 +327,27 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                     var selectedAttr: Any? = null
                     for (attr in supportedAttributes) {
                         if (attr != null) {
-                            try {
-                                val mixerBehaviorMethod = attr.javaClass.getMethod("getMixerBehavior")
-                                val behavior = mixerBehaviorMethod.invoke(attr) as? Int
-                                if (behavior == 1) {
-                                    selectedAttr = attr
-                                    break
-                                }
-                            } catch (_: Exception) {}
+                            val behavior = getMixerBehaviorCached(attr)
+                            if (behavior == 1) { selectedAttr = attr; break }
                         }
                     }
                     if (selectedAttr == null) selectedAttr = supportedAttributes.first()
                     val mixerAttrClass = Class.forName("android.media.AudioMixerAttributes")
-                    val setMethod = AudioManager::class.java.getMethod("setAudioMixerAttributes", AudioDeviceInfo::class.java, mixerAttrClass)
-                    val ok = (setMethod.invoke(audioManager, usbDevice, selectedAttr) as? Boolean) ?: false
+                    var setM = cachedSetMixerMethod
+                    if (setM == null) {
+                        setM = AudioManager::class.java.getMethod("setAudioMixerAttributes", AudioDeviceInfo::class.java, mixerAttrClass)
+                        cachedSetMixerMethod = setM
+                    }
+                    val ok = (setM.invoke(audioManager, usbDevice, selectedAttr) as? Boolean) ?: false
                     lastBitPerfectReason = if (ok) null else "set_mixer_attributes_failed"
                     ok
                 } else {
-                    val clearMethod = AudioManager::class.java.getMethod("clearAudioMixerAttributes", AudioDeviceInfo::class.java)
-                    val ok = (clearMethod.invoke(audioManager, usbDevice) as? Boolean) ?: false
+                    var clearM = cachedClearMixerMethod
+                    if (clearM == null) {
+                        clearM = AudioManager::class.java.getMethod("clearAudioMixerAttributes", AudioDeviceInfo::class.java)
+                        cachedClearMixerMethod = clearM
+                    }
+                    val ok = (clearM.invoke(audioManager, usbDevice) as? Boolean) ?: false
                     lastBitPerfectReason = null
                     ok
                 }
@@ -321,21 +355,21 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 lastBitPerfectReason = "reflection_method_not_found"
                 Log.w(TAG, "Bit-perfect API not available on this device: ${e.message}")
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    eventSink?.error("BIT_PERFECT_NOT_AVAILABLE", e.message, null)
+                    try { eventSink?.error("BIT_PERFECT_NOT_AVAILABLE", e.message, null) } catch (_: Exception) {}
                 }
                 false
             } catch (e: ClassNotFoundException) {
                 lastBitPerfectReason = "audio_mixer_class_not_found"
                 Log.w(TAG, "AudioMixerAttributes class not found: ${e.message}")
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    eventSink?.error("AUDIO_MIXER_CLASS_NOT_FOUND", e.message, null)
+                    try { eventSink?.error("AUDIO_MIXER_CLASS_NOT_FOUND", e.message, null) } catch (_: Exception) {}
                 }
                 false
             } catch (e: Throwable) {
                 lastBitPerfectReason = "unknown_error_${e.message}"
                 Log.w(TAG, "Bit-perfect mode failed: ${e.message}")
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    eventSink?.error("BIT_PERFECT_FAILED", e.message, null)
+                    try { eventSink?.error("BIT_PERFECT_FAILED", e.message, null) } catch (_: Exception) {}
                 }
                 false
             }
@@ -371,7 +405,8 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         return try {
             val usbAudioDevice = usbManager?.deviceList?.values?.firstOrNull { device ->
                 (0 until device.interfaceCount).any {
-                    device.getInterface(it).interfaceClass == UsbConstants.USB_CLASS_AUDIO
+                    val cls = device.getInterface(it).interfaceClass
+                    cls == UsbConstants.USB_CLASS_AUDIO || cls == 0xFF // vendor-specific UAC
                 }
             } ?: return Pair(UsbDacDiagnostics.UAC_NONE, null)
             val label = listOfNotNull(usbAudioDevice.manufacturerName, usbAudioDevice.productName)
@@ -485,11 +520,14 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         var isBitPerfectActive = false
         if (Build.VERSION.SDK_INT >= 34 && isUsb && usbDevice != null) {
             try {
-                val getAttrMethod = AudioManager::class.java.getMethod("getAudioMixerAttributes", AudioDeviceInfo::class.java)
-                val currentAttr = getAttrMethod.invoke(audioManager, usbDevice)
+                var getM = cachedGetMixerMethod
+                if (getM == null) {
+                    getM = AudioManager::class.java.getMethod("getAudioMixerAttributes", AudioDeviceInfo::class.java)
+                    cachedGetMixerMethod = getM
+                }
+                val currentAttr = getM.invoke(audioManager, usbDevice)
                 if (currentAttr != null) {
-                    val mixerBehaviorMethod = currentAttr.javaClass.getMethod("getMixerBehavior")
-                    val behavior = mixerBehaviorMethod.invoke(currentAttr) as? Int
+                    val behavior = getMixerBehaviorCached(currentAttr)
                     if (behavior == 1) {
                         isBitPerfectActive = true
                     }
@@ -544,7 +582,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         } && !isBluetooth
         val finalIsBitPerfectActive = when {
             isBluetooth -> false
-            isUsb -> isBitPerfectActive || bitPerfectRequested
+            isUsb -> isBitPerfectActive // only true if system actually granted it, not just requested
             isDirectSupported && bitPerfectRequested && (activeDevice?.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES || activeDevice?.type == AudioDeviceInfo.TYPE_WIRED_HEADSET) -> true
             else -> isBitPerfectActive
         }

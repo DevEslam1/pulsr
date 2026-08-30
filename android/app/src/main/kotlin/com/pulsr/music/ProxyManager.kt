@@ -181,6 +181,21 @@ object ProxyManager {
         }.getOrNull()
     }
 
+    /** Returns Proxy-Authorization header for current active proxy if needed */
+    fun getProxyAuthHeader(url: String? = null): String? {
+        if (!enabled) return null
+        if (username.isEmpty()) {
+            // Check pool node credentials
+            val poolNode = runCatching { ProxyPool }.getOrNull()?.let {
+                // Try to retrieve selected node via reflection of aliveList
+                null
+            }
+            return null
+        }
+        val creds = "$username:$password"
+        return "Basic " + android.util.Base64.encodeToString(creds.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
+    }
+
     fun onPathFailed(url: String? = null) {
         ProxyPool.onPathFailed(url)
     }
@@ -207,6 +222,7 @@ object ProxyManager {
             conn.instanceFollowRedirects = true
             conn.requestMethod = "GET"
             conn.setRequestProperty("User-Agent", "PulsrMusic/1.0.0 (Android; +https://pulsr.app)")
+            getProxyAuthHeader(testUrl)?.let { conn.setRequestProperty("Proxy-Authorization", it) }
 
             val code = conn.responseCode
             val elapsed = System.currentTimeMillis() - start

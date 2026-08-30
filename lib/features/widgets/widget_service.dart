@@ -21,6 +21,7 @@ class WidgetService {
   final OnAudioQuery _audioQuery = OnAudioQuery();
   final Map<int, String> _artworkCache = {};
   final Map<int, Uint8List> _roundedArtworkCache = {};
+  static const int _maxCacheSize = 50;
 
   int? _lastSavedArtworkSongId;
 
@@ -150,12 +151,14 @@ class WidgetService {
           if (cachedBytes != null && cachedBytes.isNotEmpty) {
             rawBytes = cachedBytes;
           } else {
-            // Fetch remote artwork via HTTP
+            // Fetch remote artwork via HTTP (close client to avoid FD leak)
+            HttpClient? client;
             try {
               final uri = Uri.tryParse(targetUrl) ?? Uri.tryParse(remoteUrl);
               if (uri != null) {
-                final client = HttpClient()
-                  ..connectionTimeout = const Duration(seconds: 5);
+                client = HttpClient()
+                  ..connectionTimeout = const Duration(seconds: 5)
+                  ..idleTimeout = const Duration(seconds: 3);
                 final req = await client
                     .getUrl(uri)
                     .timeout(const Duration(seconds: 5));
@@ -171,7 +174,11 @@ class WidgetService {
                   }
                 }
               }
-            } catch (_) {}
+            } catch (_) {} finally {
+              try {
+                client?.close(force: true);
+              } catch (_) {}
+            }
           }
         }
 
@@ -209,6 +216,17 @@ class WidgetService {
 
       await cachedFile.writeAsBytes(rawBytes, flush: true);
       _artworkCache[songId] = cachedFile.path;
+      // Already cached rounded bytes above; just enforce LRU bounds
+      if (_artworkCache.length > _maxCacheSize) {
+        final oldestKey = _artworkCache.keys.first;
+        _artworkCache.remove(oldestKey);
+      }
+      if (_roundedArtworkCache.length > _maxCacheSize) {
+        final oldestKey = _roundedArtworkCache.keys.first;
+        _roundedArtworkCache.remove(oldestKey);
+      }
+      // Opportunistically prune old widget temp files (older than 7 days)
+      unawaited(_pruneOldWidgetArtwork(dir));
       return cachedFile.path;
     } catch (e, st) {
       ErrorLogger.log('Failed to resolve artwork path for widget',
@@ -267,5 +285,36 @@ class WidgetService {
   StreamSubscription<Uri?> listenToWidgetClicks(
       void Function(Uri? uri) onUriReceived) {
     return HomeWidget.widgetClicked.listen(onUriReceived);
+  }
+
+  Future<void> _pruneOldWidgetArtwork(Directory dir) async {
+    try {
+      final now = DateTime.now();
+      await for (final entity in dir.list()) {
+        if (entity is File && entity.path.contains('pulsr_widget_art_')) {
+          try {
+            final stat = await entity.stat();
+            if (now.difference(stat.modified).inDays > 7) {
+              await entity.delete();
+            }
+          } catch (_) {}
+        }
+      }
+      // Also enforce total count limit for widget art files
+      final files = <File>[];
+      await for (final entity in dir.list()) {
+        if (entity is File && entity.path.contains('pulsr_widget_art_')) {
+          files.add(entity);
+        }
+      }
+      if (files.length > _maxCacheSize) {
+        files.sort((a, b) => a.path.compareTo(b.path));
+        for (int i = 0; i < files.length - _maxCacheSize; i++) {
+          try {
+            await files[i].delete();
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
   }
 }

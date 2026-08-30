@@ -1,10 +1,12 @@
 // lib/core/services/hires_audio_service.dart
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
 import '../../domain/models/audio_output_info.dart';
 import '../constants/channels.dart';
 import '../utils/error_logger.dart';
+import '../utils/platform_capabilities.dart';
 
 @lazySingleton
 class HiResAudioService {
@@ -27,10 +29,10 @@ class HiResAudioService {
   }
 
   void _init() {
+    if (!PlatformCapabilities.isAndroid) return;
     try {
       _eventSubscription =
           _eventChannel.receiveBroadcastStream().handleError((Object e, StackTrace st) {
-        // Ignore missing plugin exception in unit tests or platforms without native implementation
         if (e is! MissingPluginException) {
           ErrorLogger.log('HiRes DAC event stream error',
               error: e, stackTrace: st, category: 'HiResAudio');
@@ -39,14 +41,21 @@ class HiResAudioService {
         (data) {
           if (data is Map) {
             final info = AudioOutputInfo.fromMap(data);
+            // Deduplicate consecutive identical emissions
+            if (_cachedOutputInfo != null &&
+                _cachedOutputInfo!.deviceName == info.deviceName &&
+                _cachedOutputInfo!.sampleRate == info.sampleRate &&
+                _cachedOutputInfo!.isBitPerfectActive == info.isBitPerfectActive) {
+              return;
+            }
             _cachedOutputInfo = info;
-            _deviceController.add(info);
+            if (!_deviceController.isClosed) _deviceController.add(info);
           }
         },
         cancelOnError: false,
       );
       // Eagerly query current status
-      getAudioOutputInfo();
+      unawaited(getAudioOutputInfo());
     } catch (e, st) {
       ErrorLogger.log('Failed to initialize HiRes DAC listener',
           error: e, stackTrace: st, category: 'HiResAudio');
@@ -54,18 +63,35 @@ class HiResAudioService {
   }
 
   Future<AudioOutputInfo> getAudioOutputInfo() async {
+    if (!PlatformCapabilities.isAndroid) {
+      const fb = AudioOutputInfo(deviceName: 'Default Audio Output', isUsbDac: false, sampleRate: 44100, bitDepth: 16, isBitPerfectActive: false);
+      _cachedOutputInfo = fb;
+      return fb;
+    }
     try {
       final Map<dynamic, dynamic>? res = await _methodChannel
-          .invokeMapMethod<dynamic, dynamic>('getAudioOutputInfo');
+          .invokeMapMethod<dynamic, dynamic>('getAudioOutputInfo')
+          .timeout(const Duration(seconds: 3));
       if (res != null) {
         final info = AudioOutputInfo.fromMap(res);
-        _cachedOutputInfo = info;
-        _deviceController.add(info);
+        // Avoid duplicate stream emission if same as cached
+        final cached = _cachedOutputInfo;
+        if (cached == null ||
+            cached.deviceName != info.deviceName ||
+            cached.sampleRate != info.sampleRate ||
+            cached.isBitPerfectActive != info.isBitPerfectActive) {
+          _cachedOutputInfo = info;
+          if (!_deviceController.isClosed) _deviceController.add(info);
+        } else {
+          _cachedOutputInfo = info;
+        }
         return info;
       }
     } catch (e, st) {
-      ErrorLogger.log('Failed to getAudioOutputInfo',
-          error: e, stackTrace: st, category: 'HiResAudio');
+      if (e is! MissingPluginException || kDebugMode) {
+        ErrorLogger.log('Failed to getAudioOutputInfo',
+            error: e, stackTrace: st, category: 'HiResAudio');
+      }
     }
 
     const fallback = AudioOutputInfo(
@@ -82,9 +108,11 @@ class HiResAudioService {
   /// Phase 4: per-format direct-playback capability probe (API 29+; older
   /// Android levels report every entry as unsupported - no fabricated claims).
   Future<List<AudioDirectFormat>> getDirectCapabilities() async {
+    if (!PlatformCapabilities.isAndroid) return const [];
     try {
       final Map<dynamic, dynamic>? res = await _methodChannel
-          .invokeMapMethod<dynamic, dynamic>('getDirectCapabilities');
+          .invokeMapMethod<dynamic, dynamic>('getDirectCapabilities')
+          .timeout(const Duration(seconds: 3));
       final raw = res?['directFormats'];
       final out = <AudioDirectFormat>[];
       if (raw is List) {
@@ -103,20 +131,24 @@ class HiResAudioService {
   /// Phase 4: USB DAC diagnostics (advertised UAC version + label).
   /// Returns null when no audio USB device is present or off Android.
   Future<Map<String, Object?>?> getUsbDacCapabilities() async {
+    if (!PlatformCapabilities.isAndroid) return null;
     try {
       return await _methodChannel
-          .invokeMapMethod<String, Object?>('getUsbDacCapabilities');
-    } catch (e) {
+          .invokeMapMethod<String, Object?>('getUsbDacCapabilities')
+          .timeout(const Duration(seconds: 2));
+    } catch (e, st) {
       ErrorLogger.log('Failed to getUsbDacCapabilities',
-          error: e, category: 'HiResAudio');
+          error: e, stackTrace: st, category: 'HiResAudio');
       return null;
     }
   }
 
   Future<bool> isBitPerfectSupported() async {
+    if (!PlatformCapabilities.isAndroid) return false;
     try {
-      final bool? supported =
-          await _methodChannel.invokeMethod<bool>('isBitPerfectSupported');
+      final bool? supported = await _methodChannel
+          .invokeMethod<bool>('isBitPerfectSupported')
+          .timeout(const Duration(seconds: 2));
       return supported ?? false;
     } catch (e) {
       return false;
@@ -124,11 +156,11 @@ class HiResAudioService {
   }
 
   Future<bool> setBitPerfectMode(bool enabled) async {
+    if (!PlatformCapabilities.isAndroid) return false;
     try {
-      final bool? success = await _methodChannel.invokeMethod<bool>(
-        'setBitPerfectMode',
-        {'enabled': enabled},
-      );
+      final bool? success = await _methodChannel
+          .invokeMethod<bool>('setBitPerfectMode', {'enabled': enabled})
+          .timeout(const Duration(seconds: 3));
       await getAudioOutputInfo();
       return success ?? false;
     } catch (e, st) {
@@ -139,13 +171,15 @@ class HiResAudioService {
   }
 
   Future<bool> selectOutputDevice(int deviceId) async {
+    if (!PlatformCapabilities.isAndroid) return false;
     try {
-      final bool? success = await _methodChannel.invokeMethod<bool>(
-        'setOutputDevice',
-        {'deviceId': deviceId},
-      );
+      final dynamic res = await _methodChannel
+          .invokeMethod<dynamic>('setOutputDevice', {'deviceId': deviceId})
+          .timeout(const Duration(seconds: 3));
       await getAudioOutputInfo();
-      return success ?? false;
+      if (res is Map) return (res['success'] as bool?) ?? false;
+      if (res is bool) return res;
+      return false;
     } catch (e, st) {
       ErrorLogger.log('Failed to selectOutputDevice($deviceId)',
           error: e, stackTrace: st, category: 'HiResAudio');
@@ -154,9 +188,11 @@ class HiResAudioService {
   }
 
   Future<bool> clearOutputDevice() async {
+    if (!PlatformCapabilities.isAndroid) return false;
     try {
-      final bool? success =
-          await _methodChannel.invokeMethod<bool>('clearOutputDevice');
+      final bool? success = await _methodChannel
+          .invokeMethod<bool>('clearOutputDevice')
+          .timeout(const Duration(seconds: 2));
       await getAudioOutputInfo();
       return success ?? false;
     } catch (e, st) {
@@ -168,14 +204,11 @@ class HiResAudioService {
 
   Future<bool> setTargetOutputFormat(
       {int sampleRate = 0, int bitDepth = 0}) async {
+    if (!PlatformCapabilities.isAndroid) return false;
     try {
-      final bool? success = await _methodChannel.invokeMethod<bool>(
-        'setTargetOutputFormat',
-        {
-          'sampleRate': sampleRate,
-          'bitDepth': bitDepth,
-        },
-      );
+      final bool? success = await _methodChannel
+          .invokeMethod<bool>('setTargetOutputFormat', {'sampleRate': sampleRate, 'bitDepth': bitDepth})
+          .timeout(const Duration(seconds: 2));
       await getAudioOutputInfo();
       return success ?? false;
     } catch (e, st) {
@@ -187,6 +220,7 @@ class HiResAudioService {
 
   void dispose() {
     _eventSubscription?.cancel();
-    _deviceController.close();
+    _eventSubscription = null;
+    if (!_deviceController.isClosed) _deviceController.close();
   }
 }

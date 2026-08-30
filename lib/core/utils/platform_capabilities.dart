@@ -37,10 +37,11 @@ class PlatformCapabilities {
 
     try {
       const channel = MethodChannel(PulsrChannels.audioEffects);
-      final caps =
-          await channel.invokeMapMethod<String, dynamic>('getCapabilities');
+      final caps = await channel
+          .invokeMapMethod<String, dynamic>('getCapabilities')
+          .timeout(const Duration(seconds: 2));
       if (caps != null) {
-        return caps.map((k, v) => MapEntry(k, v == true));
+        return caps.map((k, v) => MapEntry(k, v == true || v == 1));
       }
     } catch (_) {}
 

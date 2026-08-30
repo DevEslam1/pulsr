@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -37,21 +38,43 @@ class FileIntentHandler {
     _initChannel();
   }
 
+  final Set<String> _recentUris = <String>{};
+  Timer? _recentClearTimer;
+
   void _initChannel() {
     _channel.setMethodCallHandler((call) async {
-      if (call.method == 'onAudioFileOpened') {
-        final uri = call.arguments as String?;
-        if (uri != null) {
-          await handleAudioUri(uri);
+      try {
+        if (call.method == 'onAudioFileOpened') {
+          final uri = call.arguments as String?;
+          if (uri != null) {
+            await handleAudioUri(uri);
+          }
         }
+      } catch (e, st) {
+        ErrorLogger.log('FileIntent channel handler error', error: e, stackTrace: st, category: 'FileIntentHandler');
       }
     });
   }
 
+  void dispose() {
+    _channel.setMethodCallHandler(null);
+    _recentClearTimer?.cancel();
+  }
+
+  bool _isDuplicateUri(String uri) {
+    if (_recentUris.contains(uri)) return true;
+    _recentUris.add(uri);
+    _recentClearTimer?.cancel();
+    _recentClearTimer = Timer(const Duration(seconds: 3), () => _recentUris.clear());
+    return false;
+  }
+
   Future<void> checkInitialUri() async {
+    if (kIsWeb) return;
+    if (!Platform.isAndroid) return;
     try {
       final initialUri =
-          await _channel.invokeMethod<String>('getInitialAudioUri');
+          await _channel.invokeMethod<String>('getInitialAudioUri').timeout(const Duration(seconds: 2));
       if (initialUri != null) {
         await handleAudioUri(initialUri);
       }
@@ -104,7 +127,7 @@ class FileIntentHandler {
 
     try {
       final ytmService = getIt<YtmService>();
-      final stream = await ytmService.resolveStream(videoId);
+      final stream = await ytmService.resolveStream(videoId).timeout(const Duration(seconds: 12));
 
       final track = YtmTrack(
         videoId: videoId,
@@ -133,6 +156,7 @@ class FileIntentHandler {
   }
 
   Future<void> handleAudioUri(String uriOrPath) async {
+    if (_isDuplicateUri(uriOrPath)) return;
     try {
       final videoId = extractYouTubeVideoId(uriOrPath);
       if (videoId != null && AppConfig.ytmEnabled) {

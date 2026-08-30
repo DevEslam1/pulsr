@@ -91,9 +91,24 @@ class RateLimiter(
      * Acquires permit for [bucket], honoring concurrency cap and pacing floors.
      */
     fun acquirePermit(bucket: Bucket = Bucket.PLAYER) {
-        // 1. Global in-flight concurrency limiter
-        globalSemaphore.acquire()
+        // 1. Global in-flight concurrency limiter — ensure release on interrupt
+        var acquired = false
+        try {
+            globalSemaphore.acquire()
+            acquired = true
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+            return
+        }
         val startWait = clock.elapsedRealtime()
+        var releasedOnExit = false
+
+        fun releaseIfNeeded() {
+            if (acquired && !releasedOnExit) {
+                releasedOnExit = true
+                globalSemaphore.release()
+            }
+        }
 
         while (true) {
             val now = clock.elapsedRealtime()
@@ -107,6 +122,7 @@ class RateLimiter(
                         condition.await(sleepTime, TimeUnit.MILLISECONDS)
                     } catch (_: InterruptedException) {
                         Thread.currentThread().interrupt()
+                        releaseIfNeeded()
                         return
                     } finally {
                         lock.unlock()
@@ -147,6 +163,7 @@ class RateLimiter(
                             condition.await(waitGap, TimeUnit.MILLISECONDS)
                         } catch (_: InterruptedException) {
                             Thread.currentThread().interrupt()
+                            releaseIfNeeded()
                             return
                         }
                         continue
@@ -166,6 +183,7 @@ class RateLimiter(
                             YtmMetricsRegistry.record("rate_limiter.wait_${bucket.name.lowercase()}", waitTotal)
                         }
                     }
+                    // Success path: caller must release via releasePermit(), so don't auto-release here
                     return
                 }
 
@@ -175,6 +193,7 @@ class RateLimiter(
                     condition.await(waitTimeMs, TimeUnit.MILLISECONDS)
                 } catch (_: InterruptedException) {
                     Thread.currentThread().interrupt()
+                    releaseIfNeeded()
                     return
                 }
             } finally {

@@ -21,7 +21,8 @@ import java.util.logging.Logger
 class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
     private var context: Context? = null
-    private val backgroundExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
+    private val backgroundExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val fileWriteLocks = java.util.concurrent.ConcurrentHashMap<String, Any>()
 
     companion object {
         const val CHANNEL_NAME = "com.pulsr.music/tag_editor"
@@ -55,9 +56,10 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
 
     fun cleanup() {
         if (::channel.isInitialized) {
-            channel.setMethodCallHandler(null)
+            try { channel.setMethodCallHandler(null) } catch (_: Exception) {}
         }
         backgroundExecutor.shutdown()
+        try { backgroundExecutor.awaitTermination(3, java.util.concurrent.TimeUnit.SECONDS) } catch (_: Exception) {}
         context = null
     }
 
@@ -145,13 +147,15 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 backgroundExecutor.execute {
+                    val lock = fileWriteLocks.computeIfAbsent(path) { Any() }
+                    synchronized(lock) {
                     try {
                         val file = File(path)
                         if (!file.exists()) {
                             android.os.Handler(android.os.Looper.getMainLooper()).post {
                                 result.error("FILE_NOT_FOUND", "File does not exist at $path", null)
                             }
-                            return@execute
+                            return@synchronized
                         }
 
                         val audioFile = AudioFileIO.read(file)
@@ -181,15 +185,19 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                             }
 
                         var effectiveArtworkBytes = rawArtworkBytes
-                        if (effectiveArtworkBytes != null && effectiveArtworkBytes.size > 1024 * 1024) {
+                        if (effectiveArtworkBytes != null && effectiveArtworkBytes.size > 512 * 1024) {
+                            // Use subsampling to avoid OOM on large images before scaling
                             val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                             BitmapFactory.decodeByteArray(effectiveArtworkBytes, 0, effectiveArtworkBytes.size, options)
-                            // Scale down whenever the file exceeds 1 MB — regardless of pixel count.
-                            // Previously the condition was `<= 10000000L` which was inverted: it scaled
-                            // moderate images (< 10 MP) but let extremely large images through unscaled.
                             if (options.outWidth > 0 && options.outHeight > 0) {
                                 try {
-                                    val bmp = BitmapFactory.decodeByteArray(effectiveArtworkBytes, 0, effectiveArtworkBytes.size)
+                                    var sampleSize = 1
+                                    while (options.outWidth / sampleSize > 1000 || options.outHeight / sampleSize > 1000) sampleSize *= 2
+                                    val decodeOpts = BitmapFactory.Options().apply {
+                                        inSampleSize = sampleSize
+                                        inPreferredConfig = Bitmap.Config.RGB_565
+                                    }
+                                    val bmp = BitmapFactory.decodeByteArray(effectiveArtworkBytes, 0, effectiveArtworkBytes.size, decodeOpts)
                                     if (bmp != null) {
                                         var scaled: Bitmap? = null
                                         try {
@@ -204,9 +212,9 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                                             effectiveArtworkBytes = rawArtworkBytes
                                         } finally {
                                             if (scaled != null && scaled != bmp) {
-                                                scaled.recycle()
+                                                try { scaled.recycle() } catch (_: Exception) {}
                                             }
-                                            bmp.recycle()
+                                            try { bmp.recycle() } catch (_: Exception) {}
                                         }
                                     }
                                 } catch (oom: OutOfMemoryError) {
@@ -235,7 +243,26 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                             tag.deleteArtworkField()
                         }
 
-                        AudioFileIO.write(audioFile)
+                        // Atomic write via temp file + rename to prevent corruption on kill
+                        try {
+                            val tmpFile = File("$path.tmp_pulsr")
+                            // Read original then write to tmp by copying then editing tmp
+                            // jaudiotagger writes directly to file; we emulate atomic via copy
+                            file.copyTo(tmpFile, overwrite = true)
+                            val tmpAudio = AudioFileIO.read(tmpFile)
+                            // Re-apply tag to tmp file (copy tag state)
+                            tmpAudio.tag = audioFile.tag
+                            AudioFileIO.write(tmpAudio)
+                            // Atomic rename
+                            if (!tmpFile.renameTo(file)) {
+                                // Fallback: copy back
+                                tmpFile.copyTo(file, overwrite = true)
+                                tmpFile.delete()
+                            }
+                        } catch (atomicEx: Exception) {
+                            android.util.Log.w("TagEditorPlugin", "Atomic write failed, falling back to direct: ${atomicEx.message}")
+                            try { AudioFileIO.write(audioFile) } catch (e2: Exception) { throw e2 }
+                        }
 
                         // Trigger Android system MediaStore scan so changes are indexed immediately
                         context?.let { ctx ->
@@ -252,6 +279,7 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                             result.error("WRITE_TAGS_ERROR", e.message, e.stackTraceToString())
                         }
                     }
+                    } // synchronized lock
                 }
             }
 

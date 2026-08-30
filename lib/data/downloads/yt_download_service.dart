@@ -218,8 +218,9 @@ class YtDownloadService {
 
       // Pre-download storage check (BUG-06 & [D6])
       try {
-        final freeBytes =
-            await _downloadChannel.invokeMethod<int>('getFreeDiskSpace');
+        final dynamic freeRaw =
+            await _downloadChannel.invokeMethod<dynamic>('getFreeDiskSpace').timeout(const Duration(seconds: 2));
+        final freeBytes = (freeRaw as num?)?.toInt();
         if (freeBytes != null && freeBytes > 0) {
           final estBitrate = stream.bitrateKbps > 0 ? stream.bitrateKbps : 160;
           final estDurationSec =
@@ -329,7 +330,7 @@ class YtDownloadService {
           'displayName': displayName,
           'title': song.title,
           'mimeType': stream.mimeType,
-        });
+        }).timeout(const Duration(seconds: 20));
       } on MissingPluginException {
         return const Left(FeatureDisabledFailure());
       } catch (e) {
@@ -632,8 +633,9 @@ class YtDownloadService {
 
     try {
       try {
-        final freeBytes =
-            await _downloadChannel.invokeMethod<int>('getFreeDiskSpace') ?? 0;
+        final dynamic freeRaw2 =
+            await _downloadChannel.invokeMethod<dynamic>('getFreeDiskSpace').timeout(const Duration(seconds: 2));
+        final freeBytes = (freeRaw2 as num?)?.toInt() ?? 0;
         if (freeBytes > 0 && freeBytes < total) {
           throw const DownloadFailure('Insufficient storage space');
         }
@@ -1041,7 +1043,7 @@ class YtDownloadService {
         'lyrics': null,
         'artworkPath': artworkPath,
         'removeArtwork': false,
-      });
+      }).timeout(const Duration(seconds: 15));
     } on PlatformException catch (e) {
       ErrorLogger.log('Tagging downloaded track failed: ${e.code}',
           category: 'YTM');

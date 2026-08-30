@@ -1,10 +1,10 @@
 // lib/data/audio/audio_effects_channel.dart
 import 'dart:async';
-import 'dart:io';
-import 'package:flutter/foundation.dart' show visibleForTesting;
+import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
 import 'package:flutter/services.dart';
 import '../../core/constants/channels.dart';
 import '../../core/utils/error_logger.dart';
+import '../../core/utils/platform_capabilities.dart';
 import '../../domain/models/audio_effects_config.dart';
 
 class AudioEffectsChannel {
@@ -19,6 +19,15 @@ class AudioEffectsChannel {
   static final AudioEffectsChannel _instance = AudioEffectsChannel._internal();
   factory AudioEffectsChannel() => _instance;
   AudioEffectsChannel._internal();
+
+  bool get _isAndroid => PlatformCapabilities.isAndroid;
+
+  /// Dispose stream controller (call on hot restart / test teardown).
+  void dispose() {
+    if (!_autoDegradeStreamController.isClosed) {
+      _autoDegradeStreamController.close();
+    }
+  }
 
   bool _isVirtualizerSupported = false;
   bool _isDynamicsSupported = false;
@@ -43,49 +52,62 @@ class AudioEffectsChannel {
   List<String> get detectedOemEngines => List.unmodifiable(_detectedOemEngines);
 
   Future<void> init() async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
+    // Isolate each probe so partial success is retained
     try {
-      final caps =
-          await _channel.invokeMapMethod<String, dynamic>('getCapabilities');
+      final caps = await _channel
+          .invokeMapMethod<String, dynamic>('getCapabilities')
+          .timeout(const Duration(seconds: 2));
       if (caps != null) {
         _isVirtualizerSupported =
-            (caps['isVirtualizerSupported'] as bool?) ?? false;
-        _isDynamicsSupported = (caps['isDynamicsSupported'] as bool?) ?? false;
+            (caps['isVirtualizerSupported'] == true || caps['isVirtualizerSupported'] == 1);
+        _isDynamicsSupported =
+            (caps['isDynamicsSupported'] == true || caps['isDynamicsSupported'] == 1);
         _isVolumeBoostSupported =
-            (caps['isVolumeBoostSupported'] as bool?) ?? false;
+            (caps['isVolumeBoostSupported'] == true || caps['isVolumeBoostSupported'] == 1);
         _isBassBoostSupported =
-            (caps['isBassBoostSupported'] as bool?) ?? false;
+            (caps['isBassBoostSupported'] == true || caps['isBassBoostSupported'] == 1);
         _isFloatOutputSupported =
-            (caps['isFloatOutputSupported'] as bool?) ?? true;
+            (caps['isFloatOutputSupported'] == true || caps['isFloatOutputSupported'] == 1);
         _isHardwareOffloadSupported =
-            (caps['isHardwareOffloadSupported'] as bool?) ?? true;
+            (caps['isHardwareOffloadSupported'] == true || caps['isHardwareOffloadSupported'] == 1);
       }
-
+    } catch (e, st) {
+      ErrorLogger.log('Failed to getCapabilities',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+    try {
       final spatialMap = await _channel
-          .invokeMapMethod<String, dynamic>('getSpatializerState');
+          .invokeMapMethod<String, dynamic>('getSpatializerState')
+          .timeout(const Duration(seconds: 2));
       if (spatialMap != null) {
-        _isSpatializerSupported = (spatialMap['isSupported'] as bool?) ?? false;
+        _isSpatializerSupported = (spatialMap['isSupported'] == true);
         _isHeadTrackerAvailable =
-            (spatialMap['isHeadTrackerAvailable'] as bool?) ?? false;
+            (spatialMap['isHeadTrackerAvailable'] == true);
       }
-
+    } catch (e, st) {
+      ErrorLogger.log('Failed to getSpatializerState',
+          error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
+    try {
       final oemMap = await detectOemAudio();
-      _hasOemAudio = (oemMap['hasOemAudio'] as bool?) ?? false;
+      _hasOemAudio = (oemMap['hasOemAudio'] == true);
       _detectedOemEngines =
           (oemMap['detectedEngines'] as List<dynamic>?)?.cast<String>() ?? [];
     } catch (e, st) {
-      ErrorLogger.log('Failed to initialize platform audio effects channel',
+      ErrorLogger.log('Failed to detectOemAudio',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
     }
   }
 
   Future<Map<String, dynamic>> detectOemAudio() async {
-    if (!Platform.isAndroid) {
+    if (!_isAndroid) {
       return {'hasOemAudio': false, 'detectedEngines': <String>[]};
     }
     try {
-      final result =
-          await _channel.invokeMapMethod<String, dynamic>('detectOemAudio');
+      final result = await _channel
+          .invokeMapMethod<String, dynamic>('detectOemAudio')
+          .timeout(const Duration(seconds: 2));
       return result ?? {'hasOemAudio': false, 'detectedEngines': <String>[]};
     } catch (e, st) {
       ErrorLogger.log('Failed to detect OEM audio engines',
@@ -95,9 +117,11 @@ class AudioEffectsChannel {
   }
 
   Future<bool> hasActiveEffects() async {
-    if (!Platform.isAndroid) return false;
+    if (!_isAndroid) return false;
     try {
-      final active = await _channel.invokeMethod<bool>('hasActiveEffects');
+      final active = await _channel
+          .invokeMethod<bool>('hasActiveEffects')
+          .timeout(const Duration(seconds: 2));
       return active ?? false;
     } catch (_) {
       return false;
@@ -105,10 +129,11 @@ class AudioEffectsChannel {
   }
 
   Future<void> setAudioSessionId(int sessionId) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
       await _channel
-          .invokeMethod('setAudioSessionId', {'audioSessionId': sessionId});
+          .invokeMethod('setAudioSessionId', {'audioSessionId': sessionId})
+          .timeout(const Duration(seconds: 2));
     } catch (e, st) {
       ErrorLogger.log('Failed to set audioSessionId ($sessionId)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -116,9 +141,9 @@ class AudioEffectsChannel {
   }
 
   Future<void> setVolumeBoost(int milliBels) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setVolumeBoost', {'milliBels': milliBels});
+      await _channel.invokeMethod('setVolumeBoost', {'milliBels': milliBels}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set volume boost ($milliBels mB)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -126,9 +151,9 @@ class AudioEffectsChannel {
   }
 
   Future<void> setBassBoost(int strength) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setBassBoost', {'strength': strength});
+      await _channel.invokeMethod('setBassBoost', {'strength': strength}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set bass boost strength ($strength)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -136,7 +161,7 @@ class AudioEffectsChannel {
   }
 
   Future<void> setVirtualizerEnabled(bool enabled) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
       await _channel
           .invokeMethod('setVirtualizerEnabled', {'enabled': enabled});
@@ -147,7 +172,7 @@ class AudioEffectsChannel {
   }
 
   Future<void> setVirtualizerStrength(double strength0to1) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
       final intStrength = (strength0to1.clamp(0.0, 1.0) * 1000).round();
       await _channel
@@ -159,12 +184,12 @@ class AudioEffectsChannel {
   }
 
   Future<void> setDynamicsPreset(DynamicsPreset preset, bool enabled) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
       await _channel.invokeMethod('setDynamicsPreset', {
         'preset': preset.name,
         'enabled': enabled && preset != DynamicsPreset.off,
-      });
+      }).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set dynamics preset (${preset.name})',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -172,7 +197,7 @@ class AudioEffectsChannel {
   }
 
   Future<void> setSpatializerEnabled(bool enabled) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
       await _channel
           .invokeMethod('setSpatializerEnabled', {'enabled': enabled});
@@ -184,9 +209,9 @@ class AudioEffectsChannel {
 
   /// Enables/disables the native 10-band graphic EQ (DynamicsProcessing postEq).
   Future<void> setEqEnabled(bool enabled) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setEqEnabled', {'enabled': enabled});
+      await _channel.invokeMethod('setEqEnabled', {'enabled': enabled}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set EQ enabled ($enabled)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -195,9 +220,9 @@ class AudioEffectsChannel {
 
   /// Sets the band center frequencies (Hz). Length defines the band count.
   Future<void> setEqBands(List<double> frequencies) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setEqBands', {'frequencies': frequencies});
+      await _channel.invokeMethod('setEqBands', {'frequencies': frequencies}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set EQ bands ($frequencies)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -206,7 +231,7 @@ class AudioEffectsChannel {
 
   /// Live-updates a single band's gain (dB) without rebuilding the effect.
   Future<void> setEqBandGain(int index, double gainDb) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
       await _channel
           .invokeMethod('setEqBandGain', {'index': index, 'gainDb': gainDb});
@@ -218,9 +243,9 @@ class AudioEffectsChannel {
 
   /// Sets all band gains (dB) at once. Length should match the band count.
   Future<void> setEqBandGains(List<double> gains) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setEqBandGains', {'gains': gains});
+      await _channel.invokeMethod('setEqBandGains', {'gains': gains}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set EQ band gains ($gains)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -229,9 +254,9 @@ class AudioEffectsChannel {
 
   /// Sets the EQ preamp (dB). Negative values attenuate as real headroom.
   Future<void> setEqPreamp(double preampDb) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setEqPreamp', {'preampDb': preampDb});
+      await _channel.invokeMethod('setEqPreamp', {'preampDb': preampDb}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set EQ preamp ($preampDb dB)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -242,7 +267,7 @@ class AudioEffectsChannel {
 
   Future<void> setNativeEqBand(int index, double freq, double gainDb, double q,
       {int type = 0, bool enabled = true}) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
       await _channel.invokeMethod('setNativeEqBand', {
         'index': index,
@@ -251,7 +276,7 @@ class AudioEffectsChannel {
         'q': q,
         'type': type,
         'enabled': enabled,
-      });
+      }).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set native EQ band ($index)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -265,14 +290,14 @@ class AudioEffectsChannel {
     List<double>? qs,
     List<int>? types,
   }) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
       await _channel.invokeMethod('setNativeEqBandsBulk', {
         'frequencies': frequencies,
         'gains': gains,
         'qs': qs ?? List<double>.filled(frequencies.length, 1.414),
         'types': types ?? List<int>.filled(frequencies.length, 0),
-      });
+      }).timeout(const Duration(seconds: 5));
     } catch (e, st) {
       ErrorLogger.log('Failed to set native EQ bands bulk',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -280,9 +305,9 @@ class AudioEffectsChannel {
   }
 
   Future<void> setNativeEqBandCount(int count) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setNativeEqBandCount', {'count': count});
+      await _channel.invokeMethod('setNativeEqBandCount', {'count': count}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set native EQ band count ($count)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -290,9 +315,9 @@ class AudioEffectsChannel {
   }
 
   Future<void> setNativeEqEnabled(bool enabled) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setNativeEqEnabled', {'enabled': enabled});
+      await _channel.invokeMethod('setNativeEqEnabled', {'enabled': enabled}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set native EQ enabled ($enabled)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -301,10 +326,12 @@ class AudioEffectsChannel {
 
   /// Unified bypass for all DSP stages when bit-perfect is active.
   Future<void> setBypassDspForBitPerfect(bool bypass) async {
+    if (!_isAndroid) return;
     lastPushedBypassDspForBitPerfect = bypass;
-    if (!Platform.isAndroid) return;
     try {
-      await _channel.invokeMethod('setBypassDspForBitPerfect', {'bypass': bypass});
+      await _channel
+          .invokeMethod('setBypassDspForBitPerfect', {'bypass': bypass})
+          .timeout(const Duration(seconds: 2));
     } catch (e, st) {
       ErrorLogger.log('Failed to set bypass DSP for bit-perfect ($bypass)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -314,9 +341,9 @@ class AudioEffectsChannel {
   // --- HEADPHONE CROSSFEED ---
 
   Future<void> setCrossfeedEnabled(bool enabled) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setCrossfeedEnabled', {'enabled': enabled});
+      await _channel.invokeMethod('setCrossfeedEnabled', {'enabled': enabled}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set crossfeed enabled ($enabled)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -324,10 +351,10 @@ class AudioEffectsChannel {
   }
 
   Future<void> setCrossfeedParams(double delayUs, double feedDb) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
       await _channel.invokeMethod(
-          'setCrossfeedParams', {'delayUs': delayUs, 'feedDb': feedDb});
+          'setCrossfeedParams', {'delayUs': delayUs, 'feedDb': feedDb}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set crossfeed params',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -337,9 +364,9 @@ class AudioEffectsChannel {
   // --- LOOKAHEAD BRICKWALL LIMITER ---
 
   Future<void> setLimiterEnabled(bool enabled) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setLimiterEnabled', {'enabled': enabled});
+      await _channel.invokeMethod('setLimiterEnabled', {'enabled': enabled}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set limiter enabled ($enabled)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -348,13 +375,13 @@ class AudioEffectsChannel {
 
   Future<void> setLimiterParams(
       double lookaheadMs, double thresholdDb, double releaseMs) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
       await _channel.invokeMethod('setLimiterParams', {
         'lookaheadMs': lookaheadMs,
         'thresholdDb': thresholdDb,
         'releaseMs': releaseMs,
-      });
+      }).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set limiter params',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -364,9 +391,9 @@ class AudioEffectsChannel {
   // --- CONVOLUTION REVERB ---
 
   Future<void> setReverbEnabled(bool enabled) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setReverbEnabled', {'enabled': enabled});
+      await _channel.invokeMethod('setReverbEnabled', {'enabled': enabled}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set reverb enabled ($enabled)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -374,9 +401,9 @@ class AudioEffectsChannel {
   }
 
   Future<void> setReverbPreset(int preset) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setReverbPreset', {'preset': preset});
+      await _channel.invokeMethod('setReverbPreset', {'preset': preset}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set reverb preset ($preset)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -384,9 +411,9 @@ class AudioEffectsChannel {
   }
 
   Future<void> setReverbWetDry(double wetRatio) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setReverbWetDry', {'wetRatio': wetRatio});
+      await _channel.invokeMethod('setReverbWetDry', {'wetRatio': wetRatio}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set reverb wet/dry ($wetRatio)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -394,7 +421,7 @@ class AudioEffectsChannel {
   }
 
   Future<void> loadImpulseResponse(List<double> irSamples) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
       await _channel
           .invokeMethod('loadImpulseResponse', {'irSamples': irSamples});
@@ -407,10 +434,10 @@ class AudioEffectsChannel {
   // --- STEREO BALANCE & MONO MIX ---
 
   Future<void> setStereoBalance(double balance) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
       await _channel.invokeMethod(
-          'setStereoBalance', {'balance': balance.clamp(-1.0, 1.0)});
+          'setStereoBalance', {'balance': balance.clamp(-1.0, 1.0)}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set stereo balance ($balance)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -418,9 +445,9 @@ class AudioEffectsChannel {
   }
 
   Future<void> setMonoMix(bool mono) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setMonoMix', {'mono': mono});
+      await _channel.invokeMethod('setMonoMix', {'mono': mono}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set mono mix ($mono)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -430,7 +457,7 @@ class AudioEffectsChannel {
   // --- SINC RESAMPLER ---
 
   Future<void> setSincResamplerEnabled(bool enabled) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
       await _channel
           .invokeMethod('setSincResamplerEnabled', {'enabled': enabled});
@@ -441,10 +468,10 @@ class AudioEffectsChannel {
   }
 
   Future<void> setSincResamplerRates(double inRate, double outRate) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
       await _channel.invokeMethod(
-          'setSincResamplerRates', {'inRate': inRate, 'outRate': outRate});
+          'setSincResamplerRates', {'inRate': inRate, 'outRate': outRate}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log(
           'Failed to set sinc resampler rates ($inRate -> $outRate)',
@@ -457,9 +484,9 @@ class AudioEffectsChannel {
   // --- PHASE 1 DSP EXPANSION: HARMONIC SATURATION / EXCITER ---
 
   Future<void> setSaturationEnabled(bool enabled) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setSaturationEnabled', {'enabled': enabled});
+      await _channel.invokeMethod('setSaturationEnabled', {'enabled': enabled}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set saturation enabled ($enabled)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -467,13 +494,13 @@ class AudioEffectsChannel {
   }
 
   Future<void> setSaturationParams(double drive, double mix, double tilt) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
       await _channel.invokeMethod('setSaturationParams', {
         'drive': drive,
         'mix': mix,
         'tilt': tilt,
-      });
+      }).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set saturation params',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -483,9 +510,9 @@ class AudioEffectsChannel {
   // --- PHASE 1 DSP EXPANSION: STEREO WIDTH (MID/SIDE) ---
 
   Future<void> setStereoWidthEnabled(bool enabled) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setStereoWidthEnabled', {'enabled': enabled});
+      await _channel.invokeMethod('setStereoWidthEnabled', {'enabled': enabled}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set stereo width enabled ($enabled)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -493,9 +520,9 @@ class AudioEffectsChannel {
   }
 
   Future<void> setStereoWidthParams(double width) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setStereoWidthParams', {'width': width});
+      await _channel.invokeMethod('setStereoWidthParams', {'width': width}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set stereo width ($width)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -505,7 +532,7 @@ class AudioEffectsChannel {
   // --- PHASE 1 DSP EXPANSION: LOUDNESS CONTOUR (FLETCHER-MUNSON) ---
 
   Future<void> setLoudnessContourEnabled(bool enabled) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
       await _channel
           .invokeMethod('setLoudnessContourEnabled', {'enabled': enabled});
@@ -517,12 +544,12 @@ class AudioEffectsChannel {
 
   Future<void> setLoudnessContourParams(
       double intensity, double volumeLinear) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
       await _channel.invokeMethod('setLoudnessContourParams', {
         'intensity': intensity,
         'volumeLinear': volumeLinear,
-      });
+      }).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set loudness contour params',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -532,9 +559,9 @@ class AudioEffectsChannel {
   // --- PHASE 1 DSP EXPANSION: SUBWOOFER / LFE CROSSOVER ---
 
   Future<void> setSubCrossoverEnabled(bool enabled) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setSubCrossoverEnabled', {'enabled': enabled});
+      await _channel.invokeMethod('setSubCrossoverEnabled', {'enabled': enabled}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set sub crossover enabled ($enabled)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -543,13 +570,13 @@ class AudioEffectsChannel {
 
   Future<void> setSubCrossoverParams(
       double cornerHz, double slopeDbPerOct, double subGain) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
       await _channel.invokeMethod('setSubCrossoverParams', {
         'cornerHz': cornerHz,
         'slopeDbPerOct': slopeDbPerOct,
         'subGain': subGain,
-      });
+      }).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set sub crossover params',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -559,9 +586,9 @@ class AudioEffectsChannel {
   // --- PHASE 1 DSP EXPANSION: DYNAMIC EQ ---
 
   Future<void> setDynamicEqEnabled(bool enabled) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setDynamicEqEnabled', {'enabled': enabled});
+      await _channel.invokeMethod('setDynamicEqEnabled', {'enabled': enabled}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set dynamic EQ enabled ($enabled)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -569,9 +596,9 @@ class AudioEffectsChannel {
   }
 
   Future<void> setDynamicEqBandCount(int count) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setDynamicEqBandCount', {'count': count});
+      await _channel.invokeMethod('setDynamicEqBandCount', {'count': count}).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set dynamic EQ band count ($count)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -589,7 +616,7 @@ class AudioEffectsChannel {
     required double maxCutDb,
     bool enabled = true,
   }) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
       await _channel.invokeMethod('setDynamicEqBand', {
         'index': index,
@@ -601,7 +628,7 @@ class AudioEffectsChannel {
         'releaseMs': releaseMs,
         'maxCutDb': maxCutDb,
         'enabled': enabled,
-      });
+      }).timeout(const Duration(seconds: 3));
     } catch (e, st) {
       ErrorLogger.log('Failed to set dynamic EQ band $index',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -614,17 +641,18 @@ class AudioEffectsChannel {
       {int dsdRate = 64,
       int targetSampleRate = 176400,
       int bitOrder = 0}) async {
-    if (!Platform.isAndroid) return null;
+    if (!_isAndroid) return null;
     try {
-      final List<dynamic>? res =
-          await _channel.invokeListMethod<dynamic>('decodeDsd', {
-        'dsdL': Uint8List.fromList(dsdL),
-        'dsdR': Uint8List.fromList(dsdR),
-        'byteCount': dsdL.length,
-        'dsdRate': dsdRate,
-        'targetSampleRate': targetSampleRate,
-        'bitOrder': bitOrder,
-      });
+      final List<dynamic>? res = await _channel
+          .invokeListMethod<dynamic>('decodeDsd', {
+            'dsdL': Uint8List.fromList(dsdL),
+            'dsdR': Uint8List.fromList(dsdR),
+            'byteCount': dsdL.length,
+            'dsdRate': dsdRate,
+            'targetSampleRate': targetSampleRate,
+            'bitOrder': bitOrder,
+          })
+          .timeout(const Duration(seconds: 10));
       if (res != null) {
         return res.map((e) => (e as num).toDouble()).toList();
       }
@@ -636,54 +664,67 @@ class AudioEffectsChannel {
   }
 
   Future<int> getPipelineLatencyFrames() async {
-    if (!Platform.isAndroid) return 0;
+    if (!_isAndroid) return 0;
     try {
-      final latency =
-          await _channel.invokeMethod<int>('getPipelineLatencyFrames');
-      return latency ?? 0;
+      final dynamic latency = await _channel
+          .invokeMethod<dynamic>('getPipelineLatencyFrames')
+          .timeout(const Duration(seconds: 2));
+      if (latency is num) return latency.toInt();
+      return 0;
     } catch (_) {
       return 0;
     }
   }
 
   Future<void> setBandSolo(int index, bool solo) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
       await _channel
-          .invokeMethod('setBandSolo', {'index': index, 'solo': solo});
-    } catch (_) {}
+          .invokeMethod('setBandSolo', {'index': index, 'solo': solo})
+          .timeout(const Duration(seconds: 2));
+    } catch (e, st) {
+      ErrorLogger.log('setBandSolo failed', error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
   }
 
   Future<void> setBandMute(int index, bool mute) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
       await _channel
-          .invokeMethod('setBandMute', {'index': index, 'mute': mute});
-    } catch (_) {}
+          .invokeMethod('setBandMute', {'index': index, 'mute': mute})
+          .timeout(const Duration(seconds: 2));
+    } catch (e, st) {
+      ErrorLogger.log('setBandMute failed', error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
   }
 
   Future<void> setReverbParams(
       {double predelayMs = 0.0, double damping = 0.5}) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setReverbParams', {
-        'predelayMs': predelayMs,
-        'damping': damping,
-      });
-    } catch (_) {}
+      await _channel
+          .invokeMethod('setReverbParams', {'predelayMs': predelayMs, 'damping': damping})
+          .timeout(const Duration(seconds: 2));
+    } catch (e, st) {
+      ErrorLogger.log('setReverbParams failed', error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
   }
 
   Future<void> setDspPreference(String preference) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setDspPreference', {'preference': preference});
-    } catch (_) {}
+      await _channel
+          .invokeMethod('setDspPreference', {'preference': preference})
+          .timeout(const Duration(seconds: 2));
+    } catch (e, st) {
+      ErrorLogger.log('setDspPreference failed', error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
   }
 
   Future<void> releaseEffects() async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('releaseEffects');
+      await _channel.invokeMethod('releaseEffects').timeout(const Duration(seconds: 2));
     } catch (e, st) {
       ErrorLogger.log('Failed to release audio effects',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -694,12 +735,11 @@ class AudioEffectsChannel {
   /// Forces native DSP generation bump, re-calculates all filter coefficients for [sampleRate],
   /// and flushes stale audio filter state.
   Future<void> resyncForTrack(double sampleRate, {int channels = 2}) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('resyncForTrack', {
-        'sampleRate': sampleRate,
-        'channels': channels,
-      });
+      await _channel
+          .invokeMethod('resyncForTrack', {'sampleRate': sampleRate, 'channels': channels})
+          .timeout(const Duration(seconds: 2));
     } catch (e, st) {
       ErrorLogger.log('Failed to resync DSP for track ($sampleRate Hz)',
           error: e, stackTrace: st, category: 'AudioEffectsChannel');
@@ -708,18 +748,20 @@ class AudioEffectsChannel {
 
   /// Configures native synthetic IR LRU cache budget (16MB on low RAM devices, 64MB default).
   Future<void> setCacheBudgetBytes(int budgetBytes) async {
-    if (!Platform.isAndroid) return;
+    if (!_isAndroid) return;
     try {
-      await _channel.invokeMethod('setCacheBudgetBytes', {'budgetBytes': budgetBytes});
-    } catch (_) {}
+      await _channel.invokeMethod('setCacheBudgetBytes', {'budgetBytes': budgetBytes}).timeout(const Duration(seconds: 2));
+    } catch (e, st) {
+      ErrorLogger.log('setCacheBudgetBytes failed', error: e, stackTrace: st, category: 'AudioEffectsChannel');
+    }
   }
 
   /// Gets the current bitmask of auto-degraded stages from the native DSP engine.
   Future<int> getAutoDegradedStages() async {
-    if (!Platform.isAndroid) return 0;
+    if (!_isAndroid) return 0;
     try {
-      final res = await _channel.invokeMethod<int>('getAutoDegradedStages');
-      final stages = res ?? 0;
+      final dynamic res = await _channel.invokeMethod<dynamic>('getAutoDegradedStages').timeout(const Duration(seconds: 2));
+      final stages = (res as num?)?.toInt() ?? 0;
       _handleAutoDegradeTransition(stages);
       return stages;
     } catch (_) {
@@ -743,9 +785,9 @@ class AudioEffectsChannel {
 
   /// Retrieves internal DSP status for assertions/testing.
   Future<Map<String, dynamic>?> getDspDebugStatus() async {
-    if (!Platform.isAndroid) return null;
+    if (!_isAndroid) return null;
     try {
-      return await _channel.invokeMapMethod<String, dynamic>('getDspDebugStatus');
+      return await _channel.invokeMapMethod<String, dynamic>('getDspDebugStatus').timeout(const Duration(seconds: 3));
     } catch (_) {
       return null;
     }

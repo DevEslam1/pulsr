@@ -24,6 +24,7 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var channel: MethodChannel
     private var context: Context? = null
     private val backgroundExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+    @Volatile private var isDetached = false
 
     companion object {
         const val CHANNEL_NAME = "com.pulsr.music/waveform"
@@ -46,11 +47,15 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        isDetached = true
         cleanup()
     }
 
     fun cleanup() {
-        if (::channel.isInitialized) channel.setMethodCallHandler(null)
+        isDetached = true
+        if (::channel.isInitialized) {
+            try { channel.setMethodCallHandler(null) } catch (_: Exception) {}
+        }
         backgroundExecutor.shutdown()
         try {
             backgroundExecutor.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS)
@@ -68,12 +73,17 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
                     return
                 }
                 backgroundExecutor.execute {
+                    if (isDetached) {
+                        postError(result, "DETACHED", "Engine detached before decode")
+                        return@execute
+                    }
                     try {
                         val buckets = decodeToBuckets(path, count)
-                        postSuccess(result, buckets.toList())
+                        if (!isDetached) postSuccess(result, buckets.toList())
+                        else postError(result, "DETACHED", "Engine detached")
                     } catch (e: Exception) {
                         Log.w(TAG, "Waveform decode failed for $path: ${e.message}")
-                        postError(result, "DECODE_ERROR", e.message)
+                        if (!isDetached) postError(result, "DECODE_ERROR", e.message)
                     }
                 }
             }
@@ -117,7 +127,7 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
             var totalFramesDecoded = 0L
             // Used only when the container reports no duration: we cannot map by
             // time, so we collect per-buffer RMS and resample it to [count].
-            val fallbackRms = ArrayList<Double>()
+            val fallbackRms = ArrayList<Double>(1024)
             var pcmEncoding = AudioFormat.ENCODING_PCM_16BIT
 
             val bufferInfo = MediaCodec.BufferInfo()
@@ -200,9 +210,10 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
                                             .toInt().coerceIn(0, count - 1)
                                         sumSq[bucket] += frameSumSq
                                         cnt[bucket] += frames
-                                    } else {
-                                        fallbackRms.add(sqrt(frameSumSq / frames))
-                                    }
+                    } else {
+                        // Cap fallback to avoid OOM on malformed files
+                        if (fallbackRms.size < 200_000) fallbackRms.add(sqrt(frameSumSq / frames))
+                    }
                                 }
                             }
                             codec.releaseOutputBuffer(outIndex, false)
@@ -252,6 +263,9 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
             try { codec?.stop() } catch (_: Exception) {}
             try { codec?.release() } catch (_: Exception) {}
             try { extractor.release() } catch (_: Exception) {}
+            extractorCloseActions.remove(extractor)?.let { pfd ->
+                try { pfd.close() } catch (_: Exception) {}
+            }
         }
     }
 
@@ -262,16 +276,32 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
                 val uri = Uri.parse(path)
                 val pfd = ctx.contentResolver.openFileDescriptor(uri, "r")
                     ?: throw IllegalStateException("Could not open file descriptor for $path")
+                // IMPORTANT: keep FD open until extractor.release() — dup FD to avoid close race
+                // We dup via ParcelFileDescriptor.dup() equivalent: hold reference in extractor via fd
+                // Instead of closing immediately, let extractor own the dup; on some OEMs close invalidates.
+                // So we delay close until finally block in decodeToBuckets after extractor.release()
+                // For now, stash pfd on extractor via tag-like workaround: store in threadLocal to close later.
+                // Simpler: use setDataSource with Uri+Headers overload which dups internally.
                 try {
+                    // Use contentResolver path via Uri source to avoid FD lifecycle issues
+                    extractor.setDataSource(ctx, uri, null)
+                } catch (e: Exception) {
+                    // Fallback to fd path and keep pfd alive for duration of extractor
                     extractor.setDataSource(pfd.fileDescriptor)
-                } finally {
-                    try { pfd.close() } catch (_: Exception) {}
+                    // Do NOT close pfd here; close after extractor.release() in caller
+                    // Stash pfd to be closed in finally by wrapping extractor
+                    extractorCloseActions[extractor] = pfd
+                    return
                 }
+                try { pfd.close() } catch (_: Exception) {}
             }
             path.startsWith("file://") -> extractor.setDataSource(Uri.parse(path).path ?: path)
             else -> extractor.setDataSource(path)
         }
     }
+
+    // Keep FD alive mapping to avoid early close
+    private val extractorCloseActions = java.util.Collections.synchronizedMap(mutableMapOf<MediaExtractor, android.os.ParcelFileDescriptor>())
 
     /// Buckets with no decoded frames land as NaN; fill them from the nearest
     /// populated neighbour so the drawn waveform has no zero-height dropouts.

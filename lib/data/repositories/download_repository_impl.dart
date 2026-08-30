@@ -15,6 +15,7 @@ import 'package:flutter/services.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 import 'package:mutex/mutex.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/channels.dart';
@@ -58,7 +59,14 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   }
 
   @override
-  Stream<DownloadTask> observeDownloads() => _streamController.stream;
+  Stream<DownloadTask> observeDownloads() async* {
+    // Replay current tasks for late subscribers (e.g., Cubit recreated after navigation)
+    // so they don't miss last DownloadTask state until next progress tick.
+    for (final task in _tasks.values) {
+      yield task;
+    }
+    yield* _streamController.stream;
+  }
 
   @override
   Future<List<DownloadTask>> getAllDownloads() async {
@@ -210,22 +218,28 @@ class DownloadRepositoryImpl implements IDownloadRepository {
 
   @override
   Future<Either<AppFailure, Unit>> retryDownload(String videoId) async {
+    DownloadTask? taskToRetry;
     final lock = _taskLocks.putIfAbsent(videoId, () => Mutex());
-    return await lock.protect(() async {
+    final precheck = await lock.protect(() async {
       final task = _tasks[videoId];
-      if (task == null) {
-        return const Left(DownloadFailure('Task not found'));
-      }
-
-      return (await queueDownload(task.copyWith(
+      if (task == null) return const Left<DownloadFailure, Unit>(DownloadFailure('Task not found'));
+      // Prepare retry task outside lock to avoid re-entrancy deadlock (queueDownload also locks same videoId)
+      taskToRetry = task.copyWith(
         status: DownloadStatus.queued,
         progress: 0.0,
         error: null,
-      ))).fold(
-        (f) => Left(f),
-        (_) => const Right(unit),
       );
+      return null;
     });
+    if (precheck != null) return precheck;
+    if (taskToRetry == null) {
+      return const Left(DownloadFailure('Task not found'));
+    }
+    // Now call queueDownload without holding the per-task lock
+    return (await queueDownload(taskToRetry!)).fold(
+      (f) => Left(f),
+      (_) => const Right(unit),
+    );
   }
 
   @override
@@ -313,32 +327,53 @@ class DownloadRepositoryImpl implements IDownloadRepository {
 
   @override
   Future<Either<AppFailure, Unit>> prioritizeDownload(String videoId) async {
+    bool needsResume = false;
     final lock = _taskLocks.putIfAbsent(videoId, () => Mutex());
-    return await lock.protect(() async {
+    final precheck = await lock.protect(() async {
       if (!_tasks.containsKey(videoId)) {
-        return const Left(DownloadFailure('Task not found'));
+        return const Left<DownloadFailure, Unit>(DownloadFailure('Task not found'));
       }
       final task = _tasks[videoId]!;
       if (task.status != DownloadStatus.queued) {
         if (task.status == DownloadStatus.paused ||
             task.status == DownloadStatus.failed ||
             task.status == DownloadStatus.interrupted) {
-          await resumeDownload(videoId);
+          needsResume = true;
         }
+      }
+      return null;
+    });
+    if (precheck != null) return precheck;
+    // Resume outside the per-task lock to avoid re-entrancy (resumeDownload also locks same id)
+    if (needsResume) {
+      await resumeDownload(videoId);
+    }
+    // Re-acquire queue mutex for mutation; call _processQueue outside to avoid nested lock deadlock
+    final queueResult = await _queueMutex.protect(() async {
+      // Re-check existence after resume
+      if (!_tasks.containsKey(videoId)) {
+        return const Left<DownloadFailure, Unit>(DownloadFailure('Task not found'));
       }
       _queue.remove(videoId);
       _queue.addFirst(videoId);
       _schedulePersist();
-      _processQueue();
-      return const Right(unit);
+      return const Right<DownloadFailure, Unit>(unit);
     });
+    if (queueResult.isRight()) {
+      _processQueue();
+    }
+    return queueResult;
   }
 
   Future<Directory?> _getTempDir() async {
     try {
-      return Directory.systemTemp;
+      return await getTemporaryDirectory();
     } catch (_) {
-      return null;
+      try {
+        return Directory.systemTemp;
+      } catch (_) {
+        return null;
+      }
     }
   }
 
@@ -353,13 +388,17 @@ class DownloadRepositoryImpl implements IDownloadRepository {
 
     try {
       final freeBytes =
-          await _downloadChannel.invokeMethod<int>('getFreeDiskSpace') ?? 0;
+          await _downloadChannel.invokeMethod<int>('getFreeDiskSpace') ?? -1;
+      // If platform returns error sentinel, treat as unavailable (don't compute total)
+      final effectiveFree = freeBytes >= 0 ? freeBytes : 0;
 
       int totalUsedBytes = 0;
       int completedCount = _tasks.values.where((t) => t.status == DownloadStatus.complete && t.filePath != null).length;
+      List<String> files = [];
+      List<int> sizes = [];
       try {
-        final files = _tasks.values.where((t) => t.status == DownloadStatus.complete && t.filePath != null).map((t) => t.filePath!).toList();
-        final sizes = await Future.wait(files.map((p) async {
+        files = _tasks.values.where((t) => t.status == DownloadStatus.complete && t.filePath != null).map((t) => t.filePath!).toList();
+        sizes = await Future.wait(files.map((p) async {
           try {
             final f = File(p);
             if (await f.exists()) return await f.length();
@@ -369,27 +408,16 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         totalUsedBytes = sizes.fold(0, (a, b) => a + b);
         final existingCount = sizes.where((s) => s > 0).length;
         if (existingCount > 0) completedCount = existingCount;
-        for (int i = 0; i < files.length; i++) {
-          if (sizes[i] == 0) {
-            final vid = _tasks.values
-                .where((t) => t.filePath == files[i])
-                .map((t) => t.videoId)
-                .firstOrNull;
-            if (vid != null) {
-              final old = _tasks[vid];
-              if (old != null && old.status == DownloadStatus.complete) {
-                _tasks[vid] = old.copyWith(status: DownloadStatus.failed, error: 'File deleted');
-                if (!_streamController.isClosed) _streamController.add(_tasks[vid]!);
-              }
-            }
-          }
-        }
       } catch (_) {}
 
-      final totalBytes = freeBytes + totalUsedBytes;
+      // Do NOT mutate task status inside a getter - surface inconsistency via stats only.
+      // File-missing correction is handled by reconcileOnBoot and explicit refresh, not here.
+      // If needed, caller can invoke a separate `reconcileFiles()` method.
+
+      final totalBytes = effectiveFree + totalUsedBytes;
       final stats = StorageStats(
         usedBytes: totalUsedBytes,
-        freeBytes: freeBytes,
+        freeBytes: effectiveFree,
         totalBytes: totalBytes > 0 ? totalBytes : 1,
         downloadedSongsCount: completedCount,
       );
@@ -415,7 +443,17 @@ class DownloadRepositoryImpl implements IDownloadRepository {
               task.status == DownloadStatus.queued) {
             _tasks[task.videoId] = task.copyWith(status: DownloadStatus.paused);
           } else if (task.status == DownloadStatus.complete) {
-            if (task.filePath != null && !File(task.filePath!).existsSync()) {
+            // Avoid blocking main isolate with existsSync(); do async check off-main where possible.
+            // For boot we still need sync but guard with try and fallback to async deferred check.
+            bool exists = false;
+            if (task.filePath != null) {
+              try {
+                exists = await File(task.filePath!).exists();
+              } catch (_) {
+                exists = false;
+              }
+            }
+            if (!exists && task.filePath != null) {
               _tasks[task.videoId] =
                   task.copyWith(status: DownloadStatus.failed, error: 'File deleted');
             } else {
@@ -426,16 +464,20 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           }
         }
       }
-      final activeNames = _tasks.values.where((t) => t.status == DownloadStatus.paused).map((t) => 'ytdl_${t.videoId}.part').toSet();
+      // Include interrupted as well as paused for part-file protection
+      final activeNames = _tasks.values
+          .where((t) => t.status == DownloadStatus.paused || t.status == DownloadStatus.interrupted)
+          .map((t) => 'ytdl_${t.videoId}.part')
+          .toSet();
       await _ytDownloadService.cleanOrphanPartFiles(activePartNames: activeNames.isNotEmpty ? activeNames : null);
     } catch (e) {
       ErrorLogger.log('DownloadRepository reconcileOnBoot failed', error: e);
     }
   }
 
-  // Throttle coalescing ~200ms with instant flush on terminal states
-  Timer? _throttleFlushTimer;
-  DownloadTask? _pendingThrottledTask;
+  // Throttle coalescing ~200ms with instant flush on terminal states - per videoId to avoid dropping concurrent progress
+  final Map<String, Timer> _throttleFlushTimers = {};
+  final Map<String, DownloadTask> _pendingThrottledTasks = {};
   static const _throttleMs = 200;
 
   void _updateTask(DownloadTask task) {
@@ -452,10 +494,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         task.status == DownloadStatus.interrupted;
 
     if (isTerminal) {
-      if (_pendingThrottledTask != null && _pendingThrottledTask!.videoId == task.videoId) {
-        _throttleFlushTimer?.cancel();
-        _pendingThrottledTask = null;
-      }
+      _throttleFlushTimers[task.videoId]?.cancel();
+      _throttleFlushTimers.remove(task.videoId);
+      _pendingThrottledTasks.remove(task.videoId);
       _lastProgressEmitMs.remove(task.videoId);
       if (!_streamController.isClosed) {
         _streamController.add(task);
@@ -466,21 +507,23 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     }
 
     if (isIntermediateProgress && (now - lastEmit < _throttleMs)) {
-      _pendingThrottledTask = task;
-      _throttleFlushTimer?.cancel();
-      _throttleFlushTimer = Timer(const Duration(milliseconds: _throttleMs), () {
-        if (_pendingThrottledTask != null && _pendingThrottledTask!.videoId == task.videoId) {
-          _lastProgressEmitMs[task.videoId] = DateTime.now().millisecondsSinceEpoch;
-          if (!_streamController.isClosed) _streamController.add(_pendingThrottledTask!);
-          _pushFgsProgress(_pendingThrottledTask!);
-          _pendingThrottledTask = null;
+      _pendingThrottledTasks[task.videoId] = task;
+      _throttleFlushTimers[task.videoId]?.cancel();
+      _throttleFlushTimers[task.videoId] = Timer(const Duration(milliseconds: _throttleMs), () {
+        final pending = _pendingThrottledTasks.remove(task.videoId);
+        _throttleFlushTimers.remove(task.videoId);
+        if (pending != null) {
+          _lastProgressEmitMs[pending.videoId] = DateTime.now().millisecondsSinceEpoch;
+          if (!_streamController.isClosed) _streamController.add(pending);
+          _pushFgsProgress(pending);
         }
       });
       _schedulePersist();
       return;
     }
-    _throttleFlushTimer?.cancel();
-    _pendingThrottledTask = null;
+    _throttleFlushTimers[task.videoId]?.cancel();
+    _throttleFlushTimers.remove(task.videoId);
+    _pendingThrottledTasks.remove(task.videoId);
 
     _lastProgressEmitMs[task.videoId] = now;
     if (!_streamController.isClosed) {
@@ -499,7 +542,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         'progress': pct,
       }).catchError((_) {});
     } else if (task.status == DownloadStatus.complete || task.status == DownloadStatus.failed) {
-      if (_activeVideoIds.length <= 1) {
+      // Only stop FGS if no active downloads AND queue empty - otherwise next queued item would need background start
+      if (_activeVideoIds.length <= 1 && _queue.isEmpty) {
         _downloadChannel.invokeMethod('stopDownloadForeground').catchError((_) {});
       }
     }
@@ -507,7 +551,12 @@ class DownloadRepositoryImpl implements IDownloadRepository {
 
   void dispose() {
     _saveDebounce?.cancel();
-    _throttleFlushTimer?.cancel();
+    for (final t in _throttleFlushTimers.values) {
+      t.cancel();
+    }
+    _throttleFlushTimers.clear();
+    _pendingThrottledTasks.clear();
+    _lastProgressEmitMs.clear();
     if (!_streamController.isClosed) _streamController.close();
   }
 
@@ -523,7 +572,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   }
 
   void _processQueue() {
-    _queueMutex.protect(() async {
+    unawaited(_queueMutex.protect(() async {
       while (_activeVideoIds.length < _maxConcurrent && _queue.isNotEmpty) {
         final videoId = _queue.removeFirst();
 
@@ -544,7 +593,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           unawaited(_downloadChannel.invokeMethod('stopDownloadForeground'));
         } catch (_) {}
       }
-    });
+    }));
   }
 
 
@@ -639,6 +688,4 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   }
 }
 
-extension _FirstOrNull<E> on Iterable<E> {
-  E? get firstOrNull => isEmpty ? null : first;
-}
+// _FirstOrNull removed - use collection's firstOrNull from dart extensions where needed
