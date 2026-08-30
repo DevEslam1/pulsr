@@ -28,6 +28,12 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
 
+  /// YtmSearchCubit is factory-registered: created once here and owned by
+  /// this State (not by BlocProvider's `create:`), so ancestor rebuilds
+  /// (theme/locale/SettingsCubit) can never recreate it and drop the
+  /// in-progress online query. Closed in [dispose].
+  YtmSearchCubit? _ytmSearchCubit;
+
   /// 0 = Local Music, 1 = Online Stream
   int _selectedTab = 0;
   StreamSubscription<void>? _settingsSub;
@@ -49,6 +55,12 @@ class _SearchScreenState extends State<SearchScreen> {
   void initState() {
     super.initState();
 
+    // Compile-time flag: the online tab (and its cubit) only exists when YTM
+    // is enabled, mirroring the conditional provider in [build].
+    if (AppConfig.ytmEnabled) {
+      _ytmSearchCubit = getIt<YtmSearchCubit>();
+    }
+
     // Reset to local tab if offline-only mode gets enabled
     _settingsSub = context.read<SettingsCubit?>()?.stream.listen((settings) {
       if (settings.offlineOnlyMode && _selectedTab == 1 && mounted) {
@@ -65,6 +77,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void dispose() {
     _settingsSub?.cancel();
+    _ytmSearchCubit?.close();
     _searchController.dispose();
     super.dispose();
   }
@@ -109,11 +122,10 @@ class _SearchScreenState extends State<SearchScreen> {
     if (!AppConfig.ytmEnabled) return scaffold;
     return MultiBlocProvider(
       providers: [
-        // YtmSearchCubit is factory-registered: fresh instance owned + closed by this screen.
-        BlocProvider(create: (_) => getIt<YtmSearchCubit>()),
+        BlocProvider<YtmSearchCubit>.value(value: _ytmSearchCubit!),
         // YtmDownloadCubit is an app-lifetime @singleton provided at root (main.dart).
-        // BlocProvider.value does NOT take ownership, so leaving this screen can never
-        // close the shared singleton (use-after-close would kill download UI updates).
+        // BlocProvider.value does NOT take ownership, so leaving this screen can
+        // never close the shared singleton (use-after-close would kill download UI updates).
         BlocProvider<YtmDownloadCubit>.value(value: getIt<YtmDownloadCubit>()),
       ],
       child: scaffold,

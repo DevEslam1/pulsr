@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/constants/audio_feature_info.dart';
+import 'package:pulsr/core/constants/channels.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/data/scanner/media_scanner_service.dart';
 import 'package:pulsr/domain/models/audio_output_info.dart';
@@ -32,6 +34,14 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues({});
+    // SettingsCubit eagerly constructs HiResAudioService, which probes the
+    // hires_dac channel with a 3s timeout on startup. Stub the channel so
+    // that timer doesn't dangle into the no-pending-timers teardown check.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel(PulsrChannels.hiresDac),
+      (call) async => null,
+    );
     mockScanner = MockMediaScannerService();
   });
 

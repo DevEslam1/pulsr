@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
@@ -7,6 +6,7 @@ import '../../core/constants/channels.dart';
 import '../../core/services/metadata_search_service.dart';
 import '../../core/utils/error_logger.dart';
 import '../../core/utils/lrc_parser.dart';
+import '../../core/utils/platform_capabilities.dart';
 import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
 import 'tag_editor_state.dart';
@@ -71,7 +71,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
 
   Future<void> loadTags() async {
     if (isClosed) return;
-    if (!Platform.isAndroid) {
+    if (!PlatformCapabilities.isAndroid) {
       emit(state.copyWith(status: TagEditorStatus.loaded));
       return;
     }

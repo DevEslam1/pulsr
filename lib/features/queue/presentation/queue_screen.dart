@@ -36,7 +36,7 @@ class QueueScreen extends StatelessWidget {
                 final cubit = context.read<PlayerCubit>();
                 switch (v) {
                   case 'clear':
-                    final confirm = await showDialog<bool>(context: context, builder: (c) => AlertDialog(title: Text(context.l10n.queue), content: const Text('Clear entire queue?'), actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Clear'))]));
+                    final confirm = await showDialog<bool>(context: context, useRootNavigator: true, builder: (c) => AlertDialog(title: Text(context.l10n.queue), content: const Text('Clear entire queue?'), actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Clear'))]));
                     if (confirm == true) {
                       for (int i = state.queue.length - 1; i >= 0; i--) {
                         if (state.queue[i].id != state.currentSong?.id) await cubit.removeQueueItem(i);

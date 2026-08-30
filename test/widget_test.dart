@@ -282,6 +282,13 @@ void main() {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
             const MethodChannel('com.pulsr.music/proxy'), (call) async => null);
+    // SettingsCubit._loadPreferences pushes the DSP preference through the
+    // audio_effects channel with a 2s timeout; stub it so that timer doesn't
+    // dangle into the no-pending-timers teardown check.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+            const MethodChannel('com.pulsr.music/audio_effects'),
+            (call) async => null);
 
     SharedPreferences.setMockInitialValues({});
     final db = AppDatabase.forTesting(NativeDatabase.memory());

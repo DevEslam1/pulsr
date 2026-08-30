@@ -12,21 +12,43 @@ import 'tag_editor_cubit.dart';
 import 'tag_editor_state.dart';
 import 'tag_field_widget.dart';
 
-class TagEditorScreen extends StatelessWidget {
+class TagEditorScreen extends StatefulWidget {
   final SongsTableData song;
   final List<SongsTableData>? batchSongs;
 
   const TagEditorScreen({super.key, required this.song, this.batchSongs});
 
   @override
+  State<TagEditorScreen> createState() => _TagEditorScreenState();
+}
+
+class _TagEditorScreenState extends State<TagEditorScreen> {
+  /// Created once and owned by this State (not by BlocProvider's `create:`),
+  /// so ancestor rebuilds can never recreate the cubit and drop unsaved tag
+  /// edits. Closed in [dispose].
+  late final TagEditorCubit _cubit;
+
+  @override
+  void initState() {
+    super.initState();
+    _cubit = TagEditorCubit(
+      song: widget.song,
+      batchSongs: widget.batchSongs,
+      scannerService: getIt<MediaScannerService>(),
+      metadataSearchService: getIt<MetadataSearchService>(),
+    );
+  }
+
+  @override
+  void dispose() {
+    _cubit.close();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) => TagEditorCubit(
-        song: song,
-        batchSongs: batchSongs,
-        scannerService: getIt<MediaScannerService>(),
-        metadataSearchService: getIt<MetadataSearchService>(),
-      ),
+    return BlocProvider<TagEditorCubit>.value(
+      value: _cubit,
       child: const _TagEditorView(),
     );
   }

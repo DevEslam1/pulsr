@@ -25,7 +25,9 @@ class FolderBrowserTab extends StatelessWidget {
           final settingsCubit = context.read<SettingsCubit>();
           final count = await settingsCubit.rescanLibrary();
           if (context.mounted) {
-            await cubit.init();
+            // refresh() re-subscribes the data streams + reloads folders;
+            // init() would additionally re-read prefs and double-emit.
+            await cubit.refresh();
             if (!context.mounted) return;
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('Scan complete! $count tracks loaded.')),

@@ -131,6 +131,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
 
   Future<void> _subscribeSongs() async {
     unawaited(_songsSub?.cancel());
+    removeFromComposite(_songsSub);
     final excludedRes = await _folderUseCases.getExcludedFolders();
     if (isClosed) return;
     final excluded = excludedRes.fold((l) => <String>[], (r) => r);
@@ -168,6 +169,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
 
   void _subscribeAlbums() {
     _albumsSub?.cancel();
+    removeFromComposite(_albumsSub);
     _albumsSub = autoSub<Result<List<AlbumsTableData>>>(_getAlbumsUseCase.watchAlbums(), (result) {
       if (isClosed) return;
       result.fold(
@@ -179,6 +181,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
 
   void _subscribeArtists() {
     _artistsSub?.cancel();
+    removeFromComposite(_artistsSub);
     _artistsSub = autoSub<Result<List<ArtistsTableData>>>(_getArtistsUseCase.watchArtists(), (result) {
       if (isClosed) return;
       result.fold(
@@ -190,6 +193,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
 
   void _subscribeGenres() {
     _genresSub?.cancel();
+    removeFromComposite(_genresSub);
     _genresSub = autoSub<Result<List<GenreItem>>>(_getGenresUseCase.watchGenres(), (result) {
       if (isClosed) return;
       result.fold(
@@ -201,6 +205,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
 
   void _subscribeYears() {
     _yearsSub?.cancel();
+    removeFromComposite(_yearsSub);
     _yearsSub = autoSub<Result<List<YearItem>>>(_getYearsUseCase.watchYears(), (result) {
       if (isClosed) return;
       result.fold(
@@ -212,6 +217,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
 
   void _subscribeFavorites() {
     _favoritesSub?.cancel();
+    removeFromComposite(_favoritesSub);
     _favoritesSub = autoSub<Result<List<SongsTableData>>>(_getFavoritesUseCase.watchFavorites(), (result) {
       if (isClosed) return;
       result.fold(

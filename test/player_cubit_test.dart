@@ -217,7 +217,6 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   List<String> get detectedOemEngines => const [];
 
   // Phase 1 DSP expansion stage surface (mirror PulsrAudioHandler)
-  @override
   bool persistedSaturationEnabled = false;
 
   @override
@@ -262,8 +261,9 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   Future<void> setDynamicEq(bool enabled) async {}
   @override
   Future<void> setDynamicEqBand(int index, DynamicEqBandConfig band) async {}
-  @override
+  
   Completer<void>? readyGate;
+  @override
   Future<void> get effectsReady => readyGate?.future ?? Future<void>.value();
 
   @override

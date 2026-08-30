@@ -12,18 +12,34 @@ import '../cubit/ytm_search_cubit.dart';
 import '../cubit/ytm_search_state.dart';
 import 'widgets/ytm_download_button.dart';
 
-class YtmSearchScreen extends StatelessWidget {
+class YtmSearchScreen extends StatefulWidget {
   const YtmSearchScreen({super.key});
+
+  @override
+  State<YtmSearchScreen> createState() => _YtmSearchScreenState();
+}
+
+class _YtmSearchScreenState extends State<YtmSearchScreen> {
+  /// YtmSearchCubit is factory-registered: created once here and owned by
+  /// this State (not by BlocProvider's `create:`), so ancestor rebuilds
+  /// (theme/locale) can never recreate it and drop the in-progress query.
+  /// Closed in [dispose].
+  late final YtmSearchCubit _searchCubit = getIt<YtmSearchCubit>();
+
+  @override
+  void dispose() {
+    _searchCubit.close();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        // YtmSearchCubit is factory-registered: fresh instance owned + closed by this screen.
-        BlocProvider(create: (_) => getIt<YtmSearchCubit>()),
+        BlocProvider<YtmSearchCubit>.value(value: _searchCubit),
         // YtmDownloadCubit is an app-lifetime @singleton provided at root (main.dart).
-        // BlocProvider.value does NOT take ownership, so leaving this screen can never
-        // close the shared singleton (use-after-close would kill download UI updates).
+        // BlocProvider.value does NOT take ownership, so leaving this screen can
+        // never close the shared singleton (use-after-close would kill download UI updates).
         BlocProvider<YtmDownloadCubit>.value(value: getIt<YtmDownloadCubit>()),
       ],
       child: const _YtmSearchView(),

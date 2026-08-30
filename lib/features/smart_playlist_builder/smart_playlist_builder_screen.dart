@@ -14,21 +14,43 @@ import '../../../domain/models/smart_playlist_criteria.dart';
 import 'smart_playlist_builder_cubit.dart';
 import 'smart_playlist_builder_state.dart';
 
-class SmartPlaylistBuilderScreen extends StatelessWidget {
+class SmartPlaylistBuilderScreen extends StatefulWidget {
   final PlaylistsTableData? initialPlaylist;
 
   const SmartPlaylistBuilderScreen({super.key, this.initialPlaylist});
 
   @override
+  State<SmartPlaylistBuilderScreen> createState() =>
+      _SmartPlaylistBuilderScreenState();
+}
+
+class _SmartPlaylistBuilderScreenState
+    extends State<SmartPlaylistBuilderScreen> {
+  /// SmartPlaylistBuilderCubit is factory-registered: created once here and
+  /// owned by this State (not by BlocProvider's `create:`), so ancestor
+  /// rebuilds can never recreate it mid-edit. Closed in [dispose].
+  late final SmartPlaylistBuilderCubit _cubit;
+
+  @override
+  void initState() {
+    super.initState();
+    _cubit = getIt<SmartPlaylistBuilderCubit>();
+    final initialPlaylist = widget.initialPlaylist;
+    if (initialPlaylist != null) {
+      _cubit.initWithPlaylist(initialPlaylist);
+    }
+  }
+
+  @override
+  void dispose() {
+    _cubit.close();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return BlocProvider<SmartPlaylistBuilderCubit>(
-      create: (_) {
-        final cubit = getIt<SmartPlaylistBuilderCubit>();
-        if (initialPlaylist != null) {
-          cubit.initWithPlaylist(initialPlaylist!);
-        }
-        return cubit;
-      },
+    return BlocProvider<SmartPlaylistBuilderCubit>.value(
+      value: _cubit,
       child: const _SmartPlaylistBuilderView(),
     );
   }

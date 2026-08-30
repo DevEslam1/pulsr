@@ -31,7 +31,6 @@ import 'domain/repositories/music_repository_interface.dart';
 import 'domain/usecases/get_songs_usecase.dart';
 import 'domain/usecases/get_albums_usecase.dart';
 import 'domain/usecases/get_artists_usecase.dart';
-import 'domain/usecases/get_favorites_usecase.dart';
 import 'domain/usecases/toggle_favorite_usecase.dart';
 import 'domain/usecases/search_music_usecase.dart';
 import 'domain/usecases/playlist_usecases.dart';

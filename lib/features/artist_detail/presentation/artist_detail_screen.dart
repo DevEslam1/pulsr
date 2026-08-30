@@ -31,6 +31,15 @@ class ArtistDetailScreen extends StatefulWidget {
 class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
   late GetArtistsUseCase _useCase;
 
+  /// Created once so StreamBuilder keeps a single drift subscription across
+  /// rebuilds — a fresh Stream per build tears down and re-subscribes the
+  /// watch, re-issuing the DB query on every rebuild. [artist] is a route
+  /// argument and cannot change for this mount.
+  late final Stream<Result<List<AlbumsTableData>>> _albumsStream =
+      _useCase.watchArtistAlbums(widget.artist.id);
+  late final Stream<Result<List<SongsTableData>>> _songsStream =
+      _useCase.watchArtistSongs(widget.artist.id);
+
   @override
   void initState() {
     super.initState();
@@ -155,7 +164,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
 
                     // Discography (Albums)
                     StreamBuilder<Result<List<AlbumsTableData>>>(
-                      stream: _useCase.watchArtistAlbums(artist.id),
+                      stream: _albumsStream,
                       builder: (context, snapshot) {
                         if (snapshot.hasError) {
                           return _ErrorSection(
@@ -231,7 +240,7 @@ class _ArtistDetailScreenState extends State<ArtistDetailScreen> {
               // Top Tracks — sliver-returning StreamBuilder so the track list
               // virtualizes instead of inflating every tile up front.
               StreamBuilder<Result<List<SongsTableData>>>(
-                stream: _useCase.watchArtistSongs(artist.id),
+                stream: _songsStream,
                 builder: (context, snapshot) {
                   if (snapshot.hasError) {
                     return SliverToBoxAdapter(

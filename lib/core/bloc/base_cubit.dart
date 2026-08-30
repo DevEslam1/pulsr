@@ -107,6 +107,21 @@ abstract class PulsrCubit<S> extends Cubit<S> {
     return sub;
   }
 
+  /// Removes a (typically just-cancelled) subscription from the composite.
+  /// Use this when a subscription is being REPLACED (refresh / re-subscribe
+  /// pattern): a bare `sub.cancel()` leaves the cancelled subscription
+  /// registered inside the [CompositeSubscription], so every re-subscribe
+  /// would inflate [activeSubscriptionCount] forever. Pair with an explicit
+  /// cancel before re-adding:
+  ///
+  ///     _albumsSub?.cancel();
+  ///     removeFromComposite(_albumsSub);
+  ///     _albumsSub = autoSub(...);
+  void removeFromComposite(StreamSubscription<dynamic>? sub) {
+    if (sub == null) return;
+    _subs.remove(sub);
+  }
+
   /// Reduces every [stream] event into a new state; the subscription is
   /// auto-cancelled on close. Errors route to [addError] (or [onError]).
   StreamSubscription<T> emitOnEach<T>(

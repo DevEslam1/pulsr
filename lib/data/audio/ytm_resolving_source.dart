@@ -166,20 +166,20 @@ class YtmResolvingSource extends StreamAudioSource {
 
     // Check Task 2 in-memory URL cache first when not force refreshing
     if (!forceRefresh) {
-      final cachedEntry = _effectiveUrlCache?.get(
-        videoId,
-        onStaleRevalidate: (vid) {
-          // Asynchronously trigger SWTR refresh without blocking current playback
-          resolve(forceRefresh: true).then((freshUrl) {
-            _effectiveUrlCache?.put(
-              vid,
-              freshUrl,
-              userAgent: effectiveUa,
-              cookies: effectiveCookies,
-            );
-          }).catchError((_) {});
-        },
-      );
+        final cachedEntry = _effectiveUrlCache?.get(
+          videoId,
+          onStaleRevalidate: (vid) {
+            // Asynchronously trigger SWTR refresh without blocking current playback
+            unawaited(resolve(forceRefresh: true).then((freshUrl) {
+              _effectiveUrlCache?.put(
+                vid,
+                freshUrl,
+                userAgent: effectiveUa,
+                cookies: effectiveCookies,
+              );
+            }).catchError((_) {}));
+          },
+        );
       if (cachedEntry != null && !cachedEntry.isExpired()) {
         url = cachedEntry.url;
         effectiveUa = cachedEntry.userAgent ?? effectiveUa;

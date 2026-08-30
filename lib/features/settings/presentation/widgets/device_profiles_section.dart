@@ -1,7 +1,6 @@
 // lib/features/settings/presentation/widgets/device_profiles_section.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:get_it/get_it.dart';
 import '../../../../core/di/injection.dart';
 
 import '../../../../core/services/device_profile_service.dart';

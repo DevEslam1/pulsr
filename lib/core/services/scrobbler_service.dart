@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -8,6 +7,7 @@ import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/channels.dart';
 import '../utils/error_logger.dart';
+import '../utils/platform_capabilities.dart';
 
 @singleton
 class ScrobblerService {
@@ -172,7 +172,7 @@ class ScrobblerService {
   }) async {
     // 1. Android Broadcast Intent
     try {
-      if (!Platform.isAndroid) {
+      if (!PlatformCapabilities.isAndroid) {
         // Skip native broadcast on non-Android
       } else {
         await _channel.invokeMethod('broadcastPlaybackState', {

@@ -85,6 +85,7 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
 
   void _updatePreview() {
     _previewSub?.cancel();
+    removeFromComposite(_previewSub);
     _previewSub = autoSub<List<SongsTableData>>(_engine.watchCriteria(state.criteria), (songs) {
         if (isClosed) return;
         emit(state.copyWith(previewSongs: songs));

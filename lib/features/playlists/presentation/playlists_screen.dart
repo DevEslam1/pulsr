@@ -36,6 +36,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
     final controller = TextEditingController();
     showDialog<void>(
       context: context,
+      useRootNavigator: true,
       builder: (ctx) => AlertDialog(
         title: Text(context.l10n.createPlaylist,
             style: const TextStyle(fontWeight: FontWeight.w800)),
@@ -473,6 +474,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
       final ytmService = getIt<YtmService>();
       final tracks =
           await ytmService.getPlaylistTracks(playlist.playlistId, limit: 200);
+      if (!context.mounted) return;
       if (tracks.isNotEmpty) {
         final songs = tracks.map((t) => t.toSongData()).toList();
         unawaited(playerCubit.playSong(songs.first, queue: songs));
@@ -483,6 +485,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
         );
       }
     } catch (e) {
+      if (!context.mounted) return;
       scaffoldMessenger.showSnackBar(
         SnackBar(content: Text('Failed to load playlist: $e')),
       );
@@ -505,6 +508,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
       final ytmService = getIt<YtmService>();
       final tracks =
           await ytmService.getPlaylistTracks(playlist.playlistId, limit: 200);
+      if (!context.mounted) return;
       if (tracks.isNotEmpty) {
         final songs = tracks.map((t) => t.toSongData()).toList();
         final downloadCubit = getIt<YtmDownloadCubit>();
@@ -526,6 +530,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
         );
       }
     } catch (e) {
+      if (!context.mounted) return;
       scaffoldMessenger.showSnackBar(
         SnackBar(content: Text('Failed to load playlist: $e')),
       );

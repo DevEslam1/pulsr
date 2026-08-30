@@ -50,9 +50,9 @@ class StreamPreResolver {
       if (curVid != null && curVid.isNotEmpty) {
         final cached = urlCache.get(curVid);
         if (cached == null || cached.isStaleWhileRevalidate()) {
-          resolveUrl(curVid).then((stream) {
+          unawaited(resolveUrl(curVid).then((stream) {
             if (!_disposed) urlCache.putStream(stream);
-          }).catchError((_) {});
+          }).catchError((_) {}));
         }
       }
     }

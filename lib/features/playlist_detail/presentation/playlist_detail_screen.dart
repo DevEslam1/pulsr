@@ -19,15 +19,32 @@ import '../../sheets/song_info_sheet.dart';
 import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 
-class PlaylistDetailScreen extends StatelessWidget {
+class PlaylistDetailScreen extends StatefulWidget {
   final PlaylistsTableData playlist;
   final PlaylistUseCases? playlistUseCases;
 
   const PlaylistDetailScreen(
       {super.key, required this.playlist, this.playlistUseCases});
 
+  @override
+  State<PlaylistDetailScreen> createState() => _PlaylistDetailScreenState();
+}
+
+class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   PlaylistUseCases get _useCases =>
-      playlistUseCases ?? getIt<PlaylistUseCases>();
+      widget.playlistUseCases ?? getIt<PlaylistUseCases>();
+
+  /// Created once so StreamBuilder keeps a single drift subscription across
+  /// rebuilds — a fresh Stream per build tears down and re-subscribes the
+  /// watch, re-issuing the DB query on every rebuild. [playlist] is a route
+  /// argument and cannot change for this mount.
+  late final Stream<List<SongsTableData>> _songsStream =
+      widget.playlist.isSmart && widget.playlist.smartCriteria != null
+          ? _useCases.watchSmartPlaylistSongs(
+              SmartCriteria.fromJsonString(widget.playlist.smartCriteria!))
+          : _useCases
+              .watchPlaylistSongs(widget.playlist.id)
+              .map((res) => res.fold((l) => <SongsTableData>[], (r) => r));
 
   void _downloadPlaylist(BuildContext context, List<SongsTableData> songs) {
     if (songs.isEmpty) {
@@ -74,7 +91,7 @@ class PlaylistDetailScreen extends StatelessWidget {
       return;
     }
     final exportUseCase = getIt<PlaylistExportUseCase>();
-    await exportUseCase.exportToFile(playlist.name, songs);
+    await exportUseCase.exportToFile(widget.playlist.name, songs);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -95,11 +112,11 @@ class PlaylistDetailScreen extends StatelessWidget {
       return;
     }
     final exportUseCase = getIt<PlaylistExportUseCase>();
-    final file = await exportUseCase.exportToFile(playlist.name, songs);
+    final file = await exportUseCase.exportToFile(widget.playlist.name, songs);
     try {
       await Share.shareXFiles(
         [XFile(file.path, mimeType: 'audio/x-mpegurl')],
-        text: 'Playlist: ${playlist.name}',
+        text: 'Playlist: ${widget.playlist.name}',
       );
     } finally {
       try {
@@ -113,18 +130,11 @@ class PlaylistDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final playlist = widget.playlist;
     final playlistUseCases = _useCases;
 
-    final Stream<List<SongsTableData>> songsStream =
-        playlist.isSmart && playlist.smartCriteria != null
-            ? playlistUseCases.watchSmartPlaylistSongs(
-                SmartCriteria.fromJsonString(playlist.smartCriteria!))
-            : playlistUseCases
-                .watchPlaylistSongs(playlist.id)
-                .map((res) => res.fold((l) => <SongsTableData>[], (r) => r));
-
     return StreamBuilder<List<SongsTableData>>(
-      stream: songsStream,
+      stream: _songsStream,
       builder: (context, snapshot) {
         final songs = snapshot.data ?? [];
 

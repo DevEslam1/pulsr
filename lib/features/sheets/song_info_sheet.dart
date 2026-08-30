@@ -53,6 +53,7 @@ class SongInfoSheet extends StatelessWidget {
           if (!context.mounted) return;
           final proceed = await showDialog<bool>(
             context: context,
+            useRootNavigator: true,
             builder: (ctx) => AlertDialog(
               title: Text(context.l10n.permissionRequired),
               content: Text(

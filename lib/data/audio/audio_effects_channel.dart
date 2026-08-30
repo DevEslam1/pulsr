@@ -1,6 +1,6 @@
 // lib/data/audio/audio_effects_channel.dart
 import 'dart:async';
-import 'package:flutter/foundation.dart' show kIsWeb, visibleForTesting;
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import '../../core/constants/channels.dart';
 import '../../core/utils/error_logger.dart';

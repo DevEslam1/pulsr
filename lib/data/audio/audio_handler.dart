@@ -360,8 +360,29 @@ class PulsrAudioHandler extends BaseAudioHandler
   Duration get crossfadeDuration => _crossfadeManager.duration;
 
   bool _switchingEngine = false;
+
+  /// Trailing debounce for crossfade changes requested while an engine switch
+  /// is in flight: instead of dropping the value (which desynced the slider
+  /// from the player), the latest request is applied ~150 ms later or right
+  /// after the switch completes. Cancelled/reset on every call.
+  Timer? _crossfadeDebounceTimer;
+
   void setCrossfadeDuration(Duration duration) {
-    if (_switchingEngine) return;
+    _crossfadeDebounceTimer?.cancel();
+    _crossfadeDebounceTimer = null;
+    if (_switchingEngine) {
+      // Trail the latest request behind the in-flight engine switch instead
+      // of dropping it; re-arms until the switch has finished.
+      _crossfadeDebounceTimer = Timer(const Duration(milliseconds: 150), () {
+        _crossfadeDebounceTimer = null;
+        setCrossfadeDuration(duration);
+      });
+      return;
+    }
+    _applyCrossfadeDuration(duration);
+  }
+
+  void _applyCrossfadeDuration(Duration duration) {
     final wasGapless = _gaplessMode;
     _crossfadeManager.duration = duration;
     final isGapless = _gaplessMode;
@@ -2979,6 +3000,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       _lifecycleObserver = null;
     }
     _savePositionDebounce?.cancel();
+    _crossfadeDebounceTimer?.cancel();
     for (final sub in _subscriptions) {
       sub.cancel();
     }

@@ -28,6 +28,13 @@ class YearDetailScreen extends StatefulWidget {
 class _YearDetailScreenState extends State<YearDetailScreen> {
   late GetYearsUseCase _useCase;
 
+  /// Created once so StreamBuilder keeps a single drift subscription across
+  /// rebuilds — a fresh Stream per build tears down and re-subscribes the
+  /// watch, re-issuing the DB query on every rebuild. [yearItem] is a route
+  /// argument and cannot change for this mount.
+  late final Stream<Result<List<SongsTableData>>> _songsStream =
+      _useCase.watchYearSongs(widget.yearItem.year);
+
   @override
   void initState() {
     super.initState();
@@ -44,7 +51,7 @@ class _YearDetailScreenState extends State<YearDetailScreen> {
         title: Text('${yearItem.year}'),
       ),
       body: StreamBuilder<Result<List<SongsTableData>>>(
-        stream: _useCase.watchYearSongs(yearItem.year),
+        stream: _songsStream,
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return Center(

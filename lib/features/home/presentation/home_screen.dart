@@ -963,8 +963,12 @@ class _OnlineCategorySection extends StatelessWidget {
 
         final tracks = snapshot.data!;
         final songs = [for (final track in tracks) track.toSongData()];
-        return BlocProvider<YtmDownloadCubit>(
-          create: (_) => getIt<YtmDownloadCubit>(),
+        // YtmDownloadCubit is an app-lifetime @singleton: BlocProvider.value
+        // does NOT take ownership, so this section rebuilding/unmounting can
+        // never close the shared instance (use-after-close would kill
+        // download UI updates elsewhere in the app).
+        return BlocProvider<YtmDownloadCubit>.value(
+          value: getIt<YtmDownloadCubit>(),
           // Sliver group (F-13): the Top Charts tiles below are built lazily
           // by SliverList.builder instead of inflating eagerly as Column
           // children of the outer scroll view.
