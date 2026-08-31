@@ -7,16 +7,21 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 
 /**
- * B-07 fix: Foreground Service for downloads (dataSync).
+ * B-07 fix: Foreground Service for downloads (dataSync / mediaProcessing).
  *
  * Keeps YouTube downloads alive when the app is backgrounded, screen-off, or under
  * Doze/App Standby. Without this, WAKE_LOCK alone does not prevent the Android 12+
- * freezer from stalling the Dart HttpClient. Uses typed FGS dataSync (Android 14+).
+ * freezer from stalling the Dart HttpClient. Uses typed FGS: Android 14 (API 34)
+ * -> dataSync; Android 15+ (API 35) -> mediaProcessing (preferred for heavy media
+ * work and no longer subject to the dataSync 6h/24h cap semantics); below API 29
+ * -> untyped startForeground.
  *
  * Features:
  * - Persistent notification with progress, pause & cancel actions
@@ -180,11 +185,7 @@ class DownloadService : Service() {
         val n = notificationFor(title, progress)
         if (!foregroundStarted) {
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    startForeground(NOTIFICATION_ID, n, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
-                } else {
-                    startForeground(NOTIFICATION_ID, n)
-                }
+                ServiceCompat.startForeground(this, NOTIFICATION_ID, n, foregroundServiceType())
                 foregroundStarted = true
             } catch (e: Exception) {
                 // ForegroundServiceStartNotAllowedException on Android 14+ (API 34+) if started while backgrounded
@@ -193,6 +194,27 @@ class DownloadService : Service() {
         } else {
             (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
                 .notify(NOTIFICATION_ID, n)
+        }
+    }
+
+    /**
+     * Runtime-selected FGS type, matching the manifest's
+     * `dataSync|mediaProcessing` declaration:
+     *  - API 35+ (Android 15): mediaProcessing — the preferred type for heavy
+     *    media work (download → tag/publish); dataSync on 15 is subject to the
+     *    6h/24h system-wide cap.
+     *  - API 29..34: dataSync — previous behavior kept (typed enforcement with
+     *    mediaProcessing starts at API 35; dataSync is required at API 34).
+     *  - API < 29: 0 — ServiceCompat.startForeground falls back to the
+     *    two-arg startForeground, exactly as before.
+     */
+    private fun foregroundServiceType(): Int {
+        return when {
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM ->
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q ->
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            else -> 0
         }
     }
 

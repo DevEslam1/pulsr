@@ -22,6 +22,7 @@ import 'package:pulsr/domain/usecases/retry_download.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_cubit.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_state.dart';
 import 'package:pulsr/features/downloads/presentation/downloads_screen.dart';
+import 'package:pulsr/features/downloads/presentation/widgets/download_tile.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -166,6 +167,101 @@ void main() {
         deliveries,
         greaterThanOrEqualTo(1),
         reason: 'the completed task must actually reach the UI',
+      );
+
+      await repoEvents.close();
+    },
+  );
+
+  testWidgets(
+    'DownloadTile rebuilds at most once per delivered progress update',
+    (tester) async {
+      // Seed one active task so a DownloadTile is actually on screen.
+      when(() => mockObserve.getAll()).thenAnswer((_) async => [
+            DownloadTask(
+              id: 'id_v1',
+              videoId: 'v1',
+              title: 'Song',
+              artist: 'Artist',
+              createdAt: DateTime.now(),
+              status: DownloadStatus.downloading,
+              progress: 0.1,
+            ),
+          ]);
+
+      final cubit = DownloadsCubit(
+        mockQueue,
+        mockPause,
+        mockResume,
+        mockRetry,
+        mockDelete,
+        mockObserve,
+        mockStats,
+      );
+      addTearDown(cubit.close);
+
+      var uiDeliveries = 0;
+      Object? lastState;
+
+      await tester.pumpWidget(
+        BlocProvider<DownloadsCubit>.value(
+          value: cubit,
+          child: MaterialApp(
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            theme: AuraTheme.customTheme(
+              const Color(0xFF00E5FF),
+              brightness: Brightness.dark,
+            ),
+            home: BlocBuilder<DownloadsCubit, DownloadsState>(
+              builder: (context, state) {
+                if (!identical(lastState, state)) {
+                  lastState = state;
+                  uiDeliveries++;
+                }
+                return const DownloadsScreen();
+              },
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(DownloadTile), findsOneWidget);
+      final baseline = uiDeliveries;
+
+      // Five progress updates spaced 250ms apart — each beyond the 200ms
+      // throttle window, so each one may rebuild the tile at most once.
+      for (var i = 2; i <= 6; i++) {
+        repoEvents.add(
+          DownloadTask(
+            id: 'id_v1',
+            videoId: 'v1',
+            title: 'Song',
+            artist: 'Artist',
+            createdAt: DateTime.now(),
+            status: DownloadStatus.downloading,
+            progress: i / 10,
+          ),
+        );
+        await tester.pump(const Duration(milliseconds: 250));
+      }
+
+      final deliveries = uiDeliveries - baseline;
+      expect(
+        deliveries,
+        lessThanOrEqualTo(5),
+        reason: '5 spaced updates must rebuild the tile at most once each '
+            '(got $deliveries)',
+      );
+      expect(
+        deliveries,
+        greaterThanOrEqualTo(1),
+        reason: 'progress updates must actually reach the tile',
       );
 
       await repoEvents.close();

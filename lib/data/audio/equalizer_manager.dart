@@ -1,11 +1,11 @@
 // lib/data/audio/equalizer_manager.dart
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/prefs_keys.dart';
 import '../../core/utils/error_logger.dart';
+import '../../core/utils/platform_capabilities.dart';
 import '../../domain/models/audio_effects_config.dart';
 import '../../domain/models/eq_preset.dart';
 import '../../domain/models/headphone_profile.dart';
@@ -421,7 +421,7 @@ class EqualizerManager {
         targetFrequencies: targetFreqs);
     currentPreset = currentPreset.copyWith(gains: interpolated);
 
-    if (Platform.isAndroid) {
+    if (PlatformCapabilities.isAndroid) {
       // Single bulk JNI hop (was 32 hops, 150-300ms jank) + fallback for legacy 10-band path
       try {
         await _effectsChannel.setNativeEqBandsBulk(
@@ -497,7 +497,7 @@ class EqualizerManager {
     currentPreset = currentPreset.copyWith(name: 'Custom', gains: newGains);
     comparisonSlots[activeComparisonSlot] = currentPreset;
 
-    if (Platform.isAndroid && isEnabled) {
+    if (PlatformCapabilities.isAndroid && isEnabled) {
       if (is32BandMode) {
         await _effectsChannel.setNativeEqBand(
           index,
@@ -519,7 +519,7 @@ class EqualizerManager {
   }
 
   Future<void> setPreamp(double preampDb) async {
-    if (Platform.isAndroid) {
+    if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setEqPreamp(preampDb.clamp(-15.0, 15.0));
     }
     _debouncedSavePreferences();
@@ -528,7 +528,7 @@ class EqualizerManager {
   Future<void> applyCurrentPreset() async {
     if (!isEnabled) return;
     final targetFreqs = is32BandMode ? custom32Frequencies : customFrequencies;
-    if (Platform.isAndroid) {
+    if (PlatformCapabilities.isAndroid) {
       // Prefer bulk path — single generation publish, zero per-band JNI overhead
       try {
         await _effectsChannel.setNativeEqBandsBulk(
@@ -601,7 +601,7 @@ class EqualizerManager {
     final clamped = value.clamp(0.0, 1.0);
     currentPreset = currentPreset.copyWith(bassBoost: clamped);
     final milliBels = (clamped * 1000).round();
-    if (Platform.isAndroid) {
+    if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setBassBoost(milliBels);
     }
     _debouncedSavePreferences();
@@ -625,7 +625,7 @@ class EqualizerManager {
     _abComparisonGains = List.from(currentPreset.gains);
     final targetFreqs = is32BandMode ? custom32Frequencies : customFrequencies;
     final flatGains = List<double>.filled(targetFreqs.length, 0.0);
-    if (Platform.isAndroid) {
+    if (PlatformCapabilities.isAndroid) {
       if (is32BandMode) {
         final futures = <Future<void>>[];
         for (int i = 0; i < targetFreqs.length; i++) {
@@ -644,7 +644,7 @@ class EqualizerManager {
     isAbComparisonActive = false;
     if (_abComparisonGains.isNotEmpty) {
       final targetFreqs = is32BandMode ? custom32Frequencies : customFrequencies;
-      if (Platform.isAndroid) {
+      if (PlatformCapabilities.isAndroid) {
         if (is32BandMode) {
           final futures = <Future<void>>[];
           for (int i = 0; i < _abComparisonGains.length; i++) {
@@ -678,7 +678,7 @@ class EqualizerManager {
     }
     volumeBoost = safeValue;
     final milliBels = (volumeBoost * 1000).round();
-    if (Platform.isAndroid) {
+    if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setVolumeBoost(milliBels);
     }
     _debouncedSavePreferences();
@@ -801,7 +801,7 @@ class EqualizerManager {
     isCrossfeedEnabled = enabled;
     if (delayUs != null) crossfeedDelayUs = delayUs;
     if (feedDb != null) crossfeedFeedDb = feedDb;
-    if (Platform.isAndroid) {
+    if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setCrossfeedParams(
           crossfeedDelayUs, crossfeedFeedDb);
       await _effectsChannel.setCrossfeedEnabled(enabled);
@@ -819,7 +819,7 @@ class EqualizerManager {
     isLimiterEnabled = enabled;
     if (thresholdDb != null) limiterThresholdDb = thresholdDb;
     if (releaseMs != null) limiterReleaseMs = releaseMs;
-    if (Platform.isAndroid) {
+    if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setLimiterParams(
           lookaheadMs ?? 3.0, limiterThresholdDb, limiterReleaseMs);
       await _effectsChannel.setLimiterEnabled(enabled);
@@ -840,7 +840,7 @@ class EqualizerManager {
     if (releaseMs != null) limiterReleaseMs = releaseMs;
     if (makeupGainDb != null) compressorMakeupGainDb = makeupGainDb;
 
-    if (Platform.isAndroid) {
+    if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setLimiterParams(
           limiterLookaheadMs, limiterThresholdDb, limiterReleaseMs);
     }
@@ -856,7 +856,7 @@ class EqualizerManager {
     isReverbEnabled = enabled;
     if (preset != null) reverbPreset = preset;
     if (wetDry != null) reverbWetDry = wetDry;
-    if (Platform.isAndroid) {
+    if (PlatformCapabilities.isAndroid) {
       if (preset != null) await _effectsChannel.setReverbPreset(preset);
       if (wetDry != null) await _effectsChannel.setReverbWetDry(wetDry);
       await _effectsChannel.setReverbEnabled(enabled);
@@ -865,7 +865,7 @@ class EqualizerManager {
   }
 
   Future<void> loadCustomImpulseResponse(List<double> irSamples) async {
-    if (Platform.isAndroid) {
+    if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.loadImpulseResponse(irSamples);
       isReverbEnabled = true;
       reverbPreset = 4; // Custom
@@ -888,7 +888,7 @@ class EqualizerManager {
       return;
     }
     stereoBalance = balance.clamp(-1.0, 1.0);
-    if (Platform.isAndroid) {
+    if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setStereoBalance(stereoBalance);
     }
     _debouncedSavePreferences();
@@ -901,7 +901,7 @@ class EqualizerManager {
       return;
     }
     monoMix = mono;
-    if (Platform.isAndroid) {
+    if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setMonoMix(mono);
     }
     _debouncedSavePreferences();
@@ -909,7 +909,7 @@ class EqualizerManager {
 
   Future<void> setSincResampler(bool enabled) async {
     isSincResamplerEnabled = enabled;
-    if (Platform.isAndroid) {
+    if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setSincResamplerEnabled(enabled);
     }
     _debouncedSavePreferences();
@@ -928,7 +928,7 @@ class EqualizerManager {
     if (drive != null) saturationDrive = drive.clamp(0.0, 1.0);
     if (mix != null) saturationMix = mix.clamp(0.0, 1.0);
     if (tilt != null) saturationTilt = tilt.clamp(0.0, 1.0);
-    if (Platform.isAndroid) {
+    if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setSaturationParams(
           saturationDrive, saturationMix, saturationTilt);
       await _effectsChannel.setSaturationEnabled(enabled);
@@ -944,7 +944,7 @@ class EqualizerManager {
     }
     isStereoWidthEnabled = enabled;
     if (width != null) stereoWidth = width.clamp(0.0, 2.0);
-    if (Platform.isAndroid) {
+    if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setStereoWidthParams(stereoWidth);
       await _effectsChannel.setStereoWidthEnabled(enabled);
     }
@@ -962,7 +962,7 @@ class EqualizerManager {
     }
     isLoudnessContourEnabled = enabled;
     if (intensity != null) loudnessContourIntensity = intensity.clamp(0.0, 1.0);
-    if (Platform.isAndroid) {
+    if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setLoudnessContourParams(
           loudnessContourIntensity, loudnessVolumeLinear);
       await _effectsChannel.setLoudnessContourEnabled(enabled);
@@ -975,7 +975,7 @@ class EqualizerManager {
   /// changes and applied on session reattach.
   Future<void> updateLoudnessVolume(double volumeLinear) async {
     loudnessVolumeLinear = volumeLinear.clamp(0.0, 1.0);
-    if (Platform.isAndroid && isLoudnessContourEnabled) {
+    if (PlatformCapabilities.isAndroid && isLoudnessContourEnabled) {
       await _effectsChannel.setLoudnessContourParams(
           loudnessContourIntensity, loudnessVolumeLinear);
     }
@@ -994,7 +994,7 @@ class EqualizerManager {
       subCrossoverSlopeDbPerOct = slopeDbPerOct < 18.0 ? 12.0 : 24.0;
     }
     if (gain != null) subCrossoverGain = gain.clamp(0.0, 1.0);
-    if (Platform.isAndroid) {
+    if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setSubCrossoverParams(
           subCrossoverCornerHz, subCrossoverSlopeDbPerOct, subCrossoverGain);
       await _effectsChannel.setSubCrossoverEnabled(enabled);
@@ -1009,7 +1009,7 @@ class EqualizerManager {
       return;
     }
     isDynamicEqEnabled = enabled;
-    if (Platform.isAndroid) {
+    if (PlatformCapabilities.isAndroid) {
       await _pushDynamicEqConfig();
       await _effectsChannel.setDynamicEqEnabled(enabled);
     }
@@ -1021,7 +1021,7 @@ class EqualizerManager {
     final bands = List<DynamicEqBandConfig>.from(dynamicEqBands);
     bands[index] = band;
     dynamicEqBands = bands;
-    if (Platform.isAndroid && isDynamicEqEnabled) {
+    if (PlatformCapabilities.isAndroid && isDynamicEqEnabled) {
       await _effectsChannel.setDynamicEqBand(
         index,
         frequency: band.frequency,
@@ -1040,7 +1040,7 @@ class EqualizerManager {
   /// Pushes band count + every band (bulk) so the native DynamicEQ stage
   /// matches the Dart-side band list atomically.
   Future<void> _pushDynamicEqConfig() async {
-    if (!Platform.isAndroid) return;
+    if (!PlatformCapabilities.isAndroid) return;
     await _effectsChannel.setDynamicEqBandCount(dynamicEqBands.length);
     for (int i = 0; i < dynamicEqBands.length; i++) {
       final band = dynamicEqBands[i];
@@ -1059,13 +1059,13 @@ class EqualizerManager {
   }
 
   Future<void> setBypassDspForBitPerfect(bool bypass) async {
-    if (Platform.isAndroid) {
+    if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setBypassDspForBitPerfect(bypass);
     }
   }
 
   Future<int> syncNativeLatency(double sampleRate) async {
-    if (!Platform.isAndroid) return 0;
+    if (!PlatformCapabilities.isAndroid) return 0;
     try {
       final frames = await _effectsChannel.getPipelineLatencyFrames();
       // Update resampler rates if needed for auto-disable check
@@ -1125,6 +1125,12 @@ class EqualizerManager {
     return false;
   }
 
+  /// Serializes re-attach + resync operations so concurrent session ids and
+  /// route changes can never race release/recreate on the native side.
+  Future<void> _reattachChain = Future<void>.value();
+  int? _pendingReattachSessionId;
+  int? _lastAppliedSessionId;
+
   /// Re-attaches all active effects to a new [sessionId] that ExoPlayer
   /// creates after `stop()` + `setAudioSource()`. This is called every time
   /// the player establishes a new audio session (e.g. on every track change
@@ -1133,106 +1139,60 @@ class EqualizerManager {
   /// Unlike [_restorePreferences] this does NOT reload prefs from disk — it
   /// uses the already-live in-memory state, making it safe to call on the
   /// hot path without any I/O.
+  ///
+  /// Ordering contract (release -> setAudioSessionId -> re-apply):
+  ///   1. `releaseEffects()` detaches every old-session AudioEffect instance
+  ///      (and clears native dedup caches so the re-push below is applied).
+  ///   2. `setAudioSessionId(sessionId)` recreates the HAL effect chain bound
+  ///      to the new session.
+  ///   3. The full current effect state (enabled flags, band count, bands,
+  ///      presets) is re-pushed so nothing survives from the old session.
+  ///
+  /// Idempotence: a repeated event for the session id that is already applied
+  /// does not release/recreate anything. Concurrent calls are serialized and
+  /// collapsed — if a newer id arrives while an older one is still applying,
+  /// only the newest one is ultimately applied.
   Future<void> reapplyToSession(int sessionId) async {
-    if (!Platform.isAndroid) return;
+    if (!PlatformCapabilities.isAndroid) return;
+    if (sessionId <= 0) return; // 0 = no session yet; never attach to the global mix
+    _pendingReattachSessionId = sessionId;
+    _reattachChain = _reattachChain
+        .then((_) => _runReattach())
+        .catchError((Object e, StackTrace st) {
+      ErrorLogger.log('reapplyToSession chain failed',
+          error: e, stackTrace: st, category: 'EqualizerManager');
+    });
+    await _reattachChain;
+  }
+
+  /// Re-pushes the full current effect state onto the LIVE session without
+  /// releasing or recreating any effect. Used on audio route changes
+  /// (Bluetooth <-> speaker) where the session id stays the same but the HAL
+  /// chain was re-initialized by the platform, and after interruptions that
+  /// ended the audio focus. Idempotent and safe to call repeatedly.
+  Future<void> resyncActiveEffects() async {
+    if (!PlatformCapabilities.isAndroid) return;
+    _reattachChain = _reattachChain
+        .then((_) => _pushFullEffectState())
+        .catchError((Object e, StackTrace st) {
+      ErrorLogger.log('resyncActiveEffects failed',
+          error: e, stackTrace: st, category: 'EqualizerManager');
+    });
+    await _reattachChain;
+  }
+
+  Future<void> _runReattach() async {
+    final sessionId = _pendingReattachSessionId;
+    _pendingReattachSessionId = null;
+    if (sessionId == null || sessionId <= 0) return;
+    if (sessionId == _lastAppliedSessionId) return; // same-id re-emit: no-op
     try {
+      await _effectsChannel.releaseEffects();
       await _effectsChannel.setAudioSessionId(sessionId);
-
-      // Nothing to do if no effects are active.
-      final anyActive = isEnabled ||
-          isVirtualizerEnabled ||
-          isDynamicsEnabled ||
-          isSpatializerEnabled ||
-          isCrossfeedEnabled ||
-          isLimiterEnabled ||
-          isReverbEnabled ||
-          isSaturationEnabled ||
-          isStereoWidthEnabled ||
-          isLoudnessContourEnabled ||
-          isSubCrossoverEnabled ||
-          isDynamicEqEnabled ||
-          volumeBoost > 0 ||
-          currentPreset.bassBoost > 0 ||
-          stereoBalance != 0.0 ||
-          monoMix;
-      if (!anyActive) return;
-
-      final futures = <Future<void>>[];
-
-      if (isEnabled) {
-        await applyCurrentPreset();
-        futures.add(_effectsChannel.setEqEnabled(true));
-        futures.add(_effectsChannel.setNativeEqEnabled(true));
-      }
-      if (currentPreset.bassBoost > 0) {
-        // Direct channel call to avoid _debouncedSavePreferences thrash on hot path (track change)
-        final milliBels = (currentPreset.bassBoost.clamp(0.0, 1.0) * 1000).round();
-        futures.add(_effectsChannel.setBassBoost(milliBels));
-      }
-      if (volumeBoost > 0) {
-        final milliBels = (volumeBoost.clamp(0.0, 1.0) * 1000).round();
-        futures.add(_effectsChannel.setVolumeBoost(milliBels));
-      }
-      if (isVirtualizerEnabled) {
-        futures.add(_effectsChannel.setVirtualizerEnabled(true));
-        futures.add(
-            _effectsChannel.setVirtualizerStrength(virtualizerStrength));
-      }
-      if (isSpatializerEnabled) {
-        futures.add(_effectsChannel.setSpatializerEnabled(true));
-      }
-      if (isCrossfeedEnabled) {
-        futures.add(_effectsChannel.setCrossfeedParams(
-            crossfeedDelayUs, crossfeedFeedDb));
-        futures.add(_effectsChannel.setCrossfeedEnabled(true));
-      }
-      if (isLimiterEnabled) {
-        futures.add(_effectsChannel.setLimiterParams(
-            limiterLookaheadMs, limiterThresholdDb, limiterReleaseMs));
-        futures.add(_effectsChannel.setLimiterEnabled(true));
-      }
-      if (isReverbEnabled) {
-        futures.add(_effectsChannel.setReverbPreset(reverbPreset));
-        futures.add(_effectsChannel.setReverbWetDry(reverbWetDry));
-        futures.add(_effectsChannel.setReverbEnabled(true));
-      }
-      if (stereoBalance != 0.0) {
-        futures.add(_effectsChannel.setStereoBalance(stereoBalance));
-      }
-      if (monoMix) futures.add(_effectsChannel.setMonoMix(true));
-      if (isSaturationEnabled) {
-        futures.add(_effectsChannel.setSaturationParams(
-            saturationDrive, saturationMix, saturationTilt));
-        futures.add(_effectsChannel.setSaturationEnabled(true));
-      }
-      if (isStereoWidthEnabled) {
-        futures.add(_effectsChannel.setStereoWidthParams(stereoWidth));
-        futures.add(_effectsChannel.setStereoWidthEnabled(true));
-      }
-      if (isLoudnessContourEnabled) {
-        futures.add(_effectsChannel.setLoudnessContourParams(
-            loudnessContourIntensity, loudnessVolumeLinear));
-        futures.add(_effectsChannel.setLoudnessContourEnabled(true));
-      }
-      if (isSubCrossoverEnabled) {
-        futures.add(_effectsChannel.setSubCrossoverParams(
-            subCrossoverCornerHz, subCrossoverSlopeDbPerOct, subCrossoverGain));
-        futures.add(_effectsChannel.setSubCrossoverEnabled(true));
-      }
-      if (isDynamicEqEnabled) {
-        futures.add(_pushDynamicEqConfig());
-        futures.add(_effectsChannel.setDynamicEqEnabled(true));
-      }
-
-      if (futures.isNotEmpty) await Future.wait(futures);
-
-      // Dynamics last — triggers recalculateActiveStages which may disable OEM
-      // engine; apply last to prevent intermediate dropout. No delay needed here
-      // because the session is already stable by the time reapplyToSession is
-      // called (unlike cold-start where AudioTrack is still opening).
-      if (isDynamicsEnabled && !_isDynamicsBypassed) {
-        await _effectsChannel.setDynamicsPreset(dynamicsPreset, true);
-      }
+      await _pushFullEffectState();
+      // Mark applied only on success so a later same-id event can retry a
+      // failed attach (e.g. channel timeout while the HAL was still settling).
+      _lastAppliedSessionId = sessionId;
     } catch (e, st) {
       ErrorLogger.log(
         'reapplyToSession($sessionId) failed',
@@ -1240,6 +1200,107 @@ class EqualizerManager {
         stackTrace: st,
         category: 'EqualizerManager',
       );
+    }
+  }
+
+  /// Pushes every active effect (enabled flags, band count, bands, presets)
+  /// to the native stack. Assumes the session is already established — either
+  /// after [_runReattach] recreated it or after a route change.
+  Future<void> _pushFullEffectState() async {
+    // Nothing to do if no effects are active.
+    final anyActive = isEnabled ||
+        isVirtualizerEnabled ||
+        isDynamicsEnabled ||
+        isSpatializerEnabled ||
+        isCrossfeedEnabled ||
+        isLimiterEnabled ||
+        isReverbEnabled ||
+        isSaturationEnabled ||
+        isStereoWidthEnabled ||
+        isLoudnessContourEnabled ||
+        isSubCrossoverEnabled ||
+        isDynamicEqEnabled ||
+        volumeBoost > 0 ||
+        currentPreset.bassBoost > 0 ||
+        stereoBalance != 0.0 ||
+        monoMix;
+    if (!anyActive) return;
+
+    final futures = <Future<void>>[];
+
+    if (isEnabled) {
+      await applyCurrentPreset();
+      futures.add(_effectsChannel.setEqEnabled(true));
+      futures.add(_effectsChannel.setNativeEqEnabled(true));
+    }
+    if (currentPreset.bassBoost > 0) {
+      // Direct channel call to avoid _debouncedSavePreferences thrash on hot path (track change)
+      final milliBels = (currentPreset.bassBoost.clamp(0.0, 1.0) * 1000).round();
+      futures.add(_effectsChannel.setBassBoost(milliBels));
+    }
+    if (volumeBoost > 0) {
+      final milliBels = (volumeBoost.clamp(0.0, 1.0) * 1000).round();
+      futures.add(_effectsChannel.setVolumeBoost(milliBels));
+    }
+    if (isVirtualizerEnabled) {
+      futures.add(_effectsChannel.setVirtualizerEnabled(true));
+      futures.add(
+          _effectsChannel.setVirtualizerStrength(virtualizerStrength));
+    }
+    if (isSpatializerEnabled) {
+      futures.add(_effectsChannel.setSpatializerEnabled(true));
+    }
+    if (isCrossfeedEnabled) {
+      futures.add(_effectsChannel.setCrossfeedParams(
+          crossfeedDelayUs, crossfeedFeedDb));
+      futures.add(_effectsChannel.setCrossfeedEnabled(true));
+    }
+    if (isLimiterEnabled) {
+      futures.add(_effectsChannel.setLimiterParams(
+          limiterLookaheadMs, limiterThresholdDb, limiterReleaseMs));
+      futures.add(_effectsChannel.setLimiterEnabled(true));
+    }
+    if (isReverbEnabled) {
+      futures.add(_effectsChannel.setReverbPreset(reverbPreset));
+      futures.add(_effectsChannel.setReverbWetDry(reverbWetDry));
+      futures.add(_effectsChannel.setReverbEnabled(true));
+    }
+    if (stereoBalance != 0.0) {
+      futures.add(_effectsChannel.setStereoBalance(stereoBalance));
+    }
+    if (monoMix) futures.add(_effectsChannel.setMonoMix(true));
+    if (isSaturationEnabled) {
+      futures.add(_effectsChannel.setSaturationParams(
+          saturationDrive, saturationMix, saturationTilt));
+      futures.add(_effectsChannel.setSaturationEnabled(true));
+    }
+    if (isStereoWidthEnabled) {
+      futures.add(_effectsChannel.setStereoWidthParams(stereoWidth));
+      futures.add(_effectsChannel.setStereoWidthEnabled(true));
+    }
+    if (isLoudnessContourEnabled) {
+      futures.add(_effectsChannel.setLoudnessContourParams(
+          loudnessContourIntensity, loudnessVolumeLinear));
+      futures.add(_effectsChannel.setLoudnessContourEnabled(true));
+    }
+    if (isSubCrossoverEnabled) {
+      futures.add(_effectsChannel.setSubCrossoverParams(
+          subCrossoverCornerHz, subCrossoverSlopeDbPerOct, subCrossoverGain));
+      futures.add(_effectsChannel.setSubCrossoverEnabled(true));
+    }
+    if (isDynamicEqEnabled) {
+      futures.add(_pushDynamicEqConfig());
+      futures.add(_effectsChannel.setDynamicEqEnabled(true));
+    }
+
+    if (futures.isNotEmpty) await Future.wait(futures);
+
+    // Dynamics last — triggers recalculateActiveStages which may disable OEM
+    // engine; apply last to prevent intermediate dropout. No delay needed here
+    // because the session is already stable by the time reapplyToSession is
+    // called (unlike cold-start where AudioTrack is still opening).
+    if (isDynamicsEnabled && !_isDynamicsBypassed) {
+      await _effectsChannel.setDynamicsPreset(dynamicsPreset, true);
     }
   }
 

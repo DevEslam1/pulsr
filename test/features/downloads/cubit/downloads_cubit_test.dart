@@ -603,5 +603,32 @@ void main() {
         await cubit.close();
       },
     );
+
+    test(
+      'close() drains every held resource (subscriptions, timers, effects)',
+      () async {
+        final cubit = buildCubit();
+        await Future.delayed(const Duration(milliseconds: 50));
+
+        // While alive, the cubit holds the repository stream subscription
+        // and the open effects controller.
+        expect(cubit.activeResourceCount, greaterThan(0));
+
+        final effectsDone = Completer<void>();
+        final effectsSub = cubit.effects.listen((_) {}, onDone: effectsDone.complete);
+
+        await cubit.close();
+
+        // Fire-and-forget close: cancellation of registered resources is
+        // synchronous, so the registry is provably drained right after.
+        expect(cubit.activeSubscriptionCount, 0);
+        expect(cubit.activeTimerCount, 0);
+        expect(cubit.activeResourceCount, 0);
+
+        // The effects stream terminates with the cubit.
+        await effectsDone.future.timeout(const Duration(seconds: 1));
+        await effectsSub.cancel();
+      },
+    );
   });
 }

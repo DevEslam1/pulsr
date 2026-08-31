@@ -503,5 +503,48 @@
   "applyProfileNow": "Aplicar",
   "forgetDevice": "Olvidar",
   "currentDeviceBadge": "Actual",
-  "profileDropdownLabel": "Perfil"
+  "profileDropdownLabel": "Perfil",
+  "undo": "Deshacer",
+  "downloadDeletedSnackbar": "Se eliminó \"{title}\"",
+  "@downloadDeletedSnackbar": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "statusEmbedding": "Insertando etiquetas…",
+  "etaLabel": "Tiempo restante: {seconds}s",
+  "@etaLabel": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "downloadTileSemantics": "{title} {artist} {status} {progress}",
+  "@downloadTileSemantics": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "artist": {
+        "type": "String"
+      },
+      "status": {
+        "type": "String"
+      },
+      "progress": {
+        "type": "String"
+      }
+    }
+  },
+  "downloadActionsSemantics": "Acciones de descarga para {title}",
+  "@downloadActionsSemantics": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  }
 }

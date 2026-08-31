@@ -10,6 +10,12 @@ import '../../../../l10n/generated/app_localizations.dart';
 import '../../cubit/downloads_cubit.dart';
 import '../../cubit/downloads_state.dart';
 
+/// A single downloads-list row.
+///
+/// Renders itself from the granular task snapshot selected out of
+/// [DownloadsCubit] state, so a progress tick for one task never rebuilds
+/// tiles of unrelated tasks. [task] is only the seed used before the first
+/// state emission arrives.
 class DownloadTile extends StatelessWidget {
   final DownloadTask task;
 
@@ -25,6 +31,10 @@ class DownloadTile extends StatelessWidget {
       selector: (state) => state.tasks[taskKey] ?? state.tasks[task.videoId] ?? task,
       builder: (context, currentTask) {
         final t = currentTask ?? task;
+        // Local copies so the nullable fields are promoted without `!`
+        // (checked-null pattern; see audit B).
+        final speedKbps = t.speedKbps;
+        final etaSeconds = t.etaSeconds;
         final p = context.palette;
         final cubit = context.read<DownloadsCubit>();
         final l10n = AppLocalizations.of(context)!;
@@ -38,7 +48,7 @@ class DownloadTile extends StatelessWidget {
           DownloadStatus.embedding => (
               Icons.tag_rounded,
               p.accent,
-              'Embedding tags…',
+              l10n.statusEmbedding,
             ),
           DownloadStatus.queued => (
               Icons.schedule_rounded,
@@ -62,9 +72,11 @@ class DownloadTile extends StatelessWidget {
             ),
         };
 
+        final progressPct =
+            t.progress > 0 ? '${(t.progress * 100).round()}%' : '';
+
         return Semantics(
-          label:
-              '${t.title} ${t.artist} $statusLabel ${t.progress > 0 ? '${(t.progress * 100).round()}%' : ''}',
+          label: l10n.downloadTileSemantics(t.title, t.artist, statusLabel, progressPct),
           button: false,
           child: Container(
             decoration: BoxDecoration(
@@ -128,7 +140,7 @@ class DownloadTile extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Semantics(
-                      label: 'Download actions for ${t.title}',
+                      label: l10n.downloadActionsSemantics(t.title),
                       button: true,
                       child: PopupMenuButton<String>(
                         icon: Icon(Icons.more_vert_rounded,
@@ -165,7 +177,7 @@ class DownloadTile extends StatelessWidget {
                                   Icon(Icons.vertical_align_top_rounded,
                                       size: 18, color: p.accent),
                                   const SizedBox(width: 10),
-                                  Text('Download Next',
+                                  Text(l10n.next,
                                       style: TextStyle(color: p.accent)),
                                 ],
                               ),
@@ -245,14 +257,14 @@ class DownloadTile extends StatelessWidget {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      if (t.speedKbps != null && t.speedKbps! > 0)
+                      if (speedKbps != null && speedKbps > 0)
                         Text(
-                          '${t.speedKbps!.toStringAsFixed(0)} KB/s',
+                          '${speedKbps.toStringAsFixed(0)} KB/s',
                           style: TextStyle(color: p.textTertiary, fontSize: 12),
                         ),
-                      if (t.etaSeconds != null && t.etaSeconds! > 0)
+                      if (etaSeconds != null && etaSeconds > 0)
                         Text(
-                          'ETA: ${t.etaSeconds}s',
+                          l10n.etaLabel(etaSeconds),
                           style: TextStyle(color: p.textTertiary, fontSize: 12),
                         ),
                     ],

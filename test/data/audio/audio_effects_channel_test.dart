@@ -42,6 +42,29 @@ void main() {
       },
     );
 
+    test('setAudioSessionId forwards the session id to the native side', () async {
+      final effectsChannel = AudioEffectsChannel();
+
+      await effectsChannel.setAudioSessionId(5);
+
+      final sent = log.where((c) => c.method == 'setAudioSessionId').toList();
+      expect(sent, hasLength(1));
+      expect(sent.single.arguments, {'audioSessionId': 5});
+    });
+
+    test('setAudioSessionId ignores id 0 (no session) without channel calls',
+        () async {
+      final effectsChannel = AudioEffectsChannel();
+
+      await effectsChannel.setAudioSessionId(0);
+      await effectsChannel.setAudioSessionId(-3);
+
+      expect(
+        log.where((c) => c.method == 'setAudioSessionId'),
+        isEmpty,
+      );
+    });
+
     test(
       '[E1] onAutoDegradedSessionStarted fires exactly once per 0->nonzero transition',
       () async {

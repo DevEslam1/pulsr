@@ -3,6 +3,7 @@
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Where the download engine may consume network bandwidth.
 enum NetworkPolicy {
   wifiOnly,
   allowCellularFailover,
@@ -20,6 +21,11 @@ enum NetworkPolicy {
   }
 }
 
+/// User preferences for the download engine.
+///
+/// Pure value object: persistence goes through [load]/[save]; both round-trip
+/// every field and clamp numeric bounds so a hand-edited store cannot poison
+/// the queue.
 class DownloadSettings {
   final bool wifiOnly;
   final NetworkPolicy networkPolicy;
@@ -28,15 +34,20 @@ class DownloadSettings {
   final String? downloadLocation; // SAF uri or null for default Music/
   final int progressTimeoutWindowSeconds; // default 30s
 
+  static const int minConcurrent = 1;
+  static const int maxConcurrentLimit = 5;
+  static const int minProgressTimeoutSeconds = 10;
+  static const int maxProgressTimeoutSeconds = 3600;
+  static const int defaultProgressTimeoutSeconds = 30;
+
   const DownloadSettings({
     this.wifiOnly = false,
     this.networkPolicy = NetworkPolicy.allowCellularFailover,
     this.quality = 'high',
     this.maxConcurrent = 3,
     this.downloadLocation,
-    this.progressTimeoutWindowSeconds = 30,
+    this.progressTimeoutWindowSeconds = defaultProgressTimeoutSeconds,
   });
-
 
   factory DownloadSettings.defaultSettings() => const DownloadSettings();
 
@@ -51,9 +62,12 @@ class DownloadSettings {
     return DownloadSettings(
       wifiOnly: prefs.getBool(_kWifi) ?? false,
       quality: prefs.getString(_kQuality) ?? 'high',
-      maxConcurrent: prefs.getInt(_kConcurrency) ?? 3,
+      maxConcurrent:
+          (prefs.getInt(_kConcurrency) ?? 3).clamp(minConcurrent, maxConcurrentLimit),
       downloadLocation: prefs.getString(_kLocation),
-      progressTimeoutWindowSeconds: prefs.getInt(_kProgressTimeout) ?? 30,
+      progressTimeoutWindowSeconds:
+          (prefs.getInt(_kProgressTimeout) ?? defaultProgressTimeoutSeconds)
+              .clamp(minProgressTimeoutSeconds, maxProgressTimeoutSeconds),
     );
   }
 
@@ -61,8 +75,12 @@ class DownloadSettings {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_kWifi, wifiOnly);
     await prefs.setString(_kQuality, quality);
-    await prefs.setInt(_kConcurrency, maxConcurrent.clamp(1, 5));
-    await prefs.setInt(_kProgressTimeout, progressTimeoutWindowSeconds);
+    await prefs.setInt(
+        _kConcurrency, maxConcurrent.clamp(minConcurrent, maxConcurrentLimit));
+    await prefs.setInt(
+        _kProgressTimeout,
+        progressTimeoutWindowSeconds
+            .clamp(minProgressTimeoutSeconds, maxProgressTimeoutSeconds));
     if (downloadLocation != null) {
       await prefs.setString(_kLocation, downloadLocation!);
     } else {
@@ -72,6 +90,7 @@ class DownloadSettings {
 
   DownloadSettings copyWith({
     bool? wifiOnly,
+    NetworkPolicy? networkPolicy,
     String? quality,
     int? maxConcurrent,
     String? downloadLocation,
@@ -79,6 +98,7 @@ class DownloadSettings {
   }) =>
       DownloadSettings(
         wifiOnly: wifiOnly ?? this.wifiOnly,
+        networkPolicy: networkPolicy ?? this.networkPolicy,
         quality: quality ?? this.quality,
         maxConcurrent: maxConcurrent ?? this.maxConcurrent,
         downloadLocation: downloadLocation ?? this.downloadLocation,

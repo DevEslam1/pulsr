@@ -15,6 +15,12 @@ import '../cubit/downloads_state.dart';
 import 'widgets/download_tile.dart';
 import 'widgets/storage_stats_header.dart';
 
+/// Offline downloads hub: storage usage header, the task list with
+/// swipe-to-delete + undo, and resume-all affordances.
+///
+/// State is observed exclusively through [DownloadsCubit]; per-tile rebuilds
+/// are isolated with [BlocSelector] so progress storms only rebuild the tile
+/// whose task actually changed.
 class DownloadsScreen extends StatefulWidget {
   const DownloadsScreen({super.key});
 
@@ -54,16 +60,17 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
   void _handleDelete(BuildContext context, DownloadTask task) {
     HapticFeedback.mediumImpact();
     final cubit = context.read<DownloadsCubit>();
+    final l10n = AppLocalizations.of(context)!;
     _recentlyDeletedTask = task;
     cubit.deleteDownload(task.videoId);
 
     ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Deleted "${task.title}"'),
+        content: Text(l10n.downloadDeletedSnackbar(task.title)),
         duration: const Duration(seconds: 5),
         action: SnackBarAction(
-          label: 'Undo',
+          label: l10n.undo,
           onPressed: () {
             if (_recentlyDeletedTask != null) {
               cubit.queueDownload(_recentlyDeletedTask!);
@@ -188,7 +195,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  '${state.pausedCount} download${state.pausedCount > 1 ? "s" : ""} paused / interrupted',
+                                  '${state.pausedCount} ${l10n.statusPaused}',
                                   style: TextStyle(color: p.textPrimary, fontSize: 13, fontWeight: FontWeight.w500),
                                 ),
                               ),
@@ -199,9 +206,9 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                                   backgroundColor: p.accent,
                                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                 ),
-                                child: const Text(
-                                  'Resume All',
-                                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700, fontSize: 12),
+                                child: Text(
+                                  l10n.resume,
+                                  style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w700, fontSize: 12),
                                 ),
                               ),
                             ],
@@ -234,16 +241,17 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                       return await showDialog<bool>(
                         context: context,
                         builder: (ctx) => AlertDialog(
-                          title: const Text('Cancel Download?'),
-                          content: Text('Are you sure you want to cancel and delete "${task.title}"?'),
+                          title: Text(l10n.cancel),
+                          content: Text(l10n.deleteSongConfirmation),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.of(ctx).pop(false),
-                              child: const Text('Keep'),
+                              child: Text(l10n.cancel),
                             ),
                             TextButton(
                               onPressed: () => Navigator.of(ctx).pop(true),
-                              child: Text('Delete', style: TextStyle(color: p.error)),
+                              child: Text(l10n.delete,
+                                  style: TextStyle(color: p.error)),
                             ),
                           ],
                         ),

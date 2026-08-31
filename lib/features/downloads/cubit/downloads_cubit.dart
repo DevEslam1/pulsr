@@ -30,6 +30,12 @@ class _RefMutex {
   int waiters = 0;
 }
 
+/// Single owner of the downloads task set: exposes one-shot user intents
+/// (queue/pause/resume/retry/delete/prioritize/reorder) backed by domain
+/// use cases, and mirrors the shared repository stream into [DownloadsState].
+///
+/// Actions are serialized per task id ([_withTaskLock]) so double-taps
+/// cannot race; every public method guards against emit-after-close.
 @singleton
 class DownloadsCubit extends PulsrCubit<DownloadsState> {
   final QueueDownloadUseCase _queueDownloadUseCase;
@@ -68,6 +74,7 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     safeEmit(state.copyWith(isLoading: false));
   }
 
+  /// Clears transient error surfaces (message + typed failure).
   void clearError() {
     safeEmit(state.clearTransient());
   }
@@ -100,6 +107,7 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     }
   }
 
+  /// Loads the persisted task set once at startup and mirrors it into state.
   Future<void> loadInitialTasks() async {
     try {
       final tasks = await _observeDownloadsUseCase.getAll();
@@ -136,28 +144,49 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     );
   }
 
+  /// Re-queries storage statistics and mirrors them into state; failures are
+  /// logged and swallowed so a transient platform error never wedges the
+  /// loading flag mid-init.
   Future<void> refreshStorageStats() async {
-    final result = await _getStorageStatsUseCase();
-    result.fold(
-      (failure) {
-        ErrorLogger.log('refreshStorageStats failure: ${failure.message}',
-            category: 'DownloadsCubit');
-      },
-      (stats) {
-        safeEmit(state.copyWith(storageStats: stats));
-      },
-    );
+    try {
+      final result = await _getStorageStatsUseCase();
+      result.fold(
+        (failure) {
+          ErrorLogger.log('refreshStorageStats failure: ${failure.message}',
+              category: 'DownloadsCubit');
+        },
+        (stats) {
+          safeEmit(state.copyWith(storageStats: stats));
+        },
+      );
+    } catch (e, st) {
+      ErrorLogger.log('refreshStorageStats in DownloadsCubit failed',
+          error: e, stackTrace: st, category: 'DownloadsCubit');
+    }
   }
 
+  /// Queues [task] for download through [QueueDownloadUseCase]. Failures
+  /// surface as a typed [AppFailure] in state plus a one-shot toast effect.
   Future<void> queueDownload(DownloadTask task) async {
+    if (isClosed) return;
     await _withTaskLock(task.videoId, () async {
       try {
         final result = await _queueDownloadUseCase(task);
         result.fold(
           (failure) {
+            if (failure is AlreadyQueuedFailure) {
+              // Duplicate start request: a no-op, not an error. The task is
+              // already queued/active; emitting a failure here would surface
+              // a spurious toast for a benign race (double-tap).
+              ErrorLogger.addBreadcrumb(
+                'queueDownload ignored: already queued (${task.videoId})',
+                category: 'DownloadsCubit',
+              );
+              return;
+            }
             safeEmit(state.copyWith(
                 errorMessage: failure.message, failure: failure));
-          _notifyFailure(failure.message);
+            _notifyFailure(failure.message);
           },
           (_) {},
         );
@@ -168,6 +197,9 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     });
   }
 
+  /// Queues many tasks sequentially (the repository enforces bounded
+  /// concurrency) and emits at most one error state at the end, never one
+  /// per item.
   Future<BatchDownloadResult> queueBatch(List<DownloadTask> tasks) async {
     final useCase = _queueDownloadsBatchUseCase;
     if (useCase != null) {
@@ -235,7 +267,9 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     );
   }
 
+  /// Pauses the task identified by [videoId].
   Future<void> pauseDownload(String videoId) async {
+    if (isClosed) return;
     await _withTaskLock(videoId, () async {
       try {
         final result = await _pauseDownloadUseCase(videoId);
@@ -254,7 +288,9 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     });
   }
 
+  /// Resumes the paused/interrupted task identified by [videoId].
   Future<void> resumeDownload(String videoId) async {
+    if (isClosed) return;
     await _withTaskLock(videoId, () async {
       try {
         final result = await _resumeDownloadUseCase(videoId);
@@ -264,7 +300,11 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
                 errorMessage: failure.message, failure: failure));
             _notifyFailure(failure.message);
           },
-          (_) {},
+          (_) {
+            // Meaningful transition only: a successful resume clears the
+            // stale failure surface that referred to the previous attempt.
+            if (state.hasFailure) safeEmit(state.clearTransient());
+          },
         );
       } catch (e, st) {
         ErrorLogger.log('resumeDownload in DownloadsCubit failed',
@@ -273,7 +313,9 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     });
   }
 
+  /// Retries the failed/interrupted task identified by [videoId].
   Future<void> retryDownload(String videoId) async {
+    if (isClosed) return;
     await _withTaskLock(videoId, () async {
       try {
         final result = await _retryDownloadUseCase(videoId);
@@ -283,7 +325,11 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
                 errorMessage: failure.message, failure: failure));
             _notifyFailure(failure.message);
           },
-          (_) {},
+          (_) {
+            // A successful retry clears the stale failure surface that
+            // referred to the failed attempt.
+            if (state.hasFailure) safeEmit(state.clearTransient());
+          },
         );
       } catch (e, st) {
         ErrorLogger.log('retryDownload in DownloadsCubit failed',
@@ -292,7 +338,10 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     });
   }
 
+  /// Deletes the task and its local file, cancelling an in-flight download
+  /// first, then refreshes storage statistics.
   Future<void> deleteDownload(String videoId) async {
+    if (isClosed) return;
     await _withTaskLock(videoId, () async {
       try {
         final result = await _deleteDownloadUseCase(videoId);
@@ -317,7 +366,10 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     });
   }
 
+  /// Moves [videoId] to the head of the download queue (no-op when the
+  /// optional use case is unavailable).
   Future<void> prioritizeDownload(String videoId) async {
+    if (isClosed) return;
     final useCase = _prioritizeDownloadUseCase;
     if (useCase != null) {
       await _withTaskLock(videoId, () async {
@@ -339,6 +391,7 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     }
   }
 
+  /// Resumes every paused/interrupted task sequentially, stopping on close.
   Future<void> resumeAllPaused() async {
     final pausedTasks = state.tasks.values
         .where((t) =>
@@ -351,6 +404,7 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     }
   }
 
+  /// Retries every failed/interrupted task sequentially, stopping on close.
   Future<void> retryAllFailed() async {
     final failedTasks = state.tasks.values
         .where((t) =>
@@ -363,6 +417,8 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     }
   }
 
+  /// Re-sequences the queue to match [orderedVideoIds]; ids missing from the
+  /// list keep their relative order at the tail.
   Future<void> reorderQueue(List<String> orderedVideoIds) async {
     final useCase = _reorderDownloadsUseCase;
     if (useCase != null) {

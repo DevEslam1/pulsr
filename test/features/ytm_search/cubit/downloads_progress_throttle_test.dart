@@ -79,4 +79,37 @@ void main() {
         reason: 'terminal state must always be delivered');
     expect(emissions.last.itemFor('vid').progress, 1.0);
   });
+
+  test('sub-throttle cadence is bounded to <= 2 emissions per 200ms window',
+      () async {
+    final cubit = YtmDownloadCubit(mockService, mockPlayerCubit, mockRepo);
+    addTearDown(cubit.close);
+
+    final emissions = <YtmDownloadState>[];
+    final sub = cubit.stream.listen(emissions.add);
+
+    // One progress update every 300ms — beyond the 200ms coalescing window.
+    // rxdart's throttleTime(trailing: true) emits each isolated value at the
+    // window start (leading) and once more at the window end (trailing), so
+    // an isolated update yields at most 2 emissions and never more than one
+    // per window boundary: the sustained rate stays <= 10/sec per task with
+    // duplicate snapshots absorbed downstream by task equality.
+    const updates = 7;
+    for (var i = 1; i <= updates; i++) {
+      repoEvents.add(_task('vid', DownloadStatus.downloading, progress: i / updates));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    }
+    // Terminal event last.
+    repoEvents.add(_task('vid', DownloadStatus.complete, progress: 1));
+    await Future<void>.delayed(const Duration(milliseconds: 700));
+    await sub.cancel();
+
+    expect(emissions.length, greaterThanOrEqualTo(updates + 1),
+        reason: 'every update (and the terminal) must be delivered');
+    expect(emissions.length, lessThanOrEqualTo(2 * (updates + 1)),
+        reason: 'each isolated event is bounded to leading + trailing '
+            'emissions (got ${emissions.length})');
+    expect(emissions.last.itemFor('vid').status, YtDownloadStatus.done);
+    expect(emissions.last.itemFor('vid').progress, 1.0);
+  });
 }

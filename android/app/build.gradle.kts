@@ -185,6 +185,12 @@ dependencies {
     implementation("androidx.media:media:1.7.0")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // ServiceCompat.startForeground(service, id, notification, type) — required
+    // for the runtime FGS type selection (dataSync on API 34 / mediaProcessing
+    // on API 35+) in DownloadService. androidx.core is already in the graph
+    // transitively (androidx.media 1.7.0 -> core 1.9.0); pinned to 1.13.1
+    // because ServiceCompat.startForeground was added in core 1.12.0.
+    implementation("androidx.core:core:1.13.1")
 
     // GPL-3.0. Its presence is why Pulsr as a whole is GPL-3.0, and why it is
     // kept out of the prod (Play Store) variant. Pulls in Mozilla Rhino, which

@@ -2739,6 +2739,47 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Profile'**
   String get profileDropdownLabel;
+
+  /// No description provided for @undo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get undo;
+
+  /// No description provided for @downloadDeletedSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted \"{title}\"'**
+  String downloadDeletedSnackbar(String title);
+
+  /// No description provided for @statusEmbedding.
+  ///
+  /// In en, this message translates to:
+  /// **'Embedding tags…'**
+  String get statusEmbedding;
+
+  /// No description provided for @etaLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'ETA: {seconds}s'**
+  String etaLabel(int seconds);
+
+  /// No description provided for @downloadTileSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'{title} {artist} {status} {progress}'**
+  String downloadTileSemantics(
+    String title,
+    String artist,
+    String status,
+    String progress,
+  );
+
+  /// No description provided for @downloadActionsSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Download actions for {title}'**
+  String downloadActionsSemantics(String title);
 }
 
 class _AppLocalizationsDelegate

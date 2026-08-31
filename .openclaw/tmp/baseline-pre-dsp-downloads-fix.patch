@@ -1,0 +1,112 @@
+﻿diff --git a/lib/core/bloc/base_cubit.dart b/lib/core/bloc/base_cubit.dart
+index 6a76b95..66969e4 100644
+--- a/lib/core/bloc/base_cubit.dart
++++ b/lib/core/bloc/base_cubit.dart
+@@ -151,13 +151,25 @@ abstract class PulsrCubit<S> extends Cubit<S> {
+ 
+   @override
+   Future<void> close() async {
++    debugPrint('DIAG:base close start');
+     _closed = true;
+     for (final timer in _timers) {
+       timer.cancel();
+     }
+     _timers.clear();
+-    await _effectController.close();
+-    await _subs.dispose();
+-    return super.close();
++    debugPrint('DIAG:base close before effectController.close');
++    final f1 = _effectController.close();
++    debugPrint('DIAG:base close effectController.close() called');
++    await f1;
++    debugPrint('DIAG:base close after effectController.close');
++    final f2 = _subs.dispose();
++    debugPrint('DIAG:base close subs.dispose() called');
++    await f2;
++    debugPrint('DIAG:base close after subs.dispose');
++    final r = super.close();
++    debugPrint('DIAG:base close super.close() called');
++    await r;
++    debugPrint('DIAG:base close fully awaited');
++    return;
+   }
+ }
+diff --git a/lib/features/downloads/cubit/downloads_cubit.dart b/lib/features/downloads/cubit/downloads_cubit.dart
+index 7452d89..ed0b9a3 100644
+--- a/lib/features/downloads/cubit/downloads_cubit.dart
++++ b/lib/features/downloads/cubit/downloads_cubit.dart
+@@ -5,6 +5,7 @@
+ // DL-19: Typed failure mapping with retryable classification.
+ 
+ import 'dart:async';
++import 'package:flutter/foundation.dart';
+ import 'package:injectable/injectable.dart';
+ import 'package:mutex/mutex.dart';
+ import 'package:rxdart/rxdart.dart';
+@@ -61,11 +62,17 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
+   }
+ 
+   Future<void> _init() async {
++    debugPrint('DIAG:cubit init start');
+     safeEmit(state.copyWith(isLoading: true));
++    debugPrint('DIAG:cubit init before loadInitialTasks');
+     await loadInitialTasks();
++    debugPrint('DIAG:cubit init after loadInitialTasks');
+     await refreshStorageStats();
++    debugPrint('DIAG:cubit init after refreshStorageStats');
+     _subscribeToDownloadUpdates();
++    debugPrint('DIAG:cubit init after subscribe');
+     safeEmit(state.copyWith(isLoading: false));
++    debugPrint('DIAG:cubit init done');
+   }
+ 
+   void clearError() {
+diff --git a/lib/features/downloads/presentation/downloads_screen.dart b/lib/features/downloads/presentation/downloads_screen.dart
+index a6bbcd7..edd5500 100644
+--- a/lib/features/downloads/presentation/downloads_screen.dart
++++ b/lib/features/downloads/presentation/downloads_screen.dart
+@@ -29,10 +29,12 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
+   @override
+   void initState() {
+     super.initState();
++    debugPrint('DIAG:screen initState');
+     // Consume one-shot effects exactly once; effects are never stored in state,
+     // so rebuilds can never re-fire a consumed toast.
+     _effectSub =
+         context.read<DownloadsCubit>().effects.listen((effect) {
++      debugPrint('DIAG:screen effect ${effect.runtimeType}');
+       if (!mounted) return;
+       if (effect is ShowToastEffect) {
+         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+@@ -96,6 +98,7 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
+       ),
+       body: BlocBuilder<DownloadsCubit, DownloadsState>(
+         builder: (context, state) {
++          debugPrint('DIAG:screen build isLoading=${state.isLoading} tasks=${state.tasks.length}');
+           if (state.isLoading && state.tasks.isEmpty) {
+             return Center(
+               child: CircularProgressIndicator(color: p.accent),
+diff --git a/lib/features/downloads/presentation/widgets/download_tile.dart b/lib/features/downloads/presentation/widgets/download_tile.dart
+index de6aaf9..cd0f2c7 100644
+--- a/lib/features/downloads/presentation/widgets/download_tile.dart
++++ b/lib/features/downloads/presentation/widgets/download_tile.dart
+@@ -20,6 +20,7 @@ class DownloadTile extends StatelessWidget {
+ 
+   @override
+   Widget build(BuildContext context) {
++    debugPrint('DIAG:tile build ${task.id}');
+     final taskKey = task.id.isNotEmpty ? task.id : task.videoId;
+     return BlocSelector<DownloadsCubit, DownloadsState, DownloadTask?>(
+       selector: (state) => state.tasks[taskKey] ?? state.tasks[task.videoId] ?? task,
+diff --git a/lib/features/player/presentation/widgets/equalizer_sheet.dart b/lib/features/player/presentation/widgets/equalizer_sheet.dart
+index 5f2db9a..6ad15ac 100644
+--- a/lib/features/player/presentation/widgets/equalizer_sheet.dart
++++ b/lib/features/player/presentation/widgets/equalizer_sheet.dart
+@@ -745,7 +745,6 @@ class _EqualizerSheetState extends State<EqualizerSheet>
+     final preset = state.eqPreset;
+     final isEnabled = state.isEqEnabled;
+     final dspBlocked = _dspBlockedReason(context);
+-    final nativePcmUnavailable = !_nativePcmEffectsAvailable;
+     final effectiveEnabled = isEnabled && dspBlocked == null;
+ 
+     // Gain staging calculations for Volume Boost

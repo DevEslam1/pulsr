@@ -6,6 +6,10 @@ import '../../../core/errors/failures.dart';
 import '../../../domain/models/download_task.dart';
 import '../../../domain/models/retry_policy.dart';
 
+/// Read-only view over the task map that also accepts lookups by either
+/// task id or videoId (downloads may be keyed by either, and two tasks can
+/// share one videoId at different qualities). All mutating members throw
+/// [UnsupportedError]; updates flow exclusively through [DownloadsState.copyWith].
 class DownloadTaskMap implements Map<String, DownloadTask> {
   final Map<String, DownloadTask> _inner;
 
@@ -83,6 +87,13 @@ class DownloadTaskMap implements Map<String, DownloadTask> {
   Map<K2, V2> cast<K2, V2>() => _inner.cast<K2, V2>();
 }
 
+/// Immutable state of the downloads hub.
+///
+/// [tasks] holds the authoritative task set; [failure]/[errorMessage] carry
+/// the last typed failure (with retryability derived from
+/// [RetryPolicy.isRetryableError] via [isErrorRetryable]). Derived getters
+/// ([activeCount], [pausedCount], …) compute counts on demand — the state
+/// never stores duplicated counters.
 class DownloadsState {
   final Map<String, DownloadTask> tasks;
   final StorageStats storageStats;
@@ -114,6 +125,9 @@ class DownloadsState {
   int get activeCount =>
       tasks.values.where((t) => t.status.isActive).length;
 
+  int get queuedCount =>
+      tasks.values.where((t) => t.status == DownloadStatus.queued).length;
+
   int get pausedCount =>
       tasks.values.where((t) => t.status == DownloadStatus.paused || t.status == DownloadStatus.interrupted).length;
 
@@ -121,6 +135,24 @@ class DownloadsState {
 
   int get completedCount =>
       tasks.values.where((t) => t.status == DownloadStatus.complete).length;
+
+  int get failedCount =>
+      tasks.values.where((t) => t.status == DownloadStatus.failed).length;
+
+  /// Failed tasks whose failure is transient (network/timeout/interrupted) and
+  /// therefore safe to auto- or manually-retry without user intervention.
+  List<DownloadTask> get transientFailures => tasks.values
+      .where((t) => t.status == DownloadStatus.failed && t.isTransientFailure)
+      .toList();
+
+  /// Failed tasks whose failure is permanent (storage full, permission,
+  /// bot-blocked, feature disabled) — retrying without user action is futile.
+  List<DownloadTask> get permanentFailures => tasks.values
+      .where(
+          (t) => t.status == DownloadStatus.failed && !t.isTransientFailure)
+      .toList();
+
+  bool get hasFailure => failure != null || (errorMessage?.isNotEmpty ?? false);
 
   bool get isErrorRetryable => failure != null
       ? RetryPolicy.isRetryableError(failure!.message)

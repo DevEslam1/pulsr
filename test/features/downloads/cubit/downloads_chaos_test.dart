@@ -190,5 +190,136 @@ void main() {
       expect(cubit.activeSubscriptionCount, equals(0));
       await streamCtrl.close();
     });
+
+    test('50-item batch queue completes with every item queued', () async {
+      final mockQueue = MockQueueDownloadUseCase();
+      final mockPause = MockPauseDownloadUseCase();
+      final mockResume = MockResumeDownloadUseCase();
+      final mockRetry = MockRetryDownloadUseCase();
+      final mockDelete = MockDeleteDownloadUseCase();
+      final mockPrioritize = MockPrioritizeDownloadUseCase();
+      final mockObserve = MockObserveDownloadsUseCase();
+      final mockStorageStats = MockGetDownloadStorageStatsUseCase();
+      final streamCtrl = StreamController<DownloadTask>.broadcast();
+
+      when(() => mockObserve.call()).thenAnswer((_) => streamCtrl.stream);
+      when(() => mockObserve.getAll()).thenAnswer((_) async => []);
+      when(() => mockStorageStats.call()).thenAnswer((_) async => const Right(StorageStats()));
+      when(() => mockQueue.call(any())).thenAnswer((inv) async {
+        final task = inv.positionalArguments[0] as DownloadTask;
+        return Right(task.id);
+      });
+
+      final cubit = DownloadsCubit(
+        mockQueue,
+        mockPause,
+        mockResume,
+        mockRetry,
+        mockDelete,
+        mockObserve,
+        mockStorageStats,
+        null,
+        mockPrioritize,
+      );
+
+      final tasks = List.generate(
+        50,
+        (i) => DownloadTask(
+          id: 'batch_id_$i',
+          videoId: 'batch_vid_$i',
+          title: 'Batch Song $i',
+          artist: 'Artist',
+          createdAt: DateTime.now(),
+        ),
+      );
+
+      final result = await cubit.queueBatch(tasks);
+
+      expect(result.totalCount, equals(50));
+      expect(result.queuedCount, equals(50),
+          reason: 'every item in a 50-item batch must queue');
+      expect(result.hasFailures, isFalse);
+      expect(result.taskIds.length, equals(50));
+      expect(cubit.state.hasFailure, isFalse);
+
+      await cubit.close();
+      await streamCtrl.close();
+    });
+
+    test('app kill during download: fresh cubit rehydrates persisted tasks',
+        () async {
+      final mockObserve = MockObserveDownloadsUseCase();
+      final mockQueue = MockQueueDownloadUseCase();
+      final mockPause = MockPauseDownloadUseCase();
+      final mockResume = MockResumeDownloadUseCase();
+      final mockRetry = MockRetryDownloadUseCase();
+      final mockDelete = MockDeleteDownloadUseCase();
+      final mockPrioritize = MockPrioritizeDownloadUseCase();
+      final mockStorageStats = MockGetDownloadStorageStatsUseCase();
+      final streamCtrl = StreamController<DownloadTask>.broadcast();
+
+      // Process death snapshot: an in-flight download plus terminal tasks,
+      // as persisted by the repository before the "kill".
+      final persisted = [
+        DownloadTask(
+          id: 'killed_downloading',
+          videoId: 'killed_downloading',
+          title: 'In Flight',
+          artist: 'Artist',
+          createdAt: DateTime.now(),
+          status: DownloadStatus.downloading,
+          progress: 0.4,
+        ),
+        DownloadTask(
+          id: 'killed_paused',
+          videoId: 'killed_paused',
+          title: 'Paused One',
+          artist: 'Artist',
+          createdAt: DateTime.now(),
+          status: DownloadStatus.paused,
+        ),
+        DownloadTask(
+          id: 'killed_done',
+          videoId: 'killed_done',
+          title: 'Done One',
+          artist: 'Artist',
+          createdAt: DateTime.now(),
+          status: DownloadStatus.complete,
+        ),
+      ];
+
+      when(() => mockObserve.call()).thenAnswer((_) => streamCtrl.stream);
+      when(() => mockObserve.getAll()).thenAnswer((_) async => persisted);
+      when(() => mockStorageStats.call()).thenAnswer((_) async => const Right(StorageStats()));
+
+      // "Reboot": a freshly constructed cubit rehydrates the persisted set.
+      final cubit = DownloadsCubit(
+        mockQueue,
+        mockPause,
+        mockResume,
+        mockRetry,
+        mockDelete,
+        mockObserve,
+        mockStorageStats,
+        null,
+        mockPrioritize,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      expect(cubit.state.tasks.length, equals(persisted.length),
+          reason: 'all persisted tasks must survive the process death');
+      expect(
+          cubit.state.tasks['killed_downloading']?.status,
+          equals(DownloadStatus.downloading),
+          reason: 'a download killed mid-flight must rehydrate');
+      expect(cubit.state.tasks['killed_paused']?.status,
+          equals(DownloadStatus.paused));
+      expect(cubit.state.tasks['killed_done']?.status,
+          equals(DownloadStatus.complete));
+      expect(cubit.state.isLoading, isFalse);
+
+      await cubit.close();
+      await streamCtrl.close();
+    });
   });
 }

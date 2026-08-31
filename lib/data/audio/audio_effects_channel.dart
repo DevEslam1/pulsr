@@ -143,8 +143,19 @@ class AudioEffectsChannel {
     }
   }
 
+  /// Pushes the active player's audio session id to the native effect stack.
+  ///
+  /// Guards against invalid ids: 0 (or negative) means "no session" and would
+  /// bind AudioEffect instances to the global output mix, so it is ignored.
+  /// The native side additionally releases + recreates the effects on the new
+  /// session and reports truthful attachment state back.
   Future<void> setAudioSessionId(int sessionId) async {
     if (!_isAndroid) return;
+    if (sessionId <= 0) {
+      ErrorLogger.log('Ignoring invalid audio session id ($sessionId)',
+          category: 'AudioEffectsChannel');
+      return;
+    }
     try {
       await _channel
           .invokeMethod('setAudioSessionId', {'audioSessionId': sessionId})

@@ -503,5 +503,48 @@
   "applyProfileNow": "تطبيق",
   "forgetDevice": "حذف",
   "currentDeviceBadge": "الحالي",
-  "profileDropdownLabel": "الملف"
+  "profileDropdownLabel": "الملف",
+  "undo": "تراجع",
+  "downloadDeletedSnackbar": "تم حذف \"{title}\"",
+  "@downloadDeletedSnackbar": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "statusEmbedding": "جارٍ تضمين الوسوم…",
+  "etaLabel": "الوقت المتبقي: {seconds} ث",
+  "@etaLabel": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "downloadTileSemantics": "{title} {artist} {status} {progress}",
+  "@downloadTileSemantics": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "artist": {
+        "type": "String"
+      },
+      "status": {
+        "type": "String"
+      },
+      "progress": {
+        "type": "String"
+      }
+    }
+  },
+  "downloadActionsSemantics": "إجراءات التنزيل لـ {title}",
+  "@downloadActionsSemantics": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  }
 }

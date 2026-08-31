@@ -1430,4 +1430,35 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get profileDropdownLabel => 'Profile';
+
+  @override
+  String get undo => 'Undo';
+
+  @override
+  String downloadDeletedSnackbar(String title) {
+    return 'Deleted \"$title\"';
+  }
+
+  @override
+  String get statusEmbedding => 'Embedding tags…';
+
+  @override
+  String etaLabel(int seconds) {
+    return 'ETA: ${seconds}s';
+  }
+
+  @override
+  String downloadTileSemantics(
+    String title,
+    String artist,
+    String status,
+    String progress,
+  ) {
+    return '$title $artist $status $progress';
+  }
+
+  @override
+  String downloadActionsSemantics(String title) {
+    return 'Download actions for $title';
+  }
 }

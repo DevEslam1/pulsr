@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:fpdart/fpdart.dart';
+import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/data/downloads/yt_download_service.dart';
 import 'package:pulsr/features/ytm_search/cubit/ytm_download_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
@@ -9,6 +12,7 @@ import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/core/errors/failures.dart';
 import 'package:pulsr/domain/models/download_task.dart';
 import 'package:pulsr/domain/repositories/download_repository_interface.dart';
+import 'package:pulsr/domain/usecases/queue_download.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockYtDownloadService extends Mock implements YtDownloadService {}
@@ -29,6 +33,13 @@ void main() {
 
   setUpAll(() {
     registerFallbackValue(MockSongsTableData());
+    registerFallbackValue(DownloadTask(
+      id: 'fallback',
+      videoId: 'fallback',
+      title: 'Fallback',
+      artist: 'Fallback',
+      createdAt: DateTime.now(),
+    ));
   });
 
   setUp(() {
@@ -203,6 +214,127 @@ void main() {
       expect(newCubit.state.itemFor('v1').status, YtDownloadStatus.running);
       expect(newCubit.state.itemFor('v2').status, YtDownloadStatus.done);
       await newCubit.close();
+    });
+  });
+
+  group('YtmDownloadCubit use-case path: player swap on completion', () {
+    // Real QueueDownloadUseCase wrapping the mock repository keeps the
+    // production wiring (cubit → use case → repository) under test.
+    test('search-initiated download swaps the player row to the reconciled '
+        'library song on completion', () async {
+      final mockRepo = MockDownloadRepo();
+      getIt.registerSingleton<QueueDownloadUseCase>(
+        QueueDownloadUseCase(mockRepo),
+      );
+      addTearDown(getIt.reset);
+
+      final repoEvents = StreamController<DownloadTask>.broadcast();
+      when(() => mockRepo.getAllDownloads()).thenAnswer((_) async => []);
+      when(() => mockRepo.observeDownloads())
+          .thenAnswer((_) => repoEvents.stream);
+      when(() => mockRepo.queueDownload(any()))
+          .thenAnswer((_) async => const Right('yt_test_video_id'));
+      when(() => mockPlayerCubit.swapReconciledSong(any(), any()))
+          .thenAnswer((_) async {});
+
+      final cubit = YtmDownloadCubit(mockService, mockPlayerCubit, mockRepo);
+      addTearDown(cubit.close);
+      addTearDown(repoEvents.close);
+
+      final song = SongsTableData(
+        id: 123,
+        title: 'Search Row',
+        artist: 'Artist',
+        album: 'Album',
+        durationMs: 1000,
+        path: 'ytmusic://test_video_id',
+        source: SongSource.youtube,
+        remoteId: 'test_video_id',
+        isFavorite: false,
+        isMissing: false,
+        isDownloaded: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+
+      await cubit.download(song);
+      expect(cubit.state.itemFor('test_video_id').status,
+          YtDownloadStatus.queued,
+          reason: 'use-case path must queue through the shared repository');
+      verifyNever(() => mockService.download(any(),
+          onProgress: any(named: 'onProgress')));
+
+      // Repository reports the completed download with the reconciled
+      // positive-id library row.
+      repoEvents.add(DownloadTask(
+        id: 'yt_test_video_id',
+        videoId: 'test_video_id',
+        title: 'Search Row',
+        artist: 'Artist',
+        createdAt: DateTime.now(),
+        status: DownloadStatus.complete,
+        progress: 1.0,
+        librarySongId: 456,
+      ));
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+
+      verify(() => mockPlayerCubit.swapReconciledSong(123, 456)).called(1);
+      expect(cubit.state.itemFor('test_video_id').status,
+          YtDownloadStatus.done);
+    });
+
+    test('failed download does not trigger the player swap', () async {
+      final mockRepo = MockDownloadRepo();
+      getIt.registerSingleton<QueueDownloadUseCase>(
+        QueueDownloadUseCase(mockRepo),
+      );
+      addTearDown(getIt.reset);
+
+      final repoEvents = StreamController<DownloadTask>.broadcast();
+      when(() => mockRepo.getAllDownloads()).thenAnswer((_) async => []);
+      when(() => mockRepo.observeDownloads())
+          .thenAnswer((_) => repoEvents.stream);
+      when(() => mockRepo.queueDownload(any())).thenAnswer(
+          (_) async => const Left(DownloadFailure('Network down')));
+      when(() => mockPlayerCubit.swapReconciledSong(any(), any()))
+          .thenAnswer((_) async {});
+
+      final cubit = YtmDownloadCubit(mockService, mockPlayerCubit, mockRepo);
+      addTearDown(cubit.close);
+      addTearDown(repoEvents.close);
+
+      final song = SongsTableData(
+        id: 123,
+        title: 'Search Row',
+        artist: 'Artist',
+        album: 'Album',
+        durationMs: 1000,
+        path: 'ytmusic://test_video_id',
+        source: SongSource.youtube,
+        remoteId: 'test_video_id',
+        isFavorite: false,
+        isMissing: false,
+        isDownloaded: false,
+        playCount: 0,
+        lastPositionMs: 0,
+      );
+
+      await cubit.download(song);
+      expect(cubit.state.itemFor('test_video_id').status,
+          YtDownloadStatus.failed);
+
+      repoEvents.add(DownloadTask(
+        id: 'yt_test_video_id',
+        videoId: 'test_video_id',
+        title: 'Search Row',
+        artist: 'Artist',
+        createdAt: DateTime.now(),
+        status: DownloadStatus.failed,
+        error: 'Network down',
+      ));
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+
+      verifyNever(() => mockPlayerCubit.swapReconciledSong(any(), any()));
     });
   });
 }

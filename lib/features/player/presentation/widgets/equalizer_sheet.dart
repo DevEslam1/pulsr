@@ -745,7 +745,6 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     final preset = state.eqPreset;
     final isEnabled = state.isEqEnabled;
     final dspBlocked = _dspBlockedReason(context);
-    final nativePcmUnavailable = !_nativePcmEffectsAvailable;
     final effectiveEnabled = isEnabled && dspBlocked == null;
 
     // Gain staging calculations for Volume Boost

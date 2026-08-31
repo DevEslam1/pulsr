@@ -3,6 +3,7 @@
 
 import 'package:fpdart/fpdart.dart';
 import '../../core/errors/failures.dart';
+import 'retry_policy.dart';
 
 enum DownloadStatus {
   queued,
@@ -100,7 +101,17 @@ class DownloadTask {
   final double progress;
   final double? speedKbps;
   final int? etaSeconds;
+
+  /// Total expected size in bytes, when the server reports it. Only
+  /// meaningful while [status] is downloading.
+  final int? totalBytes;
   final String? filePath;
+
+  /// Positive library id of the reconciled row created when the download
+  /// completed. Set by the repository in the same atomic completion commit
+  /// so observers (e.g. the player swap after a search-initiated download)
+  /// can follow the task into the local library without a second lookup.
+  final int? librarySongId;
   final String? tempFilePath;
   final String? expectedChecksum;
   final String? format;
@@ -118,7 +129,9 @@ class DownloadTask {
     this.progress = 0.0,
     this.speedKbps,
     this.etaSeconds,
+    this.totalBytes,
     this.filePath,
+    this.librarySongId,
     this.tempFilePath,
     this.expectedChecksum,
     this.format,
@@ -128,6 +141,27 @@ class DownloadTask {
     this.artworkUrl,
   });
 
+  /// Transient (retryable) failure classification for [status] == failed.
+  /// Storage/permission/feature-disabled errors are permanent; network,
+  /// timeout and interrupted errors are transient and may be auto-retried.
+  bool get isTransientFailure {
+    if (status != DownloadStatus.failed && status != DownloadStatus.interrupted) {
+      return false;
+    }
+    final message = error ?? '';
+    final permanent = message.toLowerCase().contains('insufficient storage') ||
+        message.toLowerCase().contains('storage full') ||
+        message.toLowerCase().contains('unavailable in this build') ||
+        message.toLowerCase().contains('bot blocked') ||
+        message.toLowerCase().contains('offline only');
+    if (permanent) return false;
+    return RetryPolicy.isRetryableError(message);
+  }
+
+  /// Complement of [isTransientFailure] for terminal failed states.
+  bool get isPermanentFailure =>
+      status == DownloadStatus.failed && !isTransientFailure;
+
   DownloadTask copyWith({
     String? id,
     String? videoId,
@@ -136,13 +170,19 @@ class DownloadTask {
     DownloadStatus? status,
     double? progress,
     double? speedKbps,
+    bool clearSpeedKbps = false,
     int? etaSeconds,
+    bool clearEtaSeconds = false,
+    int? totalBytes,
+    bool clearTotalBytes = false,
     String? filePath,
+    int? librarySongId,
     String? tempFilePath,
     String? expectedChecksum,
     String? format,
     int? bitrate,
     String? error,
+    bool clearError = false,
     DateTime? createdAt,
     String? artworkUrl,
   }) {
@@ -153,14 +193,16 @@ class DownloadTask {
       artist: artist ?? this.artist,
       status: status ?? this.status,
       progress: progress ?? this.progress,
-      speedKbps: speedKbps ?? this.speedKbps,
-      etaSeconds: etaSeconds ?? this.etaSeconds,
+      speedKbps: clearSpeedKbps ? null : (speedKbps ?? this.speedKbps),
+      etaSeconds: clearEtaSeconds ? null : (etaSeconds ?? this.etaSeconds),
+      totalBytes: clearTotalBytes ? null : (totalBytes ?? this.totalBytes),
       filePath: filePath ?? this.filePath,
+      librarySongId: librarySongId ?? this.librarySongId,
       tempFilePath: tempFilePath ?? this.tempFilePath,
       expectedChecksum: expectedChecksum ?? this.expectedChecksum,
       format: format ?? this.format,
       bitrate: bitrate ?? this.bitrate,
-      error: error ?? this.error,
+      error: clearError ? null : (error ?? this.error),
       createdAt: createdAt ?? this.createdAt,
       artworkUrl: artworkUrl ?? this.artworkUrl,
     );
@@ -176,7 +218,9 @@ class DownloadTask {
       'progress': progress,
       'speedKbps': speedKbps,
       'etaSeconds': etaSeconds,
+      'totalBytes': totalBytes,
       'filePath': filePath,
+      'librarySongId': librarySongId,
       'tempFilePath': tempFilePath,
       'expectedChecksum': expectedChecksum,
       'format': format,
@@ -203,7 +247,9 @@ class DownloadTask {
       progress: (json['progress'] as num?)?.toDouble() ?? 0.0,
       speedKbps: (json['speedKbps'] as num?)?.toDouble(),
       etaSeconds: json['etaSeconds'] as int?,
+      totalBytes: json['totalBytes'] as int?,
       filePath: json['filePath'] as String?,
+      librarySongId: json['librarySongId'] as int?,
       tempFilePath: json['tempFilePath'] as String?,
       expectedChecksum: json['expectedChecksum'] as String?,
       format: json['format'] as String?,

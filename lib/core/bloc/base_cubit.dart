@@ -151,13 +151,25 @@ abstract class PulsrCubit<S> extends Cubit<S> {
 
   @override
   Future<void> close() async {
+    // Teardown is initiated synchronously but never awaited:
+    //
+    // Timer/subscription *cancellation* below is synchronous, so resources are
+    // deterministically released; what we deliberately do NOT await are the
+    // completion futures of the broadcast controllers (effects, bloc's internal
+    // state stream) and of the composite disposal. Those futures only complete
+    // once every attached listener has processed the `done` event, and
+    // widget-tree-bound subscriptions (flutter_bloc builders/selectors) may
+    // defer that delivery until the tree is torn down. Awaiting them from a
+    // fake-async widget test therefore deadlocks `await cubit.close()` until
+    // the test times out (observed: 10-minute TimeoutException in
+    // downloads_tile_test). Closing must never block on the UI tree.
     _closed = true;
     for (final timer in _timers) {
       timer.cancel();
     }
     _timers.clear();
-    await _effectController.close();
-    await _subs.dispose();
-    return super.close();
+    unawaited(_effectController.close());
+    unawaited(_subs.dispose());
+    unawaited(super.close());
   }
 }

@@ -1438,4 +1438,35 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get profileDropdownLabel => 'Perfil';
+
+  @override
+  String get undo => 'Deshacer';
+
+  @override
+  String downloadDeletedSnackbar(String title) {
+    return 'Se eliminó \"$title\"';
+  }
+
+  @override
+  String get statusEmbedding => 'Insertando etiquetas…';
+
+  @override
+  String etaLabel(int seconds) {
+    return 'Tiempo restante: ${seconds}s';
+  }
+
+  @override
+  String downloadTileSemantics(
+    String title,
+    String artist,
+    String status,
+    String progress,
+  ) {
+    return '$title $artist $status $progress';
+  }
+
+  @override
+  String downloadActionsSemantics(String title) {
+    return 'Acciones de descarga para $title';
+  }
 }

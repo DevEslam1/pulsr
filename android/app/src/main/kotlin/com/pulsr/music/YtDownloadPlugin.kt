@@ -211,9 +211,15 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
             }
         }
 
-        // Pre-Q: write straight into the public Music dir, then index it.
+        // Pre-Q (API 28): no MediaStore.Downloads/IS_PENDING support and no
+        // reliably granted WRITE_EXTERNAL_STORAGE guarantee. Write into the
+        // app-specific external music dir (always writable, no permission
+        // needed) and index it via MediaScanner — the app's library discovers
+        // downloads through MediaStore + path-based playback, which works
+        // unchanged for app-specific files on API 28.
         @Suppress("DEPRECATION")
-        val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
+        val musicDir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC)
+            ?: File(context.filesDir, "Music").apply { if (!exists()) mkdirs() }
         if (!musicDir.exists()) musicDir.mkdirs()
 
         var dest = File(musicDir, displayName)

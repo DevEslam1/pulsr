@@ -12,6 +12,7 @@ import 'package:pulsr/domain/usecases/pause_download.dart';
 import 'package:pulsr/domain/usecases/queue_download.dart';
 import 'package:pulsr/domain/usecases/resume_download.dart';
 import 'package:pulsr/domain/usecases/retry_download.dart';
+import 'package:pulsr/domain/usecases/queue_downloads_batch.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_cubit.dart';
 
 class MockQueueDownloadUseCase extends Mock implements QueueDownloadUseCase {}
@@ -29,6 +30,9 @@ class MockObserveDownloadsUseCase extends Mock
 
 class MockGetDownloadStorageStatsUseCase extends Mock
     implements GetDownloadStorageStatsUseCase {}
+
+class MockQueueDownloadsBatchUseCase extends Mock
+    implements QueueDownloadsBatchUseCase {}
 
 void main() {
   setUpAll(() {
@@ -112,6 +116,82 @@ void main() {
         expect(result.failedIds['task_2'], isA<InsufficientStorageFailure>());
         expect(result.failures.length, equals(1));
         expect(result.failures.first, isA<InsufficientStorageFailure>());
+
+        await cubit.close();
+        await streamCtrl.close();
+      },
+    );
+
+    test(
+      'Batch use case path surfaces first failure and reports per-item result',
+      () async {
+        final mockQueue = MockQueueDownloadUseCase();
+        final mockPause = MockPauseDownloadUseCase();
+        final mockResume = MockResumeDownloadUseCase();
+        final mockRetry = MockRetryDownloadUseCase();
+        final mockDelete = MockDeleteDownloadUseCase();
+        final mockObserve = MockObserveDownloadsUseCase();
+        final mockStorageStats = MockGetDownloadStorageStatsUseCase();
+        final mockBatchUseCase = MockQueueDownloadsBatchUseCase();
+        final streamCtrl = StreamController<DownloadTask>.broadcast();
+
+        when(() => mockObserve.call()).thenAnswer((_) => streamCtrl.stream);
+        when(() => mockObserve.getAll()).thenAnswer((_) async => []);
+        when(
+          () => mockStorageStats.call(),
+        ).thenAnswer((_) async => const Right(StorageStats()));
+
+        final task1 = DownloadTask(
+          id: 'b_task_1',
+          videoId: 'b_vid_1',
+          title: 'Batch Song 1',
+          artist: 'Artist',
+          createdAt: DateTime.now(),
+        );
+        final task2 = DownloadTask(
+          id: 'b_task_2',
+          videoId: 'b_vid_2',
+          title: 'Batch Song 2',
+          artist: 'Artist',
+          createdAt: DateTime.now(),
+        );
+
+        when(() => mockBatchUseCase.executeWithBatchResult(any()))
+            .thenAnswer((_) async => BatchDownloadResult(
+                  totalCount: 2,
+                  queuedCount: 1,
+                  skippedDuplicatesCount: 0,
+                  taskIds: ['b_task_1'],
+                  failedIds: {
+                    'b_task_2':
+                        const InsufficientStorageFailure('Storage full'),
+                  },
+                  failures: const [InsufficientStorageFailure('Storage full')],
+                ));
+
+        final cubit = DownloadsCubit(
+          mockQueue,
+          mockPause,
+          mockResume,
+          mockRetry,
+          mockDelete,
+          mockObserve,
+          mockStorageStats,
+          null, // reorder
+          null, // prioritize
+          mockBatchUseCase,
+        );
+
+        final result = await cubit.queueBatch([task1, task2]);
+
+        verify(() => mockBatchUseCase.executeWithBatchResult(any())).called(1);
+        expect(result.totalCount, equals(2));
+        expect(result.queuedCount, equals(1));
+        expect(result.failedIds['b_task_2'],
+            isA<InsufficientStorageFailure>());
+        expect(cubit.state.errorMessage, equals('Storage full'),
+            reason: 'batch use case path emits one error at the end');
+        expect(cubit.state.failure, isA<InsufficientStorageFailure>());
 
         await cubit.close();
         await streamCtrl.close();

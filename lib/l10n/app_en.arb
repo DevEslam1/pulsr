@@ -771,5 +771,48 @@
   "applyProfileNow": "Apply",
   "forgetDevice": "Forget",
   "currentDeviceBadge": "Current",
-  "profileDropdownLabel": "Profile"
+  "profileDropdownLabel": "Profile",
+  "undo": "Undo",
+  "downloadDeletedSnackbar": "Deleted \"{title}\"",
+  "@downloadDeletedSnackbar": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "statusEmbedding": "Embedding tags…",
+  "etaLabel": "ETA: {seconds}s",
+  "@etaLabel": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
+  "downloadTileSemantics": "{title} {artist} {status} {progress}",
+  "@downloadTileSemantics": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      },
+      "artist": {
+        "type": "String"
+      },
+      "status": {
+        "type": "String"
+      },
+      "progress": {
+        "type": "String"
+      }
+    }
+  },
+  "downloadActionsSemantics": "Download actions for {title}",
+  "@downloadActionsSemantics": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  }
 }

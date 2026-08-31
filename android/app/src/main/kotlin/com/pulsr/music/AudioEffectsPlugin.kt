@@ -628,9 +628,27 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             when (call.method) {
                 "setAudioSessionId" -> {
                     val sessionId = call.argument<Int>("audioSessionId") ?: 0
-                    currentAudioSessionId = sessionId
-                    recreateEffects()
-                    result.success(true)
+                    if (sessionId <= 0) {
+                        // 0 = "no session yet". Never bind effects to the
+                        // global output mix; keep current state untouched.
+                        Log.w(TAG, "Ignoring invalid audio session id: $sessionId")
+                        result.success(false)
+                    } else {
+                        val changed = sessionId != currentAudioSessionId
+                        currentAudioSessionId = sessionId
+                        if (changed) {
+                            // Detach + release every old-session AudioEffect
+                            // instance, then recreate the chain bound to the
+                            // new session. recreateEffects() rebuilds from the
+                            // stored native state; Dart re-pushes the full
+                            // effect state right after this call returns.
+                            recreateEffects()
+                        }
+                        // Truthful attachment state: true only when the live
+                        // session is set and every HAL effect the current
+                        // stage configuration wants actually exists on it.
+                        result.success(isEffectPipelineAttached())
+                    }
                 }
 
                 "setVirtualizerEnabled" -> {
@@ -680,22 +698,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(true)
                 }
 
-                "getDspDebugStatus" -> {
-                    if (isNativeDspLoaded) {
-                        try {
-                            val status = mapOf(
-                                "appliedSampleRate" to nativeGetAppliedSampleRate(),
-                                "lastAppliedGeneration" to nativeGetLastAppliedGeneration(),
-                                "publishedGeneration" to nativeGetPublishedGeneration()
-                            )
-                            result.success(status)
-                        } catch (e: Exception) {
-                            result.success(null)
-                        }
-                    } else {
-                        result.success(null)
-                    }
-                }
+                // NOTE: the rich DSP debug report lives further down in this
+                // when-block (search for the second "getDspDebugStatus"). It
+                // used to be shadowed by a native-only branch here, which made
+                // the Signal Inspector always report "Session Detached" and 0
+                // active stages. Do not re-add another branch for the same
+                // method name: Kotlin `when` executes only the first match.
 
                 "setDynamicsPreset" -> {
                     val preset = call.argument<String>("preset") ?: "off"
@@ -1411,11 +1419,18 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(true)
                 }
 
-                // The native engine is configured by this plugin but is not
-                // yet called from just_audio/ExoPlayer's PCM callback. Report
-                // that honestly so Flutter can disable non-audible controls.
+                // Truthful pipeline attachment state. The native C++ engine is
+                // configured by this plugin but is not called from
+                // just_audio/ExoPlayer's PCM callback; the AUDIBLE path is the
+                // session-bound AudioEffect chain, so report its health so
+                // Flutter can surface genuine detachment.
                 "getProcessingCapabilities" -> {
-                    result.success(mapOf("isPcmDspAttached" to true))
+                    result.success(
+                        mapOf(
+                            "isPcmDspAttached" to isEffectPipelineAttached(),
+                            "isSessionAttached" to (currentAudioSessionId != 0)
+                        )
+                    )
                 }
 
                 "getDspPreference" -> {
@@ -1657,12 +1672,27 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isLoudnessContourEnabled) "Intensity: ${(loudnessIntensity * 100).toInt()}%" else "Disabled"
                     ))
 
+                    val nativeAppliedSampleRate = if (isNativeDspLoaded) {
+                        try { nativeGetAppliedSampleRate() } catch (_: Exception) { 0.0 }
+                    } else 0.0
+                    val nativeLastAppliedGeneration = if (isNativeDspLoaded) {
+                        try { nativeGetLastAppliedGeneration() } catch (_: Exception) { 0 }
+                    } else 0
+                    val nativePublishedGeneration = if (isNativeDspLoaded) {
+                        try { nativeGetPublishedGeneration() } catch (_: Exception) { 0 }
+                    } else 0
+
                     val report = mapOf(
                         "audioSessionId" to currentAudioSessionId,
-                        "isSessionAttached" to (currentAudioSessionId != 0),
+                        // Truthful: only attached when the HAL chain for the
+                        // current stage configuration exists on a live session.
+                        "isSessionAttached" to isEffectPipelineAttached(),
                         "dspPreference" to dspPreference,
                         "isBitPerfectBypassActive" to isBitPerfectBypassActive,
                         "isNativeDspLoaded" to isNativeDspLoaded,
+                        "appliedSampleRate" to nativeAppliedSampleRate,
+                        "lastAppliedGeneration" to nativeLastAppliedGeneration,
+                        "publishedGeneration" to nativePublishedGeneration,
                         "activeDspStagesMask" to activeDspStages,
                         "autoDegradedStagesMask" to autoDegraded,
                         "hasOemAudio" to hasOem,
@@ -1670,7 +1700,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         "stages" to stagesList,
                         "activeEffectNames" to activeNames
                     )
-                    Log.d(TAG, "[DSP_DEBUG] Live DSP snapshot requested: ${activeNames.size} active effects, session=$currentAudioSessionId, bypass=$isBitPerfectBypassActive")
+                    Log.d(TAG, "[DSP_DEBUG] Live DSP snapshot requested: ${activeNames.size} active effects, session=$currentAudioSessionId, attached=${report["isSessionAttached"]}, bypass=$isBitPerfectBypassActive")
                     result.success(report)
                 }
 
@@ -2198,6 +2228,41 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         buildDynamicsProcessing()
     }
 
+    /**
+     * Truthful attachment state of the session-bound AudioEffect chain:
+     *  - no live session (id 0) -> false;
+     *  - no HAL stage requested -> true (nothing to attach);
+     *  - otherwise at least one requested HAL effect must exist on the live
+     *    session. Creation success is verified via AudioEffect.getId(), which
+     *    throws IllegalStateException for effects that failed to construct or
+     *    went DEAD; released instances are always nulled out, so non-null plus
+     *    a queryable id on the live session is the strongest public-API check.
+     */
+    private fun isEffectPipelineAttached(): Boolean {
+        if (currentAudioSessionId == 0) return false
+        val wantsAnyHalStage = isEqEnabled ||
+                (isDynamicsEnabled && currentDynamicsPreset != "off") ||
+                isVirtualizerEnabled ||
+                virtualizerStrength > 0 ||
+                volumeBoostMilliBels > 0 ||
+                bassBoostStrength > 0
+        if (!wantsAnyHalStage) return true
+
+        fun healthy(effect: AudioEffect?): Boolean {
+            if (effect == null) return false
+            return try {
+                effect.id == currentAudioSessionId
+            } catch (_: Exception) {
+                false
+            }
+        }
+        return healthy(dynamicsProcessing) ||
+                healthy(legacyEqualizer) ||
+                healthy(virtualizer) ||
+                healthy(loudnessEnhancer) ||
+                healthy(bassBoost)
+    }
+
     fun releaseEffects() {
         volumeBoostRetryRunnable?.let {
             mainHandler.removeCallbacks(it)
@@ -2244,6 +2309,38 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
         legacyEqualizer = null
         cachedSupportedEffects = null
+        // Full reset: clear the parameter dedup caches so a subsequent
+        // re-attach re-pushes every value to the recreated effects / C++
+        // engine instead of being filtered out as a duplicate, and re-arm the
+        // DynamicsProcessing build-failure latch for the next session.
+        lastNativeEqPreamp = null
+        lastNativeEqBands.clear()
+        lastNativeEqBandCount = null
+        lastNativeEqEnabled = null
+        lastNativeCrossfeedEnabled = null
+        lastNativeCrossfeedParams = null
+        lastNativeLimiterEnabled = null
+        lastNativeLimiterParams = null
+        lastNativeReverbEnabled = null
+        lastNativeReverbPreset = null
+        lastNativeReverbWetDry = null
+        lastNativeReverbParams = null
+        lastNativeStereoBalance = null
+        lastNativeMonoMix = null
+        lastNativeResamplerEnabled = null
+        lastNativeResamplerRates = null
+        lastNativeSaturationEnabled = null
+        lastNativeSaturationParams = null
+        lastNativeStereoWidthEnabled = null
+        lastNativeStereoWidthParams = null
+        lastNativeLoudnessEnabled = null
+        lastNativeLoudnessParams = null
+        lastNativeSubCrossoverEnabled = null
+        lastNativeSubCrossoverParams = null
+        lastNativeDynamicEqEnabled = null
+        lastNativeDynamicEqBands.clear()
+        dpBuildFailures = 0
+        dpBuildFailureSessionId = 0
     }
 
     @Synchronized

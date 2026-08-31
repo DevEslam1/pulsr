@@ -144,6 +144,35 @@ void main() {
   }
 
   group('DownloadsScreen Widget Tests', () {
+    testWidgets('Renders loading spinner while initial tasks are loading',
+        (tester) async {
+      // Keep init busy so the screen observes isLoading=true with no tasks.
+      // Must be stubbed BEFORE construction: _init() runs in the constructor.
+      // A never-completed Completer avoids a lingering Timer, which
+      // testWidgets would report as pending at teardown.
+      final loadGate = Completer<List<DownloadTask>>();
+      when(() => mockObserve.getAll()).thenAnswer((_) => loadGate.future);
+      final cubit = DownloadsCubit(
+        mockQueue,
+        mockPause,
+        mockResume,
+        mockRetry,
+        mockDelete,
+        mockObserve,
+        mockStorageStats,
+        mockReorder,
+        mockPrioritize,
+      );
+
+      await tester.pumpWidget(createTestWidget(cubit));
+      await tester.pump();
+
+      expect(find.byType(CircularProgressIndicator), findsOneWidget,
+          reason: 'isLoading with an empty task list must show the spinner');
+
+      unawaited(cubit.close().catchError((_) {}));
+    });
+
     testWidgets('Renders empty state when no tasks exist', (tester) async {
       final cubit = createCubit();
 
@@ -206,6 +235,34 @@ void main() {
       // races the bloc's pending-emit machinery, and timeout timers never
       // advance without pumps). Fire-and-forget instead: the zone teardown
       // reclaims the bloc with the test.
+      unawaited(cubit.close().catchError((_) {}));
+    });
+
+    testWidgets('Renders failed task with its error surface', (tester) async {
+      final failedTask = DownloadTask(
+        id: 'task_err',
+        videoId: 'vid_err',
+        title: 'Broken Song',
+        artist: 'Artist',
+        status: DownloadStatus.failed,
+        error: 'No connection. Check your network.',
+        createdAt: DateTime(2026, 1, 1),
+      );
+
+      final cubit = createCubit([failedTask]);
+      await tester.pumpWidget(createTestWidget(cubit));
+      await tester.pump();
+
+      // The tile's indeterminate progress bar animates forever: bounded pumps
+      // instead of pumpAndSettle, which would wedge for 10 minutes.
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('Broken Song'), findsOneWidget);
+      expect(find.text('Failed'), findsOneWidget,
+          reason: 'the failed status label must be visible');
+      expect(find.text('No connection. Check your network.'), findsOneWidget,
+          reason: 'the task error message must be rendered in the tile');
+
       unawaited(cubit.close().catchError((_) {}));
     });
 
@@ -281,6 +338,8 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
         verify(() => mockDelete('vid_del')).called(1);
+        // Pins the EN rendering of l10n.downloadDeletedSnackbar / l10n.undo
+        // (see app_en.arb: downloadDeletedSnackbar, undo).
         expect(find.text('Deleted "Track To Delete"'), findsOneWidget);
         expect(find.text('Undo'), findsOneWidget);
               // Awaiting close() inside the fake-async test zone can deadlock (close

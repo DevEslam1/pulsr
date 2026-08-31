@@ -1,7 +1,6 @@
 // lib/data/downloads/yt_download_service.dart
 import 'dart:async';
 import 'dart:collection';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -26,6 +25,7 @@ import '../../core/services/xdm_backend_service.dart';
 import '../../core/services/ytm_account_service.dart';
 import '../../core/services/ytm_service.dart';
 import '../../core/utils/safe_filename.dart';
+import '../../domain/models/retry_policy.dart';
 
 /// Where a download currently is, for driving progress UI.
 enum YtDownloadStage {
@@ -76,7 +76,7 @@ class _QueuedDownload {
 class YtDownloadService {
   static const _downloadChannel = MethodChannel(PulsrChannels.ytDownload);
   static const _tagChannel = MethodChannel(PulsrChannels.tagEditor);
-  static const int _maxConcurrentDownloads = 3;
+  static const int defaultMaxConcurrentDownloads = 3;
 
   final HttpClient _http;
   final YtmService _ytmService;
@@ -84,13 +84,31 @@ class YtDownloadService {
   final MediaScannerService _scanner;
   final IMusicRepository _repository;
 
+  /// Bounded parallelism for batch downloads (worker-pool size). Defaults to
+  /// [defaultMaxConcurrentDownloads]; the repository enforces its own gate as
+  /// well, this is the per-service hard cap.
+  final int maxConcurrentDownloads;
+
   final Queue<_QueuedDownload> _queue = Queue<_QueuedDownload>();
   final Map<String, _QueuedDownload> _activeDownloads = {};
   static const int _maxCanceledIds = 200;
   final Set<String> _canceledVideoIds = <String>{};
 
+  /// Latest progress emitted per active videoId so an idempotent re-start of
+  /// an already-active download can immediately return the live position.
+  final Map<String, YtDownloadProgress> _lastProgressByVideo = {};
+
+  /// Exponential backoff with jitter for rate-limit retries that arrive
+  /// without a server-provided Retry-After hint.
+  final RetryPolicy _retryPolicy = const RetryPolicy();
+
   YtDownloadService(
-      this._http, this._ytmService, this._scanner, this._repository);
+    this._http,
+    this._ytmService,
+    this._scanner,
+    this._repository, {
+    this.maxConcurrentDownloads = defaultMaxConcurrentDownloads,
+  });
 
   /// Cancels an active or queued download.
   void cancel(String videoId) {
@@ -108,6 +126,10 @@ class YtDownloadService {
 
   /// Downloads [song] (which must be a `source == youtube` row) and returns the
   /// surviving positive song id once it is a local library track.
+  ///
+  /// Idempotent start: if [song] is already downloading, the existing
+  /// download's result is returned (plus the latest known progress) instead of
+  /// enqueueing a second download.
   Future<Result<int>> download(
     SongsTableData song, {
     void Function(YtDownloadProgress)? onProgress,
@@ -126,6 +148,13 @@ class YtDownloadService {
     final completer = Completer<Result<int>>();
     final active = _activeDownloads[videoId];
     if (active != null) {
+      // Already active: piggyback on the existing download, replaying the
+      // last known progress so the caller does not start blind.
+      final lastProgress = _lastProgressByVideo[videoId];
+      if (onProgress != null) {
+        onProgress(lastProgress ??
+            const YtDownloadProgress(YtDownloadStage.queued));
+      }
       unawaited(active.completer.future
           .then(completer.complete, onError: completer.completeError));
       return completer.future;
@@ -147,7 +176,7 @@ class YtDownloadService {
   }
 
   void _processQueue() {
-    while (_activeDownloads.length < _maxConcurrentDownloads &&
+    while (_activeDownloads.length < maxConcurrentDownloads &&
         _queue.isNotEmpty) {
       final task = _queue.removeFirst();
       final videoId = task.song.remoteId!;
@@ -181,7 +210,14 @@ class YtDownloadService {
   Future<Result<int>> _executeDownload(_QueuedDownload task) async {
     final song = task.song;
     final videoId = song.remoteId!;
-    final onProgress = task.onProgress;
+    // Wrap the caller's callback so the latest progress is always recorded
+    // for idempotent piggyback starts of this videoId.
+    final onProgress = task.onProgress == null
+        ? null
+        : (YtDownloadProgress p) {
+            _lastProgressByVideo[videoId] = p;
+            task.onProgress!(p);
+          };
 
     final prefs = await SharedPreferences.getInstance();
     final offlineOnly = prefs.getBool('setting_offline_only_mode') ?? false;
@@ -392,11 +428,27 @@ class YtDownloadService {
           error: e, category: 'YTM');
       return Left(
           DownloadFailure(e.message ?? 'Failed to save the download', e));
+    } on DownloadFailure catch (e) {
+      // Keep typed failures (canceled, corrupt, storage-estimate, …) intact so
+      // the repository's retry classification sees the real cause instead of
+      // a generic 'Download failed: …' wrapper.
+      ErrorLogger.log('YT download failed: ${e.message}',
+          error: e, category: 'download');
+      return Left(e);
+    } on StorageFailure catch (e) {
+      ErrorLogger.log('YT download storage failure: ${e.message}',
+          error: e, category: 'download');
+      return Left(e);
+    } on SocketException catch (e) {
+      ErrorLogger.log('YT download network dropped: ${e.message}',
+          error: e, category: 'download');
+      return Left(NetworkFailure('No connection while downloading', e));
     } catch (e, st) {
       ErrorLogger.log('YT download failed',
           error: e, stackTrace: st, category: 'YTM');
       return Left(DownloadFailure('Download failed: $e', e));
     } finally {
+      _lastProgressByVideo.remove(videoId);
       _canceledVideoIds.remove(videoId);
       if (artworkFuture != null) {
         try {
@@ -506,14 +558,16 @@ class YtDownloadService {
           rethrow;
         }
 
-        // 429 → Retry-After-aware exponential backoff + jitter before poToken rotation
+        // 429 → Retry-After-aware exponential backoff + jitter before poToken rotation.
+        // Falls back to the shared [RetryPolicy] (exponential + jitter) when
+        // the server does not dictate a delay.
         if (e is YtmException && (e.code == 'YTM_429' || e.details?.contains('Retry-After') == true)) {
           final retryMatch = RegExp(r'Retry-After:\s*(\d+)').firstMatch(e.details ?? '');
           final retrySec = retryMatch != null ? int.tryParse(retryMatch.group(1)!) : null;
-          final backoffMs = retrySec != null
-              ? retrySec * 1000
-              : (1000 * (1 << (attempts - 1))).clamp(1000, 15000) + (attempts * 137 % 400);
-          await Future<void>.delayed(Duration(milliseconds: backoffMs));
+          final backoff = retrySec != null
+              ? Duration(seconds: retrySec)
+              : _retryPolicy.delayForAttempt(attempts);
+          await Future<void>.delayed(backoff);
         }
 
         // Transparent 403 / failure re-resolution via same engine chain (poToken rotation mid-download)
@@ -1044,66 +1098,18 @@ class YtDownloadService {
         'artworkPath': artworkPath,
         'removeArtwork': false,
       }).timeout(const Duration(seconds: 15));
+    } on TimeoutException catch (e) {
+      // Tags are best-effort: a slow native tagger must not fail an otherwise
+      // fully downloaded file.
+      ErrorLogger.log('Tagging downloaded track timed out: $e',
+          category: 'YTM');
+    } on MissingPluginException catch (e) {
+      ErrorLogger.log('Tagging unavailable on this platform: $e',
+          category: 'YTM');
     } on PlatformException catch (e) {
       ErrorLogger.log('Tagging downloaded track failed: ${e.code}',
           category: 'YTM');
     }
-  }
-
-  static String sanitizeFilename(String artist, String title, String ext) {
-    var rawArtist = artist.trim();
-    var rawTitle = title.trim();
-    if (rawArtist.isEmpty) rawArtist = 'Unknown Artist';
-    if (rawTitle.isEmpty) rawTitle = 'Unknown Title';
-
-    // 1. Strip reserved characters and control characters (BUG-015)
-    var cleanedArtist =
-        rawArtist.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '_').trim();
-    var cleanedTitle =
-        rawTitle.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '_').trim();
-
-    var base = '$cleanedArtist - $cleanedTitle';
-    // 2. Check Windows reserved device names
-    final baseUpper = base.toUpperCase().split('.').first;
-    const reservedNames = {
-      'CON',
-      'PRN',
-      'AUX',
-      'NUL',
-      'COM1',
-      'COM2',
-      'COM3',
-      'COM4',
-      'COM5',
-      'COM6',
-      'COM7',
-      'COM8',
-      'COM9',
-      'LPT1',
-      'LPT2',
-      'LPT3',
-      'LPT4',
-      'LPT5',
-      'LPT6',
-      'LPT7',
-      'LPT8',
-      'LPT9'
-    };
-    if (reservedNames.contains(baseUpper)) {
-      base = '${base}_track';
-    }
-
-    // 3. Limit UTF-8 byte length to 180 bytes (BUG-015)
-    var encoded = utf8.encode(base);
-    if (encoded.length > 180) {
-      while (encoded.length > 180 && base.isNotEmpty) {
-        base = base.substring(0, base.length - 1);
-        encoded = utf8.encode(base);
-      }
-    }
-    if (base.isEmpty) base = 'Track';
-
-    return '$base.$ext';
   }
 }
 

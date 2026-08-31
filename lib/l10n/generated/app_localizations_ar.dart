@@ -1437,4 +1437,35 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get profileDropdownLabel => 'الملف';
+
+  @override
+  String get undo => 'تراجع';
+
+  @override
+  String downloadDeletedSnackbar(String title) {
+    return 'تم حذف \"$title\"';
+  }
+
+  @override
+  String get statusEmbedding => 'جارٍ تضمين الوسوم…';
+
+  @override
+  String etaLabel(int seconds) {
+    return 'الوقت المتبقي: $seconds ث';
+  }
+
+  @override
+  String downloadTileSemantics(
+    String title,
+    String artist,
+    String status,
+    String progress,
+  ) {
+    return '$title $artist $status $progress';
+  }
+
+  @override
+  String downloadActionsSemantics(String title) {
+    return 'إجراءات التنزيل لـ $title';
+  }
 }

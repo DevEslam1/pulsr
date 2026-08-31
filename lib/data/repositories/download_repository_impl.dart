@@ -19,18 +19,37 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/constants/channels.dart';
+import '../../core/di/injection.dart';
 import '../../core/errors/failures.dart';
 import '../downloads/yt_download_service.dart';
 import '../../core/utils/error_logger.dart';
+import '../../core/utils/ytm_rate_limiter.dart';
 import '../../domain/models/download_task.dart';
+import '../../domain/models/retry_policy.dart';
 import '../../domain/models/ytm_track.dart';
 import '../../domain/repositories/download_repository_interface.dart';
+import '../../domain/repositories/music_repository_interface.dart';
 
 @Singleton(as: IDownloadRepository)
 class DownloadRepositoryImpl implements IDownloadRepository {
   static const _downloadChannel = MethodChannel(PulsrChannels.ytDownload);
   static const String _prefKey = 'pulsr_download_tasks_v2';
   static const int _maxConcurrent = 3;
+
+  /// Bounded auto-retry budget for transient failures (network drop, stream
+  /// expiry, interrupted transfer). Permanent failures never auto-retry.
+  static const int _maxAutoRetries = 2;
+  final RetryPolicy _retryPolicy = const RetryPolicy();
+
+  /// Dart-side mirror of the native DownloadTimeoutHandler: a download that
+  /// produces no progress for the stall window is cancelled and fails
+  /// retryable instead of hanging on a silent socket forever.
+  static const String _prefStallWindowSeconds =
+      'setting_download_progress_timeout';
+  static const int _defaultStallWindowSeconds = 30;
+  static const int _minStallWindowSeconds = 10;
+  static const int _maxStallWindowSeconds = 3600;
+  static const Duration _stallCheckInterval = Duration(seconds: 5);
 
   final YtDownloadService _ytDownloadService;
   final Mutex _queueMutex = Mutex();
@@ -125,13 +144,28 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             (5 * 1024 * 1024);
 
         if (freeBytes > 0 && freeBytes < neededBytes.toInt()) {
-          return Left(InsufficientStorageFailure(
+          const failure = InsufficientStorageFailure(
             'Insufficient storage space for downloading audio',
-            neededBytes: neededBytes.toInt(),
-            availableBytes: freeBytes,
-          ));
+          );
+          ErrorLogger.log(
+            'queueDownload($videoId) storage preflight failed: '
+            'needed=$neededBytes free=$freeBytes',
+            category: 'DownloadsRepository',
+          );
+          return Left(failure);
         }
       } catch (_) {}
+
+      // Consult the shared YTM rate limiter before queueing so a burst of
+      // downloads cannot burn the IP-level token bucket and trigger 429s.
+      // Limiter failures must never block queueing.
+      try {
+        await YtmRateLimiter.shared
+            .acquirePermit(priority: YtmRequestPriority.background);
+      } catch (e) {
+        ErrorLogger.log('YtmRateLimiter acquirePermit failed; continuing',
+            error: e, category: 'DownloadsRepository');
+      }
 
       final queuedTask = task.copyWith(
         status: DownloadStatus.queued,
@@ -162,6 +196,10 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     return await lock.protect(() async {
       final task = _tasks[videoId];
       if (task == null) {
+        ErrorLogger.log(
+          'pauseDownload($videoId): task not found',
+          category: 'DownloadsRepository',
+        );
         return const Left(DownloadFailure('Task not found'));
       }
 
@@ -178,7 +216,12 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         }
       }
 
-      _updateTask(task.copyWith(status: DownloadStatus.paused));
+      _updateTask(task.copyWith(
+        status: DownloadStatus.paused,
+        clearSpeedKbps: true,
+        clearEtaSeconds: true,
+        clearTotalBytes: true,
+      ));
       return const Right(unit);
     });
   }
@@ -189,6 +232,10 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     return await lock.protect(() async {
       final task = _tasks[videoId];
       if (task == null) {
+        ErrorLogger.log(
+          'resumeDownload($videoId): task not found',
+          category: 'DownloadsRepository',
+        );
         return const Left(DownloadFailure('Task not found'));
       }
 
@@ -222,7 +269,13 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     final lock = _taskLocks.putIfAbsent(videoId, () => Mutex());
     final precheck = await lock.protect(() async {
       final task = _tasks[videoId];
-      if (task == null) return const Left<DownloadFailure, Unit>(DownloadFailure('Task not found'));
+      if (task == null) {
+        ErrorLogger.log(
+          'retryDownload($videoId): task not found',
+          category: 'DownloadsRepository',
+        );
+        return const Left<DownloadFailure, Unit>(DownloadFailure('Task not found'));
+      }
       // Prepare retry task outside lock to avoid re-entrancy deadlock (queueDownload also locks same videoId)
       taskToRetry = task.copyWith(
         status: DownloadStatus.queued,
@@ -597,11 +650,78 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   }
 
 
+  /// Transient failures are worth an automatic bounded retry; permanent ones
+  /// (storage full, permissions, feature disabled, bot-blocked) are not.
+  bool _isTransientFailure(AppFailure failure) {
+    if (failure is InsufficientStorageFailure ||
+        failure is PermissionDeniedFailure ||
+        failure is AlreadyQueuedFailure ||
+        failure is FeatureDisabledFailure ||
+        failure is ValidationFailure) {
+      return false;
+    }
+    if (failure is NetworkFailure ||
+        failure is InterruptedFailure ||
+        failure is FgsTimeoutFailure) {
+      return true;
+    }
+    return RetryPolicy.isRetryableError(failure.message);
+  }
+
+  /// Maps an unexpected exception to a typed failure — exceptions must never
+  /// surface as raw strings on the task, so the UI keeps retry semantics.
+  AppFailure _mapExceptionToFailure(Object e) {
+    if (e is SocketException || e is HttpException || e is TimeoutException) {
+      return NetworkFailure('Network error during download', e);
+    }
+    if (e is FileSystemException) {
+      final m = e.message.toLowerCase();
+      final code = e.osError?.errorCode;
+      if (m.contains('no space') || m.contains('enospc') || code == 28) {
+        return InsufficientStorageFailure('Insufficient storage space', error: e);
+      }
+      return DownloadFailure('File error during download: ${e.message}', e);
+    }
+    return GenericDownloadFailure(e.toString(), e);
+  }
+
   Future<void> _executeTask(DownloadTask task) async {
     final videoId = task.videoId;
     final completer = Completer<void>();
     _activeCompleters[videoId] = completer;
-    _updateTask(task.copyWith(status: DownloadStatus.downloading));
+    _updateTask(task.copyWith(
+      status: DownloadStatus.downloading,
+      clearError: true,
+    ));
+
+    // Stall watchdog (Dart-side mirror of DownloadTimeoutHandler): cancels the
+    // service's cancellation token when no progress arrives within the window
+    // so a silent socket can never wedge the task as "downloading" forever.
+    var lastProgressMs = DateTime.now().millisecondsSinceEpoch;
+    var stalled = false;
+    var stallWindowSeconds = _defaultStallWindowSeconds;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final configured = prefs.getInt(_prefStallWindowSeconds);
+      if (configured != null) {
+        stallWindowSeconds = configured.clamp(
+            _minStallWindowSeconds, _maxStallWindowSeconds);
+      }
+    } catch (_) {}
+    final watchdog = Timer.periodic(_stallCheckInterval, (_) {
+      if (stalled) return;
+      final idleFor =
+          DateTime.now().millisecondsSinceEpoch - lastProgressMs;
+      if (idleFor > stallWindowSeconds * 1000) {
+        stalled = true;
+        ErrorLogger.log(
+          'Download stall detected for $videoId: no progress for '
+          '$stallWindowSeconds s — cancelling attempt',
+          category: 'DownloadsRepository',
+        );
+        _ytDownloadService.cancel(videoId);
+      }
+    });
 
     try {
       final synthTrack = YtmTrack(
@@ -613,73 +733,145 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       );
       final songRow = synthTrack.toSongData();
 
-      final result = await _ytDownloadService.download(
-        songRow,
-        onProgress: (p) {
-          if (_pausedVideoIds.contains(videoId)) return;
+      int? completedLibraryId;
+      var attempt = 0;
+      while (true) {
+        attempt++;
+        lastProgressMs = DateTime.now().millisecondsSinceEpoch;
+        stalled = false;
+        final result = await _ytDownloadService.download(
+          songRow,
+          onProgress: (p) {
+            lastProgressMs = DateTime.now().millisecondsSinceEpoch;
+            if (_pausedVideoIds.contains(videoId)) return;
 
-          final progressTask = _tasks[videoId] ?? task;
-          _updateTask(progressTask.copyWith(
-            status: DownloadStatus.downloading,
-            progress: p.fraction ?? progressTask.progress,
-            speedKbps: p.speedKbps,
-            etaSeconds: p.etaSeconds,
-          ));
-        },
-      );
+            final progressTask = _tasks[videoId] ?? task;
+            _updateTask(progressTask.copyWith(
+              status: DownloadStatus.downloading,
+              progress: p.fraction ?? progressTask.progress,
+              speedKbps: p.speedKbps,
+              etaSeconds: p.etaSeconds,
+            ));
+          },
+        );
 
-      if (_pausedVideoIds.contains(videoId)) {
-        _activeVideoIds.remove(videoId);
-        _activeCompleters.remove(videoId);
-        if (!completer.isCompleted) completer.complete();
-        _processQueue();
-        return;
+        // Pause / delete honored at the first await boundary after the
+        // download finishes — never resurrect a paused or removed task.
+        if (_pausedVideoIds.contains(videoId) || !_tasks.containsKey(videoId)) {
+          return;
+        }
+
+        result.fold(
+          (failure) {
+            final current = _tasks[videoId] ?? task;
+            // A watchdog-cancel masquerades as "Download canceled" downstream;
+            // re-label it so the UI/retry classifier sees a retryable timeout.
+            final message = stalled
+                ? 'Download timed out: no progress for $stallWindowSeconds seconds'
+                : failure.message;
+            final transient =
+                _isTransientFailure(failure) && attempt <= _maxAutoRetries;
+            _updateTask(current.copyWith(
+              status: transient
+                  ? DownloadStatus.interrupted
+                  : DownloadStatus.failed,
+              error: message,
+              clearSpeedKbps: true,
+              clearEtaSeconds: true,
+            ));
+            if (transient) {
+              ErrorLogger.log(
+                'Transient download failure for $videoId '
+                '(attempt $attempt/$_maxAutoRetries): $message',
+                category: 'DownloadsRepository',
+              );
+            } else {
+              ErrorLogger.log(
+                'Download failed for $videoId: $message',
+                category: 'DownloadsRepository',
+              );
+            }
+          },
+          (newId) {
+            _cachedStorageStats = null; // Invalidate storage stats cache on completion
+            final current = _tasks[videoId] ?? task;
+            // Atomic commit: YtDownloadService already verified size and renamed .part → final via MediaStore.
+            // librarySongId travels with the terminal event so observers (e.g.
+            // the player swap after a search-initiated download) can follow
+            // the reconciled row without a second lookup.
+            _updateTask(current.copyWith(
+              status: DownloadStatus.complete,
+              progress: 1.0,
+              clearError: true,
+              clearSpeedKbps: true,
+              clearEtaSeconds: true,
+              librarySongId: newId,
+            ));
+            completedLibraryId = newId;
+          },
+        );
+
+        // Record the on-disk path of the reconciled library row so storage
+        // stats, delete, and boot integrity checks can operate on the file.
+        final newId = completedLibraryId;
+        if (newId != null && _tasks.containsKey(videoId)) {
+          completedLibraryId = null;
+          final musicRepo = getIt.isRegistered<IMusicRepository>()
+              ? getIt<IMusicRepository>()
+              : null;
+          if (musicRepo != null) {
+            final rowResult = await musicRepo.getSongById(newId);
+            rowResult.fold(
+              (f) => ErrorLogger.log(
+                  'Post-download row lookup failed for $videoId: ${f.message}',
+                  category: 'DownloadsRepository'),
+              (row) {
+                final path = row?.path;
+                final current = _tasks[videoId];
+                if (path == null ||
+                    path.isEmpty ||
+                    current == null ||
+                    current.status != DownloadStatus.complete) {
+                  return;
+                }
+                _cachedStorageStats = null;
+                _updateTask(current.copyWith(filePath: path));
+              },
+            );
+          }
+        }
+
+        final latest = _tasks[videoId];
+        if (latest == null) return;
+        if (latest.status != DownloadStatus.interrupted) break;
+
+        // Transient failure path: wait with exponential backoff, then retry.
+        // Cancellation (pause/delete) during the wait aborts the retry loop.
+        final delay = _retryPolicy.delayForAttempt(attempt);
+        await Future<void>.delayed(delay);
+        if (_pausedVideoIds.contains(videoId) || !_tasks.containsKey(videoId)) {
+          return;
+        }
+        _updateTask(_tasks[videoId]!.copyWith(
+          status: DownloadStatus.downloading,
+          clearError: true,
+        ));
       }
-      // If task was deleted while downloading, don't resurrect
-      if (!_tasks.containsKey(videoId)) {
-        _activeVideoIds.remove(videoId);
-        _activeCompleters.remove(videoId);
-        if (!completer.isCompleted) completer.complete();
-        _processQueue();
-        return;
-      }
-
-      result.fold(
-        (failure) {
-          // Classify via YtmErrorClassifier for localized message, but repository keeps raw for UI to map
-          final current = _tasks[videoId] ?? task;
-          _updateTask(current.copyWith(
-            status: DownloadStatus.failed,
-            error: failure.message,
-            speedKbps: null,
-            etaSeconds: null,
-          ));
-        },
-        (newId) {
-          _cachedStorageStats = null; // Invalidate storage stats cache on completion
-          final current = _tasks[videoId] ?? task;
-          // Atomic commit: YtDownloadService already verified size and renamed .part → final via MediaStore;
-          // Here we store filePath if service returned it via side-channel? For now mark complete.
-          _updateTask(current.copyWith(
-            status: DownloadStatus.complete,
-            progress: 1.0,
-            error: null,
-            speedKbps: null,
-            etaSeconds: null,
-          ));
-        },
-      );
     } catch (e) {
       if (_tasks.containsKey(videoId)) {
+        final failure = _mapExceptionToFailure(e);
         final current = _tasks[videoId] ?? task;
         _updateTask(current.copyWith(
           status: DownloadStatus.failed,
-          error: e.toString(),
-          speedKbps: null,
-          etaSeconds: null,
+          error: failure.message,
+          clearSpeedKbps: true,
+          clearEtaSeconds: true,
         ));
       }
+      ErrorLogger.log('Download task $videoId threw unexpectedly',
+          error: e, category: 'DownloadsRepository');
     } finally {
+      watchdog.cancel();
       _activeVideoIds.remove(videoId);
       _activeCompleters.remove(videoId);
       if (!completer.isCompleted) completer.complete();

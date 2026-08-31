@@ -30,6 +30,7 @@ import 'audio_effects_channel.dart';
 import 'crossfade_manager.dart';
 import 'replay_gain_math.dart';
 import 'equalizer_manager.dart';
+import 'audio_session_id_router.dart';
 import 'sleep_timer_manager.dart';
 import 'ytm_resolving_source.dart';
 import '../../core/services/ytm_cache_manager.dart';
@@ -145,6 +146,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       StreamController<String>.broadcast();
   Stream<String> get errorStream => _errorSubject.stream;
   int? _currentAudioSessionId;
+  late final AudioSessionIdRouter _sessionRouter;
   final StreamController<int?> _audioSessionIdSubject =
       StreamController<int?>.broadcast();
 
@@ -182,6 +184,17 @@ class PulsrAudioHandler extends BaseAudioHandler
     _equalizerManager = EqualizerManager(
       loudnessEnhancerA: loudnessEnhancerA,
       loudnessEnhancerB: loudnessEnhancerB,
+    );
+    // Single source of truth for session re-attach: every accepted session id
+    // (and route change) funnels through the router into EqualizerManager ->
+    // AudioEffectsChannel, deduped and serialized.
+    _sessionRouter = AudioSessionIdRouter(
+      onSessionChanged: (sessionId) {
+        unawaited(_equalizerManager.reapplyToSession(sessionId));
+      },
+      onRouteChanged: () {
+        unawaited(_equalizerManager.resyncActiveEffects());
+      },
     );
     if (getIt.isRegistered<EqualizerManager>()) {
       getIt.unregister<EqualizerManager>();
@@ -879,13 +892,16 @@ class PulsrAudioHandler extends BaseAudioHandler
         player.androidAudioSessionIdStream.listen(
           (sessionId) {
             if (sessionId != null && isTargetActive()) {
-              _currentAudioSessionId = sessionId;
-              _audioSessionIdSubject.add(sessionId);
               // Re-attach EQ + all active effects to this session. ExoPlayer
               // allocates a fresh session on every stop()+setAudioSource(), so
               // effects applied to the old session are silently lost and need
               // to be reapplied here instead of just forwarding the id.
-              unawaited(_equalizerManager.reapplyToSession(sessionId));
+              // The router validates (ignores 0), dedupes same-id re-emits and
+              // serializes out-of-order updates; including the FIRST non-zero
+              // id emitted right after player init.
+              _currentAudioSessionId = sessionId;
+              _audioSessionIdSubject.add(sessionId);
+              _sessionRouter.handleSessionId(sessionId);
             }
           },
           onError: (Object e, StackTrace st) {
@@ -1006,6 +1022,16 @@ class PulsrAudioHandler extends BaseAudioHandler
                 restoreVolume: rgVol);
           }
           pause();
+        }),
+      );
+
+      // Route change resilience (Bluetooth <-> speaker <-> USB DAC): the
+      // Android session id usually stays the same, but the HAL effect chain is
+      // re-initialized by the platform. Re-push the full effect state so the
+      // DSP pipeline is never left unattached after a device switch.
+      _subscriptions.add(
+        session.devicesChangedEventStream.listen((_) {
+          _sessionRouter.handleRouteChanged();
         }),
       );
     } catch (e, st) {
@@ -1599,10 +1625,12 @@ class PulsrAudioHandler extends BaseAudioHandler
         _currentIndex = nextIndex;
 
         final currentSessionId = _activePlayer.androidAudioSessionId;
-        if (currentSessionId != null) {
-          unawaited(AudioEffectsChannel().setAudioSessionId(currentSessionId));
+        if (currentSessionId != null && currentSessionId > 0) {
           _currentAudioSessionId = currentSessionId;
           _audioSessionIdSubject.add(currentSessionId);
+          // Route through the shared router (dedupe + serialization) instead
+          // of touching AudioEffectsChannel directly from this hot path.
+          _sessionRouter.handleSessionId(currentSessionId);
         }
 
         final nextSr = (nextSong.sampleRate != null && nextSong.sampleRate! > 0)
@@ -2096,7 +2124,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       if (sessionId != null && sessionId > 0) {
         _currentAudioSessionId = sessionId;
         _audioSessionIdSubject.add(sessionId);
-        unawaited(_equalizerManager.reapplyToSession(sessionId));
+        _sessionRouter.handleSessionId(sessionId);
       }
       _consecutiveFailures = 0;
       unawaited(_repository.recordPlayHistory(song.id));
@@ -2190,7 +2218,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (sessionId != null && sessionId > 0) {
       _currentAudioSessionId = sessionId;
       _audioSessionIdSubject.add(sessionId);
-      unawaited(_equalizerManager.reapplyToSession(sessionId));
+      _sessionRouter.handleSessionId(sessionId);
     }
   }
 

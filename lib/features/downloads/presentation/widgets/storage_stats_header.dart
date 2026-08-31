@@ -6,6 +6,13 @@ import '../../../../l10n/generated/app_localizations.dart';
 import '../../cubit/downloads_cubit.dart';
 import '../../cubit/downloads_state.dart';
 
+/// Storage usage banner for the downloads hub: used/free bytes and a
+/// determinate fill bar.
+///
+/// When [stats] is omitted the header subscribes to [DownloadsCubit] and
+/// selects only [StorageStats], so per-task progress ticks never rebuild it.
+/// Zero/total-free edge cases are guarded by [StorageStats.usedPercentage]
+/// and [_formatBytes].
 class StorageStatsHeader extends StatelessWidget {
   final StorageStats? stats;
 
@@ -28,8 +35,10 @@ class StorageStatsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (stats != null) {
-      return _buildContent(context, stats!);
+    // Local copy so the nullable field is promoted without `!`.
+    final provided = stats;
+    if (provided != null) {
+      return _buildContent(context, provided);
     }
 
     return BlocSelector<DownloadsCubit, DownloadsState, StorageStats>(
