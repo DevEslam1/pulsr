@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:just_audio_platform_interface/just_audio_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/config/app_config.dart';
 import '../../core/constants/prefs_keys.dart';
@@ -134,6 +135,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   // active player is the source of truth for track order/advance, and just_audio
   // joins consecutive items seamlessly. Null while crossfade (duration > 0) is
   // active, which keeps the manual dual-player path below.
+  // ignore: deprecated_member_use
   ConcatenatingAudioSource? _gaplessSource;
   // Last index reacted to from currentIndexStream, to drop duplicate emits.
   int _lastGaplessIndex = -1;
@@ -1022,6 +1024,67 @@ class PulsrAudioHandler extends BaseAudioHandler
           },
         ),
       );
+
+      // PCM audio processing for per-frame DSP
+      _subscriptions.add(
+        player.pcmEventStream.listen(
+          (PcmEventMessage pcmEvent) {
+            // Only process PCM for the active player
+            if (!isTargetActive()) return;
+
+            // Skip if no valid data
+            final pcmData = pcmEvent.pcmData;
+            final channelCount = pcmEvent.channelCount;
+
+            if (pcmData.isEmpty || channelCount <= 0) {
+              return;
+            }
+
+            // Convert byte array to Float32List for native processing
+            try {
+              // Convert List<int> to Uint8List if needed
+              final uint8Buffer =
+                  pcmData is Uint8List ? pcmData : Uint8List.fromList(pcmData);
+
+              // Create a Float32 view of the byte buffer
+              final float32Buffer = Float32List.view(
+                uint8Buffer.buffer,
+                uint8Buffer.offsetInBytes,
+                uint8Buffer.lengthInBytes ~/ 4,
+              );
+
+              // Use provided frameCount or calculate from buffer
+              final actualFrameCount =
+                  pcmEvent.frameCount > 0
+                      ? pcmEvent.frameCount
+                      : (float32Buffer.length ~/ channelCount);
+
+              // Send to native DSP engine for per-frame processing
+              // The native C++ engine will process reverb, limiter, saturation, etc.
+              unawaited(
+                AudioEffectsChannel().nativeProcessPcmAudio(
+                  float32Buffer,
+                  actualFrameCount,
+                  channelCount,
+                ),
+              );
+            } catch (e, st) {
+              // Silently skip PCM processing errors to avoid disrupting playback
+              if (kDebugMode) {
+                debugPrint('PCM processing error: $e\n$st');
+              }
+            }
+          },
+          onError: (Object e, StackTrace st) {
+            ErrorLogger.log(
+              'Player pcmEventStream error',
+              error: e,
+              stackTrace: st,
+              category: 'AudioHandler',
+            );
+          },
+        ),
+      );
     }
 
     setupPlayerListeners(_playerA, true);
@@ -1275,7 +1338,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     return _createAudioSource(song, tag);
   }
 
+  // ignore: deprecated_member_use
   ConcatenatingAudioSource _buildConcat(List<SongsTableData> songs) {
+    // ignore: deprecated_member_use
     return ConcatenatingAudioSource(
       useLazyPreparation: true,
       children: songs.map(_buildGaplessChild).toList(),
@@ -1984,7 +2049,8 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
-  /// Loads the whole queue as one [ConcatenatingAudioSource] on the active
+  // ignore: deprecated_member_use
+  /// Loads the whole queue as one gapless source on the active
   /// player so ExoPlayer joins consecutive tracks with no gap. With [preload]
   /// false the source is set but not prepared, so a restored YouTube track
   /// resolves lazily on the first play() instead of throwing at cold start when

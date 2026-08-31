@@ -21,7 +21,8 @@ class _AsyncLock {
 
   Future<T> lock<T>(Future<T> Function() fn) {
     final future = _chain.then((_) => fn());
-    _chain = future.catchError((_) => null);
+    // Always chain the next operation to maintain serialization, even if this one fails
+    _chain = future.whenComplete(() {});
     return future;
   }
 }
@@ -310,17 +311,21 @@ class EqualizerManager {
         pendingFutures.add(_effectsChannel.setEqEnabled(true));
         pendingFutures.add(_effectsChannel.setNativeEqEnabled(true));
       }
-      if (currentPreset.bassBoost > 0)
+      if (currentPreset.bassBoost > 0) {
         pendingFutures.add(setBassBoost(currentPreset.bassBoost));
-      if (volumeBoost > 0) pendingFutures.add(setVolumeBoost(volumeBoost));
+      }
+      if (volumeBoost > 0) {
+        pendingFutures.add(setVolumeBoost(volumeBoost));
+      }
       if (isVirtualizerEnabled) {
         pendingFutures.add(_effectsChannel.setVirtualizerEnabled(true));
         pendingFutures.add(
           _effectsChannel.setVirtualizerStrength(virtualizerStrength),
         );
       }
-      if (isSpatializerEnabled)
+      if (isSpatializerEnabled) {
         pendingFutures.add(_effectsChannel.setSpatializerEnabled(true));
+      }
       if (isCrossfeedEnabled) {
         pendingFutures.add(
           _effectsChannel.setCrossfeedParams(crossfeedDelayUs, crossfeedFeedDb),
@@ -342,11 +347,15 @@ class EqualizerManager {
         pendingFutures.add(_effectsChannel.setReverbWetDry(reverbWetDry));
         pendingFutures.add(_effectsChannel.setReverbEnabled(true));
       }
-      if (stereoBalance != 0.0)
+      if (stereoBalance != 0.0) {
         pendingFutures.add(_effectsChannel.setStereoBalance(stereoBalance));
-      if (monoMix) pendingFutures.add(_effectsChannel.setMonoMix(true));
-      if (!isSincResamplerEnabled)
+      }
+      if (monoMix) {
+        pendingFutures.add(_effectsChannel.setMonoMix(true));
+      }
+      if (!isSincResamplerEnabled) {
         pendingFutures.add(_effectsChannel.setSincResamplerEnabled(false));
+      }
       if (isSaturationEnabled) {
         pendingFutures.add(
           _effectsChannel.setSaturationParams(
@@ -1410,9 +1419,12 @@ class EqualizerManager {
   /// collapsed — if a newer id arrives while an older one is still applying,
   /// only the newest one is ultimately applied.
   Future<void> reapplyToSession(int sessionId) async {
-    if (!PlatformCapabilities.isAndroid) return;
-    if (sessionId <= 0)
+    if (!PlatformCapabilities.isAndroid) {
+      return;
+    }
+    if (sessionId <= 0) {
       return; // 0 = no session yet; never attach to the global mix
+    }
     _pendingReattachSessionId = sessionId;
     _reattachChain = _reattachChain.then((_) => _runReattach()).catchError((
       Object e,
@@ -1528,25 +1540,6 @@ class EqualizerManager {
       );
       // Continue even if EQ init fails - other effects may still work
     }
-
-    // Check if any other effects are active
-    final anyActive =
-        isEnabled ||
-        isVirtualizerEnabled ||
-        isDynamicsEnabled ||
-        isSpatializerEnabled ||
-        isCrossfeedEnabled ||
-        isLimiterEnabled ||
-        isReverbEnabled ||
-        isSaturationEnabled ||
-        isStereoWidthEnabled ||
-        isLoudnessContourEnabled ||
-        isSubCrossoverEnabled ||
-        isDynamicEqEnabled ||
-        volumeBoost > 0 ||
-        currentPreset.bassBoost > 0 ||
-        stereoBalance != 0.0 ||
-        monoMix;
 
     if (currentPreset.bassBoost > 0) {
       // Direct channel call to avoid _debouncedSavePreferences thrash on hot path (track change)

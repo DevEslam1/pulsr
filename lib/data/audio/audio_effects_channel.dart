@@ -1,5 +1,6 @@
 // lib/data/audio/audio_effects_channel.dart
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import '../../core/constants/channels.dart';
@@ -1180,6 +1181,40 @@ class AudioEffectsChannel {
         category: 'AudioEffectsChannel',
       );
       return null;
+    }
+  }
+
+  /// Processes a PCM audio frame through the native DSP engine.
+  ///
+  /// This method bridges the per-frame PCM callbacks from just_audio's
+  /// playback engine into Pulsr's C++ DSP pipeline. The native engine will
+  /// apply all active DSP stages (EQ, limiter, reverb, saturation, etc.)
+  /// and return the processed PCM data.
+  ///
+  /// Returns the number of frames processed, or 0 on error/Android mismatch.
+  Future<int> nativeProcessPcmAudio(
+    Float32List buffer,
+    int frameCount,
+    int channels,
+  ) async {
+    if (!_isAndroid) return 0;
+    try {
+      final result = await _channel
+          .invokeMethod<int>('nativeProcessPcmAudio', {
+            'buffer': buffer,
+            'frameCount': frameCount,
+            'channels': channels,
+          })
+          .timeout(const Duration(milliseconds: 10));
+      return result ?? 0;
+    } catch (e, st) {
+      ErrorLogger.log(
+        'nativeProcessPcmAudio failed: frame processing interrupted',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return 0;
     }
   }
 }

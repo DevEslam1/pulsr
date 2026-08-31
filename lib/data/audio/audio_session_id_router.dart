@@ -34,6 +34,7 @@ class AudioSessionIdRouter {
   final List<int> _pendingSessionIds = <int>[];
   bool _routeResyncPending = false;
   bool _isDraining = false;
+  bool _drainQueued = false;
 
   AudioSessionIdRouter({required this.onSessionChanged, this.onRouteChanged});
 
@@ -52,7 +53,6 @@ class AudioSessionIdRouter {
     }
 
     if (_pendingSessionIds.isEmpty && sessionId == _currentSessionId) {
-      // Duplicate same-id re-emit: no re-attach needed.
       return;
     }
 
@@ -66,17 +66,22 @@ class AudioSessionIdRouter {
     );
 
     _pendingSessionIds.add(sessionId);
-    _chain = _chain.then((_) => _drainQueue()).catchError((
-      Object e,
-      StackTrace st,
-    ) {
-      ErrorLogger.log(
-        'AudioSessionIdRouter chain error',
-        error: e,
-        stackTrace: st,
-        category: 'AudioSessionIdRouter',
-      );
-    });
+
+    if (!_drainQueued) {
+      _drainQueued = true;
+      _chain = _chain.then((_) => _drainQueue()).catchError((
+        Object e,
+        StackTrace st,
+      ) {
+        _drainQueued = false;
+        ErrorLogger.log(
+          'AudioSessionIdRouter chain error',
+          error: e,
+          stackTrace: st,
+          category: 'AudioSessionIdRouter',
+        );
+      });
+    }
   }
 
   void handleRouteChanged() {
@@ -107,10 +112,13 @@ class AudioSessionIdRouter {
         final next = _pendingSessionIds.removeAt(0);
         if (next == _currentSessionId) continue;
         _currentSessionId = next;
+        // Yield to event loop so handleSessionId calls can arrive and potentially collapse
+        await Future.microtask(() {});
         onSessionChanged(next);
       }
     } finally {
       _isDraining = false;
+      _drainQueued = false;
     }
   }
 

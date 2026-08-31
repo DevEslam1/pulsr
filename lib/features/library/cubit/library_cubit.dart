@@ -61,7 +61,6 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
         _getFavoritesUseCase = getFavoritesUseCase,
         _toggleFavoriteUseCase = toggleFavoriteUseCase,
         _folderUseCases = folderUseCases,
-        // TODO(inject): getIt fallback violates DI purity — keep for backward compatibility but prefer injecting IMusicRepository via constructor in production
         _musicRepository = musicRepository ??
             (getIt.isRegistered<IMusicRepository>()
                 ? getIt<IMusicRepository>()
@@ -330,7 +329,6 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
 
   /// Batch imports YouTube Music playlist tracks as Favorites.
   Future<int> importYtmTracksAsFavorites(List<YtmTrack> tracks) async {
-    // TODO(inject): fallback to getIt is a test seam; prefer _musicRepository injected via ctor
     final repo = _musicRepository ??
         (getIt.isRegistered<IMusicRepository>()
             ? getIt<IMusicRepository>()

@@ -5,11 +5,14 @@ import '../db/app_database.dart';
 /// Manages hot-swapping between gapless (ConcatenatingAudioSource) and
 /// crossfade (dual-player) modes without interrupting active playback.
 class SeamlessQueueTransition {
+  // ignore: deprecated_member_use
   final ConcatenatingAudioSource Function(List<SongsTableData> songs)
-      buildConcatSource;
+  buildConcatSource;
   final Future<void> Function(
-          AudioPlayer activePlayer, AudioPlayer inactivePlayer)?
-      crossfadeToInactive;
+    AudioPlayer activePlayer,
+    AudioPlayer inactivePlayer,
+  )?
+  crossfadeToInactive;
 
   SeamlessQueueTransition({
     required this.buildConcatSource,

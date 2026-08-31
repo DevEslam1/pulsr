@@ -532,4 +532,43 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDynamicEqBand(
     AudioDspEngine::instance().publishParams(updated);
 }
 
+// ---- PCM Audio Processing for per-frame DSP ----
+
+JNIEXPORT jint JNICALL
+Java_com_pulsr_music_AudioEffectsPlugin_nativeProcessPcmAudio(
+        JNIEnv* env, jobject /* thiz */,
+        jfloatArray jBuffer, jint frameCount, jint channels) {
+    if (!jBuffer || frameCount <= 0 || channels <= 0) {
+        LOGE("nativeProcessPcmAudio: invalid parameters - frameCount=%d, channels=%d", frameCount, channels);
+        return 0;
+    }
+
+    // Get the float array from Java
+    jfloat* javaBuffer = env->GetFloatArrayElements(jBuffer, nullptr);
+    if (!javaBuffer) {
+        LOGE("nativeProcessPcmAudio: failed to get float array elements");
+        return 0;
+    }
+
+    try {
+        // Process the PCM audio through the DSP engine
+        // The buffer is expected to be interleaved: L, R, L, R, ... for stereo
+        // or single channel depending on the channels parameter
+        int processedFrames = AudioDspEngine::instance().processInterleaved(
+            javaBuffer,
+            frameCount,
+            channels
+        );
+        
+        // Release the array elements, copying back the modified buffer
+        env->ReleaseFloatArrayElements(jBuffer, javaBuffer, 0);
+        
+        return processedFrames;
+    } catch (const std::exception& e) {
+        LOGE("nativeProcessPcmAudio: exception - %s", e.what());
+        env->ReleaseFloatArrayElements(jBuffer, javaBuffer, JNI_ABORT);
+        return 0;
+    }
+}
+
 } // extern "C"
