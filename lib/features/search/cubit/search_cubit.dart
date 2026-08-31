@@ -49,9 +49,13 @@ class SearchCubit extends PulsrCubit<SearchState> {
   void onQueryChanged(String query) {
     emit(state.copyWith(query: query));
     _debounceTimer?.cancel();
-    _debounceTimer = autoTimer(Timer(const Duration(milliseconds: 250), () {
+    _debounceTimer = autoTimer(Timer(const Duration(milliseconds: 300), () {
       _executeSearch(query);
     }));
+  }
+
+  static String _sanitizeQuery(String query) {
+    return query.replaceAll(RegExp(r'[\x00-\x1F\x7F%_\\]'), '').trim();
   }
 
   int _generation = 0;
@@ -61,15 +65,13 @@ class SearchCubit extends PulsrCubit<SearchState> {
   static const String _historyKey = 'search_history';
 
   Future<void> _persistHistory(String query) async {
-    final q = query.trim();
+    final q = _sanitizeQuery(query);
     if (q.isEmpty || q.length < 2) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       final existing = prefs.getStringList(_historyKey) ?? List.from(state.history);
       final updated = [q, ...existing.where((h) => h.toLowerCase() != q.toLowerCase())].take(_historyMax).toList();
       await prefs.setStringList(_historyKey, updated);
-      // Do not emit extra state here — history is merged into main search result emit to keep blocTest stable
-      // History will be loaded on next init or via explicit refresh
     } catch (_) {}
   }
 
@@ -84,15 +86,15 @@ class SearchCubit extends PulsrCubit<SearchState> {
     final generation = ++_generation;
     unawaited(_searchSub?.cancel());
     _searchSub = null;
-    final trimmed = query.trim();
-    if (trimmed.isEmpty) {
+    final sanitized = _sanitizeQuery(query);
+    if (sanitized.isEmpty) {
       emit(state.copyWith(results: [], isLoading: false, errorMessage: null));
       return;
     }
 
     // Limit search query to 64 chars to avoid CPU starvation on huge pastes
     final boundedQuery =
-        trimmed.length > 64 ? trimmed.substring(0, 64) : trimmed;
+        sanitized.length > 64 ? sanitized.substring(0, 64) : sanitized;
 
     emit(state.copyWith(isLoading: true));
 

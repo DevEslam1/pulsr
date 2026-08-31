@@ -1525,12 +1525,13 @@ class EqualizerManager {
     try {
       final freqs = is32BandMode ? custom32Frequencies : customFrequencies;
       await _effectsChannel.setNativeEqBandCount(freqs.length);
-      futures.add(_effectsChannel.setEqEnabled(isEnabled));
-      futures.add(_effectsChannel.setNativeEqEnabled(isEnabled));
 
       if (isEnabled) {
         await applyCurrentPreset();
       }
+
+      await _effectsChannel.setEqEnabled(isEnabled);
+      await _effectsChannel.setNativeEqEnabled(isEnabled);
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to initialize EQ chain',

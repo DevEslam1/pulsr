@@ -307,7 +307,17 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
 
   Future<void> createPlaylist(String name,
       {bool isSmart = false, String? criteria}) async {
-    final result = await _playlistUseCases.createPlaylist(name,
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) {
+      emit(state.copyWith(errorMessage: 'Playlist name cannot be empty'));
+      return;
+    }
+    if (trimmed.length > 100) {
+      emit(state.copyWith(
+          errorMessage: 'Playlist name cannot exceed 100 characters'));
+      return;
+    }
+    final result = await _playlistUseCases.createPlaylist(trimmed,
         isSmart: isSmart, smartCriteria: criteria);
     if (isClosed) return;
     result.fold(

@@ -19,8 +19,10 @@ class LrcParser {
     final lines = lrcContent.split(RegExp(r'\r?\n'));
     final List<LyricsLine> result = [];
 
-    // Match tags like [01:23.45] etc. Seconds 00-59 enforced post-parse.
-    final RegExp timeExp = RegExp(r'\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]');
+    // Match tags like [01:23], [01:23.45], [01:23.456], [01:23:45], [01:02:03.45]
+    final RegExp timeExp = RegExp(
+      r'\[(?:(\d{1,2}):)?(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]',
+    );
 
     for (final line in lines) {
       final matches = timeExp.allMatches(line).toList();
@@ -34,14 +36,15 @@ class LrcParser {
       }
 
       for (final match in matches) {
-        final minutes = int.parse(match.group(1)!);
-        final seconds = int.parse(match.group(2)!);
-        if (seconds >= 60) continue; // reject invalid LRC timestamps
-        final fractionStr = match.group(3) ?? '0';
+        final hours = match.group(1) != null ? int.parse(match.group(1)!) : 0;
+        final minutes = int.parse(match.group(2)!);
+        final seconds = int.parse(match.group(3)!);
+        final fractionStr = match.group(4) ?? '0';
         final milliseconds =
             int.parse(fractionStr.padRight(3, '0').substring(0, 3));
 
         final totalDuration = Duration(
+          hours: hours,
           minutes: minutes,
           seconds: seconds,
           milliseconds: milliseconds,

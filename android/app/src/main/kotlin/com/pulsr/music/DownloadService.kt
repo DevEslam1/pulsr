@@ -295,15 +295,43 @@ class DownloadService : Service() {
 
     private val timeoutHandler = DownloadTimeoutHandler(this)
 
-    // A10 (N-06): API 35+ Foreground Service dataSync timeout handling
+    // C-04 (N-06): API 35+ Foreground Service timeout handling (Android 15 6h FGS limit)
     override fun onTimeout(startId: Int) {
-        timeoutHandler.handleTimeout(activeDownloads)
-        stopForegroundAndSelf()
+        handleServiceTimeout()
     }
 
     override fun onTimeout(startId: Int, fgsType: Int) {
+        handleServiceTimeout()
+    }
+
+    private fun handleServiceTimeout() {
         timeoutHandler.handleTimeout(activeDownloads)
-        stopForegroundAndSelf()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        postTimeoutNotification()
+        stopSelf()
+        foregroundStarted = false
+        activeDownloads.clear()
+    }
+
+    private fun postTimeoutNotification() {
+        try {
+            createChannel()
+            val openIntent = packageManager.getLaunchIntentForPackage(packageName)?.let { base ->
+                PendingIntent.getActivity(this, REQUEST_CODE_OPEN, base,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            }
+            val builder = NotificationCompat.Builder(this, CHANNEL_ID)
+                .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                .setContentTitle("Downloads paused")
+                .setContentText("Background downloads paused due to system time limit. Tap to resume.")
+                .setOngoing(false)
+                .setAutoCancel(true)
+                .setContentIntent(openIntent)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+
+            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                .notify(NOTIFICATION_ID, builder.build())
+        } catch (_: Exception) {}
     }
 
     private fun Iterable<Int>.average(): Double = if (none()) 0.0 else sum().toDouble() / count()

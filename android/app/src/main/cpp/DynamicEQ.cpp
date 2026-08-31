@@ -118,7 +118,30 @@ void DynamicEQ::process(float* L, float* R, int frames) {
 
     for (int b = 0; b < n; ++b) {
         BandState& band = bands_[b];
-        if (!band.enabled) continue;
+        if (!band.enabled) {
+            if (std::abs(band.currentCutDb) > 1e-4) {
+                const double rampStep = band.currentCutDb / frames;
+                for (int i = 0; i < frames; ++i) {
+                    const double l = L[i];
+                    const double r = R[i];
+                    band.currentCutDb -= rampStep;
+                    if (std::abs(band.currentCutDb - band.lastCoeffGainDb) > 0.05) {
+                        computeBandCoeffs(band, band.currentCutDb);
+                    }
+                    L[i] = static_cast<float>(band.b0 * l + band.b1 * band.x1[0] + band.b2 * band.x2[0]
+                                              - band.a1 * band.y1[0] - band.a2 * band.y2[0]);
+                    R[i] = static_cast<float>(band.b0 * r + band.b1 * band.x1[1] + band.b2 * band.x2[1]
+                                              - band.a1 * band.y1[1] - band.a2 * band.y2[1]);
+                    band.x2[0] = band.x1[0]; band.x1[0] = l;
+                    band.y2[0] = band.y1[0]; band.y1[0] = L[i];
+                    band.x2[1] = band.x1[1]; band.x1[1] = r;
+                    band.y2[1] = band.y1[1]; band.y1[1] = R[i];
+                }
+                band.currentCutDb = 0.0;
+                computeBandCoeffs(band, 0.0);
+            }
+            continue;
+        }
 
         const double attackCoeff = 1.0 - std::exp(-1.0 / (sampleRate_ * band.attackMs * 0.001));
         const double releaseCoeff = 1.0 - std::exp(-1.0 / (sampleRate_ * band.releaseMs * 0.001));
@@ -182,7 +205,30 @@ void DynamicEQ::processInterleaved(float* buffer, int frames, int channels) {
 
     for (int b = 0; b < n; ++b) {
         BandState& band = bands_[b];
-        if (!band.enabled) continue;
+        if (!band.enabled) {
+            if (std::abs(band.currentCutDb) > 1e-4) {
+                const double rampStep = band.currentCutDb / frames;
+                for (int i = 0; i < frames; ++i) {
+                    band.currentCutDb -= rampStep;
+                    if (std::abs(band.currentCutDb - band.lastCoeffGainDb) > 0.05) {
+                        computeBandCoeffs(band, band.currentCutDb);
+                    }
+                    for (int ch = 0; ch < chCount; ++ch) {
+                        const double x = buffer[i * channels + ch];
+                        const double y = band.b0 * x + band.b1 * band.x1[ch] + band.b2 * band.x2[ch]
+                                         - band.a1 * band.y1[ch] - band.a2 * band.y2[ch];
+                        band.x2[ch] = band.x1[ch];
+                        band.x1[ch] = x;
+                        band.y2[ch] = band.y1[ch];
+                        band.y1[ch] = y;
+                        buffer[i * channels + ch] = static_cast<float>(y);
+                    }
+                }
+                band.currentCutDb = 0.0;
+                computeBandCoeffs(band, 0.0);
+            }
+            continue;
+        }
 
         const double attackCoeff = 1.0 - std::exp(-1.0 / (sampleRate_ * band.attackMs * 0.001));
         const double releaseCoeff = 1.0 - std::exp(-1.0 / (sampleRate_ * band.releaseMs * 0.001));

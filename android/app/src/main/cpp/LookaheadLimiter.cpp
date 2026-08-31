@@ -11,6 +11,17 @@ const float LookaheadLimiter::polyphase4x_[INTERP_PHASES][TAPS_PER_PHASE] = {
     { 0.0120f, -0.0682f, 0.2642f, 0.8841f, -0.0984f, 0.0063f }  // Phase 3 (3/4)
 };
 
+const float LookaheadLimiter::polyphase8x_[8][TAPS_PER_PHASE] = {
+    { 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f },
+    { 0.0031f, -0.0520f, 0.9620f, 0.1250f, -0.0420f, 0.0039f },
+    { 0.0063f, -0.0984f, 0.8841f, 0.2642f, -0.0682f, 0.0120f },
+    { 0.0105f, -0.1280f, 0.7680f, 0.4350f, -0.1050f, 0.0195f },
+    { 0.0152f, -0.1386f, 0.6234f, 0.6234f, -0.1386f, 0.0152f },
+    { 0.0195f, -0.1050f, 0.4350f, 0.7680f, -0.1280f, 0.0105f },
+    { 0.0120f, -0.0682f, 0.2642f, 0.8841f, -0.0984f, 0.0063f },
+    { 0.0039f, -0.0420f, 0.1250f, 0.9620f, -0.0520f, 0.0031f }
+};
+
 LookaheadLimiter::LookaheadLimiter() {
     configure(5.0, -0.2, 50.0, true);
     reset();
@@ -65,17 +76,19 @@ float LookaheadLimiter::estimateTruePeak(const float* history) {
     }
 
     if (sampleRate_ > 192000.0) {
-        // > 192kHz (e.g. 384kHz): 1x oversampling (Nyquist is >= 96kHz, intersample peaks negligible)
+        // > 192kHz: 1x oversampling (Nyquist is >= 96kHz, intersample peaks negligible)
         return peak;
-    } else if (sampleRate_ >= 96000.0) {
-        // 96kHz - 192kHz: 2x oversampling (evaluate phase 2 at midpoint 2/4 = 0.5)
-        float subSample = 0.0f;
-        for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
-            subSample += history[tap] * polyphase4x_[2][tap];
+    } else if (sampleRate_ > 96000.0) {
+        // > 96kHz: 8-phase polyphase true peak estimation
+        for (int phase = 1; phase < 8; ++phase) {
+            float subSample = 0.0f;
+            for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {
+                subSample += history[tap] * polyphase8x_[phase][tap];
+            }
+            peak = std::max(peak, std::abs(subSample));
         }
-        peak = std::max(peak, std::abs(subSample));
     } else {
-        // < 96kHz: 4x oversampling (evaluate phases 1, 2, 3)
+        // <= 96kHz: 4x oversampling (evaluate phases 1, 2, 3)
         for (int phase = 1; phase < INTERP_PHASES; ++phase) {
             float subSample = 0.0f;
             for (int tap = 0; tap < TAPS_PER_PHASE; ++tap) {

@@ -28,9 +28,10 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
         super(const YtmSearchState());
 
   void onQueryChanged(String query) {
+    _generation++;
     emit(state.copyWith(query: query));
     _debounceTimer?.cancel();
-    _debounceTimer = autoTimer(Timer(const Duration(milliseconds: 250), () {
+    _debounceTimer = autoTimer(Timer(const Duration(milliseconds: 300), () {
       _executeSearch(query);
     }));
   }

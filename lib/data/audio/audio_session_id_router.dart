@@ -65,6 +65,9 @@ class AudioSessionIdRouter {
       category: 'AudioSessionIdRouter',
     );
 
+    if (_pendingSessionIds.length >= 2) {
+      _pendingSessionIds.removeLast();
+    }
     _pendingSessionIds.add(sessionId);
 
     if (!_drainQueued) {
@@ -112,9 +115,17 @@ class AudioSessionIdRouter {
         final next = _pendingSessionIds.removeAt(0);
         if (next == _currentSessionId) continue;
         _currentSessionId = next;
-        // Yield to event loop so handleSessionId calls can arrive and potentially collapse
+        try {
+          onSessionChanged(next);
+        } catch (e, st) {
+          ErrorLogger.log(
+            'AudioSessionIdRouter callback error',
+            error: e,
+            stackTrace: st,
+            category: 'AudioSessionIdRouter',
+          );
+        }
         await Future.microtask(() {});
-        onSessionChanged(next);
       }
     } finally {
       _isDraining = false;

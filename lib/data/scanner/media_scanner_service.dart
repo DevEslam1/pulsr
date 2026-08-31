@@ -234,7 +234,13 @@ class MediaScannerService {
   }
 
   Future<void> rescanSingleFile(String path) async {
-    if (!Platform.isAndroid) return;
+    if (!Platform.isAndroid || path.isEmpty) return;
+    if (!path.startsWith('content:')) {
+      try {
+        final f = File(path);
+        if (!await f.exists()) return;
+      } catch (_) {}
+    }
     const channel = MethodChannel(PulsrChannels.tagEditor);
     try {
       final Map<dynamic, dynamic>? tags =
@@ -253,9 +259,13 @@ class MediaScannerService {
         final year = yearStr != null ? int.tryParse(yearStr) : null;
         final trackNumber = trackStr != null ? int.tryParse(trackStr) : null;
 
+        final defaultTitle = path.contains('/')
+            ? path.split('/').last.replaceAll(RegExp(r'\.[^.]+$'), '')
+            : 'Unknown Song';
+
         await _repository.updateSongTags(
           path: path,
-          title: (title != null && title.isNotEmpty) ? title : 'Unknown Song',
+          title: (title != null && title.isNotEmpty) ? title : defaultTitle,
           artist:
               (artist != null && artist.isNotEmpty) ? artist : 'Unknown Artist',
           album: (album != null && album.isNotEmpty) ? album : 'Unknown Album',

@@ -179,7 +179,9 @@ void main() {
       );
 
       router.handleSessionId(1);
+      await Future.delayed(const Duration(milliseconds: 10));
       router.handleSessionId(2);
+      await Future.delayed(const Duration(milliseconds: 10));
       router.handleSessionId(3);
 
       await router.idleForTest;

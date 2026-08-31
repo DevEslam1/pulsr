@@ -54,6 +54,7 @@ private:
     float minGain_ = 1.0f;
     int minGainAge_ = 0;
 
-    // 4x oversampling polyphase interpolation table for true peak detection
+    // 4x and 8x oversampling polyphase interpolation tables for true peak detection
     static const float polyphase4x_[INTERP_PHASES][TAPS_PER_PHASE];
+    static const float polyphase8x_[8][TAPS_PER_PHASE];
 };

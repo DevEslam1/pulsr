@@ -337,6 +337,10 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
                 const double x0 = static_cast<double>(*chPtr);
                 if (!std::isfinite(x0)) {
                     *chPtr = 0.0f;
+                    x1 = 0.0;
+                    x2 = 0.0;
+                    y1 = 0.0;
+                    y2 = 0.0;
                     chPtr += channels;
                     continue;
                 }

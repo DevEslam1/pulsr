@@ -110,8 +110,7 @@ class DownloadsState {
   });
 
   List<DownloadTask> get taskList {
-    final list = tasks.values.toList()
-      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final list = tasks.values.toList();
     return List<DownloadTask>.unmodifiable(list);
   }
 

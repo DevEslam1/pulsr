@@ -123,6 +123,17 @@ std::shared_ptr<const PreparedIr> PreparedIr::create(
     }
 
     ir->numPartitions = (totalTaps + PARTITION_SIZE - 1) / PARTITION_SIZE;
+    if (ir->numPartitions > ConvolutionReverb::MAX_PREALLOC_PARTITIONS) {
+#if defined(__ANDROID__)
+        __android_log_print(ANDROID_LOG_WARN, "PulsrDSP",
+            "ConvolutionReverb: IR partitions truncated from %d to %d",
+            ir->numPartitions, ConvolutionReverb::MAX_PREALLOC_PARTITIONS);
+#else
+        fprintf(stderr, "ConvolutionReverb: IR partitions truncated from %d to %d\n",
+            ir->numPartitions, ConvolutionReverb::MAX_PREALLOC_PARTITIONS);
+#endif
+        ir->numPartitions = ConvolutionReverb::MAX_PREALLOC_PARTITIONS;
+    }
     ir->irFreqL.assign(ir->numPartitions, std::vector<FftUtil::Complex>(FFT_SIZE));
     ir->irFreqR.assign(ir->numPartitions, std::vector<FftUtil::Complex>(FFT_SIZE));
 

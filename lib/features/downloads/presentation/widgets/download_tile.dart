@@ -55,7 +55,9 @@ class DownloadTile extends StatelessWidget {
               p.accent.withValues(alpha: 0.7),
               l10n.statusQueued,
             ),
-          DownloadStatus.paused || DownloadStatus.interrupted => (
+          DownloadStatus.paused ||
+          DownloadStatus.interrupted ||
+          DownloadStatus.canceled => (
               Icons.pause_circle_outline_rounded,
               p.textTertiary,
               l10n.statusPaused,

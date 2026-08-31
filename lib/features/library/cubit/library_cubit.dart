@@ -160,7 +160,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
                 category: 'LibraryCubit');
           }
           _lastEmittedSongCount = songs.length;
-          emit(state.copyWith(songs: songs, errorMessage: null));
+          emit(state.copyWith(songs: songs, isLoading: false, errorMessage: null));
         },
       );
     });

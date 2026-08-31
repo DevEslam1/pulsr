@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../bloc/base_cubit.dart';
@@ -160,25 +161,29 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
           palette.mutedColor?.color,
         ].whereType<Color>().toList();
 
-        for (final c in candidates) {
-          final hsl = HSLColor.fromColor(c);
-          if (hsl.saturation > 0.20 &&
-              hsl.lightness > 0.15 &&
-              hsl.lightness < 0.85) {
-            primary = c;
-            break;
-          }
-        }
-        primary ??= palette.vibrantColor?.color ??
-            palette.dominantColor?.color ??
-            AppColors.primary;
-
         final darkVibrant =
             palette.darkVibrantColor?.color ?? palette.darkMutedColor?.color;
         final bg = darkVibrant != null
             ? Color.alphaBlend(
                 Colors.black.withValues(alpha: 0.75), darkVibrant)
             : const Color(0xFF14172B);
+
+        for (final c in candidates) {
+          final hsl = HSLColor.fromColor(c);
+          final clampedLightness = hsl.lightness.clamp(0.0, 1.0);
+          final clampedSaturation = hsl.saturation.clamp(0.0, 1.0);
+          if (clampedSaturation > 0.20 &&
+              clampedLightness > 0.15 &&
+              clampedLightness < 0.85 &&
+              _contrastRatio(c, bg) >= 3.0) {
+            primary = c;
+            break;
+          }
+        }
+        primary ??= (palette.vibrantColor?.color != null &&
+                _contrastRatio(palette.vibrantColor!.color, bg) >= 3.0)
+            ? palette.vibrantColor!.color
+            : AppColors.primary;
 
         final newState = state.copyWith(
           primaryColor: primary,
@@ -221,6 +226,24 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
     _debounceTimer?.cancel();
     _currentRequestToken++;
     emit(const DynamicThemeState());
+  }
+
+  static double _luminance(Color c) {
+    double r = c.r;
+    double g = c.g;
+    double b = c.b;
+    r = r <= 0.03928 ? r / 12.92 : math.pow((r + 0.055) / 1.055, 2.4).toDouble();
+    g = g <= 0.03928 ? g / 12.92 : math.pow((g + 0.055) / 1.055, 2.4).toDouble();
+    b = b <= 0.03928 ? b / 12.92 : math.pow((b + 0.055) / 1.055, 2.4).toDouble();
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+
+  static double _contrastRatio(Color c1, Color c2) {
+    final l1 = _luminance(c1);
+    final l2 = _luminance(c2);
+    final lighter = math.max(l1, l2);
+    final darker = math.min(l1, l2);
+    return (lighter + 0.05) / (darker + 0.05);
   }
 
   @override

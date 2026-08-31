@@ -592,6 +592,11 @@ class YtmService {
     String quality = 'high',
     bool forceRefresh = false,
   }) async {
+    // Y-01: Validate video ID matches 11 valid characters
+    if (!RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(videoId)) {
+      throw const YtmException('INVALID_VIDEO_ID', 'Video ID must be exactly 11 characters');
+    }
+
     // Check Task 2 in-memory URL cache first
     final urlCache =
         getIt.isRegistered<YtmUrlCache>() ? getIt<YtmUrlCache>() : null;
@@ -646,7 +651,7 @@ class YtmService {
             final directStream = await account
                 .resolvePlayerStream(videoId, quality: quality)
                 .timeout(_tier1Deadline);
-            if (directStream != null) {
+            if (directStream != null && directStream.url.trim().isNotEmpty) {
               try {
                 _tracker?.markStage(PlaybackStage.urlObtained);
                 _tracker?.setTag('tierUsed', 'account');
@@ -693,7 +698,7 @@ class YtmService {
         );
 
         final stream = raw == null ? null : YtmStream.fromChannel(raw);
-        if (stream != null) {
+        if (stream != null && stream.url.trim().isNotEmpty) {
           try {
             _tracker?.markStage(PlaybackStage.urlObtained);
             _tracker?.setTag('tierUsed', 'native');

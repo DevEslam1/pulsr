@@ -56,6 +56,7 @@ class _QueuedDownload {
   final void Function(YtDownloadProgress)? onProgress;
   final Completer<Result<int>> completer;
   bool isCanceled = false;
+  bool isPaused = false;
 
   _QueuedDownload({
     required this.song,
@@ -124,6 +125,14 @@ class YtDownloadService {
     }
   }
 
+  /// Pauses an active download gracefully.
+  void pause(String videoId) {
+    final active = _activeDownloads[videoId];
+    if (active != null) {
+      active.isPaused = true;
+    }
+  }
+
   /// Downloads [song] (which must be a `source == youtube` row) and returns the
   /// surviving positive song id once it is a local library track.
   ///
@@ -139,8 +148,11 @@ class YtDownloadService {
           DownloadFailure('Only YouTube tracks can be downloaded'));
     }
     final videoId = song.remoteId;
-    if (videoId == null || videoId.isEmpty) {
-      return const Left(DownloadFailure('Track has no video id'));
+    if (videoId == null ||
+        videoId.isEmpty ||
+        !RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(videoId)) {
+      return const Left(
+          ValidationFailure('Invalid video id: must be exactly 11 characters'));
     }
 
     _canceledVideoIds.remove(videoId);
@@ -697,6 +709,7 @@ class YtDownloadService {
         if (e is DownloadFailure) rethrow;
       }
 
+      final chunkResults = List<File?>.filled(_concurrentChunks, null);
       final futures = <Future<void>>[];
 
       for (var i = 0; i < _concurrentChunks; i++) {
@@ -782,6 +795,7 @@ class YtDownloadService {
               }
             }
             await sink.flush();
+            chunkResults[chunkIndex] = partFile;
           } on FileSystemException catch (e) {
             final m = e.message.toLowerCase();
             if (m.contains('no space') || m.contains('enospc') || e.osError?.errorCode == 28) {
@@ -799,6 +813,20 @@ class YtDownloadService {
       // Check cancellation BEFORE merge to prevent corrupt file
       if (task.isCanceled || _canceledVideoIds.contains(task.song.remoteId)) {
         throw const DownloadFailure('Download canceled');
+      }
+
+      // Verify every chunk index 0..N-1 is present and in order (D-03)
+      for (var i = 0; i < tempParts.length; i++) {
+        final res = chunkResults[i];
+        if (res == null || !await res.exists()) {
+          for (final part in tempParts) {
+            try {
+              if (await part.exists()) await part.delete();
+            } catch (_) {}
+          }
+          throw const CorruptDownloadFailure(
+              'Parallel download chunk missing or out of order');
+        }
       }
 
       // Verify total received byte sum and chunk file integrity
@@ -847,12 +875,13 @@ class YtDownloadService {
         await outSink.close();
       }
 
-      // Verify merged total size and atomically rename (BUG-014)
+      // Verify merged total size and atomically rename (D-04, BUG-014)
       if (total > 0) {
         final finalSize = await outPartFile.length();
         if (finalSize != total) {
           await outPartFile.delete().catchError((_) => outPartFile);
-          throw DownloadFailure('Merged file size mismatch: $finalSize/$total');
+          throw CorruptDownloadFailure(
+              'Merged file size mismatch: $finalSize expected $total');
         }
       }
       if (await outPartFile.exists()) {
@@ -988,6 +1017,12 @@ class YtDownloadService {
       await for (final chunk in response) {
         if (task.isCanceled || _canceledVideoIds.contains(task.song.remoteId)) {
           throw const DownloadFailure('Download canceled');
+        }
+        if (task.isPaused) {
+          sink.add(chunk);
+          await sink.flush();
+          await sink.close();
+          throw const DownloadFailure('Download paused');
         }
         received += chunk.length;
         sink.add(chunk);

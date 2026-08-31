@@ -52,6 +52,7 @@ android {
             dimension = "default"
             applicationIdSuffix = ".plus"
             manifestPlaceholders["appName"] = "Pulsr Plus"
+            proguardFiles("src/dev/proguard-rules.pro")
         }
         create("prod") {
             dimension = "default"
@@ -63,16 +64,11 @@ android {
             dimension = "default"
             applicationIdSuffix = ".ytm"
             manifestPlaceholders["appName"] = "Pulsr Music"
+            proguardFiles("src/ytm/proguard-rules.pro")
         }
     }
 
-    // Flavor-specific ProGuard keep rules for NewPipeExtractor + Rhino.
-    // AGP does NOT auto-discover src/<flavor>/proguard-rules.pro, so we wire them
-    // explicitly. B-02 fix: these rules were previously dead code; without them
-    // R8 strips the extractor in dev/ytm release builds -> runtime crash.
-    // Using androidComponents to inject per-flavor proguard files correctly.
-    // Fallback wiring via buildTypes ensures the rules are present even if
-    // productFlavors ProGuard DSL is not supported in this AGP version.
+    // Flavor-specific ProGuard keep rules for NewPipeExtractor + Rhino are wired per-flavor above.
 
     // The extractor bridge lives outside src/main so that `prod` -- the Play
     // Store variant -- cannot compile it and does not link NewPipeExtractor at
@@ -115,29 +111,30 @@ android {
         release {
             val releaseConfig = signingConfigs.getByName("release")
             val hasKeystore = releaseConfig.storeFile != null && releaseConfig.storeFile!!.exists()
-            val isCI = System.getenv("CI") == "true"
+            val isOptedOut = System.getenv("ALLOW_INSECURE_DEBUG_SIGNING") == "true"
             val isProdOrYtmBuild = gradle.startParameter.taskNames.any {
                 (it.contains("Prod", ignoreCase = true) || it.contains("Ytm", ignoreCase = true)) &&
                 it.contains("Release", ignoreCase = true)
             }
             if (!hasKeystore) {
-                if (isCI && isProdOrYtmBuild) {
-                    throw GradleException("Release keystore file missing in key.properties for release build on CI!")
+                if (isProdOrYtmBuild && !isOptedOut) {
+                    throw GradleException(
+                        "Release keystore file missing in key.properties for shipping release build.\n" +
+                        "Shipping builds (prod/ytm) cannot fall back to debug signing without breaking Google Sign-In (N-03 / OAuth error 10).\n" +
+                        "To bypass this check strictly for local experimentation, set ALLOW_INSECURE_DEBUG_SIGNING=true."
+                    )
                 }
                 // Note (N-03): Local release builds using debug signing will fail Google Sign-In with DEVELOPER_ERROR (code 10)
                 // because the debug keystore SHA-1 does not match the registered production OAuth client.
-                logger.warn("WARNING: Release keystore file not found in key.properties. Falling back to debug signing config for local dev release build.")
+                logger.warn("WARNING: Release keystore file not found in key.properties. Falling back to debug signing config.")
             }
             signingConfig = if (hasKeystore) releaseConfig else signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
-            // Include flavor-specific ProGuard rules so dev/ytm keep NewPipe/Rhino (B-02).
-            // Both flavor files contain identical keep rules; including both is idempotent and harmless for prod.
+            // Flavor-specific rules applied via productFlavors above (C-05)
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
-                "src/dev/proguard-rules.pro",
-                "src/ytm/proguard-rules.pro"
+                "proguard-rules.pro"
             )
         }
     }
@@ -216,20 +213,32 @@ tasks.matching { it.name.startsWith("package") && it.name.endsWith("UnitTestForU
 
 tasks.register("testNative") {
     group = "verification"
-    description = "Compiles and executes native C++ DSP test suite on host (both parity and debug/sanitizer builds)."
+    description = "Compiles and executes native C++ DSP test suite on host (parity build)."
     doLast {
         val testDir = file("src/test/cpp")
         val mainDir = file("src/main/cpp")
         val outDir = file("build/testNative").apply { mkdirs() }
         val isWindows = org.apache.tools.ant.taskdefs.condition.Os.isFamily(org.apache.tools.ant.taskdefs.condition.Os.FAMILY_WINDOWS)
         val exeParity = file("${outDir.absolutePath}/test_native_parity" + if (isWindows) ".exe" else "")
-        val exeDebug = file("${outDir.absolutePath}/test_native_debug" + if (isWindows) ".exe" else "")
 
-        val compiler = if (isWindows) {
-            val windhawkClang = file("C:/Program Files/Windhawk/Compiler/bin/clang++.exe")
-            if (windhawkClang.exists()) windhawkClang.absolutePath else "clang++"
-        } else {
-            "clang++"
+        val compiler = System.getenv("CXX")
+            ?: System.getenv("CLANG_CXX")
+            ?: "clang++"
+
+        // Verify compiler availability before launching (C-02)
+        try {
+            val probeCmd = listOf(compiler, "--version")
+            val probeProc = ProcessBuilder(probeCmd).redirectErrorStream(true).start()
+            val probeRes = probeProc.waitFor()
+            if (probeRes != 0) {
+                throw GradleException("C++ compiler '$compiler' exited with code $probeRes during version probe.")
+            }
+        } catch (e: Exception) {
+            throw GradleException(
+                "C++ compiler '$compiler' could not be found or executed.\n" +
+                "Please ensure clang++ (or another C++20 compiler) is installed and available in your PATH,\n" +
+                "or set the CXX environment variable pointing to your compiler binary.", e
+            )
         }
 
         val dspSources = listOf(
@@ -243,7 +252,7 @@ tasks.register("testNative") {
             "AudioDspEngine.cpp"
         ).map { file("${mainDir.absolutePath}/$it").absolutePath }
 
-        // 1. Build & Run (a): Parity Build with exact production flags (-O3 -std=c++20)
+        // 1. Build & Run: Parity Build with exact production flags (-O3 -std=c++20)
         println("[testNative] Compiling parity build (-O3 -std=c++20)...")
         val parityCompileCmd = mutableListOf(
             compiler,

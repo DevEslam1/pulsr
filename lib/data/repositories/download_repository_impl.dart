@@ -21,6 +21,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/channels.dart';
 import '../../core/di/injection.dart';
 import '../../core/errors/failures.dart';
+import '../../core/services/ytm_service.dart';
 import '../downloads/yt_download_service.dart';
 import '../../core/utils/error_logger.dart';
 import '../../core/utils/ytm_rate_limiter.dart';
@@ -107,8 +108,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   @override
   Future<Either<AppFailure, String>> queueDownload(DownloadTask task) async {
     final videoId = task.videoId;
-    if (videoId.isEmpty) {
-      return const Left(DownloadFailure('Invalid video ID'));
+    if (videoId.isEmpty ||
+        !RegExp(r'^[a-zA-Z0-9_-]{11}$').hasMatch(videoId)) {
+      return const Left(ValidationFailure('Invalid video ID: must be exactly 11 characters'));
     }
 
     final lock = _taskLocks.putIfAbsent(videoId, () => Mutex());
@@ -447,11 +449,28 @@ class DownloadRepositoryImpl implements IDownloadRepository {
 
       int totalUsedBytes = 0;
       int completedCount = _tasks.values.where((t) => t.status == DownloadStatus.complete && t.filePath != null).length;
-      List<String> files = [];
-      List<int> sizes = [];
+      final filePaths = <String>{};
+      for (final t in _tasks.values) {
+        if (t.status == DownloadStatus.complete && t.filePath != null) {
+          filePaths.add(t.filePath!);
+        }
+      }
       try {
-        files = _tasks.values.where((t) => t.status == DownloadStatus.complete && t.filePath != null).map((t) => t.filePath!).toList();
-        sizes = await Future.wait(files.map((p) async {
+        final docDir = await getApplicationDocumentsDirectory();
+        final extDir = await getExternalStorageDirectory();
+        for (final baseDir in [docDir, extDir]) {
+          if (baseDir != null && await baseDir.exists()) {
+            await for (final entity in baseDir.list(recursive: true, followLinks: false)) {
+              if (entity is File && !entity.path.endsWith('.part') && !entity.path.contains('cache')) {
+                filePaths.add(entity.path);
+              }
+            }
+          }
+        }
+      } catch (_) {}
+
+      try {
+        final sizes = await Future.wait(filePaths.map((p) async {
           try {
             final f = File(p);
             if (await f.exists()) return await f.length();
@@ -685,14 +704,79 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     return GenericDownloadFailure(e.toString(), e);
   }
 
+  bool _tryUpdateTaskStatus(DownloadTask current, DownloadStatus targetStatus, {
+    double? progress,
+    double? speedKbps,
+    int? etaSeconds,
+    String? error,
+    bool clearError = false,
+    bool clearSpeedKbps = false,
+    bool clearEtaSeconds = false,
+    bool clearTotalBytes = false,
+    int? librarySongId,
+    String? filePath,
+  }) {
+    final validation = TransitionGuard.validate(current.status, targetStatus);
+    return validation.fold(
+      (failure) {
+        ErrorLogger.log(
+          'Illegal state transition rejected for ${current.videoId}: ${current.status} -> $targetStatus',
+          category: 'DownloadsRepository',
+        );
+        return false;
+      },
+      (_) {
+        _updateTask(current.copyWith(
+          status: targetStatus,
+          progress: progress,
+          speedKbps: speedKbps,
+          etaSeconds: etaSeconds,
+          error: error,
+          clearError: clearError,
+          clearSpeedKbps: clearSpeedKbps,
+          clearEtaSeconds: clearEtaSeconds,
+          clearTotalBytes: clearTotalBytes,
+          librarySongId: librarySongId,
+          filePath: filePath,
+        ));
+        return true;
+      },
+    );
+  }
+
   Future<void> _executeTask(DownloadTask task) async {
     final videoId = task.videoId;
     final completer = Completer<void>();
     _activeCompleters[videoId] = completer;
-    _updateTask(task.copyWith(
-      status: DownloadStatus.downloading,
-      clearError: true,
-    ));
+
+    // D-07: Add Wi-Fi-only and offline-only checks before starting download
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final offlineOnly = prefs.getBool('setting_offline_only_mode') ?? false;
+      if (offlineOnly) {
+        _tryUpdateTaskStatus(task, DownloadStatus.failed,
+            error: 'Offline Only Mode is active in Settings');
+        _activeCompleters.remove(videoId);
+        completer.complete();
+        return;
+      }
+      final wifiOnly = prefs.getBool('setting_wifi_only_mode') ?? false;
+      if (wifiOnly) {
+        final isWifi = await (getIt.isRegistered<YtmService>()
+            ? getIt<YtmService>().isWifiConnected()
+            : Future.value(true));
+        if (!isWifi) {
+          _tryUpdateTaskStatus(task, DownloadStatus.interrupted,
+              error: 'Wi-Fi Only Mode is active. Connect to Wi-Fi to download.');
+          _activeCompleters.remove(videoId);
+          completer.complete();
+          return;
+        }
+      }
+    } catch (_) {}
+
+    // D-01: Validate status transition via TransitionGuard
+    _tryUpdateTaskStatus(task, DownloadStatus.downloading, clearError: true);
 
     // Stall watchdog (Dart-side mirror of DownloadTimeoutHandler): cancels the
     // service's cancellation token when no progress arrives within the window
@@ -771,14 +855,15 @@ class DownloadRepositoryImpl implements IDownloadRepository {
                 : failure.message;
             final transient =
                 _isTransientFailure(failure) && attempt <= _maxAutoRetries;
-            _updateTask(current.copyWith(
-              status: transient
+            _tryUpdateTaskStatus(
+              current,
+              transient
                   ? DownloadStatus.interrupted
                   : DownloadStatus.failed,
               error: message,
               clearSpeedKbps: true,
               clearEtaSeconds: true,
-            ));
+            );
             if (transient) {
               ErrorLogger.log(
                 'Transient download failure for $videoId '
@@ -799,14 +884,15 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             // librarySongId travels with the terminal event so observers (e.g.
             // the player swap after a search-initiated download) can follow
             // the reconciled row without a second lookup.
-            _updateTask(current.copyWith(
-              status: DownloadStatus.complete,
+            _tryUpdateTaskStatus(
+              current,
+              DownloadStatus.complete,
               progress: 1.0,
               clearError: true,
               clearSpeedKbps: true,
               clearEtaSeconds: true,
               librarySongId: newId,
-            ));
+            );
             completedLibraryId = newId;
           },
         );
@@ -852,21 +938,23 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         if (_pausedVideoIds.contains(videoId) || !_tasks.containsKey(videoId)) {
           return;
         }
-        _updateTask(_tasks[videoId]!.copyWith(
-          status: DownloadStatus.downloading,
+        _tryUpdateTaskStatus(
+          _tasks[videoId]!,
+          DownloadStatus.downloading,
           clearError: true,
-        ));
+        );
       }
     } catch (e) {
       if (_tasks.containsKey(videoId)) {
         final failure = _mapExceptionToFailure(e);
         final current = _tasks[videoId] ?? task;
-        _updateTask(current.copyWith(
-          status: DownloadStatus.failed,
+        _tryUpdateTaskStatus(
+          current,
+          DownloadStatus.failed,
           error: failure.message,
           clearSpeedKbps: true,
           clearEtaSeconds: true,
-        ));
+        );
       }
       ErrorLogger.log('Download task $videoId threw unexpectedly',
           error: e, category: 'DownloadsRepository');

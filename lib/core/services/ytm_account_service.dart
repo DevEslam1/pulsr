@@ -232,10 +232,31 @@ class YtmAccountService {
     return null;
   }
 
+  static String sanitizeAndValidateCookies(String rawCookies) {
+    if (rawCookies.isEmpty) return '';
+    final parts = rawCookies.split(';');
+    final validPairs = <String>[];
+    for (final part in parts) {
+      final trimmed = part.trim();
+      if (trimmed.isEmpty) continue;
+      final eqIdx = trimmed.indexOf('=');
+      if (eqIdx > 0) {
+        final key = trimmed.substring(0, eqIdx).trim();
+        final value = trimmed.substring(eqIdx + 1).trim();
+        if (RegExp(r'^[a-zA-Z0-9_.-]+$').hasMatch(key)) {
+          validPairs.add('$key=$value');
+        }
+      }
+    }
+    return validPairs.join('; ');
+  }
+
   /// Persists session cookies exclusively to secure storage. (BUG-023)
   Future<void> _persistCookies(String rawCookies) async {
+    final sanitized = sanitizeAndValidateCookies(rawCookies);
     try {
-      await _secureStorage.write(key: _cookieSecureKey, value: rawCookies);
+      await _secureStorage.write(key: _cookieSecureKey, value: sanitized);
+      _cookies = sanitized;
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to persist cookies to secure storage',
@@ -243,7 +264,7 @@ class YtmAccountService {
         stackTrace: st,
         category: 'YTM_ACCOUNT',
       );
-      _cookies = rawCookies;
+      _cookies = sanitized;
     }
   }
 

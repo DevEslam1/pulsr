@@ -114,6 +114,12 @@ class YtmUrlCache {
   String _buildKey(String videoId, String quality, [String? egressId, String? identityHash]) =>
       '$videoId:${quality.toLowerCase()}:${egressId ?? "default"}:${identityHash ?? "guest"}';
 
+  /// Proactively evicts all expired or dead entries from the cache.
+  void pruneExpired([DateTime? now]) {
+    final current = now ?? _clock.now();
+    _cache.removeWhere((key, entry) => entry.isExpired(current) || _deadUrls.contains(entry.url));
+  }
+
   /// Retrieves cached entry if present and not expired or dead. Moves entry to MRU position.
   /// If [onStaleRevalidate] is provided and entry is in the Stale-While-Revalidate window (age >= ttl/2),
   /// the cached entry is returned immediately and [onStaleRevalidate] is fired asynchronously.
@@ -124,6 +130,7 @@ class YtmUrlCache {
     String? identityHash,
     void Function(String videoId)? onStaleRevalidate,
   }) {
+    pruneExpired();
     final key = _buildKey(videoId, quality, egressId, identityHash);
     final entry = _cache[key];
     if (entry == null) return null;
@@ -194,6 +201,7 @@ class YtmUrlCache {
   }) {
     // If this URL was previously flagged dead, remove from dead list upon fresh explicit put
     _deadUrls.remove(url);
+    pruneExpired();
 
     final key = _buildKey(videoId, quality, egressId, identityHash);
     final now = _clock.now();

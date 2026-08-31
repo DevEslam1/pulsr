@@ -12,14 +12,29 @@ enum DownloadStatus {
   paused,
   interrupted,
   failed,
-  complete;
+  complete,
+  canceled;
 
-  bool get isTerminal => this == DownloadStatus.complete || this == DownloadStatus.failed;
-  bool get isActive => this == DownloadStatus.queued || this == DownloadStatus.downloading || this == DownloadStatus.embedding;
-  bool get canPause => this == DownloadStatus.downloading || this == DownloadStatus.queued;
-  bool get canResume => this == DownloadStatus.paused || this == DownloadStatus.interrupted;
-  bool get canRetry => this == DownloadStatus.failed || this == DownloadStatus.interrupted;
-  bool get canPrioritize => this == DownloadStatus.queued || this == DownloadStatus.paused || this == DownloadStatus.interrupted;
+  bool get isTerminal =>
+      this == DownloadStatus.complete ||
+      this == DownloadStatus.failed ||
+      this == DownloadStatus.canceled;
+  bool get isActive =>
+      this == DownloadStatus.queued ||
+      this == DownloadStatus.downloading ||
+      this == DownloadStatus.embedding;
+  bool get canPause =>
+      this == DownloadStatus.downloading || this == DownloadStatus.queued;
+  bool get canResume =>
+      this == DownloadStatus.paused || this == DownloadStatus.interrupted;
+  bool get canRetry =>
+      this == DownloadStatus.failed ||
+      this == DownloadStatus.interrupted ||
+      this == DownloadStatus.canceled;
+  bool get canPrioritize =>
+      this == DownloadStatus.queued ||
+      this == DownloadStatus.paused ||
+      this == DownloadStatus.interrupted;
   bool get canCancel => !isTerminal;
 
   static DownloadStatus? fromString(String? raw) {
@@ -41,6 +56,7 @@ class TransitionGuard {
       DownloadStatus.interrupted,
       DownloadStatus.failed,
       DownloadStatus.complete, // direct transition if already cached
+      DownloadStatus.canceled,
     },
     DownloadStatus.downloading: {
       DownloadStatus.embedding,
@@ -49,30 +65,39 @@ class TransitionGuard {
       DownloadStatus.failed,
       DownloadStatus.complete,
       DownloadStatus.queued, // reorder / prioritize
+      DownloadStatus.canceled,
     },
     DownloadStatus.embedding: {
       DownloadStatus.complete,
       DownloadStatus.failed,
       DownloadStatus.interrupted,
+      DownloadStatus.canceled,
     },
     DownloadStatus.paused: {
       DownloadStatus.queued,
       DownloadStatus.downloading,
       DownloadStatus.failed,
       DownloadStatus.interrupted,
+      DownloadStatus.canceled,
     },
     DownloadStatus.interrupted: {
       DownloadStatus.queued,
       DownloadStatus.downloading,
       DownloadStatus.paused,
       DownloadStatus.failed,
+      DownloadStatus.canceled,
     },
     DownloadStatus.failed: {
       DownloadStatus.queued,
       DownloadStatus.downloading, // retry
+      DownloadStatus.canceled,
     },
     DownloadStatus.complete: {
       DownloadStatus.queued, // re-download after manual file delete
+    },
+    DownloadStatus.canceled: {
+      DownloadStatus.queued,
+      DownloadStatus.downloading,
     },
   };
 

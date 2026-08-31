@@ -89,6 +89,10 @@ class ScrobblerService {
   final Map<String, DateTime> _lastScrobblePerService = {};
   bool _isFlushing = false;
 
+  static String sanitizeTag(String input) {
+    return input.replaceAll(RegExp(r'[\u200B-\u200D\uFEFF]'), '').trim();
+  }
+
   bool _canScrobbleService(String service) {
     final last = _lastScrobblePerService[service];
     if (last == null) return true;
@@ -235,6 +239,9 @@ class ScrobblerService {
       final playedSec = (positionMs / 1000).round();
       final totalSec = (durationMs / 1000).round();
 
+      // SC-02: Last.fm and ListenBrainz require track duration >= 30 seconds
+      if (totalSec < 30) return;
+
       // Minimum 30 seconds of actual playback OR 80% of track (whichever is less)
       final minimumPlayback = totalSec < 60 ? totalSec * 0.8 : 30;
       if (playedSec < minimumPlayback) return;
@@ -247,10 +254,14 @@ class ScrobblerService {
         final timestamp = _trackStartTime ??
             DateTime.now().subtract(Duration(milliseconds: positionMs));
 
+        final cleanArtist = sanitizeTag(artist);
+        final cleanTrack = sanitizeTag(track);
+        final cleanAlbum = sanitizeTag(album);
+
         await _submitScrobble(
-          artist: artist,
-          track: track,
-          album: album,
+          artist: cleanArtist,
+          track: cleanTrack,
+          album: cleanAlbum,
           durationSec: totalSec,
           timestamp: timestamp,
           artworkUrl: artworkUrl,

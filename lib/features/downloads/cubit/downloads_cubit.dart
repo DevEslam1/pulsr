@@ -440,7 +440,14 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   }
 
   @override
-  Future<void> close() {
+  Future<void> close() async {
+    for (final task in state.tasks.values) {
+      if (task.status.isActive) {
+        try {
+          await _deleteDownloadUseCase(task.videoId);
+        } catch (_) {}
+      }
+    }
     _taskLocks.clear();
     return super.close();
   }

@@ -1753,7 +1753,8 @@ class PulsrAudioHandler extends BaseAudioHandler
         final artUri = await ArtworkUriResolver.resolveArtworkUri(nextSong);
         final item = _songToMediaItem(nextSong, artUri);
 
-        final source = await _resolveAudioSource(nextSong, item);
+        final source = await _resolveAudioSource(nextSong, item)
+            .timeout(const Duration(seconds: 15));
         // Resolving a YouTube URL can take seconds. If a skip/stop cancelled this
         // fade meanwhile, loading the source now would push phantom audio into a
         // player that cancel() already stopped — bail on the stale fade.
@@ -1928,6 +1929,9 @@ class PulsrAudioHandler extends BaseAudioHandler
         next = random.nextInt(_songs.length);
         attempts++;
       }
+      if (next == _currentIndex && _songs.length > 1) {
+        next = (_currentIndex + 1) % _songs.length;
+      }
       return next;
     }
     if (_currentIndex + offset < _songs.length) {
@@ -2081,6 +2085,10 @@ class PulsrAudioHandler extends BaseAudioHandler
     final concat = _buildConcat(_songs);
 
     try {
+      try {
+        await _gaplessSource?.clear();
+      } catch (_) {}
+      _gaplessSource = null;
       // Cleanly stop any existing playing source to release hanging native sockets
       try {
         await _activePlayer.stop();
@@ -2129,6 +2137,7 @@ class PulsrAudioHandler extends BaseAudioHandler
             .catchError((_) {}),
       );
     } on YtmException catch (e, st) {
+      _pendingLazyPosition = null;
       if (generation != _playGeneration) return;
       final info = YtmErrorClassifier.classify(e);
       _errorSubject.add(info.message);
@@ -2155,6 +2164,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         await _failCurrentPlayback(fatal: false);
       }
     } catch (e, st) {
+      _pendingLazyPosition = null;
       if (generation != _playGeneration) return;
       final errStr = e.toString().toLowerCase();
       // Ignore loading interrupted / abort errors resulting from newer play actions
@@ -2399,6 +2409,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         unawaited(_tripleBufferPipeline.prefetchAhead(_songs[index + 2]));
       }
     } on YtmException catch (e, st) {
+      _pendingLazyPosition = null;
       if (generation != _playGeneration) return;
       final info = YtmErrorClassifier.classify(e);
       _errorSubject.add(info.message);
@@ -2412,6 +2423,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       // row, so skipping through them is pointless — halt immediately.
       await _failCurrentPlayback(fatal: e.isFatal);
     } catch (e, st) {
+      _pendingLazyPosition = null;
       if (generation != _playGeneration) return;
       if (e is PlatformException &&
           (e.code == 'abort' ||
@@ -2477,6 +2489,14 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (pending != null && currentSong != null && !_gaplessMode) {
       _pendingLazyPosition = null;
       return playSongAt(_currentIndex, initialPosition: pending);
+    }
+    if (_activePlayer.processingState == ProcessingState.idle && currentSong != null) {
+      if (_gaplessMode) {
+        await _loadGaplessQueue();
+      } else {
+        await playSongAt(_currentIndex);
+        return;
+      }
     }
     await _activePlayer.play();
     final sessionId = _activePlayer.androidAudioSessionId;

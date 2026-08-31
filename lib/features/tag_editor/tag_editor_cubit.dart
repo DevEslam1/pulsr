@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io' as io;
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
@@ -296,6 +297,28 @@ class TagEditorCubit extends Cubit<TagEditorState> {
         errorMessage: 'Song title cannot be empty.',
       ));
       return;
+    }
+
+    if (state.year.trim().isNotEmpty) {
+      final y = int.tryParse(state.year.trim());
+      if (y == null || y < 1900 || y > 2100) {
+        emit(state.copyWith(
+          status: TagEditorStatus.failure,
+          errorMessage: 'Year must be between 1900 and 2100.',
+        ));
+        return;
+      }
+    }
+
+    if (state.trackNumber.trim().isNotEmpty) {
+      final t = int.tryParse(state.trackNumber.trim());
+      if (t == null || t < 1 || t > 999) {
+        emit(state.copyWith(
+          status: TagEditorStatus.failure,
+          errorMessage: 'Track number must be between 1 and 999.',
+        ));
+        return;
+      }
     }
 
     emit(state.copyWith(

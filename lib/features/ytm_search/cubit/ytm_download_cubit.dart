@@ -150,6 +150,8 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
       ),
       DownloadStatus.paused || DownloadStatus.interrupted =>
         const YtDownloadItem(status: YtDownloadStatus.idle),
+      DownloadStatus.canceled =>
+        const YtDownloadItem(status: YtDownloadStatus.canceled),
     };
   }
 

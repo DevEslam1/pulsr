@@ -14,7 +14,7 @@ import '../utils/google_login_recovery.dart';
 
 class YtmWebLoginSheet extends StatefulWidget {
   static const String googleSignInUrl =
-      'https://accounts.google.com/signin/v2/identifier?service=youtube&continue=https%3A%2F%2Fmusic.youtube.com%2F&hl=en';
+      'https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fmusic.youtube.com%2F&hl=en';
 
   final String? initialUrl;
   final String? title;

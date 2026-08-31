@@ -69,7 +69,7 @@ void main() {
         (MethodCall methodCall) async {
           if (methodCall.method == 'resolveStream') {
             return {
-              'videoId': 'test_video_123',
+              'videoId': 'test_video1',
               'url': 'https://googlevideo.com/native_stream',
               'mimeType': 'audio/mp4',
               'container': 'm4a',
@@ -83,7 +83,7 @@ void main() {
         },
       );
 
-      final stream = await ytmService.resolveStream('test_video_123');
+      final stream = await ytmService.resolveStream('test_video1');
       expect(stream, isNotNull);
       expect(stream.url, 'https://googlevideo.com/native_stream');
       expect(stream.title, 'Native Track');
@@ -108,11 +108,11 @@ void main() {
 
       // Backend returns stream successfully via /resolve/audio
       when(() => mockClient.get(
-            Uri.parse('https://test-backend.app/resolve/audio?videoId=fallback_vid'),
+            Uri.parse('https://test-backend.app/resolve/audio?videoId=fallback_vi'),
             headers: any(named: 'headers'),
           )).thenAnswer((_) async => http.Response(
             jsonEncode({
-              'videoId': 'fallback_vid',
+              'videoId': 'fallback_vi',
               'title': 'Fallback Track',
               'author': 'Fallback Artist',
               'audio': [
@@ -128,7 +128,7 @@ void main() {
             200,
           ));
 
-      final stream = await ytmService.resolveStream('fallback_vid');
+      final stream = await ytmService.resolveStream('fallback_vi');
       expect(stream, isNotNull);
       expect(stream.url, 'https://googlevideo.com/backend_fallback_stream');
       expect(stream.title, 'Fallback Track');

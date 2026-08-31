@@ -683,7 +683,11 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     await prefs.setBool(_keyProxyEnabled, enabled);
     final updated = state.copyWith(proxyEnabled: enabled);
     emit(updated);
-    await _syncProxySettings(activeProxyConfig.copyWith(enabled: enabled));
+    if (!enabled) {
+      await _syncProxySettings(const ProxyConfig(enabled: false));
+    } else {
+      await _syncProxySettings(activeProxyConfig.copyWith(enabled: true));
+    }
   }
 
   Future<void> setProxySettings({
@@ -695,12 +699,29 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     String? password,
     String? bypassHosts,
   }) async {
+    final trimmedHost = host.trim();
+    if (enabled) {
+      if (trimmedHost.isEmpty ||
+          (!RegExp(r'^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$').hasMatch(trimmedHost) &&
+              !RegExp(r'^([0-9a-fA-F]{1,4}:){1,7}[0-9a-fA-F]{1,4}$').hasMatch(trimmedHost) &&
+              !RegExp(r'^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$').hasMatch(trimmedHost) &&
+              trimmedHost != 'localhost' &&
+              trimmedHost != '127.0.0.1')) {
+        emit(state.copyWith(errorMessage: 'Invalid proxy host format'));
+        return;
+      }
+      if (port < 1 || port > 65535) {
+        emit(state.copyWith(errorMessage: 'Proxy port must be between 1 and 65535'));
+        return;
+      }
+    }
+
     final pass = password ?? '';
     _proxyPassword = pass;
     final newConfig = ProxyConfig(
       enabled: enabled,
       type: type,
-      host: host.trim(),
+      host: trimmedHost,
       port: port,
       username: username?.trim() ?? '',
       password: pass,
