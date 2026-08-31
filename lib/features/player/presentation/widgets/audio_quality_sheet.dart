@@ -211,6 +211,14 @@ class AudioQualitySheet extends StatelessWidget {
                   _buildOutputDevicesSelector(
                       context, outputDevice, settingsCubit, p, activeColor),
 
+                  // --- BLUETOOTH AUDIO CODEC CONTROL ---
+                  if ((outputDevice?.isBluetooth == true) ||
+                      (outputDevice?.btA2dpPresent == true)) ...[
+                    const SizedBox(height: 20),
+                    _buildBluetoothCodecSection(
+                        context, outputDevice, settingsCubit, p, activeColor),
+                  ],
+
                   // --- PHASE 4: OUTPUT PATH DIAGNOSTICS ---
                   const SizedBox(height: 10),
                   Builder(builder: (context) {
@@ -1316,3 +1324,513 @@ class _OptionPill extends StatelessWidget {
     );
   }
 }
+
+// ── Bluetooth Codec Section ──────────────────────────────────────────────────
+
+extension _BluetoothCodecSection on AudioQualitySheet {
+  static const _btAccent = Color(0xFF00D4FF);
+  static const _ldacAccent = Color(0xFF7C4DFF);
+  static const _warnAccent = Color(0xFFFFB300);
+
+  Widget _buildBluetoothCodecSection(
+    BuildContext context,
+    AudioOutputInfo? outputDevice,
+    SettingsCubit? cubit,
+    PulsrPalette p,
+    Color activeColor,
+  ) {
+    final connected = outputDevice?.btCodecConnected ?? false;
+    final reason = outputDevice?.btReason;
+    final codecName = outputDevice?.btCodecName ?? 'AAC';
+    final sampleRateHz = outputDevice?.btSampleRateHz ?? 44100;
+    final bitDepth = outputDevice?.btBitDepth ?? 16;
+    final ldacMode = outputDevice?.btLdacQualityMode;
+    final selectableCodecs = outputDevice?.btSelectableCodecs ?? const [];
+    final isLdac = codecName == 'LDAC';
+
+    const allCodecs = ['SBC', 'AAC', 'aptX', 'aptX HD', 'LDAC', 'LC3'];
+    final visibleCodecs = selectableCodecs.isNotEmpty ? selectableCodecs : allCodecs;
+
+    const ldacModes = [
+      (0, 'Best Effort', 'Auto kbps'),
+      (1, 'Mobile', '330 kbps'),
+      (2, 'Standard', '660 kbps'),
+      (3, 'Maximum', '990 kbps'),
+    ];
+
+    // ── State: permission required ───────────────────────────────────────
+    if (reason == 'permission_required') {
+      return _buildPermissionBanner(context, cubit, p);
+    }
+
+    // ── State: proxy initializing (BT stack not ready yet) ───────────────
+    if (reason == 'proxy_initializing') {
+      return _buildProxyLoadingBanner(context, cubit, p);
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Header ──────────────────────────────────────────────────────
+        Row(
+          children: [
+            const Icon(Icons.bluetooth_audio_rounded, size: 14, color: _btAccent),
+            const SizedBox(width: 6),
+            Text(
+              'BLUETOOTH AUDIO CODEC',
+              style: TextStyle(
+                fontSize: 11,
+                letterSpacing: 1.4,
+                fontWeight: FontWeight.w800,
+                color: p.textSecondary,
+              ),
+            ),
+            const Spacer(),
+            // Refresh button
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                cubit?.refreshOutputDevice();
+              },
+              child: Icon(Icons.refresh_rounded, size: 16, color: p.textTertiary),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+
+        // ── Status card ─────────────────────────────────────────────────
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                _btAccent.withValues(alpha: connected ? 0.15 : 0.07),
+                p.surfaceContainer.withValues(alpha: 0.6),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: _btAccent.withValues(alpha: connected ? 0.45 : 0.2),
+            ),
+          ),
+          child: connected
+              ? Row(children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isLdac
+                          ? _ldacAccent.withValues(alpha: 0.2)
+                          : _btAccent.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.high_quality_rounded,
+                        color: isLdac ? _ldacAccent : _btAccent, size: 18),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(codecName,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: isLdac ? _ldacAccent : _btAccent,
+                              letterSpacing: 0.5,
+                            )),
+                        Text(
+                          '${(sampleRateHz / 1000).toStringAsFixed(sampleRateHz % 1000 == 0 ? 0 : 1)} kHz'
+                          ' · $bitDepth-bit'
+                          '${isLdac && ldacMode != null ? ' · ${ldacModes[ldacMode.clamp(0, 3)].$3}' : ''}',
+                          style: TextStyle(
+                            fontSize: 11.5,
+                            color: p.textSecondary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (isLdac && ldacMode != null)
+                    Row(
+                      children: List.generate(4, (i) => Padding(
+                        padding: const EdgeInsets.only(left: 3),
+                        child: Container(
+                          width: 7,
+                          height: 7,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: i <= ldacMode ? _ldacAccent : p.hairline,
+                          ),
+                        ),
+                      )),
+                    ),
+                ])
+              : Row(children: [
+                  Icon(Icons.bluetooth_connected_rounded,
+                      color: _btAccent.withValues(alpha: 0.5), size: 20),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Earbuds connected. See specs below.',
+                      style: TextStyle(
+                        color: p.textSecondary,
+                        fontSize: 11.5,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                ]),
+        ),
+
+        if (connected) ...[
+          const SizedBox(height: 14),
+
+          // ── Read-only codec chips (what earbuds support) ───────────────
+          Text(
+            'SUPPORTED CODECS',
+            style: TextStyle(
+              fontSize: 10,
+              letterSpacing: 1.2,
+              fontWeight: FontWeight.w700,
+              color: p.textTertiary,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                children: visibleCodecs.map((c) {
+                  final isActive = c == codecName;
+                  final isLdacOpt = c == 'LDAC';
+                  final accent = isLdacOpt ? _ldacAccent : _btAccent;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: isActive ? accent.withValues(alpha: 0.18) : p.surfaceContainer,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isActive ? accent : p.hairline,
+                          width: isActive ? 1.5 : 1.0,
+                        ),
+                      ),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        if (isActive) ...[
+                          Icon(Icons.check_rounded, color: accent, size: 11),
+                          const SizedBox(width: 4),
+                        ],
+                        Text(
+                          c,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: isActive ? FontWeight.w800 : FontWeight.w500,
+                            color: isActive ? accent : p.textSecondary,
+                            letterSpacing: 0.3,
+                          ),
+                        ),
+                      ]),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // ── Sample rate + bit depth (read-only current values) ─────────
+          Row(children: [
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(
+                  'SAMPLE RATE',
+                  style: TextStyle(
+                    fontSize: 10,
+                    letterSpacing: 1.2,
+                    fontWeight: FontWeight.w700,
+                    color: p.textTertiary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: _btAccent.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: _btAccent.withValues(alpha: 0.3)),
+                  ),
+                  child: Text(
+                    '${(sampleRateHz / 1000).toStringAsFixed(sampleRateHz % 1000 == 0 ? 0 : 1)} kHz',
+                    style: const TextStyle(
+                      color: _btAccent,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ]),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(
+                  'BIT DEPTH',
+                  style: TextStyle(
+                    fontSize: 10,
+                    letterSpacing: 1.2,
+                    fontWeight: FontWeight.w700,
+                    color: p.textTertiary,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+                  decoration: BoxDecoration(
+                    color: _btAccent.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: _btAccent.withValues(alpha: 0.3)),
+                  ),
+                  child: Text(
+                    '$bitDepth-bit',
+                    style: const TextStyle(
+                      color: _btAccent,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ]),
+            ),
+          ]),
+
+          // ── LDAC quality indicator ────────────────────────────────────
+          if (isLdac && ldacMode != null) ...[
+            const SizedBox(height: 14),
+            Row(children: [
+              Container(
+                width: 8,
+                height: 8,
+                decoration: const BoxDecoration(color: _ldacAccent, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'LDAC QUALITY',
+                style: TextStyle(
+                  fontSize: 10,
+                  letterSpacing: 1.2,
+                  fontWeight: FontWeight.w700,
+                  color: _ldacAccent.withValues(alpha: 0.8),
+                ),
+              ),
+            ]),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+              decoration: BoxDecoration(
+                color: _ldacAccent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _ldacAccent.withValues(alpha: 0.35)),
+              ),
+              child: Row(children: [
+                Text(
+                  ldacModes[ldacMode.clamp(0, 3)].$1 == 0 ? 'Best Effort' : ldacModes[ldacMode.clamp(0, 3)].$1 == 1 ? 'Mobile' : ldacModes[ldacMode.clamp(0, 3)].$1 == 2 ? 'Standard' : 'Maximum',
+                  style: const TextStyle(color: _ldacAccent, fontSize: 13, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(width: 8),
+                Text(ldacModes[ldacMode.clamp(0, 3)].$3, style: TextStyle(color: p.textTertiary, fontSize: 12)),
+                const Spacer(),
+                Row(
+                  children: List.generate(4, (i) => Padding(
+                    padding: const EdgeInsets.only(left: 3),
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: i <= ldacMode ? _ldacAccent : p.hairline,
+                      ),
+                    ),
+                  )),
+                ),
+              ]),
+            ),
+          ],
+
+          // ── Open Developer Options shortcut ────────────────────────────
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: () async {
+              HapticFeedback.mediumImpact();
+              await cubit?.openBluetoothDevOptions();
+            },
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    _btAccent.withValues(alpha: 0.12),
+                    _ldacAccent.withValues(alpha: 0.08),
+                  ],
+                  begin: Alignment.centerLeft,
+                  end: Alignment.centerRight,
+                ),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: _btAccent.withValues(alpha: 0.35)),
+              ),
+              child: Row(children: [
+                Container(
+                  padding: const EdgeInsets.all(7),
+                  decoration: BoxDecoration(
+                    color: _btAccent.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.developer_mode_rounded, color: _btAccent, size: 16),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Change Bluetooth Codec',
+                        style: TextStyle(
+                          color: _btAccent,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        'Opens Developer Options → Bluetooth Audio Codec',
+                        style: TextStyle(
+                          color: p.textTertiary,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.open_in_new_rounded,
+                  color: _btAccent.withValues(alpha: 0.7),
+                  size: 16,
+                ),
+              ]),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildPermissionBanner(
+      BuildContext context, SettingsCubit? cubit, PulsrPalette p) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _warnAccent.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _warnAccent.withValues(alpha: 0.4)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          const Icon(Icons.bluetooth_audio_rounded, size: 14, color: _btAccent),
+          const SizedBox(width: 6),
+          Text('BLUETOOTH AUDIO CODEC',
+              style: TextStyle(fontSize: 11, letterSpacing: 1.4,
+                  fontWeight: FontWeight.w800, color: p.textSecondary)),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          const Icon(Icons.lock_outline_rounded, color: _warnAccent, size: 18),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Nearby Devices permission needed to read and control codec settings.',
+              style: TextStyle(color: p.textSecondary, fontSize: 12),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 12),
+        GestureDetector(
+          onTap: () async {
+            HapticFeedback.mediumImpact();
+            await _requestBluetoothPermission(context, cubit);
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 9),
+            decoration: BoxDecoration(
+              color: _warnAccent.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: _warnAccent.withValues(alpha: 0.5)),
+            ),
+            child: const Row(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.settings_bluetooth_rounded, color: _warnAccent, size: 16),
+              SizedBox(width: 8),
+              Text(
+                'Grant Bluetooth Permission',
+                style: TextStyle(
+                  color: _warnAccent,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ]),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  Widget _buildProxyLoadingBanner(
+      BuildContext context, SettingsCubit? cubit, PulsrPalette p) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: _btAccent.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _btAccent.withValues(alpha: 0.2)),
+      ),
+      child: Row(children: [
+        const Icon(Icons.bluetooth_audio_rounded, size: 14, color: _btAccent),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text('Connecting to Bluetooth stack…',
+              style: TextStyle(color: p.textSecondary, fontSize: 12,
+                  fontStyle: FontStyle.italic)),
+        ),
+        GestureDetector(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            cubit?.refreshOutputDevice();
+          },
+          child: const Text('Retry',
+              style: TextStyle(color: _btAccent, fontSize: 12,
+                  fontWeight: FontWeight.w700)),
+        ),
+      ]),
+    );
+  }
+
+  Future<void> _requestBluetoothPermission(
+      BuildContext context, SettingsCubit? cubit) async {
+    try {
+      await cubit?.requestBluetoothPermission();
+    } catch (_) {}
+    await Future<void>.delayed(const Duration(seconds: 2));
+    await cubit?.refreshOutputDevice();
+  }
+}
+

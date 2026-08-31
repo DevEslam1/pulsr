@@ -1074,6 +1074,66 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     await refreshOutputDevice();
   }
 
+  // ── Bluetooth codec control ──────────────────────────────────────────────
+
+  Future<void> setBluetoothCodec(String codec) async {
+    // Optimistic UI: update btCodecName immediately
+    if (state.currentOutputDevice != null) {
+      emit(state.copyWith(
+        currentOutputDevice:
+            state.currentOutputDevice!.copyWith(btCodecName: codec),
+      ));
+    }
+    await _hiResAudioService.setBluetoothCodec(codec);
+    await refreshOutputDevice();
+  }
+
+  Future<void> setBluetoothSampleRate(int hz) async {
+    if (state.currentOutputDevice != null) {
+      emit(state.copyWith(
+        currentOutputDevice:
+            state.currentOutputDevice!.copyWith(btSampleRateHz: hz),
+      ));
+    }
+    await _hiResAudioService.setBluetoothSampleRate(hz);
+    await refreshOutputDevice();
+  }
+
+  Future<void> setBluetoothBitDepth(int bits) async {
+    if (state.currentOutputDevice != null) {
+      emit(state.copyWith(
+        currentOutputDevice:
+            state.currentOutputDevice!.copyWith(btBitDepth: bits),
+      ));
+    }
+    await _hiResAudioService.setBluetoothBitDepth(bits);
+    await refreshOutputDevice();
+  }
+
+  Future<void> setBluetoothLdacQuality(int mode) async {
+    if (state.currentOutputDevice != null) {
+      emit(state.copyWith(
+        currentOutputDevice:
+            state.currentOutputDevice!.copyWith(btLdacQualityMode: mode),
+      ));
+    }
+    await _hiResAudioService.setBluetoothLdacQuality(mode);
+    await refreshOutputDevice();
+  }
+
+  /// Triggers a runtime BLUETOOTH_CONNECT permission request (Android 12+).
+  /// Falls back to opening app settings if already permanently denied.
+  Future<void> requestBluetoothPermission() async {
+    await _hiResAudioService.requestBluetoothPermission();
+    await Future.delayed(const Duration(milliseconds: 500));
+    await refreshOutputDevice();
+  }
+
+  /// Opens Android Developer Options directly to the Bluetooth Audio Codec page.
+  Future<void> openBluetoothDevOptions() async {
+    await _hiResAudioService.openBluetoothDevOptions();
+  }
+
   Future<void> refreshOutputDevice() async {
     final info = await _hiResAudioService.getAudioOutputInfo();
     final previous = state.currentOutputDevice;

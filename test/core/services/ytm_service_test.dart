@@ -36,7 +36,14 @@ Map<String, Object?> _resultRow({
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  tearDown(() => _mockChannel((_) async => null));
+  setUp(() {
+    YtmService.resetGlobalBlock();
+  });
+
+  tearDown(() {
+    _mockChannel((_) async => null);
+    YtmService.resetGlobalBlock();
+  });
 
   group('YtmException classification properties', () {
     test('isNetwork flags timeout and network errors', () {

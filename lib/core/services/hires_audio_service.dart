@@ -218,6 +218,96 @@ class HiResAudioService {
     }
   }
 
+  Future<void> requestBluetoothPermission() async {
+    if (!PlatformCapabilities.isAndroid) return;
+    try {
+      await _methodChannel
+          .invokeMethod<void>('requestBluetoothPermission')
+          .timeout(const Duration(seconds: 5));
+    } catch (e, st) {
+      ErrorLogger.log('requestBluetoothPermission failed',
+          error: e, stackTrace: st, category: 'HiResAudio');
+    }
+  }
+
+  Future<void> openBluetoothDevOptions() async {
+    if (!PlatformCapabilities.isAndroid) return;
+    try {
+      await _methodChannel
+          .invokeMethod<void>('openBluetoothDevOptions')
+          .timeout(const Duration(seconds: 5));
+    } catch (e, st) {
+      ErrorLogger.log('openBluetoothDevOptions failed',
+          error: e, stackTrace: st, category: 'HiResAudio');
+    }
+  }
+
+  // -- Bluetooth codec control --
+
+  Future<bool> setBluetoothCodec(String codec) async {
+    if (!PlatformCapabilities.isAndroid) return false;
+    try {
+      final bool? ok = await _methodChannel
+          .invokeMethod<bool>('setBluetoothCodec', {'codec': codec})
+          .timeout(const Duration(seconds: 3));
+      await Future<void>.delayed(const Duration(milliseconds: 700));
+      await getAudioOutputInfo();
+      return ok ?? false;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to setBluetoothCodec($codec)',
+          error: e, stackTrace: st, category: 'HiResAudio');
+      return false;
+    }
+  }
+
+  Future<bool> setBluetoothSampleRate(int hz) async {
+    if (!PlatformCapabilities.isAndroid) return false;
+    try {
+      final bool? ok = await _methodChannel
+          .invokeMethod<bool>('setBluetoothSampleRate', {'sampleRate': hz})
+          .timeout(const Duration(seconds: 3));
+      await Future<void>.delayed(const Duration(milliseconds: 700));
+      await getAudioOutputInfo();
+      return ok ?? false;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to setBluetoothSampleRate($hz)',
+          error: e, stackTrace: st, category: 'HiResAudio');
+      return false;
+    }
+  }
+
+  Future<bool> setBluetoothBitDepth(int bits) async {
+    if (!PlatformCapabilities.isAndroid) return false;
+    try {
+      final bool? ok = await _methodChannel
+          .invokeMethod<bool>('setBluetoothBitDepth', {'bitDepth': bits})
+          .timeout(const Duration(seconds: 3));
+      await Future<void>.delayed(const Duration(milliseconds: 700));
+      await getAudioOutputInfo();
+      return ok ?? false;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to setBluetoothBitDepth($bits)',
+          error: e, stackTrace: st, category: 'HiResAudio');
+      return false;
+    }
+  }
+
+  Future<bool> setBluetoothLdacQuality(int mode) async {
+    if (!PlatformCapabilities.isAndroid) return false;
+    try {
+      final bool? ok = await _methodChannel
+          .invokeMethod<bool>('setBluetoothLdacQuality', {'mode': mode})
+          .timeout(const Duration(seconds: 3));
+      await Future<void>.delayed(const Duration(milliseconds: 700));
+      await getAudioOutputInfo();
+      return ok ?? false;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to setBluetoothLdacQuality($mode)',
+          error: e, stackTrace: st, category: 'HiResAudio');
+      return false;
+    }
+  }
+
   void dispose() {
     _eventSubscription?.cancel();
     _eventSubscription = null;

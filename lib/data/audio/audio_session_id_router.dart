@@ -42,30 +42,50 @@ class AudioSessionIdRouter {
   /// Feed every emission of the player's `androidAudioSessionIdStream` here,
   /// including the first non-zero id emitted right after player init.
   void handleSessionId(int? sessionId) {
-    if (sessionId == null || sessionId <= 0) return;
+    if (sessionId == null || sessionId <= 0) {
+      ErrorLogger.log(
+        'Ignoring invalid audio session ID: $sessionId (null or <= 0)',
+        category: 'AudioSessionIdRouter',
+      );
+      return;
+    }
     if (sessionId == _currentSessionId && _pendingSessionId == null) {
       // Duplicate same-id re-emit: no re-attach needed.
       return;
     }
+    ErrorLogger.log(
+      'AudioSessionIdRouter received sessionId: $sessionId (current: $_currentSessionId)',
+      category: 'AudioSessionIdRouter',
+    );
     _pendingSessionId = sessionId;
     _chain = _chain.then((_) => _drain()).catchError((Object e, StackTrace st) {
-      ErrorLogger.log('AudioSessionIdRouter chain error',
-          error: e, stackTrace: st, category: 'AudioSessionIdRouter');
+      ErrorLogger.log(
+        'AudioSessionIdRouter chain error',
+        error: e,
+        stackTrace: st,
+        category: 'AudioSessionIdRouter',
+      );
     });
   }
 
   void handleRouteChanged() {
     if (_routeResyncPending) return;
     _routeResyncPending = true;
-    _chain = _chain.then((_) {
-      _routeResyncPending = false;
-      final callback = onRouteChanged;
-      if (callback != null) callback();
-    }).catchError((Object e, StackTrace st) {
-      _routeResyncPending = false;
-      ErrorLogger.log('AudioSessionIdRouter route resync error',
-          error: e, stackTrace: st, category: 'AudioSessionIdRouter');
-    });
+    _chain = _chain
+        .then((_) {
+          _routeResyncPending = false;
+          final callback = onRouteChanged;
+          if (callback != null) callback();
+        })
+        .catchError((Object e, StackTrace st) {
+          _routeResyncPending = false;
+          ErrorLogger.log(
+            'AudioSessionIdRouter route resync error',
+            error: e,
+            stackTrace: st,
+            category: 'AudioSessionIdRouter',
+          );
+        });
   }
 
   Future<void> _drain() async {

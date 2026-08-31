@@ -8,6 +8,7 @@ import android.media.audiofx.AudioEffect
 import android.media.audiofx.BassBoost
 import android.media.audiofx.DynamicsProcessing
 import android.media.audiofx.Equalizer
+import android.media.audiofx.PresetReverb
 import android.media.audiofx.LoudnessEnhancer
 import android.media.audiofx.Virtualizer
 import android.os.Build
@@ -62,6 +63,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var legacyEqualizer: Equalizer? = null
     private var loudnessEnhancer: LoudnessEnhancer? = null
     private var bassBoost: BassBoost? = null
+    // HAL-bound PresetReverb — actually audible via the Android AudioEffect session
+    private var halReverb: PresetReverb? = null
 
     private var isVirtualizerEnabled = false
     private var virtualizerStrength: Short = 0
@@ -131,20 +134,35 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var _oemWarningLogged = false
     private var isBitPerfectBypassActive = false
     private var bypassSavedStages: Int? = null
-    @Volatile private var reverbExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+    @Volatile private var reverbExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(
+        java.util.concurrent.ThreadFactory { r -> Thread(r, "PulsrReverbDSP") }
+    )
 
     private fun safeReverbExecute(action: () -> Unit) {
         try {
             reverbExecutor.execute { try { action() } catch (_: Exception) {} }
         } catch (e: java.util.concurrent.RejectedExecutionException) {
             try {
-                reverbExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+                // Properly shutdown the old executor before creating a new one
+                val oldExecutor = reverbExecutor
+                Log.w(TAG, "Reverb executor rejected; shutting down old executor and creating new one")
+                oldExecutor.shutdown()
+                if (!oldExecutor.awaitTermination(2, java.util.concurrent.TimeUnit.SECONDS)) {
+                    Log.w(TAG, "Reverb executor did not terminate in time; forcing shutdown")
+                    oldExecutor.shutdownNow()
+                }
+                
+                // Create a new executor with proper thread naming
+                reverbExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(
+                    java.util.concurrent.ThreadFactory { r -> Thread(r, "PulsrReverbDSP") }
+                )
                 reverbExecutor.execute { try { action() } catch (_: Exception) {} }
-            } catch (_: Exception) {
-                android.util.Log.w(TAG, "Reverb executor rejected after recreate: ${e.message}")
+                Log.i(TAG, "Reverb executor successfully recreated and action executed")
+            } catch (ex: Exception) {
+                Log.w(TAG, "Reverb executor failed to recover: ${ex.message}", ex)
             }
         } catch (e: Exception) {
-            android.util.Log.w(TAG, "safeReverbExecute failed: ${e.message}")
+            Log.w(TAG, "safeReverbExecute failed: ${e.message}", e)
         }
     }
 
@@ -538,7 +556,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         methodChannel.setMethodCallHandler(this)
         // Recreate executor if previously shut down
         if (reverbExecutor.isShutdown || reverbExecutor.isTerminated) {
-            reverbExecutor = java.util.concurrent.Executors.newSingleThreadExecutor()
+            Log.i(TAG, "Reverb executor was shut down; creating fresh instance")
+            reverbExecutor = java.util.concurrent.Executors.newSingleThreadExecutor(
+                java.util.concurrent.ThreadFactory { r -> Thread(r, "PulsrReverbDSP") }
+            )
         }
         configureNativeMemoryBudget(binding.applicationContext)
         // Prefetch OEM info off main thread
@@ -589,8 +610,25 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             eqUpdateRunnable = null
         }
         volumeBoostRetryCount = 0
-        // Don't shutdown executor permanently; just remove queued tasks for detach
-        try { reverbExecutor.shutdown() } catch (_: Exception) {}
+        
+        // Properly shutdown reverb executor with timeout
+        try {
+            Log.i(TAG, "Shutting down reverb executor gracefully")
+            reverbExecutor.shutdown()
+            if (!reverbExecutor.awaitTermination(3, java.util.concurrent.TimeUnit.SECONDS)) {
+                Log.w(TAG, "Reverb executor did not terminate in time; forcing shutdown")
+                val remaining = reverbExecutor.shutdownNow()
+                if (remaining.isNotEmpty()) {
+                    Log.w(TAG, "Forcefully shutdown ${remaining.size} remaining reverb tasks")
+                }
+            } else {
+                Log.i(TAG, "Reverb executor shut down cleanly")
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error shutting down reverb executor: ${e.message}", e)
+            try { reverbExecutor.shutdownNow() } catch (_: Exception) {}
+        }
+        
         // Clear dedup caches so post-reset values are resent
         lastNativeEqPreamp = null
         lastNativeEqBands.clear()
@@ -909,6 +947,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             Log.w(TAG, "nativeSetLimiterEnabled failed: ${e.message}")
                         }
                     }
+                    // HAL path: wire to DynamicsProcessing limiter stage
+                    applyHalLimiter()
                     recalculateActiveStages()
                     result.success(true)
                 }
@@ -933,10 +973,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             }
                         }
                     }
+                    // HAL path: update DynamicsProcessing limiter threshold/release
+                    applyHalLimiter()
                     result.success(true)
                 }
 
-                // Convolution Reverb
+                // Convolution Reverb — HAL path via EnvironmentalReverb + native C++ (for when PCM path lands)
                 "setReverbEnabled" -> {
                     val enabled = call.argument<Boolean>("enabled") ?: false
                     isReverbEnabled = enabled
@@ -948,6 +990,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             Log.w(TAG, "nativeSetReverbEnabled failed: ${e.message}")
                         }
                     }
+                    applyHalReverb()
                     recalculateActiveStages()
                     result.success(true)
                 }
@@ -966,6 +1009,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             }
                         }
                     }
+                    // HAL path: update EnvironmentalReverb preset
+                    applyHalReverb()
                     result.success(true)
                 }
 
@@ -980,6 +1025,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             Log.w(TAG, "nativeSetReverbWetDry failed: ${e.message}")
                         }
                     }
+                    // HAL path: update EnvironmentalReverb wet level
+                    applyHalReverb()
                     result.success(true)
                 }
 
@@ -1051,7 +1098,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     }
                 }
 
-                // Stereo Balance & Mono Mix
+                // Stereo Balance & Mono Mix — HAL path via DynamicsProcessing per-channel inputGain
                 "setStereoBalance" -> {
                     val balance = call.argument<Double>("balance") ?: 0.0
                     stereoBalance = balance
@@ -1063,6 +1110,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             Log.w(TAG, "nativeSetStereoBalance failed: ${e.message}")
                         }
                     }
+                    applyHalBalanceMono()
                     recalculateActiveStages()
                     result.success(true)
                 }
@@ -1078,6 +1126,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             Log.w(TAG, "nativeSetMonoMix failed: ${e.message}")
                         }
                     }
+                    applyHalBalanceMono()
                     recalculateActiveStages()
                     result.success(true)
                 }
@@ -1974,6 +2023,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         if (dp != null) {
             updateEqInPlace()
             updatePreampInPlace()
+            // Ensure DP stays enabled if limiter is active even when EQ is toggled off
+            val dynamicsActive = isDynamicsEnabled && currentDynamicsPreset != "off"
+            try { dp.enabled = isEqEnabled || dynamicsActive || isLimiterEnabled } catch (_: Exception) {}
         } else {
             buildDynamicsProcessing()
         }
@@ -2086,7 +2138,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
 
         val dynamicsActive = isDynamicsEnabled && currentDynamicsPreset != "off"
-        if (!isEqEnabled && !dynamicsActive) {
+        val needsBalanceMono = monoMix || kotlin.math.abs(stereoBalance) > 0.001
+        // Build DynamicsProcessing whenever EQ, dynamics, limiter, or balance/mono are active.
+        // Limiter and balance/mono route through the same DynamicsProcessing engine.
+        if (!isEqEnabled && !dynamicsActive && !isLimiterEnabled && !needsBalanceMono) {
             try { oldDp?.release() } catch (_: Exception) {}
             updateLegacyEqualizer()
             return
@@ -2126,9 +2181,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 neutralizeDynamics(dp)
             }
 
-            dp.enabled = isEqEnabled || dynamicsActive
+            // Enable the engine whenever any stage is active (EQ, dynamics, or limiter)
+            dp.enabled = isEqEnabled || dynamicsActive || isLimiterEnabled
             dynamicsProcessing = dp
             updateLegacyEqualizer()
+            // Wire HAL limiter and balance/mono into the freshly-built DP instance
+            applyHalLimiter()
+            applyHalBalanceMono()
         } catch (e: Exception) {
             dpBuildFailures++
             if (dpBuildFailures == 1 || dpBuildFailures == dpBuildFailureLimit) {
@@ -2146,6 +2205,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             try { oldDp?.release() } catch (_: Exception) {}
         }
     }
+
 
     private fun getSpatializerInfo(): Map<String, Any> {
         val result = mutableMapOf<String, Any>(
@@ -2204,12 +2264,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         try { bassBoost?.release() } catch (_: Exception) {}
         try { dynamicsProcessing?.release() } catch (_: Exception) {}
         try { legacyEqualizer?.release() } catch (_: Exception) {}
+        try { halReverb?.release() } catch (_: Exception) {}
 
         virtualizer = null
         loudnessEnhancer = null
         bassBoost = null
         dynamicsProcessing = null
         legacyEqualizer = null
+        halReverb = null
         cachedSupportedEffects = runCatching { AudioEffect.queryEffects() }.getOrNull()
 
         if (isVirtualizerEnabled || virtualizerStrength > 0) {
@@ -2226,6 +2288,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         }
 
         buildDynamicsProcessing()
+        // Reattach HAL-side effects after session recreate
+        applyHalReverb()
+        applyHalLimiter()
+        applyHalBalanceMono()
     }
 
     /**
@@ -2245,7 +2311,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 isVirtualizerEnabled ||
                 virtualizerStrength > 0 ||
                 volumeBoostMilliBels > 0 ||
-                bassBoostStrength > 0
+                bassBoostStrength > 0 ||
+                isReverbEnabled ||
+                isLimiterEnabled
         if (!wantsAnyHalStage) return true
 
         fun healthy(effect: AudioEffect?): Boolean {
@@ -2260,7 +2328,131 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 healthy(legacyEqualizer) ||
                 healthy(virtualizer) ||
                 healthy(loudnessEnhancer) ||
-                healthy(bassBoost)
+                healthy(bassBoost) ||
+                (halReverb?.let { try { it.id; true } catch (_: Exception) { false } } ?: false)
+    }
+
+    // -------------------------------------------------------------------------
+    // HAL-bound effect helpers — these create/update Android AudioEffect objects
+    // that ARE in the audio session path (audible, unlike the native C++ engine
+    // which requires a PCM callback that ExoPlayer does not currently provide).
+    // -------------------------------------------------------------------------
+
+    /**
+     * Creates or updates the session-bound [PresetReverb] with the current
+     * preset mapping. Preset mapping:
+     *   0 = Studio Room, 1 = Concert Hall, 2 = Warm Tube (Plate), 3 = Plate, 4 = Custom IR
+     * We map to the closest Android PresetReverb preset.
+     * Note: PresetReverb does not expose a wet/dry control — reverb is on/off
+     * via enabled flag. Wet level control would require EnvironmentalReverb
+     * with manual parameter tuning per device, which is fragile.
+     */
+    private fun applyHalReverb() {
+        if (currentAudioSessionId == 0) return
+        if (!isReverbEnabled) {
+            try { halReverb?.enabled = false } catch (_: Exception) {}
+            return
+        }
+        try {
+            val reverb = halReverb ?: PresetReverb(0, currentAudioSessionId).also {
+                halReverb = it
+            }
+            // Map our 0-4 preset index to Android's PresetReverb presets
+            val androidPreset: Short = when (reverbPreset) {
+                0 -> PresetReverb.PRESET_SMALLROOM   // Studio Room
+                1 -> PresetReverb.PRESET_LARGEHALL   // Concert Hall
+                2 -> PresetReverb.PRESET_PLATE       // Warm Tube → Plate
+                3 -> PresetReverb.PRESET_PLATE       // Plate
+                else -> PresetReverb.PRESET_SMALLROOM
+            }
+            reverb.preset = androidPreset
+            reverb.enabled = true
+            Log.d(TAG, "HAL reverb applied: preset=$reverbPreset androidPreset=$androidPreset")
+        } catch (e: Exception) {
+            Log.w(TAG, "applyHalReverb failed: ${e.message}")
+            try { halReverb?.release() } catch (_: Exception) {}
+            halReverb = null
+        }
+    }
+
+    /**
+     * Wires the user's limiter threshold/release/attack into the
+     * [DynamicsProcessing] limiter stage. This means the limiter is audible
+     * even without a dynamics preset active. When [isLimiterEnabled] is false
+     * the limiter stage is disabled (passthrough).
+     */
+    private fun applyHalLimiter() {
+        val dp = dynamicsProcessing ?: run {
+            // If DynamicsProcessing doesn't exist yet, rebuild it — it will
+            // call applyHalLimiter internally via buildDynamicsProcessing.
+            if (isLimiterEnabled) buildDynamicsProcessing()
+            return
+        }
+        try {
+            val preampDb = if (isEqEnabled) eqPreampDb.toFloat() else 0f
+            val baseGain = if (isDynamicsEnabled && currentDynamicsPreset != "off") {
+                DYNAMICS_PRESETS[currentDynamicsPreset]?.limiter?.postGain ?: 0f
+            } else 0f
+            for (ch in 0 until CHANNEL_COUNT) {
+                val limiter = dp.getLimiterByChannelIndex(ch)
+                if (isLimiterEnabled) {
+                    // Map lookahead (ms) → attack time (ms). EnvironmentalReverb
+                    // has no lookahead; DynamicsProcessing.Limiter uses attackTime.
+                    limiter.attackTime = limiterLookaheadMs.toFloat().coerceIn(0.1f, 50f)
+                    limiter.releaseTime = limiterReleaseMs.toFloat().coerceIn(10f, 2000f)
+                    limiter.ratio = 20f           // Effectively brickwall
+                    limiter.threshold = limiterThresholdDb.toFloat().coerceIn(-60f, 0f)
+                    limiter.postGain = baseGain + preampDb
+                    limiter.isEnabled = true
+                } else {
+                    limiter.isEnabled = false
+                    limiter.postGain = baseGain + preampDb
+                }
+            }
+            Log.d(TAG, "HAL limiter applied: enabled=$isLimiterEnabled threshold=${limiterThresholdDb}dB attack=${limiterLookaheadMs}ms")
+        } catch (e: Exception) {
+            Log.w(TAG, "applyHalLimiter failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Applies stereo balance and mono-mix via [DynamicsProcessing] per-channel
+     * inputGain. Balance -1.0 = full left, 0.0 = center, +1.0 = full right.
+     * Uses DynamicsProcessing.getChannelByChannelIndex() + setChannelTo() for
+     * real-time gain update on the live session.
+     */
+    private fun applyHalBalanceMono() {
+        val dp = dynamicsProcessing ?: run {
+            // Rebuild will call this helper after the DP is created
+            if (monoMix || kotlin.math.abs(stereoBalance) > 0.001) buildDynamicsProcessing()
+            return
+        }
+        try {
+            if (monoMix) {
+                // Both channels at 0 dB inputGain — downstream mixing creates mono
+                for (ch in 0 until CHANNEL_COUNT) {
+                    val channel = dp.getChannelByChannelIndex(ch)
+                    channel.inputGain = 0f
+                    dp.setChannelTo(ch, channel)
+                }
+            } else {
+                // Stereo balance: attenuate one channel. balance in [-1, +1]
+                // Left = ch 0, Right = ch 1
+                val bal = stereoBalance.toFloat().coerceIn(-1f, 1f)
+                // At balance=0: L=0dB, R=0dB. At balance=+1: L=-60dB (near silence), R=0dB
+                val leftGainDb = if (bal >= 0f) (-60f * bal) else 0f
+                val rightGainDb = if (bal <= 0f) (60f * bal) else 0f
+                val leftCh = dp.getChannelByChannelIndex(0)
+                leftCh.inputGain = leftGainDb
+                dp.setChannelTo(0, leftCh)
+                val rightCh = dp.getChannelByChannelIndex(1)
+                rightCh.inputGain = rightGainDb
+                dp.setChannelTo(1, rightCh)
+            }
+            Log.d(TAG, "HAL balance applied: balance=$stereoBalance mono=$monoMix")
+        } catch (e: Exception) {
+            Log.w(TAG, "applyHalBalanceMono failed: ${e.message}")
+        }
     }
 
     fun releaseEffects() {
@@ -2296,8 +2488,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         try {
             dynamicsProcessing?.enabled = false
             dynamicsProcessing?.release()
+            Log.i(TAG, "DynamicsProcessing released successfully")
         } catch (e: Exception) {
-            Log.w(TAG, "DynamicsProcessing cleanup error: ${e.message}")
+            Log.w(TAG, "DynamicsProcessing cleanup error: ${e.message}. Effect may still be attached to session!", e)
         }
         dynamicsProcessing = null
 
@@ -2308,6 +2501,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             Log.w(TAG, "Equalizer fallback cleanup error: ${e.message}")
         }
         legacyEqualizer = null
+
+        try {
+            halReverb?.enabled = false
+            halReverb?.release()
+        } catch (e: Exception) {
+            Log.w(TAG, "HAL EnvironmentalReverb cleanup error: ${e.message}")
+        }
+        halReverb = null
+
         cachedSupportedEffects = null
         // Full reset: clear the parameter dedup caches so a subsequent
         // re-attach re-pushes every value to the recreated effects / C++

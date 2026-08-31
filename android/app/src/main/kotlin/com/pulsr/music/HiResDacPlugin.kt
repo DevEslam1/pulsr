@@ -1,5 +1,10 @@
 package com.pulsr.music
 
+import android.bluetooth.BluetoothA2dp
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothCodecConfig
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothProfile
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -26,6 +31,7 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         private const val TAG = "HiResDacPlugin"
         private const val METHOD_CHANNEL = "com.pulsr.music/hires_dac"
         private const val EVENT_CHANNEL = "com.pulsr.music/hires_dac_events"
+        private const val REQUEST_CODE_BT_CONNECT = 9876
     }
 
     private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
@@ -48,10 +54,16 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
     private var cachedClearMixerMethod: java.lang.reflect.Method? = null
     private var cachedGetMixerMethod: java.lang.reflect.Method? = null
 
+    // Bluetooth A2DP codec control
+    private var bluetoothA2dp: BluetoothA2dp? = null
+    private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
+    private var a2dpServiceListener: BluetoothProfile.ServiceListener? = null
+
     init {
         methodChannel.setMethodCallHandler(this)
         eventChannel.setStreamHandler(this)
         registerAudioDeviceCallbacks()
+        connectBluetoothA2dpProxy()
     }
 
     private fun registerAudioDeviceCallbacks() {
@@ -134,6 +146,67 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 notifyDeviceChange()
                 result.success(mapOf("success" to success, "reason" to lastBitPerfectReason))
             }
+            // ── Bluetooth codec control ──────────────────────────────────────
+            "getBluetoothCodecInfo" -> {
+                result.success(getBluetoothCodecInfo())
+            }
+            "setBluetoothCodec" -> {
+                val codec = call.argument<String>("codec") ?: "SBC"
+                result.success(setBluetoothCodecPreference(codec = codec))
+            }
+            "setBluetoothSampleRate" -> {
+                val hz = call.argument<Int>("sampleRate") ?: 0
+                result.success(setBluetoothCodecPreference(sampleRateHz = hz))
+            }
+            "setBluetoothBitDepth" -> {
+                val bits = call.argument<Int>("bitDepth") ?: 0
+                result.success(setBluetoothCodecPreference(bitDepth = bits))
+            }
+            "setBluetoothLdacQuality" -> {
+                val mode = call.argument<Int>("mode") ?: 0
+                result.success(setBluetoothCodecPreference(ldacQualityMode = mode))
+            }
+            "requestBluetoothPermission" -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val perm = android.Manifest.permission.BLUETOOTH_CONNECT
+                    val granted = context.checkSelfPermission(perm) ==
+                        android.content.pm.PackageManager.PERMISSION_GRANTED
+                    if (!granted) {
+                        // Open system App Settings so the user can grant BLUETOOTH_CONNECT.
+                        // FLAG_ACTIVITY_NEW_TASK is required when starting from a non-Activity context.
+                        try {
+                            val intent = android.content.Intent(
+                                android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                android.net.Uri.fromParts("package", context.packageName, null)
+                            )
+                            intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(intent)
+                        } catch (_: Exception) {
+                            Log.w(TAG, "Could not open app settings for BT permission")
+                        }
+                    }
+                }
+                result.success(null)
+            }
+            "openBluetoothDevOptions" -> {
+                try {
+                    val intent = android.content.Intent(android.provider.Settings.ACTION_APPLICATION_DEVELOPMENT_SETTINGS)
+                    intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                    result.success(true)
+                } catch (_: Exception) {
+                    try {
+                        val intent = android.content.Intent(android.provider.Settings.ACTION_SETTINGS)
+                        intent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Could not open developer options: ${e.message}")
+                        result.success(false)
+                    }
+                }
+            }
+            // ────────────────────────────────────────────────────────────────
             "setOutputDevice" -> {
                 val deviceId = call.argument<Int>("deviceId")
                 selectedDeviceId = deviceId
@@ -234,7 +307,328 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             }
             usbReceiver = null
         }
+        // Close Bluetooth A2DP proxy
+        try {
+            bluetoothAdapter?.closeProfileProxy(BluetoothProfile.A2DP, bluetoothA2dp)
+        } catch (_: Exception) {}
+        bluetoothA2dp = null
     }
+
+    // ── Bluetooth A2DP codec helpers ─────────────────────────────────────────
+
+    private fun connectBluetoothA2dpProxy() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        try {
+            val listener = object : BluetoothProfile.ServiceListener {
+                override fun onServiceConnected(profile: Int, proxy: BluetoothProfile?) {
+                    bluetoothA2dp = proxy as? BluetoothA2dp
+                    Log.d(TAG, "BluetoothA2dp proxy connected")
+                }
+                override fun onServiceDisconnected(profile: Int) {
+                    bluetoothA2dp = null
+                    Log.d(TAG, "BluetoothA2dp proxy disconnected")
+                }
+            }
+            a2dpServiceListener = listener
+            bluetoothAdapter?.getProfileProxy(context, listener, BluetoothProfile.A2DP)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to connect BluetoothA2dp proxy: ${e.message}")
+        }
+    }
+
+    /** Maps codec type int to a human-readable name. */
+    private fun codecTypeName(codecType: Int): String = when (codecType) {
+        BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC    -> "SBC"
+        BluetoothCodecConfig.SOURCE_CODEC_TYPE_AAC    -> "AAC"
+        BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX   -> "aptX"
+        BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_HD -> "aptX HD"
+        BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC   -> "LDAC"
+        5 -> "LC3"    // BluetoothCodecConfig.SOURCE_CODEC_TYPE_LC3 — added in API 33, use literal to avoid compile errors on lower API
+        else -> "Unknown ($codecType)"
+    }
+
+    /** Maps codec name string to BluetoothCodecConfig codec type int. */
+    private fun codecNameToType(name: String): Int = when (name.uppercase()) {
+        "SBC"      -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC
+        "AAC"      -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_AAC
+        "APTX"     -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX
+        "APTX HD"  -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_HD
+        "LDAC"     -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC
+        "LC3"      -> 5
+        else       -> BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC
+    }
+
+    /** Maps BluetoothCodecConfig sample rate flag to Hz. */
+    private fun codecSampleRateToHz(flag: Int): Int = when (flag) {
+        BluetoothCodecConfig.SAMPLE_RATE_44100 -> 44100
+        BluetoothCodecConfig.SAMPLE_RATE_48000 -> 48000
+        BluetoothCodecConfig.SAMPLE_RATE_88200 -> 88200
+        BluetoothCodecConfig.SAMPLE_RATE_96000 -> 96000
+        BluetoothCodecConfig.SAMPLE_RATE_176400 -> 176400
+        BluetoothCodecConfig.SAMPLE_RATE_192000 -> 192000
+        else -> 44100
+    }
+
+    /** Maps Hz to BluetoothCodecConfig sample rate flag. */
+    private fun hzToCodecSampleRate(hz: Int): Int = when (hz) {
+        44100  -> BluetoothCodecConfig.SAMPLE_RATE_44100
+        48000  -> BluetoothCodecConfig.SAMPLE_RATE_48000
+        88200  -> BluetoothCodecConfig.SAMPLE_RATE_88200
+        96000  -> BluetoothCodecConfig.SAMPLE_RATE_96000
+        176400 -> BluetoothCodecConfig.SAMPLE_RATE_176400
+        192000 -> BluetoothCodecConfig.SAMPLE_RATE_192000
+        else   -> BluetoothCodecConfig.SAMPLE_RATE_NONE
+    }
+
+    /** Maps BluetoothCodecConfig bits-per-sample flag to int bit depth. */
+    private fun codecBitsToDepth(bits: Int): Int = when (bits) {
+        BluetoothCodecConfig.BITS_PER_SAMPLE_16 -> 16
+        BluetoothCodecConfig.BITS_PER_SAMPLE_24 -> 24
+        BluetoothCodecConfig.BITS_PER_SAMPLE_32 -> 32
+        else -> 16
+    }
+
+    /** Maps bit depth to BluetoothCodecConfig bits-per-sample flag. */
+    private fun depthToCodecBits(depth: Int): Int = when (depth) {
+        16 -> BluetoothCodecConfig.BITS_PER_SAMPLE_16
+        24 -> BluetoothCodecConfig.BITS_PER_SAMPLE_24
+        32 -> BluetoothCodecConfig.BITS_PER_SAMPLE_32
+        else -> BluetoothCodecConfig.BITS_PER_SAMPLE_NONE
+    }
+
+    /** Returns the active connected A2DP device, or null if none.
+     *  On API 31+ BLUETOOTH_CONNECT is a dangerous runtime permission.
+     *  When the A2DP proxy returns empty/throws due to that, we fall back
+     *  to matching the audio routing device against bondedDevices by address.
+     */
+    @Suppress("MissingPermission")
+    private fun getConnectedA2dpDevice(): BluetoothDevice? {
+        // 1. Try the fast path via A2DP profile proxy
+        try {
+            val fromProxy = bluetoothA2dp?.connectedDevices?.firstOrNull()
+            if (fromProxy != null) return fromProxy
+        } catch (e: SecurityException) {
+            Log.w(TAG, "BLUETOOTH_CONNECT permission missing — falling back to AudioManager: ${e.message}")
+        } catch (_: Exception) {}
+
+        // 2. Fallback: AudioManager knows which A2DP device is routed; match it in
+        //    bondedDevices (no BLUETOOTH_CONNECT needed to read bonded list on API < 31).
+        return try {
+            val a2dpAudioDev = audioManager
+                ?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+                ?.firstOrNull { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP }
+                ?: return null
+            // AudioDeviceInfo.address is API 28+
+            val devAddress: String? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                a2dpAudioDev.address
+            } else null
+            if (devAddress != null) {
+                val adapter = BluetoothAdapter.getDefaultAdapter()
+                adapter?.bondedDevices?.firstOrNull { it.address == devAddress }
+            } else null
+        } catch (_: Exception) { null }
+    }
+
+    /** True when we have confirmed proof of an A2DP device (proxy or audio routing). */
+    private fun hasConnectedA2dpDevice(): Boolean {
+        if (getConnectedA2dpDevice() != null) return true
+        // Even without permission we can see the A2DP audio routing entry
+        return audioManager
+            ?.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+            ?.any { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP } == true
+    }
+
+    /**
+     * Reads the current Bluetooth codec status for the connected A2DP device.
+     * Returns a map with codec name, sample rate, bit depth, LDAC quality mode,
+     * supported codecs, and selectable codecs — exactly what Developer Options shows.
+     */
+    @Suppress("MissingPermission")
+    private fun getBluetoothCodecInfo(): Map<String, Any?> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return mapOf("supported" to false, "reason" to "requires_android_8")
+        }
+        val a2dp = bluetoothA2dp
+        val device = getConnectedA2dpDevice()
+
+        // Detect whether any A2DP device is present at all (even without permission)
+        val a2dpPresent = hasConnectedA2dpDevice()
+
+        if (device == null) {
+            // Check if it's a permission problem or truly no device
+            val hasBtPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                context.checkSelfPermission(android.Manifest.permission.BLUETOOTH_CONNECT) ==
+                    android.content.pm.PackageManager.PERMISSION_GRANTED
+            } else true
+            return mapOf(
+                "supported" to true,
+                "connected" to false,
+                "a2dpPresent" to a2dpPresent,
+                "reason" to when {
+                    !hasBtPermission -> "permission_required"
+                    a2dp == null -> "proxy_initializing"
+                    else -> "no_device_connected"
+                }
+            )
+        }
+        return try {
+            // getCodecStatus is @SystemApi — use reflection
+            val getCodecStatusMethod = BluetoothA2dp::class.java
+                .getDeclaredMethod("getCodecStatus", BluetoothDevice::class.java)
+            getCodecStatusMethod.isAccessible = true
+            val status = getCodecStatusMethod.invoke(a2dp, device)
+                ?: return mapOf("supported" to true, "connected" to true,
+                    "reason" to "codec_status_null")
+
+            val statusClass = status.javaClass
+            // BluetoothCodecStatus.getCodecConfig() → BluetoothCodecConfig
+            val current = statusClass.getMethod("getCodecConfig").invoke(status) as? BluetoothCodecConfig
+                ?: return mapOf("supported" to true, "connected" to true,
+                    "reason" to "no_codec_config")
+
+            @Suppress("UNCHECKED_CAST")
+            val localCaps: List<BluetoothCodecConfig> =
+                (statusClass.getMethod("getCodecsLocalCapabilities").invoke(status) as? List<*>)
+                    ?.filterIsInstance<BluetoothCodecConfig>() ?: emptyList()
+            @Suppress("UNCHECKED_CAST")
+            val selectableCaps: List<BluetoothCodecConfig> =
+                (statusClass.getMethod("getCodecsSelectableCapabilities").invoke(status) as? List<*>)
+                    ?.filterIsInstance<BluetoothCodecConfig>() ?: emptyList()
+
+            // LDAC quality mode from codecSpecific1 (Long)
+            val ldacMode: Int? = if (current.codecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC) {
+                when (current.codecSpecific1.toLong().toInt() and 0xFF) {
+                    0x00 -> 0  // Best Effort
+                    0x01 -> 3  // 990 kbps
+                    0x02 -> 2  // 660 kbps
+                    0x04 -> 1  // 330 kbps (Mobile)
+                    else -> null
+                }
+            } else null
+
+            val sampleRateFlags = listOf(
+                BluetoothCodecConfig.SAMPLE_RATE_44100,
+                BluetoothCodecConfig.SAMPLE_RATE_48000,
+                BluetoothCodecConfig.SAMPLE_RATE_88200,
+                BluetoothCodecConfig.SAMPLE_RATE_96000
+            )
+            val bitDepthFlags = listOf(
+                BluetoothCodecConfig.BITS_PER_SAMPLE_16,
+                BluetoothCodecConfig.BITS_PER_SAMPLE_24,
+                BluetoothCodecConfig.BITS_PER_SAMPLE_32
+            )
+
+            mapOf(
+                "supported" to true,
+                "connected" to true,
+                "codecName" to codecTypeName(current.codecType),
+                "codecType" to current.codecType,
+                "sampleRateHz" to codecSampleRateToHz(current.sampleRate),
+                "bitDepth" to codecBitsToDepth(current.bitsPerSample),
+                "ldacQualityMode" to ldacMode,
+                "supportedCodecs" to localCaps.map { cap -> codecTypeName(cap.codecType) }.distinct(),
+                "selectableCodecs" to selectableCaps.map { cap -> codecTypeName(cap.codecType) }.distinct(),
+                "selectableSampleRates" to selectableCaps
+                    .filter { cap -> cap.codecType == current.codecType }
+                    .flatMap { cfg ->
+                        sampleRateFlags.filter { flag -> (cfg.sampleRate and flag) != 0 }
+                            .map { flag -> codecSampleRateToHz(flag) }
+                    }.distinct(),
+                "selectableBitDepths" to selectableCaps
+                    .filter { cap -> cap.codecType == current.codecType }
+                    .flatMap { cfg ->
+                        bitDepthFlags.filter { flag -> (cfg.bitsPerSample and flag) != 0 }
+                            .map { flag -> codecBitsToDepth(flag) }
+                    }.distinct()
+            )
+        } catch (e: Exception) {
+            Log.w(TAG, "getBluetoothCodecInfo failed: ${e.message}")
+            mapOf("supported" to true, "connected" to true,
+                "reason" to "error_${e.message}")
+        }
+    }
+
+    /**
+     * Sets the Bluetooth A2DP codec preference via reflection (setCodecConfigPreference
+     * is @SystemApi). Mirrors exactly what Developer Options codec dialog does.
+     */
+    @Suppress("MissingPermission")
+    private fun setBluetoothCodecPreference(
+        codec: String? = null,
+        sampleRateHz: Int? = null,
+        bitDepth: Int? = null,
+        ldacQualityMode: Int? = null,
+    ): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return false
+        val a2dp = bluetoothA2dp ?: return false
+        val device = getConnectedA2dpDevice() ?: return false
+        return try {
+            // Read current codec via reflection
+            val getCodecStatusMethod = BluetoothA2dp::class.java
+                .getDeclaredMethod("getCodecStatus", BluetoothDevice::class.java)
+            getCodecStatusMethod.isAccessible = true
+            val status = getCodecStatusMethod.invoke(a2dp, device) ?: return false
+
+            val current = status.javaClass.getMethod("getCodecConfig").invoke(status)
+                as? BluetoothCodecConfig ?: return false
+
+            val targetCodecType = if (codec != null) codecNameToType(codec)
+                else current.codecType
+            val targetSampleRate = if (sampleRateHz != null && sampleRateHz > 0)
+                hzToCodecSampleRate(sampleRateHz)
+                else current.sampleRate
+            val targetBits = if (bitDepth != null && bitDepth > 0)
+                depthToCodecBits(bitDepth)
+                else current.bitsPerSample
+
+            // LDAC quality encodes in codecSpecific1 (Long)
+            val ldacSpecific1: Long = if (targetCodecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC
+                && ldacQualityMode != null) {
+                when (ldacQualityMode) {
+                    0 -> 0x00L  // Best Effort
+                    1 -> 0x04L  // 330 kbps (Mobile)
+                    2 -> 0x02L  // 660 kbps (Standard)
+                    3 -> 0x01L  // 990 kbps (Maximum)
+                    else -> current.codecSpecific1.toLong()
+                }
+            } else if (targetCodecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC) {
+                current.codecSpecific1.toLong()
+            } else {
+                BluetoothCodecConfig.CODEC_PRIORITY_DEFAULT.toLong()
+            }
+
+            val newConfig = BluetoothCodecConfig.Builder()
+                .setCodecType(targetCodecType)
+                .setCodecPriority(BluetoothCodecConfig.CODEC_PRIORITY_HIGHEST)
+                .setSampleRate(targetSampleRate)
+                .setBitsPerSample(targetBits)
+                .setChannelMode(BluetoothCodecConfig.CHANNEL_MODE_STEREO)
+                .setCodecSpecific1(ldacSpecific1)
+                .setCodecSpecific2(0)
+                .setCodecSpecific3(0)
+                .setCodecSpecific4(0)
+                .build()
+
+            // setCodecConfigPreference is also @SystemApi — use reflection
+            val setCodecPrefMethod = BluetoothA2dp::class.java.getDeclaredMethod(
+                "setCodecConfigPreference",
+                BluetoothDevice::class.java,
+                BluetoothCodecConfig::class.java
+            )
+            setCodecPrefMethod.isAccessible = true
+            setCodecPrefMethod.invoke(a2dp, device, newConfig)
+
+            Log.d(TAG, "BT codec set: type=${codecTypeName(targetCodecType)} rate=${sampleRateHz}Hz bits=${bitDepth}")
+            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                try { notifyDeviceChange() } catch (_: Exception) {}
+            }, 600)
+            true
+        } catch (e: Exception) {
+            Log.w(TAG, "setBluetoothCodecPreference failed: ${e.message}")
+            false
+        }
+    }
+
 
     private fun isBitPerfectSupportedOnPlatform(): Boolean {
         // USB bit-perfect requires API 34 mixer attributes, but wired direct is available from API 23+
@@ -617,6 +1011,35 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
         result["targetSampleRate"] = targetSampleRate
         result["targetBitDepth"] = targetBitDepth
         result["bitPerfectFailureReason"] = failureReason
+
+        // Bluetooth codec info — included whenever any A2DP device is detected
+        // (not just when BT is the active output path, so the section shows even
+        //  while audio routes via phone speaker with earbuds paired/connected)
+        val a2dpAnyPresent = devices.any { it.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP }
+        if (isBluetooth || a2dpAnyPresent) {
+            val btCodec = try { getBluetoothCodecInfo() } catch (_: Exception) { emptyMap<String, Any?>() }
+            result["btCodecName"] = btCodec["codecName"]
+            result["btSampleRateHz"] = btCodec["sampleRateHz"]
+            result["btBitDepth"] = btCodec["bitDepth"]
+            result["btLdacQualityMode"] = btCodec["ldacQualityMode"]
+            result["btCodecConnected"] = btCodec["connected"] as? Boolean ?: false
+            result["btA2dpPresent"] = btCodec["a2dpPresent"] as? Boolean ?: a2dpAnyPresent
+            result["btReason"] = btCodec["reason"] as? String
+            result["btSelectableCodecs"] = btCodec["selectableCodecs"] ?: emptyList<String>()
+            result["btSupportedCodecs"] = btCodec["supportedCodecs"] ?: emptyList<String>()
+            result["btSelectableSampleRates"] = btCodec["selectableSampleRates"] ?: emptyList<Int>()
+            result["btSelectableBitDepths"] = btCodec["selectableBitDepths"] ?: emptyList<Int>()
+        } else {
+            result["btCodecName"] = null
+            result["btSampleRateHz"] = null
+            result["btBitDepth"] = null
+            result["btLdacQualityMode"] = null
+            result["btCodecConnected"] = false
+            result["btSelectableCodecs"] = emptyList<String>()
+            result["btSupportedCodecs"] = emptyList<String>()
+            result["btSelectableSampleRates"] = emptyList<Int>()
+            result["btSelectableBitDepths"] = emptyList<Int>()
+        }
 
         return result
     }

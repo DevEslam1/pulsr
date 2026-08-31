@@ -33,16 +33,21 @@ subprojects {
 }
 
 subprojects {
-    plugins.withId("com.android.library") {
-        val android = extensions.findByType(com.android.build.gradle.LibraryExtension::class.java)
-        if (android != null) {
-            if (android.namespace.isNullOrEmpty()) {
-                android.namespace = when (project.name) {
-                    "on_audio_query_android" -> "com.lucasjosino.on_audio_query"
-                    else -> "com.example.${project.name.replace('-', '_').replace(':', '_')}"
+    if (project.name == "app") return@subprojects
+    // afterEvaluate ensures our override runs AFTER the plugin's own build.gradle,
+    // so our compileSdk=36 wins over any plugin that pins an older value (e.g. file_picker @ 34).
+    project.afterEvaluate {
+        plugins.withId("com.android.library") {
+            val android = extensions.findByType(com.android.build.gradle.LibraryExtension::class.java)
+            if (android != null) {
+                if (android.namespace.isNullOrEmpty()) {
+                    android.namespace = when (project.name) {
+                        "on_audio_query_android" -> "com.lucasjosino.on_audio_query"
+                        else -> "com.example.${project.name.replace('-', '_').replace(':', '_')}"
+                    }
                 }
+                android.compileSdk = 36
             }
-            android.compileSdk = 36
         }
     }
 }

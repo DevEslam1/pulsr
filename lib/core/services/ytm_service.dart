@@ -105,6 +105,11 @@ class YtmService {
   static const Duration _signinAbortTtl = Duration(minutes: 3);
   static DateTime? _globalBlockUntil;
 
+  @visibleForTesting
+  static void resetGlobalBlock() {
+    _globalBlockUntil = null;
+  }
+
   final MethodChannel _channel = const MethodChannel(channelName);
   final StreamController<void> _authExpiredController =
       StreamController<void>.broadcast();
@@ -166,6 +171,7 @@ class YtmService {
   /// Synchronizes cookies into the native CookieManager so the extractor
   /// makes authenticated requests on all YouTube endpoints.
   Future<void> syncCookies(String cookies) async {
+    _globalBlockUntil = null;
     try {
       await _channel.invokeMethod<bool>('setCookies', {'cookies': cookies});
     } catch (_) {}
@@ -246,6 +252,7 @@ class YtmService {
 
   /// Resets identities and visitor data.
   Future<void> resetIdentities() async {
+    _globalBlockUntil = null;
     try {
       await _channel.invokeMethod<bool>('resetIdentities');
     } catch (_) {}
@@ -605,13 +612,18 @@ class YtmService {
     final globalBlock = _globalBlockUntil;
     if (globalBlock != null) {
       if (DateTime.now().isBefore(globalBlock)) {
-        throw const YtmException(
-          'YTM_SIGNIN_REQUIRED',
-          'Sign in to YouTube Music - Google is currently blocking playback '
-          'from this device or network',
-        );
+        final isLoggedIn = getIt.isRegistered<YtmAccountService>() &&
+            getIt<YtmAccountService>().isLoggedIn;
+        if (!isLoggedIn) {
+          throw const YtmException(
+            'YTM_SIGNIN_REQUIRED',
+            'Sign in to YouTube Music - Google is currently blocking playback '
+            'from this device or network',
+          );
+        }
+      } else {
+        _globalBlockUntil = null; // block expired, clear it
       }
-      _globalBlockUntil = null; // block expired, clear it
     }
 
     return _runCoalesced('resolve:$videoId:$quality', () async {
