@@ -241,11 +241,42 @@ double _calculateReplayGainVolume(SongsTableData? song) {
 - [ ] Verify native bypass message receipt
 - [ ] Add logging to audio session ID routing
 
+### Preferred execution plan (approved)
+
+This is the path to unblock the missing audible DSP stages without pretending the current HAL-only stack is the final architecture.
+
+1. [ ] Upgrade to `just_audio` 0.10.6 and verify compatibility with the current `audio_service` / ExoPlayer bindings.
+   - [ ] Run `flutter pub upgrade just_audio` / `flutter pub get` and check Android build + player smoke tests.
+   - [ ] Confirm no regressions in session routing, crossfade, and audio-session reattach behavior.
+
+2. [ ] Start a local `just_audio` fork for PCM callback support.
+   - [ ] Clone the upstream source: `https://github.com/ryanheise/just_audio`
+   - [ ] Add a PCM callback interface to the playback engine / native bridge.
+   - [ ] Expose a native entry point such as `nativeProcessPcmAudio()` for each rendered frame.
+   - [ ] Rebuild the plugin locally and test against Pulsr with mock audio frames.
+
+3. [ ] Wire the effect stack through the new callback path.
+   - [ ] Update Pulsr's `AudioEffectsChannel` to dispatch processed PCM frames through the new native callback.
+   - [ ] Validate frame-by-frame handling for reverb, limiter, saturation, and any other DSP stages that need real audible output.
+
+4. [ ] Create better preset tuning for the audible effects that remain unavailable in HAL-only mode.
+   - [ ] Convolution Reverb audible? ✓
+   - [ ] Lookahead Limiter working? ✓
+   - [ ] Saturation present? ✓
+   - [ ] Re-tune wet/dry, drive, threshold, and release values to avoid harshness while preserving the intended signature.
+
+5. [ ] Backstop with verification and regression gates.
+   - [ ] `flutter test test/audio_session_id_router_dedup_test.dart`
+   - [ ] `flutter test test/crossfade_concurrent_safety_test.dart`
+   - [ ] `flutter test test/audio_effects_error_handling_test.dart`
+   - [ ] `flutter test test/audio_effects_resource_cleanup_test.dart`
+   - [ ] `flutter test test/bit_perfect_bypass_verification_test.dart`
+
 ### Long-term (1-2 months)
-- [ ] Implement PCM callback in just_audio (for audible effects)
 - [ ] Add UI indicators for DSP stage state (active/bypassed/degraded)
 - [ ] Async chunk-load for queue restore
 - [ ] Complete loudness contour algorithm
+- [ ] Keep the fork synchronized with upstream `just_audio` releases and merge when the PCM callback lands upstream
 
 ---
 

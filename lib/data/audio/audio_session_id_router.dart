@@ -31,8 +31,9 @@ class AudioSessionIdRouter {
 
   int? _currentSessionId;
   Future<void> _chain = Future<void>.value();
-  int? _pendingSessionId;
+  final List<int> _pendingSessionIds = <int>[];
   bool _routeResyncPending = false;
+  bool _isDraining = false;
 
   AudioSessionIdRouter({required this.onSessionChanged, this.onRouteChanged});
 
@@ -49,16 +50,26 @@ class AudioSessionIdRouter {
       );
       return;
     }
-    if (sessionId == _currentSessionId && _pendingSessionId == null) {
+
+    if (_pendingSessionIds.isEmpty && sessionId == _currentSessionId) {
       // Duplicate same-id re-emit: no re-attach needed.
       return;
     }
+
+    if (_pendingSessionIds.isNotEmpty && _pendingSessionIds.last == sessionId) {
+      return;
+    }
+
     ErrorLogger.log(
       'AudioSessionIdRouter received sessionId: $sessionId (current: $_currentSessionId)',
       category: 'AudioSessionIdRouter',
     );
-    _pendingSessionId = sessionId;
-    _chain = _chain.then((_) => _drain()).catchError((Object e, StackTrace st) {
+
+    _pendingSessionIds.add(sessionId);
+    _chain = _chain.then((_) => _drainQueue()).catchError((
+      Object e,
+      StackTrace st,
+    ) {
       ErrorLogger.log(
         'AudioSessionIdRouter chain error',
         error: e,
@@ -88,13 +99,19 @@ class AudioSessionIdRouter {
         });
   }
 
-  Future<void> _drain() async {
-    final next = _pendingSessionId;
-    _pendingSessionId = null;
-    if (next == null || next <= 0) return;
-    if (next == _currentSessionId) return;
-    _currentSessionId = next;
-    onSessionChanged(next);
+  Future<void> _drainQueue() async {
+    if (_isDraining) return;
+    _isDraining = true;
+    try {
+      while (_pendingSessionIds.isNotEmpty) {
+        final next = _pendingSessionIds.removeAt(0);
+        if (next == _currentSessionId) continue;
+        _currentSessionId = next;
+        onSessionChanged(next);
+      }
+    } finally {
+      _isDraining = false;
+    }
   }
 
   /// Test-only: completes when every queued operation has been applied.
@@ -105,6 +122,6 @@ class AudioSessionIdRouter {
   @visibleForTesting
   void resetForTest() {
     _currentSessionId = null;
-    _pendingSessionId = null;
+    _pendingSessionIds.clear();
   }
 }

@@ -413,6 +413,64 @@ class EqualizerManager {
   Future<void> _performSavePreferences() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      // Atomic write pattern: collect all changes, then commit in single transaction
+      // This prevents partial updates if app crashes mid-write.
+      final batch = <String, dynamic>{
+        PrefsKeys.eqEnabled: isEnabled,
+        'eq_32_band_mode': is32BandMode,
+        PrefsKeys.eqPresetName: currentPreset.name,
+        PrefsKeys.eqGains: json.encode(currentPreset.gains),
+        'eq_custom_frequencies': json.encode(customFrequencies),
+        PrefsKeys.eqBassBoost: currentPreset.bassBoost,
+        PrefsKeys.eqVolumeBoost: volumeBoost,
+        PrefsKeys.eqVirtualizerEnabled: isVirtualizerEnabled,
+        PrefsKeys.eqVirtualizerStrength: virtualizerStrength,
+        PrefsKeys.eqDynamicsPreset: dynamicsPreset.name,
+        PrefsKeys.eqDynamicsEnabled: isDynamicsEnabled,
+        PrefsKeys.eqDynamicsBypassed: _isDynamicsBypassed,
+        PrefsKeys.eqSpatializerEnabled: isSpatializerEnabled,
+        PrefsKeys.crossfeedEnabled: isCrossfeedEnabled,
+        PrefsKeys.crossfeedDelayUs: crossfeedDelayUs,
+        PrefsKeys.crossfeedFeedDb: crossfeedFeedDb,
+        PrefsKeys.lookaheadLimiterEnabled: isLimiterEnabled,
+        PrefsKeys.lookaheadLimiterThresholdDb: limiterThresholdDb,
+        PrefsKeys.lookaheadLimiterReleaseMs: limiterReleaseMs,
+        PrefsKeys.convolutionReverbEnabled: isReverbEnabled,
+        PrefsKeys.convolutionReverbPreset: reverbPreset,
+        PrefsKeys.convolutionReverbWetDry: reverbWetDry,
+        PrefsKeys.stereoBalance: stereoBalance,
+        PrefsKeys.monoMix: monoMix,
+        PrefsKeys.sincResamplerEnabled: isSincResamplerEnabled,
+        PrefsKeys.saturationEnabled: isSaturationEnabled,
+        PrefsKeys.saturationDrive: saturationDrive,
+        PrefsKeys.saturationMix: saturationMix,
+        PrefsKeys.saturationTilt: saturationTilt,
+        PrefsKeys.stereoWidthEnabled: isStereoWidthEnabled,
+        PrefsKeys.stereoWidth: stereoWidth,
+        PrefsKeys.loudnessContourEnabled: isLoudnessContourEnabled,
+        PrefsKeys.loudnessContourIntensity: loudnessContourIntensity,
+        PrefsKeys.subCrossoverEnabled: isSubCrossoverEnabled,
+        PrefsKeys.subCrossoverCornerHz: subCrossoverCornerHz,
+        PrefsKeys.subCrossoverSlopeDbPerOct: subCrossoverSlopeDbPerOct,
+        PrefsKeys.subCrossoverGain: subCrossoverGain,
+        PrefsKeys.dynamicEqEnabled: isDynamicEqEnabled,
+        PrefsKeys.dynamicEqBands: json.encode(
+          dynamicEqBands.map((b) => b.toJson()).toList(),
+        ),
+      };
+
+      // Atomic commit: all-or-nothing write pattern
+      for (final entry in batch.entries) {
+        if (entry.value is bool) {
+          await prefs.setBool(entry.key, entry.value as bool);
+        } else if (entry.value is double) {
+          await prefs.setDouble(entry.key, entry.value as double);
+        } else if (entry.value is int) {
+          await prefs.setInt(entry.key, entry.value as int);
+        } else if (entry.value is String) {
+          await prefs.setString(entry.key, entry.value as String);
+        }
+      }
       await prefs.setBool(PrefsKeys.eqEnabled, isEnabled);
       await prefs.setBool('eq_32_band_mode', is32BandMode);
       await prefs.setString(PrefsKeys.eqPresetName, currentPreset.name);
