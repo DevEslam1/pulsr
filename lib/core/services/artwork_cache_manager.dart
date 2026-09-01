@@ -8,6 +8,7 @@ import 'package:injectable/injectable.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../constants/prefs_keys.dart';
 import '../utils/error_logger.dart';
 
 @singleton
@@ -16,7 +17,8 @@ class ArtworkCacheManager {
   factory ArtworkCacheManager() => _instance;
   ArtworkCacheManager._internal();
 
-  static const String _prefMaxCacheSizeMb = 'setting_max_cache_size_mb';
+  // FIX(N1): Canonical PrefsKey for artwork max cache size
+  static const String _prefMaxCacheSizeMb = PrefsKeys.settingMaxCacheSizeMb;
   static const int defaultMaxCacheSizeMb =
       100; // 100 MB default maximum cache size
 

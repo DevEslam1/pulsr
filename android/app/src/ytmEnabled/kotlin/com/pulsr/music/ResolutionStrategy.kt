@@ -63,13 +63,26 @@ internal class ResolutionStrategy(
         hasJsEngine: Boolean = true,
         trackType: String = ClientWinnerStore.TRACK_TYPE_MUSIC
     ): List<InnertubeClient.ClientType> {
+        val isLoggedIn = cookieStore.isSessionValid()
+
         val baseChain = when (op) {
             Operation.STREAM_RESOLVE -> {
                 val winner = winnerStore.getWinningClient(trackType)
-                if (winner != null && DEFAULT_STREAM_CHAIN.contains(winner)) {
+                val rawChain = if (winner != null && DEFAULT_STREAM_CHAIN.contains(winner)) {
                     listOf(winner) + (DEFAULT_STREAM_CHAIN - winner)
                 } else {
                     DEFAULT_STREAM_CHAIN
+                }
+                // When the user is logged in, WEB_REMIX must lead the chain.
+                // IOS_MUSIC / ANDROID_MUSIC / ANDROID_VR have no session cookies;
+                // if they return LOGIN_REQUIRED consecutively the LadderAbortPolicy
+                // fires (threshold = 3) and aborts before WEB_REMIX is ever tried,
+                // causing all streams to fail immediately after login.
+                if (isLoggedIn && rawChain.first() != InnertubeClient.ClientType.WEB_REMIX) {
+                    listOf(InnertubeClient.ClientType.WEB_REMIX) +
+                        (rawChain - InnertubeClient.ClientType.WEB_REMIX)
+                } else {
+                    rawChain
                 }
             }
             Operation.SEARCH -> DEFAULT_SEARCH_CHAIN
@@ -77,7 +90,6 @@ internal class ResolutionStrategy(
         }
 
         val hasPoToken = !limitedMode && poTokenManager.isReady && !poTokenManager.webViewBroken
-        val isLoggedIn = cookieStore.isSessionValid()
         val eligible = baseChain.filter { client ->
             val cap = ClientCapabilityMatrix.getCapability(client)
 
@@ -121,6 +133,7 @@ internal class ResolutionStrategy(
         }
     }
 }
+
 
 /**
  * Pure policy for the stream ladder's early abort: when [threshold] consecutive

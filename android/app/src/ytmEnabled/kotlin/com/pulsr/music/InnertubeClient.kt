@@ -182,7 +182,7 @@ internal class InnertubeClient(
         // Authenticated cold-start datasyncId bootstrap if needed
         if (cookieStore.isSessionValid() && PoTokenManager.dataSyncId.isEmpty()) {
             try {
-                requestPlayer(videoId, ClientType.WEB_REMIX)
+                requestBrowse("FEmusic_home", ClientType.WEB_REMIX)
             } catch (t: Throwable) {
                 Log.w(TAG, "Datasync bootstrap call failed for $videoId: ${t.message}")
             }
@@ -589,7 +589,7 @@ internal class InnertubeClient(
                 // Attach visitorData if available
                 val authedWeb = clientType.isWeb && cookieStore.isSessionValid()
                 val visitorData = if (authedWeb) {
-                    PoTokenManager.sessionVisitorData.ifEmpty { PoTokenManager.visitorData }
+                    PoTokenManager.sessionVisitorData
                 } else {
                     PoTokenManager.visitorData
                 }
@@ -760,8 +760,12 @@ internal class InnertubeClient(
 
         if (clientType.isWeb && hasPo) {
             val dataSyncId = PoTokenManager.dataSyncId
-            val poToken = if (cookieStore.isSessionValid() && dataSyncId.isNotEmpty()) {
-                PoTokenManager.accountPoTokenForSync(dataSyncId)
+            val poToken = if (cookieStore.isSessionValid()) {
+                if (dataSyncId.isNotEmpty()) {
+                    PoTokenManager.accountPoTokenForSync(dataSyncId)
+                } else {
+                    ""
+                }
             } else {
                 val tokenTarget = PoTokenManager.visitorData.ifEmpty { videoId }
                 PoTokenManager.poTokenForSync(tokenTarget)

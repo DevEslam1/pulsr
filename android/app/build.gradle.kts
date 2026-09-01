@@ -111,7 +111,8 @@ android {
         release {
             val releaseConfig = signingConfigs.getByName("release")
             val hasKeystore = releaseConfig.storeFile != null && releaseConfig.storeFile!!.exists()
-            val isOptedOut = System.getenv("ALLOW_INSECURE_DEBUG_SIGNING") == "true"
+            val isOptedOut = System.getenv("ALLOW_INSECURE_DEBUG_SIGNING") == "true" ||
+                project.findProperty("ALLOW_INSECURE_DEBUG_SIGNING") == "true"
             val isProdOrYtmBuild = gradle.startParameter.taskNames.any {
                 (it.contains("Prod", ignoreCase = true) || it.contains("Ytm", ignoreCase = true)) &&
                 it.contains("Release", ignoreCase = true)

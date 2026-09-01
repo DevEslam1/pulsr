@@ -116,7 +116,8 @@ class CrossfadeManager {
         return f * f * (3.0 - 2.0 * f);
 
       case CrossfadeCurve.exponential:
-        return f == 0.0 ? 0.0 : math.pow(2.0, 10.0 * (f - 1.0)).toDouble();
+        // FIX(BUG-24): Smooth continuous exponential formula without discontinuity at f=0
+        return ((math.pow(2.0, 10.0 * f) - 1.0) / 1023.0).clamp(0.0, 1.0);
 
       case CrossfadeCurve.djCutDrop:
         // Sharp attack after midpoint
@@ -147,12 +148,9 @@ class CrossfadeManager {
         final s = f * f * (3.0 - 2.0 * f);
         return (1.0 - s, s);
       case CrossfadeCurve.exponential:
-        final inGain =
-            f == 0.0 ? 0.0 : math.pow(2.0, 10.0 * (f - 1.0)).toDouble();
-        final outGain =
-            (1.0 - f) == 0.0
-                ? 0.0
-                : math.pow(2.0, 10.0 * ((1.0 - f) - 1.0)).toDouble();
+        // FIX(BUG-24): Continuous normalized exponential response without 0-bound jump
+        final inGain = ((math.pow(2.0, 10.0 * f) - 1.0) / 1023.0).clamp(0.0, 1.0);
+        final outGain = ((math.pow(2.0, 10.0 * (1.0 - f)) - 1.0) / 1023.0).clamp(0.0, 1.0);
         return (outGain, inGain);
       case CrossfadeCurve.djCutDrop:
         final inGain =
@@ -393,8 +391,11 @@ class CrossfadeManager {
     pendingIndex = null;
 
     try {
-      await inactivePlayer.stop();
-      await inactivePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));
+      // FIX(BUG-13): Skip stop & volume set if player already idle
+      if (inactivePlayer.processingState != ProcessingState.idle) {
+        await inactivePlayer.stop();
+        await inactivePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));
+      }
       await activePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));
     } catch (e, st) {
       ErrorLogger.log(

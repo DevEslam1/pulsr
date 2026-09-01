@@ -155,14 +155,10 @@ class XdmBackendService {
   }
 
   Future<bool> isEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
-    final engineStr = prefs.getString(PrefsKeys.extractorEngine);
-    if (engineStr == 'onDevice') return false;
-    final enabled = prefs.getBool(PrefsKeys.ytdlpBackendEnabled) ?? true;
-    if (!enabled) return false;
-    if (isCircuitOpen) return false;
-    return true;
+    // XDM backend disabled.
+    return false;
   }
+
 
   Future<bool> isCookieSyncAllowed() async {
     final prefs = await SharedPreferences.getInstance();

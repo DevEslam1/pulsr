@@ -13,11 +13,26 @@ import 'artwork_placeholder.dart';
 class ArtworkLruCache {
   static final ArtworkLruCache _instance = ArtworkLruCache._internal();
   factory ArtworkLruCache() => _instance;
-  ArtworkLruCache._internal() : maxCapacity = 200;
+  ArtworkLruCache._internal() : _maxCapacity = 200;
 
-  ArtworkLruCache.withCapacity(this.maxCapacity);
+  // FIX(B5): ArtworkLruCache.withCapacity mutates singleton capacity to prevent multiple disconnected caches
+  factory ArtworkLruCache.withCapacity(int capacity) {
+    _instance.maxCapacity = capacity;
+    return _instance;
+  }
 
-  final int maxCapacity;
+  int _maxCapacity;
+  int get maxCapacity => _maxCapacity;
+  set maxCapacity(int capacity) {
+    _maxCapacity = capacity;
+    while (_cache.length > _maxCapacity && _cache.isNotEmpty) {
+      final oldestKey = _cache.keys.first;
+      final removed = _cache.remove(oldestKey);
+      if (removed != null) {
+        _currentBytes -= removed.length;
+      }
+    }
+  }
   static const int maxBytes = 50 * 1024 * 1024; // 50MB cap
   final Map<String, Uint8List> _cache = {};
   int _currentBytes = 0;

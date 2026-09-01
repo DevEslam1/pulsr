@@ -10,38 +10,34 @@
 class EmbeddedBrowserUa {
   EmbeddedBrowserUa._();
 
-  /// Firefox 140 Mobile User-Agent on Android (Highly resilient against Google
-  /// OAuth blocks — Gecko engine has no userAgentData / Client Hints API so
-  /// there is nothing extra to suppress.)
-  static const String firefoxMobile =
-      'Mozilla/5.0 (Android 15; Mobile; rv:140.0) Gecko/140.0 Firefox/140.0';
+  /// Safari 18.3 Mobile User-Agent on iOS (Clean WebKit signature matching Android WebView engine without Gecko/V8 contradictions).
+  static const String safariMobile =
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 18_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Mobile/15E148 Safari/604.1';
 
-  /// Firefox 140 Desktop User-Agent (Windows 11)
-  static const String firefoxDesktop =
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0';
+  /// Safari 18.3 Desktop User-Agent (macOS)
+  static const String safariDesktop =
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15';
+
+  /// Chrome 137 Desktop User-Agent (Windows 11) — standard, highly compatible desktop browser
+  static const String chromeDesktop =
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.7151.119 Safari/537.36';
 
   /// Chrome 137 Mobile User-Agent on Android — no wv/Version-4.0 tokens.
   static const String chromeMobile =
       'Mozilla/5.0 (Linux; Android 15; Pixel 9 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.7151.119 Mobile Safari/537.36';
 
-  /// Chrome 137 Desktop User-Agent (Windows 11)
-  static const String chromeDesktop =
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.7151.119 Safari/537.36';
-
-  /// Default mobile sign-in UA: Firefox Mobile (Gecko has no userAgentData so nothing leaks)
-  static const String mobile = firefoxMobile;
+  /// Default mobile sign-in UA: Safari Mobile (WebKit signature without Android WebView leaks)
+  static const String mobile = safariMobile;
 
   /// Default desktop browsing UA: Chrome Desktop (full YouTube Music web experience)
   static const String desktop = chromeDesktop;
 
   /// JavaScript injected at AT_DOCUMENT_START to normalize browser environment.
   ///
-  /// Suppresses the three signals Google uses to detect an embedded WebView:
+  /// Suppresses the signals Google uses to detect an embedded WebView:
   ///   1. navigator.webdriver (automation flag)
   ///   2. navigator.userAgentData / Client Hints — Android WebView leaks
   ///      {brand:"Android WebView"} here even with a spoofed UA string.
-  ///      For Firefox UAs we hide the property entirely (real Firefox has none).
-  ///      For Chrome UAs we replace it with a self-consistent stub.
   ///   3. Missing window.chrome / inconsistent navigator.vendor & platform.
   static const String antiFingerprint = r'''
 (function () {
@@ -67,18 +63,14 @@ class EmbeddedBrowserUa {
   } catch (e) {}
 
   // ── 2. Detect spoofed UA type ──────────────────────────────────────────────
-  var ua       = (navigator.userAgent || '');
-  var isFirefox = ua.indexOf('Firefox') !== -1;
-  var isChrome  = !isFirefox && ua.indexOf('Chrome') !== -1;
-  var isMobile  = ua.indexOf('Mobile') !== -1 || ua.indexOf('Android') !== -1;
+  var ua        = (navigator.userAgent || '');
+  var isSafari  = ua.indexOf('Safari') !== -1 && ua.indexOf('Chrome') === -1;
+  var isChrome  = ua.indexOf('Chrome') !== -1;
+  var isMobile  = ua.indexOf('Mobile') !== -1 || ua.indexOf('iPhone') !== -1 || ua.indexOf('Android') !== -1;
 
   // ── 3. Suppress / replace navigator.userAgentData (UA Client Hints) ────────
-  //
-  // Android WebView exposes userAgentData.brands = [{brand:"Android WebView",…}]
-  // and getHighEntropyValues() reveals the real platform — even when the UA
-  // string is spoofed. This is the PRIMARY Google WebView detection vector.
-  if (isFirefox) {
-    // Real Firefox has no userAgentData — hide the property entirely.
+  if (isSafari) {
+    // Real Safari has no userAgentData and no window.chrome
     try {
       Object.defineProperty(navigator, 'userAgentData', {
         get: function () { return undefined; },
@@ -86,6 +78,12 @@ class EmbeddedBrowserUa {
         enumerable: false
       });
     } catch (e) {}
+    try {
+      delete window.chrome;
+    } catch (e) {}
+    def(navigator, 'vendor', 'Apple Computer, Inc.');
+    def(navigator, 'platform', isMobile ? 'iPhone' : 'MacIntel');
+    def(navigator, 'maxTouchPoints', isMobile ? 5 : 0);
   } else if (isChrome) {
     // Build a self-consistent stub that matches the spoofed Chrome version.
     var chromeMatch = ua.match(/Chrome\/(\d+)/);
@@ -107,13 +105,13 @@ class EmbeddedBrowserUa {
           brands:          brandList,
           mobile:          isMobile,
           platform:        platform,
-          platformVersion: '15.0.0',
+          platformVersion: isMobile ? '15.0.0' : '15.0.0',
           architecture:    isMobile ? 'arm' : 'x86',
           bitness:         '64',
           model:           isMobile ? 'Pixel 9 Pro' : '',
-          uaFullVersion:   chromeMajor + '.0.0.0',
+          uaFullVersion:   chromeMajor + '.0.7151.119',
           fullVersionList: brandList.map(function (b) {
-            return { brand: b.brand, version: b.version + '.0.0.0' };
+            return { brand: b.brand, version: b.version + '.0.7151.119' };
           })
         };
         var result = {};
@@ -138,18 +136,11 @@ class EmbeddedBrowserUa {
         enumerable: true
       });
     } catch (e) {}
-  }
 
-  // ── 4. Normalise other navigator properties ───────────────────────────────
-  if (isFirefox) {
-    def(navigator, 'vendor', '');
-    def(navigator, 'platform', isMobile ? 'Linux armv8l' : 'Win32');
-    def(navigator, 'oscpu',    isMobile ? 'Linux armv8l' : 'Windows NT 10.0; Win64; x64');
-  } else {
-    def(navigator, 'vendor',   'Google Inc.');
+    def(navigator, 'vendor', 'Google Inc.');
     def(navigator, 'platform', isMobile ? 'Linux armv8l' : 'Win32');
 
-    // ── 5. Inject window.chrome stub (absent in some Android WebView builds) ─
+    // Ensure window.chrome stub is properly initialized
     if (!window.chrome) {
       try {
         Object.defineProperty(window, 'chrome', {

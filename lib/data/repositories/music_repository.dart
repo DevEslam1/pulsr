@@ -1,9 +1,11 @@
-// lib/data/repositories/music_repository.dart
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 import 'package:drift/drift.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/constants/prefs_keys.dart';
 import '../../core/errors/failures.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/models/genre_item.dart';
@@ -36,20 +38,20 @@ class MusicRepository implements IMusicRepository {
             t.path.like('ytmusic://%').not());
 
       if (searchQuery != null && searchQuery.trim().isNotEmpty) {
-        final escaped = searchQuery
+        final sanitizedQuery = searchQuery
             .trim()
             .toLowerCase()
             .replaceAll(r'\', r'\\')
             .replaceAll('%', r'\%')
-            .replaceAll('_', r'\_');
-        final pattern = '%$escaped%';
-        // Drift LIKE with ESCAPE: use custom expression to enforce escape char
-        query.where((t) =>
-            t.title.lower().like(pattern) |
-            t.artist.lower().like(pattern) |
-            t.album.lower().like(pattern));
-        // Note: SQLite LIKE ESCAPE '\' is default when pattern contains escaped %/_.
-        // Drift generates `LIKE ? ESCAPE '\'` implicitly when pattern contains backslash.
+            .replaceAll('_', r'\_')
+            .replaceAll("'", "''");
+        final escaped = '%$sanitizedQuery%';
+        // FIX(BUG-03): Enforce explicit SQLite LIKE ESCAPE clause for literal % and _
+        query.where((t) => CustomExpression<bool>(
+              "lower(title) LIKE '$escaped' ESCAPE '\\' OR "
+              "lower(artist) LIKE '$escaped' ESCAPE '\\' OR "
+              "lower(album) LIKE '$escaped' ESCAPE '\\'",
+            ));
       }
 
       if (excludedFolders.isNotEmpty) {
@@ -170,8 +172,9 @@ class MusicRepository implements IMusicRepository {
   @override
   Future<Result<SongsTableData?>> getSongByPath(String path) async {
     try {
+      // FIX(BUG-16): Exclude remote ytmusic:// sentinels from local path queries
       final song = await (_db.select(_db.songsTable)
-            ..where((t) => t.path.equals(path)))
+            ..where((t) => t.path.equals(path) & t.path.like('ytmusic://%').not()))
           .getSingleOrNull();
       return Right(song);
     } catch (e) {
@@ -212,13 +215,24 @@ class MusicRepository implements IMusicRepository {
   Future<Result<SongsTableData?>> findMatchingLocalSong(
       {String? remoteId, String? title, String? artist}) async {
     try {
+      // FIX(D1): Guard nullable params early before querying
+      if ((remoteId == null || remoteId.isEmpty) &&
+          (title == null ||
+              title.trim().isEmpty ||
+              artist == null ||
+              artist.trim().isEmpty)) {
+        return const Right(null);
+      }
+
       // 1. Try matching by remoteId first
       if (remoteId != null && remoteId.isNotEmpty) {
+        // FIX(BUG-16): Ensure local row query excludes ytmusic:// sentinels
         final byRemoteId = await (_db.select(_db.songsTable)
               ..where((t) =>
                   t.remoteId.equals(remoteId) &
                   t.source.equals(SongSource.local) &
-                  t.isMissing.equals(false))
+                  t.isMissing.equals(false) &
+                  t.path.like('ytmusic://%').not())
               ..limit(1))
             .getSingleOrNull();
         if (byRemoteId != null) return Right(byRemoteId);
@@ -229,10 +243,12 @@ class MusicRepository implements IMusicRepository {
           title.trim().isNotEmpty &&
           artist != null &&
           artist.trim().isNotEmpty) {
+        // FIX(BUG-16): Ensure local metadata match excludes ytmusic:// sentinels
         final byMeta = await (_db.select(_db.songsTable)
               ..where((t) =>
                   t.source.equals(SongSource.local) &
                   t.isMissing.equals(false) &
+                  t.path.like('ytmusic://%').not() &
                   t.title.lower().equals(title.trim().toLowerCase()) &
                   t.artist.lower().equals(artist.trim().toLowerCase()))
               ..limit(1))
@@ -452,7 +468,8 @@ class MusicRepository implements IMusicRepository {
       if (updatedVal != null) {
         return Right(updatedVal);
       }
-      return const Left(DatabaseFailure('Song not found'));
+      // FIX(BUG-27): Explicit failure with songId when not found
+      return Left(DatabaseFailure('Song not found (id=$songId)'));
     } catch (e) {
       return Left(DatabaseFailure('Failed to toggle favorite', e));
     }
@@ -465,15 +482,23 @@ class MusicRepository implements IMusicRepository {
       return const Right(null);
     }
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastSongId =
+          _lastRecordedSongId ?? prefs.getInt(PrefsKeys.historyLastSongId);
+      final lastTimeMs = _lastRecordedTime?.millisecondsSinceEpoch ??
+          prefs.getInt(PrefsKeys.historyLastTimeMs);
       final now = DateTime.now();
-      if (_lastRecordedSongId == songId &&
-          _lastRecordedTime != null &&
-          now.difference(_lastRecordedTime!).inMilliseconds < 1500) {
+      final nowMs = now.millisecondsSinceEpoch;
+      // FIX(S1-FU): Dedupe play-history across in-memory calls and cold restarts within 1500ms using PrefsKeys
+      if (lastSongId == songId &&
+          lastTimeMs != null &&
+          (nowMs - lastTimeMs) < 1500) {
         return const Right(null);
       }
       _lastRecordedSongId = songId;
       _lastRecordedTime = now;
-      final nowMs = now.millisecondsSinceEpoch;
+      unawaited(prefs.setInt(PrefsKeys.historyLastSongId, songId));
+      unawaited(prefs.setInt(PrefsKeys.historyLastTimeMs, nowMs));
       await _db.transaction(() async {
         final song = await (_db.select(_db.songsTable)
               ..where((t) => t.id.equals(songId)))
@@ -954,17 +979,34 @@ class MusicRepository implements IMusicRepository {
       List<int> songIds, int currentIndex, int positionMs) async {
     try {
       await _db.transaction(() async {
-        await _db.delete(_db.queueItemsTable).go();
+        // FIX(BUG-09): Perform in-place upsert/replacement matching existing row IDs
+        // to prevent temporary empty-table window on process kill.
+        final existing = await (_db.select(_db.queueItemsTable)
+              ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
+            .get();
         await _db.batch((batch) {
           for (int i = 0; i < songIds.length; i++) {
+            final companion = QueueItemsTableCompanion(
+              id: i < existing.length ? Value(existing[i].id) : const Value.absent(),
+              songId: Value(songIds[i]),
+              orderIndex: Value(i),
+              isCurrent: Value(i == currentIndex),
+              positionMs: Value(i == currentIndex ? positionMs : 0),
+            );
             batch.insert(
               _db.queueItemsTable,
-              QueueItemsTableCompanion.insert(
-                songId: songIds[i],
-                orderIndex: i,
-                isCurrent: Value(i == currentIndex),
-                positionMs: Value(i == currentIndex ? positionMs : 0),
-              ),
+              companion,
+              mode: InsertMode.insertOrReplace,
+            );
+          }
+          if (existing.length > songIds.length) {
+            final surplusIds = existing
+                .sublist(songIds.length)
+                .map((e) => e.id)
+                .toList();
+            batch.deleteWhere(
+              _db.queueItemsTable,
+              (t) => t.id.isIn(surplusIds),
             );
           }
         });
@@ -1306,6 +1348,30 @@ class MusicRepository implements IMusicRepository {
     }
   }
 
+  // FIX(D3): Single unified helper for reassigning FKs and deleting duplicate path rows
+  Future<void> _dedupeByPath(String newPath, int survivingId) async {
+    final dupes = await (_db.select(_db.songsTable)
+          ..where((t) =>
+              t.path.lower().equals(newPath.toLowerCase()) &
+              t.id.equals(survivingId).not()))
+        .get();
+    for (final dupe in dupes) {
+      try {
+        await (_db.update(_db.playlistEntriesTable)
+              ..where((t) => t.songId.equals(dupe.id)))
+            .write(PlaylistEntriesTableCompanion(songId: Value(survivingId)));
+        await (_db.update(_db.queueItemsTable)
+              ..where((t) => t.songId.equals(dupe.id)))
+            .write(QueueItemsTableCompanion(songId: Value(survivingId)));
+        await (_db.update(_db.playHistoryTable)
+              ..where((t) => t.songId.equals(dupe.id)))
+            .write(PlayHistoryTableCompanion(songId: Value(survivingId)));
+        await (_db.delete(_db.songsTable)..where((t) => t.id.equals(dupe.id)))
+            .go();
+      } catch (_) {}
+    }
+  }
+
   @override
   Future<Result<int?>> reconcileDownloadedSong({
     required int oldId,
@@ -1314,121 +1380,111 @@ class MusicRepository implements IMusicRepository {
   }) async {
     try {
       int? survivingId;
-      // Step 1: Read + Compute outside transaction
-      final oldRow = await (_db.select(_db.songsTable)
-            ..where((t) => t.id.equals(oldId)))
-          .getSingleOrNull();
+      final fileExists = await File(newPath).exists();
 
-      // Find the row the scanner minted for the downloaded file.
-      var newRow = await (_db.select(_db.songsTable)
-            ..where((t) => t.path.equals(newPath))
-            ..orderBy([
-              (t) =>
-                  OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)
-            ])
-            ..limit(1))
-          .getSingleOrNull();
+      // FIX(D3): Wrap entire reconcile lifecycle in a single atomic transaction
+      await _db.transaction(() async {
+        final oldRow = await (_db.select(_db.songsTable)
+              ..where((t) => t.id.equals(oldId)))
+            .getSingleOrNull();
 
-      // Fallback: match on normalized metadata
-      final matchMetadata = oldRow ?? fallbackSong;
-      if (newRow == null && matchMetadata != null) {
-        newRow = await (_db.select(_db.songsTable)
-              ..where((t) =>
-                  t.source.equals(SongSource.local) &
-                  t.title.lower().equals(matchMetadata.title.toLowerCase()) &
-                  t.artist.lower().equals(matchMetadata.artist.toLowerCase()) &
-                  t.durationMs.isBetweenValues(matchMetadata.durationMs - 5000,
-                      matchMetadata.durationMs + 5000))
+        // Find the row the scanner minted for the downloaded file.
+        var newRow = await (_db.select(_db.songsTable)
+              ..where((t) => t.path.equals(newPath))
               ..orderBy([
-                (t) => OrderingTerm(
-                    expression: t.dateAdded, mode: OrderingMode.desc)
+                (t) =>
+                    OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)
               ])
               ..limit(1))
             .getSingleOrNull();
 
-        // Verify the matched row is not flagged as missing (R3-02)
-        if (newRow != null && newRow.isMissing) {
-          newRow = null;
+        // Fallback: match on normalized metadata
+        final matchMetadata = oldRow ?? fallbackSong;
+        if (newRow == null && matchMetadata != null) {
+          newRow = await (_db.select(_db.songsTable)
+                ..where((t) =>
+                    t.source.equals(SongSource.local) &
+                    t.title.lower().equals(matchMetadata.title.toLowerCase()) &
+                    t.artist.lower().equals(matchMetadata.artist.toLowerCase()) &
+                    t.durationMs.isBetweenValues(matchMetadata.durationMs - 5000,
+                        matchMetadata.durationMs + 5000))
+                ..orderBy([
+                  (t) => OrderingTerm(
+                      expression: t.dateAdded, mode: OrderingMode.desc)
+                ])
+                ..limit(1))
+              .getSingleOrNull();
         }
-      }
 
-      final fileExists = await File(newPath).exists();
+        final targetRow = newRow;
 
-      // Step 2: Write phase in focused transaction
-      await _db.transaction(() async {
-        if (newRow == null) {
+        if (targetRow == null) {
           if (fileExists) {
             final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-            if (oldRow != null) {
-              await (_db.update(_db.songsTable)
-                    ..where((t) => t.id.equals(oldId)))
-                  .write(
-                SongsTableCompanion(
-                  path: Value(newPath),
-                  source: const Value(SongSource.local),
-                  isMissing: const Value(false),
-                  isDownloaded: const Value(true),
-                  dateAdded: Value(
-                      (oldRow.dateAdded ?? 0) > 0 ? oldRow.dateAdded! : nowSec),
-                  pendingDownloadPath: const Value(null),
-                ),
-              );
+            final baseSong = oldRow ?? fallbackSong;
+            if (baseSong != null) {
+              if (oldRow != null) {
+                await (_db.update(_db.songsTable)
+                      ..where((t) => t.id.equals(oldId)))
+                    .write(
+                  SongsTableCompanion(
+                    path: Value(newPath),
+                    source: const Value(SongSource.local),
+                    isMissing: const Value(false),
+                    isDownloaded: const Value(true),
+                    dateAdded: Value(
+                        (oldRow.dateAdded ?? 0) > 0 ? oldRow.dateAdded! : nowSec),
+                    pendingDownloadPath: const Value(null),
+                  ),
+                );
+              } else {
+                await _db.into(_db.songsTable).insert(
+                      SongsTableCompanion(
+                        id: Value(oldId),
+                        title: Value(baseSong.title),
+                        artist: Value(baseSong.artist),
+                        album: Value(baseSong.album.isNotEmpty
+                            ? baseSong.album
+                            : 'YouTube Music'),
+                        durationMs: Value(baseSong.durationMs),
+                        path: Value(newPath),
+                        source: const Value(SongSource.local),
+                        isMissing: const Value(false),
+                        isDownloaded: const Value(true),
+                        remoteId: Value(baseSong.remoteId),
+                        remoteArtworkUrl: Value(baseSong.remoteArtworkUrl),
+                        dateAdded: Value(nowSec),
+                      ),
+                      mode: InsertMode.insertOrReplace,
+                    );
+              }
               survivingId = oldId;
-              // FIX: Clean any other row that already owns this path (scanner may have inserted it first)
-              try {
-                final dupes = await (_db.select(_db.songsTable)
-                      ..where((t) => t.path.lower().equals(newPath.toLowerCase()) & t.id.equals(oldId).not()))
-                    .get();
-                for (final d in dupes) {
-                  await (_db.update(_db.playlistEntriesTable)..where((t) => t.songId.equals(d.id)))
-                      .write(PlaylistEntriesTableCompanion(songId: Value(oldId)));
-                  await (_db.update(_db.queueItemsTable)..where((t) => t.songId.equals(d.id)))
-                      .write(QueueItemsTableCompanion(songId: Value(oldId)));
-                  await (_db.delete(_db.songsTable)..where((t) => t.id.equals(d.id))).go();
-                }
-              } catch (_) {}
-            } else if (fallbackSong != null) {
-              await _db.into(_db.songsTable).insert(
-                    SongsTableCompanion(
-                      id: Value(oldId),
-                      title: Value(fallbackSong.title),
-                      artist: Value(fallbackSong.artist),
-                      album: Value(fallbackSong.album.isNotEmpty
-                          ? fallbackSong.album
-                          : 'YouTube Music'),
-                      durationMs: Value(fallbackSong.durationMs),
-                      path: Value(newPath),
-                      source: const Value(SongSource.local),
-                      isMissing: const Value(false),
-                      isDownloaded: const Value(true),
-                      remoteId: Value(fallbackSong.remoteId),
-                      remoteArtworkUrl: Value(fallbackSong.remoteArtworkUrl),
-                      dateAdded: Value(nowSec),
-                    ),
-                    mode: InsertMode.insertOrReplace,
-                  );
-              survivingId = oldId;
-              try {
-                final dupes2 = await (_db.select(_db.songsTable)
-                      ..where((t) => t.path.lower().equals(newPath.toLowerCase()) & t.id.equals(oldId).not()))
-                    .get();
-                for (final d in dupes2) {
-                  await (_db.delete(_db.songsTable)..where((t) => t.id.equals(d.id))).go();
-                }
-              } catch (_) {}
+              await _dedupeByPath(newPath, survivingId!);
             }
           }
           return;
         }
 
-        final targetId = newRow.id;
+        // Target row exists from scanner
+        if (targetRow.isMissing || targetRow.path != newPath) {
+          await (_db.update(_db.songsTable)
+                ..where((t) => t.id.equals(targetRow.id)))
+              .write(SongsTableCompanion(
+            path: Value(newPath),
+            isMissing: const Value(false),
+            isDownloaded: const Value(true),
+          ));
+        }
+
+        final targetId = targetRow.id;
         survivingId = targetId;
 
-        if (oldRow == null || oldRow.id == targetId) return;
-        // Null-safe aliases: type promotion is invalidated by the awaits inside the
-        // try/catch below, so downstream code must use these non-null locals.
+        if (oldRow == null || oldRow.id == targetId) {
+          await _dedupeByPath(newPath, survivingId!);
+          return;
+        }
         final oldData = oldRow;
-        final newData = newRow;
+        final newData = targetRow;
 
         try {
           final duplicatePlaylists =
@@ -1514,7 +1570,6 @@ class MusicRepository implements IMusicRepository {
             lastPositionMs: Value(keepOldPosition
                 ? oldData.lastPositionMs
                 : newData.lastPositionMs),
-            // Carry the video id and online remoteArtworkUrl
             remoteId: Value(oldData.remoteId ?? newData.remoteId),
             remoteArtworkUrl: Value(effectiveRemoteArt),
             source: const Value(SongSource.local),
@@ -1523,24 +1578,8 @@ class MusicRepository implements IMusicRepository {
           ),
         );
 
-        // FIX: Remove any other duplicate path rows that the scanner may have inserted in parallel
-        // This guarantees a single entry per file path after download, fixing "repeats twice on local"
-        final newRowPath = newData.path;
-        final duplicateOthers = await (_db.select(_db.songsTable)
-              ..where((t) =>
-                  t.path.lower().equals(newRowPath.toLowerCase()) &
-                  t.id.isNotIn([oldId, targetId])))
-            .get();
-        for (final dupe in duplicateOthers) {
-          try {
-            // Move any playlist/queue/history refs to surviving target before deleting duplicate
-            await (_db.update(_db.playlistEntriesTable)..where((t) => t.songId.equals(dupe.id)))
-                .write(PlaylistEntriesTableCompanion(songId: Value(targetId)));
-            await (_db.update(_db.queueItemsTable)..where((t) => t.songId.equals(dupe.id)))
-                .write(QueueItemsTableCompanion(songId: Value(targetId)));
-            await (_db.delete(_db.songsTable)..where((t) => t.id.equals(dupe.id))).go();
-          } catch (_) {}
-        }
+        // Delete any duplicate rows matching path using unified helper
+        await _dedupeByPath(newPath, survivingId!);
       });
       return Right(survivingId);
     } catch (e) {

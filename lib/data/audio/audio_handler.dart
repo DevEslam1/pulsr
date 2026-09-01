@@ -102,7 +102,11 @@ class PulsrAudioHandler extends BaseAudioHandler
   int _consecutiveFailures = 0;
   DateTime? _lastGaplessChangeTime;
   int _rapidGaplessChangeCount = 0;
-  final List<int> _shuffleHistory = [];
+  // FIX(B1): Mutable shuffle tracking structures that remap dynamically on queue mutations
+  List<int> _shuffleHistory = [];
+  Set<int> _playedShuffleIndices = {};
+  // FIX(BUG-07): Debounce flag to prevent repeated smart prefetching on every 200ms tick
+  bool _prefetchTriggered = false;
   bool _wasPlayingBeforeInterruption = false;
 
   // Bumped on every playSongAt/play entry so a slow async resolve from a
@@ -618,8 +622,13 @@ class PulsrAudioHandler extends BaseAudioHandler
       duration,
       fadeOut: fadeOut,
       onTimerExpired: () async {
+        // FIX(BUG-06): Sleep-timer expiry must cancel crossfade cleanly first
         if (_crossfadeManager.isCrossfading) {
-          await _inactivePlayer.pause();
+          await _crossfadeManager.cancel(
+            _inactivePlayer,
+            _activePlayer,
+            restoreVolume: _volume,
+          );
         }
         await pause();
       },
@@ -627,12 +636,14 @@ class PulsrAudioHandler extends BaseAudioHandler
     );
   }
 
+  // FIX(T1): Handle next-day rollover if stopTime is before now, and persist target
   void startAbsoluteSleepTimer(DateTime stopTime, {bool fadeOut = true}) {
     final now = DateTime.now();
-    final diff =
-        stopTime.isAfter(now)
-            ? stopTime.difference(now)
-            : const Duration(minutes: 1);
+    DateTime effectiveStopTime = stopTime;
+    if (stopTime.isBefore(now)) {
+      effectiveStopTime = stopTime.add(const Duration(days: 1));
+    }
+    final diff = effectiveStopTime.difference(now);
     _sleepTimerManager.startSleepTimer(
       diff,
       fadeOut: fadeOut,
@@ -942,9 +953,12 @@ class PulsrAudioHandler extends BaseAudioHandler
               // opens, so resolve latency does not truncate the fade. Cheap no-op
               // for local tracks and for an already-cached url.
               // Trigger at 60% of track duration for more warm-up lead time.
-              if (duration > const Duration(seconds: 15) &&
+              // FIX(BUG-07): Debounce _smartPrefetch so it only fires once per track threshold
+              if (!_prefetchTriggered &&
+                  duration > const Duration(seconds: 15) &&
                   (pos >= duration - const Duration(seconds: 15) ||
                       pos.inMilliseconds >= duration.inMilliseconds * 0.6)) {
+                _prefetchTriggered = true;
                 _smartPrefetch();
               }
               if (_crossfadeManager.duration > Duration.zero &&
@@ -1213,6 +1227,10 @@ class PulsrAudioHandler extends BaseAudioHandler
     await _equalizerManager.init();
 
     // Register lifecycle observer to persist playback state and manage buffers on app background/resume
+    // FIX(BUG-19): Prevent duplicate observer registration on hot-reload
+    if (_lifecycleObserver != null) {
+      WidgetsBinding.instance.removeObserver(_lifecycleObserver!);
+    }
     _lifecycleObserver = _AudioHandlerLifecycleObserver(
       onBackground: () {
         saveCurrentPositionImmediate();
@@ -1227,6 +1245,12 @@ class PulsrAudioHandler extends BaseAudioHandler
       },
     );
     WidgetsBinding.instance.addObserver(_lifecycleObserver!);
+
+    // FIX(BUG-18): Restore active sleep timer if target is in the future
+    unawaited(_sleepTimerManager.restoreTimerState(
+      onTimerExpired: () async => pause(),
+      getActivePlayer: () => _activePlayer,
+    ));
 
     // Restore last played song & queue session from database with 10s timeout guard
     try {
@@ -1908,7 +1932,8 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (_activePlayer.shuffleModeEnabled && _songs.length > 1) {
       if (offset == 1) {
         _shuffleHistory.add(_currentIndex);
-        if (_shuffleHistory.length > 50) {
+        _playedShuffleIndices.add(_currentIndex);
+        if (_shuffleHistory.length > 500) {
           _shuffleHistory.removeAt(0);
         }
       }
@@ -1919,25 +1944,26 @@ class PulsrAudioHandler extends BaseAudioHandler
       if (_songs.length == 1) {
         return 0;
       }
+      // FIX(P3): Pick from unplayed indices set; when full queue has been played, reset
+      if (_playedShuffleIndices.length >= _songs.length) {
+        _playedShuffleIndices.clear();
+        _playedShuffleIndices.add(_currentIndex);
+      }
+      final unplayed = <int>[];
+      for (int i = 0; i < _songs.length; i++) {
+        if (i != _currentIndex && !_playedShuffleIndices.contains(i)) {
+          unplayed.add(i);
+        }
+      }
+      if (unplayed.isEmpty) {
+        _playedShuffleIndices.clear();
+        _playedShuffleIndices.add(_currentIndex);
+        for (int i = 0; i < _songs.length; i++) {
+          if (i != _currentIndex) unplayed.add(i);
+        }
+      }
       final random = math.Random();
-      final recentWindow = math.min(_songs.length - 1, 10);
-      final recent =
-          _shuffleHistory.length >= recentWindow
-              ? _shuffleHistory.sublist(_shuffleHistory.length - recentWindow)
-              : _shuffleHistory;
-
-      int next = random.nextInt(_songs.length);
-      int attempts = 0;
-      final maxAttempts = _songs.length * 2;
-      while ((next == _currentIndex || recent.contains(next)) &&
-          attempts < maxAttempts &&
-          _songs.length > 1) {
-        next = random.nextInt(_songs.length);
-        attempts++;
-      }
-      if (next == _currentIndex && _songs.length > 1) {
-        next = (_currentIndex + 1) % _songs.length;
-      }
+      final next = unplayed[random.nextInt(unplayed.length)];
       return next;
     }
     if (_currentIndex + offset < _songs.length) {
@@ -1965,11 +1991,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   void _broadcastState(PlaybackEvent event) {
-    // GUARD: Only broadcast from the ACTIVE player
-    if (!identical(_activePlayer, _isPlayerAActive ? _playerA : _playerB)) {
-      return;
-    }
-
+    // FIX(BUG-12): Broadcast state from active player without redundant guard
     final isCompleted =
         _activePlayer.processingState == ProcessingState.completed;
     final isPlaying = _activePlayer.playing && !isCompleted;
@@ -2014,11 +2036,14 @@ class PulsrAudioHandler extends BaseAudioHandler
     Duration? initialPosition,
   }) async {
     _sleepTimerManager.cancelSleepTimer();
+    // FIX(BUG-01): loadQueue must cancel active crossfade cleanly before reassigning queue
     await _crossfadeManager.cancel(
       _inactivePlayer,
       _activePlayer,
       restoreVolume: _volume,
     );
+    _prefetchTriggered = false; // FIX(BUG-07)
+    _playedShuffleIndices.clear(); // FIX(BUG-08)
     _songs = List.from(songs);
     _currentIndex = initialIndex.clamp(
       0,
@@ -2091,10 +2116,13 @@ class PulsrAudioHandler extends BaseAudioHandler
     final concat = _buildConcat(_songs);
 
     try {
+      // FIX(BUG-17): Guard _gaplessSource.clear() and ensure _gaplessSource = null in finally
       try {
         await _gaplessSource?.clear();
-      } catch (_) {}
-      _gaplessSource = null;
+      } catch (_) {
+      } finally {
+        _gaplessSource = null;
+      }
       // Cleanly stop any existing playing source to release hanging native sockets
       try {
         await _activePlayer.stop();
@@ -2106,6 +2134,8 @@ class PulsrAudioHandler extends BaseAudioHandler
         initialPosition: initialPosition,
         preload: preload,
       );
+      // FIX(BUG-21): Reset _consecutiveFailures on successful setAudioSource
+      _consecutiveFailures = 0;
       try {
         _latencyTracker?.markStage(PlaybackStage.sourceSet);
       } catch (_) {}
@@ -2196,6 +2226,8 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// model, notification, play history, replay-gain volume and saved position in
   /// step with the item ExoPlayer moved to on its own.
   Future<void> _onGaplessIndexChanged(int index) async {
+    // FIX(BUG-02): Capture generation at top before any async dispatch or state change
+    final gen = _playGeneration;
     if (!_gaplessMode) return;
     if (index < 0 || index >= _songs.length) return;
     if (_gaplessSource == null) return;
@@ -2218,6 +2250,8 @@ class PulsrAudioHandler extends BaseAudioHandler
         );
         _errorSubject.add('Playback stopped: multiple tracks failed to load.');
         await _activePlayer.pause();
+        // FIX(BUG-02): Check generation after await
+        if (gen != _playGeneration) return;
         _broadcastState(_activePlayer.playbackEvent);
         return;
       }
@@ -2226,10 +2260,14 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
     _lastGaplessChangeTime = now;
 
+    // FIX(BUG-02): Check generation before mutating _currentIndex and _lastGaplessIndex
+    if (gen != _playGeneration) return;
     _lastGaplessIndex = index;
     _currentIndex = index;
+    _prefetchTriggered = false; // FIX(BUG-07)
+    _playedShuffleIndices.add(index); // FIX(BUG-08)
     final song = _songs[index];
-    final generation = _playGeneration;
+    final generation = gen;
 
     final sr =
         (song.sampleRate != null && song.sampleRate! > 0)
@@ -2241,6 +2279,8 @@ class PulsrAudioHandler extends BaseAudioHandler
         song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
     mediaItem.add(_songToMediaItem(song, fastArtUri));
     await _activePlayer.setVolume(_calculateReplayGainVolume(song));
+    // FIX(BUG-02): Check generation after setVolume await
+    if (gen != _playGeneration) return;
     unawaited(_repository.recordPlayHistory(song.id));
     _broadcastState(_activePlayer.playbackEvent);
     _saveCurrentPosition();
@@ -2301,6 +2341,16 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {
     if (index < 0 || index >= _songs.length) return;
     cancelPrefetches();
+    _prefetchTriggered = false; // FIX(BUG-07)
+    _playedShuffleIndices.add(index); // FIX(BUG-08)
+    // FIX(BUG-05): Guard crossfade cancel at top to prevent double volume resetting/audio pop
+    if (_crossfadeManager.isCrossfading) {
+      await _crossfadeManager.cancel(
+        _inactivePlayer,
+        _activePlayer,
+        restoreVolume: _volume,
+      );
+    }
     // Ensure previous MediaCodec EventHandler is fully released before creating new decoder
     // — prevents LegacyMessageQueue dead-thread crash on rapid Hi-Res FLAC switch (LOG-12)
     try {
@@ -2309,11 +2359,6 @@ class PulsrAudioHandler extends BaseAudioHandler
     try {
       await _activePlayer.stop().timeout(const Duration(milliseconds: 800));
     } catch (_) {}
-    await _crossfadeManager.cancel(
-      _inactivePlayer,
-      _activePlayer,
-      restoreVolume: _volume,
-    );
     // A YouTube resolve below can await for seconds; a second skip during that
     // window must win. Capture a generation token and bail from a stale call
     // after every await, or we get double mediaItem/history and torn state.
@@ -2630,6 +2675,11 @@ class PulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> setShuffleMode(AudioServiceShuffleMode shuffleMode) async {
     final enable = shuffleMode != AudioServiceShuffleMode.none;
+    if (enable) {
+      // FIX(P3): Reset played shuffle indices on shuffle toggle to allow fresh randomized sequence
+      _playedShuffleIndices.clear();
+      _playedShuffleIndices.add(_currentIndex);
+    }
     await _playerA.setShuffleModeEnabled(enable);
     await _playerB.setShuffleModeEnabled(enable);
     // In gapless mode the concat's shuffle order drives playback; reshuffle so
@@ -2692,7 +2742,8 @@ class PulsrAudioHandler extends BaseAudioHandler
   ]) async {
     switch (name) {
       case 'toggleFavorite':
-        if (_songs.isNotEmpty && _currentIndex < _songs.length) {
+        // FIX(BUG-28): Bounds check _currentIndex >= 0 && _currentIndex < _songs.length
+        if (_songs.isNotEmpty && _currentIndex >= 0 && _currentIndex < _songs.length) {
           final currentSong = _songs[_currentIndex];
           final result = await _repository.toggleFavorite(currentSong.id);
           final newFav = result.fold((l) => currentSong.isFavorite, (r) => r);
@@ -2752,6 +2803,46 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
+  // FIX(B1): Re-map shuffle tracking structures on queue mutations so absolute indices remain valid
+  void _remapShuffleAfterRemoval(int removedIndex) {
+    _shuffleHistory = _shuffleHistory
+        .where((i) => i != removedIndex)
+        .map((i) => i > removedIndex ? i - 1 : i)
+        .toList();
+    final newPlayed = <int>{};
+    for (final i in _playedShuffleIndices) {
+      if (i == removedIndex) continue;
+      newPlayed.add(i > removedIndex ? i - 1 : i);
+    }
+    _playedShuffleIndices = newPlayed;
+  }
+
+  void _remapShuffleAfterInsertion(int insertIndex) {
+    _shuffleHistory = _shuffleHistory
+        .map((i) => i >= insertIndex ? i + 1 : i)
+        .toList();
+    final newPlayed = <int>{};
+    for (final i in _playedShuffleIndices) {
+      newPlayed.add(i >= insertIndex ? i + 1 : i);
+    }
+    _playedShuffleIndices = newPlayed;
+  }
+
+  void _remapShuffleAfterMove(int oldIndex, int newIndex) {
+    int remap(int i) {
+      if (i == oldIndex) return newIndex;
+      if (oldIndex < newIndex && i > oldIndex && i <= newIndex) return i - 1;
+      if (oldIndex > newIndex && i >= newIndex && i < oldIndex) return i + 1;
+      return i;
+    }
+    _shuffleHistory = _shuffleHistory.map(remap).toList();
+    final newPlayed = <int>{};
+    for (final i in _playedShuffleIndices) {
+      newPlayed.add(remap(i));
+    }
+    _playedShuffleIndices = newPlayed;
+  }
+
   Future<void> insertNextInQueue(SongsTableData song) async {
     if (_songs.length >= maxQueueSize) {
       ErrorLogger.log(
@@ -2764,6 +2855,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         _songs.isEmpty ? 0 : (_currentIndex + 1).clamp(0, _songs.length);
     _songs.insert(insertIdx, song);
     _queueDirty = true;
+    _remapShuffleAfterInsertion(insertIdx);
     // Insert sits after the current track, so the playing index never shifts.
     if (_gaplessMode && _gaplessSource != null) {
       await _gaplessSource!.insert(insertIdx, _buildGaplessChild(song));
@@ -2798,9 +2890,12 @@ class PulsrAudioHandler extends BaseAudioHandler
 
     _songs.removeAt(index);
     _queueDirty = true;
+    _remapShuffleAfterRemoval(index);
 
     if (_songs.isEmpty) {
       _currentIndex = 0;
+      _shuffleHistory.clear();
+      _playedShuffleIndices.clear();
       _gaplessSource = null;
       queue.add([]);
       mediaItem.add(null);
@@ -2810,10 +2905,6 @@ class PulsrAudioHandler extends BaseAudioHandler
 
     if (_gaplessMode) {
       if (wasPlayingCurrent) {
-        // Removing the playing track changes the current song. Rebuild the
-        // concat at the clamped index so the new current starts cleanly,
-        // rather than leaning on ExoPlayer's silent same-index auto-advance
-        // (which would leave the notification and play history stale).
         _currentIndex = _currentIndex.clamp(0, _songs.length - 1);
         if (gaplessRef != null && _activePlayer.audioSource != null) {
           await _loadGaplessQueue();
@@ -2827,7 +2918,6 @@ class PulsrAudioHandler extends BaseAudioHandler
         }
       } else {
         if (index < _currentIndex) _currentIndex--;
-        // Pre-set so the shift emit from currentIndexStream is a no-op.
         _lastGaplessIndex = _currentIndex;
         if (gaplessRef != null && index < gaplessRef.length) {
           await gaplessRef.removeAt(index);
@@ -2866,6 +2956,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     final song = _songs.removeAt(oldIndex);
     _songs.insert(newIndex, song);
     _queueDirty = true;
+    _remapShuffleAfterMove(oldIndex, newIndex);
 
     if (_currentIndex == oldIndex) {
       _currentIndex = newIndex;
@@ -2875,9 +2966,6 @@ class PulsrAudioHandler extends BaseAudioHandler
       _currentIndex++;
     }
 
-    // move() replays remove(oldIndex)+insert(newIndex) on the concat's still-old
-    // layout, reaching the same order as _songs. Pre-set _lastGaplessIndex so a
-    // shift emit for the (unchanged) current song is swallowed.
     if (_gaplessMode && _gaplessSource != null) {
       _lastGaplessIndex = _currentIndex;
       await _gaplessSource!.move(oldIndex, newIndex);
@@ -3355,6 +3443,8 @@ class PulsrAudioHandler extends BaseAudioHandler
     _equalizerManager.dispose();
     _crossfadeManager.dispose();
     AudioEffectsChannel().releaseEffects();
+    // FIX(BUG-20): Dispose AudioEffectsChannel singleton stream controllers
+    AudioEffectsChannel().dispose();
     _playerA.dispose();
     _playerB.dispose();
   }

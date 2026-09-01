@@ -59,7 +59,7 @@ private:
     static void computeLowShelf(Biquad& bq, double f0, double gainDb, double sampleRate);
     static void computeHighShelf(Biquad& bq, double f0, double gainDb, double sampleRate);
     void updateTargetGains();
-    void rampTowardTarget(); // per-block smoothing, then refresh biquad gains
+    void rampTowardTarget(int frames = 512); // time-based smoothing
 
     double sampleRate_ = 48000.0;
     double intensity_ = 0.0;
@@ -68,6 +68,8 @@ private:
     double targetTrebleDb_ = 0.0;
     double currentBassDb_ = 0.0;
     double currentTrebleDb_ = 0.0;
+    double lastComputedBassDb_ = 1e9;
+    double lastComputedTrebleDb_ = 1e9;
     bool enabled_ = false;
 
     Biquad bass_[MAX_CHANNELS];

@@ -103,11 +103,11 @@ int DsdDecoder::decodeDsdBytes(const uint8_t* dsdL, const uint8_t* dsdR, int byt
                 bitValR = (bR >> (7 - bit)) & 1;
             }
 
-            // Convert 0/1 to bipolar -1/+1 unsigned delta (mod 2^32)
-            const uint32_t xL = bitValL ? 1u : static_cast<uint32_t>(-1);
-            const uint32_t xR = bitValR ? 1u : static_cast<uint32_t>(-1);
+            // Convert 0/1 to bipolar -1/+1 signed int64_t
+            const int64_t xL = bitValL ? 1 : -1;
+            const int64_t xR = bitValR ? 1 : -1;
 
-            // --- STAGE 1: CIC Integrators (order 3, mod 2^32 wrapping) ---
+            // --- STAGE 1: CIC Integrators (order 3, signed 64-bit) ---
             cicL_.int1 += xL;
             cicL_.int2 += cicL_.int1;
             cicL_.int3 += cicL_.int2;
@@ -122,26 +122,24 @@ int DsdDecoder::decodeDsdBytes(const uint8_t* dsdL, const uint8_t* dsdR, int byt
             if (cicCount_ >= 8) {
                 cicCount_ = 0;
 
-                // CIC Comb filters (mod 2^32 wrapping)
-                uint32_t c1L = cicL_.int3 - cicL_.comb1_d;
+                // CIC Comb filters (signed 64-bit)
+                int64_t c1L = cicL_.int3 - cicL_.comb1_d;
                 cicL_.comb1_d = cicL_.int3;
-                uint32_t c2L = c1L - cicL_.comb2_d;
+                int64_t c2L = c1L - cicL_.comb2_d;
                 cicL_.comb2_d = c1L;
-                uint32_t c3L = c2L - cicL_.comb3_d;
+                int64_t c3L = c2L - cicL_.comb3_d;
                 cicL_.comb3_d = c2L;
 
-                uint32_t c1R = cicR_.int3 - cicR_.comb1_d;
+                int64_t c1R = cicR_.int3 - cicR_.comb1_d;
                 cicR_.comb1_d = cicR_.int3;
-                uint32_t c2R = c1R - cicR_.comb2_d;
+                int64_t c2R = c1R - cicR_.comb2_d;
                 cicR_.comb2_d = c1R;
-                uint32_t c3R = c2R - cicR_.comb3_d;
+                int64_t c3R = c2R - cicR_.comb3_d;
                 cicR_.comb3_d = c2R;
 
-                // Scale CIC output (cast diff to signed int32_t, 8^3 = 512)
-                const int32_t diffL = static_cast<int32_t>(c3L);
-                const int32_t diffR = static_cast<int32_t>(c3R);
-                const float cicOutL = static_cast<float>(diffL) * (1.0f / 512.0f);
-                const float cicOutR = static_cast<float>(diffR) * (1.0f / 512.0f);
+                // Scale CIC output (8^3 = 512 gain)
+                const float cicOutL = static_cast<float>(c3L) * (1.0f / 512.0f);
+                const float cicOutR = static_cast<float>(c3R) * (1.0f / 512.0f);
 
                 // --- STAGE 2: Anti-Aliasing Decimation Filter ---
                 stage2RingL_[stage2WriteIdx_] = cicOutL;

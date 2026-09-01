@@ -133,6 +133,20 @@ std::shared_ptr<const PreparedIr> PreparedIr::create(
             ir->numPartitions, ConvolutionReverb::MAX_PREALLOC_PARTITIONS);
 #endif
         ir->numPartitions = ConvolutionReverb::MAX_PREALLOC_PARTITIONS;
+        totalTaps = ConvolutionReverb::MAX_PREALLOC_PARTITIONS * PARTITION_SIZE;
+        ir->totalTaps = totalTaps;
+        ir->irL.resize(totalTaps);
+        ir->irR.resize(totalTaps);
+
+        // Smooth cosine taper across the truncation boundary to prevent audible clicks
+        constexpr int TAPER_SAMPLES = 64;
+        const int taperStart = std::max(0, totalTaps - TAPER_SAMPLES);
+        const int actualTaper = totalTaps - taperStart;
+        for (int i = 0; i < actualTaper; ++i) {
+            const float ramp = 0.5f * (1.0f + std::cos(static_cast<float>(M_PI) * (i + 1) / static_cast<float>(actualTaper)));
+            ir->irL[taperStart + i] *= ramp;
+            ir->irR[taperStart + i] *= ramp;
+        }
     }
     ir->irFreqL.assign(ir->numPartitions, std::vector<FftUtil::Complex>(FFT_SIZE));
     ir->irFreqR.assign(ir->numPartitions, std::vector<FftUtil::Complex>(FFT_SIZE));
@@ -291,25 +305,25 @@ std::shared_ptr<const PreparedIr> PreparedIr::createSynthetic(
 }
 
 std::shared_ptr<const PreparedIr> PreparedIr::createCustom(
-        double sampleRate, const float* irInterleaved, int frames, int channels) {
+        double sampleRate, const float* irInterleaved, int frames, int channels, double targetRate) {
     if (!irInterleaved || frames <= 0 || channels < 1) return nullptr;
 
     // Cap numPartitions at 512 (BUG-005)
     constexpr int MAX_CUSTOM_PARTITIONS = 512;
     constexpr int MAX_CUSTOM_TAPS = MAX_CUSTOM_PARTITIONS * PARTITION_SIZE; // 262,144 samples
 
-    int actualFrames = frames;
-    std::vector<float> irL;
-    std::vector<float> irR;
+    const double effectiveTargetRate = (targetRate > 0.0) ? std::min(targetRate, 48000.0) : 48000.0;
+    const double effectiveSrcRate = (sampleRate > 0.0) ? sampleRate : effectiveTargetRate;
+    const double targetFramesDouble = static_cast<double>(frames) * (effectiveTargetRate / effectiveSrcRate);
+    const int actualFrames = std::clamp(static_cast<int>(std::round(targetFramesDouble)), 1, MAX_CUSTOM_TAPS);
 
-    if (frames > MAX_CUSTOM_TAPS) {
-        // High-order windowed-sinc anti-aliasing decimation (>80dB stopband attenuation)
-        actualFrames = MAX_CUSTOM_TAPS;
-        irL.resize(actualFrames);
-        irR.resize(actualFrames);
+    std::vector<float> irL(actualFrames);
+    std::vector<float> irR(actualFrames);
 
+    if (actualFrames != frames || frames > MAX_CUSTOM_TAPS) {
+        // High-order windowed-sinc anti-aliasing interpolation (>80dB stopband attenuation)
         const double step = static_cast<double>(frames) / static_cast<double>(actualFrames);
-        const float fc = static_cast<float>(0.45 / step); // Normalized to input rate Nyquist
+        const float fc = static_cast<float>(std::min(0.45, 0.45 / step)); // Normalized cutoff
 
         constexpr int FIR_TAPS = 63;
         constexpr int HALF_FIR = FIR_TAPS / 2;
@@ -355,8 +369,6 @@ std::shared_ptr<const PreparedIr> PreparedIr::createCustom(
             irR[i] = sumR;
         }
     } else {
-        irL.resize(actualFrames);
-        irR.resize(actualFrames);
         for (int i = 0; i < actualFrames; ++i) {
             const float l = irInterleaved[i * channels];
             const float r = (channels > 1) ? irInterleaved[i * channels + 1] : l;
@@ -367,7 +379,7 @@ std::shared_ptr<const PreparedIr> PreparedIr::createCustom(
 
     auto created = create(irL.data(), irR.data(), actualFrames);
     if (!created) return nullptr;
-    const_cast<PreparedIr*>(created.get())->createdSampleRate = static_cast<int>(std::round(sampleRate));
+    const_cast<PreparedIr*>(created.get())->createdSampleRate = static_cast<int>(std::round(effectiveTargetRate));
 
     // Apply dynamic budget & LRU eviction with Custom IR registry tracking (NEW-2)
     const size_t entrySize = static_cast<size_t>(created->totalTaps) * 12 +
@@ -426,7 +438,7 @@ ConvolutionReverb::ConvolutionReverb() {
     directRingL_.assign(1024 * 2 + 16, 0.0f);
     directRingR_.assign(1024 * 2 + 16, 0.0f);
 
-    ensureScratchCapacity(8192);
+    ensureScratchCapacity(32768);
     setPreset(ReverbPreset::Room);
     reset();
 }
@@ -441,8 +453,12 @@ void ConvolutionReverb::ensurePredelayCapacity() {
     }
 }
 
+void ConvolutionReverb::prepareForBlockSize(int maxFrames) {
+    ensureScratchCapacity(maxFrames * 4);
+}
+
 void ConvolutionReverb::ensureScratchCapacity(int frames) {
-    const int req = std::max(frames, 8192);
+    const int req = std::max(frames, 32768);
     if (static_cast<int>(scratchInL_.size()) < req) {
         scratchInL_.resize(req, 0.0f);
         scratchInR_.resize(req, 0.0f);
@@ -475,9 +491,19 @@ void ConvolutionReverb::setSampleRate(double sampleRate) {
     }
 
     // A2 (B-05): Regenerate prepared IR for non-custom presets if not matching effective core rate
-    if (preset_ != ReverbPreset::Custom &&
-        (!preparedIr_ || preparedIr_->createdSampleRate != static_cast<int>(std::round(coreRate_)))) {
-        updatePreparedIr();
+    if (preset_ != ReverbPreset::Custom) {
+        if (!preparedIr_ || preparedIr_->createdSampleRate != static_cast<int>(std::round(coreRate_))) {
+            updatePreparedIr();
+        }
+    } else if (!rawCustomIr_.empty()) {
+        if (!preparedIr_ || preparedIr_->createdSampleRate != static_cast<int>(std::round(coreRate_))) {
+            auto customIr = PreparedIr::createCustom(
+                rawCustomSampleRate_, rawCustomIr_.data(), rawCustomFrames_, rawCustomChannels_, coreRate_);
+            if (customIr) {
+                preparedIr_ = customIr;
+                preparePartitions();
+            }
+        }
     }
 }
 
@@ -529,8 +555,17 @@ void ConvolutionReverb::applyParams(const ReverbParamSet& params) {
     }
 }
 
-bool ConvolutionReverb::loadCustomIR(const float* irInterleaved, int frames, int channels) {
-    auto customIr = PreparedIr::createCustom(sampleRate_, irInterleaved, frames, channels);
+bool ConvolutionReverb::loadCustomIR(const float* irInterleaved, int frames, int channels, double irSampleRate) {
+    if (!irInterleaved || frames <= 0 || channels < 1) return false;
+    coreRate_ = std::min(sampleRate_, 48000.0);
+    const double sourceRate = (irSampleRate > 0.0) ? irSampleRate : sampleRate_;
+
+    rawCustomIr_.assign(irInterleaved, irInterleaved + static_cast<size_t>(frames) * channels);
+    rawCustomFrames_ = frames;
+    rawCustomChannels_ = channels;
+    rawCustomSampleRate_ = sourceRate;
+
+    auto customIr = PreparedIr::createCustom(sourceRate, irInterleaved, frames, channels, coreRate_);
     if (!customIr) return false;
 
     preparedIr_ = customIr;
@@ -540,7 +575,6 @@ bool ConvolutionReverb::loadCustomIR(const float* irInterleaved, int frames, int
 }
 
 void ConvolutionReverb::preparePartitions() {
-    ensureScratchCapacity(8192);
     if (!preparedIr_) return;
 
     if (preparedIr_->numPartitions == 0) {
@@ -574,7 +608,7 @@ void ConvolutionReverb::preparePartitions() {
 
 void ConvolutionReverb::reset() {
     ensurePredelayCapacity();
-    ensureScratchCapacity(4096);
+    ensureScratchCapacity(32768);
     std::fill(predelayRingL_.begin(), predelayRingL_.end(), 0.0f);
     std::fill(predelayRingR_.begin(), predelayRingR_.end(), 0.0f);
     predelayWritePos_ = 0;
@@ -623,7 +657,12 @@ void ConvolutionReverb::process(const float* inL, const float* inR, float* outL,
     }
 
     // High sample rates (>48kHz): stream pure wet reverberation path through 48kHz core
-    ensureScratchCapacity(frames * 4);
+    if (frames * 4 > static_cast<int>(scratchInL_.size())) {
+        // Safety guard: preallocated capacity exceeded, fallback to dry
+        if (inL != outL) std::memcpy(outL, inL, frames * sizeof(float));
+        if (inR != outR) std::memcpy(outR, inR, frames * sizeof(float));
+        return;
+    }
 
     // 1. Resample wet input down to 48kHz core
     const float* inPlanar[2] = { inL, inR };
@@ -659,6 +698,7 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
 
     const int totalTaps = preparedIr_->totalTaps;
     const int predelayCap = static_cast<int>(predelayRingL_.size());
+    const float predelaySmoothCoeff = 1.0f - std::exp(-2.0f * static_cast<float>(M_PI) * 20.0f / static_cast<float>(coreRate_));
 
     // Direct FIR convolution path (for IR <= 1024) - BUG-006 vectorized contiguous loop
     if (preparedIr_->numPartitions == 0) {
@@ -669,8 +709,8 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
             float inSampleL = inL[i];
             float inSampleR = inR[i];
 
-            // Smooth predelay interpolation
-            smoothedPredelaySamples_ += 0.005f * (targetPredelaySamples_ - smoothedPredelaySamples_);
+            // Smooth predelay interpolation (time constant independent of sample rate)
+            smoothedPredelaySamples_ += predelaySmoothCoeff * (targetPredelaySamples_ - smoothedPredelaySamples_);
             if (smoothedPredelaySamples_ > 0.5f && predelayCap > 0) {
                 predelayRingL_[predelayWritePos_] = inSampleL;
                 predelayRingR_[predelayWritePos_] = inSampleR;
@@ -722,8 +762,8 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
         float inSampleL = inL[i];
         float inSampleR = inR[i];
 
-        // Smooth predelay interpolation
-        smoothedPredelaySamples_ += 0.005f * (targetPredelaySamples_ - smoothedPredelaySamples_);
+        // Smooth predelay interpolation (time constant independent of sample rate)
+        smoothedPredelaySamples_ += predelaySmoothCoeff * (targetPredelaySamples_ - smoothedPredelaySamples_);
         if (smoothedPredelaySamples_ > 0.5f && predelayCap > 0) {
             predelayRingL_[predelayWritePos_] = inSampleL;
             predelayRingR_[predelayWritePos_] = inSampleR;
@@ -802,8 +842,7 @@ void ConvolutionReverb::processCore(const float* inL, const float* inR, float* o
 
 void ConvolutionReverb::processInterleaved(float* buffer, int frames, int channels) {
     if (!enabled_ || !buffer || frames <= 0 || channels < 2 || !preparedIr_ || preparedIr_->totalTaps == 0) return;
-
-    ensureScratchCapacity(frames);
+    if (frames > static_cast<int>(scratchInL_.size())) return; // Safety guard: capacity exceeded, bypass
 
     float* inL = scratchInL_.data();
     float* inR = scratchInR_.data();

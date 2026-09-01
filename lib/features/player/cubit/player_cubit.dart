@@ -64,6 +64,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   final HiResAudioService? _hiResAudioService;
   String? _lastAutoAppliedDeviceKey;
 
+  // FIX(BUG-14): Expose unthrottled position stream for high-fps UI components like MiniPlayer
+  Stream<Duration> get rawPositionStream => _audioHandler.positionStream;
+
   StreamSubscription<void>? _widgetClickSub;
   DateTime? _lastWidgetUpdateTime;
   int _mediaItemResolutionGen = 0;
@@ -72,7 +75,8 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   Timer? _scrobbleDebounce;
   int? _lastScrobbleSongId;
   bool? _lastScrobbleIsPlaying;
-  int? _lastScrobblePosSec;
+  // FIX(BUG-15): Track position in milliseconds to avoid precision loss on sub-second seeks
+  int? _lastScrobblePosMs;
   List<String>? _cachedNextTitles;
   int? _cachedNextTitlesIndex;
   int? _cachedQueueLength;
@@ -279,16 +283,17 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   void _debouncedScrobble(
       SongsTableData song, Duration position, bool isPlaying) {
     if (isClosed) return;
-    final posSec = position.inSeconds;
+    final posMs = position.inMilliseconds;
     final isSongChange = _lastScrobbleSongId != song.id;
     final isPlayStateChange = _lastScrobbleIsPlaying != isPlaying;
-    final isMajorSeek = _lastScrobblePosSec != null &&
-        (posSec - _lastScrobblePosSec!).abs() >= 5;
+    // FIX(BUG-15): Compare milliseconds (>= 5000 ms) instead of integer seconds
+    final isMajorSeek = _lastScrobblePosMs != null &&
+        (posMs - _lastScrobblePosMs!).abs() >= 5000;
 
     // Always update tracking state
     _lastScrobbleSongId = song.id;
     _lastScrobbleIsPlaying = isPlaying;
-    _lastScrobblePosSec = posSec;
+    _lastScrobblePosMs = posMs;
 
     if (isSongChange || isPlayStateChange || isMajorSeek) {
       // Major update: immediate flush + reset timer

@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/channels.dart';
+import '../constants/prefs_keys.dart';
 import '../utils/error_logger.dart';
 import '../utils/platform_capabilities.dart';
 
@@ -74,14 +75,21 @@ class ScrobblerService {
     return null;
   }
 
-  static const String _keyLastScrobbleSong = 'scrobbler_last_song';
-  static const String _keyLastScrobbleTime = 'scrobbler_last_time';
-  static const String _keyLastScrobblePos = 'scrobbler_last_position';
-  static const String _keyLastScrobbleArtist = 'scrobbler_last_artist';
-  static const String _keyLastScrobbleTrack = 'scrobbler_last_track';
-  static const String _keyLastScrobbleAlbum = 'scrobbler_last_album';
-  static const String _keyLastScrobbleDuration = 'scrobbler_last_duration';
-  static const String _keyOfflineQueue = 'scrobbler_offline_queue';
+  // FIX(B2): Canonical SharedPreferences keys mapped from PrefsKeys
+  static const String _keyLastScrobbleSong = PrefsKeys.scrobblerLastSong;
+  static const String _keyLastScrobbleTime = PrefsKeys.scrobblerLastTime;
+  static const String _keyLastScrobblePos = PrefsKeys.scrobblerLastPos;
+  static const String _keyLastScrobbleArtist = PrefsKeys.scrobblerLastArtist;
+  static const String _keyLastScrobbleTrack = PrefsKeys.scrobblerLastTrack;
+  static const String _keyLastScrobbleAlbum = PrefsKeys.scrobblerLastAlbum;
+  static const String _keyLastScrobbleDuration = PrefsKeys.scrobblerLastDuration;
+  static const String _keyLastScrobbledKey = PrefsKeys.scrobblerLastScrobbledKey;
+  static const String _keyLastScrobbledTime =
+      PrefsKeys.scrobblerLastScrobbledTime;
+  static const String _keyLastScrobbledId = PrefsKeys.scrobblerLastScrobbledId;
+  static const String _keyLastScrobbledTimestamp =
+      PrefsKeys.scrobblerLastScrobbledTimestamp;
+  static const String _keyOfflineQueue = PrefsKeys.scrobblerOfflineQueue;
 
   int? _lastScrobbledTrackId;
   int? _nowPlayingTrackId;
@@ -99,10 +107,32 @@ class ScrobblerService {
     return DateTime.now().difference(last) >= const Duration(seconds: 30);
   }
 
+  // FIX(B2): Migrate legacy SharedPreferences scrobble keys on first startup
+  Future<void> _migrateLegacyKeys(SharedPreferences prefs) async {
+    const legacyKeyMap = {
+      'last_scrobbled_key': PrefsKeys.scrobbleLastKey,
+      'last_scrobbled_time': PrefsKeys.scrobbleLastTime,
+      'scrobbler_last_scrobbled_key': PrefsKeys.scrobbleLastKey,
+      'scrobbler_last_scrobbled_time': PrefsKeys.scrobbleLastTime,
+    };
+    for (final entry in legacyKeyMap.entries) {
+      if (prefs.containsKey(entry.key)) {
+        final val = prefs.get(entry.key);
+        if (val is String && !prefs.containsKey(entry.value)) {
+          await prefs.setString(entry.value, val);
+        } else if (val is int && !prefs.containsKey(entry.value)) {
+          await prefs.setInt(entry.value, val);
+        }
+        await prefs.remove(entry.key);
+      }
+    }
+  }
+
   /// Checks for pending scrobble from previous session when app was terminated
   Future<void> checkPendingScrobble() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      await _migrateLegacyKeys(prefs);
       final lastId = prefs.getInt(_keyLastScrobbleSong);
       final lastTime = prefs.getInt(_keyLastScrobbleTime);
       final lastPos = prefs.getInt(_keyLastScrobblePos) ?? 0;
@@ -121,9 +151,9 @@ class ScrobblerService {
             (duration > 0 && (lastPos / duration) >= 0.5);
 
         if (isThresholdReached && elapsed < 86400000) {
-          final lastScrobbledKey = prefs.getString('last_scrobble_key');
-          final lastScrobbledTime = prefs.getInt('last_scrobble_time') ??
-              prefs.getInt('last_scrobbled_timestamp') ??
+          final lastScrobbledKey = prefs.getString(_keyLastScrobbledKey);
+          final lastScrobbledTime = prefs.getInt(_keyLastScrobbledTime) ??
+              prefs.getInt(_keyLastScrobbledTimestamp) ??
               0;
           final pendingKey = '${artist}_$track';
           final isDuplicate = (lastScrobbledKey == pendingKey) &&
@@ -140,10 +170,10 @@ class ScrobblerService {
               timestamp: timestamp,
             );
             final nowMs = DateTime.now().millisecondsSinceEpoch;
-            await prefs.setString('last_scrobble_key', pendingKey);
-            await prefs.setInt('last_scrobble_time', nowMs);
-            await prefs.setInt('last_scrobbled_id', lastId);
-            await prefs.setInt('last_scrobbled_timestamp', nowMs);
+            await prefs.setString(_keyLastScrobbledKey, pendingKey);
+            await prefs.setInt(_keyLastScrobbledTime, nowMs);
+            await prefs.setInt(_keyLastScrobbledId, lastId);
+            await prefs.setInt(_keyLastScrobbledTimestamp, nowMs);
           }
         }
       }
@@ -269,9 +299,9 @@ class ScrobblerService {
 
         try {
           final prefs = await SharedPreferences.getInstance();
-          await prefs.setInt('last_scrobbled_id', id);
+          await prefs.setInt(_keyLastScrobbledId, id);
           await prefs.setInt(
-              'last_scrobble_time', DateTime.now().millisecondsSinceEpoch);
+              _keyLastScrobbledTime, DateTime.now().millisecondsSinceEpoch);
           // Clear active session since track scrobbled
           await prefs.remove(_keyLastScrobbleSong);
         } catch (_) {}
@@ -432,8 +462,8 @@ class ScrobblerService {
 
     // Deduplication check
     final dedupKey = '${artist}_$track';
-    final lastScrobbledKey = prefs.getString('last_scrobble_key');
-    final lastScrobbledTime = prefs.getInt('last_scrobble_time') ?? 0;
+    final lastScrobbledKey = prefs.getString(_keyLastScrobbledKey);
+    final lastScrobbledTime = prefs.getInt(_keyLastScrobbledTime) ?? 0;
     final now = DateTime.now().millisecondsSinceEpoch;
 
     if (lastScrobbledKey == dedupKey && (now - lastScrobbledTime) < 300000) {
@@ -622,9 +652,9 @@ class ScrobblerService {
         timestamp: timestamp,
       );
     } else if (!anyFailure) {
-      await prefs.setString('last_scrobble_key', dedupKey);
-      await prefs.setInt('last_scrobble_time', now);
-      await prefs.setInt('last_scrobbled_timestamp', now);
+      await prefs.setString(_keyLastScrobbledKey, dedupKey);
+      await prefs.setInt(_keyLastScrobbledTime, now);
+      await prefs.setInt(_keyLastScrobbledTimestamp, now);
     }
   }
 
@@ -715,8 +745,8 @@ class ScrobblerService {
     final prefs = await SharedPreferences.getInstance();
 
     final dedupKey = '${artist}_$track';
-    final lastScrobbledKey = prefs.getString('last_scrobble_key');
-    final lastScrobbledTime = prefs.getInt('last_scrobble_time') ?? 0;
+    final lastScrobbledKey = prefs.getString(_keyLastScrobbledKey);
+    final lastScrobbledTime = prefs.getInt(_keyLastScrobbledTime) ?? 0;
     final now = DateTime.now().millisecondsSinceEpoch;
 
     if (lastScrobbledKey == dedupKey && (now - lastScrobbledTime) < 300000) {
@@ -794,8 +824,8 @@ class ScrobblerService {
     }
 
     if (anySuccess) {
-      await prefs.setString('last_scrobble_key', dedupKey);
-      await prefs.setInt('last_scrobble_time', now);
+      await prefs.setString(_keyLastScrobbledKey, dedupKey);
+      await prefs.setInt(_keyLastScrobbledTime, now);
     }
   }
 }

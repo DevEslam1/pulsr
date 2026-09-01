@@ -68,7 +68,7 @@ struct PreparedIr {
     static std::shared_ptr<const PreparedIr> createSynthetic(
         double sampleRate, int preset, float damping);
     static std::shared_ptr<const PreparedIr> createCustom(
-        double sampleRate, const float* irInterleaved, int frames, int channels);
+        double sampleRate, const float* irInterleaved, int frames, int channels, double targetRate = 48000.0);
 
     static size_t getSyntheticCacheBytes();
     static size_t getSyntheticCacheEntryCount();

@@ -4,7 +4,7 @@ project("pulsr_dsp")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_compile_options(-O3 -Wall -Wextra)
+add_compile_options(-Wall -Wextra)
 
 # ASan/UBSan need the clang runtime (libclang_rt.asan-<abi>-android.so) to be
 # packaged with the APK - it is not, so enabling this in a normal build makes
@@ -33,6 +33,12 @@ add_library(pulsr_dsp SHARED
     DynamicEQ.cpp
     AudioDspEngine.cpp
     eq_jni_bridge.cpp
+)
+
+target_compile_options(pulsr_dsp PRIVATE
+    $<$<CONFIG:Debug>:-O0 -g>
+    $<$<CONFIG:RelWithDebInfo>:-O2 -g>
+    $<$<CONFIG:Release>:-O3>
 )
 
 find_library(log-lib log)

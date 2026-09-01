@@ -176,13 +176,14 @@ void DynamicEQ::process(float* L, float* R, int frames) {
             // --- Gain computer (frame-consistent, smoothed) ---
             const double envDb = 20.0 * std::log10(envMax + 1e-12);
             const double overDb = envDb - band.thresholdDb;
-            const double targetCut = (overDb > 0.0)
-                ? std::min(-band.maxCutDb, band.ratio * overDb)
+            const double maxCutDepth = -band.maxCutDb; // positive depth magnitude (e.g. 12 dB for maxCutDb = -12 dB)
+            const double targetCutDb = (overDb > 0.0)
+                ? -std::min(maxCutDepth, band.ratio * overDb)
                 : 0.0;
-            const double cutCoeff = (targetCut > band.currentCutDb) ? attackCoeff : releaseCoeff;
-            band.currentCutDb += cutCoeff * (targetCut - band.currentCutDb);
+            const double cutCoeff = (targetCutDb < band.currentCutDb) ? attackCoeff : releaseCoeff;
+            band.currentCutDb += cutCoeff * (targetCutDb - band.currentCutDb);
 
-            // --- Application (peaking gain = -currentCutDb) ---
+            // --- Application (peaking gain = currentCutDb <= 0) ---
             if (std::abs(band.currentCutDb - band.lastCoeffGainDb) > 0.05) {
                 computeBandCoeffs(band, band.currentCutDb);
             }
@@ -256,11 +257,12 @@ void DynamicEQ::processInterleaved(float* buffer, int frames, int channels) {
 
             const double envDb = 20.0 * std::log10(envMax + 1e-12);
             const double overDb = envDb - band.thresholdDb;
-            const double targetCut = (overDb > 0.0)
-                ? std::min(-band.maxCutDb, band.ratio * overDb)
+            const double maxCutDepth = -band.maxCutDb;
+            const double targetCutDb = (overDb > 0.0)
+                ? -std::min(maxCutDepth, band.ratio * overDb)
                 : 0.0;
-            const double cutCoeff = (targetCut > band.currentCutDb) ? attackCoeff : releaseCoeff;
-            band.currentCutDb += cutCoeff * (targetCut - band.currentCutDb);
+            const double cutCoeff = (targetCutDb < band.currentCutDb) ? attackCoeff : releaseCoeff;
+            band.currentCutDb += cutCoeff * (targetCutDb - band.currentCutDb);
 
             if (std::abs(band.currentCutDb - band.lastCoeffGainDb) > 0.05) {
                 computeBandCoeffs(band, band.currentCutDb);

@@ -88,15 +88,10 @@ class YtmService {
   static const Duration _defaultSearchTimeout = Duration(seconds: 25);
 
   // Tier-1 (account) deadline for direct authenticated Innertube playback.
-  // Raised to 12s: 8s was too tight on slow/VPN networks for the account
-  // client chain (WEB_REMIX → ANDROID_VR → …) to complete even one client
-  // attempt, causing unnecessary fallthrough to tier-2.
-  static const Duration _tier1Deadline = Duration(seconds: 12);
+  static const Duration _tier1Deadline = Duration(seconds: 20);
 
-  // TTFA hard budget for the native ladder (tier-2). Raised to 12s for the
-  // same reason — the Kotlin-side ladder has per-client timeouts; the 8s
-  // outer cap was racing against them on slower connections.
-  static const Duration _resolveFirstAttemptTimeout = Duration(seconds: 12);
+  // TTFA hard budget for the native ladder (tier-2).
+  static const Duration _resolveFirstAttemptTimeout = Duration(seconds: 20);
 
   /// TTFA: device-level negative cache — when the native ladder returns
   /// LOGIN_REQUIRED or BotChallenge from every client, the block is at the

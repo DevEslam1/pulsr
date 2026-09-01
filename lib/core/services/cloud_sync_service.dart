@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../data/db/app_database.dart';
 import '../../domain/models/ytm_track.dart';
 import '../../domain/repositories/music_repository_interface.dart';
+import '../constants/prefs_keys.dart';
 import '../utils/error_logger.dart';
 import 'auth_service.dart';
 
@@ -39,9 +40,11 @@ class CloudSyncService {
     this._db,
   );
 
-  static const String _keyLastSync = 'cloud_sync_last_timestamp';
-  static const String _keySyncFavorites = 'cloud_sync_favorites_enabled';
-  static const String _keySyncPlaylists = 'cloud_sync_playlists_enabled';
+  // FIX(B3): Canonical PrefsKeys for cloud sync
+  static const String _keyLastSync = PrefsKeys.cloudSyncLastTimestamp;
+  static const String _keySyncFavorites = PrefsKeys.cloudSyncFavoritesEnabled;
+  static const String _keySyncPlaylists = PrefsKeys.cloudSyncPlaylistsEnabled;
+  static const String _keySyncedHashes = PrefsKeys.cloudSyncDocHashes;
 
   Future<SharedPreferences> _getPrefs() async {
     _prefs ??= await SharedPreferences.getInstance();
@@ -82,10 +85,12 @@ class CloudSyncService {
     if (song.remoteId != null && song.remoteId!.isNotEmpty) {
       return 'yt_${song.remoteId}';
     }
-    // NFC normalize for cross-platform (macOS NFD vs Linux NFC)
+    // FIX(B3): Hash metadata (title|artist|album|durationMs) instead of path so renames/moves do not create duplicate Firestore docs
     final normTitle = song.title.trim().toLowerCase();
     final normArtist = song.artist.trim().toLowerCase();
-    final raw = '${song.path}|$normTitle|$normArtist';
+    final normAlbum = song.album.trim().toLowerCase();
+    final durationMs = song.durationMs;
+    final raw = '$normTitle|$normArtist|$normAlbum|$durationMs';
     return sha256.convert(utf8.encode(raw)).toString();
   }
 
@@ -93,8 +98,6 @@ class CloudSyncService {
     final raw = '${pl.name.trim().toLowerCase()}|${pl.isSmart}';
     return sha256.convert(utf8.encode(raw)).toString();
   }
-
-  static const String _keySyncedHashes = 'cloud_sync_doc_hashes_v1';
 
   Future<void> _restoreHashes() async {
     try {
@@ -177,8 +180,12 @@ class CloudSyncService {
 
       for (final song in localFavorites) {
         final docId = _stableSongId(song);
+        final isLocalSong = song.source == SongSource.local ||
+            (song.remoteId == null || song.remoteId!.isEmpty);
+        // FIX(B3): Exclude path from payload hash and payload data for local songs
+        final effectivePathForHash = isLocalSong ? '' : song.path;
         final payloadRaw =
-            '${song.title}|${song.artist}|${song.album}|${song.durationMs}|${song.path}|${song.remoteId}|${song.remoteArtworkUrl}|${song.source}|true';
+            '${song.title}|${song.artist}|${song.album}|${song.durationMs}|$effectivePathForHash|${song.remoteId}|${song.remoteArtworkUrl}|${song.source}|true';
         final hash = sha256.convert(utf8.encode(payloadRaw)).toString();
 
         if (_syncedDocHashes[docId] == hash) {
@@ -186,10 +193,9 @@ class CloudSyncService {
         }
 
         final ref = favCollection.doc(docId);
-        // Privacy: hash local file paths, keep remoteId for YTM (path is PII)
-        final isLocalPath = song.path.startsWith('/') && song.remoteId == null;
-        final sanitizedPath = isLocalPath ? null : song.path;
-        final pathHash = isLocalPath ? sha256.convert(utf8.encode(song.path)).toString() : null;
+        // Privacy: keep path null for locals, keep remoteId for YTM
+        final sanitizedPath = isLocalSong ? null : song.path;
+        final pathHash = isLocalSong ? sha256.convert(utf8.encode(song.path)).toString() : null;
         currentBatch.set(
             ref,
             {
@@ -252,13 +258,16 @@ class CloudSyncService {
         final pSongs = songsRes.fold((l) => <SongsTableData>[], (r) => r);
         for (final song in pSongs) {
           final songDocId = _stableSongId(song);
+          final isLocalSong = song.source == SongSource.local ||
+              (song.remoteId == null || song.remoteId!.isEmpty);
+          final effectivePathForHash = isLocalSong ? '' : song.path;
           final songPayloadRaw =
-              '${song.title}|${song.artist}|${song.album}|${song.path}|${song.remoteId}|${song.remoteArtworkUrl}|${song.durationMs}|${song.source}';
+              '${song.title}|${song.artist}|${song.album}|$effectivePathForHash|${song.remoteId}|${song.remoteArtworkUrl}|${song.durationMs}|${song.source}';
           final sHash = sha256.convert(utf8.encode(songPayloadRaw)).toString();
           final fullKey = '${plDocId}_$songDocId';
 
           if (_syncedDocHashes[fullKey] != sHash) {
-            final isLocalSongPath = song.path.startsWith('/') && song.remoteId == null;
+            final sanitizedPath = isLocalSong ? null : song.path;
             currentBatch.set(
                 plDoc.collection('songs').doc(songDocId),
                 {
@@ -266,8 +275,8 @@ class CloudSyncService {
                   'title': song.title,
                   'artist': song.artist,
                   'album': song.album,
-                  'path': isLocalSongPath ? null : song.path,
-                  'pathHash': isLocalSongPath ? sha256.convert(utf8.encode(song.path)).toString() : null,
+                  'path': sanitizedPath,
+                  'pathHash': isLocalSong ? sha256.convert(utf8.encode(song.path)).toString() : null,
                   'remoteId': song.remoteId,
                   'remoteArtworkUrl': song.remoteArtworkUrl,
                   'durationMs': song.durationMs,

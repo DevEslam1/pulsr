@@ -39,21 +39,6 @@ void StereoWidth::processInterleaved(float* buffer, int frames, int channels) {
     if (std::abs(width_ - 1.0) < 1e-9) return;
 
     const float w = static_cast<float>(width_);
-    if (channels % 2 != 0) {
-        // Odd channel count: process first 2 channels as stereo, pass remaining channels unchanged
-        for (int i = 0; i < frames; ++i) {
-            const float l = buffer[i * channels];
-            const float r = buffer[i * channels + 1];
-            const float mid = 0.5f * (l + r);
-            const float side = 0.5f * (l - r);
-            buffer[i * channels] = mid + w * side;
-            buffer[i * channels + 1] = mid - w * side;
-        }
-        return;
-    }
-
-    // Process channel pairs (0/1, 2/3, …) so multichannel layouts keep
-    // their stereo pairs coherent.
     for (int i = 0; i < frames; ++i) {
         for (int ch = 0; ch + 1 < channels; ch += 2) {
             const float l = buffer[i * channels + ch];

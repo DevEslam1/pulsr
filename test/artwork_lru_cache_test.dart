@@ -5,6 +5,12 @@ import 'package:pulsr/core/widgets/cached_artwork.dart';
 
 void main() {
   group('ArtworkLruCache Unit Tests', () {
+    setUp(() {
+      final cache = ArtworkLruCache();
+      cache.maxCapacity = 200;
+      cache.clear();
+    });
+
     test('Stores and retrieves artwork bytes', () {
       final cache = ArtworkLruCache.withCapacity(5);
       final sampleBytes = Uint8List.fromList([1, 2, 3, 4]);

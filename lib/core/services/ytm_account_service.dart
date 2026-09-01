@@ -109,6 +109,21 @@ class YtmAccountService {
   /// `visitorData` harvested from an authenticated response; sent in the WEB_REMIX player context.
   String? _sessionVisitorData;
 
+  /// Timestamp of the most recent successful [saveSession] call. Used to
+  /// suppress false-positive auth-expiry signals during the post-login window
+  /// (cookie propagation + poToken minting lag can cause WEB_REMIX to return
+  /// LOGIN_REQUIRED for ~10-20 s right after a fresh login).
+  DateTime? _sessionSavedAt;
+
+  /// Returns true when we are inside the 30-second grace window after a
+  /// fresh login, during which LOGIN_REQUIRED signals should NOT trigger a
+  /// logout or an auth-expiry notification.
+  bool get _inPostLoginGrace {
+    final saved = _sessionSavedAt;
+    if (saved == null) return false;
+    return DateTime.now().difference(saved).inSeconds < 30;
+  }
+
   /// Coalesces concurrent liked-songs imports so UI + background callers share
   /// a single pagination ladder instead of burning the BROWSE rate-limiter
   /// bucket with duplicate 20-page fetches.
@@ -282,6 +297,9 @@ class YtmAccountService {
   /// Saves extracted web cookies, warms the session, and triggers fresh attestation.
   Future<bool> saveSession(String rawCookies) async {
     _cookies = rawCookies;
+    // Stamp the login time BEFORE the warm request fires so the grace window
+    // is active during any concurrent resolvePlayerStream calls.
+    _sessionSavedAt = DateTime.now();
     await _persistCookies(rawCookies);
 
     // Sync to native CookieManager and invalidate stale poTokens
@@ -306,6 +324,7 @@ class YtmAccountService {
     );
     return true;
   }
+
 
   Future<void> logout() async {
     _cookies = null;
@@ -395,6 +414,17 @@ class YtmAccountService {
       if (res.statusCode == 200) {
         final json = jsonDecode(res.body) as Map<String, dynamic>;
         if (_isUnauthenticatedResponse(json)) {
+          // During the post-login grace window (≤30 s after saveSession) the
+          // warm request may race cookie propagation and return unauthenticated
+          // even though the session is valid. Suppress the auth-expiry signal
+          // so the user isn't incorrectly kicked back to the login sheet.
+          if (_inPostLoginGrace) {
+            debugPrint(
+              '[YTM_ACCOUNT] Warm-session unauthenticated response suppressed '
+              '(within 30 s post-login grace window) — session kept.',
+            );
+            return;
+          }
           debugPrint(
             '[YTM_ACCOUNT] Warmed session returned unauthenticated — keeping session, notifying expiry check',
           );
@@ -414,6 +444,7 @@ class YtmAccountService {
       debugPrint('[YTM_ACCOUNT] Session warming error (non-fatal): $e');
     }
   }
+
 
   /// Splits a (possibly comma-merged) Set-Cookie header into individual
   /// cookies without breaking on `Expires=Wed, 21 Oct ...` dates: a comma only
@@ -1425,13 +1456,14 @@ class YtmAccountService {
         } catch (e) {
           debugPrint('[YTM_ACCOUNT] Account poToken minting failed: $e');
         }
+      } else {
+        visitorData = _sessionVisitorData;
       }
-    }
-    if (poToken == null || poToken.isEmpty) {
+    } else {
       try {
         final poState = await getIt<YtmService>().getPoTokenState();
         poToken = poState?['streamingPoToken'] as String?;
-        visitorData ??= poState?['visitorData'] as String?;
+        visitorData = poState?['visitorData'] as String?;
       } catch (_) {}
     }
     // Diagnostics: every bot-gate log below reports whether a token was
@@ -1443,25 +1475,15 @@ class YtmAccountService {
         isAuthenticated
             ? [
               'WEB_REMIX', // cookies + poToken → most reliable
-              'ANDROID_VR', // still works for some content unauthenticated
-              'ANDROID_MUSIC', // now needs cookies (sent below)
+              'ANDROID_VR', // fallback unauthenticated
               'IOS_MUSIC',
-              'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
-              'WEB_EMBEDDED_PLAYER',
-              'MWEB',
-              'ANDROID_CREATOR',
-              'ANDROID_TESTSUITE',
+              'ANDROID_MUSIC',
             ]
             : [
               'ANDROID_VR',
-              'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
-              'WEB_REMIX',
-              'WEB_EMBEDDED_PLAYER',
-              'MWEB',
-              'ANDROID_MUSIC',
               'IOS_MUSIC',
-              'ANDROID_CREATOR',
-              'ANDROID_TESTSUITE',
+              'ANDROID_MUSIC',
+              'WEB_REMIX',
             ];
 
     for (final client in clientChain) {
@@ -1544,11 +1566,6 @@ class YtmAccountService {
           }
         } else {
           headers['X-Origin'] = endpointHost;
-          if ((client == 'ANDROID_MUSIC' || client == 'IOS_MUSIC') &&
-              _cookies != null &&
-              _cookies!.isNotEmpty) {
-            headers['Cookie'] = _cookies!;
-          }
         }
 
         final clientContext = _buildClientContext(client, videoId);
@@ -1614,10 +1631,28 @@ class YtmAccountService {
               final isBotChallenge =
                   reason.contains('bot') || reason.contains('confirm');
               if (!isBotChallenge) {
+                // During the post-login grace window (≤30 s) the WEB_REMIX
+                // player request can return LOGIN_REQUIRED because the poToken
+                // hasn't been minted for the new account yet, or because the
+                // cookies haven't fully propagated to the YTM domain. Treat
+                // this as a transient failure and fall through to the next
+                // client instead of wiping the session that was JUST saved.
+                if (_inPostLoginGrace) {
+                  debugPrint(
+                    '[YTM_ACCOUNT] WEB_REMIX LOGIN_REQUIRED suppressed '
+                    '(within 30 s post-login grace window) — trying next client.',
+                  );
+                  continue;
+                }
+                // Genuine session expiry outside the grace window: notify the
+                // UI so the user gets the re-login snackbar. Do NOT call
+                // logout() here — that races with saveSession() on fresh logins
+                // and wipes valid cookies. The session will be cleaned up via
+                // the normal logout flow when the user explicitly signs out or
+                // when the app validates the session on the next cold start.
                 debugPrint(
-                  '[YTM_ACCOUNT] Session expired detected on WEB_REMIX. Clearing cookies and notifying UI.',
+                  '[YTM_ACCOUNT] Session expired detected on WEB_REMIX. Notifying UI.',
                 );
-                unawaited(logout());
                 try {
                   getIt<YtmService>().notifyAuthExpired();
                 } catch (_) {}
@@ -1632,6 +1667,7 @@ class YtmAccountService {
               );
             }
             continue;
+
           }
 
           final streamingData = data['streamingData'] as Map<String, dynamic>?;

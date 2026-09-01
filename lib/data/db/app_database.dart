@@ -29,16 +29,15 @@ class AppDatabase extends _$AppDatabase {
   @override
   int get schemaVersion => 10;
 
-  static Future<void> _createFtsTable(
+  static Future<void> _dropLegacyFtsTable(
       Future<void> Function(String) executeSql) async {
-    await executeSql(
-        "CREATE VIRTUAL TABLE IF NOT EXISTS songs_fts USING fts5(title, artist, album, content='songs', content_rowid='id', tokenize='unicode61 remove_diacritics 1');");
-    await executeSql(
-        "CREATE TRIGGER IF NOT EXISTS songs_fts_insert AFTER INSERT ON songs BEGIN INSERT INTO songs_fts(rowid, title, artist, album) VALUES (new.id, new.title, new.artist, new.album); END;");
-    await executeSql(
-        "CREATE TRIGGER IF NOT EXISTS songs_fts_delete AFTER DELETE ON songs BEGIN INSERT INTO songs_fts(songs_fts, rowid, title, artist, album) VALUES('delete', old.id, old.title, old.artist, old.album); END;");
-    await executeSql(
-        "CREATE TRIGGER IF NOT EXISTS songs_fts_update AFTER UPDATE OF title, artist, album ON songs BEGIN INSERT INTO songs_fts(songs_fts, rowid, title, artist, album) VALUES('delete', old.id, old.title, old.artist, old.album); INSERT INTO songs_fts(rowid, title, artist, album) VALUES (new.id, new.title, new.artist, new.album); END;");
+    // FIX(D2): Option A - Fully remove legacy FTS virtual table & triggers as search uses indexed LIKE with ESCAPE
+    try {
+      await executeSql("DROP TRIGGER IF EXISTS songs_fts_insert;");
+      await executeSql("DROP TRIGGER IF EXISTS songs_fts_delete;");
+      await executeSql("DROP TRIGGER IF EXISTS songs_fts_update;");
+      await executeSql("DROP TABLE IF EXISTS songs_fts;");
+    } catch (_) {}
   }
 
   static Future<void> _createIndexes(
@@ -100,86 +99,82 @@ class AppDatabase extends _$AppDatabase {
           await m.createAll();
           await _createIndexes(customStatement);
           await _createRemoteSourceIndexes(customStatement);
-          await _createFtsTable(customStatement);
+          await _dropLegacyFtsTable(customStatement);
         },
         onUpgrade: (Migrator m, int from, int to) async {
-          if (from < 2) {
-            await m.createTable(excludedFoldersTable);
-          }
-          if (from < 4) {
-            await m.addColumn(songsTable, songsTable.isMissing);
-          }
-          if (from < 5) {
-            await m.addColumn(songsTable, songsTable.source);
-            await m.addColumn(songsTable, songsTable.remoteId);
-            await m.addColumn(songsTable, songsTable.remoteArtworkUrl);
-            await m.addColumn(songsTable, songsTable.pendingDownloadPath);
-          }
-          if (from < 6) {
-            await m.addColumn(songsTable, songsTable.sampleRate);
-            await m.addColumn(songsTable, songsTable.bitDepth);
-            await m.addColumn(songsTable, songsTable.bitrateKbps);
-            await m.addColumn(songsTable, songsTable.codec);
-          }
-          Future<bool> hasColumn(String table, String column) async {
-            try {
-              final rows =
-                  await customSelect('PRAGMA table_info($table);').get();
-              return rows.any((r) => r.data['name'] == column);
-            } catch (_) {
-              return false; // Table doesn't exist yet
+          // FIX(BUG-26): Guard onUpgrade migrations so they only run when strictly upgrading
+          if (from < to) {
+            if (from < 2) {
+              await m.createTable(excludedFoldersTable);
             }
-          }
-
-          if (from < 7) {
-            if (!await hasColumn('songs', 'replay_gain_track')) {
-              await m.addColumn(songsTable, songsTable.replayGainTrack);
+            if (from < 4) {
+              await m.addColumn(songsTable, songsTable.isMissing);
             }
-            if (!await hasColumn('songs', 'replay_gain_album')) {
-              await m.addColumn(songsTable, songsTable.replayGainAlbum);
+            if (from < 5) {
+              await m.addColumn(songsTable, songsTable.source);
+              await m.addColumn(songsTable, songsTable.remoteId);
+              await m.addColumn(songsTable, songsTable.remoteArtworkUrl);
+              await m.addColumn(songsTable, songsTable.pendingDownloadPath);
             }
-            if (!await hasColumn('songs', 'replay_gain_track_peak')) {
-              await m.addColumn(songsTable, songsTable.replayGainTrackPeak);
+            if (from < 6) {
+              await m.addColumn(songsTable, songsTable.sampleRate);
+              await m.addColumn(songsTable, songsTable.bitDepth);
+              await m.addColumn(songsTable, songsTable.bitrateKbps);
+              await m.addColumn(songsTable, songsTable.codec);
             }
-            if (!await hasColumn('songs', 'replay_gain_album_peak')) {
-              await m.addColumn(songsTable, songsTable.replayGainAlbumPeak);
-            }
-            if (!await hasColumn('songs', 'is_downloaded')) {
-              await m.addColumn(songsTable, songsTable.isDownloaded);
-            }
-            try {
-              if (await hasColumn('songs', 'replay_gain')) {
-                await customStatement(
-                    'UPDATE songs SET replay_gain_track = replay_gain WHERE replay_gain IS NOT NULL;');
+            Future<bool> hasColumn(String table, String column) async {
+              try {
+                final rows =
+                    await customSelect('PRAGMA table_info($table);').get();
+                return rows.any((r) => r.data['name'] == column);
+              } catch (_) {
+                return false; // Table doesn't exist yet
               }
-            } catch (_) {}
-          }
-          if (from < 8) {
-            if (!await hasColumn('songs', 'loudness_range')) {
-              await m.addColumn(songsTable, songsTable.loudnessRange);
             }
-          }
-          if (from < 9) {
-            await _createFtsTable(customStatement);
-            try {
-              await customStatement(
-                  "INSERT INTO songs_fts(songs_fts) VALUES('rebuild');");
-            } catch (_) {}
-          }
-          if (from < 10) {
-            // Add NOCASE path index for duplicate prevention (10/10 hardening)
-            try {
-              await customStatement(
-                  "CREATE INDEX IF NOT EXISTS idx_songs_path_nocase ON songs (path COLLATE NOCASE) WHERE path != '' AND path NOT LIKE 'ytmusic://%';");
-            } catch (_) {}
-            // FTS rebuild is cheap and fixes any corrupt trigger from v9
-            try {
-              await customStatement(
-                  "INSERT INTO songs_fts(songs_fts) VALUES('rebuild');");
-            } catch (_) {}
+
+            if (from < 7) {
+              if (!await hasColumn('songs', 'replay_gain_track')) {
+                await m.addColumn(songsTable, songsTable.replayGainTrack);
+              }
+              if (!await hasColumn('songs', 'replay_gain_album')) {
+                await m.addColumn(songsTable, songsTable.replayGainAlbum);
+              }
+              if (!await hasColumn('songs', 'replay_gain_track_peak')) {
+                await m.addColumn(songsTable, songsTable.replayGainTrackPeak);
+              }
+              if (!await hasColumn('songs', 'replay_gain_album_peak')) {
+                await m.addColumn(songsTable, songsTable.replayGainAlbumPeak);
+              }
+              if (!await hasColumn('songs', 'is_downloaded')) {
+                await m.addColumn(songsTable, songsTable.isDownloaded);
+              }
+              try {
+                if (await hasColumn('songs', 'replay_gain')) {
+                  await customStatement(
+                      'UPDATE songs SET replay_gain_track = replay_gain WHERE replay_gain IS NOT NULL;');
+                }
+              } catch (_) {}
+            }
+            if (from < 8) {
+              if (!await hasColumn('songs', 'loudness_range')) {
+                await m.addColumn(songsTable, songsTable.loudnessRange);
+              }
+            }
+            if (from < 9) {
+              await _dropLegacyFtsTable(customStatement);
+            }
+            if (from < 10) {
+              // Add NOCASE path index for duplicate prevention (10/10 hardening)
+              try {
+                await customStatement(
+                    "CREATE INDEX IF NOT EXISTS idx_songs_path_nocase ON songs (path COLLATE NOCASE) WHERE path != '' AND path NOT LIKE 'ytmusic://%';");
+              } catch (_) {}
+              await _dropLegacyFtsTable(customStatement);
+            }
           }
           await _createIndexes(customStatement);
           await _createRemoteSourceIndexes(customStatement);
+          await _dropLegacyFtsTable(customStatement);
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON;');

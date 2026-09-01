@@ -33,79 +33,35 @@ void AudioDspEngine::setSampleRateInternal(double sampleRate) {
     dynamicEq_.setSampleRate(sampleRate_);
 }
 
+void AudioDspEngine::applySampleRateLocked(double sampleRate) {
+    auto current = currentParams_.load();
+    const bool wasCustom = (current->reverb.preset == static_cast<int>(ReverbPreset::Custom));
+    std::shared_ptr<const PreparedIr> prewarmedIr = nullptr;
+    if (!wasCustom && current->reverb.enabled) {
+        prewarmedIr = PreparedIr::createSynthetic(
+            sampleRate,
+            current->reverb.preset,
+            static_cast<float>(current->reverb.damping));
+    } else {
+        prewarmedIr = current->reverb.preparedIr;
+    }
+
+    auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->generation = ++snapshotGeneration_;
+    updated->sampleRate = sampleRate;
+    updated->resetRequested = false; // Never wipe state on rate transitions
+    if (current->reverb.enabled && prewarmedIr) {
+        updated->reverb.preparedIr = prewarmedIr;
+    }
+    currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(updated));
+}
+
 void AudioDspEngine::setSampleRate(double sampleRate) {
     if (sampleRate < 8000.0) sampleRate = 8000.0;
     if (sampleRate > 768000.0) sampleRate = 768000.0;
 
-    // A1 (N-01): Bounded retry (max 2 attempts) to prewarm outside the lock.
-    // If snapshot mutated while prewarming (e.g. preset/damping changed), release lock and
-    // re-prewarm for the new parameters at the new sample rate.
-    // On second conflict, publish without an IR swap and schedule one async re-prewarm.
-    for (int attempt = 0; attempt < 2; ++attempt) {
-        auto initial = currentParams_.load();
-        const bool wasCustom = (initial->reverb.preset == static_cast<int>(ReverbPreset::Custom));
-        std::shared_ptr<const PreparedIr> prewarmedIr = nullptr;
-        if (!wasCustom) {
-            prewarmedIr = PreparedIr::createSynthetic(
-                sampleRate,
-                initial->reverb.preset,
-                static_cast<float>(initial->reverb.damping));
-        } else {
-            prewarmedIr = initial->reverb.preparedIr;
-        }
-
-        std::unique_lock<std::mutex> lock(publishMutex_);
-        auto current = currentParams_.load();
-        const bool nowCustom = (current->reverb.preset == static_cast<int>(ReverbPreset::Custom));
-
-        if (!nowCustom && current != initial &&
-            (current->reverb.preset != initial->reverb.preset ||
-             std::abs(current->reverb.damping - initial->reverb.damping) > 1e-9)) {
-            if (attempt == 0) {
-                // First conflict: unlock and re-prewarm with the new reverb params
-                lock.unlock();
-                continue;
-            } else {
-                // Second conflict: publish preserving current IR and schedule one async re-prewarm
-                const int targetPreset = current->reverb.preset;
-                const double targetDamping = current->reverb.damping;
-                auto updated = std::make_shared<DspParamSnapshot>(*current);
-                updated->generation = ++snapshotGeneration_;
-                updated->sampleRate = sampleRate;
-                updated->reverb.preparedIr = current->reverb.preparedIr;
-                currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(updated));
-                lock.unlock();
-
-                std::thread([this, sampleRate, targetPreset, targetDamping]() {
-                    auto asyncIr = PreparedIr::createSynthetic(sampleRate, targetPreset, static_cast<float>(targetDamping));
-                    if (asyncIr) {
-                        std::lock_guard<std::mutex> asyncLock(publishMutex_);
-                        auto latest = currentParams_.load();
-                        if (latest && latest->sampleRate == sampleRate &&
-                            latest->reverb.preset == targetPreset &&
-                            std::abs(latest->reverb.damping - targetDamping) < 1e-9) {
-                            auto newSnap = std::make_shared<DspParamSnapshot>(*latest);
-                            newSnap->generation = ++snapshotGeneration_;
-                            newSnap->reverb.preparedIr = asyncIr;
-                            currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(newSnap));
-                        }
-                    }
-                }).detach();
-                return;
-            }
-        }
-
-        if (nowCustom) {
-            prewarmedIr = current->reverb.preparedIr;
-        }
-
-        auto updated = std::make_shared<DspParamSnapshot>(*current);
-        updated->generation = ++snapshotGeneration_;
-        updated->sampleRate = sampleRate;
-        updated->reverb.preparedIr = prewarmedIr;
-        currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(updated));
-        return;
-    }
+    std::unique_lock<std::mutex> lock(publishMutex_);
+    applySampleRateLocked(sampleRate);
 }
 
 void AudioDspEngine::resyncForTrack(double sampleRate, int channels) {
@@ -113,89 +69,25 @@ void AudioDspEngine::resyncForTrack(double sampleRate, int channels) {
     if (sampleRate < 8000.0) sampleRate = 8000.0;
     if (sampleRate > 768000.0) sampleRate = 768000.0;
 
-    for (int attempt = 0; attempt < 2; ++attempt) {
-        auto initial = currentParams_.load();
-        const bool wasCustom = (initial->reverb.preset == static_cast<int>(ReverbPreset::Custom));
-        std::shared_ptr<const PreparedIr> prewarmedIr = nullptr;
-        if (!wasCustom && initial->reverb.enabled) {
-            prewarmedIr = PreparedIr::createSynthetic(
-                sampleRate,
-                initial->reverb.preset,
-                static_cast<float>(initial->reverb.damping));
-        } else if (wasCustom) {
-            prewarmedIr = initial->reverb.preparedIr;
-        }
-
-        std::unique_lock<std::mutex> lock(publishMutex_);
-        auto current = currentParams_.load();
-        const bool nowCustom = (current->reverb.preset == static_cast<int>(ReverbPreset::Custom));
-
-        if (!nowCustom && current->reverb.enabled && current != initial &&
-            (current->reverb.preset != initial->reverb.preset ||
-             std::abs(current->reverb.damping - initial->reverb.damping) > 1e-9 ||
-             current->reverb.enabled != initial->reverb.enabled)) {
-            if (attempt == 0) {
-                // First conflict: release lock and re-prewarm with the new parameters
-                lock.unlock();
-                continue;
-            } else {
-                // Second conflict: install current IR and schedule one async re-prewarm
-                const int targetPreset = current->reverb.preset;
-                const double targetDamping = current->reverb.damping;
-                auto updated = std::make_shared<DspParamSnapshot>(*current);
-                updated->generation = ++snapshotGeneration_;
-                updated->sampleRate = sampleRate;
-                updated->resetRequested = false;
-                updated->reverb.preparedIr = current->reverb.preparedIr;
-                currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(updated));
-                lock.unlock();
-
-                std::thread([this, sampleRate, targetPreset, targetDamping]() {
-                    auto asyncIr = PreparedIr::createSynthetic(sampleRate, targetPreset, static_cast<float>(targetDamping));
-                    if (asyncIr) {
-                        std::lock_guard<std::mutex> asyncLock(publishMutex_);
-                        auto latest = currentParams_.load();
-                        if (latest && latest->sampleRate == sampleRate &&
-                            latest->reverb.preset == targetPreset &&
-                            std::abs(latest->reverb.damping - targetDamping) < 1e-9) {
-                            auto newSnap = std::make_shared<DspParamSnapshot>(*latest);
-                            newSnap->generation = ++snapshotGeneration_;
-                            newSnap->reverb.preparedIr = asyncIr;
-                            currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(newSnap));
-                        }
-                    }
-                }).detach();
-                return;
-            }
-        }
-
-        if (nowCustom) {
-            prewarmedIr = current->reverb.preparedIr;
-        } else if (!current->reverb.enabled) {
-            prewarmedIr = nullptr;
-        }
-
-        auto updated = std::make_shared<DspParamSnapshot>(*current);
-        updated->generation = ++snapshotGeneration_;
-        updated->sampleRate = sampleRate;
-        updated->resetRequested = false; // Do not wipe filter state on seamless track resync
-
-        if (current->reverb.enabled) {
-            updated->reverb.preparedIr = prewarmedIr;
-        }
-
-        currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(updated));
-        return;
-    }
+    std::unique_lock<std::mutex> lock(publishMutex_);
+    applySampleRateLocked(sampleRate);
 }
 
-void AudioDspEngine::setActiveStages(uint32_t bitmask) {
+void AudioDspEngine::updateParams(SnapshotMutator mutator) {
+    if (!mutator) return;
     std::lock_guard<std::mutex> lock(publishMutex_);
     auto current = currentParams_.load();
     auto updated = std::make_shared<DspParamSnapshot>(*current);
+    updated->resetRequested = false; // Clear reset by default so reset() only fires once
+    mutator(*updated);
     updated->generation = ++snapshotGeneration_;
-    updated->activeStages = bitmask;
     currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(updated));
+}
+
+void AudioDspEngine::setActiveStages(uint32_t bitmask) {
+    updateParams([bitmask](DspParamSnapshot& snap) {
+        snap.activeStages = bitmask;
+    });
 }
 
 uint32_t AudioDspEngine::getActiveStages() const {
@@ -206,14 +98,9 @@ uint32_t AudioDspEngine::getActiveStages() const {
 void AudioDspEngine::publishParams(std::shared_ptr<const DspParamSnapshot> snapshot) {
     if (!snapshot) return;
     std::lock_guard<std::mutex> lock(publishMutex_);
-    if (snapshot->generation <= lastAppliedGeneration_.load()) {
-        auto mutableSnap = std::make_shared<DspParamSnapshot>(*snapshot);
-        mutableSnap->generation = ++snapshotGeneration_;
-        currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(mutableSnap));
-    } else {
-        snapshotGeneration_.store(snapshot->generation);
-        currentParams_.store(snapshot);
-    }
+    auto mutableSnap = std::make_shared<DspParamSnapshot>(*snapshot);
+    mutableSnap->generation = ++snapshotGeneration_;
+    currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(mutableSnap));
 }
 
 std::shared_ptr<const DspParamSnapshot> AudioDspEngine::getParams() const {
@@ -236,12 +123,9 @@ void AudioDspEngine::resetInternal() {
 }
 
 void AudioDspEngine::reset() {
-    std::lock_guard<std::mutex> lock(publishMutex_);
-    auto current = currentParams_.load();
-    auto updated = std::make_shared<DspParamSnapshot>(*current);
-    updated->generation = ++snapshotGeneration_;
-    updated->resetRequested = true;
-    currentParams_.store(std::const_pointer_cast<const DspParamSnapshot>(updated));
+    updateParams([](DspParamSnapshot& snap) {
+        snap.resetRequested = true;
+    });
 }
 
 int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) {
@@ -261,14 +145,19 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
 
         reverb_.applyParams(snapshot->reverb);
         if (std::abs(snapshot->sampleRate - sampleRate_) > 0.5) {
-            setSampleRateInternal(snapshot->sampleRate);
-            reverb_.setSampleRate(snapshot->sampleRate);
+            sampleRate_ = snapshot->sampleRate;
+            eq_.setSampleRate(sampleRate_);
+            crossfeed_.setSampleRate(sampleRate_);
+            limiter_.setSampleRate(sampleRate_);
+            saturation_.setSampleRate(sampleRate_);
+            loudnessContour_.setSampleRate(sampleRate_);
+            subCrossover_.setSampleRate(sampleRate_);
+            dynamicEq_.setSampleRate(sampleRate_);
         }
 
         eq_.applyParams(snapshot->eq);
         panner_.applyParams(snapshot->panner);
         crossfeed_.applyParams(snapshot->crossfeed);
-        resampler_.applyParams(snapshot->resampler);
         limiter_.applyParams(snapshot->limiter);
         saturation_.applyParams(snapshot->saturation);
         stereoWidth_.applyParams(snapshot->stereoWidth);
@@ -326,19 +215,14 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             subCrossover_.processInterleaved(buffer, frames, channels);
         }
 
-        // 9. Polyphase Sinc Resampler (Fixed-frame streaming contract)
-        if ((stages & STAGE_RESAMPLER) && std::abs(resampler_.getRatio() - 1.0) > 1e-5) {
-            resampler_.processInterleaved(buffer, frames, channels);
-        }
-
-        // 10. Loudness Contour Stage — computed against the current volume-stage
-        //     value (pushed from Dart). Applied pre-limiter so the limiter still
-        //     guards the contour-boosted peaks.
+        // 9. Loudness Contour Stage — computed against the current volume-stage
+        //    value (pushed from Dart). Applied pre-limiter so the limiter still
+        //    guards the contour-boosted peaks.
         if (stages & STAGE_LOUDNESS) {
             loudnessContour_.processInterleaved(buffer, frames, channels);
         }
 
-        // 11. Lookahead Limiter Stage (Multichannel / stereo / mono) — true-peak limiter is final
+        // 10. Lookahead Limiter Stage (Multichannel / stereo / mono) — true-peak limiter is final
         if (stages & STAGE_LIMITER) {
             limiter_.processInterleaved(buffer, frames, channels);
         }
@@ -353,7 +237,8 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         } else {
             const auto blockEnd = std::chrono::steady_clock::now();
             const double elapsedSec = std::chrono::duration<double>(blockEnd - blockStart).count();
-            const double budgetSec = static_cast<double>(frames) / sampleRate_;
+            const double effectiveRate = (snapshot && snapshot->sampleRate > 0.0) ? snapshot->sampleRate : sampleRate_;
+            const double budgetSec = static_cast<double>(frames) / effectiveRate;
             if (budgetSec > 1e-9) {
                 blockRtf = elapsedSec / budgetSec;
             }
@@ -376,6 +261,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             const uint32_t currentDegraded = autoDegradedStages_.load(std::memory_order_relaxed);
 
             // Sustained high load (RTF > 0.80 over window): degrade ONE stage at a time in cost order
+            // Note: Limiter output protection is NEVER disabled during auto-degrade to prevent clipping.
             if (avgRtf > 0.80f) {
                 recoveryConsecutiveBlocks_ = 0;
                 // Cost order: REVERB -> SATURATION -> DYNEQ -> CROSSOVER -> WIDTH -> CROSSFEED -> PANNER -> EQ
@@ -411,36 +297,37 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
                     triggerStageAutoDegrade(STAGE_EQ);
                     rtfCount_ = 0;
                     rtfRingHead_ = 0;
-                } else if (avgRtf > 1.0f && (rawStages & STAGE_LIMITER) && !(currentDegraded & STAGE_LIMITER)) {
-                    // NEVER auto-degrade limiter unless RTF > 1.0 persists across all other degraded stages
-                    triggerStageAutoDegrade(STAGE_LIMITER);
-                    rtfCount_ = 0;
-                    rtfRingHead_ = 0;
                 }
             } else if (avgRtf < 0.50f && currentDegraded != 0) {
                 // Recovery: sustained low load (RTF < 0.50) over kRtfRecoveryWindowSize blocks
                 recoveryConsecutiveBlocks_++;
                 if (recoveryConsecutiveBlocks_ >= kRtfRecoveryWindowSize) {
                     recoveryConsecutiveBlocks_ = 0;
-                    // Reverse cost order: EQ -> PANNER -> CROSSFEED -> WIDTH -> CROSSOVER -> DYNEQ -> SATURATION -> REVERB -> LIMITER
+                    // Reverse cost order: EQ -> PANNER -> CROSSFEED -> WIDTH -> CROSSOVER -> DYNEQ -> SATURATION -> REVERB
                     if (currentDegraded & STAGE_EQ) {
+                        eq_.reset();
                         recoverStageAutoDegrade(STAGE_EQ);
                     } else if (currentDegraded & STAGE_PANNER) {
+                        panner_.reset();
                         recoverStageAutoDegrade(STAGE_PANNER);
                     } else if (currentDegraded & STAGE_CROSSFEED) {
+                        crossfeed_.reset();
                         recoverStageAutoDegrade(STAGE_CROSSFEED);
                     } else if (currentDegraded & STAGE_WIDTH) {
+                        stereoWidth_.reset();
                         recoverStageAutoDegrade(STAGE_WIDTH);
                     } else if (currentDegraded & STAGE_CROSSOVER) {
+                        subCrossover_.reset();
                         recoverStageAutoDegrade(STAGE_CROSSOVER);
                     } else if (currentDegraded & STAGE_DYNEQ) {
+                        dynamicEq_.reset();
                         recoverStageAutoDegrade(STAGE_DYNEQ);
                     } else if (currentDegraded & STAGE_SATURATION) {
+                        saturation_.reset();
                         recoverStageAutoDegrade(STAGE_SATURATION);
                     } else if (currentDegraded & STAGE_REVERB) {
+                        reverb_.reset();
                         recoverStageAutoDegrade(STAGE_REVERB);
-                    } else if (currentDegraded & STAGE_LIMITER) {
-                        recoverStageAutoDegrade(STAGE_LIMITER);
                     }
                 }
             } else {

@@ -19,6 +19,7 @@
 #include <memory>
 #include <atomic>
 #include <mutex>
+#include <functional>
 
 enum DspStageMask {
     STAGE_EQ = 1 << 0,
@@ -82,8 +83,9 @@ public:
     void setActiveStages(uint32_t bitmask);
     uint32_t getActiveStages() const;
 
-    // Lock-free atomic parameter snapshot publishing
-    void publishParams(std::shared_ptr<const DspParamSnapshot> snapshot);
+    // Transactional parameter mutation & publishing
+    using SnapshotMutator = std::function<void(DspParamSnapshot&)>;
+    void updateParams(SnapshotMutator mutator);
     std::shared_ptr<const DspParamSnapshot> getParams() const;
 
     // Stage accessor handles
@@ -140,7 +142,9 @@ public:
 
 private:
     void setSampleRateInternal(double sampleRate);
+    void applySampleRateLocked(double sampleRate);
     void resetInternal();
+    void publishParams(std::shared_ptr<const DspParamSnapshot> snapshot);
 
     double sampleRate_ = 48000.0;
     std::atomic<uint64_t> snapshotGeneration_{1};

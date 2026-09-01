@@ -26,6 +26,9 @@ void LoudnessContour::configure(double intensity, double volumeLinear) {
 }
 
 void LoudnessContour::applyParams(const LoudnessContourParamSet& params) {
+    if (!params.enabled && enabled_) {
+        reset();
+    }
     enabled_ = params.enabled;
     configure(params.intensity, params.volumeLinear);
 }
@@ -38,18 +41,18 @@ void LoudnessContour::updateTargetGains() {
     targetTrebleDb_ = intensity_ * kTrebleMaxDb * loudnessWeight;
 }
 
-void LoudnessContour::rampTowardTarget() {
-    // ~50 ms gain smoothing (block-rate step, blocks are ~10 ms at 48000)
-    constexpr double kSmooth = 0.18;
-    const double bassStep = kSmooth * (targetBassDb_ - currentBassDb_);
-    const double trebleStep = kSmooth * (targetTrebleDb_ - currentTrebleDb_);
-    if (std::abs(bassStep) < 1e-4 && std::abs(trebleStep) < 1e-4) {
+void LoudnessContour::rampTowardTarget(int frames) {
+    // 50 ms time constant exponential smoothing
+    const double tauSeconds = 0.050;
+    const double coeff = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * tauSeconds));
+
+    if (std::abs(targetBassDb_ - currentBassDb_) < 1e-4 && std::abs(targetTrebleDb_ - currentTrebleDb_) < 1e-4) {
         currentBassDb_ = targetBassDb_;
         currentTrebleDb_ = targetTrebleDb_;
         return;
     }
-    currentBassDb_ += bassStep;
-    currentTrebleDb_ += trebleStep;
+    currentBassDb_ += coeff * (targetBassDb_ - currentBassDb_);
+    currentTrebleDb_ += coeff * (targetTrebleDb_ - currentTrebleDb_);
 }
 
 void LoudnessContour::reset() {
@@ -57,6 +60,8 @@ void LoudnessContour::reset() {
     std::memset(treble_, 0, sizeof(treble_));
     currentBassDb_ = targetBassDb_;
     currentTrebleDb_ = targetTrebleDb_;
+    lastComputedBassDb_ = currentBassDb_;
+    lastComputedTrebleDb_ = currentTrebleDb_;
     for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
         computeLowShelf(bass_[ch], kBassShelfHz, currentBassDb_, sampleRate_);
         computeHighShelf(treble_[ch], kTrebleShelfHz, currentTrebleDb_, sampleRate_);
@@ -93,12 +98,18 @@ void LoudnessContour::computeHighShelf(Biquad& bq, double f0, double gainDb, dou
 
 void LoudnessContour::process(float* L, float* R, int frames) {
     if (!enabled_ || !L || !R || frames <= 0) return;
-    rampTowardTarget();
+    rampTowardTarget(frames);
     if (std::abs(currentBassDb_) < 1e-6 && std::abs(currentTrebleDb_) < 1e-6) return;
-    computeLowShelf(bass_[0], kBassShelfHz, currentBassDb_, sampleRate_);
-    computeHighShelf(treble_[0], kTrebleShelfHz, currentTrebleDb_, sampleRate_);
-    computeLowShelf(bass_[1], kBassShelfHz, currentBassDb_, sampleRate_);
-    computeHighShelf(treble_[1], kTrebleShelfHz, currentTrebleDb_, sampleRate_);
+
+    if (std::abs(currentBassDb_ - lastComputedBassDb_) > 0.01 ||
+        std::abs(currentTrebleDb_ - lastComputedTrebleDb_) > 0.01) {
+        computeLowShelf(bass_[0], kBassShelfHz, currentBassDb_, sampleRate_);
+        computeHighShelf(treble_[0], kTrebleShelfHz, currentTrebleDb_, sampleRate_);
+        computeLowShelf(bass_[1], kBassShelfHz, currentBassDb_, sampleRate_);
+        computeHighShelf(treble_[1], kTrebleShelfHz, currentTrebleDb_, sampleRate_);
+        lastComputedBassDb_ = currentBassDb_;
+        lastComputedTrebleDb_ = currentTrebleDb_;
+    }
 
     for (int i = 0; i < frames; ++i) {
         L[i] = bass_[0].process(treble_[0].process(L[i]));
@@ -108,12 +119,17 @@ void LoudnessContour::process(float* L, float* R, int frames) {
 
 void LoudnessContour::processInterleaved(float* buffer, int frames, int channels) {
     if (!enabled_ || !buffer || frames <= 0 || channels <= 0) return;
-    rampTowardTarget();
+    rampTowardTarget(frames);
     if (std::abs(currentBassDb_) < 1e-6 && std::abs(currentTrebleDb_) < 1e-6) return;
 
-    for (int ch = 0; ch < channels && ch < MAX_CHANNELS; ++ch) {
-        computeLowShelf(bass_[ch], kBassShelfHz, currentBassDb_, sampleRate_);
-        computeHighShelf(treble_[ch], kTrebleShelfHz, currentTrebleDb_, sampleRate_);
+    if (std::abs(currentBassDb_ - lastComputedBassDb_) > 0.01 ||
+        std::abs(currentTrebleDb_ - lastComputedTrebleDb_) > 0.01) {
+        for (int ch = 0; ch < channels && ch < MAX_CHANNELS; ++ch) {
+            computeLowShelf(bass_[ch], kBassShelfHz, currentBassDb_, sampleRate_);
+            computeHighShelf(treble_[ch], kTrebleShelfHz, currentTrebleDb_, sampleRate_);
+        }
+        lastComputedBassDb_ = currentBassDb_;
+        lastComputedTrebleDb_ = currentTrebleDb_;
     }
 
     for (int i = 0; i < frames; ++i) {

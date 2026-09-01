@@ -69,5 +69,55 @@ void main() {
       final prefs = await SharedPreferences.getInstance();
       expect(prefs.getInt('scrobbler_last_song'), isNull);
     });
+
+    test(
+        'B2: write via recovery path prevents duplicate scrobble of same artist/track within 5 min',
+        () async {
+      final nowMillis = DateTime.now().millisecondsSinceEpoch - 60000;
+      SharedPreferences.setMockInitialValues({
+        'scrobbler_last_song': 303,
+        'scrobbler_last_time': nowMillis,
+        'scrobbler_last_position': 150000,
+        'scrobbler_last_duration': 200000,
+        'scrobbler_last_artist': 'Daft Punk',
+        'scrobbler_last_track': 'Get Lucky',
+        'scrobbler_last_album': 'Random Access Memories',
+        'setting_custom_scrobbler_enabled': true,
+        'setting_custom_scrobbler_url': 'https://webhook.site/scrobble',
+      });
+
+      when(() => mockClient.post(
+            any(),
+            headers: any(named: 'headers'),
+            body: any(named: 'body'),
+          )).thenAnswer((_) async => http.Response('{"status":"ok"}', 200));
+
+      await scrobblerService.checkPendingScrobble();
+
+      // First recovery scrobbles once
+      verify(() => mockClient.post(
+            Uri.parse('https://webhook.site/scrobble'),
+            headers: any(named: 'headers'),
+            body: any(named: 'body'),
+          )).called(1);
+
+      // Now simulate active playback session firing scrobble for same track immediately
+      await scrobblerService.notifyPlaybackState(
+        id: 303,
+        artist: 'Daft Punk',
+        track: 'Get Lucky',
+        album: 'Random Access Memories',
+        durationMs: 200000,
+        positionMs: 150000,
+        isPlaying: true,
+      );
+
+      // Should be skipped by dedupe gate (total calls remains 1)
+      verifyNever(() => mockClient.post(
+            Uri.parse('https://webhook.site/scrobble'),
+            headers: any(named: 'headers'),
+            body: any(named: 'body'),
+          ));
+    });
   });
 }

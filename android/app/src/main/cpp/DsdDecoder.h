@@ -43,11 +43,11 @@ private:
     static constexpr int DECIMATION_HALF = DECIMATION_TAPS / 2;
     float decimationCoeffs_[DECIMATION_TAPS] = {};
 
-    // CIC stage 1 integrators & combs (uint32_t for well-defined mod 2^32 wrap)
+    // CIC stage 1 integrators & combs (signed 64-bit to prevent overflow/drift)
     struct CicState {
-        uint32_t int1 = 0, int2 = 0, int3 = 0;
-        uint32_t comb1 = 0, comb2 = 0, comb3 = 0;
-        uint32_t comb1_d = 0, comb2_d = 0, comb3_d = 0;
+        int64_t int1 = 0, int2 = 0, int3 = 0;
+        int64_t comb1 = 0, comb2 = 0, comb3 = 0;
+        int64_t comb1_d = 0, comb2_d = 0, comb3_d = 0;
     };
     CicState cicL_;
     CicState cicR_;

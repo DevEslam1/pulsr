@@ -39,7 +39,7 @@ public:
     void applyParams(const ReverbParamSet& params);
     void reset();
 
-    bool loadCustomIR(const float* irInterleaved, int frames, int channels);
+    bool loadCustomIR(const float* irInterleaved, int frames, int channels, double irSampleRate = 0.0);
     std::shared_ptr<const PreparedIr> getPreparedIr() const { return preparedIr_; }
     ReverbPreset getPreset() const { return preset_; }
 
@@ -49,6 +49,7 @@ public:
         return (preparedIr_->numPartitions == 0) ? 0 : PARTITION_SIZE;
     }
 
+    void prepareForBlockSize(int maxFrames);
     void process(const float* inL, const float* inR, float* outL, float* outR, int frames);
     void processInterleaved(float* buffer, int frames, int channels = 2);
 
@@ -118,4 +119,10 @@ private:
     std::vector<float> scratchInR_;
     std::vector<float> scratchOutL_;
     std::vector<float> scratchOutR_;
+
+    // Cached raw custom IR for rate resynchronization
+    std::vector<float> rawCustomIr_;
+    int rawCustomFrames_ = 0;
+    int rawCustomChannels_ = 2;
+    double rawCustomSampleRate_ = 48000.0;
 };

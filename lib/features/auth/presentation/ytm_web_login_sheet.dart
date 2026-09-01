@@ -156,11 +156,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       });
     }
 
-    final isYtm = widget.isBrowseMode ||
-        _currentUrl.contains('music.youtube.com') ||
-        (_currentUrl.contains('youtube.com') &&
-            !_currentUrl.contains('accounts.youtube.com'));
-    final initialUa = isYtm ? desktopUserAgent : mobileUserAgent;
+    final initialUa = _uaIdentityOverride != null
+        ? _uaFor(_uaIdentityOverride!)
+        : desktopUserAgent;
 
     _settings = InAppWebViewSettings(
       userAgent: initialUa,
@@ -470,11 +468,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   Future<void> _navigateTo(String url) async {
     _pollIntervalSeconds = 2;
     _scheduleNextAuthPoll();
-    final isYtm = url.contains('music.youtube.com') ||
-        (url.contains('youtube.com') && !url.contains('accounts.youtube.com'));
     final targetUa = _uaIdentityOverride != null
         ? _uaFor(_uaIdentityOverride!)
-        : (isYtm ? desktopUserAgent : mobileUserAgent);
+        : desktopUserAgent;
     try {
       await _webViewController?.setSettings(
         settings: InAppWebViewSettings(userAgent: targetUa),
@@ -1177,14 +1173,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                         },
                         onLoadStart: (controller, url) async {
                           if (mounted) setState(() => _isLoading = true);
-                          final urlStr = url?.toString() ?? '';
-                          final isYtm = urlStr.contains('music.youtube.com') ||
-                              (urlStr.contains('youtube.com') &&
-                                  !urlStr.contains('accounts.youtube.com') &&
-                                  !_isAuthInProgressUrl(urlStr));
                           final targetUa = _uaIdentityOverride != null
                               ? _uaFor(_uaIdentityOverride!)
-                              : (isYtm ? desktopUserAgent : mobileUserAgent);
+                              : desktopUserAgent;
                           try {
                             await controller.setSettings(
                               settings:

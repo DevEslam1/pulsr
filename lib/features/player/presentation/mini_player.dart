@@ -214,14 +214,18 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar> {
 
   @override
   Widget build(BuildContext context) {
+    final cubit = context.read<PlayerCubit>();
     return Directionality(
       textDirection: TextDirection.ltr,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final trackWidth = constraints.maxWidth;
-          return BlocSelector<PlayerCubit, PlayerState, Duration>(
-            selector: (s) => s.position,
-            builder: (context, position) {
+          // FIX(BUG-14): Listen to raw un-throttled position stream for smooth progress bar updates
+          return StreamBuilder<Duration>(
+            stream: cubit.rawPositionStream,
+            initialData: cubit.state.position,
+            builder: (context, snapshot) {
+              final position = snapshot.data ?? Duration.zero;
               final progress = widget.duration.inMilliseconds > 0
                   ? (position.inMilliseconds / widget.duration.inMilliseconds)
                       .clamp(0.0, 1.0)

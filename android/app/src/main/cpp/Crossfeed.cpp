@@ -3,6 +3,10 @@
 #include <cstring>
 #include <cmath>
 
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 Crossfeed::Crossfeed() {
     setSampleRate(48000.0);
     configure(350.0, -9.0, 650.0);
@@ -48,6 +52,7 @@ void Crossfeed::reset() {
 
 void Crossfeed::process(float* L, float* R, int frames) {
     if (!enabled_ || !L || !R || frames <= 0) return;
+    const float makeup = 1.0f / (1.0f + feedLevel_);
 
     for (int i = 0; i < frames; ++i) {
         float l = L[i];
@@ -69,13 +74,14 @@ void Crossfeed::process(float* L, float* R, int frames) {
         delayBufferR_[writeIdx_] = lpR_;
         writeIdx_ = (writeIdx_ + 1) % MAX_DELAY_SAMPLES;
 
-        L[i] = l + delayedR * feedLevel_;
-        R[i] = r + delayedL * feedLevel_;
+        L[i] = (l + delayedR * feedLevel_) * makeup;
+        R[i] = (r + delayedL * feedLevel_) * makeup;
     }
 }
 
 void Crossfeed::processInterleaved(float* buffer, int frames) {
     if (!enabled_ || !buffer || frames <= 0) return;
+    const float makeup = 1.0f / (1.0f + feedLevel_);
 
     for (int i = 0; i < frames; ++i) {
         float l = buffer[i * 2];
@@ -97,8 +103,8 @@ void Crossfeed::processInterleaved(float* buffer, int frames) {
         delayBufferR_[writeIdx_] = lpR_;
         writeIdx_ = (writeIdx_ + 1) % MAX_DELAY_SAMPLES;
 
-        buffer[i * 2] = l + delayedR * feedLevel_;
-        buffer[i * 2 + 1] = r + delayedL * feedLevel_;
+        buffer[i * 2] = (l + delayedR * feedLevel_) * makeup;
+        buffer[i * 2 + 1] = (r + delayedL * feedLevel_) * makeup;
     }
 }
 
