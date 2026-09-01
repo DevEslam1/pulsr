@@ -87,10 +87,12 @@ class YtmService {
   static const String channelName = PulsrChannels.ytm;
   static const Duration _defaultSearchTimeout = Duration(seconds: 25);
 
-  // TTFA hard budget: tier-1 (account) gets a ~3s wall-clock deadline at the
-  // resolveStream level so a slow account resolve falls through to the native
-  // extractor instead of burning its internal 25s timeout.
-  static const Duration _tier1Deadline = Duration(seconds: 3);
+  // Tier-1 (account) deadline for direct authenticated Innertube playback.
+  // 3s is the TTFA target, but on slow/proxied networks (NE2213 + VPN) the
+  // account ladder (WEB_REMIX -> ANDROID_VR -> ...) can need ~7-8s to
+  // exhaust 3 clients with retries; 8s still leaves native 8s budget inside
+  // the overall 25s player timeout while passing the <10s gate test.
+  static const Duration _tier1Deadline = Duration(seconds: 8);
 
   // TTFA hard budget: reduced first-attempt timeout + single retry for the
   // play path (native tier-2). Other call sites keep the default 25s/2-retry
@@ -150,12 +152,17 @@ class YtmService {
   Stream<void> get onAuthExpired => _authExpiredController.stream;
 
   void notifyAuthExpired() {
-    _authExpiredController.add(null);
+    if (_authExpiredController.isClosed) return;
+    try {
+      _authExpiredController.add(null);
+    } catch (_) {}
   }
 
   @disposeMethod
   void dispose() {
-    _authExpiredController.close();
+    try {
+      _authExpiredController.close();
+    } catch (_) {}
   }
 
   Map<String, String> _localeArgs() {
@@ -432,60 +439,72 @@ class YtmService {
         void traverse(dynamic node) {
           if (node is Map<String, dynamic>) {
             if (node.containsKey('musicResponsiveListItemRenderer')) {
-              final r =
-                  node['musicResponsiveListItemRenderer']
-                      as Map<String, dynamic>;
-              final flexCols = r['flexColumns'] as List<dynamic>? ?? [];
-              String? videoId;
-              String title = 'Unknown Title';
-              String artist = 'Unknown Artist';
+              try {
+                final r =
+                    node['musicResponsiveListItemRenderer']
+                        as Map<String, dynamic>;
+                final flexCols = r['flexColumns'] as List<dynamic>? ?? [];
+                String? videoId;
+                String title = 'Unknown Title';
+                String artist = 'Unknown Artist';
 
-              final pData = r['playlistItemData'] as Map<String, dynamic>?;
-              videoId = pData?['videoId'] as String?;
+                final pData = r['playlistItemData'] as Map<String, dynamic>?;
+                videoId = pData?['videoId'] as String?;
 
-              if (flexCols.isNotEmpty) {
-                final c0 =
-                    flexCols[0]['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs']
-                        as List<dynamic>?;
-                if (c0 != null && c0.isNotEmpty) {
-                  title = c0[0]['text'] as String? ?? title;
-                  final nav =
-                      c0[0]['navigationEndpoint'] as Map<String, dynamic>?;
-                  videoId ??= nav?['watchEndpoint']?['videoId'] as String?;
+                if (flexCols.isNotEmpty && flexCols[0] is Map) {
+                  final c0Map = flexCols[0] as Map;
+                  final runs =
+                      c0Map['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs']
+                          as List<dynamic>?;
+                  if (runs != null && runs.isNotEmpty && runs[0] is Map) {
+                    final firstRun = runs[0] as Map;
+                    title = firstRun['text'] as String? ?? title;
+                    final nav = firstRun['navigationEndpoint'] as Map<String, dynamic>?;
+                    videoId ??= nav?['watchEndpoint']?['videoId'] as String?;
+                  }
                 }
-              }
-              if (flexCols.length > 1) {
-                final c1 =
-                    flexCols[1]['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs']
-                        as List<dynamic>?;
-                if (c1 != null && c1.isNotEmpty) {
-                  artist = c1[0]['text'] as String? ?? artist;
+                if (flexCols.length > 1 && flexCols[1] is Map) {
+                  final c1Map = flexCols[1] as Map;
+                  final runs =
+                      c1Map['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs']
+                          as List<dynamic>?;
+                  if (runs != null && runs.isNotEmpty && runs[0] is Map) {
+                    artist = (runs[0] as Map)['text'] as String? ?? artist;
+                  }
                 }
-              }
 
-              if (videoId != null && videoId.length == 11) {
-                tracks.add(
-                  YtmTrack(
-                    videoId: videoId,
-                    title: title,
-                    artist: artist,
-                    duration: Duration.zero,
-                  ),
-                );
+                if (videoId != null && videoId.length == 11) {
+                  tracks.add(
+                    YtmTrack(
+                      videoId: videoId,
+                      title: title,
+                      artist: artist,
+                      duration: Duration.zero,
+                    ),
+                  );
+                }
+              } catch (_) {
+                // Per-item failures must not abort the whole search result set.
               }
               return;
             }
             for (final val in node.values) {
-              traverse(val);
+              try {
+                traverse(val);
+              } catch (_) {}
             }
           } else if (node is List) {
             for (final item in node) {
-              traverse(item);
+              try {
+                traverse(item);
+              } catch (_) {}
             }
           }
         }
 
-        traverse(json);
+        try {
+          traverse(json);
+        } catch (_) {}
         return tracks.take(limit).toList();
       }
     } catch (_) {}
@@ -714,24 +733,27 @@ class YtmService {
         }
       } catch (e) {
         debugPrint('[YTM_SERVICE] Native stream resolution failed: $e');
-        if (e is YtmException &&
-            (e.code == 'YTM_SIGNIN_REQUIRED' ||
-                e.code == 'YTM_TIMEOUT' ||
-                e.isBotBlocked ||
-                e.isAuth)) {
-          signInRequiredAbort = true;
-          // Write the global block NOW before any rethrow so the next play
-          // fast-fails. For bot/IP-level gates we always want to fall through
-          // to tier-3 (XDM backend) rather than hard-failing here, so only
-          // hard-rethrow on a pure session-expiry (isAuth but NOT isBotBlocked).
-          if (e.isBotBlocked || e.code == 'YTM_SIGNIN_REQUIRED') {
-            _globalBlockUntil = DateTime.now().add(_signinAbortTtl);
-            debugPrint('[YTM_SERVICE] Global block set for '
-                '${_signinAbortTtl.inMinutes}m '
-                '(device/IP-level LOGIN_REQUIRED / BotChallenge)');
+        if (e is YtmException) {
+          final isDeviceGate = e.code == 'YTM_SIGNIN_REQUIRED' ||
+              e.isBotBlocked ||
+              e.isAuth;
+          if (isDeviceGate) {
+            signInRequiredAbort = true;
+            // Write the global block NOW before any rethrow so the next play
+            // fast-fails. For bot/IP-level gates we always want to fall through
+            // to tier-3 (XDM backend) rather than hard-failing here, so only
+            // hard-rethrow on a pure session-expiry (isAuth but NOT isBotBlocked).
+            if (e.isBotBlocked || e.code == 'YTM_SIGNIN_REQUIRED') {
+              _globalBlockUntil = DateTime.now().add(_signinAbortTtl);
+              debugPrint('[YTM_SERVICE] Global block set for '
+                  '${_signinAbortTtl.inMinutes}m '
+                  '(device/IP-level LOGIN_REQUIRED / BotChallenge)');
+            }
+            // Pure session expiry (e.g. cookie revoked) → surface immediately.
+            if (e.isAuth && !e.isBotBlocked) rethrow;
+          } else if (e.code == 'YTM_TIMEOUT') {
+            debugPrint('[YTM_SERVICE] Native timeout — not a device gate, will not set global block');
           }
-          // Pure session expiry (e.g. cookie revoked) → surface immediately.
-          if (e.isAuth && !e.isBotBlocked) rethrow;
         }
       }
 
@@ -778,15 +800,26 @@ class YtmService {
       }
 
       if (signInRequiredAbort) {
+        final isLoggedIn = getIt.isRegistered<YtmAccountService>() &&
+            getIt<YtmAccountService>().isLoggedIn;
         // Device/IP-level gate — write a global block so every subsequent
         // play fast-fails without re-running the dead ladder.
         _globalBlockUntil = DateTime.now().add(_signinAbortTtl);
-        debugPrint('[YTM_SERVICE] Global block set for ${_signinAbortTtl.inMinutes}m '
+        debugPrint('[YTM_SERVICE] Global block set for '
+            '${_signinAbortTtl.inMinutes}m '
             '(LOGIN_REQUIRED / BotChallenge on all clients)');
+        if (!isLoggedIn) {
+          throw const YtmException(
+            'YTM_SIGNIN_REQUIRED',
+            'Sign in to YouTube Music - Google is blocking playback from this '
+            'device or network',
+          );
+        }
+        // Logged-in user: surface as auth failure so UI prompts re-login
+        // instead of generic YTM_FAILED which never triggers the login sheet.
         throw const YtmException(
-          'YTM_SIGNIN_REQUIRED',
-          'Sign in to YouTube Music - Google is blocking playback from this '
-          'device or network',
+          'YTM_AUTH',
+          'YouTube session expired - please sign in again',
         );
       }
       throw const YtmException(

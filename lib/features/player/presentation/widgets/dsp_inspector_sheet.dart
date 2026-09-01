@@ -253,8 +253,35 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
       PulsrPalette p, PlayerState playerState, SettingsState settingsState) {
     final rep = _report;
     final isBypassed = rep?.isBitPerfectBypassActive == true;
-    final isAttached = rep?.isSessionAttached == true;
+    final rawAttached = rep?.isSessionAttached == true;
     final sessionId = rep?.audioSessionId ?? 0;
+    final hasOem = rep?.hasOemAudio == true;
+    // OnePlus / Dolby devices create a valid HAL session only after ExoPlayer
+    // has emitted a non-zero audioSessionId. While sessionId==0 the HAL
+    // effect chain cannot be created — show "Pending" instead of alarming red.
+    // When OEM audio is present the native C++ pipeline (limiter, crossfeed)
+    // remains ACTIVE even if the HAL EQ is temporarily detached; treat that as
+    // a soft warning (amber) rather than a hard error, and surface the OEM
+    // conflict so the user can switch DSP Preference → OEM or disable Dolby.
+    final bool isAttached;
+    final bool isPendingNoSession;
+    final bool isOemSoftDetached;
+    if (sessionId == 0 && (rep?.activeEffectNames.isNotEmpty == true)) {
+      isAttached = false;
+      isPendingNoSession = true;
+      isOemSoftDetached = false;
+    } else if (!rawAttached && hasOem && (rep?.isNativeDspLoaded == true) && (rep?.activeDspStagesMask ?? 0) != 0) {
+      // HAL detached but native stages are configured — OEM (Dolby) has
+      // hijacked the HAL session; native limiter/crossfeed still run via
+      // the C++ resampler. Show as warning, not error.
+      isAttached = false;
+      isPendingNoSession = false;
+      isOemSoftDetached = true;
+    } else {
+      isAttached = rawAttached;
+      isPendingNoSession = false;
+      isOemSoftDetached = false;
+    }
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -264,7 +291,9 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
         border: Border.all(
           color: isBypassed
               ? const Color(0xFFFFD700).withValues(alpha: 0.4)
-              : (isAttached ? p.accent.withValues(alpha: 0.3) : p.hairline),
+              : (isAttached
+                  ? p.accent.withValues(alpha: 0.3)
+                  : (isPendingNoSession || isOemSoftDetached ? Colors.amber.withValues(alpha: 0.35) : p.hairline)),
         ),
       ),
       child: Column(
@@ -275,10 +304,16 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
               Icon(
                 isBypassed
                     ? Icons.verified_rounded
-                    : (isAttached ? Icons.bolt_rounded : Icons.sensors_off_rounded),
+                    : (isAttached
+                        ? Icons.bolt_rounded
+                        : (isPendingNoSession
+                            ? Icons.hourglass_top_rounded
+                            : (isOemSoftDetached ? Icons.warning_amber_rounded : Icons.sensors_off_rounded))),
                 color: isBypassed
                     ? const Color(0xFFFFD700)
-                    : (isAttached ? const Color(0xFF10B981) : p.error),
+                    : (isAttached
+                        ? const Color(0xFF10B981)
+                        : (isPendingNoSession || isOemSoftDetached ? Colors.amber : p.error)),
                 size: 20,
               ),
               const SizedBox(width: 8),
@@ -288,13 +323,15 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                       ? 'Bit-Perfect Direct Pass-Through'
                       : (isAttached
                           ? 'AudioEffect Session Active (#$sessionId)'
-                          : 'AudioEffect Session Detached'),
+                          : (isPendingNoSession
+                              ? 'Session Pending — Play a track to attach'
+                              : (isOemSoftDetached ? 'HAL Detached (Dolby) — Native DSP Active' : 'AudioEffect Session Detached'))),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
                     color: isBypassed
                         ? const Color(0xFFFFD700)
-                        : (isAttached ? p.textPrimary : p.error),
+                        : (isAttached ? p.textPrimary : (isPendingNoSession || isOemSoftDetached ? Colors.amber : p.error)),
                   ),
                 ),
               ),
@@ -305,22 +342,93 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                       ? const Color(0xFFFFD700).withValues(alpha: 0.15)
                       : (isAttached
                           ? const Color(0xFF10B981).withValues(alpha: 0.15)
-                          : p.error.withValues(alpha: 0.15)),
+                          : (isPendingNoSession || isOemSoftDetached ? Colors.amber.withValues(alpha: 0.15) : p.error.withValues(alpha: 0.15))),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  isBypassed ? 'BYPASSED' : (isAttached ? 'ATTACHED' : 'DETACHED'),
+                  isBypassed
+                      ? 'BYPASSED'
+                      : (isAttached
+                          ? 'ATTACHED'
+                          : (isPendingNoSession ? 'PENDING' : (isOemSoftDetached ? 'HAL OFF' : 'DETACHED'))),
                   style: TextStyle(
                     fontSize: 9.5,
                     fontWeight: FontWeight.w800,
                     color: isBypassed
                         ? const Color(0xFFFFD700)
-                        : (isAttached ? const Color(0xFF10B981) : p.error),
+                        : (isAttached ? const Color(0xFF10B981) : (isPendingNoSession || isOemSoftDetached ? Colors.amber : p.error)),
                   ),
                 ),
               ),
             ],
           ),
+          if (isOemSoftDetached) ...[
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: Colors.amber.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.amber.withValues(alpha: 0.35)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_rounded, size: 16, color: Colors.amber),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Dolby Atmos is hijacking the HAL session. Native limiter/crossfeed still run, but EQ needs HAL. Fix: tap below to switch to OEM (lets system handle EQ) or disable Dolby in system Sound settings, then restart track.',
+                      style: TextStyle(fontSize: 11, height: 1.35, color: p.textSecondary, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: () async {
+                  final messenger = ScaffoldMessenger.of(context);
+                  try {
+                    final cubit = context.read<SettingsCubit>();
+                    await cubit.setDspPreference('oem');
+                    if (!mounted) return;
+                    messenger.showSnackBar(const SnackBar(content: Text('Switched DSP Preference → OEM. Restart track to attach.')));
+                    unawaited(_refreshReport());
+                  } catch (_) {
+                    if (!mounted) return;
+                    messenger.showSnackBar(const SnackBar(content: Text('Failed to switch preference — change in Settings → Audio')));
+                  }
+                },
+                icon: const Icon(Icons.tune_rounded, size: 16),
+                label: const Text('Fix: Switch to OEM', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                style: FilledButton.styleFrom(backgroundColor: Colors.amber, foregroundColor: Colors.black, visualDensity: VisualDensity.compact, padding: const EdgeInsets.symmetric(vertical: 10)),
+              ),
+            ),
+          ],
+          if (isPendingNoSession) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  // Best-effort reattach using current PlayerState session.
+                  final sid = playerState.audioSessionId;
+                  if (sid != null && sid > 0) {
+                    try { await AudioEffectsChannel().setAudioSessionId(sid); } catch (_) {}
+                  }
+                  // Refresh report after attempt
+                  if (!mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Retrying HAL attach… play a track if idle')) );
+                  unawaited(_refreshReport());
+                },
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('Retry Attach', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 12)),
+                style: OutlinedButton.styleFrom(foregroundColor: p.accent, side: BorderSide(color: p.accent.withValues(alpha: 0.4)), visualDensity: VisualDensity.compact),
+              ),
+            ),
+          ],
           const SizedBox(height: 10),
           Divider(height: 1, color: p.hairline),
           const SizedBox(height: 10),

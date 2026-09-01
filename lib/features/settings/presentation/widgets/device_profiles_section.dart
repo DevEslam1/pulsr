@@ -35,10 +35,15 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
     _reload();
   }
 
+  DeviceProfileService get _deviceService =>
+      getIt.isRegistered<DeviceProfileService>()
+          ? getIt<DeviceProfileService>()
+          : DeviceProfileService();
+
   Future<void> _reload() async {
     try {
       final profilesService = getIt<SettingsProfilesService>();
-      final deviceService = getIt<DeviceProfileService>();
+      final deviceService = _deviceService;
       final profiles = await profilesService.getProfiles();
       final devices = await deviceService.registryDevices();
       final links = await deviceService.getLinks();
@@ -63,13 +68,13 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
   }
 
   Future<void> _setAutoEnabled(bool value) async {
-    await getIt<DeviceProfileService>().setAutoSwitchEnabled(value);
+    await _deviceService.setAutoSwitchEnabled(value);
     if (!mounted) return;
     setState(() => _autoEnabled = value);
   }
 
   Future<void> _assignProfile(String deviceKey, String deviceLabel, String? profileId) async {
-    final deviceService = getIt<DeviceProfileService>();
+    final deviceService = _deviceService;
     if (profileId == null) {
       await deviceService.forgetLink(deviceKey);
     } else {

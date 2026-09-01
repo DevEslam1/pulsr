@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' as io;
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';

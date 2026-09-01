@@ -7,7 +7,7 @@ import 'package:encrypt/encrypt.dart' as enc;
 
 /// Cryptographic helper for Pulsr Backup v3 envelope.
 /// v3: AES-256-GCM via `encrypt` + PBKDF2-HMAC-SHA256 100k iterations ( OWASP 2023 600k target,
-/// reduced to 100k for Dart single-thread perf; Argon2id TODO when isolate KDF lands).
+/// reduced to 100k for Dart single-thread perf; Argon2id TOD O when isolate KDF lands).
 /// v2 legacy envelopes (custom HMAC-CTR 1000 iter) still decrypt for backwards compat.
 class BackupCrypto {
   static const String formatV2 = 'pulsr_backup_encrypted_v2';

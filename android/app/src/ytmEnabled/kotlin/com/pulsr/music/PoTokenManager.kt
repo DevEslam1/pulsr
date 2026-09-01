@@ -301,9 +301,24 @@ object PoTokenManager {
                 return streamingPoToken
             }
 
-            // 6. Cold path fallback: synchronous generation
-            val coldMintStart = System.currentTimeMillis()
-            ensureReadySync()
+            // 6. Cold path fallback: synchronous generation — release mintLock
+            // before the expensive WebView init to avoid blocking other
+            // identifiers (streamResolverPool 3 + extractor 6 can deadlock if
+            // the lock is held across runBlocking).
+        }
+
+        // Outside synchronized(mintLock)
+        val coldMintStart = System.currentTimeMillis()
+        ensureReadySync()
+
+        synchronized(mintLock) {
+            // Re-check after cold init (another thread may have minted)
+            synchronized(tokenLru) {
+                val cached = tokenLru.get(identifier)
+                if (cached != null && cached.visitorDataBound == visitorData && (Instant.now().epochSecond - cached.timestamp) < TOKEN_TTL_SECONDS) {
+                    return cached.token
+                }
+            }
 
             val activeGen = generator
             if (activeGen == null || activeGen.isExpired()) {

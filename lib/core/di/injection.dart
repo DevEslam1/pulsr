@@ -5,6 +5,7 @@ import 'package:get_it/get_it.dart';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 
+import '../services/device_profile_service.dart';
 import '../services/room_correction_service.dart';
 import 'injection.config.dart';
 
@@ -16,6 +17,10 @@ Future<void> configureDependencies() async {
   if (!getIt.isRegistered<RoomCorrectionService>()) {
     getIt.registerLazySingleton<RoomCorrectionService>(
         () => RoomCorrectionService());
+  }
+  if (!getIt.isRegistered<DeviceProfileService>()) {
+    getIt.registerLazySingleton<DeviceProfileService>(
+        () => DeviceProfileService());
   }
   await getIt.allReady();
 }

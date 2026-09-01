@@ -1496,12 +1496,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val autoDegraded = if (isNativeDspLoaded) {
                         try { nativeGetAutoDegradedStages() } catch (_: Exception) { 0 }
                     } else 0
+                    val halAttached = isEffectPipelineAttached()
 
                     val stagesList = mutableListOf<Map<String, Any?>>()
                     val activeNames = mutableListOf<String>()
 
                     // 1. Equalizer (DynamicsProcessing or legacy)
-                    val eqActive = isEqEnabled && !isBitPerfectBypassActive
+                    val eqActive = isEqEnabled && !isBitPerfectBypassActive && halAttached
                     if (eqActive) activeNames.add("Graphic Equalizer ($eqBandCount Bands, Preamp: ${String.format("%.1f", eqPreampDb)} dB)")
                     stagesList.add(mapOf(
                         "name" to "Graphic Equalizer",
@@ -1509,7 +1510,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         "isSupported" to (isEffectTypeSupported(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING) || isNativeDspLoaded),
                         "isEnabled" to isEqEnabled,
                         "isBypassed" to isBitPerfectBypassActive,
-                        "isDegraded" to ((autoDegraded and STAGE_EQ) != 0),
+                        "isDegraded" to (!halAttached && isEqEnabled || ((autoDegraded and STAGE_EQ) != 0)),
                         "parameters" to mapOf(
                             "bandCount" to eqBandCount,
                             "preampDb" to eqPreampDb,
@@ -1520,7 +1521,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     ))
 
                     // 2. Dynamics Processing / Multiband Compressor
-                    val dynActive = isDynamicsEnabled && currentDynamicsPreset != "off" && !isBitPerfectBypassActive
+                    val dynActive = isDynamicsEnabled && currentDynamicsPreset != "off" && !isBitPerfectBypassActive && halAttached
                     if (dynActive) activeNames.add("Dynamics Processing ($currentDynamicsPreset)")
                     stagesList.add(mapOf(
                         "name" to "Dynamics Processing",
@@ -1528,7 +1529,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         "isSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING),
                         "isEnabled" to isDynamicsEnabled,
                         "isBypassed" to isBitPerfectBypassActive,
-                        "isDegraded" to false,
+                        "isDegraded" to (!halAttached && isDynamicsEnabled),
                         "parameters" to mapOf(
                             "preset" to currentDynamicsPreset,
                             "isAttached" to (dynamicsProcessing != null)
@@ -1537,7 +1538,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     ))
 
                     // 3. Virtualizer / Spatializer
-                    val virtActive = isVirtualizerEnabled && virtualizerStrength > 0 && !isBitPerfectBypassActive
+                    val virtActive = isVirtualizerEnabled && virtualizerStrength > 0 && !isBitPerfectBypassActive && halAttached
                     if (virtActive) activeNames.add("Virtualizer (Strength: $virtualizerStrength/1000)")
                     stagesList.add(mapOf(
                         "name" to "Virtualizer / Surround",
@@ -1545,7 +1546,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         "isSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_VIRTUALIZER),
                         "isEnabled" to isVirtualizerEnabled,
                         "isBypassed" to isBitPerfectBypassActive,
-                        "isDegraded" to false,
+                        "isDegraded" to (!halAttached && isVirtualizerEnabled),
                         "parameters" to mapOf(
                             "strength" to virtualizerStrength.toInt(),
                             "isAttached" to (virtualizer != null)
@@ -1554,7 +1555,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     ))
 
                     // 4. Bass Boost
-                    val bbActive = bassBoostStrength > 0 && !isBitPerfectBypassActive
+                    val bbActive = bassBoostStrength > 0 && !isBitPerfectBypassActive && halAttached
                     if (bbActive) activeNames.add("Bass Boost (Strength: $bassBoostStrength/1000)")
                     stagesList.add(mapOf(
                         "name" to "Bass Boost",
@@ -1562,7 +1563,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         "isSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_BASS_BOOST),
                         "isEnabled" to (bassBoostStrength > 0),
                         "isBypassed" to isBitPerfectBypassActive,
-                        "isDegraded" to false,
+                        "isDegraded" to (!halAttached && bassBoostStrength > 0),
                         "parameters" to mapOf(
                             "strength" to bassBoostStrength.toInt(),
                             "isAttached" to (bassBoost != null)
@@ -1571,7 +1572,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     ))
 
                     // 5. Loudness Enhancer (Volume Boost)
-                    val volActive = volumeBoostMilliBels > 0 && !isBitPerfectBypassActive
+                    val volActive = volumeBoostMilliBels > 0 && !isBitPerfectBypassActive && halAttached
                     if (volActive) activeNames.add("Volume Boost (+${volumeBoostMilliBels / 100.0} dB)")
                     stagesList.add(mapOf(
                         "name" to "Volume Boost / Loudness Enhancer",
@@ -1579,7 +1580,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         "isSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_LOUDNESS_ENHANCER),
                         "isEnabled" to (volumeBoostMilliBels > 0),
                         "isBypassed" to isBitPerfectBypassActive,
-                        "isDegraded" to false,
+                        "isDegraded" to (!halAttached && volumeBoostMilliBels > 0),
                         "parameters" to mapOf(
                             "targetGainMilliBels" to volumeBoostMilliBels,
                             "gainDb" to (volumeBoostMilliBels / 100.0),

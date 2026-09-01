@@ -324,12 +324,8 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
       repo
           .observeDownloads()
           .where((t) => t.videoId == videoId)
-          .takeWhile(
-            (t) =>
-                t.status == DownloadStatus.complete ||
-                t.status == DownloadStatus.failed,
-          )
-          .where((t) => t.status == DownloadStatus.complete),
+          .where((t) => t.status == DownloadStatus.complete)
+          .take(1),
       (task) {
         final newId = task.librarySongId;
         if (isClosed || newId == null || newId == searchSongId) return;

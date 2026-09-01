@@ -109,6 +109,11 @@ class YtmAccountService {
   /// `visitorData` harvested from an authenticated response; sent in the WEB_REMIX player context.
   String? _sessionVisitorData;
 
+  /// Coalesces concurrent liked-songs imports so UI + background callers share
+  /// a single pagination ladder instead of burning the BROWSE rate-limiter
+  /// bucket with duplicate 20-page fetches.
+  final Map<String, Future<List<YtmTrack>>> _inFlightLikedSongs = {};
+
   /// Notifies listeners whenever the YTM login state changes (login/logout).
   final loginState = ValueNotifier<bool>(false);
 
@@ -308,6 +313,8 @@ class YtmAccountService {
     _accountAvatar = null;
     _dataSyncId = null;
     _sessionVisitorData = null;
+    _cachedLikedSongsBrowseId = null;
+    _inFlightLikedSongs.clear();
     await _deleteStoredCookies();
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_accountNamePrefKey);
@@ -317,9 +324,17 @@ class YtmAccountService {
 
     try {
       final ytmService = getIt<YtmService>();
-      await ytmService.syncCookies('');
-      await ytmService.invalidatePoToken();
-    } catch (_) {}
+      // Full identity reset (PoToken + visitorData + fingerprint) so the
+      // next login does not reuse a fingerprint-bound visitorData from the
+      // previous account — matches resetIdentities semantics.
+      await ytmService.resetIdentities();
+    } catch (_) {
+      try {
+        final ytmService = getIt<YtmService>();
+        await ytmService.syncCookies('');
+        await ytmService.invalidatePoToken();
+      } catch (_) {}
+    }
     try {
       await _deleteSessionWebViewCookies();
     } catch (_) {}
@@ -841,6 +856,21 @@ class YtmAccountService {
       throw const YtmException('YTM_AUTH', 'Not signed in to YouTube Music');
     }
 
+    final coalesceKey = 'fetchLikedSongs:$maxTracks';
+    final inFlight = _inFlightLikedSongs[coalesceKey];
+    if (inFlight != null) return inFlight;
+
+    final future = _fetchLikedSongsInternal(maxTracks: maxTracks);
+    _inFlightLikedSongs[coalesceKey] = future;
+    try {
+      return await future;
+    } finally {
+      // ignore: unawaited_futures - remove returns the Future value, not a new async op
+      _inFlightLikedSongs.remove(coalesceKey);
+    }
+  }
+
+  Future<List<YtmTrack>> _fetchLikedSongsInternal({required int maxTracks}) async {
     // Refresh cookies from native CookieManager if needed
     final nativeCookies = await getNativeCookiesFromDomains();
     if (nativeCookies != null &&
@@ -937,14 +967,22 @@ class YtmAccountService {
             final allTracks = List<YtmTrack>.from(tracks);
             var currentJson = json;
 
-            // Fetch continuation pages until maxTracks is satisfied.
+            // Fetch continuation pages until *unique* tracks satisfy maxTracks.
+            // Guard against YouTube returning the same token on an empty page
+            // (which would otherwise spin 20 identical requests).
             var pageCount = 0;
             const maxPages = 20;
-            while (allTracks.length < maxTracks && pageCount < maxPages) {
+            final seenTokens = <String>{};
+            final seenIdsForPaging = <String>{for (final t in allTracks) t.videoId};
+            while (seenIdsForPaging.length < maxTracks && pageCount < maxPages) {
               pageCount++;
               try {
                 final ctoken = _extractContinuationToken(currentJson);
                 if (ctoken == null || ctoken.isEmpty) break;
+                if (!seenTokens.add(ctoken)) {
+                  debugPrint('[YTM_ACCOUNT] Duplicate continuation token $ctoken — breaking loop');
+                  break;
+                }
 
                 final contBody = jsonEncode({
                   'context': _buildClientContext('WEB_REMIX'),
@@ -962,7 +1000,12 @@ class YtmAccountService {
                       jsonDecode(contResponse.body) as Map<String, dynamic>;
                   final contTracks = _parseInnertubePlaylistTracks(currentJson);
                   if (contTracks.isEmpty) break;
-                  allTracks.addAll(contTracks);
+                  for (final ct in contTracks) {
+                    if (seenIdsForPaging.add(ct.videoId)) {
+                      allTracks.add(ct);
+                    }
+                  }
+                  if (seenIdsForPaging.length >= maxTracks) break;
                 } else {
                   break;
                 }
@@ -979,6 +1022,7 @@ class YtmAccountService {
               );
             }
 
+            // Final dedup (covers initial tracks dupes)
             final seenIds = <String>{};
             final uniqueTracks = <YtmTrack>[];
             for (final t in allTracks) {
