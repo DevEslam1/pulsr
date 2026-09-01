@@ -105,10 +105,8 @@ void ParametricEQ::applyParams(const EqParamSet& params) {
 }
 
 void ParametricEQ::reset() {
-    std::memset(x1_, 0, sizeof(x1_));
-    std::memset(x2_, 0, sizeof(x2_));
-    std::memset(y1_, 0, sizeof(y1_));
-    std::memset(y2_, 0, sizeof(y2_));
+    std::memset(s1_, 0, sizeof(s1_));
+    std::memset(s2_, 0, sizeof(s2_));
     smoothedPreampDb_ = targetPreampDb_;
     preampLinear_ = std::pow(10.0, smoothedPreampDb_ / 20.0);
     for (int i = 0; i < bandCount_; ++i) {
@@ -289,8 +287,7 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
             band.bypass = true;
             if (!wasBypass) {
                 for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
-                    x1_[ch][b] = x2_[ch][b] = 0.0;
-                    y1_[ch][b] = y2_[ch][b] = 0.0;
+                    s1_[ch][b] = s2_[ch][b] = 0.0;
                 }
             }
             continue;
@@ -306,13 +303,12 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
 
         if (wasBypass && !band.bypass) {
             for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
-                x1_[ch][b] = x2_[ch][b] = 0.0;
-                y1_[ch][b] = y2_[ch][b] = 0.0;
+                s1_[ch][b] = s2_[ch][b] = 0.0;
             }
         }
     }
 
-    // Process biquad cascaded filters per band across all channels
+    // Process biquad cascaded filters per band across all channels (TDF-II)
     for (int b = 0; b < bandCount_; ++b) {
         const auto& band = bands_[b];
         if (band.bypass) continue;
@@ -324,38 +320,34 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
         const double a2 = band.coeffs.a2;
 
         for (int ch = 0; ch < channels; ++ch) {
-            double x1 = x1_[ch][b];
-            double x2 = x2_[ch][b];
-            double y1 = y1_[ch][b];
-            double y2 = y2_[ch][b];
+            double s1 = s1_[ch][b];
+            double s2 = s2_[ch][b];
 
             float* chPtr = buffer + ch;
             for (int f = 0; f < frames; ++f) {
                 const double x0 = static_cast<double>(*chPtr);
                 if (!std::isfinite(x0)) {
                     *chPtr = 0.0f;
-                    x1 = 0.0;
-                    x2 = 0.0;
-                    y1 = 0.0;
-                    y2 = 0.0;
+                    s1 = 0.0;
+                    s2 = 0.0;
                     chPtr += channels;
                     continue;
                 }
 
-                double y0 = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+                // Transposed Direct Form II Difference Equation:
+                // y[n] = b0 * x[n] + s1[n-1]
+                // s1[n] = b1 * x[n] - a1 * y[n] + s2[n-1]
+                // s2[n] = b2 * x[n] - a2 * y[n]
+                double y0 = b0 * x0 + s1;
 
                 if (!std::isfinite(y0)) {
-                    // Filter instability/blowup detected — reset biquad state registers immediately
-                    x1 = 0.0;
-                    x2 = 0.0;
-                    y1 = 0.0;
-                    y2 = 0.0;
-                    y0 = x0; // Fallback to passthrough for corrupted frame
+                    // Filter blowup detected: reset registers and bypass frame
+                    s1 = 0.0;
+                    s2 = 0.0;
+                    y0 = x0;
                 } else {
-                    x2 = x1;
-                    x1 = x0;
-                    y2 = y1;
-                    y1 = y0;
+                    s1 = b1 * x0 - a1 * y0 + s2;
+                    s2 = b2 * x0 - a2 * y0;
                 }
 
                 *chPtr = static_cast<float>(y0);
@@ -363,15 +355,11 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
             }
 
             // Flush denormals & ensure state is strictly finite
-            if (std::abs(y1) < 1e-25 || !std::isfinite(y1)) y1 = 0.0;
-            if (std::abs(y2) < 1e-25 || !std::isfinite(y2)) y2 = 0.0;
-            if (std::abs(x1) < 1e-25 || !std::isfinite(x1)) x1 = 0.0;
-            if (std::abs(x2) < 1e-25 || !std::isfinite(x2)) x2 = 0.0;
+            if (std::abs(s1) < 1e-25 || !std::isfinite(s1)) s1 = 0.0;
+            if (std::abs(s2) < 1e-25 || !std::isfinite(s2)) s2 = 0.0;
 
-            x1_[ch][b] = x1;
-            x2_[ch][b] = x2;
-            y1_[ch][b] = y1;
-            y2_[ch][b] = y2;
+            s1_[ch][b] = s1;
+            s2_[ch][b] = s2;
         }
     }
 }

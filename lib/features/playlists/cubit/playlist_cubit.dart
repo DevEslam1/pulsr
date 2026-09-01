@@ -267,14 +267,15 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         if (!_smartSubscriptions.containsKey(playlist.id)) {
           final criteria =
               SmartCriteria.fromJsonString(playlist.smartCriteria!);
-          _smartSubscriptions[playlist.id] = _playlistUseCases
-              .watchSmartPlaylistSongs(criteria)
-              .listen((songs) {
-            if (isClosed) return;
-            final updatedCounts = Map<int, int>.from(state.smartPlaylistCounts);
-            updatedCounts[playlist.id] = songs.length;
-            emit(state.copyWith(smartPlaylistCounts: updatedCounts));
-          });
+          _smartSubscriptions[playlist.id] = autoSub<List<SongsTableData>>(
+            _playlistUseCases.watchSmartPlaylistSongs(criteria),
+            (songs) {
+              if (isClosed) return;
+              final updatedCounts = Map<int, int>.from(state.smartPlaylistCounts);
+              updatedCounts[playlist.id] = songs.length;
+              emit(state.copyWith(smartPlaylistCounts: updatedCounts));
+            },
+          );
         }
       }
     }
@@ -284,6 +285,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         .toList();
     for (final id in staleIds) {
       _smartSubscriptions[id]?.cancel();
+      removeFromComposite(_smartSubscriptions[id]);
       _smartSubscriptions.remove(id);
     }
   }
@@ -294,8 +296,9 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
 
   void loadPlaylistSongs(int playlistId) {
     _playlistSongsSub?.cancel();
-    _playlistSongsSub =
-        _playlistUseCases.watchPlaylistSongs(playlistId).listen((result) {
+    removeFromComposite(_playlistSongsSub);
+    _playlistSongsSub = autoSub<Result<List<SongsTableData>>>(
+        _playlistUseCases.watchPlaylistSongs(playlistId), (result) {
       if (isClosed) return;
       result.fold(
         (failure) => emit(state.copyWith(errorMessage: failure.message)),

@@ -85,7 +85,7 @@ abstract class SettingsState with _$SettingsState {
     @Default(false) bool isTestingAllProxies,
     // Extractor & Backend Settings
     @Default(ExtractorEngine.auto) ExtractorEngine extractorEngine,
-    @Default(true) bool ytdlpBackendEnabled,
+    @Default(false) bool ytdlpBackendEnabled,
     @Default('https://xdm-backend-10763667121.europe-west1.run.app')
     String ytdlpBackendUrl,
     @Default('') String ytdlpBackendToken,
@@ -116,6 +116,12 @@ abstract class SettingsState with _$SettingsState {
     @Default(false) bool monoMix,
     @Default(true) bool sincResamplerEnabled,
     @Default('native') String dspPreference,
+    // System audio effects (Dolby Atmos / vendor)
+    @Default('auto') String systemEffectsPolicy,
+    @Default('unknown') String systemEffectsStatus,
+    @Default(<String>[]) List<String> systemEffectsBundles,
+    // Bluetooth quality & sync
+    @Default(150) int bluetoothLatencyOffsetMs,
   }) = _SettingsState;
 
   Color get customAccentColor => Color(customAccentColorValue);

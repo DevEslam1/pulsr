@@ -390,8 +390,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
           orElse: () => ExtractorEngine.auto,
         ),
         ytdlpBackendEnabled:
-            prefs.getBool(PrefsKeys.ytdlpBackendEnabled) ??
-            state.ytdlpBackendEnabled,
+            prefs.getBool(PrefsKeys.ytdlpBackendEnabled) ?? false,
         ytdlpBackendUrl:
             prefs.getString(PrefsKeys.ytdlpBackendUrl) ?? state.ytdlpBackendUrl,
         ytdlpBackendToken:
@@ -440,11 +439,20 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
             state.sincResamplerEnabled,
         dspPreference:
             prefs.getString(_keyDspPreference) ?? state.dspPreference,
+        systemEffectsPolicy:
+            prefs.getString(PrefsKeys.systemEffectsPolicy) ?? state.systemEffectsPolicy,
+        bluetoothLatencyOffsetMs:
+            prefs.getInt(PrefsKeys.bluetoothLatencyOffsetMs) ?? state.bluetoothLatencyOffsetMs,
       );
 
       _proxyPassword = proxyPassword;
-      if (!isClosed) emit(newState);
       await AudioEffectsChannel().setDspPreference(newState.dspPreference);
+      try {
+        await AudioEffectsChannel().setSystemEffectsPolicy(
+          newState.systemEffectsPolicy,
+          isHiResOrBitPerfect: newState.bitPerfectOutput,
+        );
+      } catch (_) {}
       if (newState.bitPerfectOutput) {
         await _hiResAudioService.setBitPerfectMode(true);
       }
@@ -453,6 +461,18 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         // effects plugin keeps its default (bypass off) after a restart and
         // the saved bit-perfect conflict rule is not enforced this session.
         await AudioEffectsChannel().setBypassDspForBitPerfect(true);
+      }
+      if (!isClosed) {
+        emit(newState.copyWith(
+          proxyEnabled: state.proxyHost.isNotEmpty ? state.proxyEnabled : newState.proxyEnabled,
+          proxyType: state.proxyHost.isNotEmpty ? state.proxyType : newState.proxyType,
+          proxyHost: state.proxyHost.isNotEmpty ? state.proxyHost : newState.proxyHost,
+          proxyPort: state.proxyHost.isNotEmpty ? state.proxyPort : newState.proxyPort,
+          proxyUsername: state.proxyHost.isNotEmpty ? state.proxyUsername : newState.proxyUsername,
+          hasProxyPassword: state.proxyHost.isNotEmpty ? state.hasProxyPassword : newState.hasProxyPassword,
+          proxyBypassHosts: state.proxyHost.isNotEmpty ? state.proxyBypassHosts : newState.proxyBypassHosts,
+          proxyList: state.proxyList.isNotEmpty ? state.proxyList : newState.proxyList,
+        ));
       }
       final savedSampleRate = prefs.getInt('target_output_sample_rate') ?? 0;
       final savedBitDepth = prefs.getInt('target_output_bit_depth') ?? 0;
@@ -701,12 +721,12 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
   }) async {
     final trimmedHost = host.trim();
     if (enabled) {
-      if (trimmedHost.isEmpty ||
-          (!RegExp(r'^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$').hasMatch(trimmedHost) &&
-              !RegExp(r'^([0-9a-fA-F]{1,4}:){1,7}[0-9a-fA-F]{1,4}$').hasMatch(trimmedHost) &&
-              !RegExp(r'^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$').hasMatch(trimmedHost) &&
-              trimmedHost != 'localhost' &&
-              trimmedHost != '127.0.0.1')) {
+      final isIPv4 = RegExp(r'^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$').hasMatch(trimmedHost);
+      final isIPv6 = RegExp(r'^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$').hasMatch(trimmedHost) ||
+          trimmedHost == '::1' || trimmedHost.startsWith('fe80:');
+      final isHostname = RegExp(r'^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$').hasMatch(trimmedHost);
+      final isLocalhost = trimmedHost == 'localhost' || trimmedHost == '127.0.0.1';
+      if (trimmedHost.isEmpty || (!isIPv4 && !isIPv6 && !isHostname && !isLocalhost)) {
         emit(state.copyWith(errorMessage: 'Invalid proxy host format'));
         return;
       }
@@ -1318,5 +1338,41 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       'setting_lookahead_limiter_lookahead_ms',
       newLookahead,
     );
+  }
+
+  Future<void> setSystemEffectsPolicy(String policy) async {
+    emit(state.copyWith(systemEffectsPolicy: policy));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(PrefsKeys.systemEffectsPolicy, policy);
+    try {
+      final status = await AudioEffectsChannel().setSystemEffectsPolicy(
+        policy,
+        isHiResOrBitPerfect: state.bitPerfectOutput,
+      );
+      if (!isClosed) {
+        emit(state.copyWith(systemEffectsStatus: status));
+      }
+    } catch (_) {}
+  }
+
+  Future<void> refreshSystemEffectsStatus() async {
+    try {
+      final result = await AudioEffectsChannel().detectSystemEffects();
+      final status = result['status'] as String? ?? 'unknown';
+      final bundles = (result['detectedBundles'] as List<dynamic>?)?.cast<String>() ?? [];
+      if (!isClosed) {
+        emit(state.copyWith(
+          systemEffectsStatus: status,
+          systemEffectsBundles: bundles,
+        ));
+      }
+    } catch (_) {}
+  }
+
+  Future<void> setBluetoothLatencyOffsetMs(int offsetMs) async {
+    final clamped = offsetMs.clamp(0, 500);
+    emit(state.copyWith(bluetoothLatencyOffsetMs: clamped));
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(PrefsKeys.bluetoothLatencyOffsetMs, clamped);
   }
 }

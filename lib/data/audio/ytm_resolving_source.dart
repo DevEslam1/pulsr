@@ -10,6 +10,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:mutex/mutex.dart';
 import 'package:path/path.dart' as p;
 import '../../core/di/injection.dart';
 import '../../core/errors/ytm_error_classifier.dart';
@@ -61,6 +62,7 @@ class YtmResolvingSource extends StreamAudioSource {
   String? userAgent;
   String? cookies;
 
+  final Mutex _requestMutex = Mutex();
   LockCachingAudioSource? _inner;
   Future<LockCachingAudioSource>? _pending;
   DateTime? _resolvedExpiresAt;
@@ -79,75 +81,77 @@ class YtmResolvingSource extends StreamAudioSource {
 
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
-    // 1. Proactive expiry check: if URL is within 5 minutes of expiring, discard & re-resolve
-    if (_isExpiringSoon()) {
-      debugPrint(
-        '[YtmResolvingSource] Stream URL for $videoId is expiring soon. Re-resolving...',
-      );
-      _inner = null;
-      _pending = null;
-    }
-
-    try {
-      final inner = await _ensureInner();
-      try {
-        final res = await inner.request(start, end);
-        try {
-          _latency?.markStage(PlaybackStage.firstBytesReady);
-        } catch (_) {}
-        return res;
-      } catch (byteErr) {
-        final errStr = byteErr.toString().toLowerCase();
-
-        // Check if error represents a stale/forbidden stream URL (403/404/416/408)
-        final is403or404 =
-            errStr.contains('403') ||
-            errStr.contains('forbidden') ||
-            errStr.contains('404') ||
-            errStr.contains('408') ||
-            errStr.contains('416');
-
+    return await _requestMutex.protect(() async {
+      // 1. Proactive expiry check: if URL is within 5 minutes of expiring, discard & re-resolve
+      if (_isExpiringSoon()) {
         debugPrint(
-          '[YtmResolvingSource] Byte stream error ($byteErr, isForbidden/Stale=$is403or404) for $videoId. Evicting dead URL & retrying fresh resolution once...',
+          '[YtmResolvingSource] Stream URL for $videoId is expiring soon. Re-resolving...',
         );
         _inner = null;
         _pending = null;
+      }
 
-        // Evict and blacklist dead URL in cache for this video
-        _effectiveUrlCache?.evictDeadUrl(videoId, _lastResolvedUrl);
-
+      try {
+        final inner = await _ensureInner();
         try {
-          await _deleteCacheFilesFor(videoId);
-        } catch (_) {}
-
-        // Single retry through fresh resolution pipeline
-        try {
-          final freshInner = await _createInner(forceRefresh: true);
-          final res = await freshInner.request(start, end);
+          final res = await inner.request(start, end);
           try {
             _latency?.markStage(PlaybackStage.firstBytesReady);
           } catch (_) {}
           return res;
-        } catch (retryErr) {
-          // Classify failure to ensure structured diagnostics
-          final classified = YtmErrorClassifier.classify(retryErr);
+        } catch (byteErr) {
+          final errStr = byteErr.toString().toLowerCase();
+
+          // Check if error represents a stale/forbidden stream URL (403/404/416/408)
+          final is403or404 =
+              errStr.contains('403') ||
+              errStr.contains('forbidden') ||
+              errStr.contains('404') ||
+              errStr.contains('408') ||
+              errStr.contains('416');
+
           debugPrint(
-            '[YtmResolvingSource] Retry resolution failed ($retryErr): ${classified.message}',
+            '[YtmResolvingSource] Byte stream error ($byteErr, isForbidden/Stale=$is403or404) for $videoId. Evicting dead URL & retrying fresh resolution once...',
           );
-          onError?.call(retryErr);
-          rethrow;
+          _inner = null;
+          _pending = null;
+
+          // Evict and blacklist dead URL in cache for this video
+          _effectiveUrlCache?.evictDeadUrl(videoId, _lastResolvedUrl);
+
+          try {
+            await _deleteCacheFilesFor(videoId);
+          } catch (_) {}
+
+          // Single retry through fresh resolution pipeline
+          try {
+            final freshInner = await _createInner(forceRefresh: true);
+            final res = await freshInner.request(start, end);
+            try {
+              _latency?.markStage(PlaybackStage.firstBytesReady);
+            } catch (_) {}
+            return res;
+          } catch (retryErr) {
+            // Classify failure to ensure structured diagnostics
+            final classified = YtmErrorClassifier.classify(retryErr);
+            debugPrint(
+              '[YtmResolvingSource] Retry resolution failed ($retryErr): ${classified.message}',
+            );
+            onError?.call(retryErr);
+            rethrow;
+          }
         }
+      } catch (err) {
+        _inner = null;
+        _pending = null;
+        final classified = YtmErrorClassifier.classify(err);
+        debugPrint(
+          '[YtmResolvingSource] Initial resolution failed ($err): ${classified.message}',
+        );
+        onError?.call(err);
+        rethrow;
       }
-    } catch (err) {
-      _inner = null;
-      _pending = null;
-      final classified = YtmErrorClassifier.classify(err);
-      debugPrint(
-        '[YtmResolvingSource] Initial resolution failed ($err): ${classified.message}',
-      );
-      onError?.call(err);
-      rethrow;
-    }
+    });
   }
 
   bool _isExpiringSoon() {
@@ -240,7 +244,7 @@ class YtmResolvingSource extends StreamAudioSource {
         'User-Agent': effectiveUa
       else
         'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.7151.119 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.7204.93 Safari/537.36',
       if (effectiveCookies != null && effectiveCookies.isNotEmpty)
         'Cookie': effectiveCookies,
       'Referer': 'https://music.youtube.com/',

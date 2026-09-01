@@ -13,8 +13,13 @@ import '../../../core/utils/adaptive.dart';
 import '../utils/google_login_recovery.dart';
 
 class YtmWebLoginSheet extends StatefulWidget {
+  // Use the modern Google accounts sign-in flow (v3 identifier endpoint).
+  // The older ServiceLogin URL is more aggressively fingerprinted for
+  // embedded browsers — the v3 path goes through the same risk checks but
+  // is substantially less likely to show the "This browser may not be secure"
+  // interstitial for WebView UAs that pass the other signal checks.
   static const String googleSignInUrl =
-      'https://accounts.google.com/ServiceLogin?service=youtube&continue=https%3A%2F%2Fmusic.youtube.com%2F&hl=en';
+      'https://accounts.google.com/v3/signin/identifier?continue=https%3A%2F%2Fmusic.youtube.com%2F&service=youtube&hl=en&flowName=GlifWebSignIn&flowEntry=ServiceLogin';
 
   final String? initialUrl;
   final String? title;
@@ -158,7 +163,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
     final initialUa = _uaIdentityOverride != null
         ? _uaFor(_uaIdentityOverride!)
-        : desktopUserAgent;
+        : (widget.isBrowseMode ? desktopUserAgent : mobileUserAgent);
 
     _settings = InAppWebViewSettings(
       userAgent: initialUa,
@@ -470,7 +475,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     _scheduleNextAuthPoll();
     final targetUa = _uaIdentityOverride != null
         ? _uaFor(_uaIdentityOverride!)
-        : desktopUserAgent;
+        : (widget.isBrowseMode ? desktopUserAgent : mobileUserAgent);
     try {
       await _webViewController?.setSettings(
         settings: InAppWebViewSettings(userAgent: targetUa),
@@ -964,6 +969,14 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                               ),
                               const SizedBox(width: 4),
                               IconButton(
+                                icon: const Icon(
+                                    Icons.music_note_rounded,
+                                    size: 20),
+                                tooltip: 'Open YouTube Music web',
+                                onPressed: () => _navigateTo('https://music.youtube.com'),
+                              ),
+                              const SizedBox(width: 4),
+                              IconButton(
                                 icon:
                                     const Icon(Icons.refresh_rounded, size: 20),
                                 tooltip: 'Refresh page',
@@ -1175,7 +1188,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                           if (mounted) setState(() => _isLoading = true);
                           final targetUa = _uaIdentityOverride != null
                               ? _uaFor(_uaIdentityOverride!)
-                              : desktopUserAgent;
+                              : (widget.isBrowseMode ? desktopUserAgent : mobileUserAgent);
                           try {
                             await controller.setSettings(
                               settings:
@@ -1353,6 +1366,23 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                     ? 'Use Mobile browser identity'
                     : 'Use Desktop browser identity',
                 style: const TextStyle(fontWeight: FontWeight.w700)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: p.textPrimary,
+              side: BorderSide(color: p.hairline),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () {
+              setState(() => _blockExhausted = false);
+              _navigateTo('https://music.youtube.com');
+            },
+            icon: const Icon(Icons.music_note_rounded, size: 18),
+            label: const Text('Open YouTube Music web directly',
+                style: TextStyle(fontWeight: FontWeight.w700)),
             style: OutlinedButton.styleFrom(
               foregroundColor: p.textPrimary,
               side: BorderSide(color: p.hairline),

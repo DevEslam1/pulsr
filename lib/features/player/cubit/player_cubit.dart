@@ -22,6 +22,7 @@ import '../../../data/scanner/media_scanner_service.dart';
 import '../../../domain/models/audio_effects_config.dart';
 import '../../../domain/models/eq_preset.dart';
 import '../../../domain/models/headphone_profile.dart';
+import '../../../data/audio/headphone_profiles_repository.dart';
 import '../../../domain/models/lyrics_line.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../domain/usecases/toggle_favorite_usecase.dart';
@@ -30,7 +31,7 @@ import '../../../core/services/hires_audio_service.dart';
 import '../../../core/services/settings_profiles_service.dart';
 import '../../../domain/models/audio_output_info.dart';
 import '../../settings/cubit/settings_cubit.dart';
-import '../../widgets/widget_service.dart';
+import '../../home_widget/widget_service.dart';
 import 'player_state.dart';
 
 class _QueueSlotData {
@@ -470,10 +471,15 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
                         ? Duration(milliseconds: resolvedSong!.durationMs)
                         : state.duration);
             final isSameSong = state.currentSong?.id == resolvedSong!.id;
+            final songQueueIndex =
+                state.queue.indexWhere((s) => s.id == resolvedSong!.id);
+            final effectiveIndex =
+                songQueueIndex != -1 ? songQueueIndex : state.currentIndex;
 
             safeEmit(
               state.copyWith(
                 currentSong: resolvedSong,
+                currentIndex: effectiveIndex,
                 duration: duration,
                 position: isSameSong ? state.position : Duration.zero,
                 errorMessage: null,
@@ -1533,6 +1539,19 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       }
       if (profile.dynamicEqEnabled != null) {
         await setDynamicEq(profile.dynamicEqEnabled!);
+      }
+      if (profile.crossfeedEnabled != null) {
+        await setCrossfeed(
+          profile.crossfeedEnabled!,
+          delayUs: profile.crossfeedDelayUs,
+          feedDb: profile.crossfeedFeedDb,
+        );
+      }
+      if (profile.headphoneProfileId != null) {
+        final repo = HeadphoneProfilesRepository();
+        await repo.loadProfiles();
+        final hpProfile = repo.getProfileById(profile.headphoneProfileId!);
+        await applyHeadphoneProfile(hpProfile);
       }
       final settings = _settingsCubit;
       if (settings != null) {

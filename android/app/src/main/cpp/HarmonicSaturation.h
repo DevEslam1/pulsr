@@ -35,6 +35,10 @@ public:
     double getDriveK() const { return k_; }
 
 private:
+    static constexpr int OVERSAMPLE_FACTOR = 4;
+    static constexpr int FIR_TAPS = 24;
+    static constexpr int TAPS_PER_PHASE = FIR_TAPS / OVERSAMPLE_FACTOR; // 6
+
     double sampleRate_ = 48000.0;
     double drive_ = 0.0;
     double mix_ = 0.5;
@@ -44,4 +48,7 @@ private:
     bool enabled_ = false;
 
     float hpState_[MAX_CHANNELS] = {};
+    float history_[MAX_CHANNELS][TAPS_PER_PHASE] = {};
+
+    static const float polyphase4x_[OVERSAMPLE_FACTOR][TAPS_PER_PHASE];
 };

@@ -28,6 +28,7 @@ public:
     double getInRate() const { return inRate_; }
     double getOutRate() const { return outRate_; }
     double getRatio() const { return ratio_; }
+    bool isBypassed() const { return std::abs(inRate_ - outRate_) < 0.5; }
 
     // Latency reporting in frames (exact group delay)
     int getLatencyFrames() const { return HALF_TAPS; }

@@ -49,7 +49,14 @@ private:
         double b0 = 1.0, b1 = 0.0, b2 = 0.0, a1 = 0.0, a2 = 0.0;
         double x1 = 0.0, x2 = 0.0, y1 = 0.0, y2 = 0.0;
         inline float process(float x) {
-            const double y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+            if (!std::isfinite(x)) x = 0.0f;
+            double y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+            if (!std::isfinite(y)) {
+                y = x;
+                x1 = x2 = y1 = y2 = 0.0;
+            }
+            if (std::abs(y1) < 1e-25) y1 = 0.0;
+            if (std::abs(y2) < 1e-25) y2 = 0.0;
             x2 = x1; x1 = x;
             y2 = y1; y1 = y;
             return static_cast<float>(y);

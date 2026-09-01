@@ -52,6 +52,7 @@ class CrossfadeManager {
   bool isCrossfading = false;
   int? pendingIndex;
   int _fadeId = 0;
+  int _cancelGeneration = 0;
   Completer<void>? _crossfadeCompleter;
   final Map<int, Completer<void>> _activeFadeCompleters =
       <int, Completer<void>>{};
@@ -238,6 +239,7 @@ class CrossfadeManager {
     final completer = Completer<void>();
     _activeFadeCompleters[fadeId] = completer;
     final stopwatch = Stopwatch()..start();
+    final gen = _cancelGeneration;
 
     void finish() {
       _activeFadeCompleters.remove(fadeId);
@@ -248,7 +250,7 @@ class CrossfadeManager {
 
     late final Timer timer;
     timer = Timer.periodic(const Duration(milliseconds: 16), (t) {
-      if (_fadeId != fadeId) {
+      if (_fadeId != fadeId || gen != _cancelGeneration) {
         t.cancel();
         _activeTimers.remove(t);
         finish();
@@ -315,6 +317,7 @@ class CrossfadeManager {
     final completer = Completer<void>();
     _activeFadeCompleters[fadeId] = completer;
     final stopwatch = Stopwatch()..start();
+    final gen = _cancelGeneration;
 
     void finish() {
       _activeFadeCompleters.remove(fadeId);
@@ -325,7 +328,7 @@ class CrossfadeManager {
 
     late final Timer timer;
     timer = Timer.periodic(const Duration(milliseconds: 16), (t) {
-      if (_fadeId != fadeId) {
+      if (_fadeId != fadeId || gen != _cancelGeneration) {
         t.cancel();
         _activeTimers.remove(t);
         finish();
@@ -371,6 +374,7 @@ class CrossfadeManager {
         isCrossfading || _activeTimers.isNotEmpty || _fadeTimer != null;
     if (!hadActiveFade) return;
 
+    _cancelGeneration++; // Invalidate all in-flight timers
     _fadeId++; // Invalidate any in-progress fade timers
     final activeTimers = List<Timer>.from(_activeTimers);
     for (final t in activeTimers) {

@@ -139,12 +139,12 @@ public:
 
     int processInterleaved(float* buffer, int frames, int channels = 2);
     void reset();
+    void publishParams(std::shared_ptr<const DspParamSnapshot> snapshot);
 
 private:
     void setSampleRateInternal(double sampleRate);
     void applySampleRateLocked(double sampleRate);
     void resetInternal();
-    void publishParams(std::shared_ptr<const DspParamSnapshot> snapshot);
 
     double sampleRate_ = 48000.0;
     std::atomic<uint64_t> snapshotGeneration_{1};
@@ -174,6 +174,26 @@ private:
     SincResampler resampler_;
     SpatialPanner panner_;
     DsdDecoder dsdDecoder_;
+    // Real-time zero-allocation PRNG for TPDF dither
+    uint32_t ditherPrngState1_ = 0x12345678;
+    uint32_t ditherPrngState2_ = 0x87654321;
+    double smoothedReplayGain_ = 1.0;
+    double targetReplayGain_ = 1.0;
+
+    inline float generateTpdf() {
+        ditherPrngState1_ ^= ditherPrngState1_ << 13;
+        ditherPrngState1_ ^= ditherPrngState1_ >> 17;
+        ditherPrngState1_ ^= ditherPrngState1_ << 5;
+
+        ditherPrngState2_ ^= ditherPrngState2_ << 13;
+        ditherPrngState2_ ^= ditherPrngState2_ >> 17;
+        ditherPrngState2_ ^= ditherPrngState2_ << 5;
+
+        const float r1 = static_cast<float>(ditherPrngState1_) * (1.0f / 4294967296.0f);
+        const float r2 = static_cast<float>(ditherPrngState2_) * (1.0f / 4294967296.0f);
+        return r1 - r2;
+    }
+
     // Phase 1 DSP-expansion stages (all zero-latency IIR/pointwise, so they
     // contribute nothing to getPipelineLatencyFrames)
     HarmonicSaturation saturation_;

@@ -23,9 +23,11 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     if (criteria.rules.isNotEmpty) {
       query.where((t) {
         Expression<bool>? combined;
+        bool hasValidRule = false;
         for (final rule in criteria.rules) {
           final expr = _buildRuleExpression(t, rule);
           if (expr == null) continue;
+          hasValidRule = true;
           if (combined == null) {
             combined = expr;
           } else {
@@ -33,6 +35,7 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
                 criteria.matchAll ? (combined & expr) : (combined | expr);
           }
         }
+        if (!hasValidRule) return const Constant(false);
         return combined ?? const Constant(true);
       });
     }

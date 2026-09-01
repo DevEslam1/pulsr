@@ -2780,6 +2780,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Download actions for {title}'**
   String downloadActionsSemantics(String title);
+
+  /// No description provided for @systemEffectsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'System Audio Effects (Dolby Atmos / DAP)'**
+  String get systemEffectsTitle;
+
+  /// No description provided for @systemEffectsSubtitleBypassed.
+  ///
+  /// In en, this message translates to:
+  /// **'✓ Bypassed: System effects disabled on output-mix session'**
+  String get systemEffectsSubtitleBypassed;
+
+  /// No description provided for @systemEffectsSubtitleActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active: OEM sound effects are processing audio'**
+  String get systemEffectsSubtitleActive;
+
+  /// No description provided for @systemEffectsSubtitleUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'No OEM Dolby/DAP detected on this device'**
+  String get systemEffectsSubtitleUnsupported;
+
+  /// No description provided for @systemEffectsAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get systemEffectsAuto;
+
+  /// No description provided for @systemEffectsTryDisable.
+  ///
+  /// In en, this message translates to:
+  /// **'Try to disable'**
+  String get systemEffectsTryDisable;
+
+  /// No description provided for @systemEffectsLeaveOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave on'**
+  String get systemEffectsLeaveOn;
+
+  /// No description provided for @bluetoothLatencyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth Latency Sync (AVRCP / Lyrics)'**
+  String get bluetoothLatencyTitle;
+
+  /// No description provided for @bluetoothLatencySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Compensates for Bluetooth audio codec buffer latency ({offset} ms). Volume deferral: AVRCP absolute volume active.'**
+  String bluetoothLatencySubtitle(int offset);
 }
 
 class _AppLocalizationsDelegate

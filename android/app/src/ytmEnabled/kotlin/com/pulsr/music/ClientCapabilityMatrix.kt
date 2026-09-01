@@ -198,25 +198,12 @@ internal object ClientCapabilityMatrix {
         )
     }
 
-    fun getEligibleClients(
-        supportsStreamResolve: Boolean = false,
-        supportsSearch: Boolean = false,
-        supportsBrowse: Boolean = false,
-        hasPoToken: Boolean = false,
-        isLoggedIn: Boolean = false,
-        hasJsSignatureEngine: Boolean = true
-    ): List<InnertubeClient.ClientType> {
-        return capabilities.values
-            .filter { cap ->
-                if (supportsStreamResolve && !cap.supportsStreamResolve) return@filter false
-                if (supportsSearch && !cap.supportsSearch) return@filter false
-                if (supportsBrowse && !cap.supportsBrowse) return@filter false
-                if (cap.requiresPoToken && !hasPoToken) return@filter false
-                if (cap.requiresLogin && !isLoggedIn) return@filter false
-                if (cap.requiresJsSignature && !hasJsSignatureEngine) return@filter false
-                true
-            }
-            .sortedByDescending { it.priority }
-            .map { it.clientType }
+    fun updateClientVersion(clientType: InnertubeClient.ClientType, newVersion: String) {
+        val current = capabilities[clientType] ?: defaultCapabilities[clientType] ?: return
+        val updated = current.copy(defaultClientVersion = newVersion)
+        val mutable = capabilities.toMutableMap()
+        mutable[clientType] = updated
+        capabilities = mutable
+        Log.d(TAG, "Updated client ${clientType.name} version override to $newVersion")
     }
 }

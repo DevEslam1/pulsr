@@ -551,8 +551,10 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   final Map<String, Timer> _throttleFlushTimers = {};
   final Map<String, DownloadTask> _pendingThrottledTasks = {};
   static const _throttleMs = 200;
+  bool _disposed = false;
 
   void _updateTask(DownloadTask task) {
+    if (_disposed) return;
     _tasks[task.videoId] = task;
 
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -584,7 +586,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       _throttleFlushTimers[task.videoId] = Timer(const Duration(milliseconds: _throttleMs), () {
         final pending = _pendingThrottledTasks.remove(task.videoId);
         _throttleFlushTimers.remove(task.videoId);
-        if (pending != null) {
+        if (pending != null && !_disposed) {
           _lastProgressEmitMs[pending.videoId] = DateTime.now().millisecondsSinceEpoch;
           if (!_streamController.isClosed) _streamController.add(pending);
           _pushFgsProgress(pending);
@@ -622,6 +624,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   }
 
   void dispose() {
+    _disposed = true;
     _saveDebounce?.cancel();
     for (final t in _throttleFlushTimers.values) {
       t.cancel();
@@ -704,7 +707,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     return GenericDownloadFailure(e.toString(), e);
   }
 
-  bool _tryUpdateTaskStatus(DownloadTask current, DownloadStatus targetStatus, {
+  Future<bool> _tryUpdateTaskStatus(
+    DownloadTask current,
+    DownloadStatus targetStatus, {
     double? progress,
     double? speedKbps,
     int? etaSeconds,
@@ -715,33 +720,37 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     bool clearTotalBytes = false,
     int? librarySongId,
     String? filePath,
-  }) {
-    final validation = TransitionGuard.validate(current.status, targetStatus);
-    return validation.fold(
-      (failure) {
-        ErrorLogger.log(
-          'Illegal state transition rejected for ${current.videoId}: ${current.status} -> $targetStatus',
-          category: 'DownloadsRepository',
-        );
-        return false;
-      },
-      (_) {
-        _updateTask(current.copyWith(
-          status: targetStatus,
-          progress: progress,
-          speedKbps: speedKbps,
-          etaSeconds: etaSeconds,
-          error: error,
-          clearError: clearError,
-          clearSpeedKbps: clearSpeedKbps,
-          clearEtaSeconds: clearEtaSeconds,
-          clearTotalBytes: clearTotalBytes,
-          librarySongId: librarySongId,
-          filePath: filePath,
-        ));
-        return true;
-      },
-    );
+  }) async {
+    final lock = _taskLocks.putIfAbsent(current.videoId, () => Mutex());
+    return await lock.protect(() async {
+      final latest = _tasks[current.videoId] ?? current;
+      final validation = TransitionGuard.validate(latest.status, targetStatus);
+      return validation.fold(
+        (failure) {
+          ErrorLogger.log(
+            'Illegal state transition rejected for ${latest.videoId}: ${latest.status} -> $targetStatus',
+            category: 'DownloadsRepository',
+          );
+          return false;
+        },
+        (_) {
+          _updateTask(latest.copyWith(
+            status: targetStatus,
+            progress: progress,
+            speedKbps: speedKbps,
+            etaSeconds: etaSeconds,
+            error: error,
+            clearError: clearError,
+            clearSpeedKbps: clearSpeedKbps,
+            clearEtaSeconds: clearEtaSeconds,
+            clearTotalBytes: clearTotalBytes,
+            librarySongId: librarySongId,
+            filePath: filePath,
+          ));
+          return true;
+        },
+      );
+    });
   }
 
   Future<void> _executeTask(DownloadTask task) async {
@@ -754,7 +763,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       final prefs = await SharedPreferences.getInstance();
       final offlineOnly = prefs.getBool('setting_offline_only_mode') ?? false;
       if (offlineOnly) {
-        _tryUpdateTaskStatus(task, DownloadStatus.failed,
+        await _tryUpdateTaskStatus(task, DownloadStatus.failed,
             error: 'Offline Only Mode is active in Settings');
         _activeCompleters.remove(videoId);
         completer.complete();
@@ -766,7 +775,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             ? getIt<YtmService>().isWifiConnected()
             : Future.value(true));
         if (!isWifi) {
-          _tryUpdateTaskStatus(task, DownloadStatus.interrupted,
+          await _tryUpdateTaskStatus(task, DownloadStatus.interrupted,
               error: 'Wi-Fi Only Mode is active. Connect to Wi-Fi to download.');
           _activeCompleters.remove(videoId);
           completer.complete();
@@ -776,7 +785,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
     } catch (_) {}
 
     // D-01: Validate status transition via TransitionGuard
-    _tryUpdateTaskStatus(task, DownloadStatus.downloading, clearError: true);
+    await _tryUpdateTaskStatus(task, DownloadStatus.downloading, clearError: true);
 
     // Stall watchdog (Dart-side mirror of DownloadTimeoutHandler): cancels the
     // service's cancellation token when no progress arrives within the window
@@ -845,8 +854,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           return;
         }
 
-        result.fold(
-          (failure) {
+        await result.fold(
+          (failure) async {
             final current = _tasks[videoId] ?? task;
             // A watchdog-cancel masquerades as "Download canceled" downstream;
             // re-label it so the UI/retry classifier sees a retryable timeout.
@@ -855,7 +864,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
                 : failure.message;
             final transient =
                 _isTransientFailure(failure) && attempt <= _maxAutoRetries;
-            _tryUpdateTaskStatus(
+            await _tryUpdateTaskStatus(
               current,
               transient
                   ? DownloadStatus.interrupted
@@ -877,14 +886,14 @@ class DownloadRepositoryImpl implements IDownloadRepository {
               );
             }
           },
-          (newId) {
+          (newId) async {
             _cachedStorageStats = null; // Invalidate storage stats cache on completion
             final current = _tasks[videoId] ?? task;
             // Atomic commit: YtDownloadService already verified size and renamed .part → final via MediaStore.
             // librarySongId travels with the terminal event so observers (e.g.
             // the player swap after a search-initiated download) can follow
             // the reconciled row without a second lookup.
-            _tryUpdateTaskStatus(
+            await _tryUpdateTaskStatus(
               current,
               DownloadStatus.complete,
               progress: 1.0,
@@ -938,7 +947,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         if (_pausedVideoIds.contains(videoId) || !_tasks.containsKey(videoId)) {
           return;
         }
-        _tryUpdateTaskStatus(
+        await _tryUpdateTaskStatus(
           _tasks[videoId]!,
           DownloadStatus.downloading,
           clearError: true,
@@ -948,7 +957,7 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       if (_tasks.containsKey(videoId)) {
         final failure = _mapExceptionToFailure(e);
         final current = _tasks[videoId] ?? task;
-        _tryUpdateTaskStatus(
+        await _tryUpdateTaskStatus(
           current,
           DownloadStatus.failed,
           error: failure.message,

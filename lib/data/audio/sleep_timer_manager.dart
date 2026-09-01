@@ -62,10 +62,12 @@ class SleepTimerManager {
 
     if (duration < const Duration(seconds: 1)) {
       // Sub-second timer for unit tests
-      Timer(duration, () async {
+      _countdownTicker = Timer(duration, () async {
         if (_isArmed && _sleepFadeToken == currentToken) {
           _remainingDuration = Duration.zero;
-          _sleepTimerRemainingSubject.add(null);
+          if (!_sleepTimerRemainingSubject.isClosed) {
+            _sleepTimerRemainingSubject.add(null);
+          }
           await _executeExpiration(currentToken);
         }
       });

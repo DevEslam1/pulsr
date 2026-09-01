@@ -17,9 +17,10 @@ class LadderAbortPolicyTest {
         assertFalse(policy.shouldAbort())
         policy.onLoginRequired(true)
         policy.onLoginRequired(true)
+        policy.onLoginRequired(true)
         assertFalse("below threshold must not abort", policy.shouldAbort())
         policy.onLoginRequired(true)
-        assertTrue("3 consecutive LOGIN_REQUIRED must abort", policy.shouldAbort())
+        assertTrue("4 consecutive LOGIN_REQUIRED must abort", policy.shouldAbort())
     }
 
     @Test
@@ -27,10 +28,12 @@ class LadderAbortPolicyTest {
         val policy = LadderAbortPolicy()
         policy.onLoginRequired(true)
         policy.onLoginRequired(true)
+        policy.onLoginRequired(true)
         // A client failing for a different reason (network error, UNPLAYABLE,
         // empty formats) breaks the "consecutive LOGIN_REQUIRED" streak.
         policy.onLoginRequired(false)
         assertFalse(policy.shouldAbort())
+        policy.onLoginRequired(true)
         policy.onLoginRequired(true)
         policy.onLoginRequired(true)
         assertFalse("streak was reset - still below threshold", policy.shouldAbort())

@@ -44,9 +44,13 @@ private:
         double b0 = 1.0, b1 = 0.0, b2 = 0.0, a1 = 0.0, a2 = 0.0;
         double z1 = 0.0, z2 = 0.0;
         inline float process(float x) {
-            const double y = b0 * x + z1;
+            if (!std::isfinite(x)) x = 0.0f;
+            double y = b0 * x + z1;
+            if (!std::isfinite(y)) { y = x; z1 = z2 = 0.0; }
             z1 = b1 * x - a1 * y + z2;
             z2 = b2 * x - a2 * y;
+            if (std::abs(z1) < 1e-25) z1 = 0.0;
+            if (std::abs(z2) < 1e-25) z2 = 0.0;
             return static_cast<float>(y);
         }
     };
@@ -60,7 +64,9 @@ private:
     bool enabled_ = false;
     bool cascade_ = true; // 24 dB/oct = two cascaded sections
 
-    // Per channel: up to two cascaded 2nd-order Butterworth LP sections
-    LpStage stage1_[MAX_CHANNELS];
-    LpStage stage2_[MAX_CHANNELS];
+    static constexpr int MAX_PAIRS = MAX_CHANNELS / 2; // 4 stereo pairs
+
+    // Per channel pair: up to two cascaded 2nd-order Butterworth LP sections
+    LpStage stage1_[MAX_PAIRS];
+    LpStage stage2_[MAX_PAIRS];
 };

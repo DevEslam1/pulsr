@@ -86,13 +86,6 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     emitEffect(ShowToastEffect(message));
   }
 
-  bool _isActive(DownloadStatus? s) =>
-      s == DownloadStatus.queued ||
-      s == DownloadStatus.downloading ||
-      s == DownloadStatus.embedding ||
-      s == DownloadStatus.paused ||
-      s == DownloadStatus.interrupted;
-
   Future<void> _withTaskLock(String id, Future<void> Function() action) async {
     final e = _taskLocks.putIfAbsent(id, _RefMutex.new);
     e.waiters++;
@@ -100,8 +93,7 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
       await e.m.protect(action);
     } finally {
       e.waiters--;
-      final currentStatus = state.tasks[id]?.status;
-      if (e.waiters == 0 && !_isActive(currentStatus) && _taskLocks[id] == e) {
+      if (e.waiters <= 0 && identical(_taskLocks[id], e)) {
         _taskLocks.remove(id);
       }
     }
@@ -441,12 +433,17 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
 
   @override
   Future<void> close() async {
-    for (final task in state.tasks.values) {
-      if (task.status.isActive) {
-        try {
-          await _deleteDownloadUseCase(task.videoId);
-        } catch (_) {}
-      }
+    final activeTasks = state.tasks.values
+        .where((t) => t.status.isActive)
+        .toList();
+    if (activeTasks.isNotEmpty) {
+      await Future.wait(
+        activeTasks.map((task) async {
+          try {
+            await _deleteDownloadUseCase(task.videoId);
+          } catch (_) {}
+        }),
+      );
     }
     _taskLocks.clear();
     return super.close();

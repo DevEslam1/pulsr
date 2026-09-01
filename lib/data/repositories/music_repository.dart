@@ -35,7 +35,8 @@ class MusicRepository implements IMusicRepository {
         ..where((t) =>
             t.isMissing.equals(false) &
             t.source.equals(SongSource.local) &
-            t.path.like('ytmusic://%').not());
+            t.path.like('ytmusic://%').not() &
+            t.path.equals('').not());
 
       if (searchQuery != null && searchQuery.trim().isNotEmpty) {
         final sanitizedQuery = searchQuery
@@ -43,15 +44,12 @@ class MusicRepository implements IMusicRepository {
             .toLowerCase()
             .replaceAll(r'\', r'\\')
             .replaceAll('%', r'\%')
-            .replaceAll('_', r'\_')
-            .replaceAll("'", "''");
-        final escaped = '%$sanitizedQuery%';
-        // FIX(BUG-03): Enforce explicit SQLite LIKE ESCAPE clause for literal % and _
-        query.where((t) => CustomExpression<bool>(
-              "lower(title) LIKE '$escaped' ESCAPE '\\' OR "
-              "lower(artist) LIKE '$escaped' ESCAPE '\\' OR "
-              "lower(album) LIKE '$escaped' ESCAPE '\\'",
-            ));
+            .replaceAll('_', r'\_');
+        final pattern = '%$sanitizedQuery%';
+        query.where((t) =>
+            t.title.lower().like(pattern) |
+            t.artist.lower().like(pattern) |
+            t.album.lower().like(pattern));
       }
 
       if (excludedFolders.isNotEmpty) {
@@ -63,7 +61,11 @@ class MusicRepository implements IMusicRepository {
             .toList();
 
         for (final prefix in sanitizedFolders) {
-          query.where((t) => t.path.like('$prefix%').not());
+          final escapedPrefix = prefix
+              .replaceAll(r'\', r'\\')
+              .replaceAll('%', r'\%')
+              .replaceAll('_', r'\_');
+          query.where((t) => t.path.like('$escapedPrefix%').not());
         }
       }
 
@@ -121,7 +123,8 @@ class MusicRepository implements IMusicRepository {
         ..where((t) =>
             t.isMissing.equals(false) &
             t.source.equals(SongSource.local) &
-            t.path.like('ytmusic://%').not());
+            t.path.like('ytmusic://%').not() &
+            t.path.equals('').not());
       if (sortBy == 'title') {
         query.orderBy([
           (t) => OrderingTerm(

@@ -170,7 +170,11 @@ void main() {
     test('googleSignInUrl points directly to Google Accounts ServiceLogin', () {
       expect(
         YtmWebLoginSheet.googleSignInUrl,
-        contains('accounts.google.com/ServiceLogin'),
+        contains('accounts.google.com'),
+      );
+      expect(
+        YtmWebLoginSheet.googleSignInUrl,
+        contains('flowEntry=ServiceLogin'),
       );
       expect(
         YtmWebLoginSheet.googleSignInUrl,

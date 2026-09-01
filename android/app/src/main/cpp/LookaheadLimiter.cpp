@@ -47,7 +47,9 @@ void LookaheadLimiter::configure(double lookaheadMs, double thresholdDb, double 
     );
 
     threshold_ = static_cast<float>(std::pow(10.0, thresholdDb_ / 20.0));
-    releaseCoeff_ = static_cast<float>(std::exp(-1.0 / (releaseMs_ * 0.001 * sampleRate_)));
+    fastReleaseCoeff_ = static_cast<float>(std::exp(-1.0 / (0.015 * sampleRate_))); // 15ms fast transient release
+    slowReleaseCoeff_ = static_cast<float>(std::exp(-1.0 / (std::max(releaseMs_, 50.0) * 0.001 * sampleRate_)));
+    releaseCoeff_ = slowReleaseCoeff_;
 }
 
 void LookaheadLimiter::setEnabled(bool enabled) {
@@ -66,6 +68,8 @@ void LookaheadLimiter::reset() {
     envelope_ = 1.0f;
     minGain_ = 1.0f;
     minGainAge_ = 0;
+    avgEnergy_ = 0.0f;
+    transientWeight_ = 0.0f;
 }
 
 float LookaheadLimiter::estimateTruePeak(const float* history) {
@@ -153,11 +157,24 @@ void LookaheadLimiter::process(float* L, float* R, int frames) {
 
         float targetGain = minGain_;
 
+        // Dynamic transient tracking for program-dependent release
+        const float energyCoeff = 0.001f;
+        avgEnergy_ += energyCoeff * (maxPeak - avgEnergy_);
+        if (avgEnergy_ < 1e-6f) avgEnergy_ = 1e-6f;
+        const float crest = maxPeak / avgEnergy_;
+        float currentTransient = std::clamp((crest - 1.2f) / 2.0f, 0.0f, 1.0f);
+        if (currentTransient > transientWeight_) {
+            transientWeight_ = currentTransient;
+        } else {
+            transientWeight_ *= 0.999f;
+        }
+        const float effectiveReleaseCoeff = (1.0f - transientWeight_) * slowReleaseCoeff_ + transientWeight_ * fastReleaseCoeff_;
+
         // Instantaneous attack to target minimum gain, smooth exponential release when lookahead window clears
         if (targetGain < envelope_) {
             envelope_ = targetGain;
         } else {
-            envelope_ = releaseCoeff_ * envelope_ + (1.0f - releaseCoeff_) * targetGain;
+            envelope_ = effectiveReleaseCoeff * envelope_ + (1.0f - effectiveReleaseCoeff) * targetGain;
             if (envelope_ > 0.99999f) {
                 envelope_ = 1.0f;
             }
@@ -221,10 +238,22 @@ void LookaheadLimiter::processMono(float* inOut, int frames) {
 
         float targetGain = minGain_;
 
+        const float energyCoeff = 0.001f;
+        avgEnergy_ += energyCoeff * (peak - avgEnergy_);
+        if (avgEnergy_ < 1e-6f) avgEnergy_ = 1e-6f;
+        const float crest = peak / avgEnergy_;
+        float currentTransient = std::clamp((crest - 1.2f) / 2.0f, 0.0f, 1.0f);
+        if (currentTransient > transientWeight_) {
+            transientWeight_ = currentTransient;
+        } else {
+            transientWeight_ *= 0.999f;
+        }
+        const float effectiveReleaseCoeff = (1.0f - transientWeight_) * slowReleaseCoeff_ + transientWeight_ * fastReleaseCoeff_;
+
         if (targetGain < envelope_) {
             envelope_ = targetGain;
         } else {
-            envelope_ = releaseCoeff_ * envelope_ + (1.0f - releaseCoeff_) * targetGain;
+            envelope_ = effectiveReleaseCoeff * envelope_ + (1.0f - effectiveReleaseCoeff) * targetGain;
             if (envelope_ > 0.99999f) {
                 envelope_ = 1.0f;
             }
@@ -291,10 +320,22 @@ void LookaheadLimiter::processInterleaved(float* buffer, int frames, int channel
 
         float targetGain = minGain_;
 
+        const float energyCoeff = 0.001f;
+        avgEnergy_ += energyCoeff * (frameMaxPeak - avgEnergy_);
+        if (avgEnergy_ < 1e-6f) avgEnergy_ = 1e-6f;
+        const float crest = frameMaxPeak / avgEnergy_;
+        float currentTransient = std::clamp((crest - 1.2f) / 2.0f, 0.0f, 1.0f);
+        if (currentTransient > transientWeight_) {
+            transientWeight_ = currentTransient;
+        } else {
+            transientWeight_ *= 0.999f;
+        }
+        const float effectiveReleaseCoeff = (1.0f - transientWeight_) * slowReleaseCoeff_ + transientWeight_ * fastReleaseCoeff_;
+
         if (targetGain < envelope_) {
             envelope_ = targetGain;
         } else {
-            envelope_ = releaseCoeff_ * envelope_ + (1.0f - releaseCoeff_) * targetGain;
+            envelope_ = effectiveReleaseCoeff * envelope_ + (1.0f - effectiveReleaseCoeff) * targetGain;
             if (envelope_ > 0.99999f) {
                 envelope_ = 1.0f;
             }

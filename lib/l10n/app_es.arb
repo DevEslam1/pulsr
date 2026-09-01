@@ -546,5 +546,14 @@
         "type": "String"
       }
     }
-  }
+  },
+  "systemEffectsTitle": "Efectos de audio del sistema (Dolby Atmos / DAP)",
+  "systemEffectsSubtitleBypassed": "✓ Desactivado: Efectos del sistema omitidos",
+  "systemEffectsSubtitleActive": "Activo: Los efectos OEM están procesando el audio",
+  "systemEffectsSubtitleUnsupported": "No se detectó Dolby/DAP en este dispositivo",
+  "systemEffectsAuto": "Automático",
+  "systemEffectsTryDisable": "Intentar desactivar",
+  "systemEffectsLeaveOn": "Dejar activo",
+  "bluetoothLatencyTitle": "Sincronización de latencia Bluetooth (AVRCP / Letras)",
+  "bluetoothLatencySubtitle": "Compensa la latencia del búfer del códec Bluetooth ({offset} ms)."
 }

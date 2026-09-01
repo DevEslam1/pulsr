@@ -143,7 +143,10 @@ internal class InnertubeClient(
                     }.format(Date())
                     "2.$dateStr.01.00"
                 }
-                else -> clientVersion
+                else -> {
+                    val matrixVersion = runCatching { ClientCapabilityMatrix.getCapability(this).defaultClientVersion }.getOrNull()
+                    if (!matrixVersion.isNullOrEmpty()) matrixVersion else clientVersion
+                }
             }
     }
 
@@ -196,7 +199,9 @@ internal class InnertubeClient(
         // different clients indicate a device/IP-level gate. Walking the rest
         // of the chain cannot succeed and only burns the executor, the rate
         // limiter and the user's time - abort with a typed signal instead.
-        val loginAbortPolicy = LadderAbortPolicy()
+        val loginAbortPolicy = LadderAbortPolicy(
+            countOnlyAuthenticatedClients = cookieStore.isSessionValid(),
+        )
         val clientsAttempted = java.util.concurrent.atomic.AtomicInteger(0)
 
         fun attemptClient(client: ClientType): Map<String, Any?>? {
@@ -216,7 +221,12 @@ internal class InnertubeClient(
                     val parsedSignal = YtmBlockSignal.parse(200, status, playability)
                     lastSignal = parsedSignal
                     Log.w(TAG, "[$traceId] Client ${client.name} returned status $status -> $parsedSignal")
-                    loginAbortPolicy.onLoginRequired(status.equals("LOGIN_REQUIRED", ignoreCase = true))
+                    // Only count LOGIN_REQUIRED toward the abort threshold if this client
+                    // actually sent session cookies. Unauthenticated clients failing with
+                    // LOGIN_REQUIRED when the user IS signed in is expected behavior (they
+                    // have no cookies) and must not prematurely abort the signed-in ladder.
+                    val isAuthClient = client.isWeb && cookieStore.isSessionValid()
+                    loginAbortPolicy.onLoginRequired(status.equals("LOGIN_REQUIRED", ignoreCase = true), isAuthenticatedClient = isAuthClient)
                     if ((parsedSignal == YtmBlockSignal.BotChallenge || parsedSignal == YtmBlockSignal.PoTokenInvalid) &&
                         (client == ClientType.ANDROID_MUSIC || client == ClientType.WEB_REMIX)) {
                         val now = System.currentTimeMillis()
@@ -346,9 +356,11 @@ internal class InnertubeClient(
                     val (client, res) = done.get()
                     if (res != null) {
                         for (f in activeFutures) { if (f != done) f.cancel(true) }
+                        ClientFailureTracker.recordSuccess(client)
                         winnerStore.recordWinningClient(trackType, client)
                         return res
                     } else {
+                        ClientFailureTracker.recordFailure(client)
                         winnerStore.recordFailure(trackType, client)
                         activeFutures.remove(done)
                         break
@@ -380,9 +392,11 @@ internal class InnertubeClient(
                     val (client, res) = done.get()
                     if (res != null) {
                         for (f in activeFutures) { if (f != done) f.cancel(true) }
+                        ClientFailureTracker.recordSuccess(client)
                         winnerStore.recordWinningClient(trackType, client)
                         return res
                     } else {
+                        ClientFailureTracker.recordFailure(client)
                         winnerStore.recordFailure(trackType, client)
                         activeFutures.remove(done)
                         if (loginAbortPolicy.shouldAbort()) {
@@ -409,9 +423,11 @@ internal class InnertubeClient(
             if (loginAbortPolicy.shouldAbort()) break
             val res = attemptClient(client)
             if (res != null) {
+                ClientFailureTracker.recordSuccess(client)
                 winnerStore.recordWinningClient(trackType, client)
                 return res
             } else {
+                ClientFailureTracker.recordFailure(client)
                 winnerStore.recordFailure(trackType, client)
             }
         }
@@ -742,12 +758,14 @@ internal class InnertubeClient(
             root.put("thirdParty", JSONObject().put("embedUrl", "https://www.youtube.com/watch?v=$videoId"))
         }
 
-        val hasPo = PoTokenManager.isReady || (!PoTokenManager.webViewBroken && !PoTokenManager.isLimitedMode && PoTokenManager.ensureReadySync())
+        val cap = ClientCapabilityMatrix.getCapability(clientType)
+        val requiresPo = cap.requiresPoToken
+        val hasPo = requiresPo && (PoTokenManager.isReady || (!PoTokenManager.webViewBroken && !PoTokenManager.isLimitedMode && PoTokenManager.ensureReadySync()))
 
         val playbackContext = JSONObject()
         val contentPlaybackContext = JSONObject().apply {
             put("html5Preference", "HTML5_PREF_WANTS")
-            if (!clientType.isWeb && hasPo) {
+            if (requiresPo && !clientType.isWeb && hasPo) {
                 val tokenTarget = PoTokenManager.visitorData.ifEmpty { videoId }
                 val poToken = PoTokenManager.poTokenForSync(tokenTarget)
                 if (poToken.isNotEmpty()) {
@@ -758,13 +776,19 @@ internal class InnertubeClient(
         playbackContext.put("contentPlaybackContext", contentPlaybackContext)
         root.put("playbackContext", playbackContext)
 
-        if (clientType.isWeb && hasPo) {
+        if (requiresPo && clientType.isWeb && hasPo) {
             val dataSyncId = PoTokenManager.dataSyncId
             val poToken = if (cookieStore.isSessionValid()) {
                 if (dataSyncId.isNotEmpty()) {
+                    // Authenticated path: use account-bound token minted against dataSyncId.
                     PoTokenManager.accountPoTokenForSync(dataSyncId)
                 } else {
-                    ""
+                    // dataSyncId not yet bootstrapped (e.g. right after login before the
+                    // first browse response has been harvested). Fall back to the guest
+                    // streaming poToken so WEB_REMIX still receives a valid attestation
+                    // rather than an empty string that BotGuard will reject with LOGIN_REQUIRED.
+                    val tokenTarget = PoTokenManager.visitorData.ifEmpty { videoId }
+                    PoTokenManager.poTokenForSync(tokenTarget)
                 }
             } else {
                 val tokenTarget = PoTokenManager.visitorData.ifEmpty { videoId }

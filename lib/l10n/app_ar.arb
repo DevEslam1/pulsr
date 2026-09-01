@@ -546,5 +546,14 @@
         "type": "String"
       }
     }
-  }
+  },
+  "systemEffectsTitle": "مؤثرات الصوت للنظام (Dolby Atmos / DAP)",
+  "systemEffectsSubtitleBypassed": "✓ تم التجاوز: تم تعطيل مؤثرات النظام",
+  "systemEffectsSubtitleActive": "نشط: مؤثرات صوت النظام قيد المعالجة",
+  "systemEffectsSubtitleUnsupported": "لم يتم العثور على مؤثرات Dolby/DAP على هذا الجهاز",
+  "systemEffectsAuto": "تلقائي",
+  "systemEffectsTryDisable": "محاولة التعطيل",
+  "systemEffectsLeaveOn": "إبقاء التشغيل",
+  "bluetoothLatencyTitle": "مزامنة زمن استجابة البلوتوث (AVRCP / الكلمات)",
+  "bluetoothLatencySubtitle": "تعويض تأخير ذاكرة التخزين المؤقت للبلوتوث ({offset} مللي ثانية)."
 }

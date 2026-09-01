@@ -231,6 +231,8 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> validatePlayerState() async {}
   @override
+  Future<void> skipToQueueItem(int index) async {}
+  @override
   void dispose() {
     _positionController.close();
     _errorController.close();
@@ -375,6 +377,27 @@ void main() {
       // 4. Current song MUST remain song 102 and not be clobbered by stale song 101
       expect(cubit.state.currentSong?.id, 102);
       expect(cubit.state.currentSong?.title, 'Local Track 2');
+    });
+
+    test('mediaItem emission updates both currentSong and currentIndex in sync with queue',
+        () async {
+      // 1. Initialize cubit with queue [songA, songB] playing songA (index 0)
+      await cubit.playSong(songA, queue: [songA, songB]);
+      expect(cubit.state.currentIndex, 0);
+      expect(cubit.state.currentSong?.id, 101);
+
+      // 2. Simulate external/earpod track transition to songB (index 1) via mediaItem
+      stubAudioHandler.mediaItem.add(const MediaItem(
+        id: '102',
+        title: 'Local Track 2',
+        artist: 'Artist 2',
+        album: 'Album 2',
+      ));
+      await pumpEventQueue();
+
+      // 3. Both currentSong and currentIndex must be immediately updated to index 1
+      expect(cubit.state.currentSong?.id, 102);
+      expect(cubit.state.currentIndex, 1);
     });
 
     test('saveCurrentPositionImmediate completes asynchronously without errors',

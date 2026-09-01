@@ -503,6 +503,122 @@ class AudioSoundSection extends StatelessWidget {
             onTap: () => DspInspectorSheet.show(context),
           ),
         ),
+        settingsCardDivider(p),
+        // System Audio Effects (Dolby Atmos / OEM DAP Controller)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.surround_sound_rounded, size: 20, color: p.accent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      context.l10n.systemEffectsTitle,
+                      style: TextStyle(
+                        color: p.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                switch (state.systemEffectsStatus) {
+                  'bypassed' => context.l10n.systemEffectsSubtitleBypassed,
+                  'active' => context.l10n.systemEffectsSubtitleActive,
+                  'unsupportedDevice' => context.l10n.systemEffectsSubtitleUnsupported,
+                  _ => 'Status: ${state.systemEffectsStatus}',
+                },
+                style: TextStyle(
+                  color: state.systemEffectsStatus == 'bypassed'
+                      ? Colors.greenAccent
+                      : p.textSecondary,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: SegmentedButton<String>(
+                  showSelectedIcon: false,
+                  style: const ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                    padding: WidgetStatePropertyAll(
+                      EdgeInsets.symmetric(horizontal: 4),
+                    ),
+                  ),
+                  segments: [
+                    ButtonSegment(
+                      value: 'auto',
+                      label: Text(context.l10n.systemEffectsAuto, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                    ),
+                    ButtonSegment(
+                      value: 'tryDisable',
+                      label: Text(context.l10n.systemEffectsTryDisable, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                    ),
+                    ButtonSegment(
+                      value: 'leaveOn',
+                      label: Text(context.l10n.systemEffectsLeaveOn, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700)),
+                    ),
+                  ],
+                  selected: {state.systemEffectsPolicy},
+                  onSelectionChanged: (selected) {
+                    if (selected.isNotEmpty) {
+                      cubit.setSystemEffectsPolicy(selected.first);
+                    }
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+        settingsCardDivider(p),
+        // Bluetooth Wireless Quality & Latency Sync
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.bluetooth_audio_rounded, size: 20, color: p.accent),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      context.l10n.bluetoothLatencyTitle,
+                      style: TextStyle(
+                        color: p.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                context.l10n.bluetoothLatencySubtitle(state.bluetoothLatencyOffsetMs),
+                style: TextStyle(color: p.textSecondary, fontSize: 12),
+              ),
+              const SizedBox(height: 6),
+              SettingSliderRow(
+                label: 'Sync Offset',
+                value: state.bluetoothLatencyOffsetMs.toDouble(),
+                min: 0.0,
+                max: 400.0,
+                divisions: 20,
+                defaultValue: 150.0,
+                formatValue: (v) => '${v.round()} ms',
+                onChanged: (v) => cubit.setBluetoothLatencyOffsetMs(v.round()),
+              ),
+            ],
+          ),
+        ),
         const BatteryOptimizationCard(),
       ],
     );

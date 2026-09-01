@@ -152,6 +152,35 @@ struct DynamicEqParamSet {
     bool enabled = false;
 };
 
+enum class ReplayGainMode {
+    Off = 0,
+    Track = 1,
+    Album = 2
+};
+
+struct ReplayGainParamSet {
+    ReplayGainMode mode = ReplayGainMode::Off;
+    double trackGainDb = 0.0;
+    double albumGainDb = 0.0;
+    double trackPeak = 1.0;
+    double albumPeak = 1.0;
+    double preAmpDb = 0.0;
+    bool preventClipping = true;
+    bool enabled = false;
+};
+
+struct DitherParamSet {
+    bool enabled = false;
+    int targetBitDepth = 32;  // 16, 24, 32
+    // Dither is SKIPPED on Bluetooth (lossy encode happens downstream — dithering before SBC/AAC/LDAC is wasted noise)
+    bool isBluetooth = false;
+};
+
+struct BitPerfectParamSet {
+    bool enabled = false;
+    bool isDop = false;
+};
+
 struct DspParamSnapshot {
     uint64_t generation = 0;
     double sampleRate = 48000.0;
@@ -168,4 +197,7 @@ struct DspParamSnapshot {
     LoudnessContourParamSet loudness;
     SubCrossoverParamSet subCrossover;
     DynamicEqParamSet dynamicEq;
+    ReplayGainParamSet replayGain;
+    DitherParamSet dither;
+    BitPerfectParamSet bitPerfect;
 };

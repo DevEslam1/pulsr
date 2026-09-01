@@ -394,9 +394,28 @@ class EqualizerManager {
         pendingFutures.add(_effectsChannel.setDynamicEqEnabled(true));
       }
       // Dynamics last — it triggers recalculateActiveStages which disables OEM engine; doing it last prevents intermediate dropout
-      // Wrap each future to prevent one failing stage (e.g., setLimiterEnabled timeout) from rejecting entire batch
+      // Log individual failures so failed effect stages are diagnosable while allowing remaining stages to complete
       if (pendingFutures.isNotEmpty) {
-        await Future.wait(pendingFutures.map((f) => f.catchError((_) {})));
+        final results = await Future.wait(
+          pendingFutures.map(
+            (f) => f.then((_) => true).catchError((Object e, StackTrace st) {
+              ErrorLogger.log(
+                'Failed to restore audio effect preference',
+                error: e,
+                stackTrace: st,
+                category: 'EqualizerManager',
+              );
+              return false;
+            }),
+          ),
+        );
+        final failCount = results.where((r) => !r).length;
+        if (failCount > 0) {
+          ErrorLogger.log(
+            '$failCount/${pendingFutures.length} audio effects failed to restore',
+            category: 'EqualizerManager',
+          );
+        }
       }
       if (isDynamicsEnabled && !_isDynamicsBypassed) {
         // Small delay lets AudioTrack stabilize before DynamicsProcessing rebuild (fixes sound drops needing EQ toggle)

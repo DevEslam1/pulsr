@@ -253,6 +253,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         attackMs: Double, releaseMs: Double, maxCutDb: Double, enabled: Boolean
     )
     private external fun nativeProcessAudio(buffer: FloatArray, frames: Int, channels: Int): Int
+    private external fun nativeProcessPcmAudio(buffer: FloatArray, frames: Int, channels: Int): Int
     private external fun nativeDecodeDsd(dsdL: ByteArray, dsdR: ByteArray, byteCount: Int, dsdRate: Int, targetPcmSampleRate: Int, bitOrder: Int): FloatArray?
     private external fun nativeSetActiveStages(bitmask: Int)
     private external fun nativeSetCacheBudgetBytes(budgetBytes: Long)
@@ -549,9 +550,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     private var audioDeviceCallback: Any? = null
+    private var systemAudioEffectsController: SystemAudioEffectsController? = null
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         context = binding.applicationContext
+        systemAudioEffectsController = SystemAudioEffectsController(binding.applicationContext)
         methodChannel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME)
         methodChannel.setMethodCallHandler(this)
         // Recreate executor if previously shut down
@@ -602,6 +605,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             }
         }
         audioDeviceCallback = null
+        systemAudioEffectsController?.release()
+        systemAudioEffectsController = null
 
         volumeBoostRetryRunnable?.let {
             mainHandler.removeCallbacks(it)
@@ -736,6 +741,22 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         }
                     }
                     result.success(true)
+                }
+
+                "nativeProcessPcmAudio", "nativeProcessAudio" -> {
+                    val buffer = call.argument<FloatArray>("buffer")
+                    val frameCount = call.argument<Int>("frameCount") ?: 0
+                    val channels = call.argument<Int>("channels") ?: 2
+                    if (buffer != null && isNativeDspLoaded) {
+                        try {
+                            val processed = nativeProcessPcmAudio(buffer, frameCount, channels)
+                            result.success(processed)
+                        } catch (e: Exception) {
+                            result.success(0)
+                        }
+                    } else {
+                        result.success(0)
+                    }
                 }
 
                 // NOTE: the rich DSP debug report lives further down in this
@@ -1453,6 +1474,29 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     } else {
                         result.success(mapOf("hasOemAudio" to false, "detectedEngines" to emptyList<String>()))
                     }
+                }
+
+                "detectSystemEffects" -> {
+                    val controller = systemAudioEffectsController ?: context?.let { SystemAudioEffectsController(it) }
+                    result.success(controller?.detect() ?: mapOf("status" to "unsupportedDevice", "detectedBundles" to emptyList<String>(), "hasDolbyOrVendor" to false))
+                }
+
+                "setSystemEffectsPolicy" -> {
+                    val policy = call.argument<String>("policy") ?: "auto"
+                    val isHiResOrBitPerfect = call.argument<Boolean>("isHiResOrBitPerfect") ?: isBitPerfectBypassActive
+                    val controller = systemAudioEffectsController ?: context?.let { SystemAudioEffectsController(it) }
+                    val status = controller?.applyPolicy(policy, isHiResOrBitPerfect) ?: SystemAudioEffectsController.Status.UNSUPPORTED_DEVICE
+                    result.success(mapOf("status" to status.value))
+                }
+
+                "getSystemEffectsStatus" -> {
+                    val controller = systemAudioEffectsController ?: context?.let { SystemAudioEffectsController(it) }
+                    result.success(
+                        mapOf(
+                            "status" to (controller?.getStatus()?.value ?: "unknown"),
+                            "detectedBundles" to (controller?.getDetectedBundles() ?: emptyList<String>())
+                        )
+                    )
                 }
 
                 "setDspPreference" -> {

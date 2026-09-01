@@ -1,7 +1,6 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -18,17 +17,16 @@ import '../../domain/repositories/music_repository_interface.dart';
 import '../../features/player/cubit/player_cubit.dart';
 import '../constants/channels.dart';
 import '../network/proxy_config.dart';
-import 'ytm_service.dart';
+import '../../data/services/ytm_service.dart';
 
 @singleton
 class FileIntentHandler {
   static const MethodChannel _channel = MethodChannel(PulsrChannels.fileOpener);
   static int _tempIdCounter = 0;
   static int _getNextTempId() {
-    final rand = math.Random().nextInt(1 << 16);
-    return (DateTime.now().millisecondsSinceEpoch * -1) -
-        (++_tempIdCounter * 65536) -
-        rand;
+    _tempIdCounter++;
+    final unique = DateTime.now().microsecondsSinceEpoch;
+    return -(unique * 1000 + (_tempIdCounter % 1000));
   }
 
   final IMusicRepository _repository;
@@ -334,3 +332,5 @@ class FileIntentHandler {
     }
   }
 }
+
+

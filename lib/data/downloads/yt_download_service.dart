@@ -709,8 +709,9 @@ class YtDownloadService {
         if (e is DownloadFailure) rethrow;
       }
 
-      final chunkResults = List<File?>.filled(_concurrentChunks, null);
+      final chunkResults = <int, File?>{};
       final futures = <Future<void>>[];
+      final activeChunkIndices = <int>[];
 
       for (var i = 0; i < _concurrentChunks; i++) {
         final chunkIndex = i;
@@ -719,6 +720,7 @@ class YtDownloadService {
             (i == _concurrentChunks - 1) ? total - 1 : (start + chunkSize - 1);
         if (start >= total) break;
 
+        activeChunkIndices.add(i);
         final partFile =
             File(p.join(dir.path, '${p.basename(dest.path)}.part$i'));
         tempParts.add(partFile);
@@ -816,8 +818,9 @@ class YtDownloadService {
       }
 
       // Verify every chunk index 0..N-1 is present and in order (D-03)
-      for (var i = 0; i < tempParts.length; i++) {
-        final res = chunkResults[i];
+      for (var i = 0; i < activeChunkIndices.length; i++) {
+        final chunkIdx = activeChunkIndices[i];
+        final res = chunkResults[chunkIdx];
         if (res == null || !await res.exists()) {
           for (final part in tempParts) {
             try {

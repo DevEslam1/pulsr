@@ -106,6 +106,9 @@ class PrefsKeys {
   static const String scrobblePendingAlbum = 'scrobbler_last_album';
   static const String scrobbleOfflineQueue = 'scrobbler_offline_queue';
 
+  static const String systemEffectsPolicy = 'setting_system_effects_policy';
+  static const String bluetoothLatencyOffsetMs = 'setting_bluetooth_latency_offset_ms';
+
   // Aliases for backwards compatibility with tests and services
   static const String scrobblerLastSong = scrobblePendingSong;
   static const String scrobblerLastTime = scrobblePendingTime;

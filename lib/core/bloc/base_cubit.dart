@@ -80,6 +80,9 @@ abstract class PulsrCubit<S> extends Cubit<S> {
     void Function()? onDone,
     bool? cancelOnError,
   }) {
+    if (_closed) {
+      return Stream<T>.empty().listen((_) {});
+    }
     final sub = stream.listen(
       (data) {
         if (!isClosed) {

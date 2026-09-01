@@ -4,6 +4,7 @@ import 'dart:math';
 import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:encrypt/encrypt.dart' as enc;
+import 'error_logger.dart';
 
 /// Cryptographic helper for Pulsr Backup v3 envelope.
 /// v3: AES-256-GCM via `encrypt` + PBKDF2-HMAC-SHA256 100k iterations ( OWASP 2023 600k target,
@@ -138,6 +139,10 @@ class BackupCrypto {
     if (version == 3 || envelope['format'] == formatV3) {
       return _decryptV3(envelope, passphrase);
     }
+    ErrorLogger.log(
+      'Decrypting legacy v2 backup with weak KDF. Consider re-exporting as v3.',
+      category: 'BackupCrypto',
+    );
     return _decryptV2(envelope, passphrase);
   }
 

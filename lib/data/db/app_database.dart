@@ -164,11 +164,6 @@ class AppDatabase extends _$AppDatabase {
               await _dropLegacyFtsTable(customStatement);
             }
             if (from < 10) {
-              // Add NOCASE path index for duplicate prevention (10/10 hardening)
-              try {
-                await customStatement(
-                    "CREATE INDEX IF NOT EXISTS idx_songs_path_nocase ON songs (path COLLATE NOCASE) WHERE path != '' AND path NOT LIKE 'ytmusic://%';");
-              } catch (_) {}
               await _dropLegacyFtsTable(customStatement);
             }
           }

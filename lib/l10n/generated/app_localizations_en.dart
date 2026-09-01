@@ -1461,4 +1461,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String downloadActionsSemantics(String title) {
     return 'Download actions for $title';
   }
+
+  @override
+  String get systemEffectsTitle => 'System Audio Effects (Dolby Atmos / DAP)';
+
+  @override
+  String get systemEffectsSubtitleBypassed =>
+      '✓ Bypassed: System effects disabled on output-mix session';
+
+  @override
+  String get systemEffectsSubtitleActive =>
+      'Active: OEM sound effects are processing audio';
+
+  @override
+  String get systemEffectsSubtitleUnsupported =>
+      'No OEM Dolby/DAP detected on this device';
+
+  @override
+  String get systemEffectsAuto => 'Auto';
+
+  @override
+  String get systemEffectsTryDisable => 'Try to disable';
+
+  @override
+  String get systemEffectsLeaveOn => 'Leave on';
+
+  @override
+  String get bluetoothLatencyTitle => 'Bluetooth Latency Sync (AVRCP / Lyrics)';
+
+  @override
+  String bluetoothLatencySubtitle(int offset) {
+    return 'Compensates for Bluetooth audio codec buffer latency ($offset ms). Volume deferral: AVRCP absolute volume active.';
+  }
 }

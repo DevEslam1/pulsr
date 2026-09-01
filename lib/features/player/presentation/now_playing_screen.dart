@@ -190,6 +190,7 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     if (_dragOffset > 100 || velocity > 450) {
       widget.onDismiss();
     } else if (_dragOffset > 0) {
+      _animController.stop();
       _anim =
           Tween<double>(begin: _dragOffset, end: 0.0).animate(_curvedAnimation);
       _fade = Tween<double>(

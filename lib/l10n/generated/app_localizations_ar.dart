@@ -1468,4 +1468,37 @@ class AppLocalizationsAr extends AppLocalizations {
   String downloadActionsSemantics(String title) {
     return 'إجراءات التنزيل لـ $title';
   }
+
+  @override
+  String get systemEffectsTitle => 'مؤثرات الصوت للنظام (Dolby Atmos / DAP)';
+
+  @override
+  String get systemEffectsSubtitleBypassed =>
+      '✓ تم التجاوز: تم تعطيل مؤثرات النظام';
+
+  @override
+  String get systemEffectsSubtitleActive =>
+      'نشط: مؤثرات صوت النظام قيد المعالجة';
+
+  @override
+  String get systemEffectsSubtitleUnsupported =>
+      'لم يتم العثور على مؤثرات Dolby/DAP على هذا الجهاز';
+
+  @override
+  String get systemEffectsAuto => 'تلقائي';
+
+  @override
+  String get systemEffectsTryDisable => 'محاولة التعطيل';
+
+  @override
+  String get systemEffectsLeaveOn => 'إبقاء التشغيل';
+
+  @override
+  String get bluetoothLatencyTitle =>
+      'مزامنة زمن استجابة البلوتوث (AVRCP / الكلمات)';
+
+  @override
+  String bluetoothLatencySubtitle(int offset) {
+    return 'تعويض تأخير ذاكرة التخزين المؤقت للبلوتوث ($offset مللي ثانية).';
+  }
 }

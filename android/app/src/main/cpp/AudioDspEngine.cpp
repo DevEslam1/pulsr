@@ -24,10 +24,13 @@ void AudioDspEngine::setSampleRateInternal(double sampleRate) {
     sampleRate_ = sampleRate;
 
     eq_.setSampleRate(sampleRate_);
+    panner_.setSampleRate(sampleRate_);
     crossfeed_.setSampleRate(sampleRate_);
     limiter_.setSampleRate(sampleRate_);
+    reverb_.setSampleRate(sampleRate_);
     resampler_.setRates(sampleRate_, sampleRate_);
     saturation_.setSampleRate(sampleRate_);
+    stereoWidth_.setSampleRate(sampleRate_);
     loudnessContour_.setSampleRate(sampleRate_);
     subCrossover_.setSampleRate(sampleRate_);
     dynamicEq_.setSampleRate(sampleRate_);
@@ -147,9 +150,12 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         if (std::abs(snapshot->sampleRate - sampleRate_) > 0.5) {
             sampleRate_ = snapshot->sampleRate;
             eq_.setSampleRate(sampleRate_);
+            panner_.setSampleRate(sampleRate_);
             crossfeed_.setSampleRate(sampleRate_);
             limiter_.setSampleRate(sampleRate_);
+            reverb_.setSampleRate(sampleRate_);
             saturation_.setSampleRate(sampleRate_);
+            stereoWidth_.setSampleRate(sampleRate_);
             loudnessContour_.setSampleRate(sampleRate_);
             subCrossover_.setSampleRate(sampleRate_);
             dynamicEq_.setSampleRate(sampleRate_);
@@ -168,10 +174,61 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
         lastAppliedGeneration_.store(snapshot->generation);
     }
 
+    // Bit-Perfect / DoP bypass path: sample-identical to raw input, zero DSP roundtrips, volume locked to unity
+    if (snapshot->bitPerfect.enabled || snapshot->bitPerfect.isDop) {
+        return frames;
+    }
+
+    // ReplayGain 2.0 / EBU R128 pre-gain calculation
+    if (snapshot->replayGain.enabled && snapshot->replayGain.mode != ReplayGainMode::Off) {
+        double rawGainDb = (snapshot->replayGain.mode == ReplayGainMode::Album)
+            ? (snapshot->replayGain.albumGainDb + snapshot->replayGain.preAmpDb)
+            : (snapshot->replayGain.trackGainDb + snapshot->replayGain.preAmpDb);
+        double gainLinear = std::pow(10.0, rawGainDb / 20.0);
+        if (snapshot->replayGain.preventClipping) {
+            double peak = (snapshot->replayGain.mode == ReplayGainMode::Album)
+                ? snapshot->replayGain.albumPeak : snapshot->replayGain.trackPeak;
+            if (peak > 0.0 && gainLinear * peak > 1.0) {
+                gainLinear = 1.0 / peak;
+            }
+        }
+        targetReplayGain_ = gainLinear;
+    } else {
+        targetReplayGain_ = 1.0;
+    }
+
+    // Smooth ReplayGain across 20ms window
+    const double rgTau = 0.020;
+    const double rgSmoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * rgTau));
+    smoothedReplayGain_ += rgSmoothFactor * (targetReplayGain_ - smoothedReplayGain_);
+
+    // Net gain check for conditional limiter insertion
+    bool hasNetPositiveGain = (smoothedReplayGain_ > 1.001);
+    if (snapshot->eq.enabled) {
+        if (snapshot->eq.preampDb > 0.01) hasNetPositiveGain = true;
+        for (int b = 0; b < snapshot->eq.bandCount; ++b) {
+            if (snapshot->eq.bands[b].enabled && snapshot->eq.bands[b].gainDb > 0.01) {
+                hasNetPositiveGain = true;
+                break;
+            }
+        }
+    }
+
     const uint32_t rawStages = snapshot->activeStages;
     const uint32_t degraded = autoDegradedStages_.load();
     const uint32_t stages = rawStages & ~degraded;
-    if (stages != 0) {
+    const bool nonUnityGain = (stages != 0) || (std::abs(smoothedReplayGain_ - 1.0) > 1e-4);
+
+    if (nonUnityGain) {
+        // Apply smoothed ReplayGain pre-gain before EQ stage
+        if (std::abs(smoothedReplayGain_ - 1.0) > 1e-4) {
+            const float rg = static_cast<float>(smoothedReplayGain_);
+            const int totalSamples = frames * channels;
+            for (int i = 0; i < totalSamples; ++i) {
+                buffer[i] *= rg;
+            }
+        }
+
         // 1. Parametric EQ Stage
         if (stages & STAGE_EQ) {
             eq_.processInterleaved(buffer, frames, channels);
@@ -198,8 +255,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             reverb_.processInterleaved(buffer, frames, channels);
         }
 
-        // 6. Harmonic Saturation / Exciter Stage — after tonal + spatial shaping,
-        //    before the limiter, so added harmonics stay under peak control
+        // 6. Harmonic Saturation / Exciter Stage — 4x oversampled with anti-aliasing
         if (stages & STAGE_SATURATION) {
             saturation_.processInterleaved(buffer, frames, channels);
         }
@@ -222,9 +278,24 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             loudnessContour_.processInterleaved(buffer, frames, channels);
         }
 
-        // 10. Lookahead Limiter Stage (Multichannel / stereo / mono) — true-peak limiter is final
-        if (stages & STAGE_LIMITER) {
+        // 10. Lookahead Limiter Stage — inserted only when net gain > 0dB or enabled by config
+        if ((stages & STAGE_LIMITER) && (hasNetPositiveGain || snapshot->limiter.enabled)) {
             limiter_.processInterleaved(buffer, frames, channels);
+        }
+
+        // TPDF Dither: Applied ONLY at final 16-bit truncation, ONLY when chain gain != unity,
+        // and SKIPPED on Bluetooth (lossy codecs SBC/AAC/LDAC perform lossy quantization downstream)
+        if (snapshot->dither.enabled && snapshot->dither.targetBitDepth == 16 && !snapshot->dither.isBluetooth) {
+            const int totalSamples = frames * channels;
+            constexpr float kScale = 32768.0f;
+            constexpr float kInvScale = 1.0f / 32768.0f;
+            for (int i = 0; i < totalSamples; ++i) {
+                float x = buffer[i];
+                if (!std::isfinite(x)) continue;
+                float dither = generateTpdf(); // Triangular PDF (-1.0 to +1.0 LSB)
+                float quant = std::round(x * kScale + dither) * kInvScale;
+                buffer[i] = std::clamp(quant, -1.0f, 1.0f);
+            }
         }
     }
 

@@ -888,7 +888,11 @@ class PulsrAudioHandler extends BaseAudioHandler
           (dur) {
             if (isTargetActive() && dur != null && dur > Duration.zero) {
               final current = mediaItem.value;
-              if (current != null && current.duration != dur) {
+              final activeSong = currentSong;
+              if (current != null &&
+                  activeSong != null &&
+                  current.id == activeSong.id.toString() &&
+                  current.duration != dur) {
                 mediaItem.add(current.copyWith(duration: dur));
               }
             }
@@ -967,7 +971,11 @@ class PulsrAudioHandler extends BaseAudioHandler
                   !_crossfadeManager.isCrossfading) {
                 final nextIdx = _getNextIndex();
                 if (nextIdx != null) {
-                  _startCrossfade(nextIdx);
+                  if (nextIdx != _currentIndex ||
+                      (_activePlayer.loopMode == LoopMode.one &&
+                          _crossfadeManager.duration > Duration.zero)) {
+                    _startCrossfade(nextIdx);
+                  }
                 }
               }
             }
@@ -1020,6 +1028,29 @@ class PulsrAudioHandler extends BaseAudioHandler
       );
 
       _subscriptions.add(
+        player.sequenceStateStream.listen(
+          (seqState) {
+            if (!isTargetActive()) return;
+            final index = seqState.currentIndex;
+            if (_gaplessMode && index != null && index >= 0 && index < _songs.length) {
+              if (index != _lastGaplessIndex ||
+                  mediaItem.value?.id != _songs[index].id.toString()) {
+                _onGaplessIndexChanged(index);
+              }
+            }
+          },
+          onError: (Object e, StackTrace st) {
+            ErrorLogger.log(
+              'Player sequenceStateStream error',
+              error: e,
+              stackTrace: st,
+              category: 'AudioHandler',
+            );
+          },
+        ),
+      );
+
+      _subscriptions.add(
         player.currentIndexStream.listen(
           (index) {
             // Native gapless advance: the concat moved to a new item on its own.
@@ -1028,7 +1059,10 @@ class PulsrAudioHandler extends BaseAudioHandler
             if (_gaplessMode &&
                 isTargetActive() &&
                 index != null &&
-                index != _lastGaplessIndex) {
+                (index != _lastGaplessIndex ||
+                    (index >= 0 &&
+                        index < _songs.length &&
+                        mediaItem.value?.id != _songs[index].id.toString()))) {
               _onGaplessIndexChanged(index);
             }
           },
@@ -1875,7 +1909,9 @@ class PulsrAudioHandler extends BaseAudioHandler
         unawaited(_repository.recordPlayHistory(nextSong.id));
         _broadcastState(_activePlayer.playbackEvent);
 
-        await active.stop();
+        try {
+          await active.stop();
+        } catch (_) {}
         // [active] is now the old, stopped player. Re-apply to the newly
         // active incoming player; applying it to [active] made ReplayGain
         // disappear after a crossfade while its setting still showed enabled.
@@ -1890,12 +1926,17 @@ class PulsrAudioHandler extends BaseAudioHandler
         try {
           await _inactivePlayer.stop();
         } catch (_) {}
+        try {
+          await _activePlayer.setVolume(initialActiveVolume);
+        } catch (_) {}
         if (_crossfadeManager.currentFadeId == currentFadeId) {
-          await _crossfadeManager.cancel(
-            _inactivePlayer,
-            _activePlayer,
-            restoreVolume: _calculateReplayGainVolume(currentSong),
-          );
+          try {
+            await _crossfadeManager.cancel(
+              _inactivePlayer,
+              _activePlayer,
+              restoreVolume: initialActiveVolume,
+            );
+          } catch (_) {}
           try {
             await playSongAt(nextIndex);
           } catch (fallbackError, fallbackSt) {
@@ -2222,26 +2263,22 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
-  /// Reacts to a native gapless advance (currentIndexStream): keeps the queue
-  /// model, notification, play history, replay-gain volume and saved position in
-  /// step with the item ExoPlayer moved to on its own.
+  /// Reacts to a native gapless advance (sequenceStateStream / currentIndexStream):
+  /// keeps the queue model, notification, play history, replay-gain volume and saved position
+  /// in step with the item ExoPlayer moved to on its own.
   Future<void> _onGaplessIndexChanged(int index) async {
-    // FIX(BUG-02): Capture generation at top before any async dispatch or state change
-    final gen = _playGeneration;
     if (!_gaplessMode) return;
     if (index < 0 || index >= _songs.length) return;
     if (_gaplessSource == null) return;
     final childCount = _gaplessSource!.length;
     if (index >= childCount) return;
 
-    // Detect rapid successive transitions caused by ExoPlayer auto-advancing
-    // past failing tracks in a loop.
+    // Detect rapid un-commanded auto-skips (e.g. failing corrupted files loop)
     final now = DateTime.now();
     if (_lastGaplessChangeTime != null &&
-        now.difference(_lastGaplessChangeTime!).inMilliseconds < 1500) {
+        now.difference(_lastGaplessChangeTime!).inMilliseconds < 300) {
       _rapidGaplessChangeCount++;
-      if (_rapidGaplessChangeCount >= 2) {
-        // Circuit breaker tripped: halt runaway skip loop
+      if (_rapidGaplessChangeCount >= 4) {
         _rapidGaplessChangeCount = 0;
         _consecutiveFailures = 0;
         ErrorLogger.log(
@@ -2250,8 +2287,6 @@ class PulsrAudioHandler extends BaseAudioHandler
         );
         _errorSubject.add('Playback stopped: multiple tracks failed to load.');
         await _activePlayer.pause();
-        // FIX(BUG-02): Check generation after await
-        if (gen != _playGeneration) return;
         _broadcastState(_activePlayer.playbackEvent);
         return;
       }
@@ -2260,14 +2295,12 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
     _lastGaplessChangeTime = now;
 
-    // FIX(BUG-02): Check generation before mutating _currentIndex and _lastGaplessIndex
-    if (gen != _playGeneration) return;
+    // Immediately update index and metadata synchronously so notification and UI reflect the active track
     _lastGaplessIndex = index;
     _currentIndex = index;
     _prefetchTriggered = false; // FIX(BUG-07)
     _playedShuffleIndices.add(index); // FIX(BUG-08)
     final song = _songs[index];
-    final generation = gen;
 
     final sr =
         (song.sampleRate != null && song.sampleRate! > 0)
@@ -2278,12 +2311,11 @@ class PulsrAudioHandler extends BaseAudioHandler
     final fastArtUri =
         song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
     mediaItem.add(_songToMediaItem(song, fastArtUri));
-    await _activePlayer.setVolume(_calculateReplayGainVolume(song));
-    // FIX(BUG-02): Check generation after setVolume await
-    if (gen != _playGeneration) return;
-    unawaited(_repository.recordPlayHistory(song.id));
     _broadcastState(_activePlayer.playbackEvent);
     _saveCurrentPosition();
+
+    await _activePlayer.setVolume(_calculateReplayGainVolume(song));
+    unawaited(_repository.recordPlayHistory(song.id));
 
     unawaited(
       ArtworkUriResolver.resolveArtworkUri(song)
@@ -2291,7 +2323,6 @@ class PulsrAudioHandler extends BaseAudioHandler
             if (artUri != null &&
                 artUri != fastArtUri &&
                 _currentIndex == index &&
-                generation == _playGeneration &&
                 currentSong?.id == song.id) {
               mediaItem.add(_songToMediaItem(song, artUri));
             }
@@ -2613,12 +2644,19 @@ class PulsrAudioHandler extends BaseAudioHandler
       );
     }
     if (_gaplessMode && _gaplessSource != null) {
-      if (_activePlayer.hasNext) {
+      if (_activePlayer.hasNext && _activePlayer.loopMode != LoopMode.one) {
         await _activePlayer.seekToNext();
       } else {
-        await _activePlayer.pause();
-        await _activePlayer.seek(Duration.zero);
-        _broadcastState(_activePlayer.playbackEvent);
+        final nextIdx = _getNextIndex();
+        if (nextIdx != null && nextIdx != _currentIndex) {
+          await _activePlayer.seek(Duration.zero, index: nextIdx);
+        } else if (_songs.length > 1 && _activePlayer.loopMode == LoopMode.all) {
+          await _activePlayer.seek(Duration.zero, index: 0);
+        } else {
+          await _activePlayer.pause();
+          await _activePlayer.seek(Duration.zero);
+          _broadcastState(_activePlayer.playbackEvent);
+        }
       }
       return;
     }
@@ -2650,11 +2688,16 @@ class PulsrAudioHandler extends BaseAudioHandler
         _saveCurrentPosition();
         return;
       }
-      if (_activePlayer.hasPrevious) {
+      if (_activePlayer.hasPrevious && _activePlayer.loopMode != LoopMode.one) {
         await _activePlayer.seekToPrevious();
       } else {
-        await _activePlayer.seek(Duration.zero);
-        _saveCurrentPosition();
+        final prevIdx = _getPreviousIndex();
+        if (prevIdx != null && prevIdx != _currentIndex) {
+          await _activePlayer.seek(Duration.zero, index: prevIdx);
+        } else {
+          await _activePlayer.seek(Duration.zero);
+          _saveCurrentPosition();
+        }
       }
       return;
     }
@@ -2670,6 +2713,25 @@ class PulsrAudioHandler extends BaseAudioHandler
       await _activePlayer.seek(Duration.zero);
       _saveCurrentPosition();
     }
+  }
+
+  @override
+  Future<void> skipToQueueItem(int index) async {
+    if (index < 0 || index >= _songs.length) return;
+    _playGeneration++;
+    ErrorLogger.addBreadcrumb('Playback skipToQueueItem index=$index', category: 'player');
+    if (_crossfadeManager.isCrossfading) {
+      await _crossfadeManager.cancel(
+        _inactivePlayer,
+        _activePlayer,
+        restoreVolume: _volume,
+      );
+    }
+    if (_gaplessMode && _gaplessSource != null) {
+      await _activePlayer.seek(Duration.zero, index: index);
+      return;
+    }
+    await playSongAt(index);
   }
 
   @override

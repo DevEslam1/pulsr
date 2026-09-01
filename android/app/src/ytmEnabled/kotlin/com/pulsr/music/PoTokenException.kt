@@ -11,9 +11,18 @@ open class PoTokenException(message: String, cause: Throwable? = null) : Excepti
 class BadWebViewException(message: String) : PoTokenException.WebViewUnavailable(message)
 
 /**
- * A syntax error means the WebView could not even parse the injected script, which
- * no retry will fix; anything else is a normal runtime failure worth retrying.
+ * Distinguishes fatal BotGuard JS failures (bad JS engine, missing VM, syntax error)
+ * from transient runtime failures worth retrying.
  */
+internal fun isFatalBotGuardError(error: String): Boolean {
+    val lower = error.lowercase()
+    return lower.contains("syntaxerror") ||
+        lower.contains("vm not found") ||
+        lower.contains("could not load vm") ||
+        lower.contains("could not load program") ||
+        lower.contains("not a function")
+}
+
 internal fun buildExceptionForJsError(error: String): Exception =
-    if (error.contains("SyntaxError")) BadWebViewException(error) else PoTokenException.JsError(error)
+    if (isFatalBotGuardError(error)) BadWebViewException(error) else PoTokenException.JsError(error)
 

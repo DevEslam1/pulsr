@@ -12,18 +12,21 @@ class StereoWidth {
 public:
     StereoWidth();
 
+    void setSampleRate(double sampleRate);
     void configure(double width);
     void setEnabled(bool enabled) { enabled_ = enabled; }
     bool isEnabled() const { return enabled_; }
     void applyParams(const StereoWidthParamSet& params);
     void reset();
 
-    double getWidth() const { return width_; }
+    double getWidth() const { return targetWidth_; }
 
     void process(float* L, float* R, int frames);
     void processInterleaved(float* buffer, int frames, int channels = 2);
 
 private:
-    double width_ = 1.0;
+    double sampleRate_ = 48000.0;
+    double targetWidth_ = 1.0;
+    double smoothedWidth_ = 1.0;
     bool enabled_ = false;
 };

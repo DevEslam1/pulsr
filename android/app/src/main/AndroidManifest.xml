@@ -44,6 +44,8 @@
         android:protectionLevel="signature" />
     <uses-permission android:name="com.pulsr.music.permission.WIDGET_CONTROL" />
 
+    <!-- allowBackup is intentionally disabled (false) to prevent automated ADB or
+         cloud backup extraction of cached audio, offline database, and user auth sessions/tokens. -->
     <application
         android:label="${appName}"
         android:name="${applicationName}"
@@ -52,8 +54,6 @@
         android:supportsRtl="true"
         android:networkSecurityConfig="@xml/network_security_config"
         android:enableOnBackInvokedCallback="true"
-        android:dataExtractionRules="@xml/data_extraction_rules"
-        android:fullBackupContent="@xml/backup_rules"
         tools:replace="android:allowBackup">
 
         <meta-data
@@ -104,38 +104,6 @@
                 <data android:mimeType="application/flac" />
                 <data android:mimeType="application/x-flac" />
                 <data android:mimeType="application/x-matroska" />
-                <data android:host="*" />
-                <!-- Layered pathPattern matchers for filenames with multiple dots -->
-                <data android:pathPattern=".*\\.mp3" />
-                <data android:pathPattern=".*\\..*\\.mp3" />
-                <data android:pathPattern=".*\\..*\\..*\\.mp3" />
-                <data android:pathPattern=".*\\.flac" />
-                <data android:pathPattern=".*\\..*\\.flac" />
-                <data android:pathPattern=".*\\..*\\..*\\.flac" />
-                <data android:pathPattern=".*\\.wav" />
-                <data android:pathPattern=".*\\..*\\.wav" />
-                <data android:pathPattern=".*\\..*\\..*\\.wav" />
-                <data android:pathPattern=".*\\.aac" />
-                <data android:pathPattern=".*\\..*\\.aac" />
-                <data android:pathPattern=".*\\..*\\..*\\.aac" />
-                <data android:pathPattern=".*\\.m4a" />
-                <data android:pathPattern=".*\\..*\\.m4a" />
-                <data android:pathPattern=".*\\..*\\..*\\.m4a" />
-                <data android:pathPattern=".*\\.ogg" />
-                <data android:pathPattern=".*\\..*\\.ogg" />
-                <data android:pathPattern=".*\\..*\\..*\\.ogg" />
-                <data android:pathPattern=".*\\.opus" />
-                <data android:pathPattern=".*\\..*\\.opus" />
-                <data android:pathPattern=".*\\..*\\..*\\.opus" />
-                <data android:pathPattern=".*\\.mka" />
-                <data android:pathPattern=".*\\..*\\.mka" />
-                <data android:pathPattern=".*\\..*\\..*\\.mka" />
-                <data android:pathPattern=".*\\.dsf" />
-                <data android:pathPattern=".*\\..*\\.dsf" />
-                <data android:pathPattern=".*\\..*\\..*\\.dsf" />
-                <data android:pathPattern=".*\\.dff" />
-                <data android:pathPattern=".*\\..*\\.dff" />
-                <data android:pathPattern=".*\\..*\\..*\\.dff" />
             </intent-filter>
             <!-- Intent filter to receive shared text/audio/URLs via Android share sheet -->
             <intent-filter android:label="${appName}">
@@ -150,7 +118,6 @@
         <service android:name="com.ryanheise.audioservice.AudioService"
             android:foregroundServiceType="mediaPlayback"
             android:exported="true"
-            android:permission="android.permission.MEDIA_CONTENT_CONTROL"
             tools:ignore="Instantiatable">
             <intent-filter>
                 <action android:name="android.media.browse.MediaBrowserService" />
@@ -178,8 +145,7 @@
         <receiver
             android:name="com.pulsr.music.NowPlayingWidget"
             android:label="${appName} Widget"
-            android:exported="true"
-            android:permission="com.pulsr.music.permission.WIDGET_CONTROL">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>

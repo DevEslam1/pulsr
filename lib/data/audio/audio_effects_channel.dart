@@ -161,6 +161,77 @@ class AudioEffectsChannel {
     }
   }
 
+  /// Query installed vendor / Dolby Atmos effects.
+  Future<Map<String, dynamic>> detectSystemEffects() async {
+    if (!_isAndroid) {
+      return {
+        'status': 'unsupportedDevice',
+        'detectedBundles': <String>[],
+        'hasDolbyOrVendor': false,
+      };
+    }
+    try {
+      final result = await _channel
+          .invokeMapMethod<String, dynamic>('detectSystemEffects')
+          .timeout(const Duration(seconds: 2));
+      return result ?? {
+        'status': 'unsupportedDevice',
+        'detectedBundles': <String>[],
+        'hasDolbyOrVendor': false,
+      };
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to detect system audio effects',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return {
+        'status': 'unknown',
+        'detectedBundles': <String>[],
+        'hasDolbyOrVendor': false,
+      };
+    }
+  }
+
+  /// Configure policy for vendor Dolby/system effects ('auto', 'tryDisable', 'leaveOn').
+  Future<String> setSystemEffectsPolicy(String policy, {bool isHiResOrBitPerfect = false}) async {
+    if (!_isAndroid) return 'unsupportedDevice';
+    try {
+      final result = await _channel.invokeMapMethod<String, dynamic>(
+        'setSystemEffectsPolicy',
+        {
+          'policy': policy,
+          'isHiResOrBitPerfect': isHiResOrBitPerfect,
+        },
+      ).timeout(const Duration(seconds: 2));
+      return result?['status'] as String? ?? 'unknown';
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Failed to set system effects policy',
+        error: e,
+        stackTrace: st,
+        category: 'AudioEffectsChannel',
+      );
+      return 'unknown';
+    }
+  }
+
+  /// Get current live status of system effects ('bypassed', 'active', 'unknown', 'unsupportedDevice').
+  Future<Map<String, dynamic>> getSystemEffectsStatus() async {
+    if (!_isAndroid) {
+      return {'status': 'unsupportedDevice', 'detectedBundles': <String>[]};
+    }
+    try {
+      final result = await _channel
+          .invokeMapMethod<String, dynamic>('getSystemEffectsStatus')
+          .timeout(const Duration(seconds: 2));
+      return result ?? {'status': 'unknown', 'detectedBundles': <String>[]};
+    } catch (_) {
+      return {'status': 'unknown', 'detectedBundles': <String>[]};
+    }
+  }
+
   Future<bool> hasActiveEffects() async {
     if (!_isAndroid) return false;
     try {

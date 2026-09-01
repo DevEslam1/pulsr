@@ -252,6 +252,28 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 }
                 result.success(true)
             }
+            "updateClientVersion" -> {
+                val clientName = call.argument<String>("clientName")
+                val version = call.argument<String>("version")
+                if (clientName != null && version != null) {
+                    val type = runCatching { InnertubeClient.ClientType.valueOf(clientName) }.getOrNull()
+                    if (type != null) {
+                        ClientCapabilityMatrix.updateClientVersion(type, version)
+                        result.success(true)
+                        return
+                    }
+                }
+                result.success(false)
+            }
+            "updateCapabilityMatrix" -> {
+                val json = call.argument<String>("json")
+                if (!json.isNullOrEmpty()) {
+                    ClientCapabilityMatrix.loadFromJson(json)
+                    result.success(true)
+                    return
+                }
+                result.success(false)
+            }
             "search" -> {
                 val query = call.argument<String>("query")?.trim()
                 if (query.isNullOrEmpty()) {
@@ -377,6 +399,18 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         }
         if (e is InnertubeClient.InnertubeException) {
             return e.signal.code
+        }
+        if (e is PoTokenException.WebViewUnavailable || e is BadWebViewException) {
+            return "PO_TOKEN_BROKEN"
+        }
+        if (e is PoTokenException.Timeout) {
+            return "PO_TOKEN_TIMEOUT"
+        }
+        if (e is PoTokenException.Invalidated) {
+            return "PO_TOKEN_INVALID"
+        }
+        if (e is PoTokenException) {
+            return "PO_TOKEN_UNAVAILABLE"
         }
         val msg = e.message?.lowercase() ?: ""
         if (msg.contains("not a bot") || msg.contains("login_required") || msg.contains("recaptcha") || msg.contains("bot_block")) {
@@ -835,7 +869,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             "title" to info.name,
             "artist" to (info.uploaderName ?: ""),
             "artworkUrl" to bestArtwork(info.thumbnails),
-            "userAgent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+            "userAgent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.7204.93 Safari/537.36",
         )
     }
 

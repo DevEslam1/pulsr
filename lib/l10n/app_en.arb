@@ -814,5 +814,21 @@
         "type": "String"
       }
     }
+  },
+  "systemEffectsTitle": "System Audio Effects (Dolby Atmos / DAP)",
+  "systemEffectsSubtitleBypassed": "✓ Bypassed: System effects disabled on output-mix session",
+  "systemEffectsSubtitleActive": "Active: OEM sound effects are processing audio",
+  "systemEffectsSubtitleUnsupported": "No OEM Dolby/DAP detected on this device",
+  "systemEffectsAuto": "Auto",
+  "systemEffectsTryDisable": "Try to disable",
+  "systemEffectsLeaveOn": "Leave on",
+  "bluetoothLatencyTitle": "Bluetooth Latency Sync (AVRCP / Lyrics)",
+  "bluetoothLatencySubtitle": "Compensates for Bluetooth audio codec buffer latency ({offset} ms). Volume deferral: AVRCP absolute volume active.",
+  "@bluetoothLatencySubtitle": {
+    "placeholders": {
+      "offset": {
+        "type": "int"
+      }
+    }
   }
 }

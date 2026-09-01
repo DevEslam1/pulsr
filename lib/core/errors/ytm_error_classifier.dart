@@ -227,6 +227,22 @@ class YtmErrorClassifier {
     if (codeLower.contains('429') || codeLower.contains('rate_limit')) {
       return _mapSignal(YtmBlockSignal.rateLimited, details, traceId);
     }
+    if (codeLower.contains('potoken_broken') || codeLower.contains('po_token_broken') || codeLower.contains('po_token_unavailable')) {
+      return YtmErrorInfo(
+        message: 'Security subsystem unavailable. Switching to alternate playback mode…',
+        recoveryAction: YtmRecoveryAction.limitedMode,
+        signal: YtmBlockSignal.poTokenInvalid,
+        traceId: traceId,
+      );
+    }
+    if (codeLower.contains('potoken_timeout') || codeLower.contains('po_token_timeout')) {
+      return YtmErrorInfo(
+        message: 'Security attestation timed out. Retrying…',
+        recoveryAction: YtmRecoveryAction.retryWithBackoff,
+        signal: YtmBlockSignal.poTokenInvalid,
+        traceId: traceId,
+      );
+    }
     if (codeLower.contains('potoken') || codeLower.contains('po_token')) {
       return _mapSignal(YtmBlockSignal.poTokenInvalid, details, traceId);
     }

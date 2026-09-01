@@ -43,16 +43,18 @@ void SubCrossover::computeCoeffs() {
     const double a1 = (-2.0 * cw) / a0;
     const double a2 = (1.0 - alpha) / a0;
 
-    for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
-        stage1_[ch].b0 = b0; stage1_[ch].b1 = b1; stage1_[ch].b2 = b2;
-        stage1_[ch].a1 = a1; stage1_[ch].a2 = a2;
-        stage2_[ch] = stage1_[ch];
+    for (int p = 0; p < MAX_PAIRS; ++p) {
+        stage1_[p].b0 = b0; stage1_[p].b1 = b1; stage1_[p].b2 = b2;
+        stage1_[p].a1 = a1; stage1_[p].a2 = a2;
+        stage2_[p] = stage1_[p];
     }
 }
 
 void SubCrossover::reset() {
-    std::memset(stage1_, 0, sizeof(stage1_));
-    std::memset(stage2_, 0, sizeof(stage2_));
+    for (int p = 0; p < MAX_PAIRS; ++p) {
+        stage1_[p].z1 = stage1_[p].z2 = 0.0;
+        stage2_[p].z1 = stage2_[p].z2 = 0.0;
+    }
 }
 
 void SubCrossover::process(float* L, float* R, int frames) {
@@ -60,6 +62,7 @@ void SubCrossover::process(float* L, float* R, int frames) {
     if (subGain_ <= 1e-6) return;
 
     const float gain = static_cast<float>(subGain_);
+    const float makeup = 1.0f / (1.0f + gain * 0.5f);
     LpStage& s1 = stage1_[0];
     LpStage& s2 = stage2_[0];
 
@@ -70,8 +73,8 @@ void SubCrossover::process(float* L, float* R, int frames) {
         float sub = s1.process(mono);
         if (cascade_) sub = s2.process(sub);
         const float subTap = sub * gain;
-        L[i] = l + subTap;
-        R[i] = r + subTap;
+        L[i] = (l + subTap) * makeup;
+        R[i] = (r + subTap) * makeup;
     }
 }
 
@@ -80,19 +83,21 @@ void SubCrossover::processInterleaved(float* buffer, int frames, int channels) {
     if (subGain_ <= 1e-6) return;
 
     const float gain = static_cast<float>(subGain_);
+    const float makeup = 1.0f / (1.0f + gain * 0.5f);
     // Redirect one mono sub tap per channel pair (stereo pairs stay coherent).
     for (int i = 0; i < frames; ++i) {
         for (int ch = 0; ch + 1 < channels; ch += 2) {
             const int iL = i * channels + ch;
             const int iR = i * channels + ch + 1;
             const float mono = 0.5f * (buffer[iL] + buffer[iR]);
-            LpStage& s1 = stage1_[ch];
-            LpStage& s2 = stage2_[ch];
+            const int pair = ch >> 1;
+            LpStage& s1 = stage1_[pair];
+            LpStage& s2 = stage2_[pair];
             float sub = s1.process(mono);
             if (cascade_) sub = s2.process(sub);
             const float subTap = sub * gain;
-            buffer[iL] += subTap;
-            buffer[iR] += subTap;
+            buffer[iL] = (buffer[iL] + subTap) * makeup;
+            buffer[iR] = (buffer[iR] + subTap) * makeup;
         }
     }
 }
