@@ -1392,17 +1392,28 @@ class YtmAccountService {
     // the session cookies + SAPISIDHASH. Unauthenticated → a guest token bound to guest visitorData.
     final isAuthenticated =
         isLoggedIn && _cookies != null && _cookies!.isNotEmpty;
-    // Warm the native BotGuard attestation once so both the account-bound and
-    // guest minting below have a live generator instead of a cold WebView.
-    try {
-      await getIt<YtmService>().ensurePoTokenReady();
-    } catch (_) {}
+
+    // Run ensurePoTokenReady and datasyncId bootstrap in parallel — they have
+    // no dependency on each other. Saves ~200-400ms on cold resolves.
+    await Future.wait([
+      Future(() async {
+        try {
+          await getIt<YtmService>().ensurePoTokenReady();
+        } catch (_) {}
+      }),
+      Future(() async {
+        if (isAuthenticated &&
+            (_dataSyncId == null || _dataSyncId!.isEmpty)) {
+          try {
+            await _bootstrapDataSyncId();
+          } catch (_) {}
+        }
+      }),
+    ]);
+
     String? poToken;
     String? visitorData;
     if (isAuthenticated) {
-      if (_dataSyncId == null || _dataSyncId!.isEmpty) {
-        await _bootstrapDataSyncId();
-      }
       final dsid = _dataSyncId;
       if (dsid != null && dsid.isNotEmpty) {
         try {

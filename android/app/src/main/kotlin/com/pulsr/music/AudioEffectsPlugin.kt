@@ -570,11 +570,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             if (audioManager != null) {
                 val callback = object : AudioDeviceCallback() {
                     override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
+                        // BT A2DP typically needs 500 ms – 3 s to fully route audio;
+                        // 1 500 ms strikes a balance between responsiveness and stability.
                         mainHandler.postDelayed({
                             if (currentAudioSessionId != 0 && hasActiveEffects()) {
                                 recreateEffects()
                             }
-                        }, 200L)
+                        }, 1500L)
                     }
 
                     override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
@@ -582,7 +584,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             if (currentAudioSessionId != 0 && hasActiveEffects()) {
                                 recreateEffects()
                             }
-                        }, 200L)
+                        }, 1500L)
                     }
                 }
                 audioManager.registerAudioDeviceCallback(callback, mainHandler)
@@ -1502,22 +1504,29 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val activeNames = mutableListOf<String>()
 
                     // 1. Equalizer (DynamicsProcessing or legacy)
-                    val eqActive = isEqEnabled && !isBitPerfectBypassActive && halAttached
+                    val halEqSuppressedForReport = isHalEqSuppressed()
+                    val eqActive = isEqEnabled && !isBitPerfectBypassActive && !halEqSuppressedForReport && halAttached
                     if (eqActive) activeNames.add("Graphic Equalizer ($eqBandCount Bands, Preamp: ${String.format("%.1f", eqPreampDb)} dB)")
                     stagesList.add(mapOf(
                         "name" to "Graphic Equalizer",
                         "category" to (if (dynamicsProcessing != null) "Android HAL (DynamicsProcessing)" else if (legacyEqualizer != null) "Android HAL (Legacy Equalizer)" else "Native C++"),
                         "isSupported" to (isEffectTypeSupported(AudioEffect.EFFECT_TYPE_DYNAMICS_PROCESSING) || isNativeDspLoaded),
                         "isEnabled" to isEqEnabled,
-                        "isBypassed" to isBitPerfectBypassActive,
-                        "isDegraded" to (!halAttached && isEqEnabled || ((autoDegraded and STAGE_EQ) != 0)),
+                        "isBypassed" to (isBitPerfectBypassActive || halEqSuppressedForReport),
+                        "isDegraded" to (!halAttached && isEqEnabled && !halEqSuppressedForReport || ((autoDegraded and STAGE_EQ) != 0)),
                         "parameters" to mapOf(
                             "bandCount" to eqBandCount,
                             "preampDb" to eqPreampDb,
                             "isDynamicsProcessingAttached" to (dynamicsProcessing != null),
-                            "isLegacyEqualizerAttached" to (legacyEqualizer != null)
+                            "isLegacyEqualizerAttached" to (legacyEqualizer != null),
+                            "isHalEqSuppressedForOem" to halEqSuppressedForReport
                         ),
-                        "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isEqEnabled) "$eqBandCount Bands Active (Preamp: ${String.format("%.1f", eqPreampDb)} dB)" else "Disabled"
+                        "statusDescription" to when {
+                            isBitPerfectBypassActive -> "Bypassed by Bit-Perfect"
+                            halEqSuppressedForReport -> "Suppressed (OEM engine active — dspPreference=$dspPreference)"
+                            isEqEnabled -> "$eqBandCount Bands Active (Preamp: ${String.format("%.1f", eqPreampDb)} dB)"
+                            else -> "Disabled"
+                        }
                     ))
 
                     // 2. Dynamics Processing / Multiband Compressor
@@ -2036,9 +2045,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     private fun updateLegacyEqualizer() {
-        if (!isEqEnabled || currentAudioSessionId == 0 || dynamicsProcessing != null) {
+        val halEqSuppressed = isHalEqSuppressed()
+        if (!isEqEnabled || halEqSuppressed || currentAudioSessionId == 0 || dynamicsProcessing != null) {
             try { legacyEqualizer?.enabled = false } catch (_: Exception) {}
-            if (dynamicsProcessing != null) {
+            if (dynamicsProcessing != null || halEqSuppressed) {
                 try { legacyEqualizer?.release() } catch (_: Exception) {}
                 legacyEqualizer = null
             }
@@ -2108,6 +2118,30 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         updateLegacyEqualizer()
     }
 
+    /**
+     * Returns true when the session-bound HAL EQ (DynamicsProcessing postEq / legacy
+     * Equalizer) should be suppressed to avoid double-processing through a system-level
+     * OEM audio engine (Dolby, Dirac, SoundAlive, etc.).
+     *
+     * "oem"  → always suppress, user explicitly chose to defer to the OEM engine.
+     * "auto" → suppress only when an OEM audio package is actually present; fall back
+     *          to native/HAL processing on clean ROMs.
+     * "native" → never suppress (default).
+     *
+     * Note: HAL limiter and balance/mono are NOT suppressed — they don't process the
+     * frequency spectrum and therefore don't interact adversely with Dolby-style engines.
+     */
+    private fun isHalEqSuppressed(): Boolean {
+        return when (dspPreference) {
+            "oem" -> true
+            "auto" -> {
+                val ctx = context ?: return false
+                getCachedOemInfo(ctx)["hasOemAudio"] as? Boolean ?: false
+            }
+            else -> false
+        }
+    }
+
     private fun buildPostEq(): DynamicsProcessing.Eq {
         val eq = DynamicsProcessing.Eq(true, true, eqBandCount)
         for (i in 0 until eqBandCount) {
@@ -2140,9 +2174,18 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
         val dynamicsActive = isDynamicsEnabled && currentDynamicsPreset != "off"
         val needsBalanceMono = monoMix || kotlin.math.abs(stereoBalance) > 0.001
+        // When dspPreference is "oem" (or "auto" + OEM detected), suppress the HAL
+        // graphic EQ to avoid double-processing through Dolby / Dirac / SoundAlive.
+        // Limiter and balance/mono still run through DP — they don't colour the
+        // frequency spectrum and are safe alongside system-level OEM engines.
+        val halEqSuppressed = isHalEqSuppressed()
+        val effectiveEqEnabled = isEqEnabled && !halEqSuppressed
+        if (halEqSuppressed && isEqEnabled) {
+            Log.i(TAG, "buildDynamicsProcessing: HAL EQ suppressed (dspPreference=$dspPreference) — avoiding double-process with OEM audio engine")
+        }
         // Build DynamicsProcessing whenever EQ, dynamics, limiter, or balance/mono are active.
         // Limiter and balance/mono route through the same DynamicsProcessing engine.
-        if (!isEqEnabled && !dynamicsActive && !isLimiterEnabled && !needsBalanceMono) {
+        if (!effectiveEqEnabled && !dynamicsActive && !isLimiterEnabled && !needsBalanceMono) {
             try { oldDp?.release() } catch (_: Exception) {}
             updateLegacyEqualizer()
             return
@@ -2166,7 +2209,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 0,
                 true,  // mbc
                 MBC_BAND_COUNT,
-                true,  // postEq — 10-band graphic EQ
+                true,  // postEq — 10-band graphic EQ (may be suppressed for OEM)
                 eqBandCount,
                 true   // limiter
             )
@@ -2182,8 +2225,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 neutralizeDynamics(dp)
             }
 
-            // Enable the engine whenever any stage is active (EQ, dynamics, or limiter)
-            dp.enabled = isEqEnabled || dynamicsActive || isLimiterEnabled
+            // Enable the engine whenever any stage is active (EQ, dynamics, or limiter).
+            // Use effectiveEqEnabled so OEM-suppressed EQ doesn't keep DP enabled unnecessarily.
+            dp.enabled = effectiveEqEnabled || dynamicsActive || isLimiterEnabled
             dynamicsProcessing = dp
             updateLegacyEqualizer()
             // Wire HAL limiter and balance/mono into the freshly-built DP instance
@@ -2320,7 +2364,13 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         fun healthy(effect: AudioEffect?): Boolean {
             if (effect == null) return false
             return try {
-                effect.id == currentAudioSessionId
+                // AudioEffect.getId() returns the effect's own opaque handle —
+                // NOT the session ID. We simply call it: if the effect is
+                // dead / released Android throws IllegalStateException, which
+                // we catch to signal "not healthy". Any non-throwing return
+                // means the effect is alive on the current session.
+                effect.id
+                true
             } catch (_: Exception) {
                 false
             }

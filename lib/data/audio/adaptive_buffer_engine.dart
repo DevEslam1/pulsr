@@ -21,6 +21,11 @@ class AdaptiveBufferEngine {
     if (isLocalFile) {
       return const Duration(milliseconds: 100);
     }
+    // Fast WiFi (≥25 Mbps) or very fast mobile: minimal start buffer so
+    // ExoPlayer starts decoding as quickly as possible.
+    if (_avgNetworkSpeedMbps >= 25.0) {
+      return const Duration(milliseconds: 500);
+    }
     if (isWifi && _avgNetworkSpeedMbps >= 8.0) {
       return const Duration(milliseconds: 800);
     } else if (_avgNetworkSpeedMbps >= 2.0) {

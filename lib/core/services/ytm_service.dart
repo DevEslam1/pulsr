@@ -659,103 +659,186 @@ class YtmService {
         _tracker?.markStage(PlaybackStage.pluginEntered);
         _tracker?.setTag('cacheHit', 'false');
       } catch (_) {}
-      // 1. Try direct authenticated YouTube Music InnerTube Player API if logged in
-      try {
-        if (getIt.isRegistered<YtmAccountService>()) {
-          final account = getIt<YtmAccountService>();
-          if (account.isLoggedIn) {
-            try {
-              _tracker?.markStage(PlaybackStage.clientRequestSent);
-              _tracker?.markStage(PlaybackStage.poTokenNeeded);
-            } catch (_) {}
-            // Hard ~3s wall-clock deadline: a slow tier-1 must fall through to
-            // the native extractor instead of burning its internal 25s budget.
-            final directStream = await account
-                .resolvePlayerStream(videoId, quality: quality)
-                .timeout(_tier1Deadline);
-            if (directStream != null && directStream.url.trim().isNotEmpty) {
-              try {
-                _tracker?.markStage(PlaybackStage.urlObtained);
-                _tracker?.setTag('tierUsed', 'account');
-              } catch (_) {}
-              urlCache?.put(
-                videoId,
-                directStream.url,
-                quality: quality,
-                userAgent: directStream.userAgent,
-                cookies: directStream.cookies,
-              );
-              return directStream;
-            }
-          }
-        }
-      } catch (e) {
-        // A definitive session-expired verdict must surface to callers/UI,
-        // never silently downgrade to guest playback.
-        if (e is YtmException && e.isAuth) rethrow;
-        debugPrint(
-          '[YTM_SERVICE] Direct account stream resolution fallback: $e',
-        );
-      }
 
-      // 2. Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
-      //
-      // maxRetries: 0 — the native Kotlin ladder already tries every client
-      // internally (IOS_MUSIC → ANDROID_MUSIC → ANDROID_VR → …). Adding an
-      // external retry just re-runs a ladder that already told us every client
-      // is gate-blocked (LOGIN_REQUIRED / BotChallenge), wasting ~9 extra
-      // seconds before falling through to tier-3.
-      try {
+      final account = getIt.isRegistered<YtmAccountService>()
+          ? getIt<YtmAccountService>()
+          : null;
+      final isLoggedIn = account?.isLoggedIn ?? false;
+
+      // ── Parallel race: tier-1 (account) vs tier-2 (native Kotlin) ──────────
+      // Both are fired simultaneously. The first to return a valid URL wins.
+      // The other future keeps running but its result is discarded (or cached
+      // as a bonus). Auth errors (session expiry) surface immediately and
+      // cancel the race. This saves the full slower-path latency vs the old
+      // sequential waterfall.
+      if (isLoggedIn && account != null) {
         try {
           _tracker?.markStage(PlaybackStage.clientRequestSent);
           _tracker?.markStage(PlaybackStage.poTokenNeeded);
         } catch (_) {}
-        final raw = await _guard(
+
+        YtmStream? t1Result;
+        YtmStream? t2Result;
+        Object? t1Error;
+        Object? t2Error;
+
+        // Fire both tiers at the same time.
+        // catchError must return YtmStream? — capture the error as a side-effect
+        // and return null so the future chain stays typed correctly.
+        final t1Future = account
+            .resolvePlayerStream(videoId, quality: quality)
+            .timeout(_tier1Deadline)
+            .then((s) { t1Result = s; return s; })
+            .catchError((Object e) { t1Error = e; return null as YtmStream?; });
+
+        final t2Future = _guard(
           () => _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
             'videoId': videoId,
             'quality': quality,
           }),
           timeout: _resolveFirstAttemptTimeout,
-          maxRetries: 0, // no external retry — ladder is internal
-        );
+          maxRetries: 0,
+        )
+            .then((raw) {
+              t2Result = raw == null ? null : YtmStream.fromChannel(raw);
+              return t2Result;
+            })
+            .catchError((Object e) { t2Error = e; return null as YtmStream?; });
 
-        final stream = raw == null ? null : YtmStream.fromChannel(raw);
-        if (stream != null && stream.url.trim().isNotEmpty) {
+        // Use a Completer so we return the instant the FIRST good URL arrives.
+        final winner = Completer<YtmStream?>();
+
+        void tryResolve() {
+          if (winner.isCompleted) return;
+          final t1 = t1Result;
+          final t2 = t2Result;
+          if (t1 != null && t1.url.trim().isNotEmpty) {
+            winner.complete(t1);
+          } else if (t2 != null && t2.url.trim().isNotEmpty) {
+            winner.complete(t2);
+          } else if (t1Error != null && t2Error != null) {
+            // Both failed — complete with null so we fall through to tier-3.
+            winner.complete(null);
+          }
+        }
+
+        // Surface auth errors immediately so the UI can prompt re-login.
+        void checkAuthError(Object? e) {
+          if (e is YtmException && e.isAuth && !e.isBotBlocked) {
+            if (!winner.isCompleted) winner.completeError(e);
+          }
+        }
+
+        unawaited(t1Future.then((_) {
+          checkAuthError(t1Error);
+          tryResolve();
+        }));
+        unawaited(t2Future.then((_) {
+          checkAuthError(t2Error);
+          tryResolve();
+        }));
+
+        // Fallback: after both finish ensure we resolve.
+        unawaited(Future.wait([t1Future, t2Future]).then((_) {
+          if (!winner.isCompleted) winner.complete(null);
+        }));
+
+        final winStream = await winner.future;
+
+        if (winStream != null && winStream.url.trim().isNotEmpty) {
+          final tierLabel = (t1Result?.url == winStream.url) ? 'account' : 'native';
           try {
             _tracker?.markStage(PlaybackStage.urlObtained);
-            _tracker?.setTag('tierUsed', 'native');
+            _tracker?.setTag('tierUsed', tierLabel);
           } catch (_) {}
           urlCache?.put(
             videoId,
-            stream.url,
+            winStream.url,
             quality: quality,
-            userAgent: stream.userAgent,
-            cookies: stream.cookies,
+            userAgent: winStream.userAgent,
+            cookies: winStream.cookies,
           );
-          return stream;
+          // Bonus: if the loser also resolved, cache it for the SWTR window.
+          final bonus = (t1Result?.url == winStream.url) ? t2Result : t1Result;
+          if (bonus != null && bonus.url.trim().isNotEmpty) {
+            urlCache?.put(
+              videoId,
+              bonus.url,
+              quality: quality,
+              userAgent: bonus.userAgent,
+              cookies: bonus.cookies,
+            );
+          }
+          return winStream;
         }
-      } catch (e) {
-        debugPrint('[YTM_SERVICE] Native stream resolution failed: $e');
-        if (e is YtmException) {
-          final isDeviceGate = e.code == 'YTM_SIGNIN_REQUIRED' ||
-              e.isBotBlocked ||
-              e.isAuth;
-          if (isDeviceGate) {
-            signInRequiredAbort = true;
-            // Write the global block NOW before any rethrow so the next play
-            // fast-fails. For bot/IP-level gates we always want to fall through
-            // to tier-3 (XDM backend) rather than hard-failing here, so only
-            // hard-rethrow on a pure session-expiry (isAuth but NOT isBotBlocked).
-            if (e.isBotBlocked || e.code == 'YTM_SIGNIN_REQUIRED') {
+
+        // Surface any bot/device-gate signals from the race for tier-3 logic.
+        for (final err in [t1Error, t2Error]) {
+          if (err is YtmException) {
+            // Use throw (not rethrow) since we're not inside a catch clause.
+            if (err.isAuth && !err.isBotBlocked) throw err;
+            if (err.isBotBlocked || err.code == 'YTM_SIGNIN_REQUIRED') {
+              signInRequiredAbort = true;
               _globalBlockUntil = DateTime.now().add(_signinAbortTtl);
-              debugPrint('[YTM_SERVICE] Global block set for '
-                  '${_signinAbortTtl.inMinutes}m '
-                  '(device/IP-level LOGIN_REQUIRED / BotChallenge)');
+              debugPrint(
+                '[YTM_SERVICE] Global block set for '
+                '${_signinAbortTtl.inSeconds}s '
+                '(device/IP-level LOGIN_REQUIRED / BotChallenge)',
+              );
             }
-            // Pure session expiry (e.g. cookie revoked) → surface immediately.
-            if (e.isAuth && !e.isBotBlocked) rethrow;
-          } else if (e.code == 'YTM_TIMEOUT') {
-            debugPrint('[YTM_SERVICE] Native timeout — not a device gate, will not set global block');
+          }
+        }
+        debugPrint('[YTM_SERVICE] Parallel race (account+native) produced no stream for $videoId — falling to tier-3');
+      } else {
+        // ── Guest path: native Kotlin only (no account tier) ──────────────────
+        try {
+          try {
+            _tracker?.markStage(PlaybackStage.clientRequestSent);
+            _tracker?.markStage(PlaybackStage.poTokenNeeded);
+          } catch (_) {}
+          final raw = await _guard(
+            () => _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
+              'videoId': videoId,
+              'quality': quality,
+            }),
+            timeout: _resolveFirstAttemptTimeout,
+            maxRetries: 0,
+          );
+          final stream = raw == null ? null : YtmStream.fromChannel(raw);
+          if (stream != null && stream.url.trim().isNotEmpty) {
+            try {
+              _tracker?.markStage(PlaybackStage.urlObtained);
+              _tracker?.setTag('tierUsed', 'native');
+            } catch (_) {}
+            urlCache?.put(
+              videoId,
+              stream.url,
+              quality: quality,
+              userAgent: stream.userAgent,
+              cookies: stream.cookies,
+            );
+            return stream;
+          }
+        } catch (e) {
+          debugPrint('[YTM_SERVICE] Native stream resolution failed: $e');
+          if (e is YtmException) {
+            final isDeviceGate = e.code == 'YTM_SIGNIN_REQUIRED' ||
+                e.isBotBlocked ||
+                e.isAuth;
+            if (isDeviceGate) {
+              signInRequiredAbort = true;
+              if (e.isBotBlocked || e.code == 'YTM_SIGNIN_REQUIRED') {
+                _globalBlockUntil = DateTime.now().add(_signinAbortTtl);
+                debugPrint(
+                  '[YTM_SERVICE] Global block set for '
+                  '${_signinAbortTtl.inSeconds}s '
+                  '(device/IP-level LOGIN_REQUIRED / BotChallenge)',
+                );
+              }
+              if (e.isAuth && !e.isBotBlocked) rethrow;
+            } else if (e.code == 'YTM_TIMEOUT') {
+              debugPrint('[YTM_SERVICE] Native timeout — not a device gate, will not set global block');
+            }
           }
         }
       }
@@ -768,14 +851,14 @@ class YtmService {
         if (getIt.isRegistered<XdmBackendService>()) {
           final xdm = getIt<XdmBackendService>();
           if (await xdm.isEnabled()) {
-            final account =
+            final acct =
                 getIt.isRegistered<YtmAccountService>()
                     ? getIt<YtmAccountService>()
                     : null;
             final remoteStream = await xdm.resolveStream(
               videoId,
               quality: quality,
-              cookies: account?.cookies,
+              cookies: acct?.cookies,
             );
             if (remoteStream != null) {
               try {

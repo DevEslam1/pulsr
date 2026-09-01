@@ -941,9 +941,10 @@ class PulsrAudioHandler extends BaseAudioHandler
               // Warm the next YouTube stream URL before the crossfade window even
               // opens, so resolve latency does not truncate the fade. Cheap no-op
               // for local tracks and for an already-cached url.
+              // Trigger at 60% of track duration for more warm-up lead time.
               if (duration > const Duration(seconds: 15) &&
                   (pos >= duration - const Duration(seconds: 15) ||
-                      pos.inMilliseconds >= duration.inMilliseconds * 0.7)) {
+                      pos.inMilliseconds >= duration.inMilliseconds * 0.6)) {
                 _smartPrefetch();
               }
               if (_crossfadeManager.duration > Duration.zero &&
@@ -1445,6 +1446,8 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
     final wifiOnly = prefs.getBool('setting_wifi_only_mode') ?? false;
     if (wifiOnly) {
+      // Cache the WiFi state to a local variable — isWifiConnected() is a
+      // native channel call and must not be awaited twice in the same resolve.
       final isWifi = await _ytmService.isWifiConnected();
       if (!isWifi) {
         throw const YtmException(
