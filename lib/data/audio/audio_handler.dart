@@ -789,6 +789,9 @@ class PulsrAudioHandler extends BaseAudioHandler
           getIt.isRegistered<YtmUrlCache>()
               ? getIt<YtmUrlCache>()
               : YtmUrlCache(),
+      // 2-track lookahead on WiFi: pre-resolves N+2 after N+1 lands so
+      // rapid skips and gapless transitions never stall waiting for a URL.
+      isWifi: _ytmService.isWifiConnected,
     );
 
     _formatDecoder = FormatAwareDecoder(

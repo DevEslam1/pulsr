@@ -88,23 +88,26 @@ class YtmService {
   static const Duration _defaultSearchTimeout = Duration(seconds: 25);
 
   // Tier-1 (account) deadline for direct authenticated Innertube playback.
-  // 3s is the TTFA target, but on slow/proxied networks (NE2213 + VPN) the
-  // account ladder (WEB_REMIX -> ANDROID_VR -> ...) can need ~7-8s to
-  // exhaust 3 clients with retries; 8s still leaves native 8s budget inside
-  // the overall 25s player timeout while passing the <10s gate test.
-  static const Duration _tier1Deadline = Duration(seconds: 8);
+  // Raised to 12s: 8s was too tight on slow/VPN networks for the account
+  // client chain (WEB_REMIX → ANDROID_VR → …) to complete even one client
+  // attempt, causing unnecessary fallthrough to tier-2.
+  static const Duration _tier1Deadline = Duration(seconds: 12);
 
-  // TTFA hard budget: reduced first-attempt timeout + single retry for the
-  // play path (native tier-2). Other call sites keep the default 25s/2-retry
-  // ladder.
-  static const Duration _resolveFirstAttemptTimeout = Duration(seconds: 8);
+  // TTFA hard budget for the native ladder (tier-2). Raised to 12s for the
+  // same reason — the Kotlin-side ladder has per-client timeouts; the 8s
+  // outer cap was racing against them on slower connections.
+  static const Duration _resolveFirstAttemptTimeout = Duration(seconds: 12);
 
   /// TTFA: device-level negative cache — when the native ladder returns
   /// LOGIN_REQUIRED or BotChallenge from every client, the block is at the
   /// device/IP level, not per-video. A single global flag fast-fails ALL
   /// subsequent resolves during the block window instead of re-burning the
   /// full 8–9s dead ladder for each different song.
-  static const Duration _signinAbortTtl = Duration(minutes: 3);
+  // Reduced from 3 min to 90s: with XDM (tier-3) enabled, the next song
+  // should try the remote backend immediately rather than fast-failing for
+  // 3 full minutes. 90s is enough to avoid hammering a dead ladder while
+  // still recovering quickly when network conditions change.
+  static const Duration _signinAbortTtl = Duration(seconds: 90);
   static DateTime? _globalBlockUntil;
 
   @visibleForTesting

@@ -82,7 +82,8 @@ class YtmResolvingSource extends StreamAudioSource {
     // 1. Proactive expiry check: if URL is within 5 minutes of expiring, discard & re-resolve
     if (_isExpiringSoon()) {
       debugPrint(
-          '[YtmResolvingSource] Stream URL for $videoId is expiring soon. Re-resolving...');
+        '[YtmResolvingSource] Stream URL for $videoId is expiring soon. Re-resolving...',
+      );
       _inner = null;
       _pending = null;
     }
@@ -99,14 +100,16 @@ class YtmResolvingSource extends StreamAudioSource {
         final errStr = byteErr.toString().toLowerCase();
 
         // Check if error represents a stale/forbidden stream URL (403/404/416/408)
-        final is403or404 = errStr.contains('403') ||
+        final is403or404 =
+            errStr.contains('403') ||
             errStr.contains('forbidden') ||
             errStr.contains('404') ||
             errStr.contains('408') ||
             errStr.contains('416');
 
         debugPrint(
-            '[YtmResolvingSource] Byte stream error ($byteErr, isForbidden/Stale=$is403or404) for $videoId. Evicting dead URL & retrying fresh resolution once...');
+          '[YtmResolvingSource] Byte stream error ($byteErr, isForbidden/Stale=$is403or404) for $videoId. Evicting dead URL & retrying fresh resolution once...',
+        );
         _inner = null;
         _pending = null;
 
@@ -129,7 +132,8 @@ class YtmResolvingSource extends StreamAudioSource {
           // Classify failure to ensure structured diagnostics
           final classified = YtmErrorClassifier.classify(retryErr);
           debugPrint(
-              '[YtmResolvingSource] Retry resolution failed ($retryErr): ${classified.message}');
+            '[YtmResolvingSource] Retry resolution failed ($retryErr): ${classified.message}',
+          );
           onError?.call(retryErr);
           rethrow;
         }
@@ -139,7 +143,8 @@ class YtmResolvingSource extends StreamAudioSource {
       _pending = null;
       final classified = YtmErrorClassifier.classify(err);
       debugPrint(
-          '[YtmResolvingSource] Initial resolution failed ($err): ${classified.message}');
+        '[YtmResolvingSource] Initial resolution failed ($err): ${classified.message}',
+      );
       onError?.call(err);
       rethrow;
     }
@@ -158,28 +163,33 @@ class YtmResolvingSource extends StreamAudioSource {
     return _pending ??= _createInner();
   }
 
-  Future<LockCachingAudioSource> _createInner(
-      {bool forceRefresh = false}) async {
+  Future<LockCachingAudioSource> _createInner({
+    bool forceRefresh = false,
+  }) async {
     String? url;
     String? effectiveUa = userAgent;
     String? effectiveCookies = cookies;
 
     // Check Task 2 in-memory URL cache first when not force refreshing
     if (!forceRefresh) {
-        final cachedEntry = _effectiveUrlCache?.get(
-          videoId,
-          onStaleRevalidate: (vid) {
-            // Asynchronously trigger SWTR refresh without blocking current playback
-            unawaited(resolve(forceRefresh: true).then((freshUrl) {
-              _effectiveUrlCache?.put(
-                vid,
-                freshUrl,
-                userAgent: effectiveUa,
-                cookies: effectiveCookies,
-              );
-            }).catchError((_) {}));
-          },
-        );
+      final cachedEntry = _effectiveUrlCache?.get(
+        videoId,
+        onStaleRevalidate: (vid) {
+          // Asynchronously trigger SWTR refresh without blocking current playback
+          unawaited(
+            resolve(forceRefresh: true)
+                .then((freshUrl) {
+                  _effectiveUrlCache?.put(
+                    vid,
+                    freshUrl,
+                    userAgent: effectiveUa,
+                    cookies: effectiveCookies,
+                  );
+                })
+                .catchError((_) {}),
+          );
+        },
+      );
       if (cachedEntry != null && !cachedEntry.isExpired()) {
         url = cachedEntry.url;
         effectiveUa = cachedEntry.userAgent ?? effectiveUa;
@@ -208,8 +218,9 @@ class YtmResolvingSource extends StreamAudioSource {
         if (expireParam != null) {
           final epochSeconds = int.tryParse(expireParam);
           if (epochSeconds != null && epochSeconds > 0) {
-            _resolvedExpiresAt =
-                DateTime.fromMillisecondsSinceEpoch(epochSeconds * 1000);
+            _resolvedExpiresAt = DateTime.fromMillisecondsSinceEpoch(
+              epochSeconds * 1000,
+            );
           }
         }
       } catch (_) {}
@@ -229,7 +240,7 @@ class YtmResolvingSource extends StreamAudioSource {
         'User-Agent': effectiveUa
       else
         'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.7151.119 Safari/537.36',
       if (effectiveCookies != null && effectiveCookies.isNotEmpty)
         'Cookie': effectiveCookies,
       'Referer': 'https://music.youtube.com/',
@@ -260,8 +271,10 @@ class YtmResolvingSource extends StreamAudioSource {
         }
       }
     }
-    final existingLock =
-        _pathCreationLocks.putIfAbsent(pathKey, () => completer);
+    final existingLock = _pathCreationLocks.putIfAbsent(
+      pathKey,
+      () => completer,
+    );
 
     if (!identical(existingLock, completer)) {
       // Another creation is in progress; wait for it

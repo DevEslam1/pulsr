@@ -15,10 +15,15 @@ typedef StreamUrlResolver = Future<YtmStream> Function(String videoId, {String q
 /// - Debounced re-plan (300ms) on queue mutations (add/remove/reorder/shuffle)
 /// - Idempotent cache writes into [YtmUrlCache]
 /// - Non-blocking, cancellable, and dispose-safe
+/// - 2-track lookahead on WiFi (pre-resolves N+1 and N+2 to eliminate skip latency)
 class StreamPreResolver {
   final StreamUrlResolver resolveUrl;
   final YtmUrlCache urlCache;
   final Duration debounceDuration;
+
+  /// Optional callback returning whether the device is currently on WiFi.
+  /// When null or returning false, only 1 track is pre-resolved.
+  final Future<bool> Function()? isWifi;
 
   Timer? _debounceTimer;
   Completer<void>? _activeResolution;
@@ -29,6 +34,7 @@ class StreamPreResolver {
     required this.resolveUrl,
     required this.urlCache,
     this.debounceDuration = const Duration(milliseconds: 300),
+    this.isWifi,
   });
 
   /// Current video ID actively resolving in background, if any.
@@ -125,6 +131,13 @@ class StreamPreResolver {
 
     // Idempotent: skip if already valid in URL cache
     if (urlCache.contains(videoId)) {
+      // N+1 is already cached — opportunistically pre-resolve N+2 on WiFi.
+      _preResolveSecond(
+        queue: queue,
+        currentIndex: currentIndex,
+        isShuffle: isShuffle,
+        shuffleIndices: shuffleIndices,
+      );
       return;
     }
 
@@ -143,6 +156,13 @@ class StreamPreResolver {
       if (_disposed || !identical(_activeResolution, completer)) return;
       urlCache.putStream(stream);
       debugPrint('[StreamPreResolver] Successfully pre-resolved next track ($videoId)');
+      // After N+1 lands, opportunistically kick off N+2 on WiFi.
+      _preResolveSecond(
+        queue: queue,
+        currentIndex: currentIndex,
+        isShuffle: isShuffle,
+        shuffleIndices: shuffleIndices,
+      );
     }).catchError((Object e) {
       if (_disposed || !identical(_activeResolution, completer)) return;
       debugPrint('[StreamPreResolver] Pre-resolution failed for $videoId non-fatally: $e');
@@ -152,6 +172,53 @@ class StreamPreResolver {
         _activeResolution = null;
       }
     });
+  }
+
+  /// Pre-resolves track N+2 (the one after next) on WiFi to eliminate
+  /// back-to-back skip latency. Silently no-ops if not on WiFi, if N+2
+  /// is already cached, or if [isWifi] is not provided.
+  void _preResolveSecond({
+    required List<SongsTableData> queue,
+    required int currentIndex,
+    required bool isShuffle,
+    List<int>? shuffleIndices,
+  }) {
+    if (_disposed || isWifi == null) return;
+
+    // Determine N+1 index first, then N+2 from there.
+    final nextSong = _determineNextSong(
+      queue: queue,
+      currentIndex: currentIndex,
+      isShuffle: isShuffle,
+      shuffleIndices: shuffleIndices,
+    );
+    if (nextSong == null) return;
+
+    // Compute the index of nextSong in the queue to find N+2.
+    final nextIndex = queue.indexOf(nextSong);
+    if (nextIndex < 0) return;
+
+    final secondNextSong = _determineNextSong(
+      queue: queue,
+      currentIndex: nextIndex,
+      isShuffle: isShuffle,
+      shuffleIndices: shuffleIndices,
+    );
+    final vid2 = secondNextSong?.remoteId;
+    if (vid2 == null || vid2.isEmpty) return;
+    if (urlCache.contains(vid2) || vid2 == _inFlightVideoId) return;
+
+    // Only consume bandwidth for N+2 on WiFi.
+    isWifi!().then((wifi) {
+      if (!wifi || _disposed) return;
+      if (urlCache.contains(vid2)) return;
+      debugPrint('[StreamPreResolver] WiFi detected — pre-resolving N+2 track ($vid2)');
+      resolveUrl(vid2).then((stream) {
+        if (_disposed) return;
+        urlCache.putStream(stream);
+        debugPrint('[StreamPreResolver] N+2 pre-resolved ($vid2)');
+      }).catchError((Object _) {});
+    }).catchError((Object _) {});
   }
 
   SongsTableData? _determineNextSong({

@@ -526,7 +526,7 @@ class YtmAccountService {
     String origin = 'https://music.youtube.com',
   }) {
     final defaultUa =
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36';
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.7151.119 Safari/537.36';
 
     final headers = <String, String>{
       'Content-Type': 'application/json',
@@ -641,17 +641,17 @@ class YtmAccountService {
     };
 
     if (clientType == 'ANDROID_MUSIC') {
-      clientMap['clientVersion'] = '8.32.50';
-      clientMap['androidSdkVersion'] = 34;
+      clientMap['clientVersion'] = '7.27.53';
+      clientMap['androidSdkVersion'] = 35;
       clientMap['osName'] = 'Android';
-      clientMap['osVersion'] = '14';
+      clientMap['osVersion'] = '15';
       clientMap['platform'] = 'MOBILE';
     } else if (clientType == 'IOS_MUSIC') {
-      clientMap['clientVersion'] = '8.32.1';
+      clientMap['clientVersion'] = '7.27.0';
       clientMap['deviceMake'] = 'Apple';
-      clientMap['deviceModel'] = 'iPhone15,3';
+      clientMap['deviceModel'] = 'iPhone16,2';
       clientMap['osName'] = 'iOS';
-      clientMap['osVersion'] = '18.0';
+      clientMap['osVersion'] = '18.5';
       clientMap['platform'] = 'MOBILE';
     } else if (clientType == 'ANDROID_VR') {
       clientMap['clientVersion'] = '1.63.27';
@@ -1475,15 +1475,15 @@ class YtmAccountService {
           'x-youtube-client-name': _clientNameIds[client] ?? '67',
           'x-youtube-client-version':
               client == 'ANDROID_MUSIC'
-                  ? '8.32.50'
+                  ? '7.27.53'
                   : (client == 'IOS_MUSIC'
-                      ? '8.32.1'
+                      ? '7.27.0'
                       : (client == 'ANDROID_VR'
                           ? '1.63.27'
                           : (client == 'MWEB'
-                              ? '2.20260825.01.00'
+                              ? _clientVersion
                               : (client == 'WEB_EMBEDDED_PLAYER'
-                                  ? '1.20260825.01.00'
+                                  ? _clientVersion
                                   : (client == 'ANDROID_CREATOR'
                                       ? '24.45.100'
                                       : (client ==
@@ -1494,20 +1494,20 @@ class YtmAccountService {
                                               : _clientVersion))))))),
           'User-Agent':
               client == 'ANDROID_MUSIC'
-                  ? 'com.google.android.apps.youtube.music/8.32.50 (Linux; U; Android 14; en_US) gzip'
+                  ? 'com.google.android.apps.youtube.music/7.27.53 (Linux; U; Android 15; en_US) gzip'
                   : (client == 'IOS_MUSIC'
-                      ? 'com.google.ios.youtubemusic/8.32.1 (iPhone15,3; U; CPU iOS 18_0 like Mac OS X; en_US)'
+                      ? 'com.google.ios.youtubemusic/7.27.0 (iPhone16,2; U; CPU iOS 18_5 like Mac OS X; en_US)'
                       : (client == 'ANDROID_VR'
-                          ? 'com.google.android.apps.youtube.vr.oculus/1.63.27 (Linux; U; Android 12; en_US; Quest 2) gzip'
+                          ? 'com.google.android.apps.youtube.vr.oculus/1.63.27 (Linux; U; Android 12; en_US; Quest 3) gzip'
                           : (client == 'ANDROID_CREATOR'
-                              ? 'com.google.android.apps.youtube.creator/24.45.100 (Linux; U; Android 13; en_US) gzip'
+                              ? 'com.google.android.apps.youtube.creator/24.45.100 (Linux; U; Android 14; en_US) gzip'
                               : (client == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER'
                                   ? 'Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/4.0 Chrome/76.0.3809.146 TV Safari/537.36'
                                   : (client == 'ANDROID_TESTSUITE'
                                       ? 'com.google.android.youtube/1.9 (Linux; U; Android 9; gzip)'
                                       : (client == 'MWEB'
-                                          ? 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36'
-                                          : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36')))))),
+                                          ? 'Mozilla/5.0 (Linux; Android 15; Pixel 9 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.7151.119 Mobile Safari/537.36'
+                                          : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.7151.119 Safari/537.36')))))),
         };
 
         if (visitorData != null && visitorData.isNotEmpty) {
