@@ -1,8 +1,9 @@
-// lib/features/player/presentation/widgets/player_seek_bar.dart
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
+import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../core/services/waveform_service.dart';
 import '../../../settings/cubit/settings_cubit.dart';
@@ -43,6 +44,11 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
   int? _lastSongId;
   Future<List<double>>? _cachedWaveformFuture;
 
+  static final List<double> _loadingWaveformSamples = List.generate(
+    100,
+    (i) => 0.2 + 0.15 * math.sin(i * 0.15),
+  );
+
   @override
   Widget build(BuildContext context) {
     final songId =
@@ -77,7 +83,25 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                   activeColor: widget.activeColor,
                 ));
           }
-          // Smooth fallback to standard seek bar while loading waveform
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            // Keep themed WaveformSeekBar mounted with loading state
+            return _withPosition((position) => WaveformSeekBar(
+                  position: position,
+                  duration: widget.duration,
+                  onSeek: widget.onSeek,
+                  samples: _loadingWaveformSamples,
+                  activeColor: widget.activeColor.withValues(alpha: 0.45),
+                ));
+          }
+          if (snapshot.hasError) {
+            ErrorLogger.log(
+              'Waveform calculation failed for song $effectiveSongId',
+              error: snapshot.error,
+              stackTrace: snapshot.stackTrace,
+              category: 'WaveformSeekBar',
+            );
+          }
+          // Hard failure fallback to standard seek bar
           return _buildStandardSeekBar(context);
         },
       );

@@ -106,6 +106,27 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   @override
   Stream<int?> get audioSessionIdStream => _audioSessionIdController.stream;
 
+  final StreamController<SongsTableData> _onTrackChangedController =
+      StreamController<SongsTableData>.broadcast();
+  @override
+  Stream<SongsTableData> get onTrackChanged => _onTrackChangedController.stream;
+
+  void emitTrackChanged(SongsTableData song) {
+    _onTrackChangedController.add(song);
+  }
+
+  void emitQueue(List<MediaItem> items) {
+    _queueController.add(items);
+  }
+
+  void emitMediaItem(MediaItem? item) {
+    _mediaItemController.add(item);
+  }
+
+  void emitPlaybackState(PlaybackState state) {
+    _playbackStateController.add(state);
+  }
+
   @override
   void setCrossfadeDuration(Duration d) {
     currentCrossfadeDuration = d;

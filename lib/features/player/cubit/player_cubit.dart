@@ -425,6 +425,36 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   }
 
   void _listenToAudioService() {
+    autoSub(_audioHandler.onTrackChanged, (song) {
+      if (isClosed) return;
+      final gen = ++_mediaItemResolutionGen;
+      final songQueueIndex = state.queue.indexWhere((s) => s.id == song.id);
+      final effectiveIndex =
+          songQueueIndex != -1 ? songQueueIndex : state.currentIndex;
+      final isSameSong = state.currentSong?.id == song.id;
+
+      final duration = song.durationMs > 0
+          ? Duration(milliseconds: song.durationMs)
+          : state.duration;
+
+      safeEmit(
+        state.copyWith(
+          currentSong: song,
+          currentIndex: effectiveIndex,
+          duration: duration,
+          position: isSameSong ? state.position : Duration.zero,
+          errorMessage: null,
+        ),
+      );
+
+      if (!isSameSong) {
+        unawaited(_loadLyricsForSong(song));
+        unawaited(_enrichAudioQuality(song, gen));
+      }
+      _updateWidgetThrottled(force: true);
+      _debouncedScrobble(song, state.position, state.isPlaying);
+    });
+
     autoSub(_audioHandler.mediaItem, (item) async {
       if (item != null) {
         final gen = ++_mediaItemResolutionGen;

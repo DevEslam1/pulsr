@@ -572,4 +572,26 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeProcessPcmAudio(
     return processPcmAudioInternal(env, jBuffer, frameCount, channels);
 }
 
+// ---- ExoPlayer Media3 NativeDspAudioProcessor In-Stream Direct Buffer Bridge ----
+
+JNIEXPORT jint JNICALL
+Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeProcessDirectFloatBuffer(
+        JNIEnv* env, jclass /* clazz */, jobject byteBuffer, jint offsetBytes, jint frameCount, jint channels) {
+    if (!byteBuffer || frameCount <= 0 || channels <= 0 || channels > 8) return 0;
+    void* addr = env->GetDirectBufferAddress(byteBuffer);
+    if (!addr) return 0;
+    float* floatBuffer = reinterpret_cast<float*>(static_cast<char*>(addr) + offsetBytes);
+    try {
+        return static_cast<jint>(AudioDspEngine::instance().processInterleaved(floatBuffer, frameCount, channels));
+    } catch (...) {
+        return 0;
+    }
+}
+
+JNIEXPORT void JNICALL
+Java_com_ryanheise_just_1audio_NativeDspAudioProcessor_nativeResyncForTrack(
+        JNIEnv* /* env */, jclass /* clazz */, jdouble sampleRate, jint channels) {
+    AudioDspEngine::instance().resyncForTrack(sampleRate, channels);
+}
+
 } // extern "C"

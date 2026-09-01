@@ -17,6 +17,7 @@ import '../../core/errors/ytm_error_classifier.dart';
 import '../../core/services/ytm_cache_manager.dart';
 import '../../core/services/ytm_url_cache.dart';
 import '../../core/telemetry/playback_latency_tracker.dart';
+import '../../core/utils/error_logger.dart';
 
 /// A [StreamAudioSource] for a YouTube Music track whose stream URL is resolved
 /// lazily, on the first byte request rather than up front.
@@ -84,8 +85,9 @@ class YtmResolvingSource extends StreamAudioSource {
     return await _requestMutex.protect(() async {
       // 1. Proactive expiry check: if URL is within 5 minutes of expiring, discard & re-resolve
       if (_isExpiringSoon()) {
-        debugPrint(
-          '[YtmResolvingSource] Stream URL for $videoId is expiring soon. Re-resolving...',
+        ErrorLogger.log(
+          'Stream URL for $videoId is expiring soon. Re-resolving...',
+          category: 'YtmResolvingSource',
         );
         _inner = null;
         _pending = null;
@@ -110,8 +112,9 @@ class YtmResolvingSource extends StreamAudioSource {
               errStr.contains('408') ||
               errStr.contains('416');
 
-          debugPrint(
-            '[YtmResolvingSource] Byte stream error ($byteErr, isForbidden/Stale=$is403or404) for $videoId. Evicting dead URL & retrying fresh resolution once...',
+          ErrorLogger.log(
+            'Byte stream error ($byteErr, isForbidden/Stale=$is403or404) for $videoId. Evicting dead URL & retrying fresh resolution once...',
+            category: 'YtmResolvingSource',
           );
           _inner = null;
           _pending = null;
@@ -134,8 +137,10 @@ class YtmResolvingSource extends StreamAudioSource {
           } catch (retryErr) {
             // Classify failure to ensure structured diagnostics
             final classified = YtmErrorClassifier.classify(retryErr);
-            debugPrint(
-              '[YtmResolvingSource] Retry resolution failed ($retryErr): ${classified.message}',
+            ErrorLogger.log(
+              'Retry resolution failed ($retryErr): ${classified.message}',
+              error: retryErr,
+              category: 'YtmResolvingSource',
             );
             onError?.call(retryErr);
             rethrow;
@@ -145,8 +150,10 @@ class YtmResolvingSource extends StreamAudioSource {
         _inner = null;
         _pending = null;
         final classified = YtmErrorClassifier.classify(err);
-        debugPrint(
-          '[YtmResolvingSource] Initial resolution failed ($err): ${classified.message}',
+        ErrorLogger.log(
+          'Initial resolution failed ($err): ${classified.message}',
+          error: err,
+          category: 'YtmResolvingSource',
         );
         onError?.call(err);
         rethrow;
@@ -199,6 +206,10 @@ class YtmResolvingSource extends StreamAudioSource {
         effectiveUa = cachedEntry.userAgent ?? effectiveUa;
         effectiveCookies = cachedEntry.cookies ?? effectiveCookies;
         _resolvedExpiresAt = cachedEntry.expiresAt;
+        ErrorLogger.log(
+          'Cache hit for $videoId (expires: $_resolvedExpiresAt)',
+          category: 'YtmResolvingSource',
+        );
         try {
           // Cache hit skips pluginEntered and marks urlObtained directly
           _latency?.markStage(PlaybackStage.urlObtained);
@@ -207,6 +218,10 @@ class YtmResolvingSource extends StreamAudioSource {
     }
 
     if (url == null) {
+      ErrorLogger.log(
+        'Resolving stream URL for $videoId (forceRefresh=$forceRefresh)...',
+        category: 'YtmResolvingSource',
+      );
       try {
         _latency?.markStage(PlaybackStage.pluginEntered);
       } catch (_) {}
@@ -215,9 +230,11 @@ class YtmResolvingSource extends StreamAudioSource {
         _latency?.markStage(PlaybackStage.urlObtained);
       } catch (_) {}
 
-      // Parse 'expire' Unix timestamp from query
+      // Parse 'expire' Unix timestamp and 'itag' from query
+      String? itag;
       try {
         final uri = Uri.parse(url);
+        itag = uri.queryParameters['itag'];
         final expireParam = uri.queryParameters['expire'];
         if (expireParam != null) {
           final epochSeconds = int.tryParse(expireParam);
@@ -228,6 +245,11 @@ class YtmResolvingSource extends StreamAudioSource {
           }
         }
       } catch (_) {}
+
+      ErrorLogger.log(
+        'Resolved stream for $videoId (itag=$itag, expires=$_resolvedExpiresAt)',
+        category: 'YtmResolvingSource',
+      );
 
       // Store resolved stream URL in cache
       _effectiveUrlCache?.put(

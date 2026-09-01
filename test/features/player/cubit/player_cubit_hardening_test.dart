@@ -38,6 +38,8 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   @override
   Stream<int?> get audioSessionIdStream => Stream<int?>.empty();
   @override
+  Stream<SongsTableData> get onTrackChanged => Stream<SongsTableData>.empty();
+  @override
   Future<void> setVolume(double volume) async {
     _vol = volume;
   }

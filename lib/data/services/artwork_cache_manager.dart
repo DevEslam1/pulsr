@@ -1,4 +1,4 @@
-﻿// lib/core/services/artwork_cache_manager.dart
+// lib/core/services/artwork_cache_manager.dart
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -106,7 +106,7 @@ class ArtworkCacheManager {
       if (_cacheDir == null) await init();
       if (_cacheDir != null) {
         final file = File(p.join(_cacheDir!.path, _keyToFileName(key)));
-        await file.writeAsBytes(bytes, flush: false);
+        await file.writeAsBytes(bytes, flush: true);
         _putCount++;
         if (_putCount % _enforceEvery == 0) {
           unawaited(_enforceDiskLimit());
