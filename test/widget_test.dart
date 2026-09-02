@@ -28,20 +28,17 @@ import 'package:pulsr/domain/usecases/search_music_usecase.dart';
 import 'package:pulsr/domain/usecases/toggle_favorite_usecase.dart';
 import 'package:pulsr/domain/models/download_task.dart';
 import 'package:pulsr/domain/repositories/download_repository_interface.dart';
-import 'package:pulsr/domain/usecases/queue_download.dart';
-import 'package:pulsr/domain/usecases/pause_download.dart';
-import 'package:pulsr/domain/usecases/resume_download.dart';
-import 'package:pulsr/domain/usecases/retry_download.dart';
-import 'package:pulsr/domain/usecases/delete_download.dart';
-import 'package:pulsr/domain/usecases/observe_downloads.dart';
-import 'package:pulsr/domain/usecases/get_download_storage_stats.dart';
+import 'package:pulsr/domain/usecases/download_queue_usecases.dart';
+import 'package:pulsr/domain/usecases/download_lifecycle_usecases.dart';
+import 'package:pulsr/domain/usecases/download_query_usecases.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_cubit.dart';
 import 'package:pulsr/features/library/cubit/library_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/playlists/cubit/playlist_cubit.dart';
 import 'package:pulsr/features/search/cubit/search_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
-import 'package:pulsr/features/widgets/widget_service.dart';
+import 'dart:async';
+import 'package:pulsr/features/home_widget/widget_service.dart';
 import 'package:pulsr/main.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -55,13 +52,19 @@ class MockPulsrAudioHandler extends BaseAudioHandler
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 
+  final StreamController<SongsTableData> _onTrackChangedController = StreamController<SongsTableData>.broadcast();
+  @override
+  Stream<SongsTableData> get onTrackChanged => _onTrackChangedController.stream;
+
   MockPulsrAudioHandler() {
-    playbackState.add(PlaybackState(
-      controls: [],
-      systemActions: const {},
-      processingState: AudioProcessingState.idle,
-      playing: false,
-    ));
+    playbackState.add(
+      PlaybackState(
+        controls: [],
+        systemActions: const {},
+        processingState: AudioProcessingState.idle,
+        playing: false,
+      ),
+    );
     queue.add([]);
   }
 
@@ -112,8 +115,10 @@ class MockPulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> setVirtualizerStrength(double strength) async {}
   @override
-  Future<void> setDynamicsPreset(DynamicsPreset preset,
-      {bool? enabled}) async {}
+  Future<void> setDynamicsPreset(
+    DynamicsPreset preset, {
+    bool? enabled,
+  }) async {}
   @override
   Future<void> applyHeadphoneProfile(HeadphoneProfile? profile) async {}
   @override
@@ -195,15 +200,23 @@ class MockPulsrAudioHandler extends BaseAudioHandler
   @override
   List<DynamicEqBandConfig> get dynamicEqBands => const [];
   @override
-  Future<void> setSaturation(bool enabled,
-          {double? drive, double? mix, double? tilt}) async {}
+  Future<void> setSaturation(
+    bool enabled, {
+    double? drive,
+    double? mix,
+    double? tilt,
+  }) async {}
   @override
   Future<void> setStereoWidth(bool enabled, {double? width}) async {}
   @override
   Future<void> setLoudnessContour(bool enabled, {double? intensity}) async {}
   @override
-  Future<void> setSubCrossover(bool enabled,
-          {double? cornerHz, double? slopeDbPerOct, double? gain}) async {}
+  Future<void> setSubCrossover(
+    bool enabled, {
+    double? cornerHz,
+    double? slopeDbPerOct,
+    double? gain,
+  }) async {}
   @override
   Future<void> setDynamicEq(bool enabled) async {}
   @override
@@ -212,11 +225,18 @@ class MockPulsrAudioHandler extends BaseAudioHandler
   Future<void> get effectsReady => Future<void>.value();
 
   @override
-  Future<void> setCrossfeed(bool enabled,
-      {double? delayUs, double? feedDb}) async {}
+  Future<void> setCrossfeed(
+    bool enabled, {
+    double? delayUs,
+    double? feedDb,
+  }) async {}
   @override
-  Future<void> setLookaheadLimiter(bool enabled,
-      {double? thresholdDb, double? releaseMs, double? lookaheadMs}) async {}
+  Future<void> setLookaheadLimiter(
+    bool enabled, {
+    double? thresholdDb,
+    double? releaseMs,
+    double? lookaheadMs,
+  }) async {}
   @override
   Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {}
   @override
@@ -251,14 +271,19 @@ class MockPulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> removeQueueItemAt(int index) async {}
   @override
-  Future<void> loadQueue(List<SongsTableData> songs,
-      {int initialIndex = 0, Duration? initialPosition}) async {}
+  Future<void> loadQueue(
+    List<SongsTableData> songs, {
+    int initialIndex = 0,
+    Duration? initialPosition,
+  }) async {}
   @override
   Stream<Duration?> get sleepTimerRemainingStream => const Stream.empty();
   @override
   Stream<String> get errorStream => const Stream.empty();
   @override
-  void dispose() {}
+  void dispose() {
+    _onTrackChangedController.close();
+  }
   @override
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {}
   @override
@@ -273,22 +298,27 @@ void main() {
   testWidgets('App smoke test', (WidgetTester tester) async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
-            const MethodChannel('com.pulsr.music/hires_dac'),
-            (call) async => null);
+          const MethodChannel('com.pulsr.music/hires_dac'),
+          (call) async => null,
+        );
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
-            const MethodChannel('com.pulsr.music/hires_dac_events'),
-            (call) async => null);
+          const MethodChannel('com.pulsr.music/hires_dac_events'),
+          (call) async => null,
+        );
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
-            const MethodChannel('com.pulsr.music/proxy'), (call) async => null);
+          const MethodChannel('com.pulsr.music/proxy'),
+          (call) async => null,
+        );
     // SettingsCubit._loadPreferences pushes the DSP preference through the
     // audio_effects channel with a 2s timeout; stub it so that timer doesn't
     // dangle into the no-pending-timers teardown check.
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(
-            const MethodChannel('com.pulsr.music/audio_effects'),
-            (call) async => null);
+          const MethodChannel('com.pulsr.music/audio_effects'),
+          (call) async => null,
+        );
 
     SharedPreferences.setMockInitialValues({});
     final db = AppDatabase.forTesting(NativeDatabase.memory());
@@ -327,30 +357,39 @@ void main() {
     getIt.registerSingleton<WidgetService>(widgetService);
 
     getIt.registerSingleton<DynamicThemeCubit>(DynamicThemeCubit());
-    getIt.registerFactory<PlayerCubit>(() => PlayerCubit(
-          audioHandler: audioHandler,
-          repository: repo,
-          toggleFavoriteUseCase: toggleFavoriteUseCase,
-        ));
-    getIt.registerFactory<LibraryCubit>(() => LibraryCubit(
-          getSongsUseCase: getSongsUseCase,
-          getAlbumsUseCase: getAlbumsUseCase,
-          getArtistsUseCase: getArtistsUseCase,
-          getGenresUseCase: getGenresUseCase,
-          getYearsUseCase: getYearsUseCase,
-          getFavoritesUseCase: getFavoritesUseCase,
-          toggleFavoriteUseCase: toggleFavoriteUseCase,
-          folderUseCases: folderUseCases,
-        ));
-    getIt.registerFactory<SearchCubit>(() => SearchCubit(
-        searchUseCase: searchMusicUseCase, folderUseCases: folderUseCases));
+    getIt.registerFactory<PlayerCubit>(
+      () => PlayerCubit(
+        audioHandler: audioHandler,
+        repository: repo,
+        toggleFavoriteUseCase: toggleFavoriteUseCase,
+      ),
+    );
+    getIt.registerFactory<LibraryCubit>(
+      () => LibraryCubit(
+        getSongsUseCase: getSongsUseCase,
+        getAlbumsUseCase: getAlbumsUseCase,
+        getArtistsUseCase: getArtistsUseCase,
+        getGenresUseCase: getGenresUseCase,
+        getYearsUseCase: getYearsUseCase,
+        getFavoritesUseCase: getFavoritesUseCase,
+        toggleFavoriteUseCase: toggleFavoriteUseCase,
+        folderUseCases: folderUseCases,
+      ),
+    );
+    getIt.registerFactory<SearchCubit>(
+      () => SearchCubit(
+        searchUseCase: searchMusicUseCase,
+        folderUseCases: folderUseCases,
+      ),
+    );
     final mockDownloadRepo = MockDownloadRepo();
-    when(() => mockDownloadRepo.observeDownloads())
-        .thenAnswer((_) => const Stream.empty());
-    when(() => mockDownloadRepo.getAllDownloads())
-        .thenAnswer((_) async => []);
-    when(() => mockDownloadRepo.getStorageStats())
-        .thenAnswer((_) async => const Right(StorageStats()));
+    when(
+      () => mockDownloadRepo.observeDownloads(),
+    ).thenAnswer((_) => const Stream.empty());
+    when(() => mockDownloadRepo.getAllDownloads()).thenAnswer((_) async => []);
+    when(
+      () => mockDownloadRepo.getStorageStats(),
+    ).thenAnswer((_) async => const Right(StorageStats()));
 
     final queueDownloadUseCase = QueueDownloadUseCase(mockDownloadRepo);
     final pauseDownloadUseCase = PauseDownloadUseCase(mockDownloadRepo);
@@ -358,7 +397,9 @@ void main() {
     final retryDownloadUseCase = RetryDownloadUseCase(mockDownloadRepo);
     final deleteDownloadUseCase = DeleteDownloadUseCase(mockDownloadRepo);
     final observeDownloadsUseCase = ObserveDownloadsUseCase(mockDownloadRepo);
-    final getDownloadStorageStatsUseCase = GetDownloadStorageStatsUseCase(mockDownloadRepo);
+    final getDownloadStorageStatsUseCase = GetDownloadStorageStatsUseCase(
+      mockDownloadRepo,
+    );
 
     getIt.registerSingleton<IDownloadRepository>(mockDownloadRepo);
     getIt.registerSingleton<QueueDownloadUseCase>(queueDownloadUseCase);
@@ -367,21 +408,27 @@ void main() {
     getIt.registerSingleton<RetryDownloadUseCase>(retryDownloadUseCase);
     getIt.registerSingleton<DeleteDownloadUseCase>(deleteDownloadUseCase);
     getIt.registerSingleton<ObserveDownloadsUseCase>(observeDownloadsUseCase);
-    getIt.registerSingleton<GetDownloadStorageStatsUseCase>(getDownloadStorageStatsUseCase);
-    getIt.registerSingleton<DownloadsCubit>(DownloadsCubit(
-      queueDownloadUseCase,
-      pauseDownloadUseCase,
-      resumeDownloadUseCase,
-      retryDownloadUseCase,
-      deleteDownloadUseCase,
-      observeDownloadsUseCase,
+    getIt.registerSingleton<GetDownloadStorageStatsUseCase>(
       getDownloadStorageStatsUseCase,
-    ));
+    );
+    getIt.registerSingleton<DownloadsCubit>(
+      DownloadsCubit(
+        queueDownloadUseCase,
+        pauseDownloadUseCase,
+        resumeDownloadUseCase,
+        retryDownloadUseCase,
+        deleteDownloadUseCase,
+        observeDownloadsUseCase,
+        getDownloadStorageStatsUseCase,
+      ),
+    );
 
     getIt.registerFactory<PlaylistCubit>(
-        () => PlaylistCubit(playlistUseCases: playlistUseCases));
+      () => PlaylistCubit(playlistUseCases: playlistUseCases),
+    );
     getIt.registerSingleton<SettingsCubit>(
-        SettingsCubit(scannerService: scannerService));
+      SettingsCubit(scannerService: scannerService),
+    );
 
     await tester.runAsync(() async {
       await tester.pumpWidget(const PulsrApp());

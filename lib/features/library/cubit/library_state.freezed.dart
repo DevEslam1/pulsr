@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // coverage:ignore-file
-// ignore_for_file: type=lint
+// ignore_for_file: type=lint, type=warning, deprecated_member_use, deprecated_member_use_from_same_package
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
 part of 'library_state.dart';
@@ -9,6 +9,7 @@ part of 'library_state.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// GENERATED CODE - DO NOT MODIFY BY HAND
 // dart format off
 T _$identity<T>(T value) => value;
 /// @nodoc
@@ -25,16 +26,21 @@ $LibraryStateCopyWith<LibraryState> get copyWith => _$LibraryStateCopyWithImpl<L
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is LibraryState&&const DeepCollectionEquality().equals(other.songs, songs)&&const DeepCollectionEquality().equals(other.albums, albums)&&const DeepCollectionEquality().equals(other.artists, artists)&&const DeepCollectionEquality().equals(other.genres, genres)&&const DeepCollectionEquality().equals(other.years, years)&&const DeepCollectionEquality().equals(other.favorites, favorites)&&const DeepCollectionEquality().equals(other.folders, folders)&&(identical(other.sortBy, sortBy) || other.sortBy == sortBy)&&(identical(other.ascending, ascending) || other.ascending == ascending)&&(identical(other.isLoading, isLoading) || other.isLoading == isLoading)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&const DeepCollectionEquality().equals(other.selectedSongIds, selectedSongIds)&&(identical(other.isMultiSelectMode, isMultiSelectMode) || other.isMultiSelectMode == isMultiSelectMode)&&(identical(other.viewMode, viewMode) || other.viewMode == viewMode));
+  final _this = this as LibraryState;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is LibraryState&&const DeepCollectionEquality().equals(other.songs, _this.songs)&&const DeepCollectionEquality().equals(other.albums, _this.albums)&&const DeepCollectionEquality().equals(other.artists, _this.artists)&&const DeepCollectionEquality().equals(other.genres, _this.genres)&&const DeepCollectionEquality().equals(other.years, _this.years)&&const DeepCollectionEquality().equals(other.favorites, _this.favorites)&&const DeepCollectionEquality().equals(other.folders, _this.folders)&&(identical(other.sortBy, _this.sortBy) || other.sortBy == _this.sortBy)&&(identical(other.ascending, _this.ascending) || other.ascending == _this.ascending)&&(identical(other.isLoading, _this.isLoading) || other.isLoading == _this.isLoading)&&(identical(other.errorMessage, _this.errorMessage) || other.errorMessage == _this.errorMessage)&&const DeepCollectionEquality().equals(other.selectedSongIds, _this.selectedSongIds)&&(identical(other.isMultiSelectMode, _this.isMultiSelectMode) || other.isMultiSelectMode == _this.isMultiSelectMode)&&(identical(other.viewMode, _this.viewMode) || other.viewMode == _this.viewMode));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(songs),const DeepCollectionEquality().hash(albums),const DeepCollectionEquality().hash(artists),const DeepCollectionEquality().hash(genres),const DeepCollectionEquality().hash(years),const DeepCollectionEquality().hash(favorites),const DeepCollectionEquality().hash(folders),sortBy,ascending,isLoading,errorMessage,const DeepCollectionEquality().hash(selectedSongIds),isMultiSelectMode,viewMode);
+int get hashCode {
+  final _this = this as LibraryState;
+  return Object.hash(runtimeType,const DeepCollectionEquality().hash(_this.songs),const DeepCollectionEquality().hash(_this.albums),const DeepCollectionEquality().hash(_this.artists),const DeepCollectionEquality().hash(_this.genres),const DeepCollectionEquality().hash(_this.years),const DeepCollectionEquality().hash(_this.favorites),const DeepCollectionEquality().hash(_this.folders),_this.sortBy,_this.ascending,_this.isLoading,_this.errorMessage,const DeepCollectionEquality().hash(_this.selectedSongIds),_this.isMultiSelectMode,_this.viewMode);
+}
 
 @override
 String toString() {
-  return 'LibraryState(songs: $songs, albums: $albums, artists: $artists, genres: $genres, years: $years, favorites: $favorites, folders: $folders, sortBy: $sortBy, ascending: $ascending, isLoading: $isLoading, errorMessage: $errorMessage, selectedSongIds: $selectedSongIds, isMultiSelectMode: $isMultiSelectMode, viewMode: $viewMode)';
+  final _this = this as LibraryState;
+  return 'LibraryState(songs: ${_this.songs}, albums: ${_this.albums}, artists: ${_this.artists}, genres: ${_this.genres}, years: ${_this.years}, favorites: ${_this.favorites}, folders: ${_this.folders}, sortBy: ${_this.sortBy}, ascending: ${_this.ascending}, isLoading: ${_this.isLoading}, errorMessage: ${_this.errorMessage}, selectedSongIds: ${_this.selectedSongIds}, isMultiSelectMode: ${_this.isMultiSelectMode}, viewMode: ${_this.viewMode})';
 }
 
 
@@ -63,7 +69,7 @@ class _$LibraryStateCopyWithImpl<$Res>
 /// Create a copy of LibraryState
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? songs = null,Object? albums = null,Object? artists = null,Object? genres = null,Object? years = null,Object? favorites = null,Object? folders = null,Object? sortBy = null,Object? ascending = null,Object? isLoading = null,Object? errorMessage = freezed,Object? selectedSongIds = null,Object? isMultiSelectMode = null,Object? viewMode = null,}) {
-  return _then(_self.copyWith(
+  return _then(LibraryState(
 songs: null == songs ? _self.songs : songs // ignore: cast_nullable_to_non_nullable
 as List<SongsTableData>,albums: null == albums ? _self.albums : albums // ignore: cast_nullable_to_non_nullable
 as List<AlbumsTableData>,artists: null == artists ? _self.artists : artists // ignore: cast_nullable_to_non_nullable
@@ -219,7 +225,7 @@ return $default(_that.songs,_that.albums,_that.artists,_that.genres,_that.years,
 
 
 class _LibraryState extends LibraryState {
-  const _LibraryState({final  List<SongsTableData> songs = const [], final  List<AlbumsTableData> albums = const [], final  List<ArtistsTableData> artists = const [], final  List<GenreItem> genres = const [], final  List<YearItem> years = const [], final  List<SongsTableData> favorites = const [], final  List<FolderItem> folders = const [], this.sortBy = 'title', this.ascending = true, this.isLoading = false, this.errorMessage, final  Set<int> selectedSongIds = const {}, this.isMultiSelectMode = false, this.viewMode = LibraryViewMode.list}): _songs = songs,_albums = albums,_artists = artists,_genres = genres,_years = years,_favorites = favorites,_folders = folders,_selectedSongIds = selectedSongIds,super._();
+  const _LibraryState({ List<SongsTableData> songs = const [],  List<AlbumsTableData> albums = const [],  List<ArtistsTableData> artists = const [],  List<GenreItem> genres = const [],  List<YearItem> years = const [],  List<SongsTableData> favorites = const [],  List<FolderItem> folders = const [], this.sortBy = 'title', this.ascending = true, this.isLoading = false, this.errorMessage,  Set<int> selectedSongIds = const {}, this.isMultiSelectMode = false, this.viewMode = LibraryViewMode.list}): _songs = songs,_albums = albums,_artists = artists,_genres = genres,_years = years,_favorites = favorites,_folders = folders,_selectedSongIds = selectedSongIds,super._();
   
 
  final  List<SongsTableData> _songs;
@@ -295,16 +301,18 @@ _$LibraryStateCopyWith<_LibraryState> get copyWith => __$LibraryStateCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _LibraryState&&const DeepCollectionEquality().equals(other._songs, _songs)&&const DeepCollectionEquality().equals(other._albums, _albums)&&const DeepCollectionEquality().equals(other._artists, _artists)&&const DeepCollectionEquality().equals(other._genres, _genres)&&const DeepCollectionEquality().equals(other._years, _years)&&const DeepCollectionEquality().equals(other._favorites, _favorites)&&const DeepCollectionEquality().equals(other._folders, _folders)&&(identical(other.sortBy, sortBy) || other.sortBy == sortBy)&&(identical(other.ascending, ascending) || other.ascending == ascending)&&(identical(other.isLoading, isLoading) || other.isLoading == isLoading)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&const DeepCollectionEquality().equals(other._selectedSongIds, _selectedSongIds)&&(identical(other.isMultiSelectMode, isMultiSelectMode) || other.isMultiSelectMode == isMultiSelectMode)&&(identical(other.viewMode, viewMode) || other.viewMode == viewMode));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _LibraryState&&const DeepCollectionEquality().equals(other.songs, _songs)&&const DeepCollectionEquality().equals(other.albums, _albums)&&const DeepCollectionEquality().equals(other.artists, _artists)&&const DeepCollectionEquality().equals(other.genres, _genres)&&const DeepCollectionEquality().equals(other.years, _years)&&const DeepCollectionEquality().equals(other.favorites, _favorites)&&const DeepCollectionEquality().equals(other.folders, _folders)&&(identical(other.sortBy, sortBy) || other.sortBy == sortBy)&&(identical(other.ascending, ascending) || other.ascending == ascending)&&(identical(other.isLoading, isLoading) || other.isLoading == isLoading)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage)&&const DeepCollectionEquality().equals(other.selectedSongIds, _selectedSongIds)&&(identical(other.isMultiSelectMode, isMultiSelectMode) || other.isMultiSelectMode == isMultiSelectMode)&&(identical(other.viewMode, viewMode) || other.viewMode == viewMode));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_songs),const DeepCollectionEquality().hash(_albums),const DeepCollectionEquality().hash(_artists),const DeepCollectionEquality().hash(_genres),const DeepCollectionEquality().hash(_years),const DeepCollectionEquality().hash(_favorites),const DeepCollectionEquality().hash(_folders),sortBy,ascending,isLoading,errorMessage,const DeepCollectionEquality().hash(_selectedSongIds),isMultiSelectMode,viewMode);
+int get hashCode {
+    return Object.hash(runtimeType,const DeepCollectionEquality().hash(_songs),const DeepCollectionEquality().hash(_albums),const DeepCollectionEquality().hash(_artists),const DeepCollectionEquality().hash(_genres),const DeepCollectionEquality().hash(_years),const DeepCollectionEquality().hash(_favorites),const DeepCollectionEquality().hash(_folders),sortBy,ascending,isLoading,errorMessage,const DeepCollectionEquality().hash(_selectedSongIds),isMultiSelectMode,viewMode);
+}
 
 @override
 String toString() {
-  return 'LibraryState(songs: $songs, albums: $albums, artists: $artists, genres: $genres, years: $years, favorites: $favorites, folders: $folders, sortBy: $sortBy, ascending: $ascending, isLoading: $isLoading, errorMessage: $errorMessage, selectedSongIds: $selectedSongIds, isMultiSelectMode: $isMultiSelectMode, viewMode: $viewMode)';
+    return 'LibraryState(songs: $songs, albums: $albums, artists: $artists, genres: $genres, years: $years, favorites: $favorites, folders: $folders, sortBy: $sortBy, ascending: $ascending, isLoading: $isLoading, errorMessage: $errorMessage, selectedSongIds: $selectedSongIds, isMultiSelectMode: $isMultiSelectMode, viewMode: $viewMode)';
 }
 
 

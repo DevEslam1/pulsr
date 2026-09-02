@@ -10,7 +10,7 @@ import 'package:pulsr/data/downloads/yt_download_service.dart';
 import 'package:pulsr/domain/models/download_task.dart';
 import 'package:pulsr/domain/repositories/download_repository_interface.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
-import 'package:pulsr/features/ytm_search/cubit/ytm_download_cubit.dart';
+import 'package:pulsr/features/downloads/cubit/ytm_download_cubit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockYtDownloadService extends Mock implements YtDownloadService {}

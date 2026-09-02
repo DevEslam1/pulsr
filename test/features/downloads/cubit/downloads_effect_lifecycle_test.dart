@@ -10,13 +10,9 @@ import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/bloc/base_cubit.dart';
 import 'package:pulsr/core/errors/failures.dart';
 import 'package:pulsr/domain/models/download_task.dart';
-import 'package:pulsr/domain/usecases/delete_download.dart';
-import 'package:pulsr/domain/usecases/get_download_storage_stats.dart';
-import 'package:pulsr/domain/usecases/observe_downloads.dart';
-import 'package:pulsr/domain/usecases/pause_download.dart';
-import 'package:pulsr/domain/usecases/queue_download.dart';
-import 'package:pulsr/domain/usecases/resume_download.dart';
-import 'package:pulsr/domain/usecases/retry_download.dart';
+import 'package:pulsr/domain/usecases/download_lifecycle_usecases.dart';
+import 'package:pulsr/domain/usecases/download_query_usecases.dart';
+import 'package:pulsr/domain/usecases/download_queue_usecases.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_cubit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -49,13 +45,15 @@ void main() {
   late StreamController<DownloadTask> repoEvents;
 
   setUpAll(() {
-    registerFallbackValue(DownloadTask(
-      id: 'fallback',
-      videoId: 'fallback',
-      title: 'Fallback',
-      artist: 'Fallback',
-      createdAt: DateTime.now(),
-    ));
+    registerFallbackValue(
+      DownloadTask(
+        id: 'fallback',
+        videoId: 'fallback',
+        title: 'Fallback',
+        artist: 'Fallback',
+        createdAt: DateTime.now(),
+      ),
+    );
   });
 
   setUp(() {
@@ -70,8 +68,9 @@ void main() {
     repoEvents = StreamController<DownloadTask>.broadcast();
     when(() => mockObserve.getAll()).thenAnswer((_) async => []);
     when(() => mockObserve.call()).thenAnswer((_) => repoEvents.stream);
-    when(() => mockStats.call())
-        .thenAnswer((_) async => const Right(StorageStats()));
+    when(
+      () => mockStats.call(),
+    ).thenAnswer((_) async => const Right(StorageStats()));
   });
 
   tearDown(() {
@@ -79,14 +78,14 @@ void main() {
   });
 
   DownloadsCubit buildCubit() => DownloadsCubit(
-        mockQueue,
-        mockPause,
-        mockResume,
-        mockRetry,
-        mockDelete,
-        mockObserve,
-        mockStats,
-      );
+    mockQueue,
+    mockPause,
+    mockResume,
+    mockRetry,
+    mockDelete,
+    mockObserve,
+    mockStats,
+  );
 
   test('queue failure emits exactly one ShowToastEffect', () async {
     final cubit = buildCubit();
@@ -103,7 +102,8 @@ void main() {
       createdAt: DateTime.now(),
     );
     when(() => mockQueue.call(any())).thenAnswer(
-        (_) async => const Left(InsufficientStorageFailure('Storage full')));
+      (_) async => const Left(InsufficientStorageFailure('Storage full')),
+    );
 
     await cubit.queueDownload(task);
     await Future<void>.delayed(const Duration(milliseconds: 50));
@@ -128,8 +128,9 @@ void main() {
       artist: 'Artist',
       createdAt: DateTime.now(),
     );
-    when(() => mockQueue.call(any()))
-        .thenAnswer((_) async => const Left(DownloadFailure('Nope')));
+    when(
+      () => mockQueue.call(any()),
+    ).thenAnswer((_) async => const Left(DownloadFailure('Nope')));
 
     await cubit.queueDownload(task);
     await Future<void>.delayed(const Duration(milliseconds: 50));
@@ -139,8 +140,11 @@ void main() {
     // State churn (clearError) must NOT replay the toast.
     cubit.clearError();
     await Future<void>.delayed(const Duration(milliseconds: 50));
-    expect(effects.length, countAfterFailure,
-        reason: 'rebuilds must not re-fire consumed effects');
+    expect(
+      effects.length,
+      countAfterFailure,
+      reason: 'rebuilds must not re-fire consumed effects',
+    );
     await sub.cancel();
   });
 

@@ -290,8 +290,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                           OutlinedButton.icon(
                             onPressed: () async {
                               try {
-                                final result =
-                                    await FilePicker.platform.pickFiles(
+                                final files =
+                                    await FilePicker.pickFiles(
                                   type: FileType.custom,
                                   allowedExtensions: [
                                     'txt',
@@ -300,8 +300,8 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                                     'conf'
                                   ],
                                 );
-                                if (result != null && result.files.isNotEmpty) {
-                                  final path = result.files.first.path;
+                                if (files.isNotEmpty) {
+                                  final path = files.first.path;
                                   if (path != null) {
                                     final file = File(path);
                                     final content = await file.readAsString();

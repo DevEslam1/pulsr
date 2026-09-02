@@ -11,10 +11,10 @@ import '../../../core/widgets/song_tile.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
-import '../../ytm_search/cubit/ytm_download_cubit.dart';
+import '../../downloads/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/cubit/ytm_search_cubit.dart';
 import '../../ytm_search/cubit/ytm_search_state.dart';
-import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
+import '../../downloads/presentation/widgets/ytm_download_button.dart';
 import '../cubit/search_cubit.dart';
 import '../cubit/search_state.dart';
 

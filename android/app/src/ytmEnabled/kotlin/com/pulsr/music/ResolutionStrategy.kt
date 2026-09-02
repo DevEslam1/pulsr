@@ -24,6 +24,12 @@ internal class ResolutionStrategy(
 
     companion object {
         private const val TAG = "ResolutionStrategy"
+        val DEFAULT_STREAM_CHAIN = listOf(
+            InnertubeClient.ClientType.IOS_MUSIC,
+            InnertubeClient.ClientType.ANDROID_MUSIC,
+            InnertubeClient.ClientType.ANDROID_VR,
+            InnertubeClient.ClientType.WEB_REMIX
+        )
     }
 
     /**

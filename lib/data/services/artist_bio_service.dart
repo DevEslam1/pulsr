@@ -1,4 +1,4 @@
-﻿// lib/core/services/artist_bio_service.dart
+﻿// lib/data/services/artist_bio_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';

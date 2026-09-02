@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/di/injection.dart';
-import '../../../core/services/ytm_account_service.dart';
-import '../../../core/services/ytm_service.dart';
+import '../../../data/services/ytm_account_service.dart';
+import '../../../data/services/ytm_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
@@ -16,7 +16,7 @@ import '../../../domain/usecases/playlist_io_usecases.dart';
 import '../../auth/presentation/ytm_web_login_sheet.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
-import '../../ytm_search/cubit/ytm_download_cubit.dart';
+import '../../downloads/cubit/ytm_download_cubit.dart';
 import '../cubit/playlist_cubit.dart';
 import '../cubit/playlist_state.dart';
 
@@ -65,14 +65,14 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
   }
 
   Future<void> _importPlaylist(BuildContext context) async {
-    final result = await FilePicker.platform.pickFiles(
+    final files = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['m3u', 'm3u8'],
     );
-    if (result == null || result.files.single.path == null) return;
+    if (files.isEmpty || files.single.path == null) return;
 
-    final filePath = result.files.single.path!;
-    final playlistName = result.files.single.name.replaceAll(
+    final filePath = files.single.path!;
+    final playlistName = files.single.name.replaceAll(
       RegExp(r'\.m3u8?$', caseSensitive: false),
       '',
     );

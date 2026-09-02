@@ -21,9 +21,9 @@ import '../../core/errors/failures.dart';
 import '../../core/errors/ytm_error_classifier.dart';
 import '../../core/utils/error_logger.dart';
 import '../../core/widgets/cached_artwork.dart';
-import '../../core/services/xdm_backend_service.dart';
-import '../../core/services/ytm_account_service.dart';
-import '../../core/services/ytm_service.dart';
+import '../../data/services/xdm_backend_service.dart';
+import '../../data/services/ytm_account_service.dart';
+import '../../data/services/ytm_service.dart';
 import '../../core/utils/safe_filename.dart';
 import '../../domain/models/retry_policy.dart';
 
@@ -85,10 +85,14 @@ class YtDownloadService {
   final MediaScannerService _scanner;
   final IMusicRepository _repository;
 
-  /// Bounded parallelism for batch downloads (worker-pool size). Defaults to
-  /// [defaultMaxConcurrentDownloads]; the repository enforces its own gate as
-  /// well, this is the per-service hard cap.
-  final int maxConcurrentDownloads;
+  int maxConcurrentDownloads = defaultMaxConcurrentDownloads;
+
+  YtDownloadService(
+    this._http,
+    this._ytmService,
+    this._scanner,
+    this._repository,
+  );
 
   final Queue<_QueuedDownload> _queue = Queue<_QueuedDownload>();
   final Map<String, _QueuedDownload> _activeDownloads = {};
@@ -102,14 +106,6 @@ class YtDownloadService {
   /// Exponential backoff with jitter for rate-limit retries that arrive
   /// without a server-provided Retry-After hint.
   final RetryPolicy _retryPolicy = const RetryPolicy();
-
-  YtDownloadService(
-    this._http,
-    this._ytmService,
-    this._scanner,
-    this._repository, {
-    this.maxConcurrentDownloads = defaultMaxConcurrentDownloads,
-  });
 
   /// Cancels an active or queued download.
   void cancel(String videoId) {

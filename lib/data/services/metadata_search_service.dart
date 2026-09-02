@@ -1,4 +1,4 @@
-﻿// lib/core/services/metadata_search_service.dart
+﻿// lib/data/services/metadata_search_service.dart
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;

@@ -16,7 +16,7 @@ import 'package:pulsr/domain/usecases/toggle_favorite_usecase.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
-import 'package:pulsr/features/widgets/widget_service.dart';
+import 'package:pulsr/features/home_widget/widget_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:pulsr/data/db/app_database.dart';

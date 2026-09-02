@@ -4,8 +4,8 @@ import 'package:injectable/injectable.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import '../../../core/bloc/base_cubit.dart';
-import '../../../core/services/auth_service.dart';
-import '../../../core/services/cloud_sync_service.dart';
+import '../../../domain/services/auth_service.dart';
+import '../../../data/services/cloud_sync_service.dart';
 import 'auth_state.dart';
 
 @injectable

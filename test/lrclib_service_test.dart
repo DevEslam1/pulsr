@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:pulsr/core/services/lrclib_service.dart';
+import 'package:pulsr/data/services/lrclib_service.dart';
 import 'package:pulsr/domain/models/lyrics_line.dart';
 
 class MockHttpClient extends Mock implements HttpClient {}

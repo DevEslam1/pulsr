@@ -16,8 +16,8 @@ import '../../../domain/usecases/playlist_io_usecases.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
-import '../../ytm_search/cubit/ytm_download_cubit.dart';
-import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
+import '../../downloads/cubit/ytm_download_cubit.dart';
+import '../../downloads/presentation/widgets/ytm_download_button.dart';
 
 class PlaylistDetailScreen extends StatefulWidget {
   final PlaylistsTableData playlist;
@@ -114,9 +114,11 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
     final exportUseCase = getIt<PlaylistExportUseCase>();
     final file = await exportUseCase.exportToFile(widget.playlist.name, songs);
     try {
-      await Share.shareXFiles(
-        [XFile(file.path, mimeType: 'audio/x-mpegurl')],
-        text: 'Playlist: ${widget.playlist.name}',
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'audio/x-mpegurl')],
+          text: 'Playlist: ${widget.playlist.name}',
+        ),
       );
     } finally {
       try {

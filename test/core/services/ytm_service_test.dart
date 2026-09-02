@@ -5,8 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/di/injection.dart';
-import 'package:pulsr/core/services/ytm_account_service.dart';
-import 'package:pulsr/core/services/ytm_service.dart';
+import 'package:pulsr/data/services/ytm_account_service.dart';
+import 'package:pulsr/data/services/ytm_service.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
 import 'package:pulsr/features/ytm_search/cubit/ytm_search_cubit.dart';
 
@@ -61,7 +61,7 @@ void main() {
               .isBotBlocked,
           isTrue);
       expect(const YtmException('YTM_FAILED', 'LOGIN_REQUIRED').isBotBlocked,
-          isTrue);
+          isFalse);
       expect(const YtmException('YTM_NETWORK').isBotBlocked, isFalse);
     });
 
@@ -69,6 +69,8 @@ void main() {
       expect(const YtmException('YTM_AUTH').isAuth, isTrue);
       expect(const YtmException('LOGIN_REQUIRED').isAuth, isTrue);
       expect(const YtmException('YTM_FAILED', 'Unauthenticated user').isAuth,
+          isTrue);
+      expect(const YtmException('YTM_FAILED', 'LOGIN_REQUIRED').isAuth,
           isTrue);
       expect(const YtmException('YTM_NETWORK').isAuth, isFalse);
     });
@@ -402,7 +404,8 @@ void main() {
       final stream = await YtmService().resolveStream('dQw4w9WgXcQ');
       expect(stream.url, equals('https://native.example/audio.m4a'));
     });
-  });
+  });
+
   group('YtmService sign-in-required fast-fail', () {
     test('native YTM_SIGNIN_REQUIRED abort surfaces typed, not as auth', () async {
       var calls = 0;

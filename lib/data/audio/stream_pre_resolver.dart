@@ -2,7 +2,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../db/app_database.dart';
-import '../../core/services/ytm_url_cache.dart';
+import '../../data/services/ytm_url_cache.dart';
 import '../../domain/models/ytm_track.dart';
 
 typedef StreamUrlResolver = Future<YtmStream> Function(String videoId, {String quality});

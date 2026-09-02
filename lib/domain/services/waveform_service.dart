@@ -1,4 +1,4 @@
-﻿// lib/core/services/waveform_service.dart
+﻿// lib/domain/services/waveform_service.dart
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';

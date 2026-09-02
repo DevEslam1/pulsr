@@ -5,7 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/error_logger.dart';
 import '../../../../core/utils/formatters.dart';
-import '../../../../core/services/waveform_service.dart';
+import '../../../../domain/services/waveform_service.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';

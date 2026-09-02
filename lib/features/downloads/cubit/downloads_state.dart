@@ -100,6 +100,7 @@ class DownloadsState {
   final bool isLoading;
   final String? errorMessage;
   final AppFailure? failure;
+  final bool showNotificationPermissionBanner;
 
   const DownloadsState({
     this.tasks = const DownloadTaskMap(),
@@ -107,6 +108,7 @@ class DownloadsState {
     this.isLoading = false,
     this.errorMessage,
     this.failure,
+    this.showNotificationPermissionBanner = false,
   });
 
   List<DownloadTask> get taskList {
@@ -164,6 +166,7 @@ class DownloadsState {
       isLoading: isLoading,
       errorMessage: null,
       failure: null,
+      showNotificationPermissionBanner: showNotificationPermissionBanner,
     );
   }
 
@@ -175,6 +178,7 @@ class DownloadsState {
     bool clearErrorMessage = false,
     AppFailure? failure,
     bool clearFailure = false,
+    bool? showNotificationPermissionBanner,
   }) {
     return DownloadsState(
       tasks: tasks != null ? (tasks is DownloadTaskMap ? tasks : DownloadTaskMap(Map<String, DownloadTask>.unmodifiable(tasks))) : this.tasks,
@@ -183,6 +187,8 @@ class DownloadsState {
       errorMessage:
           clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
       failure: clearFailure ? null : (failure ?? this.failure),
+      showNotificationPermissionBanner:
+          showNotificationPermissionBanner ?? this.showNotificationPermissionBanner,
     );
   }
 
@@ -195,6 +201,7 @@ class DownloadsState {
           errorMessage == other.errorMessage &&
           failure == other.failure &&
           storageStats == other.storageStats &&
+          showNotificationPermissionBanner == other.showNotificationPermissionBanner &&
           mapEquals(tasks, other.tasks);
 
   @override
@@ -204,5 +211,6 @@ class DownloadsState {
         isLoading,
         errorMessage,
         failure,
+        showNotificationPermissionBanner,
       );
 }

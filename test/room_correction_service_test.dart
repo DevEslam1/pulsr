@@ -2,7 +2,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pulsr/core/services/room_correction_service.dart';
+import 'package:pulsr/domain/services/room_correction_service.dart';
 import 'package:pulsr/domain/models/eq_preset.dart';
 
 void main() {

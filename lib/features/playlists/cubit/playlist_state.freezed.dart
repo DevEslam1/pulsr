@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // coverage:ignore-file
-// ignore_for_file: type=lint
+// ignore_for_file: type=lint, type=warning, deprecated_member_use, deprecated_member_use_from_same_package
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
 part of 'playlist_state.dart';
@@ -9,6 +9,7 @@ part of 'playlist_state.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// GENERATED CODE - DO NOT MODIFY BY HAND
 // dart format off
 T _$identity<T>(T value) => value;
 /// @nodoc
@@ -25,16 +26,21 @@ $PlaylistStateCopyWith<PlaylistState> get copyWith => _$PlaylistStateCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is PlaylistState&&const DeepCollectionEquality().equals(other.playlists, playlists)&&const DeepCollectionEquality().equals(other.currentPlaylistSongs, currentPlaylistSongs)&&const DeepCollectionEquality().equals(other.smartPlaylistCounts, smartPlaylistCounts)&&(identical(other.isLoading, isLoading) || other.isLoading == isLoading)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
+  final _this = this as PlaylistState;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is PlaylistState&&const DeepCollectionEquality().equals(other.playlists, _this.playlists)&&const DeepCollectionEquality().equals(other.currentPlaylistSongs, _this.currentPlaylistSongs)&&const DeepCollectionEquality().equals(other.smartPlaylistCounts, _this.smartPlaylistCounts)&&(identical(other.isLoading, _this.isLoading) || other.isLoading == _this.isLoading)&&(identical(other.errorMessage, _this.errorMessage) || other.errorMessage == _this.errorMessage));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(playlists),const DeepCollectionEquality().hash(currentPlaylistSongs),const DeepCollectionEquality().hash(smartPlaylistCounts),isLoading,errorMessage);
+int get hashCode {
+  final _this = this as PlaylistState;
+  return Object.hash(runtimeType,const DeepCollectionEquality().hash(_this.playlists),const DeepCollectionEquality().hash(_this.currentPlaylistSongs),const DeepCollectionEquality().hash(_this.smartPlaylistCounts),_this.isLoading,_this.errorMessage);
+}
 
 @override
 String toString() {
-  return 'PlaylistState(playlists: $playlists, currentPlaylistSongs: $currentPlaylistSongs, smartPlaylistCounts: $smartPlaylistCounts, isLoading: $isLoading, errorMessage: $errorMessage)';
+  final _this = this as PlaylistState;
+  return 'PlaylistState(playlists: ${_this.playlists}, currentPlaylistSongs: ${_this.currentPlaylistSongs}, smartPlaylistCounts: ${_this.smartPlaylistCounts}, isLoading: ${_this.isLoading}, errorMessage: ${_this.errorMessage})';
 }
 
 
@@ -63,7 +69,7 @@ class _$PlaylistStateCopyWithImpl<$Res>
 /// Create a copy of PlaylistState
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? playlists = null,Object? currentPlaylistSongs = null,Object? smartPlaylistCounts = null,Object? isLoading = null,Object? errorMessage = freezed,}) {
-  return _then(_self.copyWith(
+  return _then(PlaylistState(
 playlists: null == playlists ? _self.playlists : playlists // ignore: cast_nullable_to_non_nullable
 as List<PlaylistsTableData>,currentPlaylistSongs: null == currentPlaylistSongs ? _self.currentPlaylistSongs : currentPlaylistSongs // ignore: cast_nullable_to_non_nullable
 as List<SongsTableData>,smartPlaylistCounts: null == smartPlaylistCounts ? _self.smartPlaylistCounts : smartPlaylistCounts // ignore: cast_nullable_to_non_nullable
@@ -210,7 +216,7 @@ return $default(_that.playlists,_that.currentPlaylistSongs,_that.smartPlaylistCo
 
 
 class _PlaylistState extends PlaylistState {
-  const _PlaylistState({final  List<PlaylistsTableData> playlists = const [], final  List<SongsTableData> currentPlaylistSongs = const [], final  Map<int, int> smartPlaylistCounts = const {}, this.isLoading = false, this.errorMessage}): _playlists = playlists,_currentPlaylistSongs = currentPlaylistSongs,_smartPlaylistCounts = smartPlaylistCounts,super._();
+  const _PlaylistState({ List<PlaylistsTableData> playlists = const [],  List<SongsTableData> currentPlaylistSongs = const [],  Map<int, int> smartPlaylistCounts = const {}, this.isLoading = false, this.errorMessage}): _playlists = playlists,_currentPlaylistSongs = currentPlaylistSongs,_smartPlaylistCounts = smartPlaylistCounts,super._();
   
 
  final  List<PlaylistsTableData> _playlists;
@@ -247,16 +253,18 @@ _$PlaylistStateCopyWith<_PlaylistState> get copyWith => __$PlaylistStateCopyWith
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _PlaylistState&&const DeepCollectionEquality().equals(other._playlists, _playlists)&&const DeepCollectionEquality().equals(other._currentPlaylistSongs, _currentPlaylistSongs)&&const DeepCollectionEquality().equals(other._smartPlaylistCounts, _smartPlaylistCounts)&&(identical(other.isLoading, isLoading) || other.isLoading == isLoading)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _PlaylistState&&const DeepCollectionEquality().equals(other.playlists, _playlists)&&const DeepCollectionEquality().equals(other.currentPlaylistSongs, _currentPlaylistSongs)&&const DeepCollectionEquality().equals(other.smartPlaylistCounts, _smartPlaylistCounts)&&(identical(other.isLoading, isLoading) || other.isLoading == isLoading)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,const DeepCollectionEquality().hash(_playlists),const DeepCollectionEquality().hash(_currentPlaylistSongs),const DeepCollectionEquality().hash(_smartPlaylistCounts),isLoading,errorMessage);
+int get hashCode {
+    return Object.hash(runtimeType,const DeepCollectionEquality().hash(_playlists),const DeepCollectionEquality().hash(_currentPlaylistSongs),const DeepCollectionEquality().hash(_smartPlaylistCounts),isLoading,errorMessage);
+}
 
 @override
 String toString() {
-  return 'PlaylistState(playlists: $playlists, currentPlaylistSongs: $currentPlaylistSongs, smartPlaylistCounts: $smartPlaylistCounts, isLoading: $isLoading, errorMessage: $errorMessage)';
+    return 'PlaylistState(playlists: $playlists, currentPlaylistSongs: $currentPlaylistSongs, smartPlaylistCounts: $smartPlaylistCounts, isLoading: $isLoading, errorMessage: $errorMessage)';
 }
 
 

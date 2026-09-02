@@ -1,4 +1,4 @@
-﻿// lib/core/services/lrclib_service.dart
+﻿// lib/data/services/lrclib_service.dart
 import 'dart:convert';
 import 'dart:io';
 import 'package:injectable/injectable.dart';

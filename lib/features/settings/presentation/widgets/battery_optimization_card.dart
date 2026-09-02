@@ -1,7 +1,7 @@
 // lib/features/settings/presentation/widgets/battery_optimization_card.dart
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_radii.dart';
-import '../../../../core/services/battery_optimization_service.dart';
+import '../../../../domain/services/battery_optimization_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/platform_capabilities.dart';
 

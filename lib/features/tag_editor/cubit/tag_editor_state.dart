@@ -1,4 +1,4 @@
-﻿// lib/features/tag_editor/tag_editor_state.dart
+﻿// lib/features/tag_editor/cubit/tag_editor_state.dart
 import 'dart:typed_data';
 import '../../../data/db/app_database.dart';
 

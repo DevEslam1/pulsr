@@ -10,58 +10,57 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
   flutter_bloc: ^9.1.1
-  go_router: ^14.8.1
+  go_router: ^18.0.0
   just_audio:
     path: ../just_audio/just_audio
   just_audio_platform_interface:
     path: ../just_audio/just_audio_platform_interface
-  audio_service: ^0.18.18
-  audio_session: ^0.1.25
+  audio_service: ^0.18.19
+  audio_session: ^0.2.4
   mutex: ^3.1.0
   on_audio_query: ^2.9.0
-  drift: ^2.26.0
-  drift_flutter: ^0.2.4
-  path_provider: ^2.1.5
+  drift: ^2.34.3
+  drift_flutter: ^0.3.1
+  path_provider: ^2.1.6
   path: ^1.9.1
-  sqlite3_flutter_libs: ^0.5.28
   palette_generator: ^0.3.3+6
-  dynamic_color: ^1.7.0
+  dynamic_color: ^2.1.0
   flutter_animate: ^4.5.2
   permission_handler: ^11.4.0
   shared_preferences: ^2.5.2
   fpdart: ^1.1.0
-  get_it: ^8.0.3
-  injectable: ^2.5.0
+  get_it: ^9.2.1
+  injectable: ^3.0.0
   freezed_annotation: ^3.1.0
-  file_picker: ^8.1.7
+  file_picker: ^12.1.3
   image_picker: ^1.1.2
-  share_plus: ^10.1.4
+  share_plus: ^13.3.0
   home_widget: ^0.9.0
-  sentry_flutter: ^8.14.2
+  sentry_flutter: ^9.28.0
   firebase_core: ^3.12.1
   firebase_auth: ^5.5.1
   cloud_firestore: ^5.6.5
   google_sign_in: ^6.2.2
   flutter_inappwebview: ^6.1.5
   crypto: ^3.0.6
-  http: ^1.3.0
+  http: ^1.6.0
   encrypt: ^5.0.3
   pointycastle: ^3.9.1
   flutter_localizations:
     sdk: flutter
   intl: ^0.20.2
-  flutter_secure_storage: ^10.3.1
+  flutter_secure_storage: ^11.0.0
   rxdart: ^0.28.0
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
-  drift_dev: ^2.26.0
-  build_runner: ^2.4.15
+  drift_dev: ^2.34.5
+  build_runner: ^2.16.0
   mocktail: ^1.0.4
   bloc_test: ^10.0.0
-  injectable_generator: ^2.6.2
-  freezed: ^3.2.5
+  injectable_generator: ^3.1.3
+  freezed: ^4.0.1
   flutter_launcher_icons: ^0.14.4
   fake_async: ^1.3.3
   characters: ^1.4.0

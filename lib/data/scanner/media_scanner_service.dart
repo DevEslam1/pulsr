@@ -4,11 +4,13 @@ import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../core/constants/audio_formats.dart';
 import '../../core/constants/channels.dart';
+import '../../core/errors/failures.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../db/app_database.dart';
@@ -86,6 +88,28 @@ class MediaScannerService {
     if (!Platform.isAndroid) return false;
     try {
       return await Permission.audio.shouldShowRequestRationale;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// On Android 14+ (API 34+), returns true if user granted partial visual media access
+  /// (READ_MEDIA_VISUAL_USER_SELECTED) rather than full access.
+  Future<bool> isVisualMediaPartialAccess() async {
+    if (!Platform.isAndroid) return false;
+    try {
+      final status = await Permission.photos.status;
+      return status.isLimited;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<bool> requestPhotosPermission() async {
+    if (!Platform.isAndroid) return true;
+    try {
+      final status = await Permission.photos.request();
+      return status.isGranted || status.isLimited;
     } catch (_) {
       return false;
     }
@@ -230,6 +254,26 @@ class MediaScannerService {
       ErrorLogger.log('Media scanner failed',
           error: e, stackTrace: st, category: 'scanner');
       rethrow;
+    }
+  }
+
+  /// Resilient wrapper that captures failures as typed [AppFailure] (T10 requirement)
+  Future<Either<AppFailure, int>> scanDeviceLibraryResilient({
+    bool ignoreShortFiles = true,
+    int minDurationSec = 30,
+    bool autoHideSystemMedia = true,
+  }) async {
+    try {
+      final count = await scanDeviceLibrary(
+        ignoreShortFiles: ignoreShortFiles,
+        minDurationSec: minDurationSec,
+        autoHideSystemMedia: autoHideSystemMedia,
+      );
+      return Right(count);
+    } catch (e, st) {
+      ErrorLogger.log('scanDeviceLibraryResilient failed',
+          error: e, stackTrace: st, category: 'scanner');
+      return Left(StorageFailure(e.toString()));
     }
   }
 
@@ -526,7 +570,9 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
     final int? year = parseInt(raw['year']);
     final artistId = parseInt(raw['artist_id']) ?? parseInt(raw['artistId']);
     final albumId = parseInt(raw['album_id']) ?? parseInt(raw['albumId']);
-    final uri = parseString(raw['_uri']) ?? parseString(raw['uri']);
+    final uri = parseString(raw['_uri']) ??
+        parseString(raw['uri']) ??
+        (Platform.isAndroid ? 'content://media/external/audio/media/$id' : null);
     final track = parseInt(raw['track']);
     final dateAdded = parseInt(raw['date_added']) ?? parseInt(raw['dateAdded']);
     final size = parseInt(raw['_size']) ?? parseInt(raw['size']);

@@ -5,15 +5,9 @@ import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/errors/failures.dart';
 import 'package:pulsr/domain/models/download_task.dart';
-import 'package:pulsr/domain/usecases/delete_download.dart';
-import 'package:pulsr/domain/usecases/get_download_storage_stats.dart';
-import 'package:pulsr/domain/usecases/observe_downloads.dart';
-import 'package:pulsr/domain/usecases/pause_download.dart';
-import 'package:pulsr/domain/usecases/queue_download.dart';
-import 'package:pulsr/domain/usecases/resume_download.dart';
-import 'package:pulsr/domain/usecases/retry_download.dart';
-import 'package:pulsr/domain/usecases/prioritize_download.dart';
-import 'package:pulsr/domain/usecases/reorder_downloads.dart';
+import 'package:pulsr/domain/usecases/download_lifecycle_usecases.dart';
+import 'package:pulsr/domain/usecases/download_query_usecases.dart';
+import 'package:pulsr/domain/usecases/download_queue_usecases.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_cubit.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_state.dart';
 
@@ -615,7 +609,10 @@ void main() {
         expect(cubit.activeResourceCount, greaterThan(0));
 
         final effectsDone = Completer<void>();
-        final effectsSub = cubit.effects.listen((_) {}, onDone: effectsDone.complete);
+        final effectsSub = cubit.effects.listen(
+          (_) {},
+          onDone: effectsDone.complete,
+        );
 
         await cubit.close();
 

@@ -10,7 +10,7 @@ import 'package:just_audio/just_audio.dart' hide PlayerState;
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../../core/di/injection.dart';
-import '../../../../core/services/room_correction_service.dart';
+import '../../../../domain/services/room_correction_service.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';

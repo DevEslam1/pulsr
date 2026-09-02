@@ -5,8 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/constants/prefs_keys.dart';
-import 'package:pulsr/core/services/xdm_backend_service.dart';
-import 'package:pulsr/core/services/ytm_service.dart';
+import 'package:pulsr/data/services/xdm_backend_service.dart';
+import 'package:pulsr/data/services/ytm_service.dart';
 import 'package:pulsr/core/utils/ytm_rate_limiter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

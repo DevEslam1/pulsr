@@ -1,4 +1,4 @@
-// lib/features/ytm_search/cubit/ytm_download_cubit.dart
+// lib/features/downloads/cubit/ytm_download_cubit.dart
 // DL-17: Single source of truth — thin viewer over shared repository stream.
 // DL-18: Guard all async continuations with if (isClosed) return.
 
@@ -13,8 +13,8 @@ import '../../../data/downloads/yt_download_service.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/download_task.dart';
 import '../../../domain/repositories/download_repository_interface.dart';
-import '../../../domain/usecases/pause_download.dart';
-import '../../../domain/usecases/queue_download.dart';
+import '../../../domain/usecases/download_lifecycle_usecases.dart';
+import '../../../domain/usecases/download_queue_usecases.dart';
 import '../../player/cubit/player_cubit.dart';
 
 enum YtDownloadStatus { idle, queued, running, done, failed, canceled }

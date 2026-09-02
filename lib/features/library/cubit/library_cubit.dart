@@ -4,7 +4,7 @@ import '../../../core/bloc/base_cubit.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/di/injection.dart';
-import '../../../core/services/ytm_account_service.dart';
+import '../../../data/services/ytm_account_service.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../data/db/app_database.dart';

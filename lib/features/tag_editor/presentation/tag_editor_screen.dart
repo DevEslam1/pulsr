@@ -1,8 +1,8 @@
-﻿// lib/features/tag_editor/tag_editor_screen.dart
+﻿// lib/features/tag_editor/presentation/tag_editor_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../core/di/injection.dart';
-import '../../../core/services/metadata_search_service.dart';
+import '../../../data/services/metadata_search_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../data/db/app_database.dart';

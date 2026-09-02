@@ -1,7 +1,7 @@
 // test/stream_pre_resolver_comprehensive_test.dart
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pulsr/core/services/ytm_url_cache.dart';
+import 'package:pulsr/data/services/ytm_url_cache.dart';
 import 'package:pulsr/core/telemetry/clock.dart';
 import 'package:pulsr/data/audio/stream_pre_resolver.dart';
 import 'package:pulsr/data/db/app_database.dart';

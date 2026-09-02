@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/constants/prefs_keys.dart';
-import 'package:pulsr/core/services/scrobbler_service.dart';
+import 'package:pulsr/data/services/scrobbler_service.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/audio_effects_config.dart';

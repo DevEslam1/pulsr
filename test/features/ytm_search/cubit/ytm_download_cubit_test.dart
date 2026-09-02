@@ -6,13 +6,13 @@ import 'package:mocktail/mocktail.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/data/downloads/yt_download_service.dart';
-import 'package:pulsr/features/ytm_search/cubit/ytm_download_cubit.dart';
+import 'package:pulsr/features/downloads/cubit/ytm_download_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/core/errors/failures.dart';
 import 'package:pulsr/domain/models/download_task.dart';
 import 'package:pulsr/domain/repositories/download_repository_interface.dart';
-import 'package:pulsr/domain/usecases/queue_download.dart';
+import 'package:pulsr/domain/usecases/download_queue_usecases.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MockYtDownloadService extends Mock implements YtDownloadService {}

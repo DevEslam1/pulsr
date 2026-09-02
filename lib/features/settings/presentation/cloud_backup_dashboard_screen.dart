@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/di/injection.dart';
-import '../../../core/services/cloud_sync_service.dart';
+import '../../../data/services/cloud_sync_service.dart';
 import '../../../core/theme/aura_theme.dart';
 
 class CloudBackupDashboardScreen extends StatefulWidget {

@@ -1,4 +1,4 @@
-﻿// lib/core/services/cloud_sync_service.dart
+﻿// lib/data/services/cloud_sync_service.dart
 import 'dart:async';
 import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';

@@ -10,19 +10,14 @@ import 'package:mutex/mutex.dart';
 import 'package:rxdart/rxdart.dart';
 
 import '../../../core/bloc/base_cubit.dart';
+import '../../../core/di/injection.dart';
 import '../../../core/errors/failures.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../domain/models/download_task.dart';
-import '../../../domain/usecases/delete_download.dart';
-import '../../../domain/usecases/get_download_storage_stats.dart';
-import '../../../domain/usecases/observe_downloads.dart';
-import '../../../domain/usecases/pause_download.dart';
-import '../../../domain/usecases/queue_download.dart';
-import '../../../domain/usecases/resume_download.dart';
-import '../../../domain/usecases/retry_download.dart';
-import '../../../domain/usecases/prioritize_download.dart';
-import '../../../domain/usecases/reorder_downloads.dart';
-import '../../../domain/usecases/queue_downloads_batch.dart';
+import '../../../domain/services/notification_permission_service.dart';
+import '../../../domain/usecases/download_lifecycle_usecases.dart';
+import '../../../domain/usecases/download_query_usecases.dart';
+import '../../../domain/usecases/download_queue_usecases.dart';
 import 'downloads_state.dart';
 
 class _RefMutex {
@@ -48,6 +43,7 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   final ReorderDownloadsUseCase? _reorderDownloadsUseCase;
   final PrioritizeDownloadUseCase? _prioritizeDownloadUseCase;
   final QueueDownloadsBatchUseCase? _queueDownloadsBatchUseCase;
+  final INotificationPermissionService? _notificationPermissionService;
 
   final Map<String, _RefMutex> _taskLocks = {};
 
@@ -62,8 +58,31 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     this._reorderDownloadsUseCase,
     this._prioritizeDownloadUseCase,
     this._queueDownloadsBatchUseCase,
+    this._notificationPermissionService,
   ]) : super(const DownloadsState()) {
     _init();
+  }
+
+  void dismissNotificationBanner() {
+    safeEmit(state.copyWith(showNotificationPermissionBanner: false));
+  }
+
+  Future<void> _checkNotificationPermissionBeforeEnqueue() async {
+    try {
+      final notifService = _notificationPermissionService ??
+          (getIt.isRegistered<INotificationPermissionService>()
+              ? getIt<INotificationPermissionService>()
+              : null);
+      if (notifService != null) {
+        final granted = await notifService.checkPermission();
+        if (!granted) {
+          final requested = await notifService.requestPermission();
+          if (!requested && !isClosed) {
+            safeEmit(state.copyWith(showNotificationPermissionBanner: true));
+          }
+        }
+      }
+    } catch (_) {}
   }
 
   Future<void> _init() async {
@@ -108,15 +127,21 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
       });
       safeEmit(state.copyWith(tasks: taskMap));
     } catch (e, st) {
-      ErrorLogger.log('loadInitialTasks in DownloadsCubit failed',
-          error: e, stackTrace: st, category: 'DownloadsCubit');
+      ErrorLogger.log(
+        'loadInitialTasks in DownloadsCubit failed',
+        error: e,
+        stackTrace: st,
+        category: 'DownloadsCubit',
+      );
     }
   }
 
   void _subscribeToDownloadUpdates() {
     autoSub(
-      _observeDownloadsUseCase()
-          .throttleTime(const Duration(milliseconds: 200), trailing: true),
+      _observeDownloadsUseCase().throttleTime(
+        const Duration(milliseconds: 200),
+        trailing: true,
+      ),
       (task) {
         final key = task.id.isNotEmpty ? task.id : task.videoId;
         final updatedTasks = Map<String, DownloadTask>.unmodifiable({
@@ -144,16 +169,22 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
       final result = await _getStorageStatsUseCase();
       result.fold(
         (failure) {
-          ErrorLogger.log('refreshStorageStats failure: ${failure.message}',
-              category: 'DownloadsCubit');
+          ErrorLogger.log(
+            'refreshStorageStats failure: ${failure.message}',
+            category: 'DownloadsCubit',
+          );
         },
         (stats) {
           safeEmit(state.copyWith(storageStats: stats));
         },
       );
     } catch (e, st) {
-      ErrorLogger.log('refreshStorageStats in DownloadsCubit failed',
-          error: e, stackTrace: st, category: 'DownloadsCubit');
+      ErrorLogger.log(
+        'refreshStorageStats in DownloadsCubit failed',
+        error: e,
+        stackTrace: st,
+        category: 'DownloadsCubit',
+      );
     }
   }
 
@@ -162,29 +193,33 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   Future<void> queueDownload(DownloadTask task) async {
     if (isClosed) return;
     await _withTaskLock(task.videoId, () async {
+      await _checkNotificationPermissionBeforeEnqueue();
+      if (isClosed) return;
       try {
         final result = await _queueDownloadUseCase(task);
-        result.fold(
-          (failure) {
-            if (failure is AlreadyQueuedFailure) {
-              // Duplicate start request: a no-op, not an error. The task is
-              // already queued/active; emitting a failure here would surface
-              // a spurious toast for a benign race (double-tap).
-              ErrorLogger.addBreadcrumb(
-                'queueDownload ignored: already queued (${task.videoId})',
-                category: 'DownloadsCubit',
-              );
-              return;
-            }
-            safeEmit(state.copyWith(
-                errorMessage: failure.message, failure: failure));
-            _notifyFailure(failure.message);
-          },
-          (_) {},
-        );
+        result.fold((failure) {
+          if (failure is AlreadyQueuedFailure) {
+            // Duplicate start request: a no-op, not an error. The task is
+            // already queued/active; emitting a failure here would surface
+            // a spurious toast for a benign race (double-tap).
+            ErrorLogger.addBreadcrumb(
+              'queueDownload ignored: already queued (${task.videoId})',
+              category: 'DownloadsCubit',
+            );
+            return;
+          }
+          safeEmit(
+            state.copyWith(errorMessage: failure.message, failure: failure),
+          );
+          _notifyFailure(failure.message);
+        }, (_) {});
       } catch (e, st) {
-        ErrorLogger.log('queueDownload in DownloadsCubit failed',
-            error: e, stackTrace: st, category: 'DownloadsCubit');
+        ErrorLogger.log(
+          'queueDownload in DownloadsCubit failed',
+          error: e,
+          stackTrace: st,
+          category: 'DownloadsCubit',
+        );
       }
     });
   }
@@ -193,15 +228,21 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   /// concurrency) and emits at most one error state at the end, never one
   /// per item.
   Future<BatchDownloadResult> queueBatch(List<DownloadTask> tasks) async {
+    await _checkNotificationPermissionBeforeEnqueue();
     final useCase = _queueDownloadsBatchUseCase;
     if (useCase != null) {
       final res = await useCase.executeWithBatchResult(tasks);
       if (res.hasFailures) {
-        final firstFailure = res.failures.isNotEmpty ? res.failures.first : null;
-        safeEmit(state.copyWith(
-          errorMessage: firstFailure?.message ?? 'Batch download completed with failures',
-          failure: firstFailure,
-        ));
+        final firstFailure =
+            res.failures.isNotEmpty ? res.failures.first : null;
+        safeEmit(
+          state.copyWith(
+            errorMessage:
+                firstFailure?.message ??
+                'Batch download completed with failures',
+            failure: firstFailure,
+          ),
+        );
         _notifyFailure(firstFailure?.message);
       }
       return res;
@@ -236,17 +277,23 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
           final f = GenericDownloadFailure(e.toString(), e);
           failedIds[key] = f;
           failures.add(f);
-          ErrorLogger.log('queueBatch item failed',
-              error: e, stackTrace: st, category: 'DownloadsCubit');
+          ErrorLogger.log(
+            'queueBatch item failed',
+            error: e,
+            stackTrace: st,
+            category: 'DownloadsCubit',
+          );
         }
       });
     }
 
     if (failures.isNotEmpty) {
-      safeEmit(state.copyWith(
-        errorMessage: failures.first.message,
-        failure: failures.first,
-      ));
+      safeEmit(
+        state.copyWith(
+          errorMessage: failures.first.message,
+          failure: failures.first,
+        ),
+      );
     }
 
     return BatchDownloadResult(
@@ -265,17 +312,19 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     await _withTaskLock(videoId, () async {
       try {
         final result = await _pauseDownloadUseCase(videoId);
-        result.fold(
-          (failure) {
-            safeEmit(state.copyWith(
-                errorMessage: failure.message, failure: failure));
-            _notifyFailure(failure.message);
-          },
-          (_) {},
-        );
+        result.fold((failure) {
+          safeEmit(
+            state.copyWith(errorMessage: failure.message, failure: failure),
+          );
+          _notifyFailure(failure.message);
+        }, (_) {});
       } catch (e, st) {
-        ErrorLogger.log('pauseDownload in DownloadsCubit failed',
-            error: e, stackTrace: st, category: 'DownloadsCubit');
+        ErrorLogger.log(
+          'pauseDownload in DownloadsCubit failed',
+          error: e,
+          stackTrace: st,
+          category: 'DownloadsCubit',
+        );
       }
     });
   }
@@ -288,8 +337,9 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
         final result = await _resumeDownloadUseCase(videoId);
         result.fold(
           (failure) {
-            safeEmit(state.copyWith(
-                errorMessage: failure.message, failure: failure));
+            safeEmit(
+              state.copyWith(errorMessage: failure.message, failure: failure),
+            );
             _notifyFailure(failure.message);
           },
           (_) {
@@ -299,8 +349,12 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
           },
         );
       } catch (e, st) {
-        ErrorLogger.log('resumeDownload in DownloadsCubit failed',
-            error: e, stackTrace: st, category: 'DownloadsCubit');
+        ErrorLogger.log(
+          'resumeDownload in DownloadsCubit failed',
+          error: e,
+          stackTrace: st,
+          category: 'DownloadsCubit',
+        );
       }
     });
   }
@@ -313,8 +367,9 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
         final result = await _retryDownloadUseCase(videoId);
         result.fold(
           (failure) {
-            safeEmit(state.copyWith(
-                errorMessage: failure.message, failure: failure));
+            safeEmit(
+              state.copyWith(errorMessage: failure.message, failure: failure),
+            );
             _notifyFailure(failure.message);
           },
           (_) {
@@ -324,8 +379,12 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
           },
         );
       } catch (e, st) {
-        ErrorLogger.log('retryDownload in DownloadsCubit failed',
-            error: e, stackTrace: st, category: 'DownloadsCubit');
+        ErrorLogger.log(
+          'retryDownload in DownloadsCubit failed',
+          error: e,
+          stackTrace: st,
+          category: 'DownloadsCubit',
+        );
       }
     });
   }
@@ -339,21 +398,32 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
         final result = await _deleteDownloadUseCase(videoId);
         result.fold(
           (failure) {
-            safeEmit(state.copyWith(
-                errorMessage: failure.message, failure: failure));
+            safeEmit(
+              state.copyWith(errorMessage: failure.message, failure: failure),
+            );
             _notifyFailure(failure.message);
           },
           (_) {
-            final remaining = Map<String, DownloadTask>.from(state.tasks)
-              ..removeWhere((k, v) => k == videoId || v.videoId == videoId || v.id == videoId);
-            safeEmit(state.copyWith(
-                tasks: Map<String, DownloadTask>.unmodifiable(remaining)));
+            final remaining = Map<String, DownloadTask>.from(
+              state.tasks,
+            )..removeWhere(
+              (k, v) => k == videoId || v.videoId == videoId || v.id == videoId,
+            );
+            safeEmit(
+              state.copyWith(
+                tasks: Map<String, DownloadTask>.unmodifiable(remaining),
+              ),
+            );
             refreshStorageStats();
           },
         );
       } catch (e, st) {
-        ErrorLogger.log('deleteDownload in DownloadsCubit failed',
-            error: e, stackTrace: st, category: 'DownloadsCubit');
+        ErrorLogger.log(
+          'deleteDownload in DownloadsCubit failed',
+          error: e,
+          stackTrace: st,
+          category: 'DownloadsCubit',
+        );
       }
     });
   }
@@ -367,17 +437,19 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
       await _withTaskLock(videoId, () async {
         try {
           final result = await useCase(videoId);
-          result.fold(
-            (failure) {
-              safeEmit(state.copyWith(
-                  errorMessage: failure.message, failure: failure));
-              _notifyFailure(failure.message);
-            },
-            (_) {},
-          );
+          result.fold((failure) {
+            safeEmit(
+              state.copyWith(errorMessage: failure.message, failure: failure),
+            );
+            _notifyFailure(failure.message);
+          }, (_) {});
         } catch (e, st) {
-          ErrorLogger.log('prioritizeDownload in DownloadsCubit failed',
-              error: e, stackTrace: st, category: 'DownloadsCubit');
+          ErrorLogger.log(
+            'prioritizeDownload in DownloadsCubit failed',
+            error: e,
+            stackTrace: st,
+            category: 'DownloadsCubit',
+          );
         }
       });
     }
@@ -385,11 +457,14 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
 
   /// Resumes every paused/interrupted task sequentially, stopping on close.
   Future<void> resumeAllPaused() async {
-    final pausedTasks = state.tasks.values
-        .where((t) =>
-            t.status == DownloadStatus.paused ||
-            t.status == DownloadStatus.interrupted)
-        .toList();
+    final pausedTasks =
+        state.tasks.values
+            .where(
+              (t) =>
+                  t.status == DownloadStatus.paused ||
+                  t.status == DownloadStatus.interrupted,
+            )
+            .toList();
     for (final task in pausedTasks) {
       if (isClosed) return;
       await resumeDownload(task.videoId);
@@ -398,11 +473,14 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
 
   /// Retries every failed/interrupted task sequentially, stopping on close.
   Future<void> retryAllFailed() async {
-    final failedTasks = state.tasks.values
-        .where((t) =>
-            t.status == DownloadStatus.failed ||
-            t.status == DownloadStatus.interrupted)
-        .toList();
+    final failedTasks =
+        state.tasks.values
+            .where(
+              (t) =>
+                  t.status == DownloadStatus.failed ||
+                  t.status == DownloadStatus.interrupted,
+            )
+            .toList();
     for (final task in failedTasks) {
       if (isClosed) return;
       await retryDownload(task.videoId);
@@ -416,26 +494,27 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     if (useCase != null) {
       try {
         final result = await useCase(orderedVideoIds);
-        result.fold(
-          (failure) {
-            safeEmit(state.copyWith(
-                errorMessage: failure.message, failure: failure));
-            _notifyFailure(failure.message);
-          },
-          (_) {},
-        );
+        result.fold((failure) {
+          safeEmit(
+            state.copyWith(errorMessage: failure.message, failure: failure),
+          );
+          _notifyFailure(failure.message);
+        }, (_) {});
       } catch (e, st) {
-        ErrorLogger.log('reorderQueue in DownloadsCubit failed',
-            error: e, stackTrace: st, category: 'DownloadsCubit');
+        ErrorLogger.log(
+          'reorderQueue in DownloadsCubit failed',
+          error: e,
+          stackTrace: st,
+          category: 'DownloadsCubit',
+        );
       }
     }
   }
 
   @override
   Future<void> close() async {
-    final activeTasks = state.tasks.values
-        .where((t) => t.status.isActive)
-        .toList();
+    final activeTasks =
+        state.tasks.values.where((t) => t.status.isActive).toList();
     if (activeTasks.isNotEmpty) {
       await Future.wait(
         activeTasks.map((task) async {
@@ -449,4 +528,3 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
     return super.close();
   }
 }
-

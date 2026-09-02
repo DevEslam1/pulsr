@@ -1,5 +1,5 @@
 // lib/core/errors/ytm_error_classifier.dart
-import '../services/ytm_service.dart';
+import '../../data/services/ytm_service.dart';
 
 /// Discrete signals corresponding to Kotlin YtmBlockSignal
 enum YtmBlockSignal {

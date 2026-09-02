@@ -8,7 +8,7 @@ import 'package:injectable/injectable.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../../core/services/artwork_cache_manager.dart';
+import '../../data/services/artwork_cache_manager.dart';
 import '../../core/utils/error_logger.dart';
 import '../../core/widgets/cached_artwork.dart';
 import '../../data/db/app_database.dart';

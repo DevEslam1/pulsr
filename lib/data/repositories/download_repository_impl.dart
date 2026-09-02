@@ -21,7 +21,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/channels.dart';
 import '../../core/di/injection.dart';
 import '../../core/errors/failures.dart';
-import '../../core/services/ytm_service.dart';
+import '../../data/services/ytm_service.dart';
 import '../downloads/yt_download_service.dart';
 import '../../core/utils/error_logger.dart';
 import '../../core/utils/ytm_rate_limiter.dart';

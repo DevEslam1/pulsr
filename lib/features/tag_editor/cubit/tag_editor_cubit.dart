@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/constants/channels.dart';
-import '../../../core/services/metadata_search_service.dart';
+import '../../../data/services/metadata_search_service.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../core/utils/lrc_parser.dart';
 import '../../../core/utils/platform_capabilities.dart';

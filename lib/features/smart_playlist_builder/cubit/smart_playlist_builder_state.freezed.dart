@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // coverage:ignore-file
-// ignore_for_file: type=lint
+// ignore_for_file: type=lint, type=warning, deprecated_member_use, deprecated_member_use_from_same_package
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
 part of 'smart_playlist_builder_state.dart';
@@ -9,6 +9,7 @@ part of 'smart_playlist_builder_state.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// GENERATED CODE - DO NOT MODIFY BY HAND
 // dart format off
 T _$identity<T>(T value) => value;
 /// @nodoc
@@ -25,16 +26,21 @@ $SmartPlaylistBuilderStateCopyWith<SmartPlaylistBuilderState> get copyWith => _$
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is SmartPlaylistBuilderState&&(identical(other.name, name) || other.name == name)&&(identical(other.criteria, criteria) || other.criteria == criteria)&&const DeepCollectionEquality().equals(other.previewSongs, previewSongs)&&(identical(other.isSubmitting, isSubmitting) || other.isSubmitting == isSubmitting)&&(identical(other.isEditing, isEditing) || other.isEditing == isEditing)&&(identical(other.editingPlaylistId, editingPlaylistId) || other.editingPlaylistId == editingPlaylistId)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
+  final _this = this as SmartPlaylistBuilderState;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SmartPlaylistBuilderState&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.criteria, _this.criteria) || other.criteria == _this.criteria)&&const DeepCollectionEquality().equals(other.previewSongs, _this.previewSongs)&&(identical(other.isSubmitting, _this.isSubmitting) || other.isSubmitting == _this.isSubmitting)&&(identical(other.isEditing, _this.isEditing) || other.isEditing == _this.isEditing)&&(identical(other.editingPlaylistId, _this.editingPlaylistId) || other.editingPlaylistId == _this.editingPlaylistId)&&(identical(other.errorMessage, _this.errorMessage) || other.errorMessage == _this.errorMessage));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,name,criteria,const DeepCollectionEquality().hash(previewSongs),isSubmitting,isEditing,editingPlaylistId,errorMessage);
+int get hashCode {
+  final _this = this as SmartPlaylistBuilderState;
+  return Object.hash(runtimeType,_this.name,_this.criteria,const DeepCollectionEquality().hash(_this.previewSongs),_this.isSubmitting,_this.isEditing,_this.editingPlaylistId,_this.errorMessage);
+}
 
 @override
 String toString() {
-  return 'SmartPlaylistBuilderState(name: $name, criteria: $criteria, previewSongs: $previewSongs, isSubmitting: $isSubmitting, isEditing: $isEditing, editingPlaylistId: $editingPlaylistId, errorMessage: $errorMessage)';
+  final _this = this as SmartPlaylistBuilderState;
+  return 'SmartPlaylistBuilderState(name: ${_this.name}, criteria: ${_this.criteria}, previewSongs: ${_this.previewSongs}, isSubmitting: ${_this.isSubmitting}, isEditing: ${_this.isEditing}, editingPlaylistId: ${_this.editingPlaylistId}, errorMessage: ${_this.errorMessage})';
 }
 
 
@@ -63,7 +69,7 @@ class _$SmartPlaylistBuilderStateCopyWithImpl<$Res>
 /// Create a copy of SmartPlaylistBuilderState
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? name = null,Object? criteria = null,Object? previewSongs = null,Object? isSubmitting = null,Object? isEditing = null,Object? editingPlaylistId = freezed,Object? errorMessage = freezed,}) {
-  return _then(_self.copyWith(
+  return _then(SmartPlaylistBuilderState(
 name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,criteria: null == criteria ? _self.criteria : criteria // ignore: cast_nullable_to_non_nullable
 as SmartCriteria,previewSongs: null == previewSongs ? _self.previewSongs : previewSongs // ignore: cast_nullable_to_non_nullable
@@ -212,7 +218,7 @@ return $default(_that.name,_that.criteria,_that.previewSongs,_that.isSubmitting,
 
 
 class _SmartPlaylistBuilderState implements SmartPlaylistBuilderState {
-  const _SmartPlaylistBuilderState({this.name = '', this.criteria = const SmartCriteria(), final  List<SongsTableData> previewSongs = const [], this.isSubmitting = false, this.isEditing = false, this.editingPlaylistId, this.errorMessage}): _previewSongs = previewSongs;
+  const _SmartPlaylistBuilderState({this.name = '', this.criteria = const SmartCriteria(),  List<SongsTableData> previewSongs = const [], this.isSubmitting = false, this.isEditing = false, this.editingPlaylistId, this.errorMessage}): _previewSongs = previewSongs;
   
 
 @override@JsonKey() final  String name;
@@ -239,16 +245,18 @@ _$SmartPlaylistBuilderStateCopyWith<_SmartPlaylistBuilderState> get copyWith => 
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SmartPlaylistBuilderState&&(identical(other.name, name) || other.name == name)&&(identical(other.criteria, criteria) || other.criteria == criteria)&&const DeepCollectionEquality().equals(other._previewSongs, _previewSongs)&&(identical(other.isSubmitting, isSubmitting) || other.isSubmitting == isSubmitting)&&(identical(other.isEditing, isEditing) || other.isEditing == isEditing)&&(identical(other.editingPlaylistId, editingPlaylistId) || other.editingPlaylistId == editingPlaylistId)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _SmartPlaylistBuilderState&&(identical(other.name, name) || other.name == name)&&(identical(other.criteria, criteria) || other.criteria == criteria)&&const DeepCollectionEquality().equals(other.previewSongs, _previewSongs)&&(identical(other.isSubmitting, isSubmitting) || other.isSubmitting == isSubmitting)&&(identical(other.isEditing, isEditing) || other.isEditing == isEditing)&&(identical(other.editingPlaylistId, editingPlaylistId) || other.editingPlaylistId == editingPlaylistId)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,name,criteria,const DeepCollectionEquality().hash(_previewSongs),isSubmitting,isEditing,editingPlaylistId,errorMessage);
+int get hashCode {
+    return Object.hash(runtimeType,name,criteria,const DeepCollectionEquality().hash(_previewSongs),isSubmitting,isEditing,editingPlaylistId,errorMessage);
+}
 
 @override
 String toString() {
-  return 'SmartPlaylistBuilderState(name: $name, criteria: $criteria, previewSongs: $previewSongs, isSubmitting: $isSubmitting, isEditing: $isEditing, editingPlaylistId: $editingPlaylistId, errorMessage: $errorMessage)';
+    return 'SmartPlaylistBuilderState(name: $name, criteria: $criteria, previewSongs: $previewSongs, isSubmitting: $isSubmitting, isEditing: $isEditing, editingPlaylistId: $editingPlaylistId, errorMessage: $errorMessage)';
 }
 
 

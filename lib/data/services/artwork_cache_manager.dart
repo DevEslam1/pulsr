@@ -1,4 +1,4 @@
-// lib/core/services/artwork_cache_manager.dart
+// lib/data/services/artwork_cache_manager.dart
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';

@@ -18,11 +18,11 @@ import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
 import '../../../core/config/app_config.dart';
-import '../../../core/services/ytm_account_service.dart';
-import '../../../core/services/ytm_service.dart';
+import '../../../data/services/ytm_account_service.dart';
+import '../../../data/services/ytm_service.dart';
 import '../../../domain/models/ytm_track.dart';
-import '../../ytm_search/cubit/ytm_download_cubit.dart';
-import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
+import '../../downloads/cubit/ytm_download_cubit.dart';
+import '../../downloads/presentation/widgets/ytm_download_button.dart';
 
 import 'package:go_router/go_router.dart';
 
@@ -251,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   // ---------- Header ----------
                   SliverToBoxAdapter(child: Padding(
                     padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context),
-                        16, Adaptive.pagePadding(context), 0),
+                        24, Adaptive.pagePadding(context), 0),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [

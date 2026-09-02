@@ -1,4 +1,4 @@
-// lib/core/services/ytm_service.dart
+// lib/data/services/ytm_service.dart
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 
 import '../../core/constants/channels.dart';
+import '../../core/constants/embedded_browser_ua.dart';
 import '../../core/di/injection.dart';
 import 'xdm_backend_service.dart';
 import 'ytm_account_service.dart';
@@ -39,20 +40,19 @@ class YtmException implements Exception {
       signal == YtmBlockSignal.ipBlocked;
 
   /// YouTube has flagged the IP / client as automated/bot and requires authentication.
+  /// NOTE: rateLimited (429) is intentionally excluded — rate limits should use
+  /// backoff, not device-level blocking. LOGIN_REQUIRED is an auth signal handled
+  /// by [isAuth], not a bot signal.
   bool get isBotBlocked =>
       signal == YtmBlockSignal.botChallenge ||
       signal == YtmBlockSignal.poTokenInvalid ||
-      signal == YtmBlockSignal.rateLimited ||
       code == 'BOT_CHALLENGE' ||
       code == 'PO_TOKEN_INVALID' ||
-      code == 'RATE_LIMITED' ||
       code == 'YTM_BOT_BLOCKED' ||
-      code == 'YTM_429' ||
       code == 'YTM_RECAPTCHA' ||
       code == 'RECAPTCHA_REQUIRED' ||
       (details != null &&
           (details!.contains('bot') ||
-              details!.contains('LOGIN_REQUIRED') ||
               details!.contains('Sign in to confirm')));
 
   /// Session has expired or authentication is invalid.
@@ -61,7 +61,9 @@ class YtmException implements Exception {
       code == 'SIGN_IN_REQUIRED' ||
       code == 'YTM_AUTH' ||
       code == 'LOGIN_REQUIRED' ||
-      (details != null && details!.toLowerCase().contains('unauthenticated'));
+      (details != null &&
+          (details!.toLowerCase().contains('unauthenticated') ||
+              details!.contains('LOGIN_REQUIRED')));
 
   /// Fatal error where looping / skipping the queue will only worsen the block.
   bool get isFatal => isNetwork || isDisabled || isBotBlocked || isAuth;
@@ -85,7 +87,6 @@ class YtmException implements Exception {
 @singleton
 class YtmService {
   static const String channelName = PulsrChannels.ytm;
-  static const Duration _defaultSearchTimeout = Duration(seconds: 25);
 
   // Tier-1 (account) deadline for direct authenticated Innertube playback.
   static const Duration _tier1Deadline = Duration(seconds: 20);
@@ -325,15 +326,16 @@ class YtmService {
           'limit': limit,
           ..._localeArgs(),
         }),
-        timeout: _defaultSearchTimeout,
+        timeout: const Duration(seconds: 6),
+        maxRetries: 0,
       );
 
       return _parseTracks(raw);
     });
   }
 
-  /// Search with fallback: First tries native extractor, then falls back to
-  /// Innertube search if the extractor returns empty or throws.
+  /// Search with fallback: First tries fast Innertube JSON search (~200ms),
+  /// then falls back to native extractor if empty.
   Future<List<YtmTrack>> searchWithFallback(
     String query, {
     int limit = 30,
@@ -341,20 +343,20 @@ class YtmService {
     final trimmed = query.trim();
     if (trimmed.isEmpty) return const [];
 
-    // 1. Try native extractor search
-    try {
-      final results = await search(trimmed, limit: limit);
-      if (results.isNotEmpty) return results;
-    } catch (e) {
-      debugPrint('[YTM_SERVICE] Native search failed, trying fallbacks: $e');
-    }
-
-    // 2. Fallback: Innertube search
+    // 1. Primary: Fast direct Innertube JSON search (~200ms, authenticated when logged in)
     try {
       final innertubeResults = await _searchInnertube(trimmed, limit: limit);
       if (innertubeResults.isNotEmpty) return innertubeResults;
     } catch (e) {
-      debugPrint('[YTM_SERVICE] Innertube fallback search failed: $e');
+      debugPrint('[YTM_SERVICE] Innertube search failed, trying native extractor: $e');
+    }
+
+    // 2. Fallback: Native extractor search (bounded to 6s, zero retries)
+    try {
+      final results = await search(trimmed, limit: limit);
+      if (results.isNotEmpty) return results;
+    } catch (e) {
+      debugPrint('[YTM_SERVICE] Native search fallback failed: $e');
     }
 
     return const [];
@@ -396,8 +398,7 @@ class YtmService {
 
       final headers = <String, String>{
         'Content-Type': 'application/json',
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.7204.93 Safari/537.36',
+        'User-Agent': EmbeddedBrowserUa.desktop,
         'Origin': 'https://music.youtube.com',
         'Referer': 'https://music.youtube.com/',
         'x-origin': 'https://music.youtube.com',
@@ -510,15 +511,21 @@ class YtmService {
   }
 
   Future<List<YtmTrack>> trending({int limit = 30}) async {
-    final raw = await _guard(
-      () => _channel.invokeMethod<List<Object?>>('trending', {
-        'limit': limit,
-        ..._localeArgs(),
-      }),
-      timeout: _defaultSearchTimeout,
-    );
+    try {
+      final raw = await _guard(
+        () => _channel.invokeMethod<List<Object?>>('trending', {
+          'limit': limit,
+          ..._localeArgs(),
+        }),
+        timeout: const Duration(seconds: 5),
+        maxRetries: 0,
+      );
+      final tracks = _parseTracks(raw);
+      if (tracks.isNotEmpty) return tracks;
+    } catch (_) {}
 
-    return _parseTracks(raw);
+    // Fallback: fast direct search for top trending music
+    return await _searchInnertube('top music hits trending', limit: limit);
   }
 
   Future<List<YtmTrack>> getPlaylistTracks(
@@ -631,18 +638,27 @@ class YtmService {
     // TTFA: fast-fail while a device/IP-level bot-block is still fresh.
     // The block is global (all videos share the same IP), so we use a single
     // timestamp rather than a per-videoId map.
+    // NOTE: Logged-in users bypass the global block entirely — the block was
+    // set by the native ladder (tier-2) which uses different client contexts
+    // without the user's cookies. The authenticated WEB_REMIX + cookies path
+    // is independent of the native ladder's fate.
+    final isLoggedInForBlock = getIt.isRegistered<YtmAccountService>() &&
+        getIt<YtmAccountService>().isLoggedIn;
     final globalBlock = _globalBlockUntil;
     if (globalBlock != null) {
       if (DateTime.now().isBefore(globalBlock)) {
-        final isLoggedIn = getIt.isRegistered<YtmAccountService>() &&
-            getIt<YtmAccountService>().isLoggedIn;
-        if (!isLoggedIn) {
+        if (!isLoggedInForBlock) {
           throw const YtmException(
             'YTM_SIGNIN_REQUIRED',
             'Sign in to YouTube Music - Google is currently blocking playback '
             'from this device or network',
           );
         }
+        // Logged-in: skip fast-fail, let the authenticated path try.
+        debugPrint(
+          '[YTM_SERVICE] Global block active but user is logged in — '
+          'bypassing fast-fail to try authenticated path.',
+        );
       } else {
         _globalBlockUntil = null; // block expired, clear it
       }
@@ -775,12 +791,9 @@ class YtmService {
             if (err.isAuth && !err.isBotBlocked) throw err;
             if (err.isBotBlocked || err.code == 'YTM_SIGNIN_REQUIRED') {
               signInRequiredAbort = true;
-              _globalBlockUntil = DateTime.now().add(_signinAbortTtl);
-              debugPrint(
-                '[YTM_SERVICE] Global block set for '
-                '${_signinAbortTtl.inSeconds}s '
-                '(device/IP-level LOGIN_REQUIRED / BotChallenge)',
-              );
+              // Don't set _globalBlockUntil here — tier-3 (XDM backend) may
+              // still succeed. The block is set at the final throw point if
+              // ALL tiers fail.
             }
           }
         }
@@ -824,14 +837,9 @@ class YtmService {
                 e.isAuth;
             if (isDeviceGate) {
               signInRequiredAbort = true;
-              if (e.isBotBlocked || e.code == 'YTM_SIGNIN_REQUIRED') {
-                _globalBlockUntil = DateTime.now().add(_signinAbortTtl);
-                debugPrint(
-                  '[YTM_SERVICE] Global block set for '
-                  '${_signinAbortTtl.inSeconds}s '
-                  '(device/IP-level LOGIN_REQUIRED / BotChallenge)',
-                );
-              }
+              // Don't set _globalBlockUntil here — tier-3 (XDM backend) may
+              // still succeed. The block is set at the final throw point if
+              // ALL tiers fail.
               if (e.isAuth && !e.isBotBlocked) rethrow;
             } else if (e.code == 'YTM_TIMEOUT') {
               debugPrint('[YTM_SERVICE] Native timeout — not a device gate, will not set global block');
@@ -885,21 +893,25 @@ class YtmService {
       if (signInRequiredAbort) {
         final isLoggedIn = getIt.isRegistered<YtmAccountService>() &&
             getIt<YtmAccountService>().isLoggedIn;
-        // Device/IP-level gate — write a global block so every subsequent
-        // play fast-fails without re-running the dead ladder.
-        _globalBlockUntil = DateTime.now().add(_signinAbortTtl);
-        debugPrint('[YTM_SERVICE] Global block set for '
-            '${_signinAbortTtl.inMinutes}m '
-            '(LOGIN_REQUIRED / BotChallenge on all clients)');
         if (!isLoggedIn) {
+          // Guest: device/IP-level gate — write a global block so every
+          // subsequent play fast-fails without re-running the dead ladder.
+          _globalBlockUntil = DateTime.now().add(_signinAbortTtl);
+          debugPrint('[YTM_SERVICE] Global block set for '
+              '${_signinAbortTtl.inSeconds}s '
+              '(LOGIN_REQUIRED / BotChallenge on all clients, guest mode)');
           throw const YtmException(
             'YTM_SIGNIN_REQUIRED',
             'Sign in to YouTube Music - Google is blocking playback from this '
             'device or network',
           );
         }
-        // Logged-in user: surface as auth failure so UI prompts re-login
-        // instead of generic YTM_FAILED which never triggers the login sheet.
+        // Logged-in user: do NOT set _globalBlockUntil — the authenticated
+        // WEB_REMIX path may work on the next attempt after poToken refresh
+        // or cookie propagation. Surface as auth failure so UI prompts
+        // re-login instead of generic YTM_FAILED.
+        debugPrint('[YTM_SERVICE] All tiers failed for logged-in user — '
+            'surfacing auth failure without setting global block.');
         throw const YtmException(
           'YTM_AUTH',
           'YouTube session expired - please sign in again',
@@ -953,7 +965,19 @@ class YtmService {
             category: 'YTM',
           );
           if (e.code == 'LOGIN_REQUIRED' || e.code == 'YTM_AUTH') {
-            notifyAuthExpired();
+            // Suppress false-positive auth-expiry notifications during the
+            // 30s post-login grace window — the native ladder may return
+            // LOGIN_REQUIRED because cookies haven't propagated to Kotlin yet.
+            final inGrace = getIt.isRegistered<YtmAccountService>() &&
+                getIt<YtmAccountService>().inPostLoginGrace;
+            if (!inGrace) {
+              notifyAuthExpired();
+            } else {
+              debugPrint(
+                '[YTM_SERVICE] _guard: LOGIN_REQUIRED suppressed '
+                '(within post-login grace window)',
+              );
+            }
           }
           throw YtmException(e.code, e.message);
         }

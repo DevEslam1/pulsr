@@ -1,4 +1,4 @@
-﻿// lib/features/smart_playlist_builder/smart_playlist_builder_cubit.dart
+﻿// lib/features/smart_playlist_builder/cubit/smart_playlist_builder_cubit.dart
 import 'dart:async';
 import '../../../core/bloc/base_cubit.dart';
 import 'package:injectable/injectable.dart';

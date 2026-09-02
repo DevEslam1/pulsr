@@ -1,4 +1,4 @@
-﻿// lib/features/smart_playlist_builder/smart_playlist_builder_screen.dart
+﻿// lib/features/smart_playlist_builder/presentation/smart_playlist_builder_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';

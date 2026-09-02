@@ -1,4 +1,4 @@
-﻿// lib/core/services/device_profile_service.dart
+﻿// lib/domain/services/device_profile_service.dart
 import 'dart:convert';
 
 import 'package:injectable/injectable.dart';

@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/errors/failures.dart';
-import 'package:pulsr/core/services/ytm_service.dart';
+import 'package:pulsr/data/services/ytm_service.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
 import 'package:pulsr/data/audio/ytm_resolving_source.dart';
 import 'package:pulsr/data/db/app_database.dart';
@@ -26,6 +26,10 @@ class StubPulsrAudioHandler extends BaseAudioHandler
     implements PulsrAudioHandler {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
+  final StreamController<SongsTableData> _onTrackChangedController = StreamController<SongsTableData>.broadcast();
+  @override
+  Stream<SongsTableData> get onTrackChanged => _onTrackChangedController.stream;
 
   double _vol = 1.0;
   @override
@@ -234,6 +238,7 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   Future<void> skipToQueueItem(int index) async {}
   @override
   void dispose() {
+    _onTrackChangedController.close();
     _positionController.close();
     _errorController.close();
   }

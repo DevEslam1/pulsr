@@ -27,7 +27,7 @@ android {
         // 28 (Android 9) is the floor for the true 10-band graphic EQ, which is
         // built on DynamicsProcessing postEq — added in API 28.
         minSdk = 28
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["appName"] = "Pulsr Music"
@@ -188,7 +188,7 @@ dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.2")
     implementation("net.jthink:jaudiotagger:3.0.1")
     implementation("androidx.media:media:1.7.0")
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+    implementation("androidx.security:security-crypto:1.1.0-alpha07")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     // ServiceCompat.startForeground(service, id, notification, type) — required
     // for the runtime FGS type selection (dataSync on API 34 / mediaProcessing
@@ -274,39 +274,65 @@ tasks.register("testNative") {
             "AudioDspEngine.cpp"
         ).map { file("${mainDir.absolutePath}/$it").absolutePath }
 
-        val runnerExecutable: File
-        if (compilerAvailable) {
-            val flagsDesc = if (withAsan) "-O1 -fsanitize=address,undefined -std=c++20" else "-O3 -std=c++20"
-            println("[testNative] Compiling parity build ($flagsDesc)...")
-            val parityCompileCmd = mutableListOf(
-                compiler,
-                "-std=c++20",
-                if (withAsan) "-O1" else "-O3",
-                "-I", mainDir.absolutePath,
-                file("${testDir.absolutePath}/test_native_all.cpp").absolutePath
-            ).apply {
-                if (withAsan) {
-                    add("-fsanitize=address,undefined")
-                    add("-fno-omit-frame-pointer")
-                }
-                addAll(dspSources)
-                if (isWindows) {
-                    add("-static")
-                    add("-lpsapi")
-                }
-                add("-o")
-                add(exeParity.absolutePath)
-            }
+        val usePrebuiltOverride = project.findProperty("usePrebuiltNativeTests") == "true"
 
-            val parityCompileRes = ProcessBuilder(parityCompileCmd).inheritIO().start().waitFor()
-            if (parityCompileRes != 0) {
-                throw GradleException("Native DSP parity test compilation failed with exit code $parityCompileRes")
+        val allNativeSources = mutableListOf<File>().apply {
+            mainDir.listFiles()?.filter { it.isFile && (it.extension == "cpp" || it.extension == "h") }?.let { addAll(it) }
+            testDir.listFiles()?.filter { it.isFile && (it.extension == "cpp" || it.extension == "h") }?.let { addAll(it) }
+        }
+
+        val runnerExecutable: File
+        val newestSourceTime = allNativeSources.maxOfOrNull { it.lastModified() } ?: 0L
+
+        if (compilerAvailable) {
+            val isStale = !exeParity.exists() || (newestSourceTime > exeParity.lastModified() && !usePrebuiltOverride)
+            if (isStale) {
+                val flagsDesc = if (withAsan) "-O1 -fsanitize=address,undefined -std=c++20" else "-O3 -std=c++20"
+                println("[testNative] Compiling parity build ($flagsDesc)...")
+                val parityCompileCmd = mutableListOf(
+                    compiler,
+                    "-std=c++20",
+                    if (withAsan) "-O1" else "-O3",
+                    "-I", mainDir.absolutePath,
+                    file("${testDir.absolutePath}/test_native_all.cpp").absolutePath
+                ).apply {
+                    if (withAsan) {
+                        add("-fsanitize=address,undefined")
+                        add("-fno-omit-frame-pointer")
+                    }
+                    addAll(dspSources)
+                    if (isWindows) {
+                        add("-static")
+                        add("-lpsapi")
+                    }
+                    add("-o")
+                    add(exeParity.absolutePath)
+                }
+
+                val parityCompileRes = ProcessBuilder(parityCompileCmd).inheritIO().start().waitFor()
+                if (parityCompileRes != 0) {
+                    throw GradleException("Native DSP parity test compilation failed with exit code $parityCompileRes")
+                }
+            } else {
+                println("[testNative] Using up-to-date compiled test binary at ${exeParity.path}")
             }
             runnerExecutable = exeParity
         } else if (exeParity.exists()) {
+            if (newestSourceTime > exeParity.lastModified() && !usePrebuiltOverride) {
+                throw GradleException(
+                    "Native DSP test binary at ${exeParity.path} is STALE compared to source files, and no C++ compiler was found to recompile it.\n" +
+                    "Install clang++ (C++20) or supply -PusePrebuiltNativeTests=true to force running the existing binary."
+                )
+            }
             println("[testNative] Host C++ compiler not found; using existing compiled test binary at ${exeParity.path}")
             runnerExecutable = exeParity
         } else if (rootPrebuilt.exists()) {
+            if (newestSourceTime > rootPrebuilt.lastModified() && !usePrebuiltOverride) {
+                throw GradleException(
+                    "Prebuilt test binary at ${rootPrebuilt.path} is STALE compared to source files, and no C++ compiler was found to recompile it.\n" +
+                    "Install clang++ (C++20) or supply -PusePrebuiltNativeTests=true to force running the prebuilt binary."
+                )
+            }
             println("[testNative] Host C++ compiler not found; using verified prebuilt test binary at ${rootPrebuilt.path}")
             runnerExecutable = rootPrebuilt
         } else {
@@ -347,9 +373,8 @@ tasks.register("testNative") {
             throw GradleException("Native DSP parity test execution failed with exit code $parityRunRes")
         }
 
-        if (totalDetected == 0) {
-            totalDetected = 23
-            passDetected = 23
+        if (totalDetected == 0 || passDetected == 0 || passDetected != totalDetected) {
+            throw GradleException("No valid native DSP test banners detected or parsed! (passed: $passDetected, total: $totalDetected)")
         }
 
         println("[testNative] PASSED: Native DSP test suite ($passDetected/$totalDetected tests) passed 100%.")
@@ -499,8 +524,34 @@ tasks.register("verifyProdApkIsolation") {
     }
 }
 
+tasks.register("verifyAndroid16Gate") {
+    description = "Strict gate verifying Android 16 (API 36) compliance, 16 KB page-size flags, and prod isolation"
+    group = "verification"
+    dependsOn("validateProdIsolation")
+    doLast {
+        println("[verifyAndroid16Gate] Checking compileSdk and targetSdk...")
+        val cmakeText = file("src/main/cpp/CMakeLists.txt").readText()
+        val gradleText = file("build.gradle.kts").readText()
+
+        if (!gradleText.contains("compileSdk = 36") && !gradleText.contains("compileSdkVersion(36)")) {
+            throw GradleException("[verifyAndroid16Gate] FAILED: compileSdk must be 36")
+        }
+        if (!gradleText.contains("targetSdk = 36") && !gradleText.contains("targetSdkVersion(36)")) {
+            throw GradleException("[verifyAndroid16Gate] FAILED: targetSdk must be 36")
+        }
+
+        println("[verifyAndroid16Gate] Checking 16 KB page-size linker flags...")
+        if (!cmakeText.contains("max-page-size=16384")) {
+            throw GradleException("[verifyAndroid16Gate] FAILED: 16 KB page size linker flag -Wl,-z,max-page-size=16384 is missing from CMakeLists.txt")
+        }
+
+        println("[verifyAndroid16Gate] PASSED: All Android 16 (API 36) and 16 KB page-alignment requirements met strictly.")
+    }
+}
+
 afterEvaluate {
     tasks.matching { it.name.startsWith("assemble") || it.name == "check" || it.name == "test" }.configureEach {
         dependsOn("validateProdIsolation")
     }
 }
+

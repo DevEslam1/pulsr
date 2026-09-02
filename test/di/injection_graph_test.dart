@@ -54,6 +54,23 @@ void main() {
       expect(generated, contains('HttpClient>('));
       expect(generated, contains('networkModule.httpClient'));
     });
+
+    test('exactly ONE binding per registered type/interface', () {
+      final registrations = RegExp(
+              r'gh\.(?:singleton|lazySingleton|factory|singletonAsync|factoryAsync|lazySingletonAsync|factoryParam|factoryParamAsync)<([^>]+)>')
+          .allMatches(generated)
+          .map((m) => firstTypeArg(m.group(1)!))
+          .toList();
+
+      final counts = <String, int>{};
+      for (final type in registrations) {
+        counts[type] = (counts[type] ?? 0) + 1;
+      }
+
+      final duplicates = counts.entries.where((e) => e.value > 1).map((e) => '${e.key} (${e.value} bindings)').toList();
+      expect(duplicates, isEmpty,
+          reason: 'Duplicate bindings found in injection graph: $duplicates');
+    });
   });
 
   group('Clean Architecture Layer Boundaries', () {
@@ -135,6 +152,56 @@ void main() {
           reason: 'YtDownloadService duplicate/legacy file in core/services must be removed (N-01)');
       expect(File('lib/data/downloads/yt_download_service.dart').existsSync(), isTrue,
           reason: 'YtDownloadService canonical location is lib/data/downloads/yt_download_service.dart');
+    });
+
+    test('no duplicate classes or stale twins across lib/', () {
+      // Check stale twin files
+      final staleFiles = [
+        'lib/features/tag_editor/tag_editor_cubit.dart',
+        'lib/features/tag_editor/tag_editor_screen.dart',
+        'lib/features/tag_editor/tag_editor_state.dart',
+        'lib/features/smart_playlist_builder/smart_playlist_builder_cubit.dart',
+        'lib/features/smart_playlist_builder/smart_playlist_builder_screen.dart',
+        'lib/features/smart_playlist_builder/smart_playlist_builder_state.dart',
+        'lib/features/widgets/widget_service.dart',
+        'lib/features/ytm_search/cubit/ytm_download_cubit.dart',
+        'lib/features/ytm_search/presentation/widgets/ytm_download_button.dart',
+      ];
+
+      for (final sf in staleFiles) {
+        expect(File(sf).existsSync(), isFalse,
+            reason: 'Stale duplicate file must be removed: $sf');
+      }
+
+      // Check no duplicate class declarations in lib/ (excluding generated files)
+      final classRegex = RegExp(r'^\s*class\s+([A-Za-z0-9_]+)', multiLine: true);
+      final classMap = <String, List<String>>{};
+
+      final libFiles = Directory('lib')
+          .listSync(recursive: true)
+          .whereType<File>()
+          .where((f) =>
+              f.path.endsWith('.dart') &&
+              !f.path.contains('.g.') &&
+              !f.path.contains('.freezed.') &&
+              !f.path.contains('.config.'));
+
+      for (final file in libFiles) {
+        final content = file.readAsStringSync();
+        for (final match in classRegex.allMatches(content)) {
+          final className = match.group(1)!;
+          if (className.startsWith('_')) continue; // Skip private classes
+          classMap.putIfAbsent(className, () => []).add(file.path);
+        }
+      }
+
+      final duplicateClasses = classMap.entries
+          .where((e) => e.value.length > 1)
+          .map((e) => '${e.key} defined in: ${e.value}')
+          .toList();
+
+      expect(duplicateClasses, isEmpty,
+          reason: 'Duplicate class names detected across lib/: $duplicateClasses');
     });
   });
 }

@@ -1,7 +1,7 @@
 // lib/features/settings/presentation/widgets/cache_section.dart
 import 'package:flutter/material.dart';
-import '../../../../core/services/artwork_cache_manager.dart';
-import '../../../../core/services/ytm_cache_manager.dart';
+import '../../../../data/services/artwork_cache_manager.dart';
+import '../../../../data/services/ytm_cache_manager.dart';
 import '../../../../core/theme/aura_theme.dart';
 
 /// Storage & cache rows: artwork cache, YouTube stream cache, max cache limit.

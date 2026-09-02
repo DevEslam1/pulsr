@@ -1,7 +1,7 @@
 // lib/features/library/presentation/duplicate_finder_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../core/services/duplicate_finder_service.dart';
+import '../../../domain/services/duplicate_finder_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../cubit/library_cubit.dart';

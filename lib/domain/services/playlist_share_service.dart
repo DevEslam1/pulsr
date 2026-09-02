@@ -1,4 +1,4 @@
-﻿// lib/core/services/playlist_share_service.dart
+﻿// lib/domain/services/playlist_share_service.dart
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:injectable/injectable.dart';

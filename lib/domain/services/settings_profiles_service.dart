@@ -1,4 +1,4 @@
-// lib/core/services/settings_profiles_service.dart
+// lib/domain/services/settings_profiles_service.dart
 import 'dart:convert';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';

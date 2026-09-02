@@ -1,4 +1,4 @@
-﻿// lib/core/services/playlist_suggestions_service.dart
+﻿// lib/domain/services/playlist_suggestions_service.dart
 import 'package:injectable/injectable.dart';
 import '../../data/db/app_database.dart';
 

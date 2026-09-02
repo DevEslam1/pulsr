@@ -5,8 +5,8 @@ import 'package:get_it/get_it.dart';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 
-import '../services/device_profile_service.dart';
-import '../services/room_correction_service.dart';
+import '../../domain/services/device_profile_service.dart';
+import '../../domain/services/room_correction_service.dart';
 import 'injection.config.dart';
 
 final GetIt getIt = GetIt.instance;
@@ -45,10 +45,7 @@ abstract class NetworkModule {
 abstract class StorageModule {
   @lazySingleton
   FlutterSecureStorage get secureStorage => const FlutterSecureStorage(
-        // ignore: deprecated_member_use_from_same_package, deprecated_member_use
         aOptions: AndroidOptions(
-          // ignore: deprecated_member_use
-          encryptedSharedPreferences: true,
           resetOnError: true,
         ),
         iOptions: IOSOptions(

@@ -15,7 +15,7 @@ import '../../../domain/usecases/get_artists_usecase.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
 import '../../../core/errors/failures.dart';
-import '../../../core/services/artist_bio_service.dart';
+import '../../../data/services/artist_bio_service.dart';
 
 class ArtistDetailScreen extends StatefulWidget {
   final ArtistsTableData artist;

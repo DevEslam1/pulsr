@@ -1,4 +1,4 @@
-﻿// lib/core/services/ytm_account_service.dart
+// lib/data/services/ytm_account_service.dart
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -10,12 +10,13 @@ import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:pulsr/core/di/injection.dart';
-import 'package:pulsr/core/services/ytm_client_version_resolver.dart';
-import 'package:pulsr/core/services/ytm_service.dart';
+import 'package:pulsr/data/services/ytm_client_version_resolver.dart';
+import 'package:pulsr/data/services/ytm_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/models/lyrics_line.dart';
 import '../../domain/models/ytm_track.dart';
 import '../../core/constants/channels.dart';
+import '../../core/constants/embedded_browser_ua.dart';
 import '../../core/utils/error_logger.dart';
 import '../../core/utils/lrc_parser.dart';
 import 'xdm_backend_service.dart';
@@ -69,8 +70,6 @@ class YtmAccountService {
   static const String _cookieSecureKey = 'ytm_session_cookies_secure';
   static const FlutterSecureStorage _secureStorage = FlutterSecureStorage(
     aOptions: AndroidOptions(
-      // ignore: deprecated_member_use
-      encryptedSharedPreferences: true,
       resetOnError: true,
     ),
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock),
@@ -91,6 +90,60 @@ class YtmAccountService {
     'WEB_REMIX': '67',
     'TVHTML5_SIMPLY_EMBEDDED_PLAYER': '85',
   };
+
+  /// Centralized Innertube client versions to keep headers and body contexts in sync
+  static const String _androidMusicVersion = '7.27.53';
+  static const String _iosMusicVersion = '7.27.0';
+  static const String _androidVrVersion = '1.63.27';
+  static const String _androidCreatorVersion = '24.45.100';
+  static const String _androidTestSuiteVersion = '1.9';
+  static const String _tvSimplyEmbeddedPlayerVersion = '2.0';
+  static const String _iosVersion = '19.29.1';
+
+  String _versionForClient(String client) {
+    switch (client) {
+      case 'ANDROID_MUSIC':
+        return _androidMusicVersion;
+      case 'IOS_MUSIC':
+        return _iosMusicVersion;
+      case 'ANDROID_VR':
+        return _androidVrVersion;
+      case 'ANDROID_CREATOR':
+        return _androidCreatorVersion;
+      case 'ANDROID_TESTSUITE':
+        return _androidTestSuiteVersion;
+      case 'TVHTML5_SIMPLY_EMBEDDED_PLAYER':
+        return _tvSimplyEmbeddedPlayerVersion;
+      case 'IOS':
+        return _iosVersion;
+      case 'WEB_REMIX':
+      case 'MWEB':
+      case 'WEB_EMBEDDED_PLAYER':
+      default:
+        return _clientVersion;
+    }
+  }
+
+  static String _userAgentForClient(String client) {
+    switch (client) {
+      case 'ANDROID_MUSIC':
+        return 'com.google.android.apps.youtube.music/$_androidMusicVersion (Linux; U; Android 15; en_US) gzip';
+      case 'IOS_MUSIC':
+        return 'com.google.ios.youtubemusic/$_iosMusicVersion (iPhone16,2; U; CPU iOS 18_5 like Mac OS X; en_US)';
+      case 'ANDROID_VR':
+        return 'com.google.android.apps.youtube.vr.oculus/$_androidVrVersion (Linux; U; Android 12; en_US; Quest 3) gzip';
+      case 'ANDROID_CREATOR':
+        return 'com.google.android.apps.youtube.creator/$_androidCreatorVersion (Linux; U; Android 14; en_US) gzip';
+      case 'TVHTML5_SIMPLY_EMBEDDED_PLAYER':
+        return 'Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/4.0 Chrome/76.0.3809.146 TV Safari/537.36';
+      case 'ANDROID_TESTSUITE':
+        return 'com.google.android.youtube/$_androidTestSuiteVersion (Linux; U; Android 9; gzip)';
+      case 'MWEB':
+        return EmbeddedBrowserUa.mobile;
+      default:
+        return EmbeddedBrowserUa.desktop;
+    }
+  }
 
   final YtmClientVersionResolver _versionResolver;
 
@@ -123,6 +176,10 @@ class YtmAccountService {
     if (saved == null) return false;
     return DateTime.now().difference(saved).inSeconds < 30;
   }
+
+  /// Public accessor for the post-login grace window check, used by
+  /// [YtmService._guard] to suppress false-positive auth-expiry notifications.
+  bool get inPostLoginGrace => _inPostLoginGrace;
 
   /// Coalesces concurrent liked-songs imports so UI + background callers share
   /// a single pagination ladder instead of burning the BROWSE rate-limiter
@@ -563,8 +620,7 @@ class YtmAccountService {
     String userAgent = '',
     String origin = 'https://music.youtube.com',
   }) {
-    final defaultUa =
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.7204.93 Safari/537.36';
+    final defaultUa = EmbeddedBrowserUa.desktop;
 
     final headers = <String, String>{
       'Content-Type': 'application/json',
@@ -663,36 +719,23 @@ class YtmAccountService {
   ]) {
     final clientMap = <String, dynamic>{
       'clientName': clientType,
-      // Use the resolved client version for WEB_REMIX; explicit per-client
-      // versions for the named mobile clients; fall back to WEB_REMIX version
-      // rather than the stale '19.29.37' for anything else.
-      'clientVersion':
-          clientType == 'WEB_REMIX'
-              ? _clientVersion
-              : clientType == 'ANDROID_MUSIC'
-              ? '8.32.50'
-              : clientType == 'IOS_MUSIC'
-              ? '8.32.1'
-              : _clientVersion,
+      'clientVersion': _versionForClient(clientType),
       'hl': 'en',
       'gl': 'US',
     };
 
     if (clientType == 'ANDROID_MUSIC') {
-      clientMap['clientVersion'] = '7.27.53';
       clientMap['androidSdkVersion'] = 35;
       clientMap['osName'] = 'Android';
       clientMap['osVersion'] = '15';
       clientMap['platform'] = 'MOBILE';
     } else if (clientType == 'IOS_MUSIC') {
-      clientMap['clientVersion'] = '7.27.0';
       clientMap['deviceMake'] = 'Apple';
       clientMap['deviceModel'] = 'iPhone16,2';
       clientMap['osName'] = 'iOS';
       clientMap['osVersion'] = '18.5';
       clientMap['platform'] = 'MOBILE';
     } else if (clientType == 'ANDROID_VR') {
-      clientMap['clientVersion'] = '1.63.27';
       clientMap['androidSdkVersion'] = 32;
       clientMap['deviceMake'] = 'Oculus';
       clientMap['deviceModel'] = 'Quest 2';
@@ -700,19 +743,15 @@ class YtmAccountService {
       clientMap['osVersion'] = '12';
       clientMap['platform'] = 'MOBILE';
     } else if (clientType == 'ANDROID_CREATOR') {
-      clientMap['clientVersion'] = '24.45.100';
       clientMap['androidSdkVersion'] = 33;
       clientMap['osName'] = 'Android';
       clientMap['osVersion'] = '13';
       clientMap['platform'] = 'MOBILE';
     } else if (clientType == 'ANDROID_TESTSUITE') {
-      clientMap['clientVersion'] = '1.9';
       clientMap['androidSdkVersion'] = 28;
     } else if (clientType == 'MWEB') {
-      clientMap['clientVersion'] = _clientVersion;
       clientMap['platform'] = 'MOBILE';
     } else if (clientType == 'WEB_EMBEDDED_PLAYER') {
-      clientMap['clientVersion'] = _clientVersion;
       clientMap['platform'] = 'DESKTOP';
     } else if (clientType == 'ANDROID') {
       clientMap['androidSdkVersion'] = 33;
@@ -720,14 +759,12 @@ class YtmAccountService {
       clientMap['osVersion'] = '13';
       clientMap['platform'] = 'MOBILE';
     } else if (clientType == 'IOS') {
-      clientMap['clientVersion'] = '19.29.1';
       clientMap['deviceMake'] = 'Apple';
       clientMap['deviceModel'] = 'iPhone14,3';
       clientMap['osName'] = 'iOS';
       clientMap['osVersion'] = '17.5.1';
       clientMap['platform'] = 'MOBILE';
     } else if (clientType == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER') {
-      clientMap['clientVersion'] = '2.0';
       clientMap['platform'] = 'TV';
     } else {
       clientMap['platform'] = 'DESKTOP';
@@ -1466,6 +1503,16 @@ class YtmAccountService {
       } else {
         visitorData = _sessionVisitorData;
       }
+      // If account poToken is not yet minted or dataSyncId is empty,
+      // fall back to the global streaming poToken so WEB_REMIX still receives
+      // a valid attestation instead of an empty token that YouTube rejects.
+      if (poToken == null || poToken.isEmpty) {
+        try {
+          final poState = await getIt<YtmService>().getPoTokenState();
+          poToken = poState?['streamingPoToken'] as String?;
+          visitorData ??= poState?['visitorData'] as String?;
+        } catch (_) {}
+      }
     } else {
       try {
         final poState = await getIt<YtmService>().getPoTokenState();
@@ -1513,41 +1560,8 @@ class YtmAccountService {
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': _apiKey,
           'x-youtube-client-name': _clientNameIds[client] ?? '67',
-          'x-youtube-client-version':
-              client == 'ANDROID_MUSIC'
-                  ? '7.27.53'
-                  : (client == 'IOS_MUSIC'
-                      ? '7.27.0'
-                      : (client == 'ANDROID_VR'
-                          ? '1.63.27'
-                          : (client == 'MWEB'
-                              ? _clientVersion
-                              : (client == 'WEB_EMBEDDED_PLAYER'
-                                  ? _clientVersion
-                                  : (client == 'ANDROID_CREATOR'
-                                      ? '24.45.100'
-                                      : (client ==
-                                              'TVHTML5_SIMPLY_EMBEDDED_PLAYER'
-                                          ? '2.0'
-                                          : (client == 'ANDROID_TESTSUITE'
-                                              ? '1.9'
-                                              : _clientVersion))))))),
-          'User-Agent':
-              client == 'ANDROID_MUSIC'
-                  ? 'com.google.android.apps.youtube.music/7.27.53 (Linux; U; Android 15; en_US) gzip'
-                  : (client == 'IOS_MUSIC'
-                      ? 'com.google.ios.youtubemusic/7.27.0 (iPhone16,2; U; CPU iOS 18_5 like Mac OS X; en_US)'
-                      : (client == 'ANDROID_VR'
-                          ? 'com.google.android.apps.youtube.vr.oculus/1.63.27 (Linux; U; Android 12; en_US; Quest 3) gzip'
-                          : (client == 'ANDROID_CREATOR'
-                              ? 'com.google.android.apps.youtube.creator/24.45.100 (Linux; U; Android 14; en_US) gzip'
-                              : (client == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER'
-                                  ? 'Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/4.0 Chrome/76.0.3809.146 TV Safari/537.36'
-                                  : (client == 'ANDROID_TESTSUITE'
-                                      ? 'com.google.android.youtube/1.9 (Linux; U; Android 9; gzip)'
-                                      : (client == 'MWEB'
-                                          ? 'Mozilla/5.0 (Linux; Android 15; Pixel 9 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.7204.93 Mobile Safari/537.36'
-                                          : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.7204.93 Safari/537.36')))))),
+          'x-youtube-client-version': _versionForClient(client),
+          'User-Agent': _userAgentForClient(client),
         };
 
         if (visitorData != null && visitorData.isNotEmpty) {

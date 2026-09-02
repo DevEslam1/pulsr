@@ -12,13 +12,9 @@ import 'package:fpdart/fpdart.dart' hide State;
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/theme/aura_theme.dart';
 import 'package:pulsr/domain/models/download_task.dart';
-import 'package:pulsr/domain/usecases/delete_download.dart';
-import 'package:pulsr/domain/usecases/get_download_storage_stats.dart';
-import 'package:pulsr/domain/usecases/observe_downloads.dart';
-import 'package:pulsr/domain/usecases/pause_download.dart';
-import 'package:pulsr/domain/usecases/queue_download.dart';
-import 'package:pulsr/domain/usecases/resume_download.dart';
-import 'package:pulsr/domain/usecases/retry_download.dart';
+import 'package:pulsr/domain/usecases/download_lifecycle_usecases.dart';
+import 'package:pulsr/domain/usecases/download_query_usecases.dart';
+import 'package:pulsr/domain/usecases/download_queue_usecases.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_cubit.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_state.dart';
 import 'package:pulsr/features/downloads/presentation/downloads_screen.dart';
@@ -177,17 +173,19 @@ void main() {
     'DownloadTile rebuilds at most once per delivered progress update',
     (tester) async {
       // Seed one active task so a DownloadTile is actually on screen.
-      when(() => mockObserve.getAll()).thenAnswer((_) async => [
-            DownloadTask(
-              id: 'id_v1',
-              videoId: 'v1',
-              title: 'Song',
-              artist: 'Artist',
-              createdAt: DateTime.now(),
-              status: DownloadStatus.downloading,
-              progress: 0.1,
-            ),
-          ]);
+      when(() => mockObserve.getAll()).thenAnswer(
+        (_) async => [
+          DownloadTask(
+            id: 'id_v1',
+            videoId: 'v1',
+            title: 'Song',
+            artist: 'Artist',
+            createdAt: DateTime.now(),
+            status: DownloadStatus.downloading,
+            progress: 0.1,
+          ),
+        ],
+      );
 
       final cubit = DownloadsCubit(
         mockQueue,
@@ -255,7 +253,8 @@ void main() {
       expect(
         deliveries,
         lessThanOrEqualTo(5),
-        reason: '5 spaced updates must rebuild the tile at most once each '
+        reason:
+            '5 spaced updates must rebuild the tile at most once each '
             '(got $deliveries)',
       );
       expect(

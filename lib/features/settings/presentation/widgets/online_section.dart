@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/injection.dart';
-import '../../../../core/services/ytm_account_service.dart';
+import '../../../../data/services/ytm_account_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
 import '../../../../core/utils/l10n_extensions.dart';

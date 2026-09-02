@@ -8,14 +8,13 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:mutex/mutex.dart';
 import 'package:path/path.dart' as p;
 import '../../core/di/injection.dart';
 import '../../core/errors/ytm_error_classifier.dart';
-import '../../core/services/ytm_cache_manager.dart';
-import '../../core/services/ytm_url_cache.dart';
+import '../../data/services/ytm_cache_manager.dart';
+import '../../data/services/ytm_url_cache.dart';
 import '../../core/telemetry/playback_latency_tracker.dart';
 import '../../core/utils/error_logger.dart';
 

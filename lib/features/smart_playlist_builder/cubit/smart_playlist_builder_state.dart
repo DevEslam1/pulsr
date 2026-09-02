@@ -1,4 +1,4 @@
-﻿// lib/features/smart_playlist_builder/smart_playlist_builder_state.dart
+﻿// lib/features/smart_playlist_builder/cubit/smart_playlist_builder_state.dart
 import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/models/smart_playlist_criteria.dart';

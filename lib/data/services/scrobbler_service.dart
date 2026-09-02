@@ -1,4 +1,4 @@
-﻿import 'dart:convert';
+import 'dart:convert';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -22,8 +22,6 @@ class ScrobblerService {
         _secureStorage = secureStorage ??
             const FlutterSecureStorage(
               aOptions: AndroidOptions(
-                // ignore: deprecated_member_use
-                encryptedSharedPreferences: true,
                 resetOnError: true,
               ),
               iOptions: IOSOptions(

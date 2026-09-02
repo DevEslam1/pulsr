@@ -1,4 +1,4 @@
-﻿// lib/core/services/missing_artwork_service.dart
+﻿// lib/data/services/missing_artwork_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';

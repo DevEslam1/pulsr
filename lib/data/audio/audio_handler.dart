@@ -2,7 +2,6 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
-import 'dart:math' as math;
 import 'package:audio_service/audio_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
@@ -17,8 +16,8 @@ import '../../core/config/app_config.dart';
 import '../../core/constants/prefs_keys.dart';
 import '../../core/di/injection.dart';
 import '../../core/errors/ytm_error_classifier.dart';
-import '../../core/services/battery_optimization_service.dart';
-import '../../core/services/ytm_service.dart';
+import '../../domain/services/battery_optimization_service.dart';
+import '../../data/services/ytm_service.dart';
 import '../../core/telemetry/playback_latency_tracker.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/models/audio_effects_config.dart';
@@ -35,7 +34,7 @@ import 'equalizer_manager.dart';
 import 'audio_session_id_router.dart';
 import 'sleep_timer_manager.dart';
 import 'ytm_resolving_source.dart';
-import '../../core/services/ytm_cache_manager.dart';
+import '../../data/services/ytm_cache_manager.dart';
 import 'adaptive_buffer_engine.dart';
 import 'audio_memory_manager.dart';
 import 'battery_aware_playback.dart';
@@ -47,7 +46,7 @@ import 'seamless_queue_transition.dart';
 import 'smart_preload_scheduler.dart';
 import 'stream_pre_resolver.dart';
 import 'triple_buffer_pipeline.dart';
-import '../../core/services/ytm_url_cache.dart';
+import '../../data/services/ytm_url_cache.dart';
 
 @singleton
 class PulsrAudioHandler extends BaseAudioHandler
@@ -1318,6 +1317,18 @@ class PulsrAudioHandler extends BaseAudioHandler
         song.path.startsWith('content:')) {
       return AudioSource.uri(Uri.parse(song.uri ?? song.path), tag: tag);
     }
+    if (Platform.isAndroid && song.source == SongSource.local) {
+      if (song.uri != null && song.uri!.isNotEmpty) {
+        return AudioSource.uri(Uri.parse(song.uri!), tag: tag);
+      }
+      final file = File(song.path);
+      if (!file.existsSync() || song.path.startsWith('/storage/')) {
+        return AudioSource.uri(
+          Uri.parse('content://media/external/audio/media/${song.id}'),
+          tag: tag,
+        );
+      }
+    }
     return AudioSource.file(song.path, tag: tag);
   }
 
@@ -1997,7 +2008,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       return _currentIndex;
     }
     final seqState = _activePlayer.sequenceState;
-    if (seqState != null && seqState.effectiveSequence.isNotEmpty) {
+    if (seqState.effectiveSequence.isNotEmpty) {
       final effectiveSeq = seqState.effectiveSequence;
       final currentSource = seqState.currentSource;
       var currentEffectiveIdx = currentSource != null
@@ -2038,7 +2049,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       return _currentIndex;
     }
     final seqState = _activePlayer.sequenceState;
-    if (seqState != null && seqState.effectiveSequence.isNotEmpty) {
+    if (seqState.effectiveSequence.isNotEmpty) {
       final effectiveSeq = seqState.effectiveSequence;
       final currentSource = seqState.currentSource;
       var currentEffectiveIdx = currentSource != null
@@ -2665,7 +2676,7 @@ class PulsrAudioHandler extends BaseAudioHandler
             await _activePlayer.seek(Duration.zero, index: nextIdx);
           } else if (_songs.length > 1 && _activePlayer.loopMode == LoopMode.all) {
             final firstTag = _songIndexFromSource(
-                  _activePlayer.sequenceState?.effectiveSequence.firstOrNull,
+                  _activePlayer.sequenceState.effectiveSequence.firstOrNull,
                 ) ??
                 0;
             await _activePlayer.seek(Duration.zero, index: firstTag);
@@ -2715,7 +2726,7 @@ class PulsrAudioHandler extends BaseAudioHandler
             await _activePlayer.seek(Duration.zero, index: prevIdx);
           } else if (_activePlayer.loopMode == LoopMode.all && _songs.isNotEmpty) {
             final lastTag = _songIndexFromSource(
-                  _activePlayer.sequenceState?.effectiveSequence.lastOrNull,
+                  _activePlayer.sequenceState.effectiveSequence.lastOrNull,
                 ) ??
                 (_songs.length - 1);
             await _activePlayer.seek(Duration.zero, index: lastTag);

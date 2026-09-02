@@ -1,9 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pulsr/core/services/device_profile_service.dart';
-import 'package:pulsr/core/services/hires_audio_service.dart';
-import 'package:pulsr/core/services/settings_profiles_service.dart';
+import 'package:pulsr/domain/services/device_profile_service.dart';
+import 'package:pulsr/domain/services/hires_audio_service.dart';
+import 'package:pulsr/domain/services/settings_profiles_service.dart';
 import 'package:pulsr/domain/models/audio_output_info.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';

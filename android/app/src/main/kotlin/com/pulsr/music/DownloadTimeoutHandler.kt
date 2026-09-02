@@ -18,34 +18,89 @@ class DownloadTimeoutHandler(
     private val statePersistenceCallback: ((Map<String, Int>) -> Unit)? = null
 ) {
     companion object {
-        const val MAX_FGS_BUDGET_MS = 6L * 60 * 60 * 1000 // 6 hours in millis
+        const val MAX_FGS_BUDGET_MS = 6L * 60 * 60 * 1000 // 6 hours in millis (21,600,000 ms)
+        const val PRE_TIMEOUT_THRESHOLD_MS = (5L * 60 + 59) * 60 * 1000 // 5h 59m in millis (21,540,000 ms)
         const val DEFAULT_STALL_TIMEOUT_MS = 30_000L // 30s zero-bytes stall watchdog
+        const val PREFS_NAME = "pulsr_download_timeouts"
+        const val KEY_CUMULATIVE_FGS_MS = "cumulative_fgs_ms"
+        const val KEY_LAST_SESSION_START = "last_session_start"
+        const val KEY_HAS_TIMEOUT = "has_timeout_occurred"
     }
 
     data class TimeoutReport(
         val activeTasksCount: Int,
         val flushedVideoIds: List<String>,
         val cleanedPartFilesCount: Int,
-        val resumeScheduled: Boolean
+        val resumeScheduled: Boolean,
+        val cumulativeElapsedMs: Long = 0L
     )
 
     data class BudgetStatus(
         val elapsedMs: Long,
         val remainingMs: Long,
-        val isExhausted: Boolean
+        val isExhausted: Boolean,
+        val isPreTimeoutReached: Boolean = false
     )
 
     /**
-     * DL-24: Evaluates FGS 6-hour budget usage.
+     * DL-24: Evaluates FGS budget usage against cumulative session time.
      */
-    fun evaluateBudget(sessionStartMs: Long, currentTimeMs: Long = System.currentTimeMillis()): BudgetStatus {
-        val elapsed = (currentTimeMs - sessionStartMs).coerceAtLeast(0L)
-        val remaining = (MAX_FGS_BUDGET_MS - elapsed).coerceAtLeast(0L)
+    fun evaluateBudget(sessionStartMs: Long, currentTimeMs: Long = System.currentTimeMillis(), previousCumulativeMs: Long = 0L): BudgetStatus {
+        val currentSessionElapsed = (currentTimeMs - sessionStartMs).coerceAtLeast(0L)
+        val totalElapsed = currentSessionElapsed + previousCumulativeMs
+        val remaining = (MAX_FGS_BUDGET_MS - totalElapsed).coerceAtLeast(0L)
         return BudgetStatus(
-            elapsedMs = elapsed,
+            elapsedMs = totalElapsed,
             remainingMs = remaining,
-            isExhausted = remaining == 0L
+            isExhausted = remaining == 0L,
+            isPreTimeoutReached = totalElapsed >= PRE_TIMEOUT_THRESHOLD_MS
         )
+    }
+
+    /**
+     * Records cumulative FGS duration to persistent store across restarts/reboots.
+     */
+    fun recordCumulativeDuration(additionalMs: Long): Long {
+        if (context == null) return additionalMs
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val current = prefs.getLong(KEY_CUMULATIVE_FGS_MS, 0L)
+        val updated = current + additionalMs
+        prefs.edit().putLong(KEY_CUMULATIVE_FGS_MS, updated).apply()
+        return updated
+    }
+
+    fun getCumulativeDuration(): Long {
+        if (context == null) return 0L
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        return prefs.getLong(KEY_CUMULATIVE_FGS_MS, 0L)
+    }
+
+    fun resetCumulativeDuration() {
+        context?.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            ?.edit()
+            ?.remove(KEY_CUMULATIVE_FGS_MS)
+            ?.apply()
+    }
+
+    /**
+     * Android 15+ (API 35+) blocks starting dataSync/mediaProcessing FGS directly from BOOT_COMPLETED.
+     */
+    fun canStartFgsFromBoot(sdkInt: Int): Boolean {
+        return sdkInt < 35 // Blocked on API 35 (Android 15) and API 36 (Android 16)
+    }
+
+    /**
+     * Selects appropriate FGS type:
+     * - API 35+ (Android 15/16): MEDIA_PROCESSING (2048 / 0x800)
+     * - API 29-34 (Android 10-14): DATA_SYNC (1)
+     * - API < 29: 0 (untyped)
+     */
+    fun getRecommendedFgsType(sdkInt: Int): Int {
+        return when {
+            sdkInt >= 35 -> 2048 // ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROCESSING
+            sdkInt >= 29 -> 1    // ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+            else -> 0
+        }
     }
 
     /**
@@ -61,7 +116,8 @@ class DownloadTimeoutHandler(
 
     fun handleTimeout(
         activeDownloads: Map<String, Int>,
-        partFiles: List<File> = emptyList()
+        partFiles: List<File> = emptyList(),
+        currentCumulativeMs: Long = 0L
     ): TimeoutReport {
         val videoIds = activeDownloads.keys.toList()
 
@@ -69,10 +125,11 @@ class DownloadTimeoutHandler(
         statePersistenceCallback?.invoke(activeDownloads)
         if (context != null) {
             try {
-                val prefs = context.getSharedPreferences("pulsr_download_timeouts", Context.MODE_PRIVATE)
+                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 prefs.edit().apply {
-                    putBoolean("has_timeout_occurred", true)
+                    putBoolean(KEY_HAS_TIMEOUT, true)
                     putLong("last_timeout_timestamp", System.currentTimeMillis())
+                    putLong(KEY_CUMULATIVE_FGS_MS, currentCumulativeMs)
                     putStringSet("timed_out_video_ids", videoIds.toSet())
                     apply()
                 }
@@ -107,7 +164,8 @@ class DownloadTimeoutHandler(
             activeTasksCount = activeDownloads.size,
             flushedVideoIds = videoIds,
             cleanedPartFilesCount = cleanedCount,
-            resumeScheduled = true
+            resumeScheduled = true,
+            cumulativeElapsedMs = currentCumulativeMs
         )
     }
 }

@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pulsr/core/services/device_profile_service.dart';
-import 'package:pulsr/core/services/settings_profiles_service.dart';
+import 'package:pulsr/domain/services/device_profile_service.dart';
+import 'package:pulsr/domain/services/settings_profiles_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {

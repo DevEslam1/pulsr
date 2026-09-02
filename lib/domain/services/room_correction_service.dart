@@ -1,4 +1,4 @@
-﻿// lib/core/services/room_correction_service.dart
+﻿// lib/domain/services/room_correction_service.dart
 import 'dart:async';
 import 'dart:math' as math;
 import 'dart:typed_data';

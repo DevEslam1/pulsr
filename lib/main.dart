@@ -12,16 +12,16 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'core/config/app_config.dart';
 import 'core/di/injection.dart';
 import 'core/network/app_http_overrides.dart';
-import 'core/services/artwork_cache_manager.dart';
+import 'data/services/artwork_cache_manager.dart';
 import 'core/theme/aura_theme.dart';
 import 'core/theme/dynamic_theme_cubit.dart';
 import 'core/widgets/cached_artwork.dart';
 import 'core/router/app_router.dart';
-import 'core/services/auth_service.dart';
+import 'domain/services/auth_service.dart';
 import 'core/services/file_intent_handler.dart';
-import 'core/services/restore_detection_service.dart';
-import 'core/services/ytm_account_service.dart';
-import 'core/services/ytm_service.dart';
+import 'domain/services/restore_detection_service.dart';
+import 'data/services/ytm_account_service.dart';
+import 'data/services/ytm_service.dart';
 import 'core/utils/error_logger.dart';
 import 'core/utils/ytm_rate_limiter.dart';
 import 'data/audio/audio_handler.dart';
@@ -129,7 +129,7 @@ Future<void> main() async {
       if (!getIt.isRegistered<YtmAccountService>()) return;
       getIt<YtmAccountService>()
           .init()
-          .timeout(const Duration(seconds: 8))
+          .timeout(const Duration(seconds: 15))
           .catchError((Object e, StackTrace st) {
             ErrorLogger.log('YtmAccountService init failed or timed out',
                 error: e, stackTrace: st, category: 'Startup');
@@ -477,11 +477,11 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                   return DynamicColorBuilder(
                     builder: (lightDynamic, darkDynamic) {
                       // Resolve the accent seed per brightness.
-                      Color resolveAccent(ColorScheme? dynamicScheme) {
+                      Color resolveAccent(dynamic dynamicScheme) {
                         switch (settingsConfig.colorSource) {
                           case ThemeColorSource.system:
                             if (dynamicScheme != null) {
-                              return dynamicScheme.primary;
+                              return dynamicScheme.primary as Color;
                             }
                             return dynamicThemeConfig.hasCustomArtwork
                                 ? dynamicThemeConfig.primaryColor

@@ -1,16 +1,16 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:pulsr/features/downloads/cubit/ytm_download_cubit.dart';
+import 'package:pulsr/features/downloads/presentation/widgets/ytm_download_button.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../player/cubit/player_cubit.dart';
-import '../cubit/ytm_download_cubit.dart';
 import '../cubit/ytm_search_cubit.dart';
 import '../cubit/ytm_search_state.dart';
-import 'widgets/ytm_download_button.dart';
 
 class YtmSearchScreen extends StatefulWidget {
   const YtmSearchScreen({super.key});
@@ -84,10 +84,11 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                   children: [
                     Padding(
                       padding: EdgeInsets.fromLTRB(
-                          Adaptive.pagePadding(context),
-                          12,
-                          Adaptive.pagePadding(context),
-                          6),
+                        Adaptive.pagePadding(context),
+                        12,
+                        Adaptive.pagePadding(context),
+                        6,
+                      ),
                       child: TextField(
                         controller: _searchController,
                         autofocus: true,
@@ -95,18 +96,23 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                         onChanged: cubit.onQueryChanged,
                         decoration: InputDecoration(
                           hintText: 'Songs on YouTube Music…',
-                          prefixIcon:
-                              Icon(Icons.search_rounded, color: p.textTertiary),
-                          suffixIcon: state.query.isNotEmpty
-                              ? IconButton(
-                                  icon: Icon(Icons.clear_rounded,
-                                      color: p.textTertiary),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    cubit.clearQuery();
-                                  },
-                                )
-                              : null,
+                          prefixIcon: Icon(
+                            Icons.search_rounded,
+                            color: p.textTertiary,
+                          ),
+                          suffixIcon:
+                              state.query.isNotEmpty
+                                  ? IconButton(
+                                    icon: Icon(
+                                      Icons.clear_rounded,
+                                      color: p.textTertiary,
+                                    ),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      cubit.clearQuery();
+                                    },
+                                  )
+                                  : null,
                         ),
                       ),
                     ),
@@ -148,16 +154,15 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
     if (state.results.isEmpty) {
       return state.hasSearched
           ? EmptyStateWidget(
-              icon: Icons.search_off_rounded,
-              title: 'No Results Found',
-              subtitle: 'No YouTube Music matches for "${state.query.trim()}".',
-            )
+            icon: Icons.search_off_rounded,
+            title: 'No Results Found',
+            subtitle: 'No YouTube Music matches for "${state.query.trim()}".',
+          )
           : const EmptyStateWidget(
-              icon: Icons.travel_explore_rounded,
-              title: 'Search YouTube Music',
-              subtitle:
-                  'Stream and download songs from YouTube Music, ad-free.',
-            );
+            icon: Icons.travel_explore_rounded,
+            title: 'Search YouTube Music',
+            subtitle: 'Stream and download songs from YouTube Music, ad-free.',
+          );
     }
 
     final songs = [for (final track in state.results) track.toSongData()];

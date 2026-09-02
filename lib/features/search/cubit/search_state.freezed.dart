@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // coverage:ignore-file
-// ignore_for_file: type=lint
+// ignore_for_file: type=lint, type=warning, deprecated_member_use, deprecated_member_use_from_same_package
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
 part of 'search_state.dart';
@@ -9,6 +9,7 @@ part of 'search_state.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// GENERATED CODE - DO NOT MODIFY BY HAND
 // dart format off
 T _$identity<T>(T value) => value;
 /// @nodoc
@@ -25,16 +26,21 @@ $SearchStateCopyWith<SearchState> get copyWith => _$SearchStateCopyWithImpl<Sear
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is SearchState&&(identical(other.query, query) || other.query == query)&&(identical(other.selectedFilter, selectedFilter) || other.selectedFilter == selectedFilter)&&const DeepCollectionEquality().equals(other.results, results)&&(identical(other.isLoading, isLoading) || other.isLoading == isLoading)&&const DeepCollectionEquality().equals(other.history, history)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
+  final _this = this as SearchState;
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SearchState&&(identical(other.query, _this.query) || other.query == _this.query)&&(identical(other.selectedFilter, _this.selectedFilter) || other.selectedFilter == _this.selectedFilter)&&const DeepCollectionEquality().equals(other.results, _this.results)&&(identical(other.isLoading, _this.isLoading) || other.isLoading == _this.isLoading)&&const DeepCollectionEquality().equals(other.history, _this.history)&&(identical(other.errorMessage, _this.errorMessage) || other.errorMessage == _this.errorMessage));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,query,selectedFilter,const DeepCollectionEquality().hash(results),isLoading,const DeepCollectionEquality().hash(history),errorMessage);
+int get hashCode {
+  final _this = this as SearchState;
+  return Object.hash(runtimeType,_this.query,_this.selectedFilter,const DeepCollectionEquality().hash(_this.results),_this.isLoading,const DeepCollectionEquality().hash(_this.history),_this.errorMessage);
+}
 
 @override
 String toString() {
-  return 'SearchState(query: $query, selectedFilter: $selectedFilter, results: $results, isLoading: $isLoading, history: $history, errorMessage: $errorMessage)';
+  final _this = this as SearchState;
+  return 'SearchState(query: ${_this.query}, selectedFilter: ${_this.selectedFilter}, results: ${_this.results}, isLoading: ${_this.isLoading}, history: ${_this.history}, errorMessage: ${_this.errorMessage})';
 }
 
 
@@ -63,7 +69,7 @@ class _$SearchStateCopyWithImpl<$Res>
 /// Create a copy of SearchState
 /// with the given fields replaced by the non-null parameter values.
 @pragma('vm:prefer-inline') @override $Res call({Object? query = null,Object? selectedFilter = null,Object? results = null,Object? isLoading = null,Object? history = null,Object? errorMessage = freezed,}) {
-  return _then(_self.copyWith(
+  return _then(SearchState(
 query: null == query ? _self.query : query // ignore: cast_nullable_to_non_nullable
 as String,selectedFilter: null == selectedFilter ? _self.selectedFilter : selectedFilter // ignore: cast_nullable_to_non_nullable
 as String,results: null == results ? _self.results : results // ignore: cast_nullable_to_non_nullable
@@ -211,7 +217,7 @@ return $default(_that.query,_that.selectedFilter,_that.results,_that.isLoading,_
 
 
 class _SearchState extends SearchState {
-  const _SearchState({this.query = '', this.selectedFilter = 'All', final  List<SongsTableData> results = const [], this.isLoading = false, final  List<String> history = const [], this.errorMessage}): _results = results,_history = history,super._();
+  const _SearchState({this.query = '', this.selectedFilter = 'All',  List<SongsTableData> results = const [], this.isLoading = false,  List<String> history = const [], this.errorMessage}): _results = results,_history = history,super._();
   
 
 @override@JsonKey() final  String query;
@@ -243,16 +249,18 @@ _$SearchStateCopyWith<_SearchState> get copyWith => __$SearchStateCopyWithImpl<_
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _SearchState&&(identical(other.query, query) || other.query == query)&&(identical(other.selectedFilter, selectedFilter) || other.selectedFilter == selectedFilter)&&const DeepCollectionEquality().equals(other._results, _results)&&(identical(other.isLoading, isLoading) || other.isLoading == isLoading)&&const DeepCollectionEquality().equals(other._history, _history)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _SearchState&&(identical(other.query, query) || other.query == query)&&(identical(other.selectedFilter, selectedFilter) || other.selectedFilter == selectedFilter)&&const DeepCollectionEquality().equals(other.results, _results)&&(identical(other.isLoading, isLoading) || other.isLoading == isLoading)&&const DeepCollectionEquality().equals(other.history, _history)&&(identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
 }
 
 
 @override
-int get hashCode => Object.hash(runtimeType,query,selectedFilter,const DeepCollectionEquality().hash(_results),isLoading,const DeepCollectionEquality().hash(_history),errorMessage);
+int get hashCode {
+    return Object.hash(runtimeType,query,selectedFilter,const DeepCollectionEquality().hash(_results),isLoading,const DeepCollectionEquality().hash(_history),errorMessage);
+}
 
 @override
 String toString() {
-  return 'SearchState(query: $query, selectedFilter: $selectedFilter, results: $results, isLoading: $isLoading, history: $history, errorMessage: $errorMessage)';
+    return 'SearchState(query: $query, selectedFilter: $selectedFilter, results: $results, isLoading: $isLoading, history: $history, errorMessage: $errorMessage)';
 }
 
 

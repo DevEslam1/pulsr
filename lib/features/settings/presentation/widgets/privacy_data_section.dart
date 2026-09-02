@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../../core/services/scrobbler_service.dart';
+import '../../../../data/services/scrobbler_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../cubit/settings_state.dart';

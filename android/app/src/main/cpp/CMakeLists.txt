@@ -44,6 +44,10 @@ target_compile_options(pulsr_dsp PRIVATE
 find_library(log-lib log)
 find_library(android-lib android)
 
+target_link_options(pulsr_dsp PRIVATE
+    "-Wl,-z,max-page-size=16384"
+)
+
 target_link_libraries(pulsr_dsp
     ${log-lib}
     ${android-lib}

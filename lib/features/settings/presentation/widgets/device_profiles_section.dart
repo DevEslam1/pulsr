@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/di/injection.dart';
 
-import '../../../../core/services/device_profile_service.dart';
+import '../../../../domain/services/device_profile_service.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../l10n/generated/app_localizations.dart';
-import '../../../../core/services/hires_audio_service.dart';
-import '../../../../core/services/settings_profiles_service.dart';
+import '../../../../domain/services/hires_audio_service.dart';
+import '../../../../domain/services/settings_profiles_service.dart';
 import '../../../player/cubit/player_cubit.dart';
 
 /// Phase 3: per-output-device profile links and the auto-switch master

@@ -7,8 +7,8 @@ import '../../../core/bloc/base_cubit.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/errors/ytm_error_classifier.dart';
 import '../../../core/services/file_intent_handler.dart';
-import '../../../core/services/ytm_service.dart';
-import '../../../core/services/ytm_url_cache.dart';
+import '../../../data/services/ytm_service.dart';
+import '../../../data/services/ytm_url_cache.dart';
 import '../../../domain/models/ytm_track.dart';
 import 'ytm_search_state.dart';
 

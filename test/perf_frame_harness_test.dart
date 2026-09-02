@@ -58,13 +58,9 @@ import 'package:pulsr/domain/usecases/get_songs_usecase.dart';
 import 'package:pulsr/domain/usecases/playlist_usecases.dart';
 import 'package:pulsr/domain/usecases/search_music_usecase.dart';
 import 'package:pulsr/domain/usecases/toggle_favorite_usecase.dart';
-import 'package:pulsr/domain/usecases/queue_download.dart';
-import 'package:pulsr/domain/usecases/pause_download.dart';
-import 'package:pulsr/domain/usecases/resume_download.dart';
-import 'package:pulsr/domain/usecases/retry_download.dart';
-import 'package:pulsr/domain/usecases/delete_download.dart';
-import 'package:pulsr/domain/usecases/observe_downloads.dart';
-import 'package:pulsr/domain/usecases/get_download_storage_stats.dart';
+import 'package:pulsr/domain/usecases/download_queue_usecases.dart';
+import 'package:pulsr/domain/usecases/download_lifecycle_usecases.dart';
+import 'package:pulsr/domain/usecases/download_query_usecases.dart';
 import 'package:pulsr/features/downloads/cubit/downloads_cubit.dart';
 import 'package:pulsr/features/genre_detail/presentation/genre_detail_screen.dart';
 import 'package:pulsr/features/library/cubit/library_cubit.dart';
@@ -78,7 +74,7 @@ import 'package:pulsr/features/search/cubit/search_cubit.dart';
 import 'package:pulsr/features/search/presentation/search_screen.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
-import 'package:pulsr/features/widgets/widget_service.dart';
+import 'package:pulsr/features/home_widget/widget_service.dart';
 import 'package:pulsr/l10n/generated/app_localizations.dart';
 
 class MockDownloadRepo extends Mock implements IDownloadRepository {}
@@ -92,6 +88,10 @@ class MockPulsrAudioHandler extends BaseAudioHandler
     implements PulsrAudioHandler {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+
+  final StreamController<SongsTableData> _onTrackChangedController = StreamController<SongsTableData>.broadcast();
+  @override
+  Stream<SongsTableData> get onTrackChanged => _onTrackChangedController.stream;
 
   MockPulsrAudioHandler() {
     playbackState.add(
@@ -237,15 +237,23 @@ class MockPulsrAudioHandler extends BaseAudioHandler
   @override
   List<DynamicEqBandConfig> get dynamicEqBands => const [];
   @override
-  Future<void> setSaturation(bool enabled,
-          {double? drive, double? mix, double? tilt}) async {}
+  Future<void> setSaturation(
+    bool enabled, {
+    double? drive,
+    double? mix,
+    double? tilt,
+  }) async {}
   @override
   Future<void> setStereoWidth(bool enabled, {double? width}) async {}
   @override
   Future<void> setLoudnessContour(bool enabled, {double? intensity}) async {}
   @override
-  Future<void> setSubCrossover(bool enabled,
-          {double? cornerHz, double? slopeDbPerOct, double? gain}) async {}
+  Future<void> setSubCrossover(
+    bool enabled, {
+    double? cornerHz,
+    double? slopeDbPerOct,
+    double? gain,
+  }) async {}
   @override
   Future<void> setDynamicEq(bool enabled) async {}
   @override
@@ -310,7 +318,9 @@ class MockPulsrAudioHandler extends BaseAudioHandler
   @override
   Stream<String> get errorStream => const Stream.empty();
   @override
-  void dispose() {}
+  void dispose() {
+    _onTrackChangedController.close();
+  }
   @override
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {}
   @override

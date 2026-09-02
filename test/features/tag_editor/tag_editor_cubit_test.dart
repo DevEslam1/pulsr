@@ -3,11 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/constants/channels.dart';
-import 'package:pulsr/core/services/metadata_search_service.dart';
+import 'package:pulsr/data/services/metadata_search_service.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/data/scanner/media_scanner_service.dart';
-import 'package:pulsr/features/tag_editor/tag_editor_cubit.dart';
-import 'package:pulsr/features/tag_editor/tag_editor_state.dart';
+import 'package:pulsr/features/tag_editor/cubit/tag_editor_cubit.dart';
+import 'package:pulsr/features/tag_editor/cubit/tag_editor_state.dart';
 
 class MockMediaScannerService extends Mock implements MediaScannerService {}
 

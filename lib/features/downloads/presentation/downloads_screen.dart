@@ -139,6 +139,35 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                 children: [
                   if (state.storageStats.totalBytes > 0)
                     StorageStatsHeader(stats: state.storageStats),
+                  if (state.showNotificationPermissionBanner)
+                    Padding(
+                      key: const ValueKey('notification_permission_banner'),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: p.error.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: p.error.withValues(alpha: 0.3)),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        child: Row(
+                          children: [
+                            Icon(Icons.notifications_off_outlined, color: p.error, size: 20),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                'Notifications disabled. Download progress won\'t appear in your shade, but downloads continue.',
+                                style: TextStyle(color: p.textPrimary, fontSize: 12, fontWeight: FontWeight.w500),
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.close, color: p.textSecondary, size: 18),
+                              onPressed: () => context.read<DownloadsCubit>().dismissNotificationBanner(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 32.0, vertical: 80.0),
                     child: Column(
@@ -198,6 +227,35 @@ class _DownloadsScreenState extends State<DownloadsScreen> {
                         stats: stats,
                       ),
                     ),
+                    if (state.showNotificationPermissionBanner)
+                      Padding(
+                        key: const ValueKey('notification_permission_banner'),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: p.error.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: p.error.withValues(alpha: 0.3)),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          child: Row(
+                            children: [
+                              Icon(Icons.notifications_off_outlined, color: p.error, size: 20),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Notifications disabled. Download progress won\'t appear in your shade, but downloads continue.',
+                                  style: TextStyle(color: p.textPrimary, fontSize: 12, fontWeight: FontWeight.w500),
+                                ),
+                              ),
+                              IconButton(
+                                icon: Icon(Icons.close, color: p.textSecondary, size: 18),
+                                onPressed: () => context.read<DownloadsCubit>().dismissNotificationBanner(),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     if (state.hasPausedTasks)
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),

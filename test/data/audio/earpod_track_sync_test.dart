@@ -23,6 +23,10 @@ class FakePulsrAudioHandler extends BaseAudioHandler
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 
+  final StreamController<SongsTableData> _onTrackChangedController = StreamController<SongsTableData>.broadcast();
+  @override
+  Stream<SongsTableData> get onTrackChanged => _onTrackChangedController.stream;
+
   final List<SongsTableData> _queue = [];
   int _currentIdx = 0;
 
@@ -237,6 +241,7 @@ class FakePulsrAudioHandler extends BaseAudioHandler
 
   @override
   void dispose() {
+    _onTrackChangedController.close();
     _posCtrl.close();
     _errCtrl.close();
   }

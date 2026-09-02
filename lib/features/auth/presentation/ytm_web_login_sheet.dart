@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../../../core/constants/embedded_browser_ua.dart';
 import '../../../core/di/injection.dart';
-import '../../../core/services/ytm_account_service.dart';
+import '../../../data/services/ytm_account_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../utils/google_login_recovery.dart';
@@ -124,7 +124,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     'this browser or app may not be secure',
   ];
 
-  final GoogleBlockRecovery _blockRecovery = GoogleBlockRecovery();
+  final GoogleBlockRecovery _blockRecovery =
+      GoogleBlockRecovery(initialIdentity: BrowserIdentity.mobile);
 
   /// Non-null while the automatic recovery ladder is running (drives the
   /// inline status banner); prevents re-entry so the ladder never loops.
@@ -215,6 +216,17 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       if (_webViewController != null && !_isLoading) {
         final loggedIn = await _checkIfLoggedIn();
         if (loggedIn) return;
+
+        // Check for Google block during polling (detects SPA client-side rejections after tapping Next)
+        if (!widget.isBrowseMode && !_blockExhausted && _blockStatus == null) {
+          final isBlocked = _shouldScanForBlockPage()
+              ? await _scanPageForBlockText(_webViewController!)
+              : false;
+          if (isBlocked) {
+            _handleGoogleBlock();
+            return;
+          }
+        }
       }
       if (_pollIntervalSeconds < 3) {
         _pollIntervalSeconds = 3;
@@ -374,9 +386,10 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       final raw = await controller.evaluateJavascript(source: '''
 (() => {
   try {
+    if (window.__googleBlockDetected) return "couldn't sign you in";
     var t = (document.title || '');
     var b = '';
-    try { b = (document.body && document.body.innerText) || ''; } catch (e) {}
+    try { b = (document.body && (document.body.innerText || document.body.textContent)) || ''; } catch (e) {}
     return (t + '|' + b).slice(0, 4000).toLowerCase();
   } catch (e) { return ''; }
 })()''');
@@ -698,8 +711,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     final totalHeight = media.size.height;
     final isBrowse = widget.isBrowseMode;
 
-    // Expand height cleanly down to the bottom of the screen
-    final targetHeight = (totalHeight - topPadding - (isBrowse ? 8 : 16))
+    // Expand height cleanly down to the bottom of the screen with proper status bar clearance
+    final safeTop = topPadding > 0 ? topPadding : 24.0;
+    final targetHeight = (totalHeight - safeTop - (isBrowse ? 8 : 16))
         .clamp(300.0, totalHeight);
 
     return Align(
@@ -728,7 +742,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
               ],
             ),
             child: SafeArea(
-              top: false,
+              top: true,
               bottom: true,
               child: Column(
                 children: [
@@ -878,6 +892,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                         ] else ...[
                           // LOGIN HEADER
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Icon(
                                 _isLoggedIn
@@ -885,32 +900,38 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                     : Icons.cloud_sync_rounded,
                                 color:
                                     _isLoggedIn ? p.success : Colors.redAccent,
-                                size: 24,
+                                size: 22,
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 8),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Text(
                                       _isLoggedIn
                                           ? 'Logged In Successfully'
                                           : 'Sign in to YouTube Music',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         color: p.textPrimary,
-                                        fontSize: 15,
+                                        fontSize: 14.5,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
+                                    const SizedBox(height: 1),
                                     Text(
                                       _isLoggedIn
                                           ? 'Account connected! Tap "Done" to finish.'
-                                          : 'Connects your account to sync your Liked Music automatically',
+                                          : 'Connect account to sync Liked Music automatically',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         color: _isLoggedIn
                                             ? p.success
                                             : p.textSecondary,
-                                        fontSize: 11.5,
+                                        fontSize: 11,
                                         fontWeight: _isLoggedIn
                                             ? FontWeight.w600
                                             : FontWeight.normal,
@@ -919,89 +940,137 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                   ],
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              // Done Button
-                              FilledButton(
-                                onPressed: _forceSaveAndFinish,
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: _isLoggedIn
-                                      ? p.success
-                                      : p.surfaceContainerHigh,
-                                  foregroundColor: _isLoggedIn
-                                      ? Colors.white
-                                      : p.textPrimary,
-                                  elevation: _isLoggedIn ? 3 : 0,
-                                  visualDensity: VisualDensity.compact,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 8,
+                              const SizedBox(width: 6),
+                              // Action Controls
+                              if (_isLoggedIn) ...[
+                                FilledButton.icon(
+                                  onPressed: _forceSaveAndFinish,
+                                  icon: const Icon(
+                                    Icons.check_rounded,
+                                    size: 15,
+                                    color: Colors.white,
                                   ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    side: _isLoggedIn
-                                        ? BorderSide.none
-                                        : BorderSide(color: p.hairline),
+                                  label: const Text(
+                                    'Done',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: p.success,
+                                    elevation: 2,
+                                    visualDensity: VisualDensity.compact,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (_isLoggedIn) ...[
-                                      const Icon(
-                                        Icons.check_rounded,
-                                        size: 16,
-                                        color: Colors.white,
+                              ] else ...[
+                                FilledButton(
+                                  onPressed: _forceSaveAndFinish,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: p.surfaceContainerHigh,
+                                    foregroundColor: p.textPrimary,
+                                    elevation: 0,
+                                    visualDensity: VisualDensity.compact,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      side: BorderSide(color: p.hairline),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'Done',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: p.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 2),
+                                IconButton(
+                                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                                  tooltip: 'Refresh page',
+                                  padding: const EdgeInsets.all(6),
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () => _webViewController?.reload(),
+                                ),
+                                const SizedBox(width: 2),
+                                PopupMenuButton<String>(
+                                  icon: const Icon(Icons.more_vert_rounded, size: 18),
+                                  tooltip: 'More options',
+                                  padding: const EdgeInsets.all(6),
+                                  constraints: const BoxConstraints(),
+                                  onSelected: (action) {
+                                    switch (action) {
+                                      case 'ytm_web':
+                                        _navigateTo('https://music.youtube.com');
+                                        break;
+                                      case 'manual_cookies':
+                                        _showManualCookieDialog(context);
+                                        break;
+                                      case 'clear_cache':
+                                        _clearCookiesAndReset();
+                                        break;
+                                    }
+                                  },
+                                  itemBuilder: (context) => [
+                                    PopupMenuItem(
+                                      value: 'ytm_web',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.music_note_rounded,
+                                              size: 18, color: p.textSecondary),
+                                          const SizedBox(width: 8),
+                                          const Text('Open YouTube Music Web'),
+                                        ],
                                       ),
-                                      const SizedBox(width: 4),
-                                    ],
-                                    Text(
-                                      'Done',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: _isLoggedIn
-                                            ? Colors.white
-                                            : p.textPrimary,
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'manual_cookies',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.vpn_key_rounded,
+                                              size: 18, color: p.textSecondary),
+                                          const SizedBox(width: 8),
+                                          const Text('Import Cookies Manually'),
+                                        ],
+                                      ),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'clear_cache',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.cleaning_services_rounded,
+                                              size: 18, color: p.textSecondary),
+                                          const SizedBox(width: 8),
+                                          const Text('Clear Cache & Reset'),
+                                        ],
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-                              const SizedBox(width: 4),
+                              ],
+                              const SizedBox(width: 2),
                               IconButton(
-                                icon: const Icon(
-                                    Icons.music_note_rounded,
-                                    size: 20),
-                                tooltip: 'Open YouTube Music web',
-                                onPressed: () => _navigateTo('https://music.youtube.com'),
-                              ),
-                              const SizedBox(width: 4),
-                              IconButton(
-                                icon:
-                                    const Icon(Icons.refresh_rounded, size: 20),
-                                tooltip: 'Refresh page',
-                                onPressed: () => _webViewController?.reload(),
-                              ),
-                              const SizedBox(width: 4),
-                              IconButton(
-                                icon: const Icon(
-                                    Icons.vpn_key_rounded,
-                                    size: 20),
-                                tooltip: 'Import cookies manually',
-                                onPressed: () => _showManualCookieDialog(context),
-                              ),
-                              const SizedBox(width: 4),
-                              IconButton(
-                                icon: const Icon(
-                                    Icons.cleaning_services_rounded,
-                                    size: 20),
-                                tooltip: 'Clear cache & reset cookies',
-                                onPressed: _clearCookiesAndReset,
-                              ),
-                              const SizedBox(width: 4),
-                              IconButton(
-                                icon: const Icon(Icons.close_rounded, size: 20),
+                                icon: const Icon(Icons.close_rounded, size: 18),
                                 tooltip: 'Close',
+                                padding: const EdgeInsets.all(6),
+                                constraints: const BoxConstraints(),
                                 onPressed: () =>
                                     Navigator.of(context).pop(false),
                               ),
@@ -1330,7 +1399,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Current browser identity: ${currentIdentity.name} Safari',
+                  'Current browser identity: ${currentIdentity.name} Chrome',
                   style: TextStyle(
                       color: p.textTertiary,
                       fontSize: 11,
