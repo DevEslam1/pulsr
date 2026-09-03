@@ -108,9 +108,17 @@ void PreparedIr::clearSyntheticCache() {
     sCurrentCacheBytes = 0;
 }
 
-std::shared_ptr<const PreparedIr> PreparedIr::create(
+// Mutable-core IR builder shared by the public factories. It returns a plain
+// shared_ptr<PreparedIr> so callers (createSynthetic/createCustom) can fill
+// createdSampleRate during construction, then bind the finished object as
+// shared_ptr<const PreparedIr> — const-correct by construction, no casting
+// away constness on a const pointer (no UB).
+static std::shared_ptr<PreparedIr> createMutableIr(
         const float* irLData, const float* irRData, int totalTaps) {
     if (!irLData || !irRData || totalTaps <= 0) return nullptr;
+
+    constexpr int PARTITION_SIZE = PreparedIr::PARTITION_SIZE;
+    constexpr int FFT_SIZE = PreparedIr::FFT_SIZE;
 
     auto ir = std::make_shared<PreparedIr>();
     ir->totalTaps = totalTaps;
@@ -176,6 +184,12 @@ std::shared_ptr<const PreparedIr> PreparedIr::create(
     return ir;
 }
 
+std::shared_ptr<const PreparedIr> PreparedIr::create(
+        const float* irLData, const float* irRData, int totalTaps) {
+    // Bind the mutable build result as const for callers (implicit upcast).
+    return createMutableIr(irLData, irRData, totalTaps);
+}
+
 std::shared_ptr<const PreparedIr> PreparedIr::createSynthetic(
         double sampleRate, int presetInt, float dampingFactor) {
     auto preset = static_cast<ReverbPreset>(presetInt);
@@ -183,7 +197,7 @@ std::shared_ptr<const PreparedIr> PreparedIr::createSynthetic(
 
     const double effectiveRate = std::min(sampleRate, 48000.0);
     const int srKey = static_cast<int>(std::round(effectiveRate));
-    const int dampKey = static_cast<int>(std::round(dampingFactor * 50.0f)); // Quantize * 50 (R1)
+    const int dampKey = static_cast<int>(std::round(dampingFactor * 200.0f)); // Quantize * 200 (0.005 resolution)
     const SyntheticCacheKey key{presetInt, srKey, dampKey};
 
     {
@@ -265,9 +279,9 @@ std::shared_ptr<const PreparedIr> PreparedIr::createSynthetic(
         }
     }
 
-    auto created = create(irL.data(), irR.data(), totalSamples);
+    auto created = createMutableIr(irL.data(), irR.data(), totalSamples);
     if (created) {
-        const_cast<PreparedIr*>(created.get())->createdSampleRate = static_cast<int>(std::round(effectiveRate));
+        created->createdSampleRate = static_cast<int>(std::round(effectiveRate));
         const size_t entrySize = static_cast<size_t>(created->totalTaps) * 12 +
                                  static_cast<size_t>(created->numPartitions) * ConvolutionReverb::FFT_SIZE * 16;
         CacheLockGuard lock(sIrCacheMutex);
@@ -377,9 +391,9 @@ std::shared_ptr<const PreparedIr> PreparedIr::createCustom(
         }
     }
 
-    auto created = create(irL.data(), irR.data(), actualFrames);
+    auto created = createMutableIr(irL.data(), irR.data(), actualFrames);
     if (!created) return nullptr;
-    const_cast<PreparedIr*>(created.get())->createdSampleRate = static_cast<int>(std::round(effectiveTargetRate));
+    created->createdSampleRate = static_cast<int>(std::round(effectiveTargetRate));
 
     // Apply dynamic budget & LRU eviction with Custom IR registry tracking (NEW-2)
     const size_t entrySize = static_cast<size_t>(created->totalTaps) * 12 +
@@ -417,8 +431,8 @@ std::shared_ptr<const PreparedIr> PreparedIr::createCustom(
 
 ConvolutionReverb::ConvolutionReverb() {
     // Pre-allocate minimal working buffers (predelay, single partition, fftWork)
-    predelayRingL_.assign(MAX_PREDELAY_SAMPLES, 0.0f);
-    predelayRingR_.assign(MAX_PREDELAY_SAMPLES, 0.0f);
+    predelayRingL_.assign(4096, 0.0f);
+    predelayRingR_.assign(4096, 0.0f);
     predelayWritePos_ = 0;
 
     prevBlockL_.assign(PARTITION_SIZE, 0.0f);
@@ -444,12 +458,10 @@ ConvolutionReverb::ConvolutionReverb() {
 }
 
 void ConvolutionReverb::ensurePredelayCapacity() {
-    // Fixed max capacity (153,600) pre-allocated in constructor (Sr up to 768kHz * 0.200).
-    // Real-time audio thread never re-allocates.
     const int requiredCap = std::max(4096, static_cast<int>(coreRate_ * 0.150) + 16);
     if (static_cast<int>(predelayRingL_.size()) < requiredCap) {
-        predelayRingL_.assign(MAX_PREDELAY_SAMPLES, 0.0f);
-        predelayRingR_.assign(MAX_PREDELAY_SAMPLES, 0.0f);
+        predelayRingL_.assign(requiredCap, 0.0f);
+        predelayRingR_.assign(requiredCap, 0.0f);
     }
 }
 
@@ -600,9 +612,10 @@ void ConvolutionReverb::preparePartitions() {
             preparedIr_->numPartitions, MAX_PREALLOC_PARTITIONS);
 #endif
     }
-    if (static_cast<int>(inputHistoryFreqL_.size()) < MAX_PREALLOC_PARTITIONS) {
-        inputHistoryFreqL_.resize(MAX_PREALLOC_PARTITIONS, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
-        inputHistoryFreqR_.resize(MAX_PREALLOC_PARTITIONS, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
+    const int neededPartitions = std::min(preparedIr_->numPartitions, MAX_PREALLOC_PARTITIONS);
+    if (static_cast<int>(inputHistoryFreqL_.size()) < neededPartitions) {
+        inputHistoryFreqL_.resize(neededPartitions, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
+        inputHistoryFreqR_.resize(neededPartitions, std::vector<FftUtil::Complex>(FFT_SIZE, FftUtil::Complex(0.0f, 0.0f)));
     }
 }
 
@@ -645,7 +658,8 @@ void ConvolutionReverb::process(const float* inL, const float* inR, float* outL,
         return;
     }
 
-    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * 0.020));
+    const double effectiveRate = (sampleRate_ > 48000.0) ? coreRate_ : sampleRate_;
+    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (effectiveRate * 0.020));
     smoothedWet_ += smoothFactor * (targetWet_ - smoothedWet_);
 
     const float dryGain = static_cast<float>(std::cos(smoothedWet_ * (M_PI / 2.0)));

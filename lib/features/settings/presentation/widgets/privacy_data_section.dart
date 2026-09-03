@@ -10,6 +10,7 @@ import 'backup_section.dart';
 import 'settings_section.dart';
 import 'settings_tiles.dart';
 
+import '../../../../core/utils/error_logger.dart';
 /// Cloud backup, scrobbling and privacy guarantees.
 class PrivacyDataSection extends StatelessWidget {
   final SettingsState state;
@@ -100,7 +101,9 @@ class _ScrobblerConfigSheetState extends State<_ScrobblerConfigSheet> {
       lastFmSession = await secureStorage.read(
               key: ScrobblerService.keyLastFmSessionKeySecure) ??
           '';
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_loadScrobblerPrefs failed', error: e, stackTrace: st, category: 'PrivacyDataSection');
+    }
     if (lbToken.isEmpty) {
       lbToken = prefs.getString(ScrobblerService.keyListenBrainzToken) ?? '';
     }

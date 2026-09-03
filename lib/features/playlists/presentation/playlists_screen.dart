@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:file_picker/file_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -20,6 +22,7 @@ import '../../downloads/cubit/ytm_download_cubit.dart';
 import '../cubit/playlist_cubit.dart';
 import '../cubit/playlist_state.dart';
 
+import '../../../core/utils/error_logger.dart';
 enum _PlaylistTabMode { local, online }
 
 class PlaylistsScreen extends StatefulWidget {
@@ -69,10 +72,25 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
       type: FileType.custom,
       allowedExtensions: ['m3u', 'm3u8'],
     );
-    if (files.isEmpty || files.single.path == null) return;
-
-    final filePath = files.single.path!;
-    final playlistName = files.single.name.replaceAll(
+    if (files.isEmpty) return;
+    final picked = files.single;
+    // FIX(file_picker 12 / platform_interface 3.2): PlatformFile.bytes was
+    // removed — use path when available, else materialize readAsByteStream
+    // (SAF / cloud providers like Drive on Android 10+ where path is null).
+    String? filePath = picked.path;
+    if (filePath == null) {
+      try {
+        final bytes = await picked.readAsBytes();
+        final tempDir = await getTemporaryDirectory();
+        final tempFile = File('${tempDir.path}/${picked.name}');
+        await tempFile.writeAsBytes(bytes);
+        filePath = tempFile.path;
+      } catch (e, st) {
+        ErrorLogger.log('_importPlaylist failed, using fallback', error: e, stackTrace: st, category: 'PlaylistsScreen');
+        return;
+      }
+    }
+    final playlistName = picked.name.replaceAll(
       RegExp(r'\.m3u8?$', caseSensitive: false),
       '',
     );

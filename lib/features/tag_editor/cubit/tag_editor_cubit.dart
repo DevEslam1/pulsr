@@ -1,7 +1,7 @@
 ﻿import 'dart:async';
 import 'package:flutter/services.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../core/bloc/base_cubit.dart';
 import '../../../core/constants/channels.dart';
 import '../../../data/services/metadata_search_service.dart';
 import '../../../core/utils/error_logger.dart';
@@ -11,7 +11,7 @@ import '../../../data/db/app_database.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 import 'tag_editor_state.dart';
 
-class TagEditorCubit extends Cubit<TagEditorState> {
+class TagEditorCubit extends PulsrCubit<TagEditorState> {
   static const MethodChannel _channel = MethodChannel(PulsrChannels.tagEditor);
   final MediaScannerService _scannerService;
   final MetadataSearchService _metadataSearchService;
@@ -69,20 +69,27 @@ class TagEditorCubit extends Cubit<TagEditorState> {
     );
   }
 
+  int _loadTagsGen = 0;
+
   Future<void> loadTags() async {
+    final gen = ++_loadTagsGen;
     if (isClosed) return;
     if (!PlatformCapabilities.isAndroid) {
-      emit(state.copyWith(status: TagEditorStatus.loaded));
+      safeEmit(state.copyWith(status: TagEditorStatus.loaded));
       return;
     }
-    emit(state.copyWith(status: TagEditorStatus.loading));
+    final songPath = state.song.path;
+    safeEmit(state.copyWith(status: TagEditorStatus.loading));
     try {
       final Map<dynamic, dynamic>? tags =
           await _channel.invokeMapMethod<dynamic, dynamic>(
         'readTags',
-        {'path': state.song.path},
+        {'path': songPath},
       ).timeout(const Duration(seconds: 5));
-      if (isClosed) return;
+      // FIX: fast song switch emitted stale tags to the wrong song.
+      if (isClosed || gen != _loadTagsGen || state.song.path != songPath) {
+        return;
+      }
 
       if (tags != null) {
         final title = (tags['title'] as String?)?.trim();
@@ -95,7 +102,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
         final lyrics = (tags['lyrics'] as String?)?.trim();
         final artworkData = tags['artwork'] as Uint8List?;
 
-        emit(state.copyWith(
+        safeEmit(state.copyWith(
           status: TagEditorStatus.loaded,
           title: (title != null && title.isNotEmpty) ? title : state.title,
           artist: (artist != null && artist.isNotEmpty) ? artist : state.artist,
@@ -108,7 +115,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
           artworkBytes: artworkData,
         ));
       } else {
-        emit(state.copyWith(status: TagEditorStatus.loaded));
+        safeEmit(state.copyWith(status: TagEditorStatus.loaded));
       }
     } catch (e, st) {
       if (isClosed) return;
@@ -117,37 +124,37 @@ class TagEditorCubit extends Cubit<TagEditorState> {
           error: e,
           stackTrace: st,
           category: 'TagEditorCubit');
-      emit(state.copyWith(status: TagEditorStatus.loaded));
+      safeEmit(state.copyWith(status: TagEditorStatus.loaded));
     }
   }
 
   void updateTitle(String val) {
     if (isClosed) return;
-    emit(state.copyWith(title: val));
+    safeEmit(state.copyWith(title: val));
   }
 
   void updateArtist(String val) {
     if (isClosed) return;
     if (state.isBatchMode) _batchArtistEdited = true;
-    emit(state.copyWith(artist: val));
+    safeEmit(state.copyWith(artist: val));
   }
 
   void updateAlbum(String val) {
     if (isClosed) return;
     if (state.isBatchMode) _batchAlbumEdited = true;
-    emit(state.copyWith(album: val));
+    safeEmit(state.copyWith(album: val));
   }
 
   void updateGenre(String val) {
     if (isClosed) return;
     if (state.isBatchMode) _batchGenreEdited = true;
-    emit(state.copyWith(genre: val));
+    safeEmit(state.copyWith(genre: val));
   }
 
   void updateYear(String val) {
     if (isClosed) return;
     if (state.isBatchMode) _batchYearEdited = true;
-    emit(state.copyWith(year: val));
+    safeEmit(state.copyWith(year: val));
   }
 
   bool _batchTrackEdited = false;
@@ -156,19 +163,19 @@ class TagEditorCubit extends Cubit<TagEditorState> {
   void updateTrackNumber(String val) {
     if (isClosed) return;
     if (state.isBatchMode) _batchTrackEdited = true;
-    emit(state.copyWith(trackNumber: val));
+    safeEmit(state.copyWith(trackNumber: val));
   }
 
   void updateComment(String val) {
     if (isClosed) return;
     if (state.isBatchMode) _batchCommentEdited = true;
-    emit(state.copyWith(comment: val));
+    safeEmit(state.copyWith(comment: val));
   }
 
   void updateLyrics(String val) {
     if (isClosed) return;
     if (state.isBatchMode) _batchLyricsEdited = true;
-    emit(state.copyWith(lyrics: val));
+    safeEmit(state.copyWith(lyrics: val));
   }
 
   Future<void> pickArtwork() async {
@@ -182,24 +189,32 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       );
       if (isClosed) return;
       if (image != null) {
-        emit(state.copyWith(
+        // FIX: handle scoped storage partial access (READ_MEDIA_VISUAL_USER_SELECTED)
+        // image_picker already uses system picker on Android 13+, but we need to
+        // ensure we don't treat limited grant as generic failure; any returned
+        // image here is valid selection even under partial.
+        safeEmit(state.copyWith(
           newArtworkPath: image.path,
           removeArtwork: false,
         ));
+      } else {
+        // User cancelled picker - not an error, just no-op. On Android 14+ with
+        // partial access, cancellation may mean they dismissed the limited picker;
+        // we could offer a manage-selection hint via effect, but don't emit error.
       }
     } on PlatformException catch (e) {
       if (isClosed) return;
-      final msg = e.code == 'photo_access_denied' || e.code == 'camera_access_denied' ? 'Permission denied to access gallery' : 'Failed to pick artwork image: ${e.message ?? e.code}';
-      emit(state.copyWith(errorMessage: msg));
+      final msg = e.code == 'photo_access_denied' || e.code == 'camera_access_denied' ? 'Permission denied to access gallery. On Android 14+, grant Full or Select More photos to pick artwork.' : 'Failed to pick artwork image: ${e.message ?? e.code}';
+      safeEmit(state.copyWith(errorMessage: msg));
     } catch (e) {
       if (isClosed) return;
-      emit(state.copyWith(errorMessage: 'Failed to pick artwork image: $e'));
+      safeEmit(state.copyWith(errorMessage: 'Failed to pick artwork image: $e'));
     }
   }
 
   void removeArtworkImage() {
     if (isClosed) return;
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       removeArtwork: true,
       clearNewArtworkPath: true,
       clearArtworkBytes: true,
@@ -221,7 +236,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
   /// Applies the selected metadata result to the form state.
   Future<bool> applyMetadataResult(OnlineTrackMetadata match) async {
     if (isClosed) return false;
-    emit(state.copyWith(isAutoFetching: true, clearErrorMessage: true));
+    safeEmit(state.copyWith(isAutoFetching: true, clearErrorMessage: true));
     try {
       String? downloadedArtPath;
       if (match.artworkUrl != null) {
@@ -230,7 +245,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       }
       if (isClosed) return false;
 
-      emit(state.copyWith(
+      safeEmit(state.copyWith(
         isAutoFetching: false,
         title: match.title.isNotEmpty ? match.title : state.title,
         artist: match.artist.isNotEmpty ? match.artist : state.artist,
@@ -253,7 +268,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       if (isClosed) return false;
       ErrorLogger.log('Applying metadata result failed',
           error: e, stackTrace: st, category: 'TagEditorCubit');
-      emit(state.copyWith(
+      safeEmit(state.copyWith(
         isAutoFetching: false,
         errorMessage: 'Failed to apply metadata: $e',
       ));
@@ -264,12 +279,12 @@ class TagEditorCubit extends Cubit<TagEditorState> {
   /// Automatically searches online (iTunes & MusicBrainz) and updates tags + cover art in 1 tap.
   Future<bool> autoFetchOnlineTags() async {
     if (isClosed) return false;
-    emit(state.copyWith(isAutoFetching: true, clearErrorMessage: true));
+    safeEmit(state.copyWith(isAutoFetching: true, clearErrorMessage: true));
     try {
       final results = await searchOnlineMatches();
       if (isClosed) return false;
       if (results.isEmpty) {
-        emit(state.copyWith(
+        safeEmit(state.copyWith(
           isAutoFetching: false,
           errorMessage: 'No matching online metadata found for this track.',
         ));
@@ -280,7 +295,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       if (isClosed) return false;
       ErrorLogger.log('Auto-fetch online tags failed',
           error: e, stackTrace: st, category: 'TagEditorCubit');
-      emit(state.copyWith(
+      safeEmit(state.copyWith(
         isAutoFetching: false,
         errorMessage: 'Failed to auto-fetch online tags: $e',
       ));
@@ -291,14 +306,14 @@ class TagEditorCubit extends Cubit<TagEditorState> {
   Future<void> saveTags() async {
     if (isClosed) return;
     if (state.isBatchMode && state.batchSongs.isEmpty) {
-      emit(state.copyWith(
+      safeEmit(state.copyWith(
         status: TagEditorStatus.failure,
         errorMessage: 'No songs selected for batch edit.',
       ));
       return;
     }
     if (!state.isBatchMode && state.title.trim().isEmpty) {
-      emit(state.copyWith(
+      safeEmit(state.copyWith(
         status: TagEditorStatus.failure,
         errorMessage: 'Song title cannot be empty.',
       ));
@@ -308,7 +323,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
     if (state.year.trim().isNotEmpty) {
       final y = int.tryParse(state.year.trim());
       if (y == null || y < 1900 || y > 2100) {
-        emit(state.copyWith(
+        safeEmit(state.copyWith(
           status: TagEditorStatus.failure,
           errorMessage: 'Year must be between 1900 and 2100.',
         ));
@@ -319,7 +334,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
     if (state.trackNumber.trim().isNotEmpty) {
       final t = int.tryParse(state.trackNumber.trim());
       if (t == null || t < 1 || t > 999) {
-        emit(state.copyWith(
+        safeEmit(state.copyWith(
           status: TagEditorStatus.failure,
           errorMessage: 'Track number must be between 1 and 999.',
         ));
@@ -327,7 +342,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       }
     }
 
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
         status: TagEditorStatus.saving,
         clearErrorMessage: true,
         batchProgress: 0.0));
@@ -345,9 +360,11 @@ class TagEditorCubit extends Cubit<TagEditorState> {
               (i % 3 == 0) ||
               now.difference(lastEmitTime).inMilliseconds >= 200) {
             lastEmitTime = now;
-            emit(state.copyWith(
+            // FIX: emit progress reflects items already attempted; correct to (i)/total before, (i+1)/total after success.
+            // We keep pre-emit but clamp to i/total so UI doesn't show 100% before last write finishes.
+            safeEmit(state.copyWith(
               status: TagEditorStatus.saving,
-              batchProgress: total > 0 ? (i + 1) / total : 1.0,
+              batchProgress: total > 0 ? i / total : 1.0,
             ));
           }
           try {
@@ -383,11 +400,15 @@ class TagEditorCubit extends Cubit<TagEditorState> {
             failedFiles.add(s.title);
           }
           if (isClosed) return;
+          // FIX: update progress after item completes so 100% means done
+          if (i == total - 1) {
+            safeEmit(state.copyWith(batchProgress: 1.0));
+          }
         }
         if (failedFiles.isEmpty) LrcParser.clearCache();
         if (isClosed) return;
         if (failedFiles.isNotEmpty) {
-          emit(state.copyWith(
+          safeEmit(state.copyWith(
             status: failedFiles.length == total
                 ? TagEditorStatus.failure
                 : TagEditorStatus.success,
@@ -396,15 +417,17 @@ class TagEditorCubit extends Cubit<TagEditorState> {
             clearBatchProgress: true,
           ));
         } else {
-          emit(state.copyWith(
+          safeEmit(state.copyWith(
               status: TagEditorStatus.success, clearBatchProgress: true));
         }
         return;
       }
 
       String lyrics = state.lyrics;
+      bool lyricsTruncated = false;
       if (lyrics.length > 8192) {
         lyrics = lyrics.substring(0, 8192);
+        lyricsTruncated = true;
       }
 
       await _channel.invokeMethod('writeTags', {
@@ -427,16 +450,24 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       await _scannerService.rescanSingleFile(state.song.path);
       if (isClosed) return;
 
-      emit(state.copyWith(status: TagEditorStatus.success));
+      if (lyricsTruncated) {
+        // FIX: surface truncation instead of silent data loss
+        safeEmit(state.copyWith(
+            status: TagEditorStatus.success,
+            errorMessage: 'Note: lyrics truncated to 8192 chars (embedded limit)'));
+        emitEffect(ShowToastEffect('Lyrics truncated to 8192 chars for embedded storage'));
+      } else {
+        safeEmit(state.copyWith(status: TagEditorStatus.success));
+      }
     } on PlatformException catch (e) {
       if (isClosed) return;
-      emit(state.copyWith(
+      safeEmit(state.copyWith(
         status: TagEditorStatus.failure,
         errorMessage: e.message ?? 'Failed to save tags on this device.',
       ));
     } catch (e) {
       if (isClosed) return;
-      emit(state.copyWith(
+      safeEmit(state.copyWith(
         status: TagEditorStatus.failure,
         errorMessage: 'Failed to save tags: $e',
       ));

@@ -45,7 +45,9 @@ class MediaScannerService {
           final storage = await Permission.storage.status;
           return storage.isGranted;
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('checkPermission failed', error: e, stackTrace: st, category: 'MediaScannerService');
+      }
       return false;
     } else if (Platform.isIOS) {
       final status = await Permission.mediaLibrary.status;
@@ -57,7 +59,9 @@ class MediaScannerService {
   Future<bool> requestPermission() async {
     if (Platform.isAndroid) {
       final audioStatus = await Permission.audio.request();
-      if (audioStatus.isGranted) return true;
+      // FIX: Android 14 partial grant (isLimited) must count as granted —
+      // checkPermission() already accepts it, request path must match.
+      if (audioStatus.isGranted || audioStatus.isLimited) return true;
       if (audioStatus.isPermanentlyDenied) {
         return false; // Caller should show openAppSettings rationale
       }
@@ -70,7 +74,8 @@ class MediaScannerService {
           final storageStatus = await Permission.storage.request();
           return storageStatus.isGranted;
         }
-      } catch (_) {
+      } catch (e, st) {
+        ErrorLogger.log('timeout failed, using fallback', error: e, stackTrace: st, category: 'MediaScannerService');
         if (!audioStatus.isPermanentlyDenied) {
           final storageStatus = await Permission.storage.request();
           return storageStatus.isGranted;
@@ -88,7 +93,8 @@ class MediaScannerService {
     if (!Platform.isAndroid) return false;
     try {
       return await Permission.audio.shouldShowRequestRationale;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('shouldShowAudioPermissionRationale failed, using fallback', error: e, stackTrace: st, category: 'MediaScannerService');
       return false;
     }
   }
@@ -100,7 +106,8 @@ class MediaScannerService {
     try {
       final status = await Permission.photos.status;
       return status.isLimited;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('isVisualMediaPartialAccess failed, using fallback', error: e, stackTrace: st, category: 'MediaScannerService');
       return false;
     }
   }
@@ -110,7 +117,8 @@ class MediaScannerService {
     try {
       final status = await Permission.photos.request();
       return status.isGranted || status.isLimited;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('requestPhotosPermission failed, using fallback', error: e, stackTrace: st, category: 'MediaScannerService');
       return false;
     }
   }
@@ -190,8 +198,9 @@ class MediaScannerService {
     try {
       final hasPermission = await checkPermission();
       if (!hasPermission) {
-        final granted = await requestPermission();
-        if (!granted) return 0;
+        // FIX: don't return 0 (indistinguishable from empty library) — throw
+        // so scanDeviceLibraryResilient maps to a typed failure.
+        throw const PermissionFailure('Storage permission denied for scan');
       }
 
       if (!_progressController.isClosed) _progressController.add(0.1);
@@ -273,6 +282,7 @@ class MediaScannerService {
     } catch (e, st) {
       ErrorLogger.log('scanDeviceLibraryResilient failed',
           error: e, stackTrace: st, category: 'scanner');
+      if (e is PermissionFailure) return Left(e);
       return Left(StorageFailure(e.toString()));
     }
   }
@@ -283,7 +293,9 @@ class MediaScannerService {
       try {
         final f = File(path);
         if (!await f.exists()) return;
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('rescanSingleFile failed', error: e, stackTrace: st, category: 'MediaScannerService');
+      }
     }
     const channel = MethodChannel(PulsrChannels.tagEditor);
     try {

@@ -124,13 +124,6 @@ void ParametricEQ::computeCoeffs(EQBandState& band, double gainDb) {
         return;
     }
 
-    if (band.type == FilterType::Peaking || band.type == FilterType::LowShelf || band.type == FilterType::HighShelf) {
-        if (std::abs(gainDb) < 0.01) {
-            band.bypass = true;
-            band.coeffs = {1.0, 0.0, 0.0, 0.0, 0.0};
-            return;
-        }
-    }
     band.bypass = false;
 
     const double f0 = std::clamp(band.frequency, 10.0, sampleRate_ * 0.499);
@@ -225,11 +218,24 @@ void ParametricEQ::computeCoeffs(EQBandState& band, double gainDb) {
     }
 
     const double invA0 = 1.0 / a0;
-    band.coeffs.b0 = b0 * invA0;
-    band.coeffs.b1 = b1 * invA0;
-    band.coeffs.b2 = b2 * invA0;
-    band.coeffs.a1 = a1 * invA0;
-    band.coeffs.a2 = a2 * invA0;
+    const double rawB0 = b0 * invA0;
+    const double rawB1 = b1 * invA0;
+    const double rawB2 = b2 * invA0;
+    const double rawA1 = a1 * invA0;
+    const double rawA2 = a2 * invA0;
+
+    // Continuous blend for small gains on peaking and shelving filters (B-10)
+    const double blendFactor = (band.type == FilterType::Peaking || band.type == FilterType::LowShelf || band.type == FilterType::HighShelf)
+        ? std::clamp(std::abs(gainDb) / 0.1, 0.0, 1.0)
+        : 1.0;
+
+    band.coeffs.b0 = 1.0 * (1.0 - blendFactor) + rawB0 * blendFactor;
+    band.coeffs.b1 = 0.0 * (1.0 - blendFactor) + rawB1 * blendFactor;
+    band.coeffs.b2 = 0.0 * (1.0 - blendFactor) + rawB2 * blendFactor;
+    band.coeffs.a1 = 0.0 * (1.0 - blendFactor) + rawA1 * blendFactor;
+    band.coeffs.a2 = 0.0 * (1.0 - blendFactor) + rawA2 * blendFactor;
+
+    band.bypass = (blendFactor < 0.001);
 }
 
 void ParametricEQ::process(const float* in, float* out, int frames, int channels) {

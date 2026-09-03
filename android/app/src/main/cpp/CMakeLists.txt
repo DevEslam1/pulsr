@@ -4,7 +4,14 @@ project("pulsr_dsp")
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g -DNDEBUG")
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g")
+
 add_compile_options(-Wall -Wextra)
+
+# Apply 16KB page size alignment to ALL targets
+add_link_options("-Wl,-z,max-page-size=16384")
 
 # ASan/UBSan need the clang runtime (libclang_rt.asan-<abi>-android.so) to be
 # packaged with the APK - it is not, so enabling this in a normal build makes
@@ -35,18 +42,8 @@ add_library(pulsr_dsp SHARED
     eq_jni_bridge.cpp
 )
 
-target_compile_options(pulsr_dsp PRIVATE
-    $<$<CONFIG:Debug>:-O0 -g>
-    $<$<CONFIG:RelWithDebInfo>:-O2 -g>
-    $<$<CONFIG:Release>:-O3>
-)
-
 find_library(log-lib log)
 find_library(android-lib android)
-
-target_link_options(pulsr_dsp PRIVATE
-    "-Wl,-z,max-page-size=16384"
-)
 
 target_link_libraries(pulsr_dsp
     ${log-lib}

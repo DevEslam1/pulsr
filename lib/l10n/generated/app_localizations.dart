@@ -2359,7 +2359,7 @@ abstract class AppLocalizations {
   /// No description provided for @downloadErrorBotChallenge.
   ///
   /// In en, this message translates to:
-  /// **'YouTube verification triggered. Retrying…'**
+  /// **'YouTube verification required — open the app to complete it'**
   String get downloadErrorBotChallenge;
 
   /// No description provided for @downloadErrorUnavailable.
@@ -2834,6 +2834,54 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Compensates for Bluetooth audio codec buffer latency ({offset} ms). Volume deferral: AVRCP absolute volume active.'**
   String bluetoothLatencySubtitle(int offset);
+
+  /// No description provided for @clearEntireQueueConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear entire queue?'**
+  String get clearEntireQueueConfirm;
+
+  /// No description provided for @shuffleQueueAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Shuffle queue'**
+  String get shuffleQueueAction;
+
+  /// No description provided for @saveAsPlaylistAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Save as playlist'**
+  String get saveAsPlaylistAction;
+
+  /// No description provided for @clearAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get clearAction;
+
+  /// No description provided for @playlistNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Playlist name'**
+  String get playlistNameLabel;
+
+  /// No description provided for @queueSavedAs.
+  ///
+  /// In en, this message translates to:
+  /// **'Queue saved as \"{name}\" ({count} tracks)'**
+  String queueSavedAs(String name, int count);
+
+  /// No description provided for @failedToCreatePlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to create playlist: {error}'**
+  String failedToCreatePlaylist(String error);
+
+  /// No description provided for @errorSavingPlaylist.
+  ///
+  /// In en, this message translates to:
+  /// **'Error saving playlist: {error}'**
+  String errorSavingPlaylist(String error);
 }
 
 class _AppLocalizationsDelegate

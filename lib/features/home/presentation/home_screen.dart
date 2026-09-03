@@ -26,6 +26,7 @@ import '../../downloads/presentation/widgets/ytm_download_button.dart';
 
 import 'package:go_router/go_router.dart';
 
+import '../../../core/utils/error_logger.dart';
 class HomeScreen extends StatefulWidget {
   final YtmService? ytmService;
   final YtmAccountService? ytmAccountService;
@@ -161,12 +162,16 @@ class _HomeScreenState extends State<HomeScreen> {
                 final recs =
                     await account.fetchHomeRecommendations(maxTracks: 50);
                 if (recs.isNotEmpty) return recs;
-              } catch (_) {}
+              } catch (e, st) {
+                ErrorLogger.log('_getCategoryFuture failed', error: e, stackTrace: st, category: 'HomeScreen');
+              }
             }
             try {
               final trending = await _ytmService.trending(limit: 25);
               if (trending.isNotEmpty) return trending;
-            } catch (_) {}
+            } catch (e, st) {
+              ErrorLogger.log('_getCategoryFuture failed', error: e, stackTrace: st, category: 'HomeScreen');
+            }
             return await _ytmService.searchWithFallback(
                 _categoryQueries['Recommended For You'] ?? 'top hits music',
                 limit: 25);
@@ -175,7 +180,9 @@ class _HomeScreenState extends State<HomeScreen> {
             try {
               final trending = await _ytmService.trending(limit: 25);
               if (trending.isNotEmpty) return trending;
-            } catch (_) {}
+            } catch (e, st) {
+              ErrorLogger.log('_getCategoryFuture failed', error: e, stackTrace: st, category: 'HomeScreen');
+            }
             return await _ytmService.searchWithFallback(
                 _categoryQueries['Trending Egypt'] ?? 'أغاني مصرية جديدة تريند',
                 limit: 25);

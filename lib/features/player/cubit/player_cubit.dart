@@ -63,6 +63,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   final SettingsProfilesService? _settingsProfilesService;
   final DeviceProfileService? _deviceProfileService;
   final HiResAudioService? _hiResAudioService;
+  final Duration _deviceSwitchDebounceDuration;
   String? _lastAutoAppliedDeviceKey;
 
   // FIX(BUG-14): Expose unthrottled position stream for high-fps UI components like MiniPlayer
@@ -70,10 +71,12 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
   StreamSubscription<void>? _widgetClickSub;
   DateTime? _lastWidgetUpdateTime;
+  DateTime? _lastWidgetProgressTime;
   int _mediaItemResolutionGen = 0;
 
   Timer? _persistQueueDebounce;
   Timer? _scrobbleDebounce;
+  Timer? _deviceSwitchDebounce;
   int? _lastScrobbleSongId;
   bool? _lastScrobbleIsPlaying;
   // FIX(BUG-15): Track position in milliseconds to avoid precision loss on sub-second seeks
@@ -92,6 +95,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
         songs: [], currentIndex: 0, position: Duration.zero, speed: 1.0),
   };
   bool _queueRestorationDone = false;
+  // FIX: user-initiated playSong during async restore must win — restore
+  // checks this after every await and skips overwriting live queue slots.
+  bool _userPlaybackStarted = false;
 
   PlayerCubit({
     required PulsrAudioHandler audioHandler,
@@ -104,12 +110,14 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     DeviceProfileService? deviceProfileService,
     HiResAudioService? hiResAudioService,
     PlaybackLatencyTracker? latencyTracker,
+    Duration deviceSwitchDebounceDuration = const Duration(milliseconds: 500),
   })  : _audioHandler = audioHandler,
         _repository = repository,
         _toggleFavoriteUseCase = toggleFavoriteUseCase,
         _settingsCubit = settingsCubit,
         _widgetService = widgetService,
         _scrobblerService = scrobblerService,
+        _deviceSwitchDebounceDuration = deviceSwitchDebounceDuration,
         _settingsProfilesService = settingsProfilesService ??
             (getIt.isRegistered<SettingsProfilesService>()
                 ? getIt<SettingsProfilesService>()
@@ -245,7 +253,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   Future<void> _restoreQueueSlots() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      if (_queueRestorationDone) return;
+      if (_queueRestorationDone || _userPlaybackStarted || isClosed) return;
       final raw = prefs.getString(PrefsKeys.queueSlots);
       if (raw == null) return;
       final decoded = jsonDecode(raw);
@@ -254,7 +262,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       // Validate: reject oversized slots (DoS)
       if (data.length > 3) return;
       for (final key in data.keys) {
-        if (_queueRestorationDone) return;
+        if (_queueRestorationDone || _userPlaybackStarted || isClosed) return;
         final slotIndex = int.tryParse(key);
         if (slotIndex == null || slotIndex < 0 || slotIndex > 2) continue;
         final slotData = data[key] as Map<String, dynamic>;
@@ -263,7 +271,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
         final songIds = rawIds.whereType<int>().toList();
         if (songIds.isEmpty) continue;
         final songsResult = await _repository.getSongsByIds(songIds);
-        if (_queueRestorationDone) return;
+        // FIX: user queue wins — if playSong started during the await above,
+        // do NOT overwrite the live slot with stale persisted data.
+        if (_queueRestorationDone || _userPlaybackStarted || isClosed) return;
         final songs = songsResult.fold((_) => <SongsTableData>[], (r) => r);
         if (songs.isEmpty) continue;
         _queueSlots[slotIndex] = _QueueSlotData(
@@ -382,17 +392,16 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     return _cachedNextTitles;
   }
 
-  DateTime? _lastWidgetProgressUpdateTime;
-
   void _updateWidgetThrottled({bool force = false}) {
     final now = DateTime.now();
+    // FIX: separate clocks for metadata vs progress — a 200ms position tick
+    // must never suppress a play/pause or track-change widget update.
     if (!force &&
         _lastWidgetUpdateTime != null &&
         now.difference(_lastWidgetUpdateTime!).inMilliseconds < 1000) {
       return;
     }
     _lastWidgetUpdateTime = now;
-    _lastWidgetProgressUpdateTime = now;
     final nextTitles = _getNextTitles(state);
     _widgetService?.updateNowPlaying(
       song: state.currentSong,
@@ -412,11 +421,11 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
   void _updateWidgetProgressThrottled() {
     final now = DateTime.now();
-    if (_lastWidgetProgressUpdateTime != null &&
-        now.difference(_lastWidgetProgressUpdateTime!).inMilliseconds < 1000) {
+    if (_lastWidgetProgressTime != null &&
+        now.difference(_lastWidgetProgressTime!).inMilliseconds < 1000) {
       return;
     }
-    _lastWidgetProgressUpdateTime = now;
+    _lastWidgetProgressTime = now;
     _widgetService?.updateProgress(
       isPlaying: state.isPlaying,
       position: state.position,
@@ -533,7 +542,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     autoSub(_audioHandler.errorStream, (err) {
       try {
         _latencyTracker?.finishWithError(err, stage: PlaybackStage.playing);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('tryParse failed', error: e, stackTrace: st, category: 'PlayerCubit');
+      }
       safeEmit(state.copyWith(errorMessage: err));
     });
 
@@ -601,7 +612,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
             _latencyTracker?.markStage(PlaybackStage.firstBytesReady);
             _latencyTracker?.markStage(PlaybackStage.playing);
           }
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('tryParse failed', error: e, stackTrace: st, category: 'PlayerCubit');
+        }
       }
       final effectivePos = isCompleted ? Duration.zero : playbackState.position;
 
@@ -672,7 +685,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
           state.currentSong?.id == updated.id) {
         safeEmit(state.copyWith(currentSong: updated));
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_enrichAudioQuality failed', error: e, stackTrace: st, category: 'PlayerCubit');
+    }
   }
 
   Future<void> _loadLyricsForSong(SongsTableData song) async {
@@ -704,7 +719,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
           albumName: song.album,
           durationSeconds: song.durationMs > 0 ? song.durationMs ~/ 1000 : null,
         );
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('_loadLyricsForSong failed', error: e, stackTrace: st, category: 'PlayerCubit');
+      }
     }
 
     if (isClosed || state.currentSong?.id != song.id) return;
@@ -717,7 +734,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       try {
         final ytmAccount = getIt<YtmAccountService>();
         lyricsResult = await ytmAccount.fetchYtmLyrics(videoId);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('_loadLyricsForSong failed', error: e, stackTrace: st, category: 'PlayerCubit');
+      }
     }
 
     if (isClosed || state.currentSong?.id != song.id) return;
@@ -735,11 +754,14 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     try {
       _latencyTracker?.start(videoId: videoIdForLatency);
       _latencyTracker?.markStage(PlaybackStage.tap);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('playSong failed', error: e, stackTrace: st, category: 'PlayerCubit');
+    }
     ++_mediaItemResolutionGen;
     final capturedGen = _mediaItemResolutionGen;
     // Mark restoration as done: any in-flight _restoreQueueSlots must abort
     _queueRestorationDone = true;
+    _userPlaybackStarted = true;
     // If playing an online song that has already been downloaded to the device, swap to local song
     SongsTableData targetSong = song;
     if (song.source == SongSource.youtube) {
@@ -757,7 +779,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
                 await File(local.path).exists())) {
           targetSong = local;
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('playSong failed', error: e, stackTrace: st, category: 'PlayerCubit');
+      }
     }
 
     var rawQueue =
@@ -793,6 +817,10 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     }
 
     final startPos = initialPosition ?? Duration.zero;
+    // Snapshot BEFORE optimistic emit for rollback on loadQueue failure.
+    final prevQueue = List<SongsTableData>.from(state.queue);
+    final prevSong = state.currentSong;
+    final prevIndex = state.currentIndex;
     _queueSlots[state.activeQueueSlot] = _QueueSlotData(
       songs: List.from(effectiveQueue),
       currentIndex: effectiveIndex,
@@ -809,9 +837,12 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       duration: Duration(milliseconds: targetSong.durationMs),
       errorMessage: queueTruncationWarning,
     ));
+    // Snapshot for rollback if loadQueue throws (YTM resolve / gapless fail).
     try {
       _latencyTracker?.markStage(PlaybackStage.resolutionRequested);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('from failed', error: e, stackTrace: st, category: 'PlayerCubit');
+    }
     try {
       await _audioHandler.loadQueue(
         effectiveQueue,
@@ -820,11 +851,27 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       );
       try {
         _latencyTracker?.markStage(PlaybackStage.sourceSet);
-      } catch (_) {}
-    } catch (e) {
+      } catch (e, st) {
+        ErrorLogger.log('from failed', error: e, stackTrace: st, category: 'PlayerCubit');
+      }
+    } catch (e, st) {
       try {
         _latencyTracker?.finishWithError(e, stage: PlaybackStage.sourceSet);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('from failed', error: e, stackTrace: st, category: 'PlayerCubit');
+      }
+      ErrorLogger.log('playSong loadQueue failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+      if (!isClosed) {
+        // Roll back optimistic emit so UI doesn't show a track that never loaded.
+        safeEmit(state.copyWith(
+          queue: prevQueue,
+          currentSong: prevSong,
+          currentIndex: prevIndex,
+          errorMessage: 'Could not play ${targetSong.title}: $e',
+        ));
+        _updateWidgetThrottled(force: true);
+      }
       rethrow;
     }
     unawaited(_loadLyricsForSong(targetSong));
@@ -990,36 +1037,85 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
     try {
       _audioHandler.swapReconciledSong(oldId, newSong);
-    } catch (_) {}
-  }
-
-  Future<void> togglePlayPause() async {
-    if (state.isPlaying) {
-      await _audioHandler.pause();
-    } else {
-      await _audioHandler.play();
+    } catch (e, st) {
+      ErrorLogger.log('swapReconciledSong failed', error: e, stackTrace: st, category: 'PlayerCubit');
     }
   }
 
-  Future<void> seek(Duration position) => _audioHandler.seek(position);
+  Future<void> togglePlayPause() async {
+    if (isClosed) return;
+    if (state.queue.isEmpty && state.currentSong == null) return;
+    try {
+      if (state.isPlaying) {
+        await _audioHandler.pause();
+      } else {
+        await _audioHandler.play();
+      }
+    } catch (e, st) {
+      ErrorLogger.log('togglePlayPause failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+      if (!isClosed) {
+        safeEmit(state.copyWith(errorMessage: 'Playback failed: $e'));
+      }
+    }
+  }
 
-  Future<void> next() => _audioHandler.skipToNext();
+  Future<void> seek(Duration position) async {
+    if (isClosed) return;
+    try {
+      final clamped = position.isNegative ? Duration.zero : position;
+      await _audioHandler.seek(clamped);
+    } catch (e, st) {
+      ErrorLogger.log('seek failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }
+  }
 
-  Future<void> previous() => _audioHandler.skipToPrevious();
+  Future<void> next() async {
+    if (isClosed) return;
+    try {
+      await _audioHandler.skipToNext();
+    } catch (e, st) {
+      ErrorLogger.log('skipToNext failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }
+  }
+
+  Future<void> previous() async {
+    if (isClosed) return;
+    try {
+      await _audioHandler.skipToPrevious();
+    } catch (e, st) {
+      ErrorLogger.log('skipToPrevious failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }
+  }
 
   Future<void> toggleShuffle() async {
-    final next = !state.isShuffle;
-    await _audioHandler.setShuffleMode(
-        next ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none);
+    if (isClosed) return;
+    try {
+      final next = !state.isShuffle;
+      await _audioHandler.setShuffleMode(
+          next ? AudioServiceShuffleMode.all : AudioServiceShuffleMode.none);
+    } catch (e, st) {
+      ErrorLogger.log('toggleShuffle failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }
   }
 
   Future<void> toggleRepeat() async {
-    final nextMode = switch (state.repeatMode) {
-      PlayerRepeatMode.off => AudioServiceRepeatMode.all,
-      PlayerRepeatMode.all => AudioServiceRepeatMode.one,
-      PlayerRepeatMode.one => AudioServiceRepeatMode.none,
-    };
-    await _audioHandler.setRepeatMode(nextMode);
+    if (isClosed) return;
+    try {
+      final nextMode = switch (state.repeatMode) {
+        PlayerRepeatMode.off => AudioServiceRepeatMode.all,
+        PlayerRepeatMode.all => AudioServiceRepeatMode.one,
+        PlayerRepeatMode.one => AudioServiceRepeatMode.none,
+      };
+      await _audioHandler.setRepeatMode(nextMode);
+    } catch (e, st) {
+      ErrorLogger.log('toggleRepeat failed',
+          error: e, stackTrace: st, category: 'PlayerCubit');
+    }
   }
 
   Future<void> toggleFavorite(int songId) async {
@@ -1512,6 +1608,20 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     final service = _deviceProfileService;
     final profilesService = _settingsProfilesService;
     if (service == null || profilesService == null || isClosed) return;
+    if (_deviceSwitchDebounceDuration == Duration.zero) {
+      await _applyOutputDeviceChanged(device);
+      return;
+    }
+    _deviceSwitchDebounce?.cancel();
+    _deviceSwitchDebounce = Timer(_deviceSwitchDebounceDuration, () async {
+      await _applyOutputDeviceChanged(device);
+    });
+  }
+
+  Future<void> _applyOutputDeviceChanged(AudioOutputInfo device) async {
+    final service = _deviceProfileService;
+    final profilesService = _settingsProfilesService;
+    if (service == null || profilesService == null || isClosed) return;
     try {
       final key = DeviceProfileService.deviceKeyFromInfo(device);
       await service.rememberDevice(key, device.deviceName);
@@ -1681,8 +1791,17 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
   @override
   Future<void> close() {
+    // FIX: flush queue synchronously on teardown — 2s debounce loses queue
+    // on kill/background within the window.
     _persistQueueDebounce?.cancel();
+    _persistQueueDebounce = null;
+    try {
+      unawaited(_persistQueueSlots());
+    } catch (e, st) {
+      ErrorLogger.log('close failed', error: e, stackTrace: st, category: 'PlayerCubit');
+    }
     _scrobbleDebounce?.cancel();
+    _deviceSwitchDebounce?.cancel();
     _widgetClickSub?.cancel();
     return super.close();
   }

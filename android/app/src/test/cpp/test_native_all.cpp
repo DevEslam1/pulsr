@@ -589,6 +589,8 @@ void runDspStressTest() {
 #include "test_sr_change.cpp"
 #include "test_snapshot_race.cpp"
 #include "test_custom_ir_budget.cpp"
+#include "test_predelay_allocation.cpp"
+#include "test_dsd_decoder_syntax.cpp"
 
 void runSyntheticIrCacheBudgetTest() {
     std::cout << "\n=== [TEST 12/22] Synthetic IR Cache 64MB LRU Budget & Damping Sweep Test ===" << std::endl;
@@ -758,6 +760,7 @@ void runIrDecimationAliasingTest() {
 void runCrossfadeDspContinuityTest() {
     std::cout << "\n=== [TEST 18/22] Test 18 v2: Reverb Enabled + Ringing Tail Across SR Transition (48k -> 44.1k) ===" << std::endl;
     auto& engine = AudioDspEngine::instance();
+    engine.clearAutoDegradedStages();
     engine.setSampleRate(48000.0);
 
     auto snap = std::make_shared<DspParamSnapshot>();
@@ -2164,8 +2167,12 @@ int main() {
     runSpatialPannerTimeConstantSmoothingTest();
     runSubCrossoverResetAndPairsTest();
 
+    // v3 Regression Tests
+    runPredelayAllocationTest();
+    runDsdDecoderSyntaxAndRatioTest();
+
     std::cout << "\n====================================================" << std::endl;
-    std::cout << "  [PASS] ALL 41 NATIVE DSP SUITE TESTS PASSED 100%!" << std::endl;
+    std::cout << "  [PASS] ALL 43 NATIVE DSP SUITE TESTS PASSED 100%!" << std::endl;
     std::cout << "====================================================" << std::endl;
     return 0;
 }

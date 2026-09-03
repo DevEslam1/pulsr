@@ -31,6 +31,7 @@ import '../../downloads/cubit/ytm_download_cubit.dart';
 import '../../downloads/presentation/widgets/ytm_download_button.dart';
 import 'widgets/folder_browser_tab.dart';
 
+import '../../../core/utils/error_logger.dart';
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
 
@@ -1778,7 +1779,9 @@ class _LibraryScreenState extends State<LibraryScreen>
         );
         try {
           unawaited(authCubit.syncNow());
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('_syncYtmLikes failed', error: e, stackTrace: st, category: 'LibraryScreen');
+        }
       }
     } catch (e) {
       if (context.mounted) {
@@ -2010,7 +2013,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                                     // Trigger cloud sync if authenticated
                                     try {
                                       unawaited(authCubit.syncNow());
-                                    } catch (_) {}
+                                    } catch (e, st) {
+                                      ErrorLogger.log('canPop failed', error: e, stackTrace: st, category: 'LibraryScreen');
+                                    }
                                   }
                                 } catch (e) {
                                   setSheetState(() {

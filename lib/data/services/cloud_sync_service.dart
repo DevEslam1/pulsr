@@ -109,29 +109,75 @@ class CloudSyncService {
           ..clear()
           ..addAll(map.map((k, v) => MapEntry(k, v.toString())));
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_restoreHashes failed', error: e, stackTrace: st, category: 'CloudSyncService');
+    }
   }
 
   Future<void> _persistHashes() async {
     try {
       final prefs = await _getPrefs();
       await prefs.setString(_keySyncedHashes, jsonEncode(_syncedDocHashes));
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_persistHashes failed', error: e, stackTrace: st, category: 'CloudSyncService');
+    }
   }
 
   Future<bool> syncAll(
       {bool syncFavorites = true, bool syncPlaylists = true}) async {
+    // FIX: serialize overlapping syncNow calls (auth flip + manual tap).
+    if (_syncRunning) return false;
+    _syncRunning = true;
+    try {
+      return await _syncAllInner(
+          syncFavorites: syncFavorites, syncPlaylists: syncPlaylists);
+    } finally {
+      _syncRunning = false;
+    }
+  }
+
+  bool _syncRunning = false;
+
+  /// Clears per-account dedup state on sign-out so the next account re-uploads.
+  Future<void> clearAccountState() async {
+    _syncedDocHashes.clear();
+    try {
+      final prefs = await _getPrefs();
+      await prefs.remove(_keySyncedHashes);
+      await prefs.remove(_keyLastSync);
+    } catch (e, st) {
+      ErrorLogger.log('clearAccountState failed', error: e, stackTrace: st, category: 'CloudSyncService');
+    }
+  }
+
+  Future<bool> _syncAllInner(
+      {bool syncFavorites = true, bool syncPlaylists = true}) async {
     final user = _authService.currentUser;
     if (user == null) return false;
 
+    // Snapshot hashes — if any batch commit fails, _uploadLocalData only logs.
+    // Restoring the snapshot forces retry next sync instead of marking dirty
+    // docs clean forever.
     try {
       await _restoreHashes();
+      final hashSnapshot = Map<String, String>.from(_syncedDocHashes);
+      _lastUploadHadFailures = false;
       final firestore = FirebaseFirestore.instance;
       final userDoc = firestore.collection('users').doc(user.uid);
 
       // 1. Upload Local Data to Cloud
       await _uploadLocalData(userDoc,
           syncFavorites: syncFavorites, syncPlaylists: syncPlaylists);
+
+      if (_lastUploadHadFailures) {
+        // Discard optimistic hashes from the failed run; keep pre-sync state.
+        _syncedDocHashes
+          ..clear()
+          ..addAll(hashSnapshot);
+        ErrorLogger.log('Cloud sync upload had batch failures — hashes rolled back for retry',
+            category: 'CloudSyncService');
+        return false;
+      }
 
       // 2. Download & Merge Cloud Data into Local DB
       await _downloadAndMergeCloudData(userDoc,
@@ -148,6 +194,7 @@ class CloudSyncService {
   }
 
   final Map<String, String> _syncedDocHashes = <String, String>{};
+  bool _lastUploadHadFailures = false;
 
   Future<void> _uploadLocalData(
     DocumentReference userDoc, {
@@ -166,6 +213,9 @@ class CloudSyncService {
         try {
           await batchToCommit.commit();
         } catch (e, st) {
+          // FIX: mark failure so _syncAllInner discards optimistic hashes and
+          // retries next sync instead of losing the write forever.
+          _lastUploadHadFailures = true;
           ErrorLogger.log('Batch commit failed',
               error: e, stackTrace: st, category: 'CloudSync');
         }
@@ -298,6 +348,7 @@ class CloudSyncService {
       try {
         await currentBatch.commit();
       } catch (e, st) {
+        _lastUploadHadFailures = true;
         ErrorLogger.log('Final batch commit failed',
             error: e, stackTrace: st, category: 'CloudSync');
       }

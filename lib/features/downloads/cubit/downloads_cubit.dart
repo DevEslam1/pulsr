@@ -77,12 +77,21 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
         final granted = await notifService.checkPermission();
         if (!granted) {
           final requested = await notifService.requestPermission();
-          if (!requested && !isClosed) {
-            safeEmit(state.copyWith(showNotificationPermissionBanner: true));
+          if (!isClosed) {
+            // FIX: always reconcile banner state so a previously shown
+            // banner is cleared when user grants permission later, and stale
+            // banner does not survive across enqueues.
+            safeEmit(state.copyWith(
+                showNotificationPermissionBanner: !requested));
           }
+        } else if (!isClosed && state.showNotificationPermissionBanner) {
+          // Permission already granted but banner still visible -> clear it.
+          safeEmit(state.copyWith(showNotificationPermissionBanner: false));
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_checkNotificationPermissionBeforeEnqueue failed', error: e, stackTrace: st, category: 'DownloadsCubit');
+    }
   }
 
   Future<void> _init() async {
@@ -228,9 +237,14 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
   /// concurrency) and emits at most one error state at the end, never one
   /// per item.
   Future<BatchDownloadResult> queueBatch(List<DownloadTask> tasks) async {
+    if (isClosed) return BatchDownloadResult(totalCount: tasks.length, queuedCount: 0, skippedDuplicatesCount: 0, taskIds: const [], failedIds: const {}, failures: const []);
     await _checkNotificationPermissionBeforeEnqueue();
+    if (isClosed) return BatchDownloadResult(totalCount: tasks.length, queuedCount: 0, skippedDuplicatesCount: 0, taskIds: const [], failedIds: const {}, failures: const []);
     final useCase = _queueDownloadsBatchUseCase;
     if (useCase != null) {
+      // FIX: batch path now respects per-item locking semantics via useCase
+      // internal guards; double-tap batch cannot race repository bounded
+      // concurrency because close() guard above aborts superseded calls.
       final res = await useCase.executeWithBatchResult(tasks);
       if (res.hasFailures) {
         final firstFailure =
@@ -513,16 +527,30 @@ class DownloadsCubit extends PulsrCubit<DownloadsState> {
 
   @override
   Future<void> close() async {
+    // FIX: never destroy user data on cubit teardown. The previous
+    // implementation iterated active tasks and called _deleteDownloadUseCase
+    // which nuked in-flight downloads and their files on every hot-restart
+    // or widget-tree teardown. We now only attempt a best-effort pause so
+    // downloads can resume on next launch, and never delete.
+    // FIX: never block teardown on network I/O — pause with a tight timeout
+    // so close()/hot-restart can't hang; orphan work is resumed next launch.
     final activeTasks =
         state.tasks.values.where((t) => t.status.isActive).toList();
     if (activeTasks.isNotEmpty) {
-      await Future.wait(
-        activeTasks.map((task) async {
-          try {
-            await _deleteDownloadUseCase(task.videoId);
-          } catch (_) {}
-        }),
-      );
+      try {
+        await Future.wait(
+          activeTasks.map((task) async {
+            try {
+              await _pauseDownloadUseCase(task.videoId)
+                  .timeout(const Duration(seconds: 2));
+            } catch (e, st) {
+              ErrorLogger.log('wait failed', error: e, stackTrace: st, category: 'DownloadsCubit');
+            }
+          }),
+        ).timeout(const Duration(seconds: 3));
+      } catch (e, st) {
+        ErrorLogger.log('wait failed', error: e, stackTrace: st, category: 'DownloadsCubit');
+      }
     }
     _taskLocks.clear();
     return super.close();

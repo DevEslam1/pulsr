@@ -165,7 +165,8 @@ class FileIntentHandler {
       String cleanPath;
       try {
         cleanPath = Uri.decodeFull(uriOrPath);
-      } catch (_) {
+      } catch (e, st) {
+        ErrorLogger.log('handleAudioUri failed, using fallback', error: e, stackTrace: st, category: 'FileIntentHandler');
         cleanPath = uriOrPath;
       }
       if (cleanPath.startsWith('file://')) {
@@ -176,7 +177,8 @@ class FileIntentHandler {
           } else {
             cleanPath = cleanPath.replaceFirst('file://', '');
           }
-        } catch (_) {
+        } catch (e, st) {
+          ErrorLogger.log('handleAudioUri failed, using fallback', error: e, stackTrace: st, category: 'FileIntentHandler');
           cleanPath = cleanPath.replaceFirst('file://', '');
         }
       }
@@ -212,7 +214,9 @@ class FileIntentHandler {
                 return;
               }
             }
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('handleAudioUri failed', error: e, stackTrace: st, category: 'FileIntentHandler');
+          }
         } else {
           final parsedProxies = ProxyEntry.parseList(uriOrPath);
           if (parsedProxies.isNotEmpty) {
@@ -292,7 +296,9 @@ class FileIntentHandler {
           if (await file.exists()) {
             fileSize = await file.length();
           }
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('contains failed', error: e, stackTrace: st, category: 'FileIntentHandler');
+        }
       }
 
       final tempSong = SongsTableData(

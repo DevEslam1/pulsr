@@ -172,7 +172,9 @@ class SleepTimerManager {
       final target =
           (_preFadeVolume! * fraction.clamp(0.0, 1.0)).clamp(0.0, 1.0);
       player.setVolume(target);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_applyFadeOutStep failed', error: e, stackTrace: st, category: 'SleepTimerManager');
+    }
   }
 
   Future<void> _executeExpiration(int token) async {
@@ -193,7 +195,9 @@ class SleepTimerManager {
       if (_preFadeVolume != null && player != null) {
         try {
           await player.setVolume(_preFadeVolume!);
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('_executeExpiration failed', error: e, stackTrace: st, category: 'SleepTimerManager');
+        }
         _preFadeVolume = null;
       }
       _clearPersistedState();
@@ -217,7 +221,9 @@ class SleepTimerManager {
     if (_preFadeVolume != null && _lastPlayerGetter != null) {
       try {
         _lastPlayerGetter!().setVolume(_preFadeVolume!);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('cancelSleepTimer failed', error: e, stackTrace: st, category: 'SleepTimerManager');
+      }
       _preFadeVolume = null;
     }
     _clearPersistedState();
@@ -259,7 +265,9 @@ class SleepTimerManager {
           _clearPersistedState();
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Function failed', error: e, stackTrace: st, category: 'SleepTimerManager');
+    }
   }
 
   void dispose() {

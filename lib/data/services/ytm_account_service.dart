@@ -22,6 +22,7 @@ import '../../core/utils/lrc_parser.dart';
 import 'xdm_backend_service.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart'
     hide AndroidOptions;
+import '../../core/utils/app_logger.dart';
 
 class YtmAccountPlaylist {
   final String playlistId;
@@ -91,9 +92,11 @@ class YtmAccountService {
     'TVHTML5_SIMPLY_EMBEDDED_PLAYER': '85',
   };
 
-  /// Centralized Innertube client versions to keep headers and body contexts in sync
-  static const String _androidMusicVersion = '7.27.53';
-  static const String _iosMusicVersion = '7.27.0';
+  /// Centralized Innertube client versions to keep headers and body contexts in sync.
+  /// Aligned with native ClientCapabilityMatrix (ANDROID_MUSIC 8.32.50, IOS 8.32.1)
+  /// to avoid 400 CLIENT_DEPRECATED skew between Dart and Kotlin ladders.
+  static const String _androidMusicVersion = '8.32.50';
+  static const String _iosMusicVersion = '8.32.1';
   static const String _androidVrVersion = '1.63.27';
   static const String _androidCreatorVersion = '24.45.100';
   static const String _androidTestSuiteVersion = '1.9';
@@ -271,7 +274,8 @@ class YtmAccountService {
       return e.isAuth
           ? SessionValidationResult.invalid
           : SessionValidationResult.unknown;
-    } catch (_) {
+    } catch (e) {
+      AppLogger.debug('validateSessionDetailed failed (non-fatal): $e', category: 'YtmAccountService');
       return SessionValidationResult.unknown; // network failure
     }
   }
@@ -288,7 +292,8 @@ class YtmAccountService {
     try {
       final cookies = await channel.invokeMethod<String>('getCookies');
       return cookies;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('getNativeCookiesFromDomains failed, using fallback', error: e, stackTrace: st, category: 'YtmAccountService');
       return null;
     }
   }
@@ -348,7 +353,9 @@ class YtmAccountService {
   Future<void> _deleteStoredCookies() async {
     try {
       await _secureStorage.delete(key: _cookieSecureKey);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_deleteStoredCookies failed', error: e, stackTrace: st, category: 'YtmAccountService');
+    }
   }
 
   /// Saves extracted web cookies, warms the session, and triggers fresh attestation.
@@ -404,16 +411,21 @@ class YtmAccountService {
       // next login does not reuse a fingerprint-bound visitorData from the
       // previous account — matches resetIdentities semantics.
       await ytmService.resetIdentities();
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('logout failed, using fallback', error: e, stackTrace: st, category: 'YtmAccountService');
       try {
         final ytmService = getIt<YtmService>();
         await ytmService.syncCookies('');
         await ytmService.invalidatePoToken();
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('logout failed', error: e, stackTrace: st, category: 'YtmAccountService');
+      }
     }
     try {
       await _deleteSessionWebViewCookies();
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('logout failed', error: e, stackTrace: st, category: 'YtmAccountService');
+    }
   }
 
   /// Cookie domains owned by the YTM sign-in flow. Logout clears only these
@@ -445,12 +457,15 @@ class YtmAccountService {
           path: '/',
         );
       }
-    } catch (_) {
+    } catch (e) {
       // Scoped deletion unsupported on this platform — fall back to a full
       // wipe rather than leaving session cookies behind.
+      AppLogger.debug('_deleteSessionWebViewCookies failed (non-fatal): $e', category: 'YtmAccountService');
       try {
         await CookieManager.instance().deleteAllCookies();
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('_deleteSessionWebViewCookies failed', error: e, stackTrace: st, category: 'YtmAccountService');
+      }
     }
   }
 
@@ -490,7 +505,9 @@ class YtmAccountService {
         }
         try {
           _harvestSessionState(json);
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('_warmSession failed', error: e, stackTrace: st, category: 'YtmAccountService');
+        }
         final setCookie = res.headers['set-cookie'];
         if (setCookie != null && setCookie.isNotEmpty) {
           _ingestSetCookies(setCookie);
@@ -581,7 +598,8 @@ class YtmAccountService {
             if (expires.isBefore(DateTime.now())) {
               shouldDelete = true;
             }
-          } catch (_) {
+          } catch (e, st) {
+            ErrorLogger.log('tryParse failed, using fallback', error: e, stackTrace: st, category: 'YtmAccountService');
             final fallbackExp = DateTime.tryParse(attr.substring(8));
             if (fallbackExp != null && fallbackExp.isBefore(DateTime.now())) {
               shouldDelete = true;
@@ -612,7 +630,9 @@ class YtmAccountService {
     // refreshed jar so the two layers never drift apart.
     try {
       unawaited(getIt<YtmService>().syncCookies(merged));
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_ingestSetCookies failed', error: e, stackTrace: st, category: 'YtmAccountService');
+    }
   }
 
   /// Builds authenticated Innertube request headers with timestamped SAPISIDHASH, SAPISID3PHASH, or SAPISID1PHASH.
@@ -627,12 +647,18 @@ class YtmAccountService {
       'User-Agent': userAgent.isNotEmpty ? userAgent : defaultUa,
       'Origin': origin,
       'Referer': '$origin/',
+      'X-Origin': origin,
       'x-origin': origin,
       'x-youtube-client-name': '67',
       'x-youtube-client-version': _clientVersion,
+      'X-Goog-AuthUser': '0',
       'x-goog-authuser': '0',
       'X-Goog-Api-Key': _apiKey,
     };
+
+    if (_sessionVisitorData != null && _sessionVisitorData!.isNotEmpty) {
+      headers['X-Goog-Visitor-Id'] = _sessionVisitorData!;
+    }
 
     if (_cookies != null && _cookies!.isNotEmpty) {
       headers['Cookie'] = _cookies!;
@@ -801,12 +827,16 @@ class YtmAccountService {
   }) async {
     for (var attempt = 0; attempt < maxAttempts; attempt++) {
       final startTime = DateTime.now().millisecondsSinceEpoch;
+      var permitAcquired = false;
       try {
         try {
           await _channel.invokeMethod<bool>('acquirePermit', {
             'bucket': bucket,
           });
-        } catch (_) {}
+          permitAcquired = true;
+        } catch (e, st) {
+          ErrorLogger.log('_postWithRetry failed', error: e, stackTrace: st, category: 'YtmAccountService');
+        }
         final timeout = Duration(seconds: baseTimeoutSeconds + attempt * 5);
         final res = await http
             .post(uri, headers: headers, body: body)
@@ -820,7 +850,9 @@ class YtmAccountService {
               'latencyMs': elapsed,
               'isError': true,
             });
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('_postWithRetry failed', error: e, stackTrace: st, category: 'YtmAccountService');
+          }
 
           if (res.statusCode == 429) {
             final retryHeader = res.headers['retry-after'];
@@ -829,7 +861,9 @@ class YtmAccountService {
               await _channel.invokeMethod<int>('onRateLimited', {
                 'retryAfter': retryAfter,
               });
-            } catch (_) {}
+            } catch (e, st) {
+              ErrorLogger.log('tryParse failed', error: e, stackTrace: st, category: 'YtmAccountService');
+            }
           }
           final backoffSec = (1 << attempt) + Random().nextInt(2);
           debugPrint(
@@ -860,7 +894,9 @@ class YtmAccountService {
             'latencyMs': elapsed,
             'isError': false,
           });
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('delayed failed', error: e, stackTrace: st, category: 'YtmAccountService');
+        }
         return res;
       } on TimeoutException {
         if (attempt == maxAttempts - 1) {
@@ -868,6 +904,14 @@ class YtmAccountService {
         }
       } catch (e) {
         if (attempt == maxAttempts - 1) rethrow;
+      } finally {
+        if (permitAcquired) {
+          try {
+            await _channel.invokeMethod<bool>('releasePermit');
+          } catch (e, st) {
+            ErrorLogger.log('releasePermit failed', error: e, stackTrace: st, category: 'YtmAccountService');
+          }
+        }
       }
     }
     throw const YtmException('YTM_TIMEOUT', 'Exceeded maximum retry attempts');
@@ -902,10 +946,17 @@ class YtmAccountService {
         if (response.statusCode == 200) {
           final json = jsonDecode(response.body) as Map<String, dynamic>;
           if (_isUnauthenticatedResponse(json)) {
+            if (_inPostLoginGrace) {
+              debugPrint(
+                '[YTM_ACCOUNT] Unauthenticated response on $bId suppressed '
+                '(within post-login grace window)',
+              );
+              continue;
+            }
             debugPrint(
               '[YTM_ACCOUNT] Unauthenticated response detected on $bId',
             );
-            await logout();
+            getIt<YtmService>().notifyAuthExpired();
             throw const YtmException('YTM_AUTH', 'Session expired');
           }
 
@@ -1474,14 +1525,18 @@ class YtmAccountService {
       Future(() async {
         try {
           await getIt<YtmService>().ensurePoTokenReady();
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('wait failed', error: e, stackTrace: st, category: 'YtmAccountService');
+        }
       }),
       Future(() async {
         if (isAuthenticated &&
             (_dataSyncId == null || _dataSyncId!.isEmpty)) {
           try {
             await _bootstrapDataSyncId();
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('wait failed', error: e, stackTrace: st, category: 'YtmAccountService');
+          }
         }
       }),
     ]);
@@ -1511,14 +1566,18 @@ class YtmAccountService {
           final poState = await getIt<YtmService>().getPoTokenState();
           poToken = poState?['streamingPoToken'] as String?;
           visitorData ??= poState?['visitorData'] as String?;
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('wait failed', error: e, stackTrace: st, category: 'YtmAccountService');
+        }
       }
     } else {
       try {
         final poState = await getIt<YtmService>().getPoTokenState();
         poToken = poState?['streamingPoToken'] as String?;
         visitorData = poState?['visitorData'] as String?;
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('wait failed', error: e, stackTrace: st, category: 'YtmAccountService');
+      }
     }
     // Diagnostics: every bot-gate log below reports whether a token was
     // actually attached, so "WEB_REMIX bot challenge" is immediately
@@ -1676,7 +1735,9 @@ class YtmAccountService {
                 );
                 try {
                   getIt<YtmService>().notifyAuthExpired();
-                } catch (_) {}
+                } catch (e, st) {
+                  ErrorLogger.log('toLowerCase failed', error: e, stackTrace: st, category: 'YtmAccountService');
+                }
 
                 throw const YtmException(
                   'YTM_AUTH',
@@ -1800,7 +1861,9 @@ class YtmAccountService {
         if (extracted != null && extracted.isNotEmpty) {
           return extracted;
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('_extractUrlFromFormat failed', error: e, stackTrace: st, category: 'YtmAccountService');
+      }
     }
     return null;
   }
@@ -2287,7 +2350,8 @@ class YtmAccountService {
         duration: Duration(milliseconds: durationMs),
         artworkUrl: artworkUrl,
       );
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('tryParse failed, using fallback', error: e, stackTrace: st, category: 'YtmAccountService');
       return null;
     }
   }
@@ -2299,11 +2363,19 @@ class YtmAccountService {
     final seenIds = <String>{};
 
     void traverse(dynamic node) {
-      if (node is Map<String, dynamic>) {
-        if (node.containsKey('musicTwoRowItemRenderer')) {
-          final renderer =
-              node['musicTwoRowItemRenderer'] as Map<String, dynamic>;
-          final nav = renderer['navigationEndpoint'] as Map<String, dynamic>?;
+      if (node is Map) {
+        final nodeMap = node is Map<String, dynamic>
+            ? node
+            : node.cast<String, dynamic>();
+
+        if (nodeMap.containsKey('musicTwoRowItemRenderer')) {
+          final rawRenderer = nodeMap['musicTwoRowItemRenderer'];
+          final renderer = rawRenderer is Map
+              ? (rawRenderer is Map<String, dynamic>
+                  ? rawRenderer
+                  : rawRenderer.cast<String, dynamic>())
+              : null;
+          final nav = renderer?['navigationEndpoint'] as Map<String, dynamic>?;
           final browseId = nav?['browseEndpoint']?['browseId'] as String?;
 
           if (browseId != null &&
@@ -2318,19 +2390,19 @@ class YtmAccountService {
                 !seenIds.contains(cleanId)) {
               seenIds.add(cleanId);
 
-              final titleRuns = renderer['title']?['runs'] as List<dynamic>?;
+              final titleRuns = renderer?['title']?['runs'] as List<dynamic>?;
               final title =
                   titleRuns?.map((r) => r['text']?.toString() ?? '').join() ??
                   'Playlist';
 
-              final subRuns = renderer['subtitle']?['runs'] as List<dynamic>?;
+              final subRuns = renderer?['subtitle']?['runs'] as List<dynamic>?;
               final subtitle =
                   subRuns?.map((r) => r['text']?.toString() ?? '').join() ??
                   'YouTube Music';
 
               String? artwork;
               final thumbRenderer =
-                  renderer['thumbnailRenderer']?['musicThumbnailRenderer'];
+                  renderer?['thumbnailRenderer']?['musicThumbnailRenderer'];
               final thumbs =
                   thumbRenderer?['thumbnail']?['thumbnails'] as List<dynamic>?;
               if (thumbs != null && thumbs.isNotEmpty) {
@@ -2349,10 +2421,14 @@ class YtmAccountService {
           }
         }
 
-        if (node.containsKey('musicResponsiveListItemRenderer')) {
-          final renderer =
-              node['musicResponsiveListItemRenderer'] as Map<String, dynamic>;
-          final nav = renderer['navigationEndpoint'] as Map<String, dynamic>?;
+        if (nodeMap.containsKey('musicResponsiveListItemRenderer')) {
+          final rawRenderer = nodeMap['musicResponsiveListItemRenderer'];
+          final renderer = rawRenderer is Map
+              ? (rawRenderer is Map<String, dynamic>
+                  ? rawRenderer
+                  : rawRenderer.cast<String, dynamic>())
+              : null;
+          final nav = renderer?['navigationEndpoint'] as Map<String, dynamic>?;
           final browseId = nav?['browseEndpoint']?['browseId'] as String?;
           if (browseId != null &&
               (browseId.startsWith('VLPL') ||
@@ -2366,7 +2442,7 @@ class YtmAccountService {
               seenIds.add(cleanId);
 
               String title = 'Playlist';
-              final flexCols = renderer['flexColumns'] as List<dynamic>?;
+              final flexCols = renderer?['flexColumns'] as List<dynamic>?;
               if (flexCols != null && flexCols.isNotEmpty) {
                 final r =
                     flexCols[0]['musicResponsiveListItemFlexColumnRenderer']?['text']?['runs']
@@ -2388,7 +2464,7 @@ class YtmAccountService {
 
               String? artwork;
               final thumbs =
-                  renderer['thumbnail']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails']
+                  renderer?['thumbnail']?['musicThumbnailRenderer']?['thumbnail']?['thumbnails']
                       as List<dynamic>?;
               if (thumbs != null && thumbs.isNotEmpty) {
                 artwork = thumbs.last['url'] as String?;

@@ -12,6 +12,7 @@ import '../../../core/utils/l10n_extensions.dart';
 import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
 
+import '../../../core/utils/error_logger.dart';
 class ProxySettingsScreen extends StatefulWidget {
   final String? initialImportText;
 
@@ -301,10 +302,24 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                                   ],
                                 );
                                 if (files.isNotEmpty) {
-                                  final path = files.first.path;
-                                  if (path != null) {
-                                    final file = File(path);
-                                    final content = await file.readAsString();
+                                  final picked = files.first;
+                                  String? content;
+                                  if (picked.path != null) {
+                                    final file = File(picked.path!);
+                                    content = await file.readAsString();
+                                  } else {
+                                    // FIX(file_picker 12): bytes removed — use
+                                    // readAsBytes for SAF/cloud providers.
+                                    try {
+                                      final bytes =
+                                          await picked.readAsBytes();
+                                      content =
+                                          String.fromCharCodes(bytes);
+                                    } catch (e, st) {
+                                      ErrorLogger.log('fromCharCodes failed', error: e, stackTrace: st, category: 'ProxySettingsScreen');
+                                    }
+                                  }
+                                  if (content != null) {
                                     textController.text = content;
                                   }
                                 }

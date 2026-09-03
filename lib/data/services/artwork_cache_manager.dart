@@ -89,7 +89,9 @@ class ArtworkCacheManager {
           }
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_keyToFileName failed', error: e, stackTrace: st, category: 'ArtworkCacheManager');
+    }
     return null;
   }
 
@@ -139,7 +141,8 @@ class ArtworkCacheManager {
         }
       }
       return total;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('getDiskCacheSizeBytes failed, using fallback', error: e, stackTrace: st, category: 'ArtworkCacheManager');
       return 0;
     }
   }
@@ -194,10 +197,13 @@ class ArtworkCacheManager {
           try {
             await item.file.delete();
             currentSize -= item.size;
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('_enforceDiskLimit failed', error: e, stackTrace: st, category: 'ArtworkCacheManager');
+          }
         }
       }
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('_enforceDiskLimit failed', error: e, stackTrace: st, category: 'ArtworkCacheManager');
     } finally {
       _isCleaning = false;
     }

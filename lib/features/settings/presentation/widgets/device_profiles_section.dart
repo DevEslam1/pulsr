@@ -10,6 +10,7 @@ import '../../../../domain/services/hires_audio_service.dart';
 import '../../../../domain/services/settings_profiles_service.dart';
 import '../../../player/cubit/player_cubit.dart';
 
+import '../../../../core/utils/error_logger.dart';
 /// Phase 3: per-output-device profile links and the auto-switch master
 /// toggle. Read/write goes through [DeviceProfileService]; applying a
 /// profile goes through [PlayerCubit.applyProfile] so the cubit's guarded
@@ -52,7 +53,9 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
       try {
         final info = getIt<HiResAudioService>().currentOutputInfo;
         if (info != null) currentKey = DeviceProfileService.deviceKeyFromInfo(info);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('_reload failed', error: e, stackTrace: st, category: 'DeviceProfilesSection');
+      }
       if (!mounted) return;
       setState(() {
         _profiles = profiles;
@@ -62,7 +65,8 @@ class _DeviceProfilesSectionState extends State<DeviceProfilesSection> {
         _currentDeviceKey = currentKey;
         _loading = false;
       });
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('_reload failed, using fallback', error: e, stackTrace: st, category: 'DeviceProfilesSection');
       if (mounted) setState(() => _loading = false);
     }
   }

@@ -86,7 +86,9 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       if (pass != null) {
         _proxyPassword = pass;
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('getProxyPassword failed', error: e, stackTrace: st, category: 'SettingsCubit');
+    }
     return _proxyPassword;
   }
 
@@ -106,7 +108,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       if (isClosed) return;
       final savedSampleRate = state.currentOutputDevice?.targetSampleRate ?? 0;
       final savedBitDepth = state.currentOutputDevice?.targetBitDepth ?? 0;
-      emit(
+      safeEmit(
         state.copyWith(
           currentOutputDevice: device.copyWith(
             targetSampleRate:
@@ -128,7 +130,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
   }
 
   void clearError() {
-    emit(state.copyWith(errorMessage: null));
+    safeEmit(state.copyWith(errorMessage: null));
   }
 
   Future<void> reloadSettings() async {
@@ -305,7 +307,9 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
               value: legacyToken,
             );
             await prefs.remove(PrefsKeys.ytdlpBackendToken);
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('settings_cubit failed', error: e, stackTrace: st, category: 'SettingsCubit');
+          }
         } else {
           xdmToken = XdmBackendService.defaultApiToken;
         }
@@ -324,7 +328,9 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
                   .map((e) => ProxyEntry.fromMap(e as Map<String, dynamic>))
                   .where((e) => e.isValid)
                   .toList();
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('where failed', error: e, stackTrace: st, category: 'SettingsCubit');
+        }
       }
 
       // Proxy Settings
@@ -452,7 +458,9 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
           newState.systemEffectsPolicy,
           isHiResOrBitPerfect: newState.bitPerfectOutput,
         );
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('settings_cubit failed', error: e, stackTrace: st, category: 'SettingsCubit');
+      }
       if (newState.bitPerfectOutput) {
         await _hiResAudioService.setBitPerfectMode(true);
       }
@@ -463,15 +471,42 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         await AudioEffectsChannel().setBypassDspForBitPerfect(true);
       }
       if (!isClosed) {
-        emit(newState.copyWith(
-          proxyEnabled: state.proxyHost.isNotEmpty ? state.proxyEnabled : newState.proxyEnabled,
-          proxyType: state.proxyHost.isNotEmpty ? state.proxyType : newState.proxyType,
-          proxyHost: state.proxyHost.isNotEmpty ? state.proxyHost : newState.proxyHost,
-          proxyPort: state.proxyHost.isNotEmpty ? state.proxyPort : newState.proxyPort,
-          proxyUsername: state.proxyHost.isNotEmpty ? state.proxyUsername : newState.proxyUsername,
-          hasProxyPassword: state.proxyHost.isNotEmpty ? state.hasProxyPassword : newState.hasProxyPassword,
-          proxyBypassHosts: state.proxyHost.isNotEmpty ? state.proxyBypassHosts : newState.proxyBypassHosts,
-          proxyList: state.proxyList.isNotEmpty ? state.proxyList : newState.proxyList,
+        // FIX: fragile merge removed. The previous conditional merged current state's
+        // proxy fields when hardware output stream fired before prefs load finished,
+        // causing race-dependent lost writes. prefs-loaded newState is now the
+        // single source of truth; hardware stream (HiRes) only mutates outputDevice
+        // which we preserve below.
+        // FIX(race): _loadPreferences is async from ctor — user/test may have
+        // mutated proxy state before it finishes. Don't wipe non-empty
+        // in-memory proxy edits with empty prefs defaults.
+        final currentDevice = state.currentOutputDevice;
+        final keepProxyList = state.proxyList.isNotEmpty && proxyList.isEmpty
+            ? state.proxyList
+            : proxyList;
+        final keepProxyHost = state.proxyHost.isNotEmpty && proxyHost.isEmpty
+            ? state.proxyHost
+            : proxyHost;
+        final keepProxyPort = state.proxyHost.isNotEmpty && proxyHost.isEmpty
+            ? state.proxyPort
+            : proxyPort;
+        final keepProxyUsername =
+            state.proxyHost.isNotEmpty && proxyHost.isEmpty
+                ? state.proxyUsername
+                : proxyUsername;
+        final keepProxyEnabled =
+            state.proxyHost.isNotEmpty && proxyHost.isEmpty
+                ? state.proxyEnabled
+                : proxyEnabled;
+        safeEmit(newState.copyWith(
+          // Preserve hardware-derived output device if it arrived early and has richer data
+          currentOutputDevice: (currentDevice != null && currentDevice.availableDevices.isNotEmpty && newState.currentOutputDevice?.availableDevices.isEmpty == true)
+              ? currentDevice
+              : newState.currentOutputDevice,
+          proxyList: keepProxyList,
+          proxyHost: keepProxyHost,
+          proxyPort: keepProxyPort,
+          proxyUsername: keepProxyUsername,
+          proxyEnabled: keepProxyEnabled,
         ));
       }
       final savedSampleRate = prefs.getInt('target_output_sample_rate') ?? 0;
@@ -495,8 +530,8 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
 
   Future<void> setGapless(bool value) async {
     // Prevent gapless + crossfade together — auto-disable crossfade and inform user
-    if (value && state.crossfadeSeconds > 0.01) {
-      emit(
+    if (value && state.crossfadeSeconds > 0.0) {
+      safeEmit(
         state.copyWith(
           gaplessPlayback: true,
           crossfadeSeconds: 0.0,
@@ -512,16 +547,16 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       await prefs.setDouble(_keyCrossfade, 0.0);
       return;
     }
-    emit(state.copyWith(gaplessPlayback: value, errorMessage: null));
+    safeEmit(state.copyWith(gaplessPlayback: value, errorMessage: null));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyGapless, value);
   }
 
   Future<void> setCrossfade(double seconds) async {
     final clamped = seconds.clamp(0.0, 12.0);
-    if (clamped > 0.01 && state.gaplessPlayback) {
+    if (clamped > 0.0 && state.gaplessPlayback) {
       // Crossfade needs gapless OFF — auto-disable gapless
-      emit(
+      safeEmit(
         state.copyWith(
           crossfadeSeconds: clamped,
           gaplessPlayback: false,
@@ -535,26 +570,26 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       await prefs.setBool(_keyGapless, false);
       return;
     }
-    emit(state.copyWith(crossfadeSeconds: clamped, errorMessage: null));
+    safeEmit(state.copyWith(crossfadeSeconds: clamped, errorMessage: null));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(_keyCrossfade, clamped);
   }
 
   Future<void> setMinDuration(int seconds) async {
     final clamped = seconds.clamp(0, 300);
-    emit(state.copyWith(minDurationSec: clamped));
+    safeEmit(state.copyWith(minDurationSec: clamped));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_keyMinDuration, clamped);
   }
 
   Future<void> setAutoHideSystemMedia(bool value) async {
-    emit(state.copyWith(autoHideSystemMedia: value));
+    safeEmit(state.copyWith(autoHideSystemMedia: value));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyAutoHideSystemMedia, value);
   }
 
   Future<void> setThemeColorSource(ThemeColorSource source) async {
-    emit(state.copyWith(themeColorSource: source));
+    safeEmit(state.copyWith(themeColorSource: source));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyThemeColorSource, source.name);
     await prefs.setBool(_keyDynamicTheme, source == ThemeColorSource.artwork);
@@ -565,25 +600,25 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
   );
 
   Future<void> setResumeAfterInterruption(bool value) async {
-    emit(state.copyWith(resumeAfterInterruption: value));
+    safeEmit(state.copyWith(resumeAfterInterruption: value));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyResumeAfterInterruption, value);
   }
 
   Future<void> setWaveformSeekBar(bool value) async {
-    emit(state.copyWith(waveformSeekBarEnabled: value));
+    safeEmit(state.copyWith(waveformSeekBarEnabled: value));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyWaveformSeekBar, value);
   }
 
   Future<void> setThemeMode(AppThemeMode mode) async {
-    emit(state.copyWith(themeMode: mode));
+    safeEmit(state.copyWith(themeMode: mode));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyThemeMode, mode.name);
   }
 
   Future<void> setLanguage(String languageCode) async {
-    emit(state.copyWith(languageCode: languageCode));
+    safeEmit(state.copyWith(languageCode: languageCode));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyLanguageCode, languageCode);
   }
@@ -592,40 +627,41 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     int colorVal;
     try {
       colorVal = (color as dynamic).toARGB32() as int;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('toARGB32 failed, using fallback', error: e, stackTrace: st, category: 'SettingsCubit');
       colorVal = color.toARGB32();
     }
-    emit(state.copyWith(customAccentColorValue: colorVal));
+    safeEmit(state.copyWith(customAccentColorValue: colorVal));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_keyCustomAccent, colorVal);
   }
 
   Future<void> setPlayerThemeMode(PlayerThemeMode mode) async {
-    emit(state.copyWith(playerThemeMode: mode));
+    safeEmit(state.copyWith(playerThemeMode: mode));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyPlayerThemeMode, mode.name);
   }
 
   Future<void> setVisualizerStyle(VisualizerStyle style) async {
-    emit(state.copyWith(visualizerStyle: style));
+    safeEmit(state.copyWith(visualizerStyle: style));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyVisualizerStyle, style.name);
   }
 
   Future<void> setMiniPlayerSwipeLeft(MiniPlayerSwipeAction action) async {
-    emit(state.copyWith(miniPlayerSwipeLeft: action));
+    safeEmit(state.copyWith(miniPlayerSwipeLeft: action));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyMiniPlayerSwipeLeft, action.name);
   }
 
   Future<void> setMiniPlayerSwipeRight(MiniPlayerSwipeAction action) async {
-    emit(state.copyWith(miniPlayerSwipeRight: action));
+    safeEmit(state.copyWith(miniPlayerSwipeRight: action));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyMiniPlayerSwipeRight, action.name);
   }
 
   Future<void> setNowPlayingDoubleTap(NowPlayingDoubleTapAction action) async {
-    emit(state.copyWith(nowPlayingDoubleTap: action));
+    safeEmit(state.copyWith(nowPlayingDoubleTap: action));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyNowPlayingDoubleTap, action.name);
   }
@@ -633,7 +669,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
   Future<void> setNowPlayingArtworkSwipe(
     NowPlayingArtworkSwipeAction action,
   ) async {
-    emit(state.copyWith(nowPlayingArtworkSwipe: action));
+    safeEmit(state.copyWith(nowPlayingArtworkSwipe: action));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyNowPlayingArtworkSwipe, action.name);
   }
@@ -646,7 +682,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         device: state.currentOutputDevice,
       );
       if (blocked != null) {
-        emit(state.copyWith(errorMessage: blocked));
+        safeEmit(state.copyWith(errorMessage: blocked));
         return;
       }
     }
@@ -655,43 +691,43 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     // PlayerCubit reacts to this state emission by re-applying the gain. Save
     // first so AudioHandler's cached preferences cannot calculate using the
     // previous mode (which made ReplayGain look enabled but sound unchanged).
-    emit(state.copyWith(replayGainMode: mode, errorMessage: null));
+    safeEmit(state.copyWith(replayGainMode: mode, errorMessage: null));
   }
 
   Future<void> setReplayGainPreampWithRg(double db) async {
     final clamped = db.clamp(-15.0, 15.0);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(_keyReplayGainPreampWithRg, clamped);
-    emit(state.copyWith(replayGainPreampWithRg: clamped));
+    safeEmit(state.copyWith(replayGainPreampWithRg: clamped));
   }
 
   Future<void> setReplayGainPreampWithoutRg(double db) async {
     final clamped = db.clamp(-15.0, 15.0);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble(_keyReplayGainPreampWithoutRg, clamped);
-    emit(state.copyWith(replayGainPreampWithoutRg: clamped));
+    safeEmit(state.copyWith(replayGainPreampWithoutRg: clamped));
   }
 
   Future<void> setStreamingQuality(YtmAudioQuality quality) async {
-    emit(state.copyWith(streamingQuality: quality));
+    safeEmit(state.copyWith(streamingQuality: quality));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyStreamingQuality, quality.name);
   }
 
   Future<void> setDownloadQuality(YtmAudioQuality quality) async {
-    emit(state.copyWith(downloadQuality: quality));
+    safeEmit(state.copyWith(downloadQuality: quality));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyDownloadQuality, quality.name);
   }
 
   Future<void> setWifiOnlyMode(bool enabled) async {
-    emit(state.copyWith(wifiOnlyMode: enabled));
+    safeEmit(state.copyWith(wifiOnlyMode: enabled));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyWifiOnlyMode, enabled);
   }
 
   Future<void> setOfflineOnlyMode(bool enabled) async {
-    emit(state.copyWith(offlineOnlyMode: enabled));
+    safeEmit(state.copyWith(offlineOnlyMode: enabled));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyOfflineOnlyMode, enabled);
   }
@@ -702,7 +738,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyProxyEnabled, enabled);
     final updated = state.copyWith(proxyEnabled: enabled);
-    emit(updated);
+    safeEmit(updated);
     if (!enabled) {
       await _syncProxySettings(const ProxyConfig(enabled: false));
     } else {
@@ -721,17 +757,41 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
   }) async {
     final trimmedHost = host.trim();
     if (enabled) {
-      final isIPv4 = RegExp(r'^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$').hasMatch(trimmedHost);
-      final isIPv6 = RegExp(r'^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$').hasMatch(trimmedHost) ||
-          trimmedHost == '::1' || trimmedHost.startsWith('fe80:');
-      final isHostname = RegExp(r'^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$').hasMatch(trimmedHost);
-      final isLocalhost = trimmedHost == 'localhost' || trimmedHost == '127.0.0.1';
-      if (trimmedHost.isEmpty || (!isIPv4 && !isIPv6 && !isHostname && !isLocalhost)) {
-        emit(state.copyWith(errorMessage: 'Invalid proxy host format'));
+      if (trimmedHost.isEmpty) {
+        safeEmit(state.copyWith(errorMessage: 'Proxy host cannot be empty'));
+        return;
+      }
+      // FIX: delegate host validation to Uri + strict regex to avoid junk like ::::: matching IPv6 pattern.
+      // We try Uri parsing first, then strict IPv4/hostname/IPv6 checks.
+      bool isValidHost = false;
+      // Try Uri/host validation
+      try {
+        final uri = Uri.tryParse('http://$trimmedHost');
+        final hostPart = uri?.host ?? '';
+        if (hostPart.isNotEmpty && hostPart == trimmedHost.replaceAll(RegExp(r'^\[|\]$'), '')) {
+          // Uri parsed successfully and host matches (handles brackets for IPv6)
+          isValidHost = true;
+        }
+      } catch (e, st) {
+        ErrorLogger.log('setProxySettings failed', error: e, stackTrace: st, category: 'SettingsCubit');
+      }
+      if (!isValidHost) {
+        final isIPv4 = RegExp(r'^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$').hasMatch(trimmedHost);
+        // Stricter IPv6: at least 2 colons, only hex + colons, no 4+ consecutive colons
+        final isIPv6 = !trimmedHost.contains('::::') &&
+            RegExp(r'^[0-9a-fA-F:]+$').hasMatch(trimmedHost) &&
+            trimmedHost.contains(':') &&
+            (trimmedHost == '::1' || trimmedHost.startsWith('fe80:') || RegExp(r'^([0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$').hasMatch(trimmedHost));
+        final isHostname = RegExp(r'^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$').hasMatch(trimmedHost);
+        final isLocalhost = trimmedHost == 'localhost' || trimmedHost == '127.0.0.1';
+        isValidHost = isIPv4 || isIPv6 || isHostname || isLocalhost;
+      }
+      if (!isValidHost) {
+        safeEmit(state.copyWith(errorMessage: 'Invalid proxy host format'));
         return;
       }
       if (port < 1 || port > 65535) {
-        emit(state.copyWith(errorMessage: 'Proxy port must be between 1 and 65535'));
+        safeEmit(state.copyWith(errorMessage: 'Proxy port must be between 1 and 65535'));
         return;
       }
     }
@@ -758,7 +818,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       proxyBypassHosts: newConfig.bypassHosts,
     );
 
-    emit(updated);
+    safeEmit(updated);
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_keyProxyEnabled, newConfig.enabled);
@@ -775,7 +835,9 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       } else {
         await _secureStorage.delete(key: _keyProxyPasswordSecure);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('setProxySettings failed', error: e, stackTrace: st, category: 'SettingsCubit');
+    }
     await prefs.remove(_keyProxyPassword);
     await prefs.setString(_keyProxyBypassHosts, newConfig.bypassHosts);
 
@@ -820,7 +882,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     }
 
     if (addedCount > 0) {
-      emit(state.copyWith(proxyList: existing));
+      safeEmit(state.copyWith(proxyList: existing));
       await _saveProxyList(existing);
       if (autoSelectFirst && existing.isNotEmpty) {
         await selectProxyEntry(parsed.first);
@@ -843,7 +905,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     } else {
       existing.add(entry);
     }
-    emit(state.copyWith(proxyList: existing));
+    safeEmit(state.copyWith(proxyList: existing));
     await _saveProxyList(existing);
     if (autoSelect) {
       await selectProxyEntry(entry);
@@ -853,13 +915,13 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
   /// Removes a proxy from the pool by ID.
   Future<void> removeProxyEntry(String id) async {
     final updated = state.proxyList.where((e) => e.id != id).toList();
-    emit(state.copyWith(proxyList: updated));
+    safeEmit(state.copyWith(proxyList: updated));
     await _saveProxyList(updated);
   }
 
   /// Clears the entire proxy pool.
   Future<void> clearProxyList() async {
-    emit(state.copyWith(proxyList: []));
+    safeEmit(state.copyWith(proxyList: []));
     await _saveProxyList([]);
   }
 
@@ -881,7 +943,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
   Future<void> testAllProxies() async {
     if (state.proxyList.isEmpty || state.isTestingAllProxies) return;
 
-    emit(state.copyWith(isTestingAllProxies: true));
+    safeEmit(state.copyWith(isTestingAllProxies: true));
     final currentList = List<ProxyEntry>.from(state.proxyList);
 
     for (int i = 0; i < currentList.length; i += 5) {
@@ -889,7 +951,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       for (int j = i; j < end; j++) {
         currentList[j] = currentList[j].copyWith(isTesting: true);
       }
-      emit(state.copyWith(proxyList: List.from(currentList)));
+      safeEmit(state.copyWith(proxyList: List.from(currentList)));
 
       await Future.wait(
         List.generate(end - i, (offset) async {
@@ -908,10 +970,10 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         }),
       );
 
-      emit(state.copyWith(proxyList: List.from(currentList)));
+      safeEmit(state.copyWith(proxyList: List.from(currentList)));
     }
 
-    emit(state.copyWith(isTestingAllProxies: false));
+    safeEmit(state.copyWith(isTestingAllProxies: false));
     await _saveProxyList(currentList);
   }
 
@@ -923,7 +985,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     final entry = state.proxyList[index];
     final updatedList = List<ProxyEntry>.from(state.proxyList);
     updatedList[index] = entry.copyWith(isTesting: true);
-    emit(state.copyWith(proxyList: updatedList));
+    safeEmit(state.copyWith(proxyList: updatedList));
 
     final result = await AppHttpOverrides.instance.testConnection(
       configToTest: entry.toProxyConfig(enabled: true),
@@ -936,7 +998,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       latencyMs: result.latencyMs,
       lastError: result.error,
     );
-    emit(state.copyWith(proxyList: updatedList));
+    safeEmit(state.copyWith(proxyList: updatedList));
     await _saveProxyList(updatedList);
   }
 
@@ -951,7 +1013,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       if (a.isWorking != true && b.isWorking == true) return 1;
       return 0;
     });
-    emit(state.copyWith(proxyList: list));
+    safeEmit(state.copyWith(proxyList: list));
     await _saveProxyList(list);
   }
 
@@ -960,7 +1022,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     await prefs.setString(PrefsKeys.extractorEngine, engine.name);
     final isBackendActive = engine != ExtractorEngine.onDevice;
     await prefs.setBool(PrefsKeys.ytdlpBackendEnabled, isBackendActive);
-    emit(
+    safeEmit(
       state.copyWith(
         extractorEngine: engine,
         ytdlpBackendEnabled: isBackendActive,
@@ -973,7 +1035,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     await prefs.setBool(PrefsKeys.ytdlpBackendEnabled, enabled);
     final newEngine = enabled ? ExtractorEngine.auto : ExtractorEngine.onDevice;
     await prefs.setString(PrefsKeys.extractorEngine, newEngine.name);
-    emit(
+    safeEmit(
       state.copyWith(ytdlpBackendEnabled: enabled, extractorEngine: newEngine),
     );
   }
@@ -985,7 +1047,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       if (parsed == null ||
           (!parsed.isScheme('http') && !parsed.isScheme('https')) ||
           parsed.host.isEmpty) {
-        emit(
+        safeEmit(
           state.copyWith(
             errorMessage:
                 'Invalid backend URL format. Must be http:// or https://',
@@ -996,7 +1058,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(PrefsKeys.ytdlpBackendUrl, cleanUrl);
-    emit(state.copyWith(ytdlpBackendUrl: cleanUrl, errorMessage: null));
+    safeEmit(state.copyWith(ytdlpBackendUrl: cleanUrl, errorMessage: null));
   }
 
   Future<void> setYtdlpBackendToken(String token) async {
@@ -1010,20 +1072,22 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       } else {
         await _secureStorage.delete(key: 'xdm_backend_token_secure');
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('setYtdlpBackendToken failed', error: e, stackTrace: st, category: 'SettingsCubit');
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(PrefsKeys.ytdlpBackendToken);
-    emit(state.copyWith(ytdlpBackendToken: cleanToken));
+    safeEmit(state.copyWith(ytdlpBackendToken: cleanToken));
   }
 
   Future<void> setSyncCookiesToBackend(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.syncCookiesToBackend, value);
-    emit(state.copyWith(syncCookiesToBackend: value));
+    safeEmit(state.copyWith(syncCookiesToBackend: value));
   }
 
   Future<void> testYtdlpBackend() async {
-    emit(
+    safeEmit(
       state.copyWith(
         isTestingYtdlpBackend: true,
         ytdlpBackendStatusMessage: null,
@@ -1032,7 +1096,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     try {
       final xdm = getIt<XdmBackendService>();
       final health = await xdm.checkHealth(force: true);
-      emit(
+      safeEmit(
         state.copyWith(
           isTestingYtdlpBackend: false,
           ytdlpBackendStatusMessage: health.message,
@@ -1042,7 +1106,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         ),
       );
     } catch (e) {
-      emit(
+      safeEmit(
         state.copyWith(
           isTestingYtdlpBackend: false,
           ytdlpBackendStatusMessage: 'Error: $e',
@@ -1052,7 +1116,10 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
   }
 
   Future<int> rescanLibrary() async {
-    emit(
+    // FIX: re-entrancy guard — startup auto-scan + user tap raced two full
+    // MediaStore scans (double DB writes, orphan flaps).
+    if (state.isScanning) return 0;
+    safeEmit(
       state.copyWith(
         isScanning: true,
         scanResultCount: null,
@@ -1065,10 +1132,15 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         minDurationSec: state.minDurationSec,
         autoHideSystemMedia: state.autoHideSystemMedia,
       );
-      emit(state.copyWith(isScanning: false, scanResultCount: count));
+      if (isClosed) return count;
+      safeEmit(state.copyWith(isScanning: false, scanResultCount: count));
       return count;
     } catch (e) {
-      emit(state.copyWith(isScanning: false, errorMessage: e.toString()));
+      if (isClosed) return 0;
+      // Don't leak internals (paths, SQL) to the snackbar.
+      safeEmit(state.copyWith(
+          isScanning: false,
+          errorMessage: 'Library scan failed. Please try again.'));
       return 0;
     }
   }
@@ -1079,11 +1151,11 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         state.currentOutputDevice,
       );
       if (block != null) {
-        emit(state.copyWith(errorMessage: block));
+        safeEmit(state.copyWith(errorMessage: block));
         return;
       }
     }
-    emit(
+    safeEmit(
       state.copyWith(
         bitPerfectOutput: enabled,
         currentOutputDevice: state.currentOutputDevice?.copyWith(
@@ -1099,11 +1171,13 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     if (enabled && state.bypassDspOnBitPerfect) {
       try {
         await AudioEffectsChannel().setBypassDspForBitPerfect(true);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('setBitPerfectOutput failed', error: e, stackTrace: st, category: 'SettingsCubit');
+      }
       // Also force ReplayGain off — software gain breaks bit-perfect
       if (state.replayGainMode != ReplayGainMode.off) {
         await prefs.setString(_keyReplayGainMode, ReplayGainMode.off.name);
-        emit(
+        safeEmit(
           state.copyWith(
             replayGainMode: ReplayGainMode.off,
             errorMessage:
@@ -1114,20 +1188,24 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     } else if (!enabled) {
       try {
         await AudioEffectsChannel().setBypassDspForBitPerfect(false);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('setBitPerfectOutput failed', error: e, stackTrace: st, category: 'SettingsCubit');
+      }
     }
     await refreshOutputDevice();
   }
 
   Future<void> setBypassDspOnBitPerfect(bool enabled) async {
-    emit(state.copyWith(bypassDspOnBitPerfect: enabled));
+    safeEmit(state.copyWith(bypassDspOnBitPerfect: enabled));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(PrefsKeys.bypassDspOnBitPerfect, enabled);
     // Apply immediately if bit-perfect is currently active
     if (state.bitPerfectOutput) {
       try {
         await AudioEffectsChannel().setBypassDspForBitPerfect(enabled);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('setBypassDspOnBitPerfect failed', error: e, stackTrace: st, category: 'SettingsCubit');
+      }
       await refreshOutputDevice();
     }
   }
@@ -1146,7 +1224,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
               maxBitDepth: d.maxBitDepth,
             );
           }).toList();
-      emit(
+      safeEmit(
         state.copyWith(
           currentOutputDevice: state.currentOutputDevice!.copyWith(
             availableDevices: updatedDevices,
@@ -1165,7 +1243,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
 
   Future<void> setTargetOutputSampleRate(int sampleRate) async {
     if (state.currentOutputDevice != null) {
-      emit(
+      safeEmit(
         state.copyWith(
           currentOutputDevice: state.currentOutputDevice!.copyWith(
             targetSampleRate: sampleRate,
@@ -1185,7 +1263,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
 
   Future<void> setTargetOutputBitDepth(int bitDepth) async {
     if (state.currentOutputDevice != null) {
-      emit(
+      safeEmit(
         state.copyWith(
           currentOutputDevice: state.currentOutputDevice!.copyWith(
             targetBitDepth: bitDepth,
@@ -1208,7 +1286,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
   Future<void> setBluetoothCodec(String codec) async {
     // Optimistic UI: update btCodecName immediately
     if (state.currentOutputDevice != null) {
-      emit(
+      safeEmit(
         state.copyWith(
           currentOutputDevice: state.currentOutputDevice!.copyWith(
             btCodecName: codec,
@@ -1222,7 +1300,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
 
   Future<void> setBluetoothSampleRate(int hz) async {
     if (state.currentOutputDevice != null) {
-      emit(
+      safeEmit(
         state.copyWith(
           currentOutputDevice: state.currentOutputDevice!.copyWith(
             btSampleRateHz: hz,
@@ -1236,7 +1314,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
 
   Future<void> setBluetoothBitDepth(int bits) async {
     if (state.currentOutputDevice != null) {
-      emit(
+      safeEmit(
         state.copyWith(
           currentOutputDevice: state.currentOutputDevice!.copyWith(
             btBitDepth: bits,
@@ -1250,7 +1328,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
 
   Future<void> setBluetoothLdacQuality(int mode) async {
     if (state.currentOutputDevice != null) {
-      emit(
+      safeEmit(
         state.copyWith(
           currentOutputDevice: state.currentOutputDevice!.copyWith(
             btLdacQualityMode: mode,
@@ -1266,8 +1344,19 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
   /// Falls back to opening app settings if already permanently denied.
   Future<void> requestBluetoothPermission() async {
     await _hiResAudioService.requestBluetoothPermission();
-    await Future<void>.delayed(const Duration(milliseconds: 500));
-    await refreshOutputDevice();
+    // FIX: replace magic 500ms with permission-aware poll. The system dialog is
+    // async; waiting fixed 500ms raced slow devices. We now poll permission
+    // state via refreshOutputDevice with exponential backoff up to ~2s.
+    for (int attempt = 0; attempt < 4; attempt++) {
+      await Future<void>.delayed(Duration(milliseconds: 300 * (1 << attempt) ~/ 2 + 200));
+      await refreshOutputDevice();
+      // If device info shows Bluetooth available, break early.
+      final dev = state.currentOutputDevice;
+      if (dev != null && dev.availableDevices.any((d) => d.typeName.toLowerCase().contains('bluetooth'))) {
+        break;
+      }
+      if (attempt == 3) break;
+    }
   }
 
   /// Opens Android Developer Options directly to the Bluetooth Audio Codec page.
@@ -1289,7 +1378,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     final isBitPerfect = state.bitPerfectOutput;
 
     if (isClosed) return;
-    emit(
+    safeEmit(
       state.copyWith(
         currentOutputDevice: info.copyWith(
           targetSampleRate:
@@ -1306,7 +1395,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
   }
 
   Future<void> setDspPreference(String preference) async {
-    emit(state.copyWith(dspPreference: preference));
+    safeEmit(state.copyWith(dspPreference: preference));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_keyDspPreference, preference);
     await AudioEffectsChannel().setDspPreference(preference);
@@ -1322,7 +1411,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     final newThreshold = thresholdDb ?? state.limiterThresholdDb;
     final newRelease = releaseMs ?? state.limiterReleaseMs;
     final newLookahead = lookaheadMs ?? state.limiterLookaheadMs;
-    emit(
+    safeEmit(
       state.copyWith(
         limiterEnabled: newEnabled,
         limiterThresholdDb: newThreshold,
@@ -1341,7 +1430,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
   }
 
   Future<void> setSystemEffectsPolicy(String policy) async {
-    emit(state.copyWith(systemEffectsPolicy: policy));
+    safeEmit(state.copyWith(systemEffectsPolicy: policy));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(PrefsKeys.systemEffectsPolicy, policy);
     try {
@@ -1350,9 +1439,11 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         isHiResOrBitPerfect: state.bitPerfectOutput,
       );
       if (!isClosed) {
-        emit(state.copyWith(systemEffectsStatus: status));
+        safeEmit(state.copyWith(systemEffectsStatus: status));
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('setSystemEffectsPolicy failed', error: e, stackTrace: st, category: 'SettingsCubit');
+    }
   }
 
   Future<void> refreshSystemEffectsStatus() async {
@@ -1361,17 +1452,19 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       final status = result['status'] as String? ?? 'unknown';
       final bundles = (result['detectedBundles'] as List<dynamic>?)?.cast<String>() ?? [];
       if (!isClosed) {
-        emit(state.copyWith(
+        safeEmit(state.copyWith(
           systemEffectsStatus: status,
           systemEffectsBundles: bundles,
         ));
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('refreshSystemEffectsStatus failed', error: e, stackTrace: st, category: 'SettingsCubit');
+    }
   }
 
   Future<void> setBluetoothLatencyOffsetMs(int offsetMs) async {
     final clamped = offsetMs.clamp(0, 500);
-    emit(state.copyWith(bluetoothLatencyOffsetMs: clamped));
+    safeEmit(state.copyWith(bluetoothLatencyOffsetMs: clamped));
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(PrefsKeys.bluetoothLatencyOffsetMs, clamped);
   }

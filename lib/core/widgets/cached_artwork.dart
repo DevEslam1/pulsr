@@ -8,6 +8,7 @@ import 'package:pulsr/data/services/artwork_cache_manager.dart';
 import '../di/injection.dart';
 import 'artwork_placeholder.dart';
 
+import '../utils/error_logger.dart';
 /// LRU Memory Bitmap Cache for Artwork images.
 /// Delegates to [ArtworkCacheManager] for persistent disk storage and size bounds.
 class ArtworkLruCache {
@@ -219,10 +220,13 @@ class _CachedArtworkState extends State<CachedArtwork> {
       ).timeout(const Duration(seconds: 8));
       if (bytes.lengthInBytes > _maxRemoteBytes) return null;
       return bytes;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('_fetchRemote failed, using fallback', error: e, stackTrace: st, category: 'CachedArtwork');
       try {
         request?.abort();
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('_fetchRemote failed', error: e, stackTrace: st, category: 'CachedArtwork');
+      }
       return null;
     }
   }

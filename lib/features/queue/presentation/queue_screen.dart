@@ -36,7 +36,7 @@ class QueueScreen extends StatelessWidget {
                 final cubit = context.read<PlayerCubit>();
                 switch (v) {
                   case 'clear':
-                    final confirm = await showDialog<bool>(context: context, useRootNavigator: true, builder: (c) => AlertDialog(title: Text(context.l10n.queue), content: const Text('Clear entire queue?'), actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(c, true), child: const Text('Clear'))]));
+                    final confirm = await showDialog<bool>(context: context, useRootNavigator: true, builder: (c) => AlertDialog(title: Text(context.l10n.queue), content: Text(context.l10n.clearEntireQueueConfirm), actions: [TextButton(onPressed: () => Navigator.pop(c, false), child: Text(context.l10n.cancel)), FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(context.l10n.clearAction))]));
                     if (confirm == true) {
                       for (int i = state.queue.length - 1; i >= 0; i--) {
                         if (state.queue[i].id != state.currentSong?.id) await cubit.removeQueueItem(i);
@@ -51,7 +51,7 @@ class QueueScreen extends StatelessWidget {
                     break;
                   case 'save':
                     final nameCtrl = TextEditingController(text: 'Queue ${DateTime.now().toIso8601String().substring(0,10)}');
-                    final name = await showDialog<String>(context: context, builder: (c) => AlertDialog(title: const Text('Save as playlist'), content: TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'Playlist name'), autofocus: true), actions: [TextButton(onPressed: () => Navigator.pop(c), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(c, nameCtrl.text.trim()), child: const Text('Save'))]));
+                    final name = await showDialog<String>(context: context, builder: (c) => AlertDialog(title: Text(context.l10n.saveAsPlaylistAction), content: TextField(controller: nameCtrl, decoration: InputDecoration(labelText: context.l10n.playlistNameLabel), autofocus: true), actions: [TextButton(onPressed: () => Navigator.pop(c), child: Text(context.l10n.cancel)), FilledButton(onPressed: () => Navigator.pop(c, nameCtrl.text.trim()), child: Text(context.l10n.save))]));
                     if (name != null && name.isNotEmpty) {
                       if (!context.mounted) break;
                       try {
@@ -64,17 +64,17 @@ class QueueScreen extends StatelessWidget {
                         if (playlistId == null) {
                           final err = context.read<PlaylistCubit>().state.errorMessage;
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Failed to create playlist: ${err ?? "unknown error"}')),
+                            SnackBar(content: Text(context.l10n.failedToCreatePlaylist(err ?? 'unknown error'))),
                           );
                         } else {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Queue saved as "$name" (${state.queue.length} tracks)')),
+                            SnackBar(content: Text(context.l10n.queueSavedAs(name, state.queue.length))),
                           );
                         }
                       } catch (e) {
                         if (!context.mounted) break;
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error saving playlist: $e')),
+                          SnackBar(content: Text(context.l10n.errorSavingPlaylist('$e'))),
                         );
                       }
                     }
@@ -82,10 +82,29 @@ class QueueScreen extends StatelessWidget {
                 }
               },
               itemBuilder: (c) => [
-                const PopupMenuItem(value: 'shuffle', child: Row(children: [Icon(Icons.shuffle), SizedBox(width: 8), Text('Shuffle queue')])),
-                const PopupMenuItem(value: 'save', child: Row(children: [Icon(Icons.playlist_add), SizedBox(width: 8), Text('Save as playlist')])),
+                PopupMenuItem(
+                    value: 'shuffle',
+                    child: Row(children: [
+                      const Icon(Icons.shuffle),
+                      const SizedBox(width: 8),
+                      Text(context.l10n.shuffleQueueAction)
+                    ])),
+                PopupMenuItem(
+                    value: 'save',
+                    child: Row(children: [
+                      const Icon(Icons.playlist_add),
+                      const SizedBox(width: 8),
+                      Text(context.l10n.saveAsPlaylistAction)
+                    ])),
                 const PopupMenuDivider(),
-                const PopupMenuItem(value: 'clear', child: Row(children: [Icon(Icons.clear_all, color: Colors.red), SizedBox(width: 8), Text('Clear queue', style: TextStyle(color: Colors.red))])),
+                PopupMenuItem(
+                    value: 'clear',
+                    child: Row(children: [
+                      const Icon(Icons.clear_all, color: Colors.red),
+                      const SizedBox(width: 8),
+                      Text(context.l10n.clearQueue,
+                          style: const TextStyle(color: Colors.red))
+                    ])),
               ],
             );
           }),

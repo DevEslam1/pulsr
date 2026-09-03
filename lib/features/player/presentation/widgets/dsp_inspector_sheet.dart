@@ -12,6 +12,7 @@ import '../../../settings/cubit/settings_state.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 
+import '../../../../core/utils/error_logger.dart';
 class DspInspectorSheet extends StatefulWidget {
   const DspInspectorSheet({super.key});
 
@@ -396,7 +397,8 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                     if (!mounted) return;
                     messenger.showSnackBar(const SnackBar(content: Text('Switched DSP Preference → OEM. Restart track to attach.')));
                     unawaited(_refreshReport());
-                  } catch (_) {
+                  } catch (e, st) {
+                    ErrorLogger.log('dsp_inspector_sheet failed, using fallback', error: e, stackTrace: st, category: 'DspInspectorSheet');
                     if (!mounted) return;
                     messenger.showSnackBar(const SnackBar(content: Text('Failed to switch preference — change in Settings → Audio')));
                   }
@@ -416,7 +418,9 @@ class _DspInspectorSheetState extends State<DspInspectorSheet> {
                   // Best-effort reattach using current PlayerState session.
                   final sid = playerState.audioSessionId;
                   if (sid != null && sid > 0) {
-                    try { await AudioEffectsChannel().setAudioSessionId(sid); } catch (_) {}
+                    try { await AudioEffectsChannel().setAudioSessionId(sid); } catch (e, st) {
+                      ErrorLogger.log('dsp_inspector_sheet failed', error: e, stackTrace: st, category: 'DspInspectorSheet');
+                    }
                   }
                   // Refresh report after attempt
                   if (!mounted) return;

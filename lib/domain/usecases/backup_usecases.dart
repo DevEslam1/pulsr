@@ -9,6 +9,7 @@ import '../../core/utils/error_logger.dart';
 import '../../data/db/app_database.dart';
 import '../repositories/music_repository_interface.dart';
 
+import '../../core/utils/app_logger.dart';
 class ImportResult {
   final int restoredFavoritesCount;
   final int restoredPlaylistsCount;
@@ -94,7 +95,11 @@ class ExportBackupUseCase {
       'replayGainPreampWithoutRg': prefs.getDouble('setting_replay_gain_preamp_without_rg') ?? -3.0,
       'wifiOnlyMode': prefs.getBool('setting_wifi_only_mode') ?? false,
       'offlineOnlyMode': prefs.getBool('setting_offline_only_mode') ?? false,
-      'bitPerfectMode': prefs.getBool('setting_bit_perfect') ?? false,
+      // FIX: canonical key is setting_bit_perfect_output (PrefsKeys.bitPerfectOutput).
+      // Read both (new + legacy) so old backups still restore.
+      'bitPerfectMode': prefs.getBool('setting_bit_perfect_output') ??
+          prefs.getBool('setting_bit_perfect') ??
+          false,
       'dspPreference': prefs.getString('setting_dsp_preference') ?? 'native',
       'streamingQuality': prefs.getString('setting_streaming_quality') ?? 'high',
       'downloadQuality': prefs.getString('setting_download_quality') ?? 'high',
@@ -177,8 +182,9 @@ class ImportBackupUseCase {
         final dynamic f = file;
         try {
           length = await f.length() as int;
-        } catch (_) {
+        } catch (e) {
           // Fallback: try reading content directly and measure bytes
+          AppLogger.debug('executeFromFile failed (non-fatal): $e', category: 'BackupUsecases');
           final c = await f.readAsString() as String;
           length = utf8.encode(c).length;
           if (length > maxBackupSizeBytes) {
@@ -358,66 +364,70 @@ class ImportBackupUseCase {
     int restoredPlaylistsCount = 0;
     if (data['playlists'] != null && data['playlists'] is List) {
       final playlistsList = data['playlists'] as List;
-      for (final item in playlistsList) {
+
+      Future<void> restoreSinglePlaylist(dynamic item) async {
         if (item is Map<String, dynamic> && item.containsKey('name')) {
-          // No outer _db.transaction here: repository methods already handle
-          // their own transactions. Nesting would cause SQLITE_BUSY.
-          {
-            final name = item['name'] as String? ?? 'Restored Playlist';
-            final isSmart = item['isSmart'] as bool? ?? false;
-            final smartCriteria = item['smartCriteria'] as String?;
-            final songPaths = (item['songPaths'] is List)
-                ? (item['songPaths'] as List).whereType<String>().toList()
-                : <String>[];
+          final name = item['name'] as String? ?? 'Restored Playlist';
+          final isSmart = item['isSmart'] as bool? ?? false;
+          final smartCriteria = item['smartCriteria'] as String?;
+          final songPaths = (item['songPaths'] is List)
+              ? (item['songPaths'] as List).whereType<String>().toList()
+              : <String>[];
 
-            final existingPlaylistsRes = await _repository.getPlaylists();
-            final existingList = existingPlaylistsRes.fold(
-                (l) => <PlaylistsTableData>[], (r) => r);
-            final existing =
-                existingList.where((p) => p.name == name).firstOrNull;
+          final existingPlaylistsRes = await _repository.getPlaylists();
+          final existingList = existingPlaylistsRes.fold(
+              (l) => <PlaylistsTableData>[], (r) => r);
+          final existing =
+              existingList.where((p) => p.name == name).firstOrNull;
 
-            int? playlistId;
-            if (existing != null) {
-              playlistId = existing.id;
-              if (isSmart && smartCriteria != null) {
-                await _repository.updateSmartPlaylist(
-                    existing.id, name, smartCriteria);
-              }
-            } else {
-              final createRes = await _repository.createPlaylist(
-                name,
-                isSmart: isSmart,
-                smartCriteria: smartCriteria,
-              );
-              playlistId = createRes.fold(
-                (f) => null,
-                (id) => id,
-              );
+          int? playlistId;
+          if (existing != null) {
+            playlistId = existing.id;
+            if (isSmart && smartCriteria != null) {
+              await _repository.updateSmartPlaylist(
+                  existing.id, name, smartCriteria);
             }
+          } else {
+            final createRes = await _repository.createPlaylist(
+              name,
+              isSmart: isSmart,
+              smartCriteria: smartCriteria,
+            );
+            playlistId = createRes.fold(
+              (f) => null,
+              (id) => id,
+            );
+          }
 
-            if (playlistId != null) {
-              if (!isSmart) {
-                final matchedSongIds = <int>[];
-                for (final path in songPaths) {
-                  final matched = matchPath(path);
-                  if (matched != null) {
-                    if (!matchedSongIds.contains(matched.id)) {
-                      matchedSongIds.add(matched.id);
-                    }
-                  } else {
-                    unmatchedPaths.add(path);
+          if (playlistId != null) {
+            if (!isSmart) {
+              final matchedSongIds = <int>[];
+              for (final path in songPaths) {
+                final matched = matchPath(path);
+                if (matched != null) {
+                  if (!matchedSongIds.contains(matched.id)) {
+                    matchedSongIds.add(matched.id);
                   }
-                }
-
-                if (matchedSongIds.isNotEmpty) {
-                  await _repository.addSongsToPlaylist(
-                      playlistId, matchedSongIds);
+                } else {
+                  unmatchedPaths.add(path);
                 }
               }
-              restoredPlaylistsCount++;
+
+              if (matchedSongIds.isNotEmpty) {
+                await _repository.addSongsToPlaylist(
+                    playlistId, matchedSongIds);
+              }
             }
+            restoredPlaylistsCount++;
           }
         }
+      }
+
+      // Process playlists in batches of 10 (Fix B-42)
+      for (var i = 0; i < playlistsList.length; i += 10) {
+        final batch = playlistsList.sublist(
+            i, math.min(i + 10, playlistsList.length));
+        await Future.wait(batch.map((item) => restoreSinglePlaylist(item)));
       }
     }
 
@@ -485,7 +495,13 @@ class ImportBackupUseCase {
       if (settings['replayGainPreampWithoutRg'] is num) await prefs.setDouble('setting_replay_gain_preamp_without_rg', (settings['replayGainPreampWithoutRg'] as num).toDouble());
       if (settings['wifiOnlyMode'] is bool) await prefs.setBool('setting_wifi_only_mode', settings['wifiOnlyMode'] as bool);
       if (settings['offlineOnlyMode'] is bool) await prefs.setBool('setting_offline_only_mode', settings['offlineOnlyMode'] as bool);
-      if (settings['bitPerfectMode'] is bool) await prefs.setBool('setting_bit_perfect', settings['bitPerfectMode'] as bool);
+      // FIX: write canonical key (legacy alias too for old readers).
+      if (settings['bitPerfectMode'] is bool) {
+        await prefs.setBool(
+            'setting_bit_perfect_output', settings['bitPerfectMode'] as bool);
+        await prefs.setBool(
+            'setting_bit_perfect', settings['bitPerfectMode'] as bool);
+      }
       if (settings['dspPreference'] is String) await prefs.setString('setting_dsp_preference', settings['dspPreference'] as String);
       if (settings['streamingQuality'] is String) await prefs.setString('setting_streaming_quality', settings['streamingQuality'] as String);
       if (settings['downloadQuality'] is String) await prefs.setString('setting_download_quality', settings['downloadQuality'] as String);

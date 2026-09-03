@@ -80,7 +80,9 @@ class YtmCacheManager {
           if (entity is File) {
             try {
               await entity.delete();
-            } catch (_) {}
+            } catch (e, st) {
+              ErrorLogger.log('clearCache failed', error: e, stackTrace: st, category: 'YtmCacheManager');
+            }
           }
         }
       }
@@ -120,7 +122,9 @@ class YtmCacheManager {
         try {
           await item.file.delete();
           totalSize -= item.size;
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('pruneIfExceedsLimit failed', error: e, stackTrace: st, category: 'YtmCacheManager');
+        }
       }
     } catch (e, st) {
       ErrorLogger.log('Error pruning stream cache',

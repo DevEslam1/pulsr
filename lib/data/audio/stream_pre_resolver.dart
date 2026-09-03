@@ -29,6 +29,37 @@ class StreamPreResolver {
   Completer<void>? _activeResolution;
   String? _inFlightVideoId;
   bool _disposed = false;
+  // Cooldown after a block signal (429/bot/403): prefetch must not hammer
+  // the ladder while interactive playback is cooling down.
+  DateTime? _coolingUntil;
+
+  bool get _isCooling =>
+      _coolingUntil != null && DateTime.now().isBefore(_coolingUntil!);
+
+  void _noteBlockSignal(Object e) {
+    final s = e.toString().toLowerCase();
+    if (s.contains('429') ||
+        s.contains('rate_limit') ||
+        s.contains('bot') ||
+        s.contains('recaptcha') ||
+        s.contains('403') ||
+        s.contains('forbidden') ||
+        s.contains('sign in to confirm')) {
+      _coolingUntil = DateTime.now().add(const Duration(seconds: 60));
+    }
+  }
+
+  Future<void> _resolveBestEffort(String videoId) async {
+    if (_disposed || _isCooling) return;
+    try {
+      final stream = await resolveUrl(videoId).timeout(
+        const Duration(seconds: 15),
+      );
+      if (!_disposed) urlCache.putStream(stream);
+    } catch (e) {
+      _noteBlockSignal(e);
+    }
+  }
 
   StreamPreResolver({
     required this.resolveUrl,
@@ -53,12 +84,10 @@ class StreamPreResolver {
     if (currentIndex >= 0 && currentIndex < queue.length) {
       final currentSong = queue[currentIndex];
       final curVid = currentSong.remoteId;
-      if (curVid != null && curVid.isNotEmpty) {
+      if (curVid != null && curVid.isNotEmpty && !_isCooling) {
         final cached = urlCache.get(curVid);
         if (cached == null || cached.isStaleWhileRevalidate()) {
-          unawaited(resolveUrl(curVid).then((stream) {
-            if (!_disposed) urlCache.putStream(stream);
-          }).catchError((_) {}));
+          unawaited(_resolveBestEffort(curVid));
         }
       }
     }
@@ -114,7 +143,7 @@ class StreamPreResolver {
     required bool isShuffle,
     List<int>? shuffleIndices,
   }) {
-    if (queue.isEmpty || currentIndex < 0) return;
+    if (queue.isEmpty || currentIndex < 0 || _isCooling) return;
 
     final nextSong = _determineNextSong(
       queue: queue,
@@ -152,7 +181,7 @@ class StreamPreResolver {
     final completer = Completer<void>();
     _activeResolution = completer;
 
-    resolveUrl(videoId).then((stream) {
+    resolveUrl(videoId).timeout(const Duration(seconds: 15)).then((stream) {
       if (_disposed || !identical(_activeResolution, completer)) return;
       urlCache.putStream(stream);
       debugPrint('[StreamPreResolver] Successfully pre-resolved next track ($videoId)');
@@ -165,6 +194,7 @@ class StreamPreResolver {
       );
     }).catchError((Object e) {
       if (_disposed || !identical(_activeResolution, completer)) return;
+      _noteBlockSignal(e);
       debugPrint('[StreamPreResolver] Pre-resolution failed for $videoId non-fatally: $e');
     }).whenComplete(() {
       if (identical(_activeResolution, completer)) {
@@ -183,7 +213,7 @@ class StreamPreResolver {
     required bool isShuffle,
     List<int>? shuffleIndices,
   }) {
-    if (_disposed || isWifi == null) return;
+    if (_disposed || isWifi == null || _isCooling) return;
 
     // Determine N+1 index first, then N+2 from there.
     final nextSong = _determineNextSong(
@@ -194,9 +224,18 @@ class StreamPreResolver {
     );
     if (nextSong == null) return;
 
-    // Compute the index of nextSong in the queue to find N+2.
-    final nextIndex = queue.indexOf(nextSong);
-    if (nextIndex < 0) return;
+    // Compute the index of nextSong without O(n) indexOf (equality-fragile
+    // on Drift rows): derive arithmetically.
+    int nextIndex = -1;
+    if (isShuffle && shuffleIndices != null && shuffleIndices.isNotEmpty) {
+      final pos = shuffleIndices.indexOf(currentIndex);
+      if (pos >= 0 && pos + 1 < shuffleIndices.length) {
+        nextIndex = shuffleIndices[pos + 1];
+      }
+    } else {
+      nextIndex = currentIndex + 1;
+    }
+    if (nextIndex < 0 || nextIndex >= queue.length) return;
 
     final secondNextSong = _determineNextSong(
       queue: queue,
@@ -210,14 +249,16 @@ class StreamPreResolver {
 
     // Only consume bandwidth for N+2 on WiFi.
     isWifi!().then((wifi) {
-      if (!wifi || _disposed) return;
+      if (!wifi || _disposed || _isCooling) return;
       if (urlCache.contains(vid2)) return;
       debugPrint('[StreamPreResolver] WiFi detected — pre-resolving N+2 track ($vid2)');
-      resolveUrl(vid2).then((stream) {
+      resolveUrl(vid2).timeout(const Duration(seconds: 15)).then((stream) {
         if (_disposed) return;
         urlCache.putStream(stream);
         debugPrint('[StreamPreResolver] N+2 pre-resolved ($vid2)');
-      }).catchError((Object _) {});
+      }).catchError((Object e) {
+        _noteBlockSignal(e);
+      });
     }).catchError((Object _) {});
   }
 
@@ -239,13 +280,12 @@ class StreamPreResolver {
       }
     }
 
-    // Normal linear queue order
+    // Normal linear queue order — do NOT loop to head: pre-resolving
+    // queue.first at the end of the queue warms the wrong track and burns
+    // a PLAYER permit for a song the user likely won't play next.
     final nextIndex = currentIndex + 1;
     if (nextIndex < queue.length) {
       return queue[nextIndex];
-    } else if (queue.length > 1) {
-      // Loop around to head if repeat queue or wrap
-      return queue.first;
     }
     return null;
   }

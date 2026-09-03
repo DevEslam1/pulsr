@@ -47,6 +47,28 @@ class DynamicThemeState {
           hasCustomArtworkColor ?? this.hasCustomArtworkColor,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is DynamicThemeState &&
+          runtimeType == other.runtimeType &&
+          primaryColor == other.primaryColor &&
+          secondaryColor == other.secondaryColor &&
+          backgroundColor == other.backgroundColor &&
+          surfaceColor == other.surfaceColor &&
+          isDark == other.isDark &&
+          hasCustomArtworkColor == other.hasCustomArtworkColor;
+
+  @override
+  int get hashCode => Object.hash(
+        primaryColor,
+        secondaryColor,
+        backgroundColor,
+        surfaceColor,
+        isDark,
+        hasCustomArtworkColor,
+      );
 }
 
 @singleton
@@ -85,7 +107,7 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
       _debounceTimer?.cancel();
       final cached = _cachedPalettes.remove(cacheKey)!;
       _cachedPalettes[cacheKey] = cached; // Refresh LRU position
-      emit(cached);
+      safeEmit(cached);
       return;
     }
 
@@ -131,7 +153,8 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
               size: 150,
               quality: 75,
             );
-          } catch (_) {
+          } catch (e, st) {
+            ErrorLogger.log('_extractPalette failed, using fallback', error: e, stackTrace: st, category: 'DynamicThemeCubit');
             rawArt = null;
           }
         }
@@ -192,6 +215,9 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
           surfaceColor: Color.alphaBlend(
               primary.withValues(alpha: 0.08), AppColors.surface),
           hasCustomArtworkColor: true,
+          // FIX: isDark was never set (always true) — derive from bg luminance
+          // so light AuraTheme gets a light seed instead of dark 0xFF14172B.
+          isDark: _luminance(bg) < 0.35,
         );
 
         if (_cachedPalettes.length >= _maxCacheSize) {
@@ -199,7 +225,7 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
         }
         _cachedPalettes[cacheKey] = newState;
         if (!isClosed && token == _currentRequestToken) {
-          emit(newState);
+          safeEmit(newState);
         }
         return;
       }
@@ -218,14 +244,14 @@ class DynamicThemeCubit extends PulsrCubit<DynamicThemeState> {
     if (token == _currentRequestToken &&
         !isClosed &&
         !state.hasCustomArtworkColor) {
-      emit(const DynamicThemeState());
+      safeEmit(const DynamicThemeState());
     }
   }
 
   void resetToDefault() {
     _debounceTimer?.cancel();
     _currentRequestToken++;
-    emit(const DynamicThemeState());
+    safeEmit(const DynamicThemeState());
   }
 
   static double _luminance(Color c) {

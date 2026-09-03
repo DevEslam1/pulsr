@@ -12,6 +12,8 @@ import '../../../data/services/ytm_url_cache.dart';
 import '../../../domain/models/ytm_track.dart';
 import 'ytm_search_state.dart';
 
+import '../../../core/utils/error_logger.dart';
+import '../../../core/utils/app_logger.dart';
 @injectable
 class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
   final YtmService _service;
@@ -29,7 +31,7 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
 
   void onQueryChanged(String query) {
     _generation++;
-    emit(state.copyWith(query: query));
+    safeEmit(state.copyWith(query: query));
     _debounceTimer?.cancel();
     _debounceTimer = autoTimer(Timer(const Duration(milliseconds: 300), () {
       _executeSearch(query);
@@ -39,11 +41,11 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
   void clearQuery() {
     _debounceTimer?.cancel();
     _generation++;
-    emit(const YtmSearchState());
+    safeEmit(const YtmSearchState());
   }
 
   void clearError() {
-    emit(state.copyWith(errorMessage: null));
+    safeEmit(state.copyWith(errorMessage: null));
   }
 
   Future<void> retry() => _executeSearch(state.query);
@@ -56,16 +58,21 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
     final generation = ++_generation;
 
     if (query.trim().isEmpty) {
-      emit(state.copyWith(results: [], isLoading: false, errorMessage: null));
+      safeEmit(state.copyWith(results: [], isLoading: false, errorMessage: null));
       return;
     }
 
-    emit(state.copyWith(isLoading: true, errorMessage: null));
+    safeEmit(state.copyWith(isLoading: true, errorMessage: null));
     try {
-      final videoId = FileIntentHandler.extractYouTubeVideoId(query);
+      // FIX: gate expensive regex behind quick contains check to avoid hot-path burn on every keystroke
+      final videoId = (query.contains('youtu') || query.contains('youtube.com') || query.contains('youtu.be'))
+          ? FileIntentHandler.extractYouTubeVideoId(query)
+          : null;
       if (videoId != null) {
         try {
-          final stream = await _service.resolveStream(videoId);
+          final stream = await _service
+              .resolveStream(videoId)
+              .timeout(const Duration(seconds: 20));
           if (generation != _generation || isClosed) return;
           final track = YtmTrack(
             videoId: videoId,
@@ -74,18 +81,19 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
             duration: stream.duration,
             artworkUrl: stream.artworkUrl,
           );
-          emit(state.copyWith(
+          safeEmit(state.copyWith(
               results: [track], isLoading: false, errorMessage: null));
           _scheduleFirstResultPreResolve(track.videoId, generation);
           return;
-        } catch (_) {
-          // Fall through to regular search if resolving by ID fails
+        } catch (e) {
+          // Fallthrough to regular search if resolving by ID fails
+          AppLogger.debug('_executeSearch failed (non-fatal): $e', category: 'YtmSearchCubit');
         }
       }
 
       final results = await _service.searchWithFallback(query);
       if (generation != _generation || isClosed) return;
-      emit(state.copyWith(
+      safeEmit(state.copyWith(
           results: results, isLoading: false, errorMessage: null));
       if (results.isNotEmpty) {
         _scheduleFirstResultPreResolve(results.first.videoId, generation);
@@ -93,22 +101,33 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
     } on YtmException catch (e) {
       if (generation != _generation || isClosed) return;
 
-      // Auto-recovery: On bot block or recaptcha, invalidate poToken and retry with depth bound
+      // Auto-recovery: On bot block or recaptcha, invalidate poToken and retry
+      // with exponential backoff + jitter (immediate retry hammers the ladder
+      // and escalates IP blocks). Depth bound 2.
       if (e.isBotBlocked && !isRetryAfterBotBlock && retryDepth < 2) {
-        await _service.invalidatePoToken();
-        await _service.ensurePoTokenReady();
+        final backoffMs =
+            1000 * (1 << retryDepth) + DateTime.now().millisecond % 500;
+        await Future<void>.delayed(Duration(milliseconds: backoffMs));
+        if (generation != _generation || isClosed) return;
+        try {
+          await _service.invalidatePoToken();
+          await _service.ensurePoTokenReady().timeout(
+              const Duration(seconds: 10));
+        } catch (e, st) {
+          ErrorLogger.log('delayed failed', error: e, stackTrace: st, category: 'YtmSearchCubit');
+        }
         if (generation != _generation || isClosed) return;
         return _executeSearch(query,
             isRetryAfterBotBlock: true, retryDepth: retryDepth + 1);
       }
 
       final errorInfo = YtmErrorClassifier.classify(e);
-      emit(state.copyWith(
+      safeEmit(state.copyWith(
           isLoading: false, results: [], errorMessage: errorInfo.message));
     } catch (e) {
       if (generation != _generation || isClosed) return;
       final errorInfo = YtmErrorClassifier.classify(e);
-      emit(state.copyWith(
+      safeEmit(state.copyWith(
           isLoading: false, results: [], errorMessage: errorInfo.message));
     }
   }
@@ -131,11 +150,29 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
       final urlCache =
           getIt.isRegistered<YtmUrlCache>() ? getIt<YtmUrlCache>() : null;
       if (urlCache != null && urlCache.contains(videoId)) return;
-      final stream = await _service.resolveStream(videoId);
+      final stream = await _service
+          .resolveStream(videoId)
+          .timeout(const Duration(seconds: 15));
       if (isClosed) return;
       urlCache?.putStream(stream);
+    } on TimeoutException {
+      // Best-effort only — playback resolves lazily on tap.
+      debugPrint('[YtmSearchCubit] First-result pre-resolve timed out');
     } catch (e) {
       // Pre-resolution is best-effort; playback resolves lazily on tap.
+      // Don't prefetch on rate-limit/bot-block — it escalates the block.
+      try {
+        final info = YtmErrorClassifier.classify(e);
+        if (info.signal == YtmBlockSignal.rateLimited ||
+            info.signal == YtmBlockSignal.botChallenge ||
+            info.signal == YtmBlockSignal.ipBlocked) {
+          debugPrint(
+              '[YtmSearchCubit] Pre-resolve skipped (block signal: ${info.signal})');
+          return;
+        }
+      } catch (e, st) {
+        ErrorLogger.log('_preResolveFirstResult failed', error: e, stackTrace: st, category: 'YtmSearchCubit');
+      }
       debugPrint('[YtmSearchCubit] First-result pre-resolve failed: $e');
     }
   }

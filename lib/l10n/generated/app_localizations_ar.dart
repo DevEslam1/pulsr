@@ -1233,7 +1233,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get downloadErrorBotChallenge =>
-      'تم تشغيل التحقق من يوتيوب. جارٍ إعادة المحاولة…';
+      'مطلوب التحقق من يوتيوب — افتح التطبيق لإكماله';
 
   @override
   String get downloadErrorUnavailable => 'هذا المسار غير متوفر.';
@@ -1500,5 +1500,35 @@ class AppLocalizationsAr extends AppLocalizations {
   @override
   String bluetoothLatencySubtitle(int offset) {
     return 'تعويض تأخير ذاكرة التخزين المؤقت للبلوتوث ($offset مللي ثانية).';
+  }
+
+  @override
+  String get clearEntireQueueConfirm => 'مسح قائمة الانتظار بالكامل؟';
+
+  @override
+  String get shuffleQueueAction => 'خلط قائمة الانتظار';
+
+  @override
+  String get saveAsPlaylistAction => 'حفظ كقائمة تشغيل';
+
+  @override
+  String get clearAction => 'مسح';
+
+  @override
+  String get playlistNameLabel => 'اسم قائمة التشغيل';
+
+  @override
+  String queueSavedAs(String name, int count) {
+    return 'تم حفظ القائمة باسم \"$name\" ($count مقاطع)';
+  }
+
+  @override
+  String failedToCreatePlaylist(String error) {
+    return 'تعذر إنشاء قائمة التشغيل: $error';
+  }
+
+  @override
+  String errorSavingPlaylist(String error) {
+    return 'خطأ في حفظ قائمة التشغيل: $error';
   }
 }

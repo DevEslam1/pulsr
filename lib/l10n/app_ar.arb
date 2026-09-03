@@ -440,7 +440,7 @@
   "downloadErrorTransition": "انتقال حالة عملية تنزيل غير صالح.",
   "downloadErrorRateLimited": "يوتيوب مشغول. فترة تبريد…",
   "downloadErrorNetwork": "لا يوجد اتصال. تحقق من الشبكة.",
-  "downloadErrorBotChallenge": "تم تشغيل التحقق من يوتيوب. جارٍ إعادة المحاولة…",
+  "downloadErrorBotChallenge": "مطلوب التحقق من يوتيوب — افتح التطبيق لإكماله",
   "downloadErrorUnavailable": "هذا المسار غير متوفر.",
   "downloadWifiOnly": "وضع Wi-Fi فقط نشط. اتصل بالشبكة للتنزيل.",
   "downloadErrorAlreadyQueued": "هذه الأغنية موجودة بالفعل في قائمة التنزيل.",
@@ -555,5 +555,37 @@
   "systemEffectsTryDisable": "محاولة التعطيل",
   "systemEffectsLeaveOn": "إبقاء التشغيل",
   "bluetoothLatencyTitle": "مزامنة زمن استجابة البلوتوث (AVRCP / الكلمات)",
-  "bluetoothLatencySubtitle": "تعويض تأخير ذاكرة التخزين المؤقت للبلوتوث ({offset} مللي ثانية)."
+  "bluetoothLatencySubtitle": "تعويض تأخير ذاكرة التخزين المؤقت للبلوتوث ({offset} مللي ثانية).",
+  "clearEntireQueueConfirm": "مسح قائمة الانتظار بالكامل؟",
+  "shuffleQueueAction": "خلط قائمة الانتظار",
+  "saveAsPlaylistAction": "حفظ كقائمة تشغيل",
+  "clearAction": "مسح",
+  "playlistNameLabel": "اسم قائمة التشغيل",
+  "queueSavedAs": "تم حفظ القائمة باسم \"{name}\" ({count} مقاطع)",
+  "@queueSavedAs": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "failedToCreatePlaylist": "تعذر إنشاء قائمة التشغيل: {error}",
+  "@failedToCreatePlaylist": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "errorSavingPlaylist": "خطأ في حفظ قائمة التشغيل: {error}",
+  "@errorSavingPlaylist": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  }
 }

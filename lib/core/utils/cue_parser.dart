@@ -122,9 +122,13 @@ class CueParser {
               final parsed = parse(content);
               if (parsed.isNotEmpty) return parsed;
             }
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('findAndParseCue failed', error: e, stackTrace: st, category: 'CueParser');
+          }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('findAndParseCue failed', error: e, stackTrace: st, category: 'CueParser');
+      }
     } catch (e, st) {
       ErrorLogger.log('Failed to read external .cue file for $audioFilePath',
           error: e, stackTrace: st, category: 'CueParser');

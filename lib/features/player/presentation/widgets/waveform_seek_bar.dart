@@ -79,8 +79,10 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                     onHorizontalDragStart: (details) {
                       if (trackWidth > 0 && maxDuration > 0) {
                         HapticFeedback.selectionClick();
-                        final ratio = (details.localPosition.dx / trackWidth)
-                            .clamp(0.0, 1.0);
+                        final isRtl = Directionality.maybeOf(context) == TextDirection.rtl;
+                        final rawDx = details.localPosition.dx;
+                        final dx = isRtl ? (trackWidth - rawDx) : rawDx;
+                        final ratio = (dx / trackWidth).clamp(0.0, 1.0);
                         setState(() {
                           _dragValue = ratio * maxDuration;
                         });
@@ -88,8 +90,10 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                     },
                     onHorizontalDragUpdate: (details) {
                       if (trackWidth > 0 && maxDuration > 0) {
-                        final ratio = (details.localPosition.dx / trackWidth)
-                            .clamp(0.0, 1.0);
+                        final isRtl = Directionality.maybeOf(context) == TextDirection.rtl;
+                        final rawDx = details.localPosition.dx;
+                        final dx = isRtl ? (trackWidth - rawDx) : rawDx;
+                        final ratio = (dx / trackWidth).clamp(0.0, 1.0);
                         setState(() {
                           _dragValue = ratio * maxDuration;
                         });
@@ -108,8 +112,10 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                     onTapDown: (details) {
                       if (trackWidth > 0 && maxDuration > 0) {
                         HapticFeedback.selectionClick();
-                        final ratio = (details.localPosition.dx / trackWidth)
-                            .clamp(0.0, 1.0);
+                        final isRtl = Directionality.maybeOf(context) == TextDirection.rtl;
+                        final rawDx = details.localPosition.dx;
+                        final dx = isRtl ? (trackWidth - rawDx) : rawDx;
+                        final ratio = (dx / trackWidth).clamp(0.0, 1.0);
                         final seekMs = ratio * maxDuration;
                         widget.onSeek(Duration(milliseconds: seekMs.round()));
                       }
@@ -128,6 +134,7 @@ class _WaveformSeekBarState extends State<WaveformSeekBar> {
                           loopPointA: widget.loopPointA,
                           loopPointB: widget.loopPointB,
                           zoomScale: _zoomScale,
+                          isRtl: Directionality.maybeOf(context) == TextDirection.rtl,
                         ),
                       ),
                     ),
@@ -179,6 +186,7 @@ class _WaveformPainter extends CustomPainter {
   final Duration? loopPointA;
   final Duration? loopPointB;
   final double zoomScale;
+  final bool isRtl;
 
   _WaveformPainter({
     required this.samples,
@@ -190,11 +198,18 @@ class _WaveformPainter extends CustomPainter {
     this.loopPointA,
     this.loopPointB,
     this.zoomScale = 1.0,
+    this.isRtl = false,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
     if (samples.isEmpty) return;
+
+    if (isRtl) {
+      canvas.save();
+      canvas.translate(size.width, 0);
+      canvas.scale(-1.0, 1.0);
+    }
 
     final int totalCount = samples.length;
     if (totalCount < 2) {
@@ -313,6 +328,10 @@ class _WaveformPainter extends CustomPainter {
         }
       }
     }
+
+    if (isRtl) {
+      canvas.restore();
+    }
   }
 
   @override
@@ -324,6 +343,7 @@ class _WaveformPainter extends CustomPainter {
         oldDelegate.chapterMarkers != chapterMarkers ||
         oldDelegate.loopPointA != loopPointA ||
         oldDelegate.loopPointB != loopPointB ||
-        oldDelegate.zoomScale != zoomScale;
+        oldDelegate.zoomScale != zoomScale ||
+        oldDelegate.isRtl != isRtl;
   }
 }

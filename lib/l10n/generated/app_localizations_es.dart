@@ -1229,7 +1229,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get downloadErrorBotChallenge =>
-      'Verificación de YouTube activada. Reintentando…';
+      'Se requiere verificación de YouTube — abre la aplicación para completarla';
 
   @override
   String get downloadErrorUnavailable => 'Esta pista no está disponible.';
@@ -1502,5 +1502,35 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String bluetoothLatencySubtitle(int offset) {
     return 'Compensa la latencia del búfer del códec Bluetooth ($offset ms).';
+  }
+
+  @override
+  String get clearEntireQueueConfirm => '¿Vaciar toda la cola?';
+
+  @override
+  String get shuffleQueueAction => 'Mezclar cola';
+
+  @override
+  String get saveAsPlaylistAction => 'Guardar como lista';
+
+  @override
+  String get clearAction => 'Vaciar';
+
+  @override
+  String get playlistNameLabel => 'Nombre de la lista';
+
+  @override
+  String queueSavedAs(String name, int count) {
+    return 'Cola guardada como «$name» ($count pistas)';
+  }
+
+  @override
+  String failedToCreatePlaylist(String error) {
+    return 'No se pudo crear la lista: $error';
+  }
+
+  @override
+  String errorSavingPlaylist(String error) {
+    return 'Error al guardar la lista: $error';
   }
 }

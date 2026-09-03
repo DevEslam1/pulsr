@@ -12,6 +12,7 @@ import '../../../../core/constants/audio_feature_info.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 import '../../../settings/cubit/settings_state.dart';
 
+import '../../../../core/utils/error_logger.dart';
 class AudioQualitySheet extends StatelessWidget {
   final SongsTableData song;
   final Color activeColor;
@@ -2085,7 +2086,9 @@ extension _BluetoothCodecSection on AudioQualitySheet {
   ) async {
     try {
       await cubit?.requestBluetoothPermission();
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_requestBluetoothPermission failed', error: e, stackTrace: st, category: 'AudioQualitySheet');
+    }
     await Future<void>.delayed(const Duration(seconds: 2));
     await cubit?.refreshOutputDevice();
   }

@@ -1222,7 +1222,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get downloadErrorBotChallenge =>
-      'YouTube verification triggered. Retrying…';
+      'YouTube verification required — open the app to complete it';
 
   @override
   String get downloadErrorUnavailable => 'This track is unavailable.';
@@ -1492,5 +1492,35 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String bluetoothLatencySubtitle(int offset) {
     return 'Compensates for Bluetooth audio codec buffer latency ($offset ms). Volume deferral: AVRCP absolute volume active.';
+  }
+
+  @override
+  String get clearEntireQueueConfirm => 'Clear entire queue?';
+
+  @override
+  String get shuffleQueueAction => 'Shuffle queue';
+
+  @override
+  String get saveAsPlaylistAction => 'Save as playlist';
+
+  @override
+  String get clearAction => 'Clear';
+
+  @override
+  String get playlistNameLabel => 'Playlist name';
+
+  @override
+  String queueSavedAs(String name, int count) {
+    return 'Queue saved as \"$name\" ($count tracks)';
+  }
+
+  @override
+  String failedToCreatePlaylist(String error) {
+    return 'Failed to create playlist: $error';
+  }
+
+  @override
+  String errorSavingPlaylist(String error) {
+    return 'Error saving playlist: $error';
   }
 }

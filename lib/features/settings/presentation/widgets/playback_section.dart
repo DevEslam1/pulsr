@@ -21,13 +21,13 @@ class PlaybackSection extends StatelessWidget {
   Future<void> _resolveCrossfadeConflict(
       BuildContext context, SettingsCubit cubit, double crossfade) async {
     await cubit.setGapless(false);
-    if (crossfade > 0.01) {
+    if (crossfade > 0.0) {
       await cubit.setCrossfade(crossfade);
     }
     if (!context.mounted) return;
     ScaffoldMessenger.maybeOf(context)?.showSnackBar(SnackBar(
       behavior: SnackBarBehavior.floating,
-      content: Text(crossfade > 0.01
+      content: Text(crossfade > 0.0
           ? 'Resolved: Gapless off — Crossfade set to ${crossfade.toStringAsFixed(1)}s'
           : 'Resolved: Gapless disabled'),
     ));
@@ -103,7 +103,7 @@ class PlaybackSection extends StatelessWidget {
         if (state.gaplessPlayback)
           SettingsConflictCard(
             reason: AudioConflicts.crossfadeBlockedByGapless(true)!,
-            resolveLabel: state.crossfadeSeconds > 0.01
+            resolveLabel: state.crossfadeSeconds > 0.0
                 ? 'Turn off Gapless & enable Crossfade'
                 : 'Turn off Gapless',
             onResolve: () =>

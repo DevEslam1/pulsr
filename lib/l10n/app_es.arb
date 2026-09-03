@@ -440,7 +440,7 @@
   "downloadErrorTransition": "Transición de estado de descarga no válida.",
   "downloadErrorRateLimited": "YouTube está ocupado. Enfriando…",
   "downloadErrorNetwork": "Sin conexión. Revisa tu red.",
-  "downloadErrorBotChallenge": "Verificación de YouTube activada. Reintentando…",
+  "downloadErrorBotChallenge": "Se requiere verificación de YouTube — abre la aplicación para completarla",
   "downloadErrorUnavailable": "Esta pista no está disponible.",
   "downloadWifiOnly": "Modo solo Wi-Fi activo. Conéctate al Wi-Fi para descargar.",
   "downloadErrorAlreadyQueued": "Esta canción ya está en la cola de descarga.",
@@ -555,5 +555,37 @@
   "systemEffectsTryDisable": "Intentar desactivar",
   "systemEffectsLeaveOn": "Dejar activo",
   "bluetoothLatencyTitle": "Sincronización de latencia Bluetooth (AVRCP / Letras)",
-  "bluetoothLatencySubtitle": "Compensa la latencia del búfer del códec Bluetooth ({offset} ms)."
+  "bluetoothLatencySubtitle": "Compensa la latencia del búfer del códec Bluetooth ({offset} ms).",
+  "clearEntireQueueConfirm": "¿Vaciar toda la cola?",
+  "shuffleQueueAction": "Mezclar cola",
+  "saveAsPlaylistAction": "Guardar como lista",
+  "clearAction": "Vaciar",
+  "playlistNameLabel": "Nombre de la lista",
+  "queueSavedAs": "Cola guardada como «{name}» ({count} pistas)",
+  "@queueSavedAs": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "failedToCreatePlaylist": "No se pudo crear la lista: {error}",
+  "@failedToCreatePlaylist": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "errorSavingPlaylist": "Error al guardar la lista: {error}",
+  "@errorSavingPlaylist": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  }
 }

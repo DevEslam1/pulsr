@@ -1,4 +1,4 @@
-﻿// lib/domain/services/waveform_service.dart
+// lib/domain/services/waveform_service.dart
 import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
@@ -12,6 +12,7 @@ import '../../core/utils/error_logger.dart';
 import '../../core/utils/platform_capabilities.dart';
 import '../../core/utils/waveform_generator.dart';
 
+import '../../core/utils/app_logger.dart';
 /// Produces waveform samples (0..1) for the seek bar.
 ///
 /// For local files it decodes real PCM natively ([MediaExtractor]+[MediaCodec])
@@ -92,8 +93,9 @@ class WaveformService {
               .map((e) => (e as num).toDouble())
               .toList();
           if (decoded.length == count) return decoded;
-        } catch (_) {
+        } catch (e) {
           // Corrupt cache entry — fall through and re-decode.
+          AppLogger.debug('toDouble failed (non-fatal): $e', category: 'WaveformService');
         }
       }
 
@@ -102,7 +104,9 @@ class WaveformService {
         await _pruneStaleEntries(path, keep: diskFile.path);
         try {
           await diskFile.writeAsString(jsonEncode(result));
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('toDouble failed', error: e, stackTrace: st, category: 'WaveformService');
+        }
         return result;
       }
     } catch (e, st) {
@@ -154,10 +158,14 @@ class WaveformService {
             entity.uri.pathSegments.last.startsWith(prefix)) {
           try {
             await entity.delete();
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('_pruneStaleEntries failed', error: e, stackTrace: st, category: 'WaveformService');
+          }
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_pruneStaleEntries failed', error: e, stackTrace: st, category: 'WaveformService');
+    }
   }
 
   Future<Directory> _initCacheDir() async {

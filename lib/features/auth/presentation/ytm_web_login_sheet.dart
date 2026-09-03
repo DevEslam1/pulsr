@@ -12,6 +12,7 @@ import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../utils/google_login_recovery.dart';
 
+import '../../../core/utils/error_logger.dart';
 class YtmWebLoginSheet extends StatefulWidget {
   // Use the modern Google accounts sign-in flow (v3 identifier endpoint).
   // The older ServiceLogin URL is more aggressively fingerprinted for
@@ -81,7 +82,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       ).hasMatch(u);
 
   static bool _isAuthInProgressUrl(String u) => RegExp(
-        r'accounts\.google\.com|ServiceLogin|signin|/checkpoint/|consent\.',
+        r'accounts\.google\.com/v3/signin|accounts\.google\.com/ServiceLogin|/checkpoint/|consent\.google',
         caseSensitive: false,
       ).hasMatch(u);
 
@@ -265,7 +266,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           }
         });
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_updateNavState failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+    }
   }
 
   /// Called by the CookieMismatch page detection. Google's cross-domain OAuth cookie
@@ -273,20 +276,11 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   void _handleCookieMismatch() {
     // Hard cap on automatic bounces: when Google's third-party cookie state
     // is broken it redirects every reload straight back to CookieMismatch.
-    if (_mismatchAutoNavCount >= 3) {
+    const maxMismatchNav = 3;
+    if (_mismatchAutoNavCount >= maxMismatchNav) {
       debugPrint('[YtmWebLogin] CookieMismatch auto-navigation cap reached; '
-          'stopping and resetting cookies.');
-      _clearCookiesAndReset();
-      if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          const SnackBar(
-            content: Text(
-                'Google cookie mismatch detected. Resetting cookies — please sign in again.'),
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 4),
-          ),
-        );
-      }
+          'treating as Google block for recovery.');
+      _handleGoogleBlock();
       return;
     }
 
@@ -387,17 +381,31 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 (() => {
   try {
     if (window.__googleBlockDetected) return "couldn't sign you in";
+    if (!window.__blockObserverInstalled) {
+      window.__blockObserverInstalled = true;
+      const observer = new MutationObserver(() => {
+        if (document.body && (document.body.innerText || document.body.textContent || '').includes("couldn't sign you in")) {
+          window.__googleBlockDetected = true;
+          observer.disconnect();
+        }
+      });
+      if (document.body) {
+        observer.observe(document.body, { childList: true, subtree: true });
+      }
+    }
     var t = (document.title || '');
     var b = '';
     try { b = (document.body && (document.body.innerText || document.body.textContent)) || ''; } catch (e) {}
-    return (t + '|' + b).slice(0, 4000).toLowerCase();
+    return (t + '|' + b).slice(0, 8000).toLowerCase();
   } catch (e) { return ''; }
 })()''');
       final text = raw?.toString().toLowerCase() ?? '';
       for (final phrase in _blockPhrases) {
         if (text.contains(phrase)) return true;
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_scanPageForBlockText failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+    }
     return false;
   }
 
@@ -437,7 +445,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           settings: InAppWebViewSettings(
               userAgent: _uaFor(step.nextIdentity)),
         );
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('_runBlockRecoveryStep failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+      }
       final target =
           widget.isBrowseMode ? 'https://music.youtube.com' : googleSignInUrl;
       await _webViewController?.loadUrl(
@@ -493,7 +503,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       await _webViewController?.setSettings(
         settings: InAppWebViewSettings(userAgent: targetUa),
       );
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_navigateTo failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+    }
     final loadUrlFuture = _webViewController?.loadUrl(
         urlRequest: URLRequest(url: WebUri(url)));
     if (loadUrlFuture != null) unawaited(loadUrlFuture);
@@ -512,7 +524,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     try {
       final webUri = await _webViewController?.getUrl();
       currentUrl ??= webUri?.toString();
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_detectLoginState failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+    }
 
     if (currentUrl != null) {
       if (currentUrl.startsWith('chrome-error://') ||
@@ -565,7 +579,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         }
         return true;
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_detectLoginState failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+    }
 
     // 2. Try native platform cookie manager
     final cookies = await accountService.getNativeCookiesFromDomains();
@@ -612,7 +628,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           }
           return true;
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('toString failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+      }
     }
 
     return false;
@@ -646,7 +664,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         if (jar.isNotEmpty) {
           cookies = jar.entries.map((e) => '${e.key}=${e.value}').join('; ');
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('_forceSaveAndFinish failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+      }
     }
 
     // 2. Try native platform cookies
@@ -668,7 +688,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         if (cookieStr.isNotEmpty) {
           cookies = cookieStr;
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('toString failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+      }
     }
 
     if (cookies != null &&
@@ -1263,7 +1285,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                               settings:
                                   InAppWebViewSettings(userAgent: targetUa),
                             );
-                          } catch (_) {}
+                          } catch (e, st) {
+                            ErrorLogger.log('startsWith failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+                          }
                         },
                         onProgressChanged: (controller, progress) {
                           // F-17: no setState — progress ticks only rebuild

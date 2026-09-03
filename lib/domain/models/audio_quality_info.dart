@@ -83,7 +83,6 @@ class AudioQualityInfo {
 
     // YouTube Music online streaming track
     if (song.source == SongSource.youtube ||
-        song.source == 'youtube' ||
         path.startsWith('ytmusic://')) {
       final defaultKbps = streamingQuality == YtmAudioQuality.low
           ? 64
@@ -297,10 +296,19 @@ class AudioQualityInfo {
       bitDepth = '16-bit equivalent';
     } else {
       // Default to MP3 / general audio
-      formatLabel = 'MP3';
-      codecName = 'MPEG-1 Audio Layer III';
-      final kbps = calculatedBitrate ?? 320;
-      if (kbps >= 256) {
+      final kbps = calculatedBitrate ?? 0;
+      if (kbps == 0) {
+        tier = AudioQualityTier.standardQuality;
+        tierLabel = 'Unknown Quality';
+        formatLabel = 'Audio';
+        codecName = 'Audio';
+        shortBadgeLabel = 'Audio';
+        description = 'Standard audio playback';
+        badgeColor = const Color(0xFF94A3B8);
+        icon = Icons.audiotrack_rounded;
+      } else if (kbps >= 256) {
+        formatLabel = 'MP3';
+        codecName = 'MPEG-1 Audio Layer III';
         tier = AudioQualityTier.highQuality;
         tierLabel = 'High Quality MP3';
         shortBadgeLabel = 'MP3 • ${kbps}k';
@@ -308,6 +316,8 @@ class AudioQualityInfo {
         badgeColor = const Color(0xFF60A5FA);
         icon = Icons.high_quality_rounded;
       } else if (kbps >= 160) {
+        formatLabel = 'MP3';
+        codecName = 'MPEG-1 Audio Layer III';
         tier = AudioQualityTier.standardQuality;
         tierLabel = 'Standard Quality MP3';
         shortBadgeLabel = 'MP3 • ${kbps}k';
@@ -315,6 +325,8 @@ class AudioQualityInfo {
         badgeColor = const Color(0xFF94A3B8);
         icon = Icons.graphic_eq_rounded;
       } else {
+        formatLabel = 'MP3';
+        codecName = 'MPEG-1 Audio Layer III';
         tier = AudioQualityTier.compact;
         tierLabel = 'Compact MP3';
         shortBadgeLabel = 'MP3 • ${kbps}k';

@@ -1,4 +1,4 @@
-﻿// lib/data/services/xdm_backend_service.dart
+// lib/data/services/xdm_backend_service.dart
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -14,6 +14,7 @@ import '../../core/constants/prefs_keys.dart';
 import '../../core/utils/ytm_rate_limiter.dart';
 import 'ytm_service.dart';
 
+import '../../core/utils/error_logger.dart';
 enum BackendCircuitState {
   closed,
   open,
@@ -70,6 +71,10 @@ class XdmBackendService {
   DateTime? _lastHealthCheck;
   BackendHealthInfo? _cachedHealth;
   static const Duration _healthCacheTtl = Duration(minutes: 5);
+  int _healthCheckAttempts = 0;
+  Duration get _healthTimeout => Duration(
+        seconds: min(4 * pow(2, _healthCheckAttempts).toInt(), 30),
+      );
 
   @factoryMethod
   XdmBackendService({
@@ -138,7 +143,9 @@ class XdmBackendService {
     try {
       final secureToken = await _secureStorage.read(key: _tokenSecureKey);
       if (secureToken != null && secureToken.isNotEmpty) return secureToken;
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_getApiToken failed', error: e, stackTrace: st, category: 'XdmBackendService');
+    }
 
     // One-time migration from SharedPreferences to FlutterSecureStorage
     final prefs = await SharedPreferences.getInstance();
@@ -147,7 +154,9 @@ class XdmBackendService {
       try {
         await _secureStorage.write(key: _tokenSecureKey, value: prefsToken);
         await prefs.remove(PrefsKeys.ytdlpBackendToken);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('_getApiToken failed', error: e, stackTrace: st, category: 'XdmBackendService');
+      }
       return prefsToken;
     }
 
@@ -196,12 +205,12 @@ class XdmBackendService {
     try {
       final baseUrl = await _getBaseUrl();
       final uri = Uri.parse('$baseUrl/health?strict=true');
-      final response =
-          await _client.get(uri).timeout(const Duration(seconds: 8));
+      final response = await _client.get(uri).timeout(_healthTimeout);
       stopwatch.stop();
 
       final latency = stopwatch.elapsedMilliseconds;
       if (response.statusCode == 200) {
+        _healthCheckAttempts = 0;
         final data = jsonDecode(response.body) as Map<String, dynamic>;
         final ytdlpVer = data['ytdlp_version'] as String? ??
             data['ytdlp'] as String? ??
@@ -227,6 +236,7 @@ class XdmBackendService {
         _cachedHealth = info;
         return info;
       } else {
+        _healthCheckAttempts = min(_healthCheckAttempts + 1, 5);
         recordInfraFailure();
         final info = BackendHealthInfo(
           ok: false,
@@ -242,6 +252,7 @@ class XdmBackendService {
         return info;
       }
     } catch (e) {
+      _healthCheckAttempts = min(_healthCheckAttempts + 1, 5);
       stopwatch.stop();
       recordInfraFailure();
       final info = BackendHealthInfo(
@@ -332,7 +343,9 @@ class XdmBackendService {
       final json = jsonDecode(response.body) as Map<String, dynamic>;
       errorCode = json['error_code'] as String? ?? errorCode;
       message = json['message'] as String? ?? message;
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_handleBackendErrorResponse failed', error: e, stackTrace: st, category: 'XdmBackendService');
+    }
 
     // Infra 5xx status codes trip circuit breaker
     if (response.statusCode >= 500) {

@@ -190,14 +190,17 @@ int SincResampler::processInterleaved(float* buffer, int frames, int channels) {
 
     // Prevent availableFrames_ growth past capacity
     if (availableFrames_ > FIFO_CAPACITY - 256) {
+        int currentOverflow = ++overflowCount_;
+        if (currentOverflow % 100 == 1) {
 #if defined(__ANDROID__)
-        __android_log_print(ANDROID_LOG_WARN, "PulsrDSP",
-            "SincResampler: FIFO buffer overflow (%d > %d), dropping oldest frames",
-            availableFrames_, FIFO_CAPACITY - 256);
+            __android_log_print(ANDROID_LOG_WARN, "PulsrDSP",
+                "SincResampler: FIFO buffer overflow (%d > %d), dropping oldest frames (total: %d)",
+                availableFrames_, FIFO_CAPACITY - 256, currentOverflow);
 #else
-        fprintf(stderr, "SincResampler: FIFO buffer overflow (%d > %d), dropping oldest frames\n",
-            availableFrames_, FIFO_CAPACITY - 256);
+            fprintf(stderr, "SincResampler: FIFO buffer overflow (%d > %d), dropping oldest frames (total: %d)\n",
+                availableFrames_, FIFO_CAPACITY - 256, currentOverflow);
 #endif
+        }
         availableFrames_ = FIFO_CAPACITY - 256;
     }
 
@@ -264,14 +267,17 @@ int SincResampler::processPlanar(const float* const* in, float* const* out, int 
     }
 
     if (availableFrames_ > FIFO_CAPACITY - 256) {
+        int currentOverflow = ++overflowCount_;
+        if (currentOverflow % 100 == 1) {
 #if defined(__ANDROID__)
-        __android_log_print(ANDROID_LOG_WARN, "PulsrDSP",
-            "SincResampler: FIFO buffer overflow (%d > %d), dropping oldest frames",
-            availableFrames_, FIFO_CAPACITY - 256);
+            __android_log_print(ANDROID_LOG_WARN, "PulsrDSP",
+                "SincResampler: FIFO buffer overflow (%d > %d), dropping oldest frames (total: %d)",
+                availableFrames_, FIFO_CAPACITY - 256, currentOverflow);
 #else
-        fprintf(stderr, "SincResampler: FIFO buffer overflow (%d > %d), dropping oldest frames\n",
-            availableFrames_, FIFO_CAPACITY - 256);
+            fprintf(stderr, "SincResampler: FIFO buffer overflow (%d > %d), dropping oldest frames (total: %d)\n",
+                availableFrames_, FIFO_CAPACITY - 256, currentOverflow);
 #endif
+        }
         availableFrames_ = FIFO_CAPACITY - 256;
     }
 

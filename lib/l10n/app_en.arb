@@ -506,7 +506,7 @@
   "downloadErrorTransition": "Invalid download state transition.",
   "downloadErrorRateLimited": "YouTube is busy. Cooling down…",
   "downloadErrorNetwork": "No connection. Check your network.",
-  "downloadErrorBotChallenge": "YouTube verification triggered. Retrying…",
+  "downloadErrorBotChallenge": "YouTube verification required — open the app to complete it",
   "downloadErrorUnavailable": "This track is unavailable.",
   "downloadWifiOnly": "Wi-Fi Only Mode is active. Connect to Wi-Fi to download.",
   "downloadErrorAlreadyQueued": "This song is already in the download queue.",
@@ -701,7 +701,7 @@
   "downloadErrorTransition": "Invalid download state transition.",
   "downloadErrorRateLimited": "YouTube is busy. Cooling down…",
   "downloadErrorNetwork": "No connection. Check your network.",
-  "downloadErrorBotChallenge": "YouTube verification triggered. Retrying…",
+  "downloadErrorBotChallenge": "YouTube verification required — open the app to complete it",
   "downloadErrorUnavailable": "This track is unavailable.",
   "downloadWifiOnly": "Wi-Fi Only Mode is active. Connect to Wi-Fi to download.",
   "downloadErrorAlreadyQueued": "This song is already in the download queue.",
@@ -828,6 +828,38 @@
     "placeholders": {
       "offset": {
         "type": "int"
+      }
+    }
+  },
+  "clearEntireQueueConfirm": "Clear entire queue?",
+  "shuffleQueueAction": "Shuffle queue",
+  "saveAsPlaylistAction": "Save as playlist",
+  "clearAction": "Clear",
+  "playlistNameLabel": "Playlist name",
+  "queueSavedAs": "Queue saved as \"{name}\" ({count} tracks)",
+  "@queueSavedAs": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      },
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "failedToCreatePlaylist": "Failed to create playlist: {error}",
+  "@failedToCreatePlaylist": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "errorSavingPlaylist": "Error saving playlist: {error}",
+  "@errorSavingPlaylist": {
+    "placeholders": {
+      "error": {
+        "type": "String"
       }
     }
   }

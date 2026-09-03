@@ -68,6 +68,7 @@ void main() {
       settingsProfilesService: profilesService,
       deviceProfileService: deviceService,
       hiResAudioService: fakeHiRes,
+      deviceSwitchDebounceDuration: Duration.zero,
     );
   }
 

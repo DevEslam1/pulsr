@@ -25,6 +25,7 @@ public:
     void setBitOrder(DsdBitOrder bitOrder) { bitOrder_ = bitOrder; }
     DsdBitOrder getBitOrder() const { return bitOrder_; }
     double getDecimationRatio() const { return decimationRatio_; }
+    int getTargetRate() const { return targetRate_; }
     int getExpectedPcmFrames(int byteCount) const {
         if (decimationRatio_ <= 0.0 || byteCount <= 0) return 0;
         return static_cast<int>(std::ceil((byteCount * 8.0) / decimationRatio_)) + 64;

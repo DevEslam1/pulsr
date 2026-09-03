@@ -52,6 +52,7 @@ public:
     void prepareForBlockSize(int maxFrames);
     void process(const float* inL, const float* inR, float* outL, float* outR, int frames);
     void processInterleaved(float* buffer, int frames, int channels = 2);
+    int getPredelayCapacity() const { return static_cast<int>(predelayRingL_.size()); }
 
 private:
     void updatePreparedIr();

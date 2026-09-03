@@ -264,7 +264,9 @@ class AudioConflicts {
   }
 
   static String? gaplessBlockedByCrossfade(double crossfadeSeconds) {
-    if (crossfadeSeconds > 0.01) return 'Disabled: Crossfade is ${crossfadeSeconds.toStringAsFixed(1)} s — gapless requires 0 s. Set Crossfade to 0 to enable gapless.';
+    if (crossfadeSeconds > 0.0) {
+      return 'Disabled: Crossfade is ${crossfadeSeconds.toStringAsFixed(1)}s — gapless requires 0s.';
+    }
     return null;
   }
 

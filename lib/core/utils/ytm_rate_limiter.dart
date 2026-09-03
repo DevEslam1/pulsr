@@ -1,9 +1,10 @@
 // lib/core/utils/ytm_rate_limiter.dart
 import 'dart:async';
-import 'dart:math';
+import 'dart:math' as math;
 import 'package:mutex/mutex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'error_logger.dart';
 /// Request priority classes for rate limiting.
 enum YtmRequestPriority {
   interactive,
@@ -39,12 +40,15 @@ class YtmRateLimiter {
 
   double _tokens = _maxTokens.toDouble();
   DateTime _lastRefill = DateTime.now();
-  final _random = Random.secure();
+  final _random = math.Random.secure();
   final _mutex = Mutex();
 
   DateTime _backoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
+  static const int maxAdaptiveMultiplier = 8;
   int _adaptiveMultiplier = 1;
+  int get adaptiveMultiplier => _adaptiveMultiplier;
   DateTime _lastSuccess = DateTime.now();
+  DateTime get lastSuccess => _lastSuccess;
 
   // Dedicated Backend bucket (higher cap, 10/s refill, no client-side pacing floors)
   static const int _backendMaxTokens = 30;
@@ -117,7 +121,9 @@ class YtmRateLimiter {
           _backendBackoffUntil = deadline.isBefore(clamp) ? deadline : clamp;
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('restore failed', error: e, stackTrace: st, category: 'YtmRateLimiter');
+    }
   }
 
   void _persist() {
@@ -257,7 +263,8 @@ class YtmRateLimiter {
   /// Called when a 429 rate-limit response is received from native YouTube.
   void onRateLimited([int? retryAfterSeconds]) {
     final now = DateTime.now();
-    _adaptiveMultiplier = (_adaptiveMultiplier * 2).clamp(1, 16);
+    _adaptiveMultiplier =
+        math.min(_adaptiveMultiplier + 1, maxAdaptiveMultiplier);
 
     if (retryAfterSeconds != null && retryAfterSeconds > 0) {
       _backoffUntil = now.add(Duration(seconds: retryAfterSeconds));
@@ -288,9 +295,7 @@ class YtmRateLimiter {
   /// Called on a successful native request to reset backoff state.
   void onSuccess() {
     final now = DateTime.now();
-    if (now.difference(_lastSuccess).inMinutes > 10) {
-      _adaptiveMultiplier = 1;
-    }
+    _adaptiveMultiplier = 1;
     _lastSuccess = now;
     _backoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
     _persist();

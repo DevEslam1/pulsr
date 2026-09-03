@@ -227,7 +227,8 @@ class AudioEffectsChannel {
           .invokeMapMethod<String, dynamic>('getSystemEffectsStatus')
           .timeout(const Duration(seconds: 2));
       return result ?? {'status': 'unknown', 'detectedBundles': <String>[]};
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('getSystemEffectsStatus failed, using fallback', error: e, stackTrace: st, category: 'AudioEffectsChannel');
       return {'status': 'unknown', 'detectedBundles': <String>[]};
     }
   }
@@ -239,7 +240,8 @@ class AudioEffectsChannel {
           .invokeMethod<bool>('hasActiveEffects')
           .timeout(const Duration(seconds: 2));
       return active ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('hasActiveEffects failed, using fallback', error: e, stackTrace: st, category: 'AudioEffectsChannel');
       return false;
     }
   }
@@ -1066,7 +1068,8 @@ class AudioEffectsChannel {
           .timeout(const Duration(seconds: 2));
       if (latency is num) return latency.toInt();
       return 0;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('toInt failed, using fallback', error: e, stackTrace: st, category: 'AudioEffectsChannel');
       return 0;
     }
   }
@@ -1206,7 +1209,8 @@ class AudioEffectsChannel {
       final stages = (res as num?)?.toInt() ?? 0;
       _handleAutoDegradeTransition(stages);
       return stages;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('toInt failed, using fallback', error: e, stackTrace: st, category: 'AudioEffectsChannel');
       return 0;
     }
   }
@@ -1233,7 +1237,8 @@ class AudioEffectsChannel {
       return await _channel
           .invokeMapMethod<String, dynamic>('getDspDebugStatus')
           .timeout(const Duration(seconds: 3));
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('getDspDebugStatus failed, using fallback', error: e, stackTrace: st, category: 'AudioEffectsChannel');
       return null;
     }
   }

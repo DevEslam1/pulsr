@@ -22,6 +22,7 @@ import 'core/services/file_intent_handler.dart';
 import 'domain/services/restore_detection_service.dart';
 import 'data/services/ytm_account_service.dart';
 import 'data/services/ytm_service.dart';
+import 'core/errors/ytm_error_classifier.dart';
 import 'core/utils/error_logger.dart';
 import 'core/utils/ytm_rate_limiter.dart';
 import 'data/audio/audio_handler.dart';
@@ -219,13 +220,28 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
   void didHaveMemoryPressure() {
     try {
       getIt<ArtworkCacheManager>().clearAllCache();
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('didHaveMemoryPressure failed', error: e, stackTrace: st, category: 'Main');
+    }
     try {
       final cache = getIt.isRegistered<ArtworkLruCache>()
           ? getIt<ArtworkLruCache>()
           : null;
       cache?.trimForMemoryPressure();
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('didHaveMemoryPressure failed', error: e, stackTrace: st, category: 'Main');
+    }
+    // FIX: also drop dynamic-theme palette LRU (50 cached states + images).
+    try {
+      if (getIt.isRegistered<DynamicThemeCubit>()) {
+        // resetToDefault clears debounce; palettes cleared in close only —
+        // best-effort trim here via reset when no custom color is showing.
+        final theme = getIt<DynamicThemeCubit>();
+        if (!theme.state.hasCustomArtworkColor) theme.resetToDefault();
+      }
+    } catch (e, st) {
+      ErrorLogger.log('LRU failed', error: e, stackTrace: st, category: 'Main');
+    }
   }
 
   /// Surfaces a re-login prompt when the YouTube Music session dies mid-use
@@ -243,6 +259,22 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
 
           final ctx = rootNavigatorKey.currentContext;
           if (ctx == null || !ctx.mounted) return;
+
+          final loopBreaker = LoginLoopBreaker.shared;
+          if (!loopBreaker.canAutoRelogin) {
+            ScaffoldMessenger.of(ctx)
+              ..hideCurrentSnackBar()
+              ..showSnackBar(
+                const SnackBar(
+                  content: Text(
+                      'YouTube rejected this session. Please try again in a few minutes.'),
+                  behavior: SnackBarBehavior.floating,
+                  duration: Duration(seconds: 6),
+                ),
+              );
+            return;
+          }
+
           ScaffoldMessenger.of(ctx)
             ..hideCurrentSnackBar()
             ..showSnackBar(
@@ -253,12 +285,17 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                 duration: const Duration(seconds: 6),
                 action: SnackBarAction(
                   label: 'Sign In',
-                  onPressed: () => YtmWebLoginSheet.show(ctx),
+                  onPressed: () {
+                    loopBreaker.record();
+                    YtmWebLoginSheet.show(ctx);
+                  },
                 ),
               ),
             );
         });
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('_listenForYtmSessionExpiry failed', error: e, stackTrace: st, category: 'Main');
+      }
     });
   }
 
@@ -294,11 +331,15 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
         if (getIt.isRegistered<PulsrAudioHandler>()) {
           try {
             await getIt<PulsrAudioHandler>().effectsReady.timeout(const Duration(seconds: 5));
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('delayed failed', error: e, stackTrace: st, category: 'Main');
+          }
           // Small grace period to let restoreLastPlaybackSession's DB read finish
           await Future<void>.delayed(const Duration(milliseconds: 300));
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('delayed failed', error: e, stackTrace: st, category: 'Main');
+      }
       if (!mounted) return;
       try {
         final scanner = getIt<MediaScannerService>();
@@ -383,33 +424,36 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
       ],
       child: MultiBlocProvider(
         providers: [
-          BlocProvider<DynamicThemeCubit>(
-            create: (_) => getIt<DynamicThemeCubit>(),
+          // FIX: singletons must use .value — create: would close() the shared
+          // getIt instance when this subtree disposes, leaving a closed cubit
+          // for later getIt<X>() lookups (StateError: Cannot emit after close).
+          BlocProvider<DynamicThemeCubit>.value(
+            value: getIt<DynamicThemeCubit>(),
           ),
-          BlocProvider<PlayerCubit>(
-            create: (_) => getIt<PlayerCubit>(),
+          BlocProvider<PlayerCubit>.value(
+            value: getIt<PlayerCubit>(),
           ),
-          BlocProvider<LibraryCubit>(
-            create: (_) => getIt<LibraryCubit>(),
+          BlocProvider<LibraryCubit>.value(
+            value: getIt<LibraryCubit>(),
           ),
-          BlocProvider<SearchCubit>(
-            create: (_) => getIt<SearchCubit>(),
+          BlocProvider<SearchCubit>.value(
+            value: getIt<SearchCubit>(),
           ),
-          BlocProvider<PlaylistCubit>(
-            create: (_) => getIt<PlaylistCubit>(),
+          BlocProvider<PlaylistCubit>.value(
+            value: getIt<PlaylistCubit>(),
           ),
-          BlocProvider<SettingsCubit>(
-            create: (_) => getIt<SettingsCubit>(),
+          BlocProvider<SettingsCubit>.value(
+            value: getIt<SettingsCubit>(),
           ),
-          BlocProvider<AuthCubit>(
-            create: (_) => getIt<AuthCubit>(),
+          BlocProvider<AuthCubit>.value(
+            value: getIt<AuthCubit>(),
           ),
-          BlocProvider<DownloadsCubit>(
-            create: (_) => getIt<DownloadsCubit>(),
+          BlocProvider<DownloadsCubit>.value(
+            value: getIt<DownloadsCubit>(),
           ),
           if (AppConfig.ytmEnabled)
-            BlocProvider<YtmDownloadCubit>(
-              create: (_) => getIt<YtmDownloadCubit>(),
+            BlocProvider<YtmDownloadCubit>.value(
+              value: getIt<YtmDownloadCubit>(),
             ),
         ],
         child: MultiBlocListener(

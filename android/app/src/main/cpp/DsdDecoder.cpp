@@ -53,6 +53,10 @@ void DsdDecoder::configure(DsdRate rate, int targetPcmSampleRate, DsdBitOrder bi
 
     const double dsdFrequencyHz = 44100.0 * static_cast<double>(dsdRate_);
     decimationRatio_ = dsdFrequencyHz / static_cast<double>(targetRate_);
+    if (decimationRatio_ < 8.0) {
+        targetRate_ = static_cast<int>(dsdFrequencyHz / 8.0);
+        decimationRatio_ = 8.0;
+    }
 
     generateFilters();
     reset();

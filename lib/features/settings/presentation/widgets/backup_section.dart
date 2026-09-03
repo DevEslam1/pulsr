@@ -7,6 +7,7 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -14,6 +15,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../domain/usecases/backup_usecases.dart';
 import '../../cubit/settings_cubit.dart';
 
+import '../../../../core/utils/error_logger.dart';
 class BackupSection extends StatefulWidget {
   const BackupSection({super.key});
 
@@ -101,11 +103,23 @@ class _BackupSectionState extends State<BackupSection> {
       allowedExtensions: ['json'],
     );
 
-    if (files.isEmpty || files.single.path == null) {
-      return;
+    if (files.isEmpty) return;
+    final picked = files.single;
+    String? filePath = picked.path;
+    // FIX(file_picker 12): bytes removed — materialize readAsBytes to temp
+    // for SAF cloud providers when path is null.
+    if (filePath == null) {
+      try {
+        final bytes = await picked.readAsBytes();
+        final tempDir = await getTemporaryDirectory();
+        final tmp = File('${tempDir.path}/${picked.name}');
+        await tmp.writeAsBytes(bytes);
+        filePath = tmp.path;
+      } catch (e, st) {
+        ErrorLogger.log('_importBackup failed, using fallback', error: e, stackTrace: st, category: 'BackupSection');
+        return;
+      }
     }
-
-    final filePath = files.single.path!;
     final file = File(filePath);
 
     if (!await file.exists()) {

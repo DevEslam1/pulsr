@@ -9,6 +9,7 @@ import '../../../../domain/models/lyrics_line.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 
+import '../../../../core/utils/error_logger.dart';
 class LyricsView extends StatefulWidget {
   /// Playback position used to highlight the active line.
   ///
@@ -212,7 +213,9 @@ class _LyricsViewState extends State<LyricsView> {
                           } else {
                             try {
                               context.read<PlayerCubit>().seek(line.timestamp);
-                            } catch (_) {}
+                            } catch (e, st) {
+                              ErrorLogger.log('dispose failed', error: e, stackTrace: st, category: 'LyricsView');
+                            }
                           }
                         },
                         borderRadius: BorderRadius.circular(12),

@@ -49,9 +49,17 @@ function loadBotGuard(challengeData) {
     const intervalMs = 5;
     const timeoutMs = 10000;
 
-    const intervalId = setInterval(function() {
+    if (window._botGuardIntervalId) {
+      clearInterval(window._botGuardIntervalId);
+      window._botGuardIntervalId = null;
+    }
+
+    window._botGuardIntervalId = setInterval(function() {
       if (typeof vmFunctions.asyncSnapshotFunction === 'function') {
-        clearInterval(intervalId);
+        if (window._botGuardIntervalId) {
+          clearInterval(window._botGuardIntervalId);
+          window._botGuardIntervalId = null;
+        }
         resolve({
           snapshot: function(args) {
             return new Promise(function(snapResolve, snapReject) {
@@ -78,12 +86,22 @@ function loadBotGuard(challengeData) {
 
       elapsedMs += intervalMs;
       if (elapsedMs >= timeoutMs) {
-        clearInterval(intervalId);
+        if (window._botGuardIntervalId) {
+          clearInterval(window._botGuardIntervalId);
+          window._botGuardIntervalId = null;
+        }
         reject(new Error('[BotGuardClient]: asyncSnapshotFunction is null after ' + (timeoutMs / 1000) + ' seconds timeout'));
       }
     }, intervalMs);
   });
 }
+
+window.disposeBotGuard = function() {
+  if (window._botGuardIntervalId) {
+    clearInterval(window._botGuardIntervalId);
+    window._botGuardIntervalId = null;
+  }
+};
 
 function runBotGuard(challengeData) {
   if (!challengeData || !challengeData.interpreterJavascript) {

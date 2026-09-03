@@ -7,6 +7,7 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import '../utils/error_logger.dart';
 import 'clock.dart';
 
+import '../utils/app_logger.dart';
 /// Stages in tap-to-audible pipeline. Ordered by expected occurrence.
 enum PlaybackStage {
   tap,
@@ -162,7 +163,8 @@ class PlaybackLatencyTracker {
       );
       transaction.setTag('videoId', videoId);
       if (quality != null) transaction.setTag('quality', quality);
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('start failed, using fallback', error: e, stackTrace: st, category: 'PlaybackLatencyTracker');
       transaction = null;
     }
     final session = _Session(
@@ -199,7 +201,9 @@ class PlaybackLatencyTracker {
     session.tags[name] = value;
     try {
       session.transaction?.setTag(name, value);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('setTag failed', error: e, stackTrace: st, category: 'PlaybackLatencyTracker');
+    }
   }
 
   /// Attaches a native-side timing relayed one-way over the platform channel
@@ -226,7 +230,9 @@ class PlaybackLatencyTracker {
           }
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('markNativeTiming failed', error: e, stackTrace: st, category: 'PlaybackLatencyTracker');
+    }
   }
 
   Duration _markInternal(PlaybackStage stage,
@@ -273,8 +279,9 @@ class PlaybackLatencyTracker {
           },
         );
       }
-    } catch (_) {
+    } catch (e) {
       // Fallback to breadcrumb on any Sentry error
+      AppLogger.debug('markNativeTiming failed (non-fatal): $e', category: 'PlaybackLatencyTracker');
       try {
         ErrorLogger.addBreadcrumb(
           'Playback stage $stageName @ ${elapsed.inMilliseconds}ms',
@@ -287,7 +294,9 @@ class PlaybackLatencyTracker {
             ...?data,
           },
         );
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('markNativeTiming failed', error: e, stackTrace: st, category: 'PlaybackLatencyTracker');
+      }
     }
 
     // If playing stage is reached, auto-finish successfully
@@ -407,7 +416,9 @@ class PlaybackLatencyTracker {
           },
         );
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('setData failed', error: e, stackTrace: st, category: 'PlaybackLatencyTracker');
+    }
 
     _emitSummary(report);
     _history.add(report);
@@ -489,7 +500,9 @@ class PlaybackLatencyTracker {
     if (_active != null && !_active!.closed) {
       try {
         _active!.transaction?.finish(status: SpanStatus.cancelled());
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('debugReset failed', error: e, stackTrace: st, category: 'PlaybackLatencyTracker');
+      }
     }
     _active = null;
     _history.clear();

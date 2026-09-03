@@ -64,21 +64,26 @@ class YtmBrowseService {
     if (_pendingFeed != null) return _pendingFeed!.future;
     _pendingFeed = Completer<List<YtmBrowseSection>>();
     try {
-      // Curated diverse showcase when offline/initial load with dynamic fallback
-      final charts = await getTrendingCharts();
-      final newReleases = await getNewReleases();
+      // Parallel: old serial await tripled latency (charts→releases→moods).
+      // Moods are local constants — no need to await network for them.
       final moods = await getMoodsAndGenres();
+      final results = await Future.wait([
+        getTrendingCharts().timeout(
+            const Duration(seconds: 12), onTimeout: () => const <YtmBrowseItem>[]),
+        getNewReleases().timeout(
+            const Duration(seconds: 12), onTimeout: () => const <YtmBrowseItem>[]),
+      ]);
 
       final sections = [
         YtmBrowseSection(
           title: 'Top Charts & Trending',
           subtitle: 'Most played tracks right now',
-          items: charts,
+          items: results[0],
         ),
         YtmBrowseSection(
           title: 'New Releases',
           subtitle: 'Fresh albums & singles',
-          items: newReleases,
+          items: results[1],
         ),
         YtmBrowseSection(
           title: 'Moods & Genres',
@@ -118,7 +123,9 @@ class YtmBrowseService {
                 ))
             .toList();
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('getTrendingCharts failed', error: e, stackTrace: st, category: 'YtmBrowseService');
+    }
 
     try {
       final onlineTracks = await _ytmService.search('Top Global Hits');
@@ -135,7 +142,9 @@ class YtmBrowseService {
                 ))
             .toList();
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('getTrendingCharts failed', error: e, stackTrace: st, category: 'YtmBrowseService');
+    }
 
     return const [];
   }
@@ -157,44 +166,44 @@ class YtmBrowseService {
                 ))
             .toList();
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('getNewReleases failed', error: e, stackTrace: st, category: 'YtmBrowseService');
+    }
 
     return const [];
   }
 
-  /// Fetches Moods and Genres.
+  /// Fetches Moods and Genres — local constants only (no network, no
+  /// third-party image hosts). Old unsplash.com artwork URLs leaked user IP
+  /// to a tracker and broke offline; UI now renders local placeholders.
   Future<List<YtmBrowseItem>> getMoodsAndGenres() async {
     return const [
       YtmBrowseItem(
         id: 'mood_chill',
         title: 'Chill & Relax',
         subtitle: 'Calm beats and ambient vibes',
-        artworkUrl:
-            'https://images.unsplash.com/photo-1518495973542-4542c06a5843?w=500',
+        artworkUrl: null,
         type: 'playlist',
       ),
       YtmBrowseItem(
         id: 'mood_workout',
         title: 'Workout & Energy',
         subtitle: 'High BPM hype and motivation',
-        artworkUrl:
-            'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=500',
+        artworkUrl: null,
         type: 'playlist',
       ),
       YtmBrowseItem(
         id: 'mood_focus',
         title: 'Deep Focus & Study',
         subtitle: 'Lo-Fi, piano and instrumental',
-        artworkUrl:
-            'https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=500',
+        artworkUrl: null,
         type: 'playlist',
       ),
       YtmBrowseItem(
         id: 'mood_party',
         title: 'Party & Dance',
         subtitle: 'EDM, House and club bangers',
-        artworkUrl:
-            'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=500',
+        artworkUrl: null,
         type: 'playlist',
       ),
     ];
@@ -205,7 +214,9 @@ class YtmBrowseService {
     try {
       final related = await _ytmService.search('related to $videoId');
       if (related.isNotEmpty) return related;
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('startRadio failed', error: e, stackTrace: st, category: 'YtmBrowseService');
+    }
     return (await getTrendingCharts()).map((e) => e.toYtmTrack()).toList();
   }
 }

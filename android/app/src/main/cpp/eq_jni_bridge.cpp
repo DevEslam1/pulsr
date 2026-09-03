@@ -287,14 +287,16 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeLoadImpulseResponse(
     auto customIr = PreparedIr::createCustom(current ? current->sampleRate : 48000.0, data, frames, channels, targetCoreRate);
     env->ReleaseFloatArrayElements(irSamples, data, JNI_ABORT);
 
-    if (customIr) {
-        AudioDspEngine::instance().updateParams([customIr](DspParamSnapshot& snap) {
-            snap.reverb.preset = static_cast<int>(ReverbPreset::Custom);
-            snap.reverb.preparedIr = customIr;
-        });
-        return JNI_TRUE;
+    if (!customIr) {
+        __android_log_print(ANDROID_LOG_ERROR, "PulsrDSP", "Failed to create custom IR");
+        return JNI_FALSE;
     }
-    return JNI_FALSE;
+
+    AudioDspEngine::instance().updateParams([customIr](DspParamSnapshot& snap) {
+        snap.reverb.preset = static_cast<int>(ReverbPreset::Custom);
+        snap.reverb.preparedIr = customIr;
+    });
+    return JNI_TRUE;
 }
 
 JNIEXPORT void JNICALL

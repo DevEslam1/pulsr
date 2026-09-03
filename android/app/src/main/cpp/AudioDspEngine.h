@@ -121,10 +121,21 @@ public:
 
     // Auto-Degrade Safety Net: tracks stages bypassed due to budget exhaustion
     uint32_t getAutoDegradedStages() const { return autoDegradedStages_.load(); }
-    void triggerStageAutoDegrade(uint32_t stageBitmask) { autoDegradedStages_.fetch_or(stageBitmask); }
-    void recoverStageAutoDegrade(uint32_t stageBitmask) { autoDegradedStages_.fetch_and(~stageBitmask); }
+    void triggerStageAutoDegrade(uint32_t stageBitmask) {
+        autoDegradedStages_.fetch_or(stageBitmask);
+        if (stageBitmask == STAGE_SATURATION) {
+            stageGainCompensation_.store(1.1885f); // ~1.5 dB linear compensation
+        }
+    }
+    void recoverStageAutoDegrade(uint32_t stageBitmask) {
+        autoDegradedStages_.fetch_and(~stageBitmask);
+        if (stageBitmask == STAGE_SATURATION) {
+            stageGainCompensation_.store(1.0f);
+        }
+    }
     void clearAutoDegradedStages() {
         autoDegradedStages_.store(0);
+        stageGainCompensation_.store(1.0f);
         degradeConsecutiveBlocks_ = 0;
         recoveryConsecutiveBlocks_ = 0;
         rtfCount_ = 0;
@@ -153,10 +164,14 @@ private:
 
     // Rolling RTF monitor (zero heap allocation, preallocated fixed ring buffer)
     static constexpr int kRtfWindowSize = 20;
-    static constexpr int kRtfRecoveryWindowSize = 40;
+    static constexpr int kRtfRecoveryWindowSize = 32;
+    static constexpr float RTF_DEGRADE_THRESHOLD = 0.85f;
+    static constexpr float RTF_RECOVER_THRESHOLD = 0.45f;
+    static constexpr int RECOVERY_HOLD_BLOCKS = 32;
     std::atomic<bool> autoDegradeMonitorEnabled_{true};
     std::atomic<double> simulatedBlockRtf_{-1.0}; // < 0 means measure actual wall-clock
     std::atomic<double> rollingRtf_{0.0};
+    std::atomic<float> stageGainCompensation_{0.0f};
     float rtfRingBuffer_[kRtfWindowSize] = {};
     int rtfRingHead_ = 0;
     int rtfCount_ = 0;

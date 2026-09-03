@@ -27,6 +27,7 @@ import '../../data/services/ytm_service.dart';
 import '../../core/utils/safe_filename.dart';
 import '../../domain/models/retry_policy.dart';
 
+import '../../core/utils/app_logger.dart';
 /// Where a download currently is, for driving progress UI.
 enum YtDownloadStage {
   queued,
@@ -255,10 +256,26 @@ class YtDownloadService {
           category: 'download', data: {'videoId': videoId});
 
       // 1. Ensure PoToken attestation is fresh before requesting stream
-      await _ytmService.ensurePoTokenReady();
+      try {
+        await _ytmService.ensurePoTokenReady().timeout(
+            const Duration(seconds: 10));
+      } catch (e) {
+        // Best-effort: resolve chain will surface a structured error.
+        AppLogger.debug('_executeDownload failed (non-fatal): $e', category: 'YtDownloadService');
+      }
 
-      final quality = prefs.getString('setting_download_quality') ?? 'high';
+      // Validate quality (prefs corruption → fallback high, never empty).
+      var quality = prefs.getString('setting_download_quality') ?? 'high';
+      if (quality != 'low' && quality != 'medium' && quality != 'high') {
+        quality = 'high';
+      }
       var stream = await _resolveDownloadStream(videoId, quality);
+
+      // Freshness: never start chunks on a URL expiring within 5 min —
+      // parallel chunks share one URL and all 4 die together on expire.
+      if (stream.isExpiringSoon()) {
+        stream = await _resolveDownloadStream(videoId, quality);
+      }
 
       // Pre-download storage check (BUG-06 & [D6])
       try {
@@ -280,7 +297,9 @@ class YtDownloadService {
                 ));
           }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('toInt failed', error: e, stackTrace: st, category: 'YtDownloadService');
+      }
 
       final ext = stream.container.isNotEmpty ? stream.container : 'm4a';
       final dir = await getTemporaryDirectory();
@@ -467,21 +486,27 @@ class YtDownloadService {
               await resolvedArtFile.delete().catchError((_) => resolvedArtFile);
             }
           }
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('yt_download_service failed', error: e, stackTrace: st, category: 'YtDownloadService');
+        }
       }
       if (temp != null) {
         try {
           if (await temp.exists()) {
             await temp.delete();
           }
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('yt_download_service failed', error: e, stackTrace: st, category: 'YtDownloadService');
+        }
       }
       if (tempArt != null) {
         try {
           if (await tempArt!.exists()) {
             await tempArt!.delete();
           }
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('yt_download_service failed', error: e, stackTrace: st, category: 'YtDownloadService');
+        }
       }
     }
   }
@@ -821,7 +846,9 @@ class YtDownloadService {
           for (final part in tempParts) {
             try {
               if (await part.exists()) await part.delete();
-            } catch (_) {}
+            } catch (e, st) {
+              ErrorLogger.log('wait failed', error: e, stackTrace: st, category: 'YtDownloadService');
+            }
           }
           throw const CorruptDownloadFailure(
               'Parallel download chunk missing or out of order');
@@ -896,20 +923,26 @@ class YtDownloadService {
           if (await part.exists()) {
             await part.delete();
           }
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('wait failed', error: e, stackTrace: st, category: 'YtDownloadService');
+        }
       }
       final outPartFile = File('${dest.path}.part');
       try {
         if (await outPartFile.exists()) {
           await outPartFile.delete();
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('wait failed', error: e, stackTrace: st, category: 'YtDownloadService');
+      }
       if (!mergeCompleted) {
         try {
           if (await dest.exists()) {
             await dest.delete();
           }
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('wait failed', error: e, stackTrace: st, category: 'YtDownloadService');
+        }
       }
     }
   }
@@ -935,7 +968,8 @@ class YtDownloadService {
           resumeOffset = 0;
         }
       }
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('Function failed, using fallback', error: e, stackTrace: st, category: 'YtDownloadService');
       resumeOffset = 0;
     }
 
@@ -969,7 +1003,9 @@ class YtDownloadService {
         await response.drain<void>();
         try {
           await partFile.delete();
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('tryParse failed', error: e, stackTrace: st, category: 'YtDownloadService');
+        }
         // Retry fresh without Range (recurse once) — guard depth ≤1 to avoid infinite recursion
         if (depth >= 1) {
           throw const DownloadFailure(
@@ -1021,7 +1057,8 @@ class YtDownloadService {
           sink.add(chunk);
           await sink.flush();
           await sink.close();
-          throw const DownloadFailure('Download paused');
+          // Distinct from errors: pause is user-intent, resumable — not a failure toast.
+          throw const InterruptedFailure('Download paused');
         }
         received += chunk.length;
         sink.add(chunk);
@@ -1085,7 +1122,9 @@ class YtDownloadService {
         final raf = await partFile.open(mode: FileMode.append);
         await raf.flush();
         await raf.close();
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('tryParse failed', error: e, stackTrace: st, category: 'YtDownloadService');
+      }
       if (await dest.exists()) {
         await dest.delete();
       }
@@ -1108,12 +1147,16 @@ class YtDownloadService {
                     const Duration(minutes: 10)) {
                   await entity.delete();
                 }
-              } catch (_) {}
+              } catch (e, st) {
+                ErrorLogger.log('cleanOrphanPartFiles failed', error: e, stackTrace: st, category: 'YtDownloadService');
+              }
             }
           }
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('cleanOrphanPartFiles failed', error: e, stackTrace: st, category: 'YtDownloadService');
+    }
   }
 
   Future<void> _tag(String path, SongsTableData song,

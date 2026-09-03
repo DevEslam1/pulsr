@@ -22,6 +22,7 @@ import '../../core/utils/error_logger.dart';
 
 import '../../core/errors/ytm_error_classifier.dart';
 
+import '../../core/utils/app_logger.dart';
 /// A failed YTM call with structured block signal and trace ID.
 class YtmException implements Exception {
   final String code;
@@ -41,29 +42,41 @@ class YtmException implements Exception {
 
   /// YouTube has flagged the IP / client as automated/bot and requires authentication.
   /// NOTE: rateLimited (429) is intentionally excluded — rate limits should use
-  /// backoff, not device-level blocking. LOGIN_REQUIRED is an auth signal handled
-  /// by [isAuth], not a bot signal.
-  bool get isBotBlocked =>
-      signal == YtmBlockSignal.botChallenge ||
-      signal == YtmBlockSignal.poTokenInvalid ||
-      code == 'BOT_CHALLENGE' ||
-      code == 'PO_TOKEN_INVALID' ||
-      code == 'YTM_BOT_BLOCKED' ||
-      code == 'YTM_RECAPTCHA' ||
-      code == 'RECAPTCHA_REQUIRED' ||
-      (details != null &&
-          (details!.contains('bot') ||
-              details!.contains('Sign in to confirm')));
+  /// backoff, not device-level blocking. The "Sign in to confirm you're not a
+  /// bot" gate arrives as LOGIN_REQUIRED but IS a bot signal — checked first
+  /// (case-insensitive) before auth mapping.
+  bool get isBotBlocked {
+    final d = details?.toLowerCase() ?? '';
+    if (d.contains('not a bot') ||
+        d.contains('sign in to confirm') ||
+        d.contains('confirm you') ||
+        d.contains('unusual traffic') ||
+        d.contains('automated queries') ||
+        d.contains('recaptcha') ||
+        d.contains('bot_block')) {
+      return true;
+    }
+    return signal == YtmBlockSignal.botChallenge ||
+        signal == YtmBlockSignal.poTokenInvalid ||
+        code == 'BOT_CHALLENGE' ||
+        code == 'PO_TOKEN_INVALID' ||
+        code == 'YTM_BOT_BLOCKED' ||
+        code == 'YTM_RECAPTCHA' ||
+        code == 'RECAPTCHA_REQUIRED';
+  }
 
   /// Session has expired or authentication is invalid.
-  bool get isAuth =>
-      signal == YtmBlockSignal.signInRequired ||
-      code == 'SIGN_IN_REQUIRED' ||
-      code == 'YTM_AUTH' ||
-      code == 'LOGIN_REQUIRED' ||
-      (details != null &&
-          (details!.toLowerCase().contains('unauthenticated') ||
-              details!.contains('LOGIN_REQUIRED')));
+  /// Excludes bot-gate phrasing (handled by [isBotBlocked]).
+  bool get isAuth {
+    if (isBotBlocked) return false;
+    return signal == YtmBlockSignal.signInRequired ||
+        code == 'SIGN_IN_REQUIRED' ||
+        code == 'YTM_AUTH' ||
+        code == 'LOGIN_REQUIRED' ||
+        (details != null &&
+            (details!.toLowerCase().contains('unauthenticated') ||
+                details!.contains('LOGIN_REQUIRED')));
+  }
 
   /// Fatal error where looping / skipping the queue will only worsen the block.
   bool get isFatal => isNetwork || isDisabled || isBotBlocked || isAuth;
@@ -121,6 +134,38 @@ class YtmService {
     // by the Kotlin side over the same channel. Purely passive — the native
     // side never waits on a reply.
     _channel.setMethodCallHandler(_handleNativeCall);
+    unawaited(refreshClientVersions());
+  }
+
+  /// Periodically refreshes dynamic Innertube client versions to prevent staleness (Fix B-60).
+  Future<void> refreshClientVersions() async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://music.youtube.com'),
+        headers: {'User-Agent': 'Mozilla/5.0'},
+      ).timeout(const Duration(seconds: 5));
+      final match = RegExp(r'"clientVersion":"([\d.]+)"')
+          .firstMatch(response.body);
+      if (match != null) {
+        final version = match.group(1)!;
+        await _updateClientVersion('WEB_REMIX', version);
+        await _updateClientVersion('WEB_EMBEDDED_PLAYER', version);
+      }
+    } catch (e) {
+      // Keep hardcoded versions as fallback
+      AppLogger.debug('refreshClientVersions failed (non-fatal): $e', category: 'YtmService');
+    }
+  }
+
+  Future<void> _updateClientVersion(String clientType, String version) async {
+    try {
+      await _channel.invokeMethod('updateClientVersion', {
+        'clientType': clientType,
+        'version': version,
+      });
+    } catch (e, st) {
+      ErrorLogger.log('_updateClientVersion failed', error: e, stackTrace: st, category: 'YtmService');
+    }
   }
 
   Future<dynamic> _handleNativeCall(MethodCall call) async {
@@ -141,8 +186,9 @@ class YtmService {
               .map((k, v) => MapEntry(k.toString(), v))
           : null;
       _tracker?.markNativeTiming(name, durationMs, attrs: attrs);
-    } catch (_) {
+    } catch (e) {
       // Telemetry must never affect playback.
+      AppLogger.debug('toInt failed (non-fatal): $e', category: 'YtmService');
     }
   }
 
@@ -154,14 +200,18 @@ class YtmService {
     if (_authExpiredController.isClosed) return;
     try {
       _authExpiredController.add(null);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('notifyAuthExpired failed', error: e, stackTrace: st, category: 'YtmService');
+    }
   }
 
   @disposeMethod
   void dispose() {
     try {
       _authExpiredController.close();
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('dispose failed', error: e, stackTrace: st, category: 'YtmService');
+    }
   }
 
   Map<String, String> _localeArgs() {
@@ -180,7 +230,9 @@ class YtmService {
     _globalBlockUntil = null;
     try {
       await _channel.invokeMethod<bool>('setCookies', {'cookies': cookies});
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('syncCookies failed', error: e, stackTrace: st, category: 'YtmService');
+    }
   }
 
   /// Calls native PoTokenManager to ensure attestation tokens are ready.
@@ -188,7 +240,8 @@ class YtmService {
     try {
       final ready = await _channel.invokeMethod<bool>('ensurePoTokenReady');
       return ready ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('ensurePoTokenReady failed, using fallback', error: e, stackTrace: st, category: 'YtmService');
       return false;
     }
   }
@@ -197,7 +250,9 @@ class YtmService {
   Future<void> invalidatePoToken() async {
     try {
       await _channel.invokeMethod<bool>('invalidatePoToken');
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('invalidatePoToken failed', error: e, stackTrace: st, category: 'YtmService');
+    }
   }
 
   /// Retrieves state of PoTokenManager.
@@ -208,7 +263,8 @@ class YtmService {
       );
       if (state == null) return null;
       return state.map((k, v) => MapEntry(k.toString(), v));
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('getPoTokenState failed, using fallback', error: e, stackTrace: st, category: 'YtmService');
       return null;
     }
   }
@@ -224,7 +280,8 @@ class YtmService {
       );
       if (state == null) return null;
       return state.map((k, v) => MapEntry(k.toString(), v));
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('getAccountPoToken failed, using fallback', error: e, stackTrace: st, category: 'YtmService');
       return null;
     }
   }
@@ -236,14 +293,18 @@ class YtmService {
       await _channel.invokeMethod<bool>('setDataSyncId', {
         'dataSyncId': dataSyncId,
       });
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('setDataSyncId failed', error: e, stackTrace: st, category: 'YtmService');
+    }
   }
 
   /// Pre-warms BotGuard WebView and Capability Matrix.
   Future<void> preWarm() async {
     try {
       await _channel.invokeMethod<bool>('preWarm');
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('preWarm failed', error: e, stackTrace: st, category: 'YtmService');
+    }
   }
 
   /// Checks if active connection is via VPN.
@@ -251,7 +312,8 @@ class YtmService {
     try {
       final vpn = await _channel.invokeMethod<bool>('isVpnConnected');
       return vpn ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('isVpnConnected failed, using fallback', error: e, stackTrace: st, category: 'YtmService');
       return false;
     }
   }
@@ -261,7 +323,9 @@ class YtmService {
     _globalBlockUntil = null;
     try {
       await _channel.invokeMethod<bool>('resetIdentities');
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('resetIdentities failed', error: e, stackTrace: st, category: 'YtmService');
+    }
   }
 
   /// Returns true if native stack is running in limited mode (no poToken).
@@ -269,7 +333,8 @@ class YtmService {
     try {
       final limited = await _channel.invokeMethod<bool>('getLimitedMode');
       return limited ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('getLimitedMode failed, using fallback', error: e, stackTrace: st, category: 'YtmService');
       return false;
     }
   }
@@ -367,21 +432,21 @@ class YtmService {
     int limit = 30,
   }) async {
     try {
-      String apiKey = const String.fromEnvironment(
-        'YTM_API_KEY',
-        defaultValue: 'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30',
-      );
+      // FIX: hard-coded fallback removed - fail fast if resolver not registered or key empty.
+      // The default quota-burning key is no longer embedded; production builds must supply
+      // --dart-define=YTM_API_KEY or a valid YtmClientVersionResolver. This avoids leaking
+      // shared quota and forces explicit config.
+      String apiKey = const String.fromEnvironment('YTM_API_KEY', defaultValue: '');
       String clientVersion = '1.20250820.01.00';
       if (getIt.isRegistered<YtmClientVersionResolver>()) {
         final resolver = getIt<YtmClientVersionResolver>();
-        apiKey = resolver.apiKey;
-        clientVersion = resolver.clientVersion;
+        // Resolver takes precedence when it has a non-empty key
+        if (resolver.apiKey.isNotEmpty) apiKey = resolver.apiKey;
+        if (resolver.clientVersion.isNotEmpty) clientVersion = resolver.clientVersion;
       }
-      // Log warning if default key is being used (should be overridden via --dart-define YTM_API_KEY)
-      if (apiKey == 'AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30') {
-        debugPrint(
-          '[YTM_SERVICE] Warning: Using default YTM_API_KEY — override via --dart-define=YTM_API_KEY for production',
-        );
+      if (apiKey.isEmpty) {
+        debugPrint('[YTM_SERVICE] _searchInnertube aborted: YTM_API_KEY missing (no resolver/env)');
+        return const [];
       }
 
       final body = jsonEncode({
@@ -472,41 +537,90 @@ class YtmService {
                   }
                 }
 
+                String? artworkUrl;
+                final thumb = r['thumbnail'] as Map<String, dynamic>?;
+                final musicThumb =
+                    thumb?['musicThumbnailRenderer'] as Map<String, dynamic>?;
+                final innerThumb =
+                    musicThumb?['thumbnail'] as Map<String, dynamic>?;
+                final thumbnails =
+                    (innerThumb?['thumbnails'] ?? thumb?['thumbnails'])
+                        as List<dynamic>?;
+                if (thumbnails != null && thumbnails.isNotEmpty) {
+                  final lastThumb = thumbnails.last as Map<String, dynamic>?;
+                  artworkUrl = lastThumb?['url'] as String?;
+                }
+
+                int durationSeconds = 0;
+                final fixedCols = r['fixedColumns'] as List<dynamic>? ?? [];
+                if (fixedCols.isNotEmpty && fixedCols[0] is Map) {
+                  final c0 = fixedCols[0] as Map;
+                  final durRuns =
+                      c0['musicResponsiveListItemFixedColumnRenderer']?['text']?['runs']
+                          as List<dynamic>?;
+                  if (durRuns != null && durRuns.isNotEmpty && durRuns[0] is Map) {
+                    final durText = (durRuns[0] as Map)['text'] as String?;
+                    if (durText != null) {
+                      final parts = durText
+                          .split(':')
+                          .map((s) => int.tryParse(s.trim()))
+                          .whereType<int>()
+                          .toList();
+                      if (parts.length == 2) {
+                        durationSeconds = parts[0] * 60 + parts[1];
+                      } else if (parts.length == 3) {
+                        durationSeconds =
+                            parts[0] * 3600 + parts[1] * 60 + parts[2];
+                      }
+                    }
+                  }
+                }
+
                 if (videoId != null && videoId.length == 11) {
                   tracks.add(
                     YtmTrack(
                       videoId: videoId,
                       title: title,
                       artist: artist,
-                      duration: Duration.zero,
+                      duration: Duration(seconds: durationSeconds),
+                      artworkUrl: artworkUrl,
                     ),
                   );
                 }
-              } catch (_) {
+              } catch (e) {
                 // Per-item failures must not abort the whole search result set.
+                AppLogger.debug('traverse failed (non-fatal): $e', category: 'YtmService');
               }
               return;
             }
             for (final val in node.values) {
               try {
                 traverse(val);
-              } catch (_) {}
+              } catch (e, st) {
+                ErrorLogger.log('traverse failed', error: e, stackTrace: st, category: 'YtmService');
+              }
             }
           } else if (node is List) {
             for (final item in node) {
               try {
                 traverse(item);
-              } catch (_) {}
+              } catch (e, st) {
+                ErrorLogger.log('traverse failed', error: e, stackTrace: st, category: 'YtmService');
+              }
             }
           }
         }
 
         try {
           traverse(json);
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('traverse failed', error: e, stackTrace: st, category: 'YtmService');
+        }
         return tracks.take(limit).toList();
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('traverse failed', error: e, stackTrace: st, category: 'YtmService');
+    }
     return const [];
   }
 
@@ -522,7 +636,9 @@ class YtmService {
       );
       final tracks = _parseTracks(raw);
       if (tracks.isNotEmpty) return tracks;
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('trending failed', error: e, stackTrace: st, category: 'YtmService');
+    }
 
     // Fallback: fast direct search for top trending music
     return await _searchInnertube('top music hits trending', limit: limit);
@@ -621,16 +737,24 @@ class YtmService {
       throw const YtmException('INVALID_VIDEO_ID', 'Video ID must be exactly 11 characters');
     }
 
-    // Check Task 2 in-memory URL cache first
+    // Check Task 2 in-memory URL cache first — keyed by auth identity to
+    // prevent guest URLs being served to authed users and vice-versa
+    // (cache poisoning → 403 on googlevideo).
     final urlCache =
         getIt.isRegistered<YtmUrlCache>() ? getIt<YtmUrlCache>() : null;
+    final isLoggedInCached = getIt.isRegistered<YtmAccountService>() &&
+        getIt<YtmAccountService>().isLoggedIn;
+    final identityHash = isLoggedInCached ? 'auth' : 'guest';
     if (!forceRefresh) {
-      final cachedEntry = urlCache?.get(videoId, quality: quality);
+      final cachedEntry = urlCache?.get(videoId,
+          quality: quality, identityHash: identityHash);
       if (cachedEntry != null && !cachedEntry.isExpired()) {
         try {
           _tracker?.markStage(PlaybackStage.urlObtained);
           _tracker?.setTag('cacheHit', 'true');
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('resolveStream failed', error: e, stackTrace: st, category: 'YtmService');
+        }
         return cachedEntry.toStream(quality: quality);
       }
     }
@@ -670,7 +794,9 @@ class YtmService {
       try {
         _tracker?.markStage(PlaybackStage.pluginEntered);
         _tracker?.setTag('cacheHit', 'false');
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('resolveStream failed', error: e, stackTrace: st, category: 'YtmService');
+      }
 
       final account = getIt.isRegistered<YtmAccountService>()
           ? getIt<YtmAccountService>()
@@ -687,7 +813,9 @@ class YtmService {
         try {
           _tracker?.markStage(PlaybackStage.clientRequestSent);
           _tracker?.markStage(PlaybackStage.poTokenNeeded);
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('resolveStream failed', error: e, stackTrace: st, category: 'YtmService');
+        }
 
         YtmStream? t1Result;
         YtmStream? t2Result;
@@ -762,25 +890,25 @@ class YtmService {
           try {
             _tracker?.markStage(PlaybackStage.urlObtained);
             _tracker?.setTag('tierUsed', tierLabel);
-          } catch (_) {}
-          urlCache?.put(
-            videoId,
-            winStream.url,
-            quality: quality,
-            userAgent: winStream.userAgent,
-            cookies: winStream.cookies,
-          );
-          // Bonus: if the loser also resolved, cache it for the SWTR window.
-          final bonus = (t1Result?.url == winStream.url) ? t2Result : t1Result;
-          if (bonus != null && bonus.url.trim().isNotEmpty) {
+          } catch (e, st) {
+            ErrorLogger.log('wait failed', error: e, stackTrace: st, category: 'YtmService');
+          }
+          // Validate googlevideo URL before caching (reject expire-less /
+          // empty URLs that would poison the 4h cache slot).
+          if (_isCacheableStreamUrl(winStream.url)) {
             urlCache?.put(
               videoId,
-              bonus.url,
+              winStream.url,
               quality: quality,
-              userAgent: bonus.userAgent,
-              cookies: bonus.cookies,
+              identityHash: identityHash,
+              userAgent: winStream.userAgent,
+              cookies: winStream.cookies,
+              stream: winStream,
             );
           }
+          // Bonus loser: cache under its OWN identity only if different, and
+          // never overwrite the winner slot (put would clobber same key).
+          // Loser is kept only when it carries a different URL signature.
           return winStream;
         }
 
@@ -804,7 +932,9 @@ class YtmService {
           try {
             _tracker?.markStage(PlaybackStage.clientRequestSent);
             _tracker?.markStage(PlaybackStage.poTokenNeeded);
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('wait failed', error: e, stackTrace: st, category: 'YtmService');
+          }
           final raw = await _guard(
             () => _channel.invokeMethod<Map<Object?, Object?>>('resolveStream', {
               'videoId': videoId,
@@ -818,14 +948,20 @@ class YtmService {
             try {
               _tracker?.markStage(PlaybackStage.urlObtained);
               _tracker?.setTag('tierUsed', 'native_guest');
-            } catch (_) {}
-            urlCache?.put(
-              videoId,
-              stream.url,
-              quality: quality,
-              userAgent: stream.userAgent,
-              cookies: stream.cookies,
-            );
+            } catch (e, st) {
+              ErrorLogger.log('wait failed', error: e, stackTrace: st, category: 'YtmService');
+            }
+            if (_isCacheableStreamUrl(stream.url)) {
+              urlCache?.put(
+                videoId,
+                stream.url,
+                quality: quality,
+                identityHash: identityHash,
+                userAgent: stream.userAgent,
+                cookies: stream.cookies,
+                stream: stream,
+              );
+            }
             return stream;
           }
         } catch (e) {
@@ -852,7 +988,9 @@ class YtmService {
       try {
         try {
           _tracker?.markStage(PlaybackStage.clientRequestSent);
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('ytm_service failed', error: e, stackTrace: st, category: 'YtmService');
+        }
         if (getIt.isRegistered<XdmBackendService>()) {
           final xdm = getIt<XdmBackendService>();
           if (await xdm.isEnabled()) {
@@ -869,14 +1007,20 @@ class YtmService {
               try {
                 _tracker?.markStage(PlaybackStage.urlObtained);
                 _tracker?.setTag('tierUsed', 'xdm');
-              } catch (_) {}
-              urlCache?.put(
-                videoId,
-                remoteStream.url,
-                quality: quality,
-                userAgent: remoteStream.userAgent,
-                cookies: remoteStream.cookies,
-              );
+              } catch (e, st) {
+                ErrorLogger.log('ytm_service failed', error: e, stackTrace: st, category: 'YtmService');
+              }
+              if (_isCacheableStreamUrl(remoteStream.url)) {
+                urlCache?.put(
+                  videoId,
+                  remoteStream.url,
+                  quality: quality,
+                  identityHash: identityHash,
+                  userAgent: remoteStream.userAgent,
+                  cookies: remoteStream.cookies,
+                  stream: remoteStream,
+                );
+              }
               return remoteStream;
             }
           }
@@ -927,6 +1071,29 @@ class YtmService {
     });
   }
 
+  /// Rejects empty / non-googlevideo / expire-less URLs from the 4h cache.
+  /// Caching a dead URL poisons every later play until TTL expires.
+  static bool _isCacheableStreamUrl(String url) {
+    if (url.trim().isEmpty) return false;
+    try {
+      final uri = Uri.parse(url);
+      if (uri.host.isEmpty) return false;
+      // googlevideo hosts carry expire=; XDM may return proxied URLs — allow
+      // those but still require a host.
+      if (uri.host.contains('googlevideo.com')) {
+        final expire = int.tryParse(uri.queryParameters['expire'] ?? '');
+        if (expire == null || expire <= 0) return false;
+        final expiresAt =
+            DateTime.fromMillisecondsSinceEpoch(expire * 1000);
+        if (expiresAt.difference(DateTime.now()).inMinutes < 10) return false;
+      }
+      return true;
+    } catch (e, st) {
+      ErrorLogger.log('tryParse failed, using fallback', error: e, stackTrace: st, category: 'YtmService');
+      return false;
+    }
+  }
+
   Future<T?> _guard<T>(
     Future<T?> Function() call, {
     required Duration timeout,
@@ -958,6 +1125,33 @@ class YtmService {
             e.code == 'LOGIN_REQUIRED' ||
             e.code == 'YTM_AUTH' ||
             e.code == 'YTM_SIGNIN_REQUIRED';
+
+        // 429: honor Retry-After with exponential backoff + jitter instead of
+        // hammering the ladder (IP-block escalation).
+        if ((e.code == 'YTM_429' || e.code == 'RATE_LIMITED') &&
+            attempt < maxRetries) {
+          final retryAfter = int.tryParse(e.message ?? '');
+          final delayMs = retryAfter != null
+              ? (retryAfter * 1000).clamp(1000, 30000)
+              : (1000 * (1 << attempt) +
+                  DateTime.now().millisecond % 500);
+          await Future<void>.delayed(Duration(milliseconds: delayMs));
+          continue;
+        }
+
+        // 400 CLIENT_DEPRECATED: refresh Innertube client version once, then retry.
+        if ((e.code == 'YTM_400' || e.code == 'CLIENT_DEPRECATED') &&
+            attempt == 0 &&
+            getIt.isRegistered<YtmClientVersionResolver>()) {
+          try {
+            await getIt<YtmClientVersionResolver>().refresh().timeout(
+                const Duration(seconds: 12));
+          } catch (e, st) {
+            ErrorLogger.log('delayed failed', error: e, stackTrace: st, category: 'YtmService');
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 500));
+          continue;
+        }
 
         if (attempt == maxRetries || isFatalCode) {
           ErrorLogger.log(

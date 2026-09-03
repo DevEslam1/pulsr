@@ -53,6 +53,28 @@ class OnlinePlaylistEntry {
             .map((t) => YtmTrack.fromJson(t as Map<String, dynamic>))
             .toList(),
       );
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is OnlinePlaylistEntry &&
+          runtimeType == other.runtimeType &&
+          id == other.id &&
+          title == other.title &&
+          uploader == other.uploader &&
+          _tracksEqual(tracks, other.tracks);
+
+  @override
+  int get hashCode => Object.hash(id, title, uploader, Object.hashAll(tracks));
+
+  static bool _tracksEqual(List<YtmTrack> a, List<YtmTrack> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
 }
 
 /// Reactive state for the online-playlists section, exposed as a
@@ -114,6 +136,45 @@ class YtmOnlineState {
       isAutoFetching: isAutoFetching ?? this.isAutoFetching,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is YtmOnlineState &&
+          runtimeType == other.runtimeType &&
+          likedStatus == other.likedStatus &&
+          likedError == other.likedError &&
+          accountStatus == other.accountStatus &&
+          accountError == other.accountError &&
+          customStatus == other.customStatus &&
+          customError == other.customError &&
+          isAutoFetching == other.isAutoFetching &&
+          _listEquals(likedTracks, other.likedTracks) &&
+          _listEquals(accountPlaylists, other.accountPlaylists) &&
+          _listEquals(customPlaylists, other.customPlaylists);
+
+  @override
+  int get hashCode => Object.hash(
+        likedStatus,
+        likedError,
+        accountStatus,
+        accountError,
+        customStatus,
+        customError,
+        isAutoFetching,
+        Object.hashAll(likedTracks),
+        Object.hashAll(accountPlaylists),
+        Object.hashAll(customPlaylists),
+      );
+
+  static bool _listEquals<T>(List<T> a, List<T> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -124,30 +185,60 @@ class YtmOnlineState {
 class PlaylistCubit extends PulsrCubit<PlaylistState> {
   static const String _onlineCacheKey = 'ytm_cached_online_playlists_v1';
   final PlaylistUseCases _playlistUseCases;
+  final YtmAccountService? _ytmAccount;
+  final YtmService? _ytmService;
   StreamSubscription<void>? _playlistsSub;
   StreamSubscription<void>? _playlistSongsSub;
   final Map<int, StreamSubscription<void> > _smartSubscriptions = {};
   bool _isSeedingChecked = false;
 
-  /// Reactive online-playlist state. Widgets use [ValueListenableBuilder]
-  /// to rebuild only when this changes, without touching the freezed state.
+  /// Reactive online-playlist state (performance-isolated view).
+  ///
+  /// Single-writer invariant: only this cubit mutates [ytmOnline], and every
+  /// mutation mirrors the canonical local state via [PlaylistState] emissions
+  /// where relevant. The [ValueNotifier] exists solely to avoid rebuilding the
+  /// full local-playlist list on high-frequency YTM progress; it is NOT a
+  /// second source of truth — [close] disposes it and tests assert parity.
   final ytmOnline = ValueNotifier<YtmOnlineState>(const YtmOnlineState());
+  bool _ytmOnlineDisposed = false;
 
-  PlaylistCubit({required PlaylistUseCases playlistUseCases})
-      : _playlistUseCases = playlistUseCases,
+  PlaylistCubit({
+    required PlaylistUseCases playlistUseCases,
+    YtmAccountService? ytmAccountService,
+    YtmService? ytmService,
+  })  : _playlistUseCases = playlistUseCases,
+        _ytmAccount = ytmAccountService,
+        _ytmService = ytmService,
         super(const PlaylistState()) {
     _init();
   }
 
+  YtmAccountService? get _account {
+    if (_ytmAccount != null) return _ytmAccount;
+    if (getIt.isRegistered<YtmAccountService>()) {
+      return getIt<YtmAccountService>();
+    }
+    return null;
+  }
+
+  YtmService? get _service {
+    if (_ytmService != null) return _ytmService;
+    if (getIt.isRegistered<YtmService>()) return getIt<YtmService>();
+    return null;
+  }
+
   void _init() {
     _loadOnlineCache();
+    safeEmit(state.copyWith(isLoading: true));
 
     _playlistsSub = autoSub<Result<List<PlaylistsTableData>>>(_playlistUseCases.watchPlaylists(), (result) {
       if (isClosed) return;
       result.fold(
-        (failure) => emit(state.copyWith(errorMessage: failure.message)),
+        (failure) => safeEmit(
+            state.copyWith(isLoading: false, errorMessage: failure.message)),
         (playlists) {
-          emit(state.copyWith(playlists: playlists, errorMessage: null));
+          safeEmit(state.copyWith(
+              playlists: playlists, isLoading: false, errorMessage: null));
           _updateSmartCounts(playlists);
           if (!_isSeedingChecked) {
             _isSeedingChecked = true;
@@ -159,12 +250,9 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
 
     // Auto-update online playlists & liked songs in background on every restart
     if (AppConfig.ytmEnabled) {
-      getIt<YtmAccountService>()
-          .loginState
-          .removeListener(_onYtmLoginStateChanged);
-      getIt<YtmAccountService>()
-          .loginState
-          .addListener(_onYtmLoginStateChanged);
+      final account = _account;
+      account?.loginState.removeListener(_onYtmLoginStateChanged);
+      account?.loginState.addListener(_onYtmLoginStateChanged);
       WidgetsBinding.instance.addPostFrameCallback((_) {
         Future.delayed(const Duration(seconds: 2), () {
           if (!isClosed) {
@@ -176,7 +264,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   }
 
   void _onYtmLoginStateChanged() {
-    if (getIt<YtmAccountService>().isLoggedIn) {
+    if ((_account?.isLoggedIn ?? false)) {
       // YTM account init completes asynchronously after startup (deferred for jank);
       // refresh the online library reactively once login becomes available.
       autoFetchOnlineLibrary(force: true);
@@ -259,12 +347,21 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     }
   }
 
+  final Map<int, String> _smartCriteriaHash = {};
+
   void _updateSmartCounts(List<PlaylistsTableData> playlists) {
     final currentSmartIds = <int>{};
     for (final playlist in playlists) {
       if (playlist.isSmart && playlist.smartCriteria != null) {
         currentSmartIds.add(playlist.id);
-        if (!_smartSubscriptions.containsKey(playlist.id)) {
+        final hash = playlist.smartCriteria!;
+        // FIX: resub when criteria JSON changed — edited smart playlists
+        // kept the old watchCriteria and showed stale counts.
+        if (!_smartSubscriptions.containsKey(playlist.id) ||
+            _smartCriteriaHash[playlist.id] != hash) {
+          _smartSubscriptions[playlist.id]?.cancel();
+          removeFromComposite(_smartSubscriptions[playlist.id]);
+          _smartCriteriaHash[playlist.id] = hash;
           final criteria =
               SmartCriteria.fromJsonString(playlist.smartCriteria!);
           _smartSubscriptions[playlist.id] = autoSub<List<SongsTableData>>(
@@ -273,7 +370,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
               if (isClosed) return;
               final updatedCounts = Map<int, int>.from(state.smartPlaylistCounts);
               updatedCounts[playlist.id] = songs.length;
-              emit(state.copyWith(smartPlaylistCounts: updatedCounts));
+              safeEmit(state.copyWith(smartPlaylistCounts: updatedCounts));
             },
           );
         }
@@ -291,19 +388,26 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   }
 
   void clearError() {
-    emit(state.copyWith(errorMessage: null));
+    safeEmit(state.copyWith(errorMessage: null));
   }
 
   void loadPlaylistSongs(int playlistId) {
-    _playlistSongsSub?.cancel();
-    removeFromComposite(_playlistSongsSub);
+    if (_playlistSongsSub != null) {
+      unawaited(_playlistSongsSub?.cancel());
+      removeFromComposite(_playlistSongsSub);
+      _playlistSongsSub = null;
+    }
+    safeEmit(state.copyWith(isLoading: true, errorMessage: null));
     _playlistSongsSub = autoSub<Result<List<SongsTableData>>>(
         _playlistUseCases.watchPlaylistSongs(playlistId), (result) {
       if (isClosed) return;
       result.fold(
-        (failure) => emit(state.copyWith(errorMessage: failure.message)),
-        (songs) => emit(
-            state.copyWith(currentPlaylistSongs: songs, errorMessage: null)),
+        (failure) => safeEmit(
+            state.copyWith(isLoading: false, errorMessage: failure.message)),
+        (songs) => safeEmit(state.copyWith(
+            currentPlaylistSongs: songs,
+            isLoading: false,
+            errorMessage: null)),
       );
     });
   }
@@ -312,11 +416,11 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       {bool isSmart = false, String? criteria}) async {
     final trimmed = name.trim();
     if (trimmed.isEmpty) {
-      emit(state.copyWith(errorMessage: 'Playlist name cannot be empty'));
+      safeEmit(state.copyWith(errorMessage: 'Playlist name cannot be empty'));
       return;
     }
     if (trimmed.length > 100) {
-      emit(state.copyWith(
+      safeEmit(state.copyWith(
           errorMessage: 'Playlist name cannot exceed 100 characters'));
       return;
     }
@@ -324,30 +428,44 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         isSmart: isSmart, smartCriteria: criteria);
     if (isClosed) return;
     result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
+      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
       (_) => null,
     );
   }
 
   Future<void> renamePlaylist(int playlistId, String newName) async {
-    final result = await _playlistUseCases.renamePlaylist(playlistId, newName);
+    final trimmed = newName.trim();
+    if (trimmed.isEmpty) {
+      safeEmit(state.copyWith(errorMessage: 'Playlist name cannot be empty'));
+      return;
+    }
+    if (trimmed.length > 100) {
+      safeEmit(state.copyWith(
+          errorMessage: 'Playlist name cannot exceed 100 characters'));
+      return;
+    }
+    final result = await _playlistUseCases.renamePlaylist(playlistId, trimmed);
     if (isClosed) return;
     result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
+      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
       (_) => null,
     );
   }
 
   Future<void> deletePlaylist(int playlistId) async {
-    unawaited(_smartSubscriptions[playlistId]?.cancel());
-    _smartSubscriptions.remove(playlistId);
+    final stale = _smartSubscriptions.remove(playlistId);
+    if (stale != null) {
+      unawaited(stale.cancel());
+      removeFromComposite(stale);
+    }
+    _smartCriteriaHash.remove(playlistId);
     final updatedCounts = Map<int, int>.from(state.smartPlaylistCounts)
       ..remove(playlistId);
-    emit(state.copyWith(smartPlaylistCounts: updatedCounts));
+    safeEmit(state.copyWith(smartPlaylistCounts: updatedCounts));
     final result = await _playlistUseCases.deletePlaylist(playlistId);
     if (isClosed) return;
     result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
+      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
       (_) => null,
     );
   }
@@ -357,7 +475,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         await _playlistUseCases.addSongToPlaylist(playlistId, songId);
     if (isClosed) return;
     result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
+      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
       (_) => null,
     );
   }
@@ -369,7 +487,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     final playlistId = createResult.fold((_) => null, (id) => id);
     if (playlistId == null) {
       if (!isClosed) {
-        emit(state.copyWith(
+        safeEmit(state.copyWith(
           errorMessage: createResult.fold((f) => f.message, (_) => null),
         ));
       }
@@ -381,7 +499,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       addResult.fold(
         (failure) {
           if (!isClosed) {
-            emit(state.copyWith(errorMessage: failure.message));
+            safeEmit(state.copyWith(errorMessage: failure.message));
           }
         },
         (_) => null,
@@ -395,7 +513,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         await _playlistUseCases.addSongsToPlaylist(playlistId, songIds);
     if (isClosed) return;
     result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
+      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
       (_) => null,
     );
   }
@@ -405,7 +523,7 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
         await _playlistUseCases.removeSongFromPlaylist(playlistId, songId);
     if (isClosed) return;
     result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
+      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
       (_) => null,
     );
   }
@@ -418,8 +536,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   /// logged in and not already fetched.
   Future<void> autoFetchOnlineLibrary({bool force = false}) async {
     if (!AppConfig.ytmEnabled) return;
-    final account = getIt<YtmAccountService>();
-    if (!account.isLoggedIn) return;
+    final account = _account;
+    if (account == null || !account.isLoggedIn) return;
 
     if (!force &&
         ytmOnline.value.likedStatus == YtmFetchStatus.done &&
@@ -439,8 +557,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   /// Fetches the authenticated user's Liked Music from YouTube Music.
   Future<void> fetchLikedSongsPlaylist() async {
     if (!AppConfig.ytmEnabled) return;
-    final account = getIt<YtmAccountService>();
-    if (!account.isLoggedIn) {
+    final account = _account;
+    if (account == null || !account.isLoggedIn) {
       ytmOnline.value = ytmOnline.value.copyWith(
         likedStatus: YtmFetchStatus.error,
         likedError: 'Not signed in to YouTube Music',
@@ -487,8 +605,8 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   /// Fetches the authenticated user's library playlists from YouTube Music.
   Future<void> fetchAccountPlaylists() async {
     if (!AppConfig.ytmEnabled) return;
-    final account = getIt<YtmAccountService>();
-    if (!account.isLoggedIn) {
+    final account = _account;
+    if (account == null || !account.isLoggedIn) {
       ytmOnline.value = ytmOnline.value.copyWith(
         accountStatus: YtmFetchStatus.error,
         accountError: 'Not signed in to YouTube Music',
@@ -546,7 +664,16 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
     );
 
     try {
-      final ytmService = getIt<YtmService>();
+      final ytmService = _service;
+      if (ytmService == null) {
+        if (!isClosed) {
+          ytmOnline.value = ytmOnline.value.copyWith(
+            customStatus: YtmFetchStatus.error,
+            customError: 'Online service unavailable',
+          );
+        }
+        return;
+      }
       final tracks = await ytmService.getPlaylistTracks(input, limit: 200);
       if (isClosed) return;
       if (tracks.isEmpty) {
@@ -610,19 +737,33 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
   }
 
   @override
-  Future<void> close() {
+  Future<void> close() async {
     if (AppConfig.ytmEnabled) {
       try {
-        getIt<YtmAccountService>()
-            .loginState
-            .removeListener(_onYtmLoginStateChanged);
-      } catch (_) {}
+        _account?.loginState.removeListener(_onYtmLoginStateChanged);
+      } catch (e, st) {
+        ErrorLogger.log('PlaylistCubit detach login listener failed',
+            error: e, stackTrace: st, category: 'PlaylistCubit');
+      }
     }
-    ytmOnline.dispose();
-    _playlistsSub?.cancel();
-    _playlistSongsSub?.cancel();
-    for (final sub in _smartSubscriptions.values) {
-      sub.cancel();
+    // FIX: ytmOnline + _playlistsSub/_playlistSongsSub are ValueNotifier /
+    // autoSub-owned. Guard dispose-after-close and route sub cancels through
+    // the composite so activeSubscriptionCount doesn't leak.
+    if (!_ytmOnlineDisposed) {
+      _ytmOnlineDisposed = true;
+      try {
+        ytmOnline.dispose();
+      } catch (e, st) {
+        ErrorLogger.log('close failed', error: e, stackTrace: st, category: 'PlaylistCubit');
+      }
+    }
+    await _playlistsSub?.cancel();
+    removeFromComposite(_playlistsSub);
+    await _playlistSongsSub?.cancel();
+    removeFromComposite(_playlistSongsSub);
+    for (final entry in _smartSubscriptions.entries) {
+      await entry.value.cancel();
+      removeFromComposite(entry.value);
     }
     _smartSubscriptions.clear();
     return super.close();

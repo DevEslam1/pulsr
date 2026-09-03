@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../core/constants/channels.dart';
 import '../../domain/services/notification_permission_service.dart';
 
+import '../../core/utils/error_logger.dart';
 @LazySingleton(as: INotificationPermissionService)
 class NotificationPermissionService implements INotificationPermissionService {
   int? _cachedSdkInt;
@@ -21,7 +22,8 @@ class NotificationPermissionService implements INotificationPermissionService {
           .invokeMethod<int>('getSdkInt')
           .timeout(const Duration(seconds: 1));
       _cachedSdkInt = sdk ?? 33;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('_getSdkInt failed, using fallback', error: e, stackTrace: st, category: 'NotificationPermissionService');
       _cachedSdkInt = 33;
     }
     return _cachedSdkInt!;

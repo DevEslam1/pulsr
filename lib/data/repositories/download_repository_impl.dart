@@ -100,7 +100,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       return await _downloadChannel.invokeMethod<T>(method, arguments);
     } on MissingPluginException {
       return null;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('value failed, using fallback', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
       return null;
     }
   }
@@ -132,7 +133,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             if (exists) {
               return const Left(AlreadyQueuedFailure('Task is already downloaded and complete'));
             }
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('queueDownload failed', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
+          }
         }
       }
 
@@ -156,7 +159,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           );
           return Left(failure);
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('queueDownload failed', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
+      }
 
       // Consult the shared YTM rate limiter before queueing so a burst of
       // downloads cannot burn the IP-level token bucket and trigger 429s.
@@ -214,7 +219,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         if (c != null) {
           try {
             await c.future.timeout(const Duration(seconds: 2));
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('pauseDownload failed', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
+          }
         }
       }
 
@@ -258,7 +265,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           'videoId': videoId,
           'title': task.title,
         });
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('resumeDownload failed', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
+      }
 
       _processQueue();
       return const Right(unit);
@@ -311,7 +320,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         if (completer != null && !completer.isCompleted) {
           try {
             await completer.future.timeout(const Duration(seconds: 5));
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('deleteDownload failed', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
+          }
         }
         _activeVideoIds.remove(videoId);
         _activeCompleters.remove(videoId);
@@ -319,18 +330,24 @@ class DownloadRepositoryImpl implements IDownloadRepository {
 
       try {
         await _ytDownloadService.cleanOrphanPartFiles(activePartNames: {});
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('deleteDownload failed', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
+      }
       if (task?.filePath != null) {
         try {
           final f = File(task!.filePath!);
           if (await f.exists()) {
             await f.delete();
           }
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('deleteDownload failed', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
+        }
         try {
           final part = File('${task!.filePath!}.part');
           if (await part.exists()) await part.delete();
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('deleteDownload failed', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
+        }
       }
       try {
         final dir = await _getTempDir();
@@ -340,17 +357,23 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             if (e is File && e.path.contains(prefix)) {
               try {
                 await e.delete();
-              } catch (_) {}
+              } catch (e, st) {
+                ErrorLogger.log('deleteDownload failed', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
+              }
             }
           }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('deleteDownload failed', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
+      }
 
       _tasks.remove(videoId);
       _cachedStorageStats = null;
       try {
         await _downloadChannel.invokeMethod('stopDownloadForeground');
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('deleteDownload failed', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
+      }
       _schedulePersist();
       _processQueue();
       return const Right<AppFailure, Unit>(unit);
@@ -423,10 +446,12 @@ class DownloadRepositoryImpl implements IDownloadRepository {
   Future<Directory?> _getTempDir() async {
     try {
       return await getTemporaryDirectory();
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('_getTempDir failed, using fallback', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
       try {
         return Directory.systemTemp;
-      } catch (_) {
+      } catch (e, st) {
+        ErrorLogger.log('_getTempDir failed, using fallback', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
         return null;
       }
     }
@@ -467,20 +492,26 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             }
           }
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('where failed', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
+      }
 
       try {
         final sizes = await Future.wait(filePaths.map((p) async {
           try {
             final f = File(p);
             if (await f.exists()) return await f.length();
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('wait failed', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
+          }
           return 0;
         }));
         totalUsedBytes = sizes.fold(0, (a, b) => a + b);
         final existingCount = sizes.where((s) => s > 0).length;
         if (existingCount > 0) completedCount = existingCount;
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('wait failed', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
+      }
 
       // Do NOT mutate task status inside a getter - surface inconsistency via stats only.
       // File-missing correction is handled by reconcileOnBoot and explicit refresh, not here.
@@ -521,7 +552,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             if (task.filePath != null) {
               try {
                 exists = await File(task.filePath!).exists();
-              } catch (_) {
+              } catch (e, st) {
+                ErrorLogger.log('reconcileOnBoot failed, using fallback', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
                 exists = false;
               }
             }
@@ -642,7 +674,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         final prefs = await SharedPreferences.getInstance();
         final rawList = _tasks.values.map((t) => t.toJson()).toList();
         await prefs.setString(_prefKey, jsonEncode(rawList));
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('_schedulePersist failed', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
+      }
     });
   }
 
@@ -666,7 +700,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       if (_activeVideoIds.isEmpty && _queue.isEmpty) {
         try {
           unawaited(_downloadChannel.invokeMethod('stopDownloadForeground'));
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('_processQueue failed', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
+        }
       }
     }));
   }
@@ -782,7 +818,9 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           return;
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('value failed', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
+    }
 
     // D-01: Validate status transition via TransitionGuard
     await _tryUpdateTaskStatus(task, DownloadStatus.downloading, clearError: true);
@@ -800,13 +838,19 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         stallWindowSeconds = configured.clamp(
             _minStallWindowSeconds, _maxStallWindowSeconds);
       }
-    } catch (_) {}
-    final watchdog = Timer.periodic(_stallCheckInterval, (_) {
-      if (stalled) return;
+    } catch (e, st) {
+      ErrorLogger.log('value failed', error: e, stackTrace: st, category: 'DownloadRepositoryImpl');
+    }
+    final watchdog = Timer.periodic(_stallCheckInterval, (timer) {
+      if (stalled) {
+        timer.cancel();
+        return;
+      }
       final idleFor =
           DateTime.now().millisecondsSinceEpoch - lastProgressMs;
       if (idleFor > stallWindowSeconds * 1000) {
         stalled = true;
+        timer.cancel();
         ErrorLogger.log(
           'Download stall detected for $videoId: no progress for '
           '$stallWindowSeconds s — cancelling attempt',
@@ -859,9 +903,13 @@ class DownloadRepositoryImpl implements IDownloadRepository {
             final current = _tasks[videoId] ?? task;
             // A watchdog-cancel masquerades as "Download canceled" downstream;
             // re-label it so the UI/retry classifier sees a retryable timeout.
+            final isBot = failure.message.toLowerCase().contains('bot') ||
+                failure.message.toLowerCase().contains('confirm you');
             final message = stalled
                 ? 'Download timed out: no progress for $stallWindowSeconds seconds'
-                : failure.message;
+                : (isBot
+                    ? 'YouTube verification required — open the app to complete it'
+                    : failure.message);
             final transient =
                 _isTransientFailure(failure) && attempt <= _maxAutoRetries;
             await _tryUpdateTaskStatus(

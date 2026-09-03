@@ -149,6 +149,17 @@ internal object ClientCapabilityMatrix {
             Log.w(TAG, "Failed loading $ASSET_FILE from assets, using built-in matrix defaults: ${e.message}")
             capabilities = defaultCapabilities
         }
+        validateClientChain()
+    }
+
+    fun validateClientChain() {
+        val priorities = capabilities.values.map { it.priority }.sorted()
+        for (i in 1 until priorities.size) {
+            val gap = priorities[i] - priorities[i - 1]
+            if (gap > 3) {
+                Log.w(TAG, "Priority gap ($gap) between ${priorities[i - 1]} and ${priorities[i]}")
+            }
+        }
     }
 
     fun loadFromJson(jsonString: String) {

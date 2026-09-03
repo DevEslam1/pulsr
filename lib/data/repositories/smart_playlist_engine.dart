@@ -248,10 +248,15 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       case SmartRuleField.lastPlayed:
         if (rule.operator == SmartOperator.withinDays) {
           final days = valInt ?? 30;
-          final cutoffSec =
-              DateTime.now().millisecondsSinceEpoch ~/ 1000 - (days * 86400);
+          // FIX: dual-unit — production writes ms, legacy/tests use sec.
+          // Match either so Recently Played works for both.
+          final nowMs = DateTime.now().millisecondsSinceEpoch;
+          final cutoffMs = nowMs - (days * 86400000);
+          final cutoffSec = cutoffMs ~/ 1000;
           return t.lastPlayed.isNotNull() &
-              t.lastPlayed.isBiggerOrEqualValue(cutoffSec);
+              (t.lastPlayed.isBiggerOrEqualValue(cutoffMs) |
+                  t.lastPlayed.isBiggerOrEqualValue(cutoffSec) &
+                      t.lastPlayed.isSmallerThanValue(1000000000000));
         }
         if (rule.operator == SmartOperator.between) {
           final b = _parseIntBetween(valStr);

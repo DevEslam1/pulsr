@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import '../constants/channels.dart';
 
+import 'error_logger.dart';
 class AudioCapabilityMatrix {
   final int sdkInt;
   const AudioCapabilityMatrix(this.sdkInt);
@@ -77,7 +78,9 @@ class PlatformCapabilities {
       if (caps != null) {
         return caps.map((k, v) => MapEntry(k, v == true || v == 1));
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('queryNativeCapabilities failed', error: e, stackTrace: st, category: 'PlatformCapabilities');
+    }
 
     return {
       'hasEqualizer': false,

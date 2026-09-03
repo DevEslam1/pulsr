@@ -15,6 +15,7 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/cubit/player_state.dart';
 
+import '../../../../core/utils/error_logger.dart';
 /// In-memory measurement sweep playable through a dedicated [AudioPlayer]
 /// (NOT the app handler) so the measurement never touches the user's queue,
 /// volume stage or DSP pipeline.
@@ -147,7 +148,9 @@ class _RoomCorrectionSheetState extends State<RoomCorrectionSheet> {
       });
       try {
         await _service.stopCapture();
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('delayed failed', error: e, stackTrace: st, category: 'RoomCorrectionSheet');
+      }
     }
   }
 

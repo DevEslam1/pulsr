@@ -295,7 +295,7 @@ internal class InnertubeClient(
 
                 // Pre-stream validation check: 1-byte ranged GET (fixes C-03)
                 val validateStart = System.currentTimeMillis()
-                val isValid = validateStreamUrl(selectedUrl)
+                val isValid = validateStreamUrl(selectedUrl, client.userAgent, traceId)
                 YtmMetricsRegistry.record("stream.validate", System.currentTimeMillis() - validateStart, isError = !isValid)
                 if (!isValid) {
                     Log.w(TAG, "[$traceId] Resolved URL for ${client.name} failed 1-byte pre-validation. Escalating ladder...")
@@ -489,7 +489,11 @@ internal class InnertubeClient(
 
     private val validatedUrls = ConcurrentHashMap<String, Long>()
 
-    private fun validateStreamUrl(url: String): Boolean {
+    private fun validateStreamUrl(
+        url: String,
+        userAgent: String = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/138.0.0.0 Safari/537.36",
+        traceId: String = ""
+    ): Boolean {
         val now = System.currentTimeMillis()
         val lastVal = validatedUrls[url]
         if (lastVal != null && (now - lastVal) < 300_000L) {
@@ -500,11 +504,11 @@ internal class InnertubeClient(
             val req = okhttp3.Request.Builder()
                 .url(url)
                 .addHeader("Range", "bytes=0-0")
-                .addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/138.0.0.0 Safari/537.36")
+                .addHeader("User-Agent", userAgent)
                 .build()
             val client = YtmHttpClient.okHttpClient.newBuilder()
-                .callTimeout(1200, TimeUnit.MILLISECONDS)
-                .readTimeout(1000, TimeUnit.MILLISECONDS)
+                .callTimeout(3500, TimeUnit.MILLISECONDS)
+                .readTimeout(2500, TimeUnit.MILLISECONDS)
                 .build()
             client.newCall(req).execute().use { resp ->
                 val code = resp.code
@@ -512,10 +516,13 @@ internal class InnertubeClient(
                 val ok = (code in 200..206) && (contentType.startsWith("audio/") || contentType.startsWith("video/")) && !contentType.contains("text/html")
                 if (ok) {
                     validatedUrls[url] = now
+                } else {
+                    Log.w(TAG, "[$traceId] Pre-validation failed: code=$code, contentType=$contentType")
                 }
                 ok
             }
-        } catch (_: Throwable) {
+        } catch (e: Throwable) {
+            Log.w(TAG, "[$traceId] Pre-validation error: ${e.javaClass.simpleName}: ${e.message}")
             false
         }
     }

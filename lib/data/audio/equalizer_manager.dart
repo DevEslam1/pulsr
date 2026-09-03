@@ -612,7 +612,8 @@ class EqualizerManager {
           frequencies: targetFreqs,
           gains: currentPreset.gains,
         );
-      } catch (_) {
+      } catch (e, st) {
+        ErrorLogger.log('set32BandMode failed, using fallback', error: e, stackTrace: st, category: 'EqualizerManager');
         await _effectsChannel.setNativeEqBandCount(targetFreqs.length);
         final futures = <Future<void>>[];
         for (int i = 0; i < targetFreqs.length; i++) {
@@ -733,7 +734,9 @@ class EqualizerManager {
           await _effectsChannel.setEqBandGains(currentPreset.gains);
         }
         return;
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('applyCurrentPreset failed', error: e, stackTrace: st, category: 'EqualizerManager');
+      }
       // Fallback to legacy per-band if bulk unavailable (old APK)
       if (is32BandMode) {
         await _effectsChannel.setNativeEqBandCount(targetFreqs.length);
@@ -1350,7 +1353,8 @@ class EqualizerManager {
         await _effectsChannel.setSincResamplerRates(sampleRate, sampleRate);
       }
       return frames;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('syncNativeLatency failed, using fallback', error: e, stackTrace: st, category: 'EqualizerManager');
       return 0;
     }
   }

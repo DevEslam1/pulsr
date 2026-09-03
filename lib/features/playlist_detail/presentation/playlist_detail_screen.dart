@@ -19,6 +19,7 @@ import '../../sheets/song_info_sheet.dart';
 import '../../downloads/cubit/ytm_download_cubit.dart';
 import '../../downloads/presentation/widgets/ytm_download_button.dart';
 
+import '../../../core/utils/error_logger.dart';
 class PlaylistDetailScreen extends StatefulWidget {
   final PlaylistsTableData playlist;
   final PlaylistUseCases? playlistUseCases;
@@ -125,7 +126,9 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
         if (await file.exists()) {
           await file.delete();
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('_sharePlaylist failed', error: e, stackTrace: st, category: 'PlaylistDetailScreen');
+      }
     }
   }
 

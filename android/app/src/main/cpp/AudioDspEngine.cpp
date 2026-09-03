@@ -141,37 +141,41 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
     if (!snapshot) return frames;
 
     // Fast check: generation counter skips applyParams entirely when unchanged
-    if (snapshot->generation != lastAppliedGeneration_.load()) {
-        if (snapshot->resetRequested) {
-            resetInternal();
+    auto expected = lastAppliedGeneration_.load(std::memory_order_acquire);
+    if (snapshot->generation != expected) {
+        if (lastAppliedGeneration_.compare_exchange_strong(
+                expected, snapshot->generation,
+                std::memory_order_acq_rel,
+                std::memory_order_acquire)) {
+            if (snapshot->resetRequested) {
+                resetInternal();
+            }
+
+            reverb_.applyParams(snapshot->reverb);
+            if (std::abs(snapshot->sampleRate - sampleRate_) > 0.5) {
+                sampleRate_ = snapshot->sampleRate;
+                eq_.setSampleRate(sampleRate_);
+                panner_.setSampleRate(sampleRate_);
+                crossfeed_.setSampleRate(sampleRate_);
+                limiter_.setSampleRate(sampleRate_);
+                reverb_.setSampleRate(sampleRate_);
+                saturation_.setSampleRate(sampleRate_);
+                stereoWidth_.setSampleRate(sampleRate_);
+                loudnessContour_.setSampleRate(sampleRate_);
+                subCrossover_.setSampleRate(sampleRate_);
+                dynamicEq_.setSampleRate(sampleRate_);
+            }
+
+            eq_.applyParams(snapshot->eq);
+            panner_.applyParams(snapshot->panner);
+            crossfeed_.applyParams(snapshot->crossfeed);
+            limiter_.applyParams(snapshot->limiter);
+            saturation_.applyParams(snapshot->saturation);
+            stereoWidth_.applyParams(snapshot->stereoWidth);
+            loudnessContour_.applyParams(snapshot->loudness);
+            subCrossover_.applyParams(snapshot->subCrossover);
+            dynamicEq_.applyParams(snapshot->dynamicEq);
         }
-
-        reverb_.applyParams(snapshot->reverb);
-        if (std::abs(snapshot->sampleRate - sampleRate_) > 0.5) {
-            sampleRate_ = snapshot->sampleRate;
-            eq_.setSampleRate(sampleRate_);
-            panner_.setSampleRate(sampleRate_);
-            crossfeed_.setSampleRate(sampleRate_);
-            limiter_.setSampleRate(sampleRate_);
-            reverb_.setSampleRate(sampleRate_);
-            saturation_.setSampleRate(sampleRate_);
-            stereoWidth_.setSampleRate(sampleRate_);
-            loudnessContour_.setSampleRate(sampleRate_);
-            subCrossover_.setSampleRate(sampleRate_);
-            dynamicEq_.setSampleRate(sampleRate_);
-        }
-
-        eq_.applyParams(snapshot->eq);
-        panner_.applyParams(snapshot->panner);
-        crossfeed_.applyParams(snapshot->crossfeed);
-        limiter_.applyParams(snapshot->limiter);
-        saturation_.applyParams(snapshot->saturation);
-        stereoWidth_.applyParams(snapshot->stereoWidth);
-        loudnessContour_.applyParams(snapshot->loudness);
-        subCrossover_.applyParams(snapshot->subCrossover);
-        dynamicEq_.applyParams(snapshot->dynamicEq);
-
-        lastAppliedGeneration_.store(snapshot->generation);
     }
 
     // Bit-Perfect / DoP bypass path: sample-identical to raw input, zero DSP roundtrips, volume locked to unity
@@ -278,6 +282,15 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
             loudnessContour_.processInterleaved(buffer, frames, channels);
         }
 
+        // Apply auto-degrade gain compensation if any active stages were dropped
+        const float degradeComp = stageGainCompensation_.load(std::memory_order_relaxed);
+        if (std::abs(degradeComp - 1.0f) > 0.001f) {
+            const int total = frames * channels;
+            for (int i = 0; i < total; ++i) {
+                buffer[i] *= degradeComp;
+            }
+        }
+
         // 10. Lookahead Limiter Stage — inserted only when net gain > 0dB or enabled by config
         if ((stages & STAGE_LIMITER) && (hasNetPositiveGain || snapshot->limiter.enabled)) {
             limiter_.processInterleaved(buffer, frames, channels);
@@ -333,7 +346,7 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
 
             // Sustained high load (RTF > 0.80 over window): degrade ONE stage at a time in cost order
             // Note: Limiter output protection is NEVER disabled during auto-degrade to prevent clipping.
-            if (avgRtf > 0.80f) {
+            if (avgRtf > RTF_DEGRADE_THRESHOLD) {
                 recoveryConsecutiveBlocks_ = 0;
                 // Cost order: REVERB -> SATURATION -> DYNEQ -> CROSSOVER -> WIDTH -> CROSSFEED -> PANNER -> EQ
                 if ((rawStages & STAGE_REVERB) && !(currentDegraded & STAGE_REVERB)) {
@@ -369,10 +382,10 @@ int AudioDspEngine::processInterleaved(float* buffer, int frames, int channels) 
                     rtfCount_ = 0;
                     rtfRingHead_ = 0;
                 }
-            } else if (avgRtf < 0.50f && currentDegraded != 0) {
-                // Recovery: sustained low load (RTF < 0.50) over kRtfRecoveryWindowSize blocks
+            } else if (avgRtf < RTF_RECOVER_THRESHOLD && currentDegraded != 0) {
+                // Recovery: sustained low load over RECOVERY_HOLD_BLOCKS
                 recoveryConsecutiveBlocks_++;
-                if (recoveryConsecutiveBlocks_ >= kRtfRecoveryWindowSize) {
+                if (recoveryConsecutiveBlocks_ >= RECOVERY_HOLD_BLOCKS) {
                     recoveryConsecutiveBlocks_ = 0;
                     // Reverse cost order: EQ -> PANNER -> CROSSFEED -> WIDTH -> CROSSOVER -> DYNEQ -> SATURATION -> REVERB
                     if (currentDegraded & STAGE_EQ) {

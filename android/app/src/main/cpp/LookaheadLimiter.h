@@ -13,6 +13,8 @@
 class LookaheadLimiter {
 public:
     static constexpr int MAX_LOOKAHEAD_SAMPLES = 8192;
+    static_assert((MAX_LOOKAHEAD_SAMPLES & (MAX_LOOKAHEAD_SAMPLES - 1)) == 0,
+                  "MAX_LOOKAHEAD_SAMPLES must be a power of 2 for bitmask wrap");
     static constexpr int INTERP_TAPS = 24;
     static constexpr int INTERP_PHASES = 4;
     static constexpr int TAPS_PER_PHASE = INTERP_TAPS / INTERP_PHASES; // 6

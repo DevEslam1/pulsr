@@ -55,7 +55,9 @@ class ScrobblerService {
     try {
       final val = await _secureStorage.read(key: secureKey);
       if (val != null && val.isNotEmpty) return val;
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_getSecureOrMigrate failed', error: e, stackTrace: st, category: 'ScrobblerService');
+    }
     try {
       final prefs = await SharedPreferences.getInstance();
       final legacyVal = prefs.getString(legacyKey)?.trim();
@@ -66,10 +68,14 @@ class ScrobblerService {
           if (verifyVal == legacyVal) {
             await prefs.remove(legacyKey);
           }
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('_getSecureOrMigrate failed', error: e, stackTrace: st, category: 'ScrobblerService');
+        }
         return legacyVal;
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_getSecureOrMigrate failed', error: e, stackTrace: st, category: 'ScrobblerService');
+    }
     return null;
   }
 
@@ -244,7 +250,9 @@ class ScrobblerService {
           await prefs.setString(_keyLastScrobbleArtist, artist);
           await prefs.setString(_keyLastScrobbleTrack, track);
           await prefs.setString(_keyLastScrobbleAlbum, album);
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('notifyPlaybackState failed', error: e, stackTrace: st, category: 'ScrobblerService');
+        }
 
         // Send "Now Playing" update
         await _updateNowPlaying(
@@ -260,7 +268,9 @@ class ScrobblerService {
         try {
           final prefs = await SharedPreferences.getInstance();
           await prefs.setInt(_keyLastScrobblePos, positionMs);
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('notifyPlaybackState failed', error: e, stackTrace: st, category: 'ScrobblerService');
+        }
       }
 
       // Check scrobble threshold (played >50% of duration or >4 minutes (240s))
@@ -302,7 +312,9 @@ class ScrobblerService {
               _keyLastScrobbledTime, DateTime.now().millisecondsSinceEpoch);
           // Clear active session since track scrobbled
           await prefs.remove(_keyLastScrobbleSong);
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('notifyPlaybackState failed', error: e, stackTrace: st, category: 'ScrobblerService');
+        }
       }
     } catch (e, st) {
       ErrorLogger.log('Error during REST scrobbling: $e',
@@ -351,7 +363,9 @@ class ScrobblerService {
                 body: params,
               )
               .timeout(const Duration(seconds: 8));
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('_updateNowPlaying failed', error: e, stackTrace: st, category: 'ScrobblerService');
+        }
       }
     }
 
@@ -389,7 +403,9 @@ class ScrobblerService {
                 body: jsonEncode(payload),
               )
               .timeout(const Duration(seconds: 8));
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('_updateNowPlaying failed', error: e, stackTrace: st, category: 'ScrobblerService');
+        }
       }
     }
   }
@@ -445,7 +461,9 @@ class ScrobblerService {
       final trimmed =
           list.length > 200 ? list.sublist(list.length - 200) : list;
       await prefs.setString(_keyOfflineQueue, jsonEncode(trimmed));
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_enqueueOfflineScrobble failed', error: e, stackTrace: st, category: 'ScrobblerService');
+    }
   }
 
   Future<void> _submitScrobble({
@@ -459,7 +477,8 @@ class ScrobblerService {
     final prefs = await SharedPreferences.getInstance();
 
     // Deduplication check
-    final dedupKey = '${artist}_$track';
+    final dedupKey =
+        '${artist}_${track}_${album.isNotEmpty ? album : "unknown"}';
     final lastScrobbledKey = prefs.getString(_keyLastScrobbledKey);
     final lastScrobbledTime = prefs.getInt(_keyLastScrobbledTime) ?? 0;
     final now = DateTime.now().millisecondsSinceEpoch;
@@ -691,7 +710,8 @@ class ScrobblerService {
                 timestamp: DateTime.fromMillisecondsSinceEpoch(tsMillis),
               );
               return null;
-            } catch (_) {
+            } catch (e, st) {
+              ErrorLogger.log('wait failed, using fallback', error: e, stackTrace: st, category: 'ScrobblerService');
               return item;
             }
           }
@@ -742,7 +762,8 @@ class ScrobblerService {
   }) async {
     final prefs = await SharedPreferences.getInstance();
 
-    final dedupKey = '${artist}_$track';
+    final dedupKey =
+        '${artist}_${track}_${album.isNotEmpty ? album : "unknown"}';
     final lastScrobbledKey = prefs.getString(_keyLastScrobbledKey);
     final lastScrobbledTime = prefs.getInt(_keyLastScrobbledTime) ?? 0;
     final now = DateTime.now().millisecondsSinceEpoch;

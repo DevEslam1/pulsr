@@ -34,6 +34,22 @@ class YtDownloadItem {
     this.error,
   });
 
+  YtDownloadItem copyWith({
+    YtDownloadStatus? status,
+    double? progress,
+    double? speedKbps,
+    int? etaSeconds,
+    String? error,
+  }) {
+    return YtDownloadItem(
+      status: status ?? this.status,
+      progress: progress ?? this.progress,
+      speedKbps: speedKbps ?? this.speedKbps,
+      etaSeconds: etaSeconds ?? this.etaSeconds,
+      error: error ?? this.error,
+    );
+  }
+
   Map<String, dynamic> toJson() => {'status': status.name, 'error': error};
 
   factory YtDownloadItem.fromJson(Map<String, dynamic> json) {
@@ -46,6 +62,21 @@ class YtDownloadItem {
       error: json['error'] as String?,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is YtDownloadItem &&
+          runtimeType == other.runtimeType &&
+          status == other.status &&
+          progress == other.progress &&
+          speedKbps == other.speedKbps &&
+          etaSeconds == other.etaSeconds &&
+          error == other.error;
+
+  @override
+  int get hashCode =>
+      Object.hash(status, progress, speedKbps, etaSeconds, error);
 }
 
 class BatchResult {
@@ -70,6 +101,33 @@ class YtmDownloadState {
 
   YtDownloadItem itemFor(String videoId) =>
       items[videoId] ?? const YtDownloadItem();
+
+  YtmDownloadState copyWith({Map<String, YtDownloadItem>? items}) {
+    return YtmDownloadState(
+      items: items ?? this.items,
+    );
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is YtmDownloadState &&
+          runtimeType == other.runtimeType &&
+          _mapsEqual(items, other.items);
+
+  @override
+  int get hashCode => Object.hashAll(
+      items.entries.map((e) => Object.hash(e.key, e.value)));
+
+  static bool _mapsEqual(
+      Map<String, YtDownloadItem> a, Map<String, YtDownloadItem> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (final k in a.keys) {
+      if (a[k] != b[k]) return false;
+    }
+    return true;
+  }
 }
 
 @singleton
@@ -77,10 +135,33 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
   final YtDownloadService _service;
   final PlayerCubit _playerCubit;
   final IDownloadRepository? _repository;
+  final QueueDownloadUseCase? _queueUseCase;
+  final PauseDownloadUseCase? _pauseUseCase;
 
-  YtmDownloadCubit(this._service, this._playerCubit, [this._repository])
-    : super(const YtmDownloadState()) {
+  YtmDownloadCubit(
+    this._service,
+    this._playerCubit, [
+    this._repository,
+    this._queueUseCase,
+    this._pauseUseCase,
+  ]) : super(const YtmDownloadState()) {
     _initSharedStream();
+  }
+
+  QueueDownloadUseCase? get _queueUseCaseOrRegistered {
+    if (_queueUseCase != null) return _queueUseCase;
+    if (getIt.isRegistered<QueueDownloadUseCase>()) {
+      return getIt<QueueDownloadUseCase>();
+    }
+    return null;
+  }
+
+  PauseDownloadUseCase? get _pauseUseCaseOrRegistered {
+    if (_pauseUseCase != null) return _pauseUseCase;
+    if (getIt.isRegistered<PauseDownloadUseCase>()) {
+      return getIt<PauseDownloadUseCase>();
+    }
+    return null;
   }
 
   void _initSharedStream() {
@@ -165,8 +246,8 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
   void cancelDownload(String videoId) {
     _service.cancel(videoId);
     _set(videoId, const YtDownloadItem(status: YtDownloadStatus.canceled));
-    if (getIt.isRegistered<PauseDownloadUseCase>()) {
-      final useCase = getIt<PauseDownloadUseCase>();
+    final useCase = _pauseUseCaseOrRegistered;
+    if (useCase != null) {
       unawaited(useCase(videoId).then((result) {
         result.fold(
           (f) => ErrorLogger.log(
@@ -214,8 +295,9 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
 
     // Preferred path: queue through the shared repository (use case), so the
     // task is tracked, throttled and rate-limited in one place.
-    if (getIt.isRegistered<QueueDownloadUseCase>()) {
-      final useCase = getIt<QueueDownloadUseCase>();
+    final queueUseCase = _queueUseCaseOrRegistered;
+    if (queueUseCase != null) {
+      final useCase = queueUseCase;
       try {
         final result = await useCase(
           DownloadTask(
@@ -318,9 +400,13 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
   /// reconciled library row. The subscription self-terminates on the first
   /// terminal event and is cancelled with the cubit (autoSub).
   void _watchForDownloadedSong(String videoId, int searchSongId) {
-    final repo = _repository;
+    final repo = _repository ??
+        (getIt.isRegistered<IDownloadRepository>()
+            ? getIt<IDownloadRepository>()
+            : null);
     if (repo == null) return;
-    autoSub(
+    StreamSubscription<DownloadTask>? sub;
+    sub = autoSub(
       repo
           .observeDownloads()
           .where((t) => t.videoId == videoId)
@@ -328,11 +414,19 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
           .take(1),
       (task) {
         final newId = task.librarySongId;
+        if (sub != null) {
+          unawaited(sub.cancel());
+          removeFromComposite(sub);
+        }
         if (isClosed || newId == null || newId == searchSongId) return;
         unawaited(_playerCubit.swapReconciledSong(searchSongId, newId));
       },
+      onDone: () {
+        if (sub != null) removeFromComposite(sub);
+      },
     );
   }
+
 
   int downloadAll(
     Iterable<SongsTableData> songs, {
@@ -408,23 +502,22 @@ class YtmDownloadCubit extends PulsrCubit<YtmDownloadState> {
   }
 
   void _set(String videoId, YtDownloadItem item) {
-    // Never downgrade a terminal status (done/failed/canceled) back to a
-    // running/queued state or overwrite terminal inappropriately.
+    // FIX(retry vs stale): `done` is sticky (never downgraded). `failed` /
+    // `canceled` are retryable BUT only via an explicit queued signal —
+    // a real retry always starts as queued, then running. A stale
+    // downloading/running event landing directly on canceled/failed (no
+    // intermediate queued) is a throttled-stream race and must stay blocked.
+    // Fresh user intent via download() bypasses this entirely with _forceSet.
     final current = state.items[videoId];
     if (current != null) {
-      const terminal = {
-        YtDownloadStatus.done,
-        YtDownloadStatus.failed,
-        YtDownloadStatus.canceled,
-      };
-      // Block any transition FROM terminal state
-      if (terminal.contains(current.status)) {
-        // Only allow done -> done (idempotent)
-        if (current.status == YtDownloadStatus.done &&
-            item.status == YtDownloadStatus.done) {
-          return;
-        }
-        return; // Block all other transitions from terminal
+      if (current.status == YtDownloadStatus.done &&
+          item.status != YtDownloadStatus.done) {
+        return; // Block stale downgrade of a completed download.
+      }
+      if ((current.status == YtDownloadStatus.failed ||
+              current.status == YtDownloadStatus.canceled) &&
+          item.status == YtDownloadStatus.running) {
+        return; // Stale running event — retry must arrive as queued first.
       }
     }
     safeEmit(

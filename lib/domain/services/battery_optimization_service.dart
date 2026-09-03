@@ -1,10 +1,12 @@
-﻿// lib/domain/services/battery_optimization_service.dart
+// lib/domain/services/battery_optimization_service.dart
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/channels.dart';
 
+import '../../core/utils/error_logger.dart';
+import '../../core/utils/app_logger.dart';
 class BatteryOptimizationService {
   static const MethodChannel _channel = MethodChannel(PulsrChannels.battery);
   static const String prefDismissedKey = 'battery_opt_card_dismissed';
@@ -14,14 +16,15 @@ class BatteryOptimizationService {
     try {
       final isIgnoring =
           await _channel.invokeMethod<bool>('isIgnoringBatteryOptimizations').timeout(const Duration(seconds: 2));
-      // MIUI and some OEMs return null for non-standard POWER_SERVICE; treat null as whitelisted to avoid perpetual card
-      if (isIgnoring == null) return true;
+      // null means unknown — treat as not whitelisted so user is prompted to check
+      if (isIgnoring == null) return false;
       return isIgnoring;
     } on PlatformException {
-      // Platform channel missing or OEM quirk - assume whitelisted to avoid spam
-      return true;
-    } catch (_) {
+      // Platform channel error or OEM quirk - show card to prevent background silent kill
+      return false;
+    } catch (e) {
       // Timeout after 2s - assume not whitelisted conservatively but avoid crash
+      AppLogger.debug('timeout failed (non-fatal): $e', category: 'BatteryOptimizationService');
       return false;
     }
   }
@@ -32,7 +35,8 @@ class BatteryOptimizationService {
       final res = await _channel
           .invokeMethod<bool>('requestIgnoreBatteryOptimizations');
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('requestIgnoreBatteryOptimizations failed, using fallback', error: e, stackTrace: st, category: 'BatteryOptimizationService');
       return false;
     }
   }
@@ -43,7 +47,8 @@ class BatteryOptimizationService {
       final res = await _channel
           .invokeMethod<bool>('openBatteryOptimizationSettings');
       return res ?? false;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('openBatteryOptimizationSettings failed, using fallback', error: e, stackTrace: st, category: 'BatteryOptimizationService');
       return false;
     }
   }
@@ -54,7 +59,8 @@ class BatteryOptimizationService {
     try {
       final m = await _channel.invokeMethod<String>('getDeviceManufacturer').timeout(const Duration(seconds: 2));
       return m?.toLowerCase() ?? '';
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('timeout failed, using fallback', error: e, stackTrace: st, category: 'BatteryOptimizationService');
       return '';
     }
   }
@@ -64,7 +70,8 @@ class BatteryOptimizationService {
     try {
       final level = await _channel.invokeMethod<int>('getBatteryLevel').timeout(const Duration(seconds: 2));
       return level ?? 100;
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('timeout failed, using fallback', error: e, stackTrace: st, category: 'BatteryOptimizationService');
       return 100;
     }
   }

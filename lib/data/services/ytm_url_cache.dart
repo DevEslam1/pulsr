@@ -5,6 +5,7 @@ import 'package:injectable/injectable.dart';
 import '../../domain/models/ytm_track.dart';
 import '../../core/telemetry/clock.dart';
 
+import '../../core/utils/error_logger.dart';
 /// Representation of a cached direct stream URL for a YouTube Music track.
 class YtmUrlCacheEntry {
   final String videoId;
@@ -145,7 +146,9 @@ class YtmUrlCache {
     if (onStaleRevalidate != null && entry.isStaleWhileRevalidate(now)) {
       try {
         onStaleRevalidate(videoId);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('Function failed', error: e, stackTrace: st, category: 'YtmUrlCache');
+      }
     }
 
     // Refresh LRU order (move to end)
@@ -159,11 +162,13 @@ class YtmUrlCache {
     String videoId, {
     String quality = 'high',
     String? egressId,
+    String? identityHash,
     void Function(String videoId)? onStaleRevalidate,
   }) {
     return get(videoId,
             quality: quality,
             egressId: egressId,
+            identityHash: identityHash,
             onStaleRevalidate: onStaleRevalidate)
         ?.url;
   }
@@ -173,18 +178,31 @@ class YtmUrlCache {
     String videoId, {
     String quality = 'high',
     String? egressId,
+    String? identityHash,
     void Function(String videoId)? onStaleRevalidate,
   }) {
     return get(videoId,
             quality: quality,
             egressId: egressId,
+            identityHash: identityHash,
             onStaleRevalidate: onStaleRevalidate)
         ?.toStream(quality: quality);
   }
 
   /// Checks if a valid, unexpired entry exists in cache.
-  bool contains(String videoId, {String quality = 'high', String? egressId}) {
-    return get(videoId, quality: quality, egressId: egressId) != null;
+  /// Pure check — does not mutate LRU order (unlike [get]).
+  bool contains(String videoId,
+      {String quality = 'high', String? egressId, String? identityHash}) {
+    pruneExpired();
+    final key = _buildKey(videoId, quality, egressId, identityHash);
+    final entry = _cache[key];
+    if (entry == null) return false;
+    final now = _clock.now();
+    if (entry.isExpired(now) || _deadUrls.contains(entry.url)) {
+      _cache.remove(key);
+      return false;
+    }
+    return true;
   }
 
   /// Stores a resolved stream URL into the LRU cache.
@@ -314,7 +332,9 @@ class YtmUrlCache {
           return safeExpiry.isAfter(now) ? safeExpiry : null;
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('tryParse failed', error: e, stackTrace: st, category: 'YtmUrlCache');
+    }
     return null;
   }
 }

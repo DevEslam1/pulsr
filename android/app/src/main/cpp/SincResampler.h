@@ -6,6 +6,7 @@
 #include <cmath>
 #include <algorithm>
 #include <cstring>
+#include <atomic>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -29,6 +30,7 @@ public:
     double getOutRate() const { return outRate_; }
     double getRatio() const { return ratio_; }
     bool isBypassed() const { return std::abs(inRate_ - outRate_) < 0.5; }
+    int getOverflowCount() const { return overflowCount_.load(std::memory_order_relaxed); }
 
     // Latency reporting in frames (exact group delay)
     int getLatencyFrames() const { return HALF_TAPS; }
@@ -59,6 +61,7 @@ private:
     float ringBuf_[MAX_CHANNELS][FIFO_CAPACITY] = {};
     int writePos_ = 0;
     int availableFrames_ = 0;
+    std::atomic<int> overflowCount_{0};
 
     std::vector<float> tempOutBuf_;
 };

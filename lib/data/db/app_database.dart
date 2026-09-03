@@ -5,6 +5,7 @@ import 'package:drift_flutter/drift_flutter.dart';
 import 'package:injectable/injectable.dart';
 import 'tables.dart';
 
+import '../../core/utils/app_logger.dart';
 export 'tables.dart' show SongSource;
 
 part 'app_database.g.dart';
@@ -37,7 +38,9 @@ class AppDatabase extends _$AppDatabase {
       await executeSql("DROP TRIGGER IF EXISTS songs_fts_delete;");
       await executeSql("DROP TRIGGER IF EXISTS songs_fts_update;");
       await executeSql("DROP TABLE IF EXISTS songs_fts;");
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('Function failed', error: e, stackTrace: st, category: 'AppDatabase');
+    }
   }
 
   static Future<void> _createIndexes(
@@ -104,34 +107,56 @@ class AppDatabase extends _$AppDatabase {
         onUpgrade: (Migrator m, int from, int to) async {
           // FIX(BUG-26): Guard onUpgrade migrations so they only run when strictly upgrading
           if (from < to) {
-            if (from < 2) {
-              await m.createTable(excludedFoldersTable);
-            }
-            if (from < 4) {
-              await m.addColumn(songsTable, songsTable.isMissing);
-            }
-            if (from < 5) {
-              await m.addColumn(songsTable, songsTable.source);
-              await m.addColumn(songsTable, songsTable.remoteId);
-              await m.addColumn(songsTable, songsTable.remoteArtworkUrl);
-              await m.addColumn(songsTable, songsTable.pendingDownloadPath);
-            }
-            if (from < 6) {
-              await m.addColumn(songsTable, songsTable.sampleRate);
-              await m.addColumn(songsTable, songsTable.bitDepth);
-              await m.addColumn(songsTable, songsTable.bitrateKbps);
-              await m.addColumn(songsTable, songsTable.codec);
-            }
             Future<bool> hasColumn(String table, String column) async {
               try {
                 final rows =
                     await customSelect('PRAGMA table_info($table);').get();
                 return rows.any((r) => r.data['name'] == column);
-              } catch (_) {
+              } catch (e) {
+                AppLogger.debug('hasColumn failed (non-fatal): $e', category: 'AppDatabase');
                 return false; // Table doesn't exist yet
               }
             }
 
+            if (from < 2) {
+              await m.createTable(excludedFoldersTable);
+            }
+            if (from < 4) {
+              if (!await hasColumn('songs', 'is_missing')) {
+                await m.addColumn(songsTable, songsTable.isMissing);
+              }
+            }
+            // FIX: crash-retry safe — every addColumn guarded by hasColumn.
+            // Unconditional addColumn (old from<5/from<6) throws "duplicate
+            // column" if a previous upgrade attempt partially completed.
+            if (from < 5) {
+              if (!await hasColumn('songs', 'source')) {
+                await m.addColumn(songsTable, songsTable.source);
+              }
+              if (!await hasColumn('songs', 'remote_id')) {
+                await m.addColumn(songsTable, songsTable.remoteId);
+              }
+              if (!await hasColumn('songs', 'remote_artwork_url')) {
+                await m.addColumn(songsTable, songsTable.remoteArtworkUrl);
+              }
+              if (!await hasColumn('songs', 'pending_download_path')) {
+                await m.addColumn(songsTable, songsTable.pendingDownloadPath);
+              }
+            }
+            if (from < 6) {
+              if (!await hasColumn('songs', 'sample_rate')) {
+                await m.addColumn(songsTable, songsTable.sampleRate);
+              }
+              if (!await hasColumn('songs', 'bit_depth')) {
+                await m.addColumn(songsTable, songsTable.bitDepth);
+              }
+              if (!await hasColumn('songs', 'bitrate_kbps')) {
+                await m.addColumn(songsTable, songsTable.bitrateKbps);
+              }
+              if (!await hasColumn('songs', 'codec')) {
+                await m.addColumn(songsTable, songsTable.codec);
+              }
+            }
             if (from < 7) {
               if (!await hasColumn('songs', 'replay_gain_track')) {
                 await m.addColumn(songsTable, songsTable.replayGainTrack);
@@ -153,7 +178,9 @@ class AppDatabase extends _$AppDatabase {
                   await customStatement(
                       'UPDATE songs SET replay_gain_track = replay_gain WHERE replay_gain IS NOT NULL;');
                 }
-              } catch (_) {}
+              } catch (e, st) {
+                ErrorLogger.log('hasColumn failed', error: e, stackTrace: st, category: 'AppDatabase');
+              }
             }
             if (from < 8) {
               if (!await hasColumn('songs', 'loudness_range')) {

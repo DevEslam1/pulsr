@@ -423,9 +423,28 @@ object PoTokenManager {
 
     /**
      * Invalidation on BotChallenge or PoTokenInvalid:
-     * Drops all tokens, visitorData, and generator so next call mints a completely fresh set.
+     * Soft path (default): drops minted streaming tokens + generator but
+     * PRESERVES dataSyncId/sessionVisitorData/visitorData. Wiping the
+     * account-bound dataSyncId forces the next auth resolve to mint as guest
+     * → guaranteed LOGIN_REQUIRED until re-bootstrap. Full wipe is only for
+     * explicit logout / PoTokenInvalid-hard via [invalidateHard].
      */
     fun invalidate() {
+        invalidateSoft()
+    }
+
+    fun invalidateSoft() {
+        val oldGen = generator
+        generator = null
+        expiryInstant = 0L
+        streamingPoToken = ""
+        oldGen?.let { Handler(Looper.getMainLooper()).post { it.close() } }
+        synchronized(tokenLru) {
+            tokenLru.evictAll()
+        }
+    }
+
+    fun invalidateHard() {
         val oldGen = generator
         generator = null
         expiryInstant = 0L

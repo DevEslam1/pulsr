@@ -28,7 +28,7 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
     final criteria = playlist.smartCriteria != null
         ? SmartCriteria.fromJsonString(playlist.smartCriteria!)
         : const SmartCriteria();
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       name: playlist.name,
       criteria: criteria,
       isEditing: true,
@@ -38,18 +38,18 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
   }
 
   void updateName(String name) {
-    emit(state.copyWith(name: name));
+    safeEmit(state.copyWith(name: name));
   }
 
   void toggleMatchAll(bool matchAll) {
     final newCriteria = state.criteria.copyWith(matchAll: matchAll);
-    emit(state.copyWith(criteria: newCriteria));
+    safeEmit(state.copyWith(criteria: newCriteria));
     _updatePreview();
   }
 
   void setLimit(int? limit) {
     final newCriteria = state.criteria.copyWith(limit: limit);
-    emit(state.copyWith(criteria: newCriteria));
+    safeEmit(state.copyWith(criteria: newCriteria));
     _updatePreview();
   }
 
@@ -58,13 +58,13 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
       sortBy: sortBy,
       sortAscending: sortAscending ?? state.criteria.sortAscending,
     );
-    emit(state.copyWith(criteria: newCriteria));
+    safeEmit(state.copyWith(criteria: newCriteria));
     _updatePreview();
   }
 
   void addRule(SmartRule rule) {
     final rules = List<SmartRule>.from(state.criteria.rules)..add(rule);
-    emit(state.copyWith(criteria: state.criteria.copyWith(rules: rules)));
+    safeEmit(state.copyWith(criteria: state.criteria.copyWith(rules: rules)));
     _updatePreview();
   }
 
@@ -72,14 +72,14 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
     if (index < 0 || index >= state.criteria.rules.length) return;
     final rules = List<SmartRule>.from(state.criteria.rules);
     rules[index] = rule;
-    emit(state.copyWith(criteria: state.criteria.copyWith(rules: rules)));
+    safeEmit(state.copyWith(criteria: state.criteria.copyWith(rules: rules)));
     _updatePreview();
   }
 
   void removeRule(int index) {
     if (index < 0 || index >= state.criteria.rules.length) return;
     final rules = List<SmartRule>.from(state.criteria.rules)..removeAt(index);
-    emit(state.copyWith(criteria: state.criteria.copyWith(rules: rules)));
+    safeEmit(state.copyWith(criteria: state.criteria.copyWith(rules: rules)));
     _updatePreview();
   }
 
@@ -90,11 +90,11 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
       _engine.watchCriteria(state.criteria),
       (songs) {
         if (isClosed) return;
-        emit(state.copyWith(previewSongs: songs));
+        safeEmit(state.copyWith(previewSongs: songs));
       },
       onError: (Object e, StackTrace st) {
         if (isClosed) return;
-        emit(state.copyWith(previewSongs: []));
+        safeEmit(state.copyWith(previewSongs: []));
       },
     );
   }
@@ -102,32 +102,67 @@ class SmartPlaylistBuilderCubit extends PulsrCubit<SmartPlaylistBuilderState> {
   Future<bool> savePlaylist() async {
     final name = state.name.trim();
     if (name.isEmpty) {
-      emit(state.copyWith(errorMessage: 'Please enter a playlist name'));
+      safeEmit(state.copyWith(errorMessage: 'Please enter a playlist name'));
+      return false;
+    }
+    if (name.length > 100) {
+      safeEmit(state.copyWith(
+          errorMessage: 'Playlist name cannot exceed 100 characters'));
+      return false;
+    }
+    if (state.criteria.limit != null && state.criteria.limit! <= 0) {
+      safeEmit(state.copyWith(errorMessage: 'Limit must be positive'));
       return false;
     }
 
-    emit(state.copyWith(isSubmitting: true, errorMessage: null));
+    safeEmit(state.copyWith(isSubmitting: true, errorMessage: null));
 
-    if (state.isEditing && state.editingPlaylistId != null) {
-      final res = await _playlistUseCases.updateSmartPlaylist(
-        state.editingPlaylistId!,
-        name,
-        state.criteria.toJsonString(),
-      );
-      if (!isClosed) {
-        emit(state.copyWith(isSubmitting: false));
+    try {
+      if (state.isEditing && state.editingPlaylistId != null) {
+        final res = await _playlistUseCases.updateSmartPlaylist(
+          state.editingPlaylistId!,
+          name,
+          state.criteria.toJsonString(),
+        );
+        if (isClosed) return false;
+        final ok = res.fold(
+          (f) {
+            safeEmit(
+                state.copyWith(isSubmitting: false, errorMessage: f.message));
+            return false;
+          },
+          (_) {
+            safeEmit(state.copyWith(isSubmitting: false));
+            return true;
+          },
+        );
+        return ok;
+      } else {
+        final res = await _playlistUseCases.createPlaylist(
+          name,
+          isSmart: true,
+          smartCriteria: state.criteria.toJsonString(),
+        );
+        if (isClosed) return false;
+        final ok = res.fold(
+          (f) {
+            safeEmit(
+                state.copyWith(isSubmitting: false, errorMessage: f.message));
+            return false;
+          },
+          (_) {
+            safeEmit(state.copyWith(isSubmitting: false));
+            return true;
+          },
+        );
+        return ok;
       }
-      return res.isRight();
-    } else {
-      final res = await _playlistUseCases.createPlaylist(
-        name,
-        isSmart: true,
-        smartCriteria: state.criteria.toJsonString(),
-      );
+    } catch (e) {
       if (!isClosed) {
-        emit(state.copyWith(isSubmitting: false));
+        safeEmit(state.copyWith(
+            isSubmitting: false, errorMessage: 'Failed to save: $e'));
       }
-      return res.isRight();
+      return false;
     }
   }
 

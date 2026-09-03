@@ -25,6 +25,7 @@ import '../../../../core/di/injection.dart';
 import '../../../../core/constants/audio_feature_info.dart';
 import '../../../settings/cubit/settings_cubit.dart';
 
+import '../../../../core/utils/error_logger.dart';
 // Rebuild gate for the whole DSP sheet. Every user-facing toggle/slider field
 // MUST be listed here or its switch will not flip until the sheet is reopened
 // (state emits, engine applies, but BlocBuilder skips the rebuild).
@@ -127,7 +128,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
           setState(() {});
         },
       );
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_listenForDspAutoDegrade failed', error: e, stackTrace: st, category: 'EqualizerSheet');
+    }
   }
 
   Future<void> _loadHeadphoneProfiles() async {
@@ -155,7 +158,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         bypassDspOnBitPerfect: settings.bypassDspOnBitPerfect,
         device: settings.currentOutputDevice,
       );
-    } catch (_) {
+    } catch (e, st) {
+      ErrorLogger.log('_dspBlockedReason failed, using fallback', error: e, stackTrace: st, category: 'EqualizerSheet');
       return null;
     }
   }

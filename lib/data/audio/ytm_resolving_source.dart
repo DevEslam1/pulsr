@@ -11,6 +11,7 @@ import 'dart:io';
 import 'package:just_audio/just_audio.dart';
 import 'package:mutex/mutex.dart';
 import 'package:path/path.dart' as p;
+import '../../core/constants/embedded_browser_ua.dart';
 import '../../core/di/injection.dart';
 import '../../core/errors/ytm_error_classifier.dart';
 import '../../data/services/ytm_cache_manager.dart';
@@ -98,7 +99,9 @@ class YtmResolvingSource extends StreamAudioSource {
           final res = await inner.request(start, end);
           try {
             _latency?.markStage(PlaybackStage.firstBytesReady);
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('request failed', error: e, stackTrace: st, category: 'YtmResolvingSource');
+          }
           return res;
         } catch (byteErr) {
           final errStr = byteErr.toString().toLowerCase();
@@ -123,7 +126,9 @@ class YtmResolvingSource extends StreamAudioSource {
 
           try {
             await _deleteCacheFilesFor(videoId);
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('request failed', error: e, stackTrace: st, category: 'YtmResolvingSource');
+          }
 
           // Single retry through fresh resolution pipeline
           try {
@@ -131,7 +136,9 @@ class YtmResolvingSource extends StreamAudioSource {
             final res = await freshInner.request(start, end);
             try {
               _latency?.markStage(PlaybackStage.firstBytesReady);
-            } catch (_) {}
+            } catch (e, st) {
+              ErrorLogger.log('request failed', error: e, stackTrace: st, category: 'YtmResolvingSource');
+            }
             return res;
           } catch (retryErr) {
             // Classify failure to ensure structured diagnostics
@@ -212,7 +219,9 @@ class YtmResolvingSource extends StreamAudioSource {
         try {
           // Cache hit skips pluginEntered and marks urlObtained directly
           _latency?.markStage(PlaybackStage.urlObtained);
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('_createInner failed', error: e, stackTrace: st, category: 'YtmResolvingSource');
+        }
       }
     }
 
@@ -223,11 +232,15 @@ class YtmResolvingSource extends StreamAudioSource {
       );
       try {
         _latency?.markStage(PlaybackStage.pluginEntered);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('_createInner failed', error: e, stackTrace: st, category: 'YtmResolvingSource');
+      }
       url = await resolve(forceRefresh: forceRefresh);
       try {
         _latency?.markStage(PlaybackStage.urlObtained);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('_createInner failed', error: e, stackTrace: st, category: 'YtmResolvingSource');
+      }
 
       // Parse 'expire' Unix timestamp and 'itag' from query
       String? itag;
@@ -241,9 +254,22 @@ class YtmResolvingSource extends StreamAudioSource {
             _resolvedExpiresAt = DateTime.fromMillisecondsSinceEpoch(
               epochSeconds * 1000,
             );
+          } else {
+            // Unparseable expire → conservative 1h proactive refresh.
+            _resolvedExpiresAt =
+                DateTime.now().add(const Duration(hours: 1));
           }
+        } else {
+          // No expire param (proxied/XDM URLs) → default 4h to match
+          // YtmUrlCache TTL so _isExpiringSoon() can still fire.
+          _resolvedExpiresAt =
+              DateTime.now().add(const Duration(hours: 4));
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('tryParse failed, using fallback', error: e, stackTrace: st, category: 'YtmResolvingSource');
+        _resolvedExpiresAt =
+            DateTime.now().add(const Duration(hours: 1));
+      }
 
       ErrorLogger.log(
         'Resolved stream for $videoId (itag=$itag, expires=$_resolvedExpiresAt)',
@@ -260,15 +286,12 @@ class YtmResolvingSource extends StreamAudioSource {
     }
 
     final cacheFile = await _cacheFileFor(videoId, url);
+    // Playback headers: send ONLY User-Agent to googlevideo CDN.
+    // Forwarding Cookie or Referer to googlevideo triggers 403 Forbidden on media stream fetch.
     final headers = <String, String>{
-      if (effectiveUa != null && effectiveUa.isNotEmpty)
-        'User-Agent': effectiveUa
-      else
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.7204.93 Safari/537.36',
-      if (effectiveCookies != null && effectiveCookies.isNotEmpty)
-        'Cookie': effectiveCookies,
-      'Referer': 'https://music.youtube.com/',
+      'User-Agent': (effectiveUa != null && effectiveUa.isNotEmpty)
+          ? effectiveUa
+          : EmbeddedBrowserUa.desktop,
     };
 
     // Serialize creation per cache path so two sources for the same videoId
@@ -305,7 +328,9 @@ class YtmResolvingSource extends StreamAudioSource {
       // Another creation is in progress; wait for it
       try {
         await existingLock.future;
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('tryParse failed', error: e, stackTrace: st, category: 'YtmResolvingSource');
+      }
       final existing = _inner;
       if (existing != null) return existing;
     }
@@ -320,7 +345,9 @@ class YtmResolvingSource extends StreamAudioSource {
       _inner = inner;
       try {
         _latency?.markStage(PlaybackStage.sourceSet);
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('tryParse failed', error: e, stackTrace: st, category: 'YtmResolvingSource');
+      }
 
       // Trigger asynchronous background cache pruning if exceeding size limit
       _cacheManager.pruneIfExceedsLimit().ignore();
@@ -351,7 +378,9 @@ class YtmResolvingSource extends StreamAudioSource {
       if (await f.exists()) {
         try {
           await f.delete();
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('_deleteCacheFilesFor failed', error: e, stackTrace: st, category: 'YtmResolvingSource');
+        }
       }
     }
   }
@@ -369,7 +398,9 @@ class YtmResolvingSource extends StreamAudioSource {
     try {
       final mime = Uri.parse(url).queryParameters['mime'] ?? '';
       if (mime.contains('webm')) ext = 'webm';
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_cacheFileFor failed', error: e, stackTrace: st, category: 'YtmResolvingSource');
+    }
     return File(p.join(dir.path, '$hash.$ext'));
   }
 }

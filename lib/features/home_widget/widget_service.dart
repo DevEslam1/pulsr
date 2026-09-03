@@ -114,7 +114,9 @@ class WidgetService {
         androidName: androidWidgetName,
         qualifiedAndroidName: qualifiedAndroidName,
       );
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('updateProgress failed', error: e, stackTrace: st, category: 'WidgetService');
+    }
   }
 
   /// Exports a corner-rounded artwork PNG for the widget, cached per song.
@@ -177,10 +179,14 @@ class WidgetService {
                   }
                 }
               }
-            } catch (_) {} finally {
+            } catch (e, st) {
+              ErrorLogger.log('_resolveArtworkPath failed', error: e, stackTrace: st, category: 'WidgetService');
+            } finally {
               try {
                 client?.close(force: true);
-              } catch (_) {}
+              } catch (e, st) {
+                ErrorLogger.log('_resolveArtworkPath failed', error: e, stackTrace: st, category: 'WidgetService');
+              }
             }
           }
         }
@@ -300,7 +306,9 @@ class WidgetService {
             if (now.difference(stat.modified).inDays > 7) {
               await entity.delete();
             }
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('_pruneOldWidgetArtwork failed', error: e, stackTrace: st, category: 'WidgetService');
+          }
         }
       }
       // Also enforce total count limit for widget art files
@@ -315,9 +323,13 @@ class WidgetService {
         for (int i = 0; i < files.length - _maxCacheSize; i++) {
           try {
             await files[i].delete();
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('_pruneOldWidgetArtwork failed', error: e, stackTrace: st, category: 'WidgetService');
+          }
         }
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_pruneOldWidgetArtwork failed', error: e, stackTrace: st, category: 'WidgetService');
+    }
   }
 }

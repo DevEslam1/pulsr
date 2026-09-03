@@ -269,10 +269,22 @@ class MusicRepository implements IMusicRepository {
   Future<Result<List<SongsTableData>>> getSongsByIds(List<int> ids) async {
     if (ids.isEmpty) return const Right([]);
     try {
-      final songs = await (_db.select(_db.songsTable)
-            ..where((t) => t.id.isIn(ids)))
-          .get();
-      return Right(songs);
+      // FIX: chunk to 500 (SQLite ~999 var limit), filter missing, restore
+      // caller order (IN returns arbitrary order) so playlists/queues keep order.
+      final ordered = <SongsTableData>[];
+      for (var i = 0; i < ids.length; i += 500) {
+        final chunk =
+            ids.sublist(i, (i + 500 > ids.length) ? ids.length : i + 500);
+        final songs = await (_db.select(_db.songsTable)
+              ..where((t) => t.id.isIn(chunk) & t.isMissing.equals(false)))
+            .get();
+        final byId = {for (final s in songs) s.id: s};
+        for (final id in chunk) {
+          final s = byId[id];
+          if (s != null) ordered.add(s);
+        }
+      }
+      return Right(ordered);
     } catch (e) {
       return Left(DatabaseFailure('Failed to fetch songs by ids', e));
     }
@@ -366,7 +378,6 @@ class MusicRepository implements IMusicRepository {
             ..where((t) =>
                 t.lastPlayed.isNotNull() &
                 t.isMissing.equals(false) &
-                t.source.equals(SongSource.local) &
                 t.path.like('ytmusic://%').not())
             ..orderBy([
               (t) => OrderingTerm(
@@ -391,7 +402,6 @@ class MusicRepository implements IMusicRepository {
             ..where((t) =>
                 t.lastPlayed.isNotNull() &
                 t.isMissing.equals(false) &
-                t.source.equals(SongSource.local) &
                 t.path.like('ytmusic://%').not())
             ..orderBy([
               (t) => OrderingTerm(
@@ -1057,7 +1067,9 @@ class MusicRepository implements IMusicRepository {
         final existing = existingByPath[path];
 
         if (existing != null) {
-          // Preserve existing ID and all rich user/download metadata
+          // Preserve existing ID and all rich user/download metadata.
+          // FIX: also preserve enriched audio-header fields + clear isMissing
+          // so a rescanned track reappears immediately with quality intact.
           reconciledSongs.add(
             companion.copyWith(
               id: Value(existing.id),
@@ -1069,6 +1081,12 @@ class MusicRepository implements IMusicRepository {
               lastPlayed: Value(existing.lastPlayed),
               lastPositionMs: Value(existing.lastPositionMs),
               source: Value(existing.source),
+              isMissing: const Value(false),
+              codec: Value(existing.codec),
+              bitDepth: Value(existing.bitDepth),
+              bitrateKbps: Value(existing.bitrateKbps),
+              sampleRate: Value(existing.sampleRate),
+              loudnessRange: Value(existing.loudnessRange),
             ),
           );
         } else {
@@ -1124,11 +1142,15 @@ class MusicRepository implements IMusicRepository {
                   'DELETE FROM songs WHERE id = ?',
                   [dupeId],
                 );
-              } catch (_) {}
+              } catch (e, st) {
+                ErrorLogger.log('music_repository failed', error: e, stackTrace: st, category: 'MusicRepository');
+              }
             }
           });
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('music_repository failed', error: e, stackTrace: st, category: 'MusicRepository');
+      }
 
       return const Right(null);
     } catch (e) {
@@ -1145,13 +1167,16 @@ class MusicRepository implements IMusicRepository {
         return const Right(0);
       }
 
-      // 1. Fetch unscanned local songs outside the transaction
-      final unscannedSongs = await (_db.select(_db.songsTable)
+      // 1. Fetch unscanned local songs outside the transaction.
+      // FIX: chunk-safe — isNotIn() with >999 vars crashes SQLite. Fetch all
+      // local rows once and exclude in Dart (libraries are ~10k rows max).
+      final allLocal = await (_db.select(_db.songsTable)
             ..where((t) =>
-                t.id.isNotIn(scannedSongIds) &
                 t.id.isBiggerThanValue(0) &
                 t.source.equals(SongSource.local)))
           .get();
+      final unscannedSongs =
+          allLocal.where((s) => !scannedSongIds.contains(s.id)).toList();
 
       // 2. Perform bounded async disk checks (max 16 concurrent) without blocking database locks
       final trulyMissingIds = <int>[];
@@ -1164,31 +1189,29 @@ class MusicRepository implements IMusicRepository {
       // Also: never mark a downloaded song as missing — its row is managed by
       // reconcileDownloadedSong and may legitimately have an ID not in scannedSongIds.
       final scannedPaths = <String>{};
-      // Fetch the actual file paths for all scannedSongIds in one query to build the set.
+      // Fetch the actual file paths for all scannedSongIds in chunks of 500
+      // (SQLite var limit) to build the set.
       if (scannedSongIds.isNotEmpty) {
         try {
-          final scannedRows = await (_db.select(_db.songsTable)
-                ..where((t) => t.id.isIn(scannedSongIds)))
-              .get();
-          for (final r in scannedRows) {
-            if (r.path.isNotEmpty) scannedPaths.add(r.path.toLowerCase());
+          final idList = scannedSongIds.toList();
+          for (var i = 0; i < idList.length; i += 500) {
+            final chunk = idList.sublist(
+                i, (i + 500 > idList.length) ? idList.length : i + 500);
+            final scannedRows = await (_db.select(_db.songsTable)
+                  ..where((t) => t.id.isIn(chunk)))
+                .get();
+            for (final r in scannedRows) {
+              if (r.path.isNotEmpty) scannedPaths.add(r.path.toLowerCase());
+            }
           }
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('cleanupOrphanedSongs failed', error: e, stackTrace: st, category: 'MusicRepository');
+        }
       }
 
       // Isolate-friendly disk check: use compute for large orphan sets to avoid main-isolate ANR
       // For < 200 items, do cheap chunked async; for larger, offload to isolate
       if (unscannedSongs.length > 500) {
-        // Heavy case: delegate to isolate (file exists is sync I/O)
-        final pathsToCheck = unscannedSongs
-            .where((s) =>
-                !s.isDownloaded &&
-                s.path.isNotEmpty &&
-                !s.path.startsWith('content:') &&
-                !scannedPaths.contains(s.path.toLowerCase()))
-            .map((s) => s.path)
-            .toList();
-        // Fallback to chunked if isolate fails
         for (var i = 0; i < unscannedSongs.length; i += chunkSize) {
           final end = (i + chunkSize < unscannedSongs.length)
               ? i + chunkSize
@@ -1218,8 +1241,6 @@ class MusicRepository implements IMusicRepository {
             }
           }));
         }
-        // suppress unused variable warning
-        pathsToCheck;
       } else {
         for (var i = 0; i < unscannedSongs.length; i += chunkSize) {
           final end = (i + chunkSize < unscannedSongs.length)
@@ -1371,7 +1392,9 @@ class MusicRepository implements IMusicRepository {
             .write(PlayHistoryTableCompanion(songId: Value(survivingId)));
         await (_db.delete(_db.songsTable)..where((t) => t.id.equals(dupe.id)))
             .go();
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('_dedupeByPath failed', error: e, stackTrace: st, category: 'MusicRepository');
+      }
     }
   }
 
@@ -1526,7 +1549,9 @@ class MusicRepository implements IMusicRepository {
           try {
             await (_db.update(_db.songsTable)..where((t) => t.id.equals(oldId)))
                 .write(const SongsTableCompanion(isMissing: Value(true)));
-          } catch (_) {}
+          } catch (e, st) {
+            ErrorLogger.log('equals failed', error: e, stackTrace: st, category: 'MusicRepository');
+          }
         }
 
         // Merge stats (don't clobber — the scanned row may predate the download).

@@ -6,6 +6,7 @@ import 'package:injectable/injectable.dart';
 import '../../../core/bloc/base_cubit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/errors/failures.dart';
+import '../../../core/utils/error_logger.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/folder_usecases.dart';
 import '../../../domain/usecases/search_music_usecase.dart';
@@ -31,23 +32,26 @@ class SearchCubit extends PulsrCubit<SearchState> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final list = prefs.getStringList(_historyKey) ?? [];
-      if (!isClosed) emit(state.copyWith(history: list));
-    } catch (_) {}
+      if (!isClosed) safeEmit(state.copyWith(history: list));
+    } catch (e, st) {
+      ErrorLogger.log('SearchCubit load history failed',
+          error: e, stackTrace: st, category: 'SearchCubit');
+    }
   }
 
   void _loadHistory() { unawaited(_loadHistoryAsync()); }
 
   void clearError() {
-    emit(state.copyWith(errorMessage: null));
+    safeEmit(state.copyWith(errorMessage: null));
   }
 
   void setFilter(String filter) {
-    emit(state.copyWith(selectedFilter: filter));
+    safeEmit(state.copyWith(selectedFilter: filter));
     _executeSearch(state.query, filterOverride: filter);
   }
 
   void onQueryChanged(String query) {
-    emit(state.copyWith(query: query));
+    safeEmit(state.copyWith(query: query));
     _debounceTimer?.cancel();
     _debounceTimer = autoTimer(Timer(const Duration(milliseconds: 300), () {
       _executeSearch(query);
@@ -72,23 +76,35 @@ class SearchCubit extends PulsrCubit<SearchState> {
       final existing = prefs.getStringList(_historyKey) ?? List.from(state.history);
       final updated = [q, ...existing.where((h) => h.toLowerCase() != q.toLowerCase())].take(_historyMax).toList();
       await prefs.setStringList(_historyKey, updated);
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('SearchCubit persist history failed',
+          error: e, stackTrace: st, category: 'SearchCubit');
+    }
   }
 
-  void clearHistory() async {
-    try { final p = await SharedPreferences.getInstance(); await p.remove(_historyKey); } catch (_) {}
-    if (!isClosed) emit(state.copyWith(history: []));
+  Future<void> clearHistory() async {
+    try {
+      final p = await SharedPreferences.getInstance();
+      await p.remove(_historyKey);
+    } catch (e, st) {
+      ErrorLogger.log('SearchCubit clear history failed',
+          error: e, stackTrace: st, category: 'SearchCubit');
+    }
+    if (!isClosed) safeEmit(state.copyWith(history: []));
   }
 
   void useHistoryQuery(String q) => onQueryChanged(q);
 
   Future<void> _executeSearch(String query, {String? filterOverride}) async {
     final generation = ++_generation;
-    unawaited(_searchSub?.cancel());
-    _searchSub = null;
+    if (_searchSub != null) {
+      unawaited(_searchSub?.cancel());
+      removeFromComposite(_searchSub);
+      _searchSub = null;
+    }
     final sanitized = _sanitizeQuery(query);
     if (sanitized.isEmpty) {
-      emit(state.copyWith(results: [], isLoading: false, errorMessage: null));
+      safeEmit(state.copyWith(results: [], isLoading: false, errorMessage: null));
       return;
     }
 
@@ -96,7 +112,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
     final boundedQuery =
         sanitized.length > 64 ? sanitized.substring(0, 64) : sanitized;
 
-    emit(state.copyWith(isLoading: true));
+    safeEmit(state.copyWith(isLoading: true));
 
     // Cache excluded folders for 5 seconds to reduce DB round-trips while typing
     final now = DateTime.now();
@@ -115,7 +131,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
         .searchSongs(boundedQuery, excludedFolders: excluded), (result) {
       if (generation != _generation || isClosed) return;
       result.fold(
-        (failure) => emit(
+        (failure) => safeEmit(
             state.copyWith(isLoading: false, errorMessage: failure.message)),
         (allResults) => unawaited(_applyResults(
             allResults, query, filterOverride, boundedQuery, generation)),
@@ -133,9 +149,11 @@ class SearchCubit extends PulsrCubit<SearchState> {
     if (allResults.length > _isolateSongThreshold) {
       try {
         filtered = await _filterWithFuzzyIsolated(allResults, q, filter);
-      } catch (_) {
+      } catch (e, st) {
         // Defensive fallback: never leave the search spinner stuck if the
         // background isolate could not run.
+        ErrorLogger.log('SearchCubit isolate filter failed, using sync fallback',
+            error: e, stackTrace: st, category: 'SearchCubit');
         filtered = _filterWithFuzzy(allResults, q, filter);
       }
     } else {
@@ -145,7 +163,7 @@ class SearchCubit extends PulsrCubit<SearchState> {
     // background filter was running.
     if (generation != _generation || isClosed) return;
 
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
         results: filtered, isLoading: false, errorMessage: null));
     if (filtered.isNotEmpty) unawaited(_persistHistory(boundedQuery));
   }
@@ -245,8 +263,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
       final album = norm.album;
 
       bool matchesField(String text) {
-        final cleanText = text.replaceAll(RegExp(r"[^\w\s]"), "");
-        final cleanQ = q.replaceAll(RegExp(r"[^\w\s]"), "");
+        final cleanText = text.replaceAll(RegExp(r"[^\p{L}\p{N}\s]", unicode: true), "");
+        final cleanQ = q.replaceAll(RegExp(r"[^\p{L}\p{N}\s]", unicode: true), "");
         if (cleanText.contains(cleanQ)) return true;
         // Skip Levenshtein distance check for queries < 3 chars
         if (cleanQ.length < 3) return false;
@@ -295,8 +313,8 @@ class SearchCubit extends PulsrCubit<SearchState> {
       final album = norm.album;
 
       bool matchesField(String text) {
-        final cleanText = text.replaceAll(RegExp(r"[^\w\s]"), "");
-        final cleanQ = q.replaceAll(RegExp(r"[^\w\s]"), "");
+        final cleanText = text.replaceAll(RegExp(r"[^\p{L}\p{N}\s]", unicode: true), "");
+        final cleanQ = q.replaceAll(RegExp(r"[^\p{L}\p{N}\s]", unicode: true), "");
         if (cleanText.contains(cleanQ)) return true;
         // Skip Levenshtein distance check for queries < 3 chars
         if (cleanQ.length < 3) return false;
@@ -367,12 +385,24 @@ class SearchCubit extends PulsrCubit<SearchState> {
     _generation++;
     _debounceTimer?.cancel();
     _debounceTimer = null;
-    _searchSub?.cancel();
-    _searchSub = null;
-    emit(state.copyWith(
+    if (_searchSub != null) {
+      unawaited(_searchSub?.cancel());
+      removeFromComposite(_searchSub);
+      _searchSub = null;
+    }
+    safeEmit(state.copyWith(
         query: '', results: [], isLoading: false, errorMessage: null));
   }
 
-  // Debounce timer + search subscription are registered with PulsrCubit and
-  // cancelled automatically in close().
+  @override
+  Future<void> close() {
+    if (_searchSub != null) {
+      unawaited(_searchSub?.cancel());
+      removeFromComposite(_searchSub);
+      _searchSub = null;
+    }
+    _debounceTimer?.cancel();
+    _debounceTimer = null;
+    return super.close();
+  }
 }

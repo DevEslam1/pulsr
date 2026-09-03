@@ -71,7 +71,9 @@ class ArtistBioService {
           final wikiData = json.decode(wikiRes.body);
           bio = wikiData['extract'] as String?;
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('toInt failed', error: e, stackTrace: st, category: 'ArtistBioService');
+      }
 
       final info = ArtistInfo(
         name: cleanName,

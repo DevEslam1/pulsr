@@ -94,8 +94,10 @@ class RateLimiter(
         // 1. Global in-flight concurrency limiter — ensure release on interrupt
         var acquired = false
         try {
-            globalSemaphore.acquire()
-            acquired = true
+            acquired = globalSemaphore.tryAcquire(10, TimeUnit.SECONDS)
+            if (!acquired) {
+                android.util.Log.w(TAG, "Timed out waiting for globalSemaphore permit; proceeding under degraded concurrency")
+            }
         } catch (e: InterruptedException) {
             Thread.currentThread().interrupt()
             return
@@ -203,7 +205,9 @@ class RateLimiter(
     }
 
     fun releasePermit() {
-        globalSemaphore.release()
+        if (globalSemaphore.availablePermits() < 8) {
+            globalSemaphore.release()
+        }
     }
 
     /**
@@ -262,6 +266,7 @@ class RateLimiter(
     }
 
     companion object {
+        private const val TAG = "RateLimiter"
         private const val PREFS_NAME = "ytm_ratelimiter_prefs"
         private const val KEY_BACKOFF_UNTIL = "key_backoff_until"
 

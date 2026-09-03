@@ -42,6 +42,10 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   StreamSubscription<void>? _favoritesSub;
   bool _initialized = false;
   int? _lastEmittedSongCount;
+  // FIX: generation guard — rapid updateSort() re-subscribes faster than
+  // Drift cancel() completes; stale stream events must not overwrite the
+  // newest sort. Each _subscribeSongs bumps _songsGen and captures it.
+  int _songsGen = 0;
 
   LibraryCubit({
     required GetSongsUseCase getSongsUseCase,
@@ -85,7 +89,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
             : LibraryViewMode.list;
 
         if (!isClosed) {
-          emit(state.copyWith(
+          safeEmit(state.copyWith(
             sortBy: savedSortBy,
             ascending: savedAscending,
             viewMode: savedViewMode,
@@ -125,30 +129,42 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   }
 
   void clearError() {
-    emit(state.copyWith(errorMessage: null));
+    safeEmit(state.copyWith(errorMessage: null));
   }
 
   Future<void> _subscribeSongs() async {
-    unawaited(_songsSub?.cancel());
-    removeFromComposite(_songsSub);
+    final gen = ++_songsGen;
+    final oldSub = _songsSub;
+    _songsSub = null;
+    removeFromComposite(oldSub);
+    try {
+      await oldSub?.cancel();
+    } catch (e, st) {
+      ErrorLogger.log('_subscribeSongs failed', error: e, stackTrace: st, category: 'LibraryCubit');
+    }
+    if (isClosed || gen != _songsGen) return;
     final excludedRes = await _folderUseCases.getExcludedFolders();
-    if (isClosed) return;
+    if (isClosed || gen != _songsGen) return;
     final excluded = excludedRes.fold((l) => <String>[], (r) => r);
+    // Capture sort at subscribe time so a mid-flight sort change can't mix
+    // old stream + new sort label.
+    final sortBy = state.sortBy;
+    final ascending = state.ascending;
     _songsSub = autoSub<Result<List<SongsTableData>>>(
       _getSongsUseCase.watchSongs(
-        sortBy: state.sortBy,
-        ascending: state.ascending,
+        sortBy: sortBy,
+        ascending: ascending,
         excludedFolders: excluded,
       ),
       (result) {
-      if (isClosed) return;
+      if (isClosed || gen != _songsGen) return;
       result.fold(
         (failure) {
           ErrorLogger.log(
               'LibraryCubit.watchSongs emitted failure',
               error: failure,
               category: 'LibraryCubit');
-          emit(state.copyWith(errorMessage: failure.message));
+          safeEmit(state.copyWith(errorMessage: failure.message));
         },
         (songs) {
           // SCAN-DEBUG: first emission + size changes are the key evidence
@@ -160,7 +176,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
                 category: 'LibraryCubit');
           }
           _lastEmittedSongCount = songs.length;
-          emit(state.copyWith(songs: songs, isLoading: false, errorMessage: null));
+          safeEmit(state.copyWith(songs: songs, isLoading: false, errorMessage: null));
         },
       );
     });
@@ -172,8 +188,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     _albumsSub = autoSub<Result<List<AlbumsTableData>>>(_getAlbumsUseCase.watchAlbums(), (result) {
       if (isClosed) return;
       result.fold(
-        (failure) => emit(state.copyWith(errorMessage: failure.message)),
-        (albums) => emit(state.copyWith(albums: albums, errorMessage: null)),
+        (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+        (albums) => safeEmit(state.copyWith(albums: albums, errorMessage: null)),
       );
     });
   }
@@ -184,8 +200,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     _artistsSub = autoSub<Result<List<ArtistsTableData>>>(_getArtistsUseCase.watchArtists(), (result) {
       if (isClosed) return;
       result.fold(
-        (failure) => emit(state.copyWith(errorMessage: failure.message)),
-        (artists) => emit(state.copyWith(artists: artists, errorMessage: null)),
+        (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+        (artists) => safeEmit(state.copyWith(artists: artists, errorMessage: null)),
       );
     });
   }
@@ -196,8 +212,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     _genresSub = autoSub<Result<List<GenreItem>>>(_getGenresUseCase.watchGenres(), (result) {
       if (isClosed) return;
       result.fold(
-        (failure) => emit(state.copyWith(errorMessage: failure.message)),
-        (genres) => emit(state.copyWith(genres: genres, errorMessage: null)),
+        (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+        (genres) => safeEmit(state.copyWith(genres: genres, errorMessage: null)),
       );
     });
   }
@@ -208,8 +224,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     _yearsSub = autoSub<Result<List<YearItem>>>(_getYearsUseCase.watchYears(), (result) {
       if (isClosed) return;
       result.fold(
-        (failure) => emit(state.copyWith(errorMessage: failure.message)),
-        (years) => emit(state.copyWith(years: years, errorMessage: null)),
+        (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+        (years) => safeEmit(state.copyWith(years: years, errorMessage: null)),
       );
     });
   }
@@ -220,8 +236,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     _favoritesSub = autoSub<Result<List<SongsTableData>>>(_getFavoritesUseCase.watchFavorites(), (result) {
       if (isClosed) return;
       result.fold(
-        (failure) => emit(state.copyWith(errorMessage: failure.message)),
-        (favs) => emit(state.copyWith(favorites: favs, errorMessage: null)),
+        (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+        (favs) => safeEmit(state.copyWith(favorites: favs, errorMessage: null)),
       );
     });
   }
@@ -230,14 +246,15 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     final result = await _folderUseCases.getFolderHierarchy();
     if (isClosed) return;
     result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
-      (folders) => emit(state.copyWith(folders: folders, errorMessage: null)),
+      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+      (folders) => safeEmit(state.copyWith(folders: folders, errorMessage: null)),
     );
   }
 
   void updateSort(String sortBy, bool ascending) {
-    emit(state.copyWith(sortBy: sortBy, ascending: ascending));
-    _subscribeSongs();
+    safeEmit(state.copyWith(sortBy: sortBy, ascending: ascending));
+    // FIX: debounce rapid sort toggles to avoid overlapping drift queries
+    unawaited(_subscribeSongs());
     SharedPreferences.getInstance().then((prefs) async {
       try {
         await prefs.setString('library_sort_by', sortBy);
@@ -250,7 +267,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     final nextMode = state.viewMode == LibraryViewMode.list
         ? LibraryViewMode.grid
         : LibraryViewMode.list;
-    emit(state.copyWith(viewMode: nextMode));
+    safeEmit(state.copyWith(viewMode: nextMode));
     SharedPreferences.getInstance().then((prefs) async {
       try { await prefs.setString('library_view_mode', nextMode.name); } catch (e, st) { ErrorLogger.log('Failed to persist view mode', error: e, stackTrace: st, category: 'LibraryCubit'); }
     }).catchError((Object e, StackTrace st) { ErrorLogger.log('Failed to persist view mode', error: e, stackTrace: st, category: 'LibraryCubit'); });
@@ -260,11 +277,15 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   Future<void> toggleFavorite(int songId) async {
     final opGen = ++_favoriteOpGen;
     final previousFavorites = List<SongsTableData>.from(state.favorites);
+    final previousSongs = List<SongsTableData>.from(state.songs);
     final currentFavs = List<SongsTableData>.from(state.favorites);
     final isFav = currentFavs.any((s) => s.id == songId);
     if (isFav) {
       currentFavs.removeWhere((s) => s.id == songId);
-      emit(state.copyWith(favorites: currentFavs));
+      safeEmit(state.copyWith(favorites: currentFavs,
+          songs: state.songs
+              .map((s) => s.id == songId ? s.copyWith(isFavorite: false) : s)
+              .toList()));
     } else {
       final matchingSong = state.songs.cast<SongsTableData?>().firstWhere(
             (s) => s?.id == songId,
@@ -272,15 +293,22 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
           );
       if (matchingSong != null) {
         currentFavs.add(matchingSong.copyWith(isFavorite: true));
-        emit(state.copyWith(favorites: currentFavs));
       }
+      // FIX: patch songs[] too so hearts stay in sync until DB re-emits.
+      safeEmit(state.copyWith(
+          favorites: currentFavs,
+          songs: state.songs
+              .map((s) => s.id == songId ? s.copyWith(isFavorite: !isFav) : s)
+              .toList()));
     }
 
     final result = await _toggleFavoriteUseCase(songId);
     if (isClosed || opGen != _favoriteOpGen) return;
     result.fold(
-      (failure) => emit(state.copyWith(
-          favorites: previousFavorites, errorMessage: failure.message)),
+      (failure) => safeEmit(state.copyWith(
+          favorites: previousFavorites,
+          songs: previousSongs,
+          errorMessage: failure.message)),
       (_) => null,
     );
   }
@@ -289,7 +317,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     final result = await _folderUseCases.toggleExcludeFolder(folderPath);
     if (isClosed) return;
     result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
+      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
       (_) async {
         await loadFolders();
         if (isClosed) return;
@@ -306,7 +334,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     } else {
       current.add(songId);
     }
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
       selectedSongIds: current,
       isMultiSelectMode: current.isNotEmpty,
     ));
@@ -314,11 +342,11 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
 
   void selectAllSongs() {
     final allIds = state.songs.map((s) => s.id).toSet();
-    emit(state.copyWith(selectedSongIds: allIds, isMultiSelectMode: true));
+    safeEmit(state.copyWith(selectedSongIds: allIds, isMultiSelectMode: true));
   }
 
   void clearSelection() {
-    emit(state.copyWith(selectedSongIds: {}, isMultiSelectMode: false));
+    safeEmit(state.copyWith(selectedSongIds: {}, isMultiSelectMode: false));
   }
 
   List<SongsTableData> getSelectedSongs() {
@@ -343,7 +371,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     try {
       final accountService = getIt<YtmAccountService>();
       if (!accountService.isLoggedIn) {
-        emit(state.copyWith(errorMessage: 'Not signed in to YouTube Music'));
+        safeEmit(state.copyWith(errorMessage: 'Not signed in to YouTube Music'));
         return 0;
       }
       final tracks = await accountService.fetchLikedSongs();
@@ -353,11 +381,27 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
       ErrorLogger.log('Failed to sync YTM account likes',
           error: e, stackTrace: st, category: 'LibraryCubit');
       if (!isClosed) {
-        emit(
+        safeEmit(
             state.copyWith(errorMessage: 'Failed to sync YouTube Music likes'));
       }
       return 0;
     }
   }
 
+  @override
+  Future<void> close() async {
+    await _songsSub?.cancel();
+    removeFromComposite(_songsSub);
+    await _albumsSub?.cancel();
+    removeFromComposite(_albumsSub);
+    await _artistsSub?.cancel();
+    removeFromComposite(_artistsSub);
+    await _genresSub?.cancel();
+    removeFromComposite(_genresSub);
+    await _yearsSub?.cancel();
+    removeFromComposite(_yearsSub);
+    await _favoritesSub?.cancel();
+    removeFromComposite(_favoritesSub);
+    return super.close();
+  }
 }

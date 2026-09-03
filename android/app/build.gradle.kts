@@ -31,12 +31,6 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["appName"] = "Pulsr Music"
-
-        externalNativeBuild {
-            cmake {
-                cppFlags += listOf("-std=c++20")
-            }
-        }
     }
 
     externalNativeBuild {
@@ -147,6 +141,9 @@ android {
         // B-10 fix: false prevents silent stubbing of un-mocked MethodChannels (which caused false-greens)
         unitTests.isReturnDefaultValues = false
         unitTests.isIncludeAndroidResources = true
+        unitTests.all { test ->
+            test.jvmArgs("-XX:+EnableDynamicAgentLoading")
+        }
     }
 
     lint {
@@ -544,6 +541,53 @@ tasks.register("verifyAndroid16Gate") {
         if (!cmakeText.contains("max-page-size=16384")) {
             throw GradleException("[verifyAndroid16Gate] FAILED: 16 KB page size linker flag -Wl,-z,max-page-size=16384 is missing from CMakeLists.txt")
         }
+
+        println("[verifyAndroid16Gate] Checking AndroidManifest FGS declarations...")
+        val manifest = file("src/main/AndroidManifest.xml").readText()
+        if (!manifest.contains("android:foregroundServiceType=\"mediaPlayback\"")) {
+            throw GradleException("[verifyAndroid16Gate] FAILED: mediaPlayback FGS type missing from AndroidManifest.xml")
+        }
+        if (!manifest.contains("dataSync")) {
+            throw GradleException("[verifyAndroid16Gate] FAILED: dataSync FGS type missing from AndroidManifest.xml")
+        }
+
+        println("[verifyAndroid16Gate] Checking NDK minSdk platform alignment...")
+        val minSdk = android.defaultConfig.minSdk ?: 28
+        if (minSdk != 28) {
+            throw GradleException("[verifyAndroid16Gate] FAILED: minSdk $minSdk does not match expected baseline 28")
+        }
+        println("[verifyAndroid16Gate] Validating google-services.json...")
+        val gsFiles = listOf(file("google-services.json"), file("src/dev/google-services.json"), file("src/prod/google-services.json"), file("src/ytm/google-services.json"))
+        gsFiles.forEach { gsFile ->
+            if (gsFile.exists()) {
+                val gsText = gsFile.readText()
+                require(!gsText.contains("com.example.")) {
+                    "Placeholder bundle_id found in ${gsFile.name}"
+                }
+                require(!gsText.contains(",,")) {
+                    "Invalid JSON (double comma) in ${gsFile.name}"
+                }
+            }
+        }
+
+        println("[verifyAndroid16Gate] Verifying C++ files syntax sanity...")
+        val cppFiles = fileTree("src/main/cpp") { include("**/*.cpp") }
+        cppFiles.forEach { cpp ->
+            val text = cpp.readText()
+            require(text.isNotEmpty()) { "Empty C++ file: ${cpp.name}" }
+        }
+
+        println("[verifyAndroid16Gate] Checking for const_cast in production C++ sources...")
+        val cppSources = fileTree("src/main/cpp") {
+            include("**/*.cpp", "**/*.h")
+            exclude("**/test/**", "**/tests/**")
+        }
+        cppSources.forEach { source ->
+            if (source.readText().contains("const_cast")) {
+                throw GradleException("[verifyAndroid16Gate] FAILED: const_cast found in production C++ file: ${source.name}")
+            }
+        }
+        println("[verifyAndroid16Gate] PASSED: No const_cast found in ${cppSources.files.size} production C++ files.")
 
         println("[verifyAndroid16Gate] PASSED: All Android 16 (API 36) and 16 KB page-alignment requirements met strictly.")
     }

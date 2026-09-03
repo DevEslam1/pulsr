@@ -65,7 +65,9 @@ class ArtworkUriResolver {
       _cachedArtworkUris.clear();
       _cachedAlbumArtUris.clear();
       _cachedArtistArtUris.clear();
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('cleanupTempArtwork failed', error: e, stackTrace: st, category: 'ArtworkUriResolver');
+    }
   }
 
   static const List<int> _placeholderJpegBytes = [
