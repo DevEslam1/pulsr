@@ -82,6 +82,7 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
 
             if (code == HTTP_TOO_MANY_REQUESTS) {
                 RateLimiter.shared.onRateLimited()
+                ProxyManager.onPathFailed(request.url())
                 throw ReCaptchaException("HTTP 429 Too Many Requests: Rate limited by YouTube", request.url())
             }
 
@@ -100,6 +101,7 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
                         body.contains("Sign in to confirm you're not a bot") ||
                         body.contains("recaptcha"))) {
                 RateLimiter.shared.onRateLimited()
+                ProxyManager.onPathFailed(request.url())
                 throw ReCaptchaException("YouTube bot verification required: Sign in to confirm you're not a bot", request.url())
             }
 

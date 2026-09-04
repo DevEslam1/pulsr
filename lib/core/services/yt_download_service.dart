@@ -420,10 +420,14 @@ class YtDownloadService {
           final account = getIt.isRegistered<YtmAccountService>()
               ? getIt<YtmAccountService>()
               : null;
+          // Respect the cookie-sync opt-out: never leak account cookies to
+          // the remote backend when the user disabled sync (XDM strips them
+          // itself, but don't send them in the first place).
+          final allowCookies = await xdm.isCookieSyncAllowed();
           final backendStream = await xdm.resolveStream(
             videoId,
             quality: quality,
-            cookies: account?.cookies,
+            cookies: allowCookies ? account?.cookies : null,
           );
           if (backendStream != null) {
             return backendStream;
@@ -525,7 +529,7 @@ class YtDownloadService {
       req.headers.set(HttpHeaders.userAgentHeader, ua);
     } else {
       req.headers.set(HttpHeaders.userAgentHeader,
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36');
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36');
     }
     if (cookies != null && cookies.isNotEmpty) {
       req.headers.set(HttpHeaders.cookieHeader, cookies);

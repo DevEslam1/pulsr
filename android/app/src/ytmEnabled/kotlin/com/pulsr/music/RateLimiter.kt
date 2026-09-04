@@ -100,7 +100,11 @@ class RateLimiter(
                     try {
                         condition.await(sleepTime, TimeUnit.MILLISECONDS)
                     } catch (_: InterruptedException) {
+                        // Release the global permit: without this, 8
+                        // interrupted acquires (e.g. cancelled hedges) stall
+                        // the limiter permanently.
                         Thread.currentThread().interrupt()
+                        globalSemaphore.release()
                         return
                     } finally {
                         lock.unlock()
@@ -137,6 +141,7 @@ class RateLimiter(
                             condition.await(waitGap, TimeUnit.MILLISECONDS)
                         } catch (_: InterruptedException) {
                             Thread.currentThread().interrupt()
+                            globalSemaphore.release()
                             return
                         }
                         continue
@@ -154,6 +159,7 @@ class RateLimiter(
                     condition.await(waitTimeMs, TimeUnit.MILLISECONDS)
                 } catch (_: InterruptedException) {
                     Thread.currentThread().interrupt()
+                    globalSemaphore.release()
                     return
                 }
             } finally {

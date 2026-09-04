@@ -9,12 +9,14 @@ class AudioQualityBadge extends StatelessWidget {
   final SongsTableData? song;
   final Color activeColor;
   final bool compact;
+  final bool showDevice;
 
   const AudioQualityBadge({
     super.key,
     required this.song,
     required this.activeColor,
     this.compact = false,
+    this.showDevice = true,
   });
 
   @override
@@ -46,6 +48,8 @@ class AudioQualityBadge extends StatelessWidget {
                 ? 'Speaker'
                 : 'DAC'));
 
+    final shouldShowDevice = showDevice && deviceShortName.isNotEmpty;
+
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -53,8 +57,8 @@ class AudioQualityBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         child: Ink(
           padding: EdgeInsets.symmetric(
-            horizontal: compact ? 8 : 12,
-            vertical: compact ? 3 : 6,
+            horizontal: compact ? 7 : 12,
+            vertical: compact ? 2.5 : 6,
           ),
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -88,43 +92,53 @@ class AudioQualityBadge extends StatelessWidget {
             children: [
               Icon(
                 isUsb ? Icons.usb_rounded : info.icon,
-                size: compact ? 12 : 14,
+                size: compact ? 11 : 14,
                 color: isUsb ? const Color(0xFFFFD700) : info.badgeColor,
               ),
-              const SizedBox(width: 6),
-              Text(
-                info.shortBadgeLabel,
-                style: TextStyle(
-                  color: isUsb ? const Color(0xFFFFD700) : Colors.white,
-                  fontSize: compact ? 10 : 11.5,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.6,
+              const SizedBox(width: 5),
+              Flexible(
+                child: Text(
+                  info.shortBadgeLabel,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: isUsb ? const Color(0xFFFFD700) : Colors.white,
+                    fontSize: compact ? 9.5 : 11.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                  ),
                 ),
               ),
-              const SizedBox(width: 6),
-              Container(
-                width: 3,
-                height: 3,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.5),
+              if (shouldShowDevice) ...[
+                const SizedBox(width: 5),
+                Container(
+                  width: 3,
+                  height: 3,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.white.withValues(alpha: 0.5),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                isBitPerfect
-                    ? '$deviceShortName • Direct'
-                    : '$deviceShortName • ${outputRate}kHz/${outputBitDepth}b',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  fontSize: compact ? 9.5 : 11,
-                  fontWeight: FontWeight.w700,
+                const SizedBox(width: 5),
+                Flexible(
+                  child: Text(
+                    isBitPerfect
+                        ? '$deviceShortName • Direct'
+                        : '$deviceShortName • ${outputRate}kHz/${outputBitDepth}b',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: compact ? 9 : 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 4),
+              ],
+              const SizedBox(width: 3),
               Icon(
                 Icons.tune_rounded,
-                size: compact ? 11 : 13,
+                size: compact ? 10 : 13,
                 color: (isUsb ? const Color(0xFFFFD700) : info.badgeColor)
                     .withValues(alpha: 0.8),
               ),

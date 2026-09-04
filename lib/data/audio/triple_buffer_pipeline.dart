@@ -8,8 +8,8 @@ import '../../core/utils/error_logger.dart';
 /// 3-player architecture (Active, Preloaded, Prefetched) for zero-latency
 /// transitions and lookahead caching.
 class TripleBufferPipeline {
-  final AudioPlayer activePlayer;
-  final AudioPlayer preloadedPlayer;
+  final AudioPlayer Function() getActivePlayer;
+  final AudioPlayer Function() getInactivePlayer;
   final AudioPlayer? prefetchPlayer;
 
   final Future<AudioSource> Function(SongsTableData song, MediaItem tag)
@@ -18,19 +18,20 @@ class TripleBufferPipeline {
       songToMediaItem;
 
   TripleBufferPipeline({
-    required this.activePlayer,
-    required this.preloadedPlayer,
+    required this.getActivePlayer,
+    required this.getInactivePlayer,
     this.prefetchPlayer,
     required this.resolveAudioSource,
     required this.songToMediaItem,
   });
 
-  /// Preloads the next track into [preloadedPlayer] so crossfade starts with zero buffering delay.
+  /// Preloads the next track into inactive player so crossfade starts with zero buffering delay.
   Future<void> preloadNext(SongsTableData nextSong) async {
     try {
+      final inactivePlayer = getInactivePlayer();
       final tag = songToMediaItem(nextSong);
       final source = await resolveAudioSource(nextSong, tag);
-      await preloadedPlayer.setAudioSource(source, preload: true);
+      await inactivePlayer.setAudioSource(source, preload: true);
     } catch (e) {
       ErrorLogger.log('Preload failed', error: e, category: 'TripleBuffer');
     }

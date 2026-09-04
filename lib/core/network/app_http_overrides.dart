@@ -56,10 +56,14 @@ class AppHttpOverrides extends HttpOverrides {
   }
 
   /// Probes connectivity through the currently configured proxy.
+  /// Defaults to the YouTube Music host: a Google-204 probe can succeed while
+  /// the current IP/VPN exit is blocked for YouTube, marking a useless proxy
+  /// as "working". Any HTTP response (even 4xx) from music.youtube.com proves
+  /// the path reaches YouTube; only 5xx/network errors mean failure.
   /// Returns a record with `(success, latencyMs, errorMessage)`.
   Future<({bool success, int latencyMs, String? error})> testConnection({
     ProxyConfig? configToTest,
-    String testUrl = 'https://www.google.com/generate_204',
+    String testUrl = 'https://music.youtube.com/',
     Duration timeout = const Duration(seconds: 10),
   }) async {
     final testConfig = configToTest ?? _config;
@@ -101,6 +105,17 @@ class AppHttpOverrides extends HttpOverrides {
       await response.drain<void>();
 
       if (response.statusCode >= 200 && response.statusCode < 400) {
+        return (
+          success: true,
+          latencyMs: stopwatch.elapsedMilliseconds,
+          error: null,
+        );
+      } else if (response.statusCode >= 400 &&
+          response.statusCode < 500 &&
+          (uri.host.contains('youtube.com') ||
+              uri.host.contains('googlevideo.com'))) {
+        // YouTube answered (even with 403/404): the proxy path itself works,
+        // the restriction is IP-level. Count the proxy as reachable.
         return (
           success: true,
           latencyMs: stopwatch.elapsedMilliseconds,

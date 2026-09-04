@@ -78,6 +78,23 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
       if (generation != _generation || isClosed) return;
       emit(state.copyWith(
           results: results, isLoading: false, errorMessage: null));
+      // Speculative warm: the top hit is the most likely tap. Resolving its
+      // stream URL now (one background player request) turns that tap into a
+      // cache hit (~62ms) instead of a full multi-engine resolve (seconds).
+      // Skipped while bot-cooling so a flagged IP isn't hammered further.
+      // Fully defensive: warming must never disturb search results.
+      if (results.isNotEmpty) {
+        try {
+          final topId = results.first.videoId;
+          if (topId.isNotEmpty && !_service.isBotCoolingDown) {
+            unawaited(_service
+                .resolveStream(topId)
+                .timeout(const Duration(seconds: 25))
+                .then((_) {})
+                .catchError((_) {}));
+          }
+        } catch (_) {}
+      }
     } on YtmException catch (e) {
       if (generation != _generation || isClosed) return;
 

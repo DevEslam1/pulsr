@@ -122,9 +122,10 @@ enum class YtmBlockSignal(val code: String) {
                 return GeoBlocked
             }
 
-            // 6. Video Gone / Removed / Private
-            if (status == "ERROR" ||
-                status == "UNPLAYABLE" && GONE_SUBSTRINGS.any { combinedReasons.contains(it) } ||
+            // 6. Video Gone / Removed / Private (parenthesized: a bare ERROR
+            // status without gone wording must NOT mask IpBlocked/RateLimited)
+            if ((status == "ERROR" && GONE_SUBSTRINGS.any { combinedReasons.contains(it) }) ||
+                (status == "UNPLAYABLE" && GONE_SUBSTRINGS.any { combinedReasons.contains(it) }) ||
                 httpCode == 404 ||
                 GONE_SUBSTRINGS.any { combinedReasons.contains(it) }) {
                 return VideoGone

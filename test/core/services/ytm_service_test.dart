@@ -214,6 +214,37 @@ void main() {
       );
     });
 
+    test(
+        'resolveStream surfaces the native BOT_CHALLENGE instead of a generic YTM_FAILED',
+        () async {
+      _mockChannel((_) async => throw PlatformException(
+          code: 'BOT_CHALLENGE', message: 'All clients LOGIN_REQUIRED'));
+      await expectLater(
+        YtmService().resolveStream('dQw4w9WgXcQ'),
+        throwsA(isA<YtmException>()
+            .having((e) => e.code, 'code', 'BOT_CHALLENGE')
+            .having((e) => e.isBotBlocked, 'isBotBlocked', isTrue)),
+      );
+    });
+
+    test(
+        'resolveStream skips the native tier while bot-cooling down (no chain pileup)',
+        () async {
+      var calls = 0;
+      _mockChannel((_) async {
+        calls++;
+        throw PlatformException(
+            code: 'BOT_CHALLENGE', message: 'All clients LOGIN_REQUIRED');
+      });
+      final service = YtmService();
+      await expectLater(
+          service.resolveStream('dQw4w9WgXcQ'), throwsA(isA<YtmException>()));
+      await expectLater(
+          service.resolveStream('dQw4w9WgXcQ'), throwsA(isA<YtmException>()));
+      expect(calls, equals(1),
+          reason: 'second resolve must short-circuit to backend, not burn another full chain');
+    });
+
     test('resolveStream forwards quality parameter to platform channel',
         () async {
       _mockChannel((call) async {
@@ -315,6 +346,17 @@ void main() {
     test('clearing the query cancels the pending debounce', () async {
       when(() => service.searchWithFallback(any()))
           .thenAnswer((_) async => const []);
+      when(() => service.isBotCoolingDown).thenReturn(false);
+      when(() => service.resolveStream(any())).thenAnswer((_) async =>
+          const YtmStream(
+              videoId: 'topvideoid1',
+              url: 'https://example.com/a.m4a',
+              mimeType: 'audio/mp4',
+              container: 'm4a',
+              bitrateKbps: 128,
+              duration: Duration(milliseconds: 200000),
+              title: 'Top',
+              artist: 'Someone'));
 
       final cubit = YtmSearchCubit(service: service);
       cubit.onQueryChanged('abc');
@@ -323,6 +365,51 @@ void main() {
 
       verifyNever(() => service.searchWithFallback(any()));
       expect(cubit.state.query, isEmpty);
+      await cubit.close();
+    });
+
+    test('a settled search warms the top hit stream URL in background',
+        () async {
+      final top = YtmTrack.fromChannel(
+          _resultRow(videoId: 'topvideoid1', title: 'Top'))!;
+      final other = YtmTrack.fromChannel(
+          _resultRow(videoId: 'othervideo2', title: 'Other'))!;
+      when(() => service.searchWithFallback(any()))
+          .thenAnswer((_) async => [top, other]);
+      when(() => service.isBotCoolingDown).thenReturn(false);
+      when(() => service.resolveStream(any())).thenAnswer((_) async =>
+          const YtmStream(
+              videoId: 'topvideoid1',
+              url: 'https://example.com/a.m4a',
+              mimeType: 'audio/mp4',
+              container: 'm4a',
+              bitrateKbps: 128,
+              duration: Duration(milliseconds: 200000),
+              title: 'Top',
+              artist: 'Someone'));
+
+      final cubit = YtmSearchCubit(service: service);
+      cubit.onQueryChanged('something');
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+
+      expect(cubit.state.results.length, equals(2));
+      verify(() => service.resolveStream('topvideoid1')).called(1);
+      verifyNever(() => service.resolveStream('othervideo2'));
+      await cubit.close();
+    });
+
+    test('no speculative warm while bot-cooling down', () async {
+      final top = YtmTrack.fromChannel(
+          _resultRow(videoId: 'topvideoid1', title: 'Top'))!;
+      when(() => service.searchWithFallback(any()))
+          .thenAnswer((_) async => [top]);
+      when(() => service.isBotCoolingDown).thenReturn(true);
+
+      final cubit = YtmSearchCubit(service: service);
+      cubit.onQueryChanged('something');
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+
+      verifyNever(() => service.resolveStream(any()));
       await cubit.close();
     });
   });

@@ -32,12 +32,14 @@ void main() {
       });
     });
 
-    test('onSuccess clears the backoff deadline', () {
+    test('onSuccess does not cancel an active cooling window', () {
       fakeAsync((async) {
         YtmRateLimiter.debugReset();
         final limiter = YtmRateLimiter.shared;
 
         limiter.onRateLimited();
+        // One success via an alternate route must not instantly re-hammer
+        // the blocked route: the cooling window survives.
         limiter.onSuccess();
 
         Duration waited = Duration.zero;
@@ -49,8 +51,8 @@ void main() {
         async.flushMicrotasks();
         async.flushTimers();
 
-        // Bucket starts full: no meaningful wait after backoff was cleared.
-        expect(waited, lessThan(const Duration(milliseconds: 50)));
+        // ~4s base (2s x multiplier 2) + jitter: still cooling down.
+        expect(waited, greaterThan(const Duration(seconds: 2)));
       });
     });
 

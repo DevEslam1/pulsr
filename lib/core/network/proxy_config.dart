@@ -52,7 +52,8 @@ class ProxyConfig {
       if (pattern == host) return true;
       if (pattern.startsWith('*.')) {
         final domain = pattern.substring(2);
-        if (host.endsWith(domain)) return true;
+        // Require a dot boundary so *.example.com does NOT match fakeexample.com.
+        if (host == domain || host.endsWith('.$domain')) return true;
       }
       if (_isLocalhost(pattern) && _isLocalhost(host)) {
         return true;

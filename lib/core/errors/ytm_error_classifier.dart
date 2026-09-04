@@ -185,10 +185,15 @@ class YtmErrorClassifier {
       );
     }
 
-    // 8. Sign in required
+    // 8. Sign in required (bare 'auth' intentionally NOT matched: it
+    // misclassifies artist/track text such as "author" as expired sessions)
     if (errStr.contains('login_required') ||
         errStr.contains('unauthenticated') ||
-        errStr.contains('auth')) {
+        errStr.contains('unauthorized') ||
+        errStr.contains('authentication required') ||
+        errStr.contains('auth failed') ||
+        errStr.contains('session expired') ||
+        errStr.contains('sign in to access')) {
       return YtmErrorInfo(
         message: 'YouTube session expired. Tap to reconnect.',
         recoveryAction: YtmRecoveryAction.showLoginPrompt,
@@ -241,7 +246,11 @@ class YtmErrorClassifier {
     if (combined.contains('proxy') || combined.contains('407')) {
       return _mapSignal(YtmBlockSignal.ipBlocked, details, traceId);
     }
-    if (combined.contains('login_required') || combined.contains('auth') || combined.contains('unauthenticated')) {
+    if (combined.contains('login_required') ||
+        combined.contains('unauthenticated') ||
+        combined.contains('unauthorized') ||
+        combined.contains('authentication required') ||
+        combined.contains('session expired')) {
       return _mapSignal(YtmBlockSignal.signInRequired, details, traceId);
     }
     if (combined.contains('403') || combined.contains('forbidden')) {

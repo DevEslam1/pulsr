@@ -46,7 +46,7 @@ subprojects {
                     else -> "com.example.${project.name.replace('-', '_').replace(':', '_')}"
                 }
             }
-            android.compileSdk = 36
+            android.compileSdk = 37
         }
     }
 }

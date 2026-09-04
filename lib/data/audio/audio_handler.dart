@@ -221,29 +221,21 @@ class PulsrAudioHandler extends BaseAudioHandler
   factory PulsrAudioHandler(
       IMusicRepository repository, YtmService ytmService) {
     if (Platform.isAndroid) {
-      // The 10-band EQ now runs natively (DynamicsProcessing postEq). Only the
-      // loudness enhancers remain in the just_audio pipeline, as inert anchors
-      // that make ExoPlayer allocate the audio session the native effects bind to.
-      final leA = AndroidLoudnessEnhancer();
-      final leB = AndroidLoudnessEnhancer();
-
       final loadConfig = AudioLoadConfiguration(
         androidLoadControl: AndroidLoadControl(
-          minBufferDuration: const Duration(seconds: 5),
-          maxBufferDuration: const Duration(seconds: 30),
-          bufferForPlaybackDuration: const Duration(milliseconds: 1000),
+          minBufferDuration: const Duration(seconds: 30),
+          maxBufferDuration: const Duration(seconds: 60),
+          bufferForPlaybackDuration: const Duration(milliseconds: 2500),
           bufferForPlaybackAfterRebufferDuration:
-              const Duration(milliseconds: 1500),
-          prioritizeTimeOverSizeThresholds: true,
+              const Duration(milliseconds: 3000),
+          prioritizeTimeOverSizeThresholds: false,
         ),
       );
 
       final playerA = AudioPlayer(
-        audioPipeline: AudioPipeline(androidAudioEffects: [leA]),
         audioLoadConfiguration: loadConfig,
       );
       final playerB = AudioPlayer(
-        audioPipeline: AudioPipeline(androidAudioEffects: [leB]),
         audioLoadConfiguration: loadConfig,
       );
       return PulsrAudioHandler._(
@@ -251,8 +243,6 @@ class PulsrAudioHandler extends BaseAudioHandler
         ytmService: ytmService,
         playerA: playerA,
         playerB: playerB,
-        loudnessEnhancerA: leA,
-        loudnessEnhancerB: leB,
       );
     } else {
       return PulsrAudioHandler._(
@@ -669,8 +659,8 @@ class PulsrAudioHandler extends BaseAudioHandler
     );
 
     _tripleBufferPipeline = TripleBufferPipeline(
-      activePlayer: _playerA,
-      preloadedPlayer: _playerB,
+      getActivePlayer: () => _activePlayer,
+      getInactivePlayer: () => _inactivePlayer,
       resolveAudioSource: (song, tag) => _resolveAudioSource(song, tag),
       songToMediaItem: (song, [fastArtUri]) =>
           _songToMediaItem(song, fastArtUri),
@@ -1168,7 +1158,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         'User-Agent': userAgent
       else
         'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
       if (cookies != null && cookies.isNotEmpty) 'Cookie': cookies,
       'Referer': 'https://music.youtube.com/',
     };
@@ -1194,7 +1184,10 @@ class PulsrAudioHandler extends BaseAudioHandler
       throw const YtmException('YTM_UNAVAILABLE', 'Missing video id');
     }
 
-    final prefs = await SharedPreferences.getInstance();
+    // Hot path: reuse the cached prefs (loaded once in _init) instead of an
+    // async disk read per resolve — saves ~5-20ms on every tap/prefetch.
+    final prefs =
+        _cachedPrefs ?? await SharedPreferences.getInstance();
     final offlineOnly = prefs.getBool('setting_offline_only_mode') ?? false;
     if (offlineOnly) {
       throw const YtmException(
@@ -1228,7 +1221,8 @@ class PulsrAudioHandler extends BaseAudioHandler
       _latencyTracker?.markStage(PlaybackStage.pluginEntered);
       _latencyTracker?.markStage(PlaybackStage.clientRequestSent);
     } catch (_) {}
-    final stream = await _ytmService.resolveStream(videoId, quality: quality);
+    final stream = await _ytmService.resolveStream(videoId,
+        quality: quality, forceRefresh: forceRefresh);
     if (stream.url.trim().isEmpty) {
       throw const YtmException(
           'YTM_UNAVAILABLE', 'Resolved stream URL is empty');
@@ -1284,6 +1278,30 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   int _prefetchGeneration = 0;
+
+  /// Quick soft-landing before a hard stop/swap: stopping mid-waveform without
+  /// a fade cuts the signal at a non-zero crossing, which the ear hears as a
+  /// click/pop on every manual track change. 70ms is inaudible as a delay.
+  Future<void> _fadeOutForSwitch(AudioPlayer player) async {
+    try {
+      if (!player.playing) return;
+      final from = player.volume;
+      if (from <= 0.01) return;
+      await _crossfadeManager
+          .fadeVolume(player, from, 0.0, const Duration(milliseconds: 70),
+              _crossfadeManager.nextFadeId())
+          .timeout(const Duration(milliseconds: 250));
+    } catch (_) {}
+  }
+
+  /// Matching fade-in after a switch: starting at 0 and ramping to the
+  /// ReplayGain target avoids the cold-start click. Skipped while ducked
+  /// (navigation/call) so the ramp never fights the duck level.
+  void _fadeInAfterSwitch(AudioPlayer player, double targetVolume) {
+    if (_duckActive) return;
+    unawaited(_crossfadeManager.fadeVolume(player, 0.0,
+        targetVolume.clamp(0.0, 1.0), const Duration(milliseconds: 90), _crossfadeManager.nextFadeId()));
+  }
 
   void cancelPrefetches() {
     _prefetchGeneration++;
@@ -1732,28 +1750,66 @@ class PulsrAudioHandler extends BaseAudioHandler
       {Duration? initialPosition, bool preload = true}) async {
     if (_songs.isEmpty) return;
     final generation = ++_playGeneration;
+    // Quiesce native index events for the whole load: stop()/setAudioSources
+    // emit transient indices (playlist attach resets to 0 before the initial
+    // seek lands). With the stale _gaplessLoaded=true those transients used
+    // to run _onGaplessIndexChanged mid-load, corrupting _currentIndex —
+    // sometimes BEFORE it was consumed as initialIndex below, so tapping
+    // song N loaded and played song 0 instead, with mediaItem/volume/history
+    // churning (the "glitch + first song again" bug).
+    _gaplessLoaded = false;
     _pendingLazyPosition = null;
     _consecutiveFailures = 0;
     _rapidGaplessChangeCount = 0;
     _lastGaplessChangeTime = null;
-    _lastGaplessIndex = _currentIndex;
+    // Snapshot: no interleaved stream event may change the load target.
+    final targetIndex = _currentIndex;
+    _lastGaplessIndex = targetIndex;
 
-    final song = _songs[_currentIndex];
+    final song = _songs[targetIndex];
     final fastArtUri =
         song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
     mediaItem.add(_songToMediaItem(song, fastArtUri));
 
     final sources = _buildAudioSources(_songs);
 
+    // Pre-resolve the target online URL BEFORE stopping current playback:
+    // a YouTube resolve can take seconds, and stopping first turns that into
+    // seconds of dead silence followed by a cold start. Resolving first keeps
+    // the old track playing until the swap is near-instant (the URL lands in
+    // _streamCache/YtmUrlCache, which the lazy child then reuses). On failure
+    // the current track keeps playing and only an error toast is shown.
+    if (song.source == SongSource.youtube &&
+        (song.path.startsWith('ytmusic://') ||
+            song.path.isEmpty ||
+            (!song.path.startsWith('content:') &&
+                song.isDownloaded != true)) &&
+        (song.remoteId?.isNotEmpty ?? false)) {
+      try {
+        await _resolveStreamUrl(song).timeout(const Duration(seconds: 20));
+      } catch (e) {
+        if (generation != _playGeneration) return;
+        final info = YtmErrorClassifier.classify(e);
+        _errorSubject.add(info.message);
+        ErrorLogger.log('Pre-resolve failed for ${song.title}, keeping current playback',
+            error: e, category: 'AudioHandler');
+        return;
+      }
+      if (generation != _playGeneration) return;
+    }
+
     try {
-      // Cleanly stop any existing playing source to release hanging native sockets
+      // Soft-landing fade so the stop doesn't click, then cleanly stop any
+      // existing playing source to release hanging native sockets.
+      await _fadeOutForSwitch(_activePlayer);
+      if (generation != _playGeneration) return;
       try {
         await _activePlayer.stop();
       } catch (_) {}
 
       await _activePlayer.setAudioSources(
         sources,
-        initialIndex: _currentIndex,
+        initialIndex: targetIndex,
         initialPosition: initialPosition,
         preload: preload,
       );
@@ -1761,10 +1817,24 @@ class PulsrAudioHandler extends BaseAudioHandler
         _latencyTracker?.markStage(PlaybackStage.sourceSet);
       } catch (_) {}
       _gaplessLoaded = true;
+      _lastGaplessIndex = targetIndex;
       if (generation != _playGeneration) return;
-      await _activePlayer.setVolume(_calculateReplayGainVolume(song));
-      if (preload) {
+      final targetVolume = _calculateReplayGainVolume(song);
+      if (!preload) {
+        // Restored queue, not playing yet: park the correct level so a later
+        // play() doesn't inherit a faded-out 0 from a previous switch.
+        await _activePlayer.setVolume(targetVolume);
+      } else if (_duckActive) {
+        await _activePlayer.setVolume(targetVolume);
         await _activePlayer.play();
+      } else {
+        // Cold-start at 0 with a short ramp instead of slamming to full
+        // volume on the first buffer (click).
+        await _activePlayer.setVolume(0.0);
+        await _activePlayer.play();
+        _fadeInAfterSwitch(_activePlayer, targetVolume);
+      }
+      if (preload) {
         try {
           _latencyTracker?.markStage(PlaybackStage.firstBytesReady);
           _latencyTracker?.markStage(PlaybackStage.playing);
@@ -1803,7 +1873,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         return;
       }
       final nextIdx = _getNextIndex();
-      if (nextIdx != null && nextIdx != _currentIndex) {
+      if (nextIdx != null && nextIdx != targetIndex) {
         await playSongAt(nextIdx, initialPosition: initialPosition);
       } else {
         await _failCurrentPlayback(fatal: false);
@@ -1882,12 +1952,12 @@ class PulsrAudioHandler extends BaseAudioHandler
       }
     }).catchError((_) {});
 
-    if (_songs.length > index + 1) {
+    // Only preload onto the inactive player when crossfade is active (dual-player engine).
+    // In gapless mode, the active player's ConcatenatingAudioSource handles seamless playback natively.
+    if (!_gaplessMode && _songs.length > index + 1) {
       unawaited(_tripleBufferPipeline.preloadNext(_songs[index + 1]));
     }
-    // Prefetch N+2 into the third buffer so the track after next is ready
-    // without any loading delay (completes the triple-buffer pipeline).
-    if (_songs.length > index + 2) {
+    if (!_gaplessMode && _songs.length > index + 2) {
       unawaited(_tripleBufferPipeline.prefetchAhead(_songs[index + 2]));
     }
     // Notify sleep timer of track completion for endOfTrack / afterNTracks modes (fixes silent never-fire)
@@ -1897,8 +1967,39 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {
     if (index < 0 || index >= _songs.length) return;
     cancelPrefetches();
-    // Ensure previous MediaCodec EventHandler is fully released before creating new decoder
+    // A YouTube resolve below can await for seconds; a second skip during that
+    // window must win. Capture a generation token FIRST so a pre-resolve
+    // failure can bail without touching current playback at all.
+    final generation = ++_playGeneration;
+    final song = _songs[index];
+
+    // Pre-resolve online targets before stopping: stopping first turns resolve
+    // latency into dead silence, and a failure then kills playback that was
+    // fine. Warmed URLs land in the caches the loader below reuses.
+    if (song.source == SongSource.youtube &&
+        (song.remoteId?.isNotEmpty ?? false) &&
+        (song.path.startsWith('ytmusic://') ||
+            song.path.isEmpty ||
+            (!song.path.startsWith('content:') &&
+                song.isDownloaded != true))) {
+      try {
+        await _resolveStreamUrl(song).timeout(const Duration(seconds: 20));
+      } catch (e) {
+        if (generation != _playGeneration) return;
+        final info = YtmErrorClassifier.classify(e);
+        _errorSubject.add(info.message);
+        ErrorLogger.log('Pre-resolve failed for ${song.title}, keeping current playback',
+            error: e, category: 'AudioHandler');
+        return;
+      }
+      if (generation != _playGeneration) return;
+    }
+
+    // Soft-landing fade so pause/stop doesn't click, then ensure the previous
+    // MediaCodec EventHandler is fully released before creating a new decoder
     // — prevents LegacyMessageQueue dead-thread crash on rapid Hi-Res FLAC switch (LOG-12)
+    await _fadeOutForSwitch(_activePlayer);
+    if (generation != _playGeneration) return;
     try {
       await _activePlayer.pause().timeout(const Duration(milliseconds: 800));
     } catch (_) {}
@@ -1907,14 +2008,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     } catch (_) {}
     await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
         restoreVolume: _volume);
-    // A YouTube resolve below can await for seconds; a second skip during that
-    // window must win. Capture a generation token and bail from a stale call
-    // after every await, or we get double mediaItem/history and torn state.
-    final generation = ++_playGeneration;
+    if (generation != _playGeneration) return;
     _pendingLazyPosition = null;
     _currentIndex = index;
-
-    final song = _songs[index];
     final fastArtUri =
         song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
     final item = _songToMediaItem(song, fastArtUri);
@@ -1971,19 +2067,27 @@ class PulsrAudioHandler extends BaseAudioHandler
         }
       }
       if (generation != _playGeneration) return;
-      await _activePlayer.setVolume(_calculateReplayGainVolume(song));
+      final targetVolume = _calculateReplayGainVolume(song);
+      if (_duckActive) {
+        await _activePlayer.setVolume(targetVolume);
+      } else {
+        // Cold-start at 0 with a short ramp instead of slamming to full
+        // volume on the first buffer (click).
+        await _activePlayer.setVolume(0.0);
+      }
       await _activePlayer.play();
+      if (!_duckActive) _fadeInAfterSwitch(_activePlayer, targetVolume);
       _consecutiveFailures = 0;
       _repository.recordPlayHistory(song.id);
       _saveCurrentPosition();
 
       // Early prefetch next streams for Gapless 2.0
       _prefetchNextTracks();
-      if (_songs.length > index + 1) {
+      // Only preload onto inactive player when crossfade is active
+      if (!_gaplessMode && _songs.length > index + 1) {
         unawaited(_tripleBufferPipeline.preloadNext(_songs[index + 1]));
       }
-      // Prefetch N+2 into the third buffer (completes the triple-buffer pipeline)
-      if (_songs.length > index + 2) {
+      if (!_gaplessMode && _songs.length > index + 2) {
         unawaited(_tripleBufferPipeline.prefetchAhead(_songs[index + 2]));
       }
     } on YtmException catch (e, st) {

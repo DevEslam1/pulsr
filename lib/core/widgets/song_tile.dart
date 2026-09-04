@@ -72,9 +72,9 @@ class SongTile extends StatelessWidget {
                 onTap: onTap,
                 onLongPress: onLongPress,
                 child: Container(
-                  constraints: const BoxConstraints(minHeight: 58),
+                  constraints: const BoxConstraints(minHeight: 56),
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   child: Row(
                     children: [
                       if (index != null)

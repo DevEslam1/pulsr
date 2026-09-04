@@ -106,6 +106,18 @@ Future<void> main() async {
                 error: e, stackTrace: st, category: 'Startup');
           }),
         ]);
+        // Warm the native extractor (BotGuard WebView + client matrix) while
+        // the user is still looking at the home screen, so the first YTM
+        // search/tap doesn't pay cold-start attestation (~seconds).
+        // Fire-and-forget, guarded: never blocks or throws into startup.
+        try {
+          if (getIt.isRegistered<YtmService>()) {
+            unawaited(getIt<YtmService>()
+                .preWarm()
+                .timeout(const Duration(seconds: 15))
+                .catchError((_) {}));
+          }
+        } catch (_) {}
       } catch (e, st) {
         ErrorLogger.log('Parallel startup init failed',
             error: e, stackTrace: st, category: 'Startup');

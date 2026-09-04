@@ -148,7 +148,11 @@ object ProxyManager {
             ?: return false
         for (pattern in bypassList) {
             if (pattern == uriHost) return true
-            if (pattern.startsWith("*.") && uriHost.endsWith(pattern.substring(2))) return true
+            // Require a dot boundary so *.example.com does NOT match fakeexample.com.
+            if (pattern.startsWith("*.")) {
+                val domain = pattern.substring(2)
+                if (uriHost == domain || uriHost.endsWith(".$domain")) return true
+            }
             if (pattern == "localhost" && (uriHost == "localhost" || uriHost == "127.0.0.1")) return true
         }
         return false

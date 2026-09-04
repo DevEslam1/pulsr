@@ -214,6 +214,8 @@ class YtmRateLimiter {
   }
 
   /// Called when a 429 rate-limit response is received from native YouTube.
+  /// [_adaptiveMultiplier] actually scales the backoff (previously it was
+  /// incremented but never read), so repeated blocks cool down longer.
   void onRateLimited([int? retryAfterSeconds]) {
     final now = DateTime.now();
     _adaptiveMultiplier = (_adaptiveMultiplier * 2).clamp(1, 16);
@@ -224,8 +226,10 @@ class YtmRateLimiter {
       final remaining = _backoffUntil.isAfter(now)
           ? _backoffUntil.difference(now)
           : Duration.zero;
+      // Fresh block scales with the adaptive multiplier (repeated 429s cool
+      // down longer); an in-progress window extends by doubling, capped.
       var base = remaining == Duration.zero
-          ? const Duration(seconds: 2)
+          ? Duration(seconds: 2 * _adaptiveMultiplier)
           : remaining * 2;
       final jitter = Duration(milliseconds: _random.nextInt(1000));
       if (base.inSeconds > 30) base = const Duration(seconds: 30);
@@ -244,14 +248,17 @@ class YtmRateLimiter {
     _persist();
   }
 
-  /// Called on a successful native request to reset backoff state.
+  /// Called on a successful native request.
+  /// Never clears an active cooling window: one success through an alternate
+  /// route must not instantly hammer the blocked route again. The window
+  /// expires naturally; success only decays the adaptive multiplier after
+  /// 10 minutes of clean traffic.
   void onSuccess() {
     final now = DateTime.now();
     if (now.difference(_lastSuccess).inMinutes > 10) {
       _adaptiveMultiplier = 1;
     }
     _lastSuccess = now;
-    _backoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
     _persist();
   }
 

@@ -1229,24 +1229,20 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
         try {
             val builder = DynamicsProcessing.Config.Builder(
-                DynamicsProcessing.VARIANT_FAVOR_FREQUENCY_RESOLUTION,
+                DynamicsProcessing.VARIANT_FAVOR_TIME_RESOLUTION,
                 CHANNEL_COUNT,
                 false, // preEq
                 0,
-                true,  // mbc
-                MBC_BAND_COUNT,
-                true,  // postEq — 10-band graphic EQ
-                eqBandCount,
-                true   // limiter
+                dynamicsActive,  // mbc: only enable when dynamics preset is active
+                if (dynamicsActive) MBC_BAND_COUNT else 0,
+                isEqEnabled,  // postEq — 10-band graphic EQ
+                if (isEqEnabled) eqBandCount else 0,
+                true   // limiter: used for preamp and peak control
             )
-            val nativeBufferMs = try {
-                val audioManager = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-                val nativeRate = audioManager?.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toIntOrNull() ?: 48000
-                val nativeFrames = audioManager?.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)?.toIntOrNull() ?: 192
-                (nativeFrames.toDouble() / nativeRate * 1000).toFloat().coerceIn(5f, 20f)
-            } catch (_: Exception) { 10f }
-            builder.setPreferredFrameDuration(nativeBufferMs)
-            builder.setPostEqAllChannelsTo(buildPostEq())
+            builder.setPreferredFrameDuration(10f)
+            if (isEqEnabled) {
+                builder.setPostEqAllChannelsTo(buildPostEq())
+            }
 
             val config = builder.build()
             val dp = DynamicsProcessing(0, currentAudioSessionId, config)

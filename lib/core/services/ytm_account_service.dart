@@ -99,6 +99,12 @@ class YtmAccountService {
 
   YtmAccountService(this._versionResolver);
 
+  /// Shared persistent HTTP client for the Dart Innertube chain (login-state
+  /// resolve path issues up to 9 sequential player requests; keep-alive skips
+  /// a fresh TCP+TLS handshake on each). Field, not a ctor param, so the
+  /// injectable binding stays untouched.
+  final http.Client _innertubeClient = http.Client();
+
   String? _cookies;
   String? _accountName;
   String? _accountAvatar;
@@ -474,7 +480,7 @@ class YtmAccountService {
   Map<String, String> _buildHeaders(
       {String userAgent = '', String origin = 'https://music.youtube.com'}) {
     final defaultUa =
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36';
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 
     final headers = <String, String>{
       'Content-Type': 'application/json',
@@ -665,8 +671,9 @@ class YtmAccountService {
       try {
         await YtmRateLimiter.shared.acquirePermit();
         final timeout = Duration(seconds: baseTimeoutSeconds + attempt * 5);
-        final res =
-            await http.post(uri, headers: headers, body: body).timeout(timeout);
+        final res = await _innertubeClient
+            .post(uri, headers: headers, body: body)
+            .timeout(timeout);
         if (res.statusCode == 429 || res.statusCode >= 500) {
           if (res.statusCode == 429) {
             YtmRateLimiter.shared.onRateLimited();
@@ -680,14 +687,20 @@ class YtmAccountService {
           }
         }
 
-        YtmRateLimiter.shared.onSuccess();
+        // Only 2xx clears/updates limiter state: a 403/401 must never reset
+        // an active cooling window back to "all clear".
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          YtmRateLimiter.shared.onSuccess();
+        }
         return res;
       } on TimeoutException {
         if (attempt == maxAttempts - 1) {
           throw const YtmException('YTM_TIMEOUT', 'Request timed out');
         }
+        await Future.delayed(Duration(milliseconds: 800 * (1 << attempt)));
       } catch (e) {
         if (attempt == maxAttempts - 1) rethrow;
+        await Future.delayed(Duration(milliseconds: 500 * (1 << attempt)));
       }
     }
     throw const YtmException('YTM_TIMEOUT', 'Exceeded maximum retry attempts');
@@ -1329,8 +1342,8 @@ class YtmAccountService {
                               : (client == 'ANDROID_TESTSUITE'
                                   ? 'com.google.android.youtube/1.9 (Linux; U; Android 9; gzip)'
                                   : (client == 'MWEB'
-                                      ? 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36'
-                                      : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36')))))),
+                                      ? 'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36'
+                                      : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')))))),
         };
 
         if (visitorData != null && visitorData.isNotEmpty) {
@@ -2121,5 +2134,8 @@ class YtmAccountService {
   void dispose() {
     _sessionHarvestDebounce?.cancel();
     loginState.dispose();
+    try {
+      _innertubeClient.close();
+    } catch (_) {}
   }
 }

@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../../../core/constants/embedded_browser_ua.dart';
 import '../../../core/di/injection.dart';
-import '../../../data/services/ytm_account_service.dart';
+import '../../../core/services/ytm_account_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../utils/google_login_recovery.dart';

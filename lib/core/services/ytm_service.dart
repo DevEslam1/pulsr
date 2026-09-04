@@ -30,16 +30,24 @@ class YtmException implements Exception {
 
   const YtmException(this.code, [this.details, this.traceId]);
 
-  YtmBlockSignal? get signal =>
-      YtmErrorClassifier.classify(
-        details ?? code,
-        traceId,
-      ).signal;
+  YtmBlockSignal? get signal {
+    // Prefer the explicit machine code (e.g. native BOT_CHALLENGE with a
+    // human message like "All clients LOGIN_REQUIRED"): classifying the free
+    // text first would misread it as signInRequired and route auth-recovery
+    // instead of bot-recovery.
+    final explicit = YtmBlockSignal.fromCode(code);
+    if (explicit != null) return explicit;
+    return YtmErrorClassifier.classify(
+      details ?? code,
+      traceId,
+    ).signal;
+  }
 
   /// Retrying later may work; retrying the rest of the queue now will not.
   bool get isNetwork =>
       code == 'YTM_NETWORK' ||
       code == 'YTM_TIMEOUT' ||
+      code == 'YTM_OFFLINE' ||
       signal == YtmBlockSignal.ipBlocked;
 
   /// YouTube has flagged the IP / client as automated/bot and requires authentication.
@@ -96,7 +104,35 @@ class YtmService {
   final StreamController<void> _authExpiredController =
       StreamController<void>.broadcast();
 
+  /// Shared persistent HTTP client for Dart-side Innertube calls (search
+  /// fallback). Keep-alive reuses TCP+TLS across requests; the previous
+  /// top-level `http.post` paid a fresh handshake per call (~100-400ms).
+  /// (Field, not a ctor param, so injectable codegen stays untouched.)
+  final http.Client _httpClient = http.Client();
+
   bool? _available;
+
+  /// Bot-challenge cooldown: when YouTube flags this IP, every native resolve
+  /// burns a full multi-client chain and fails identically. While cooling
+  /// down, [resolveStream] skips the native tiers and goes straight to the
+  /// remote backend instead of piling up doomed chains (which also starves
+  /// the native thread pool into cascading YTM_TIMEOUTs).
+  static const _botCooldown = Duration(seconds: 90);
+  DateTime _botChallengeUntil = DateTime.fromMillisecondsSinceEpoch(0);
+  YtmException? _lastBotChallenge;
+
+  bool get isBotCoolingDown => DateTime.now().isBefore(_botChallengeUntil);
+
+  void _noteBotChallenge(YtmException e) {
+    _lastBotChallenge = e;
+    _botChallengeUntil = DateTime.now().add(_botCooldown);
+  }
+
+  /// Test-only: clears bot-cooldown state.
+  void debugClearBotCooldown() {
+    _botChallengeUntil = DateTime.fromMillisecondsSinceEpoch(0);
+    _lastBotChallenge = null;
+  }
 
   Stream<void> get onAuthExpired => _authExpiredController.stream;
 
@@ -107,6 +143,9 @@ class YtmService {
   @disposeMethod
   void dispose() {
     _authExpiredController.close();
+    try {
+      _httpClient.close();
+    } catch (_) {}
   }
 
   Map<String, String> _localeArgs() {
@@ -335,7 +374,7 @@ class YtmService {
       }
 
       await YtmRateLimiter.shared.acquirePermit();
-      final response = await http
+      final response = await _httpClient
           .post(
             Uri.parse(
                 'https://music.youtube.com/youtubei/v1/search?prettyPrint=false&key=$apiKey'),
@@ -402,9 +441,22 @@ class YtmService {
         }
 
         traverse(json);
+        YtmRateLimiter.shared.onSuccess();
         return tracks.take(limit).toList();
       }
-    } catch (_) {}
+
+      // Non-200 from Innertube search: feed the shared limiter so the block
+      // signal survives (previously swallowed, indistinguishable from "empty").
+      if (response.statusCode == 429) {
+        YtmRateLimiter.shared.onRateLimited(
+          int.tryParse(response.headers['retry-after'] ?? ''),
+        );
+      }
+      debugPrint(
+          '[YTM_SERVICE] Innertube search HTTP ${response.statusCode}');
+    } catch (e) {
+      debugPrint('[YTM_SERVICE] Innertube search error: $e');
+    }
     return const [];
   }
 
@@ -515,12 +567,22 @@ class YtmService {
       }
     }
 
+    // Remember the first classified failure so the caller gets an actionable
+    // error (e.g. BOT_CHALLENGE → "verification" + poToken recovery) instead
+    // of a generic YTM_FAILED that maps to recoveryAction.none (dead end).
+    Object? firstError;
+    final inBotCooldown = isBotCoolingDown;
+    if (inBotCooldown) {
+      debugPrint(
+          '[YTM_SERVICE] Bot cooldown active, skipping native tiers for $videoId');
+    }
+
     try {
       _tracker?.markStage(PlaybackStage.pluginEntered);
     } catch (_) {}
     // 1. Try direct authenticated YouTube Music InnerTube Player API if logged in
     try {
-      if (getIt.isRegistered<YtmAccountService>()) {
+      if (!inBotCooldown && getIt.isRegistered<YtmAccountService>()) {
         final account = getIt<YtmAccountService>();
         if (account.isLoggedIn) {
           try {
@@ -547,12 +609,15 @@ class YtmService {
     } catch (e) {
       // A definitive session-expired verdict must surface to callers/UI,
       // never silently downgrade to guest playback.
+      // (Tier-1 account misses are routine fallback, not the final error, so
+      // they are deliberately NOT recorded in firstError.)
       if (e is YtmException && e.isAuth) rethrow;
       debugPrint('[YTM_SERVICE] Direct account stream resolution fallback: $e');
     }
 
     // 2. Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
     try {
+      if (inBotCooldown) throw _lastBotChallenge ?? const YtmException('BOT_CHALLENGE', 'Cooling down after YouTube verification challenge');
       try {
         _tracker?.markStage(PlaybackStage.clientRequestSent);
         // Check poToken state heuristically: if we have a cached token, this is warm
@@ -583,6 +648,14 @@ class YtmService {
     } catch (e) {
       debugPrint('[YTM_SERVICE] Native stream resolution failed: $e');
       if (e is YtmException && e.isAuth) rethrow;
+      firstError ??= e;
+      // The cooldown short-circuit itself must not extend the window, or a
+      // retry loop would hold it open forever (fixed window from first hit).
+      if (!inBotCooldown &&
+          e is YtmException &&
+          (e.isBotBlocked || e.code == 'PO_TOKEN_INVALID')) {
+        _noteBotChallenge(e);
+      }
     }
 
     // 3. Engine 3: Remote yt-dlp backend fallback if enabled and healthy
@@ -622,8 +695,15 @@ class YtmService {
       if (e is YtmException && (e.isBotBlocked || e.code == 'RATE_LIMITED')) {
         rethrow;
       }
+      firstError ??= e;
     }
 
+    // All engines failed: surface the first classified engine error so the
+    // UI/recovery layer sees the real cause (bot/rate/auth) with its mapped
+    // recovery action, not a generic dead-end.
+    final err = firstError;
+    if (err is YtmException) throw err;
+    if (err != null) throw err;
     throw const YtmException('YTM_FAILED', 'No stream returned from any engine');
   }
 
@@ -640,6 +720,9 @@ class YtmService {
         if (attempt == maxRetries) {
           throw const YtmException('YTM_TIMEOUT', 'Request timed out');
         }
+        // Back off before retrying a timeout: a tight loop hammers an
+        // already-struggling route/VPN exit and hastens an IP block.
+        await Future.delayed(Duration(milliseconds: 800 * (1 << attempt)));
       } on MissingPluginException {
         throw const YtmException('YTM_UNSUPPORTED');
       } on SocketException catch (e) {
@@ -650,10 +733,24 @@ class YtmService {
         }
         await Future.delayed(Duration(milliseconds: 800 * (1 << attempt)));
       } on PlatformException catch (e) {
+        final codeUpper = e.code.toUpperCase();
+        // Feed 429s into the shared Dart limiter so search/resolve/download
+        // all cool down together instead of each retrying against the same IP.
+        if (codeUpper.contains('429') ||
+            codeUpper.contains('RATE_LIMIT') ||
+            (e.message?.toUpperCase().contains('429') ?? false)) {
+          YtmRateLimiter.shared.onRateLimited();
+        }
+        // A full native chain already tried every client: blindly replaying
+        // the whole chain 2x more triples thread-pool load and turns one
+        // IP-flag into cascading timeouts. Fail fast to the next engine.
         final isFatalCode = e.code == 'YTM_DISABLED' ||
             e.code == 'YTM_UNSUPPORTED' ||
+            e.code == 'BOT_CHALLENGE' ||
             e.code == 'YTM_BOT_BLOCKED' ||
             e.code == 'YTM_RECAPTCHA' ||
+            e.code == 'PO_TOKEN_INVALID' ||
+            e.code == 'YTM_PO_TOKEN_INVALID' ||
             e.code == 'LOGIN_REQUIRED' ||
             e.code == 'YTM_AUTH';
 

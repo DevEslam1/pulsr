@@ -192,8 +192,15 @@ internal class InnertubeClient(
                     Log.w(TAG, "[$traceId] Client ${client.name} returned status $status -> $parsedSignal")
                     if ((parsedSignal == YtmBlockSignal.BotChallenge || parsedSignal == YtmBlockSignal.PoTokenInvalid) &&
                         (client == ClientType.ANDROID_MUSIC || client == ClientType.WEB_REMIX)) {
-                        PoTokenManager.evictMintedTokens()
-                        PoTokenManager.triggerBackgroundRefresh()
+                        // Throttled: during an IP-flagged sweep every client hits
+                        // this branch; the refresh itself is a no-op while the
+                        // token is fresh, so once a minute is plenty.
+                        val now = android.os.SystemClock.elapsedRealtime()
+                        if (now - lastBotRefreshTriggerMs > 60_000L) {
+                            lastBotRefreshTriggerMs = now
+                            PoTokenManager.evictMintedTokens()
+                            PoTokenManager.triggerBackgroundRefresh()
+                        }
                     }
                     return null
                 }
@@ -536,7 +543,11 @@ internal class InnertubeClient(
                     ProxyManager.onPathFailed(urlStr)
                     Log.w(TAG, "[$traceId] Rate limited (429) on attempt $attempt. Backing off for ${backoff}ms")
                     response.close()
+                    // Sleep outside the global permit: holding it across a
+                    // (potentially 15m) backoff starves all other buckets.
+                    rateLimiter.releasePermit()
                     Thread.sleep(backoff)
+                    rateLimiter.acquirePermit(bucket)
                     continue
                 }
 
@@ -547,7 +558,10 @@ internal class InnertubeClient(
                 if (code in 500..599) {
                     Log.w(TAG, "[$traceId] Server error ($code) on attempt $attempt. Retrying...")
                     response.close()
-                    Thread.sleep((1000L shl attempt) + (0..500).random())
+                    val sleepMs = (1000L shl attempt) + (0..500).random()
+                    rateLimiter.releasePermit()
+                    Thread.sleep(sleepMs)
+                    rateLimiter.acquirePermit(bucket)
                     continue
                 }
 
@@ -570,12 +584,17 @@ internal class InnertubeClient(
                 }
                 lastError = e
             } catch (e: UnknownHostException) {
-                // DoH fallback attempt
+                // DoH fallback: resolve via DNS-over-HTTPS, inject into the
+                // shared TTL cache so the immediate retry hits the fresh IP
+                // instead of the same failing system DNS.
                 val host = Uri.parse(urlStr).host
                 if (host != null) {
                     val dohResolved = DnsOverHttpsResolver.resolve(host)
                     if (dohResolved != null) {
                         Log.i(TAG, "[$traceId] Resolved host $host via DoH: ${dohResolved.hostAddress}")
+                        runCatching {
+                            YtmHttpClient.TtlDnsCache.instance.put(host, listOf(dohResolved))
+                        }
                     }
                 }
                 lastError = e
@@ -630,7 +649,10 @@ internal class InnertubeClient(
         val playbackContext = JSONObject()
         val contentPlaybackContext = JSONObject().apply {
             put("html5Preference", "HTML5_PREF_WANTS")
-            if (!clientType.isWeb && hasPo) {
+            // ANDROID_TESTSUITE is a bare no-auth client: a web-minted BotGuard
+            // token attached to its context is at best useless, at worst a
+            // mismatch signal, so it always goes out clean.
+            if (!clientType.isWeb && hasPo && clientType != ClientType.ANDROID_TESTSUITE) {
                 val tokenTarget = PoTokenManager.visitorData.ifEmpty { videoId }
                 val poToken = PoTokenManager.poTokenForSync(tokenTarget)
                 if (poToken.isNotEmpty()) {
@@ -752,6 +774,9 @@ internal class InnertubeClient(
     companion object {
         private const val TAG = "InnertubeClient"
         const val HEDGE_DELAY_MS = 350L
+        // Last bot-refresh trigger across all resolve calls (throttle).
+        @Volatile
+        private var lastBotRefreshTriggerMs = 0L
         var API_KEY: String = System.getProperty("YTM_API_KEY") ?: "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30"
         @Volatile
         private var _streamResolverPool: java.util.concurrent.ExecutorService? = null

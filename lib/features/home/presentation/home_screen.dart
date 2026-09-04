@@ -636,7 +636,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         horizontal: Adaptive.pagePadding(context)),
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: context.trackGridColumns,
-                      mainAxisExtent: 64,
+                      mainAxisExtent: 72,
                       crossAxisSpacing: 10,
                       mainAxisSpacing: 4,
                     ),
@@ -1006,7 +1006,7 @@ class _OnlineCategorySection extends StatelessWidget {
                       horizontal: Adaptive.pagePadding(context)),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: context.trackGridColumns,
-                    mainAxisExtent: 64,
+                    mainAxisExtent: 72,
                     crossAxisSpacing: 10,
                     mainAxisSpacing: 4,
                   ),

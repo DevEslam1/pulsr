@@ -42,9 +42,11 @@ internal object YtmHttpClient {
     ) : Dns {
         private val cache = ConcurrentHashMap<String, Pair<List<InetAddress>, Long>>()
 
-        companion object {
-            val instance = TtlDnsCache()
-        }
+    companion object {
+        val instance = TtlDnsCache()
+        private val IPV4_REGEX =
+            Regex("^((25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)$")
+    }
 
         @Throws(UnknownHostException::class)
         override fun lookup(hostname: String): List<InetAddress> {
@@ -95,8 +97,11 @@ internal object YtmHttpClient {
                 val addresses = mutableListOf<InetAddress>()
                 for (i in 0 until answers.length()) {
                     val answer = answers.getJSONObject(i)
+                    // Only A records (type 1): CNAME hostnames would bounce
+                    // back to system DNS, and AAAA breaks IPv4-only networks.
+                    if (answer.optInt("type", -1) != 1) continue
                     val data = answer.optString("data")
-                    if (data.isNotEmpty()) {
+                    if (data.isNotEmpty() && IPV4_REGEX.matches(data)) {
                         runCatching {
                             addresses.add(InetAddress.getByName(data))
                         }

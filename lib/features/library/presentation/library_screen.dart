@@ -476,7 +476,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                       bottom: 160, top: 8, left: 6, right: 6),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: trackCols,
-                    mainAxisExtent: 64,
+                    mainAxisExtent: 72,
                     crossAxisSpacing: 10,
                     mainAxisSpacing: 4,
                   ),
@@ -648,7 +648,7 @@ class _LibraryScreenState extends State<LibraryScreen>
                         bottom: 160, top: 4, left: 6, right: 6),
                     gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: trackCols,
-                      mainAxisExtent: 64,
+                      mainAxisExtent: 72,
                       crossAxisSpacing: 10,
                       mainAxisSpacing: 4,
                     ),

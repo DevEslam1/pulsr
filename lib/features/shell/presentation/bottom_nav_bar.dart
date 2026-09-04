@@ -67,72 +67,77 @@ class PulsrBottomNavBar extends StatelessWidget {
           isTablet ? 24 : 12,
           isTablet ? 10 : 6,
         ),
-        child: Center(
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          heightFactor: 1.0,
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxBarWidth),
-            child: Container(
+            child: SizedBox(
               height: barHeight,
-              decoration: BoxDecoration(
-                borderRadius: navRadius,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: p.isDark ? 0.45 : 0.12),
-                    blurRadius: 24,
-                    spreadRadius: 0,
-                    offset: const Offset(0, 8),
-                  ),
-                  BoxShadow(
-                    color: p.accent.withValues(alpha: p.isDark ? 0.12 : 0.06),
-                    blurRadius: 18,
-                    spreadRadius: -2,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: navRadius,
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: navRadius,
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          p.surface.withValues(alpha: p.isDark ? 0.88 : 0.94),
-                          p.surfaceContainer
-                              .withValues(alpha: p.isDark ? 0.82 : 0.90),
+              child: Container(
+                height: barHeight,
+                decoration: BoxDecoration(
+                  borderRadius: navRadius,
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: p.isDark ? 0.45 : 0.12),
+                      blurRadius: 24,
+                      spreadRadius: 0,
+                      offset: const Offset(0, 8),
+                    ),
+                    BoxShadow(
+                      color: p.accent.withValues(alpha: p.isDark ? 0.12 : 0.06),
+                      blurRadius: 18,
+                      spreadRadius: -2,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: navRadius,
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: navRadius,
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            p.surface.withValues(alpha: p.isDark ? 0.88 : 0.94),
+                            p.surfaceContainer
+                                .withValues(alpha: p.isDark ? 0.82 : 0.90),
+                          ],
+                        ),
+                        border: Border.all(
+                          color: p.isDark
+                              ? Colors.white.withValues(alpha: 0.14)
+                              : Colors.black.withValues(alpha: 0.08),
+                          width: 1.2,
+                        ),
+                      ),
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          for (int i = 0; i < items.length; i++)
+                            Expanded(
+                              child: _NavTabItem(
+                                item: items[i],
+                                isSelected: currentIndex == i,
+                                p: p,
+                                isTablet: isTablet,
+                                onTap: () {
+                                  if (currentIndex != i) {
+                                    HapticFeedback.selectionClick();
+                                    onTap(i);
+                                  }
+                                },
+                              ),
+                            ),
                         ],
                       ),
-                      border: Border.all(
-                        color: p.isDark
-                            ? Colors.white.withValues(alpha: 0.14)
-                            : Colors.black.withValues(alpha: 0.08),
-                        width: 1.2,
-                      ),
-                    ),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: [
-                        for (int i = 0; i < items.length; i++)
-                          Expanded(
-                            child: _NavTabItem(
-                              item: items[i],
-                              isSelected: currentIndex == i,
-                              p: p,
-                              isTablet: isTablet,
-                              onTap: () {
-                                if (currentIndex != i) {
-                                  HapticFeedback.selectionClick();
-                                  onTap(i);
-                                }
-                              },
-                            ),
-                          ),
-                      ],
                     ),
                   ),
                 ),

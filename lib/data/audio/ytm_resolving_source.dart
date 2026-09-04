@@ -97,11 +97,24 @@ class YtmResolvingSource extends StreamAudioSource {
       } catch (byteErr) {
         final errStr = byteErr.toString().toLowerCase();
 
-        // Check if error represents a stale/forbidden stream URL (403/404/416)
+        // Stale/forbidden/pressured stream URL: 403/404/416 plus rate-limit,
+        // proxy-auth and bot-verification signals. A 429/401/407 or bot page
+        // on googlevideo means the URL or the route is burned — same remedy
+        // as 403: invalidate and re-resolve once.
         final is403or404 = errStr.contains('403') ||
             errStr.contains('forbidden') ||
             errStr.contains('404') ||
-            errStr.contains('416');
+            errStr.contains('416') ||
+            errStr.contains('429') ||
+            errStr.contains('too many requests') ||
+            errStr.contains('rate limit') ||
+            errStr.contains('401') ||
+            errStr.contains('407') ||
+            errStr.contains('proxy authentication') ||
+            errStr.contains('unusual traffic') ||
+            errStr.contains('not a bot') ||
+            errStr.contains('recaptcha') ||
+            errStr.contains('bot');
 
         debugPrint(
             '[YtmResolvingSource] Byte stream error ($byteErr, isForbidden/Stale=$is403or404) for $videoId. Invalidating URL cache & retrying fresh resolution once...');
@@ -150,10 +163,29 @@ class YtmResolvingSource extends StreamAudioSource {
     return expires.difference(now).inSeconds < 300;
   }
 
-  Future<LockCachingAudioSource> _ensureInner() {
+  Future<LockCachingAudioSource> _ensureInner() async {
     final existing = _inner;
-    if (existing != null && !_isExpiringSoon()) return Future.value(existing);
-    return _pending ??= _createInner();
+    if (existing != null && !_isExpiringSoon()) return existing;
+    final pending = _pending;
+    if (pending != null) {
+      try {
+        return await pending;
+      } catch (_) {
+        // Stale failed future: fall through and create a fresh one instead
+        // of handing every waiter the same cached failure (thundering herd).
+        _pending = null;
+      }
+    }
+    final fut = _createInner();
+    _pending = fut;
+    try {
+      final inner = await fut;
+      _pending = null;
+      return inner;
+    } catch (e) {
+      _pending = null;
+      rethrow;
+    }
   }
 
   Future<LockCachingAudioSource> _createInner(
@@ -214,7 +246,7 @@ class YtmResolvingSource extends StreamAudioSource {
         'User-Agent': effectiveUa
       else
         'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
       if (effectiveCookies != null && effectiveCookies.isNotEmpty)
         'Cookie': effectiveCookies,
       'Referer': 'https://music.youtube.com/',

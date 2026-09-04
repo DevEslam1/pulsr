@@ -161,6 +161,11 @@ void main() {
       expect(find.byIcon(Icons.search_rounded), findsOneWidget);
       expect(find.byIcon(Icons.queue_music_outlined), findsOneWidget);
       expect(find.byIcon(Icons.settings_outlined), findsOneWidget);
+
+      // Verify bottom nav bar height is strictly bounded and does not swallow the screen
+      final navBarSize = tester.getSize(find.byType(PulsrBottomNavBar));
+      expect(navBarSize.height, lessThan(120.0));
+      expect(navBarSize.height, greaterThan(50.0));
     });
   });
 }
