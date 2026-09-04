@@ -1266,6 +1266,8 @@ class MusicRepository implements IMusicRepository {
         survivingId = targetId;
 
         if (oldRow == null || oldRow.id == targetId) return;
+        final oldData = oldRow;
+        final newData = newRow;
 
         try {
           final duplicatePlaylists =
@@ -1309,34 +1311,34 @@ class MusicRepository implements IMusicRepository {
 
         // Merge stats (don't clobber — the scanned row may predate the download).
         final int? mergedLastPlayed;
-        if (oldRow.lastPlayed != null && newRow.lastPlayed != null) {
-          mergedLastPlayed = oldRow.lastPlayed! > newRow.lastPlayed!
-              ? oldRow.lastPlayed
-              : newRow.lastPlayed;
+        if (oldData.lastPlayed != null && newData.lastPlayed != null) {
+          mergedLastPlayed = oldData.lastPlayed! > newData.lastPlayed!
+              ? oldData.lastPlayed
+              : newData.lastPlayed;
         } else {
-          mergedLastPlayed = oldRow.lastPlayed ?? newRow.lastPlayed;
+          mergedLastPlayed = oldData.lastPlayed ?? newData.lastPlayed;
         }
         final keepOldPosition =
-            (oldRow.lastPlayed ?? 0) > (newRow.lastPlayed ?? 0);
+            (oldData.lastPlayed ?? 0) > (newData.lastPlayed ?? 0);
 
-        final String effectiveTitle = (oldRow.title.isNotEmpty &&
-                !oldRow.title.toLowerCase().startsWith('ytdl_'))
-            ? oldRow.title
-            : newRow.title;
-        final String effectiveArtist = (oldRow.artist.isNotEmpty &&
-                oldRow.artist != '<unknown>' &&
-                oldRow.artist != 'Unknown')
-            ? oldRow.artist
-            : newRow.artist;
-        final String effectiveAlbum = (oldRow.album.isNotEmpty &&
-                oldRow.album != '<unknown>' &&
-                oldRow.album != 'Unknown')
-            ? oldRow.album
-            : newRow.album;
-        final String? effectiveRemoteArt = (oldRow.remoteArtworkUrl != null &&
-                oldRow.remoteArtworkUrl!.isNotEmpty)
-            ? oldRow.remoteArtworkUrl
-            : newRow.remoteArtworkUrl;
+        final String effectiveTitle = (oldData.title.isNotEmpty &&
+                !oldData.title.toLowerCase().startsWith('ytdl_'))
+            ? oldData.title
+            : newData.title;
+        final String effectiveArtist = (oldData.artist.isNotEmpty &&
+                oldData.artist != '<unknown>' &&
+                oldData.artist != 'Unknown')
+            ? oldData.artist
+            : newData.artist;
+        final String effectiveAlbum = (oldData.album.isNotEmpty &&
+                oldData.album != '<unknown>' &&
+                oldData.album != 'Unknown')
+            ? oldData.album
+            : newData.album;
+        final String? effectiveRemoteArt = (oldData.remoteArtworkUrl != null &&
+                oldData.remoteArtworkUrl!.isNotEmpty)
+            ? oldData.remoteArtworkUrl
+            : newData.remoteArtworkUrl;
 
         await (_db.update(_db.songsTable)..where((t) => t.id.equals(targetId)))
             .write(
@@ -1344,15 +1346,15 @@ class MusicRepository implements IMusicRepository {
             title: Value(effectiveTitle),
             artist: Value(effectiveArtist),
             album: Value(effectiveAlbum),
-            genre: Value(oldRow.genre ?? newRow.genre),
-            isFavorite: Value(oldRow.isFavorite || newRow.isFavorite),
-            playCount: Value(oldRow.playCount + newRow.playCount),
+            genre: Value(oldData.genre ?? newData.genre),
+            isFavorite: Value(oldData.isFavorite || newData.isFavorite),
+            playCount: Value(oldData.playCount + newData.playCount),
             lastPlayed: Value(mergedLastPlayed),
             lastPositionMs: Value(keepOldPosition
-                ? oldRow.lastPositionMs
-                : newRow.lastPositionMs),
+                ? oldData.lastPositionMs
+                : newData.lastPositionMs),
             // Carry the video id and online remoteArtworkUrl
-            remoteId: Value(oldRow.remoteId ?? newRow.remoteId),
+            remoteId: Value(oldData.remoteId ?? newData.remoteId),
             remoteArtworkUrl: Value(effectiveRemoteArt),
             source: const Value(SongSource.local),
             isDownloaded: const Value(true),
@@ -1362,7 +1364,7 @@ class MusicRepository implements IMusicRepository {
 
         // FIX: Remove any other duplicate path rows that the scanner may have inserted in parallel
         // This guarantees a single entry per file path after download, fixing "repeats twice on local"
-        final newRowPath = newRow.path;
+        final newRowPath = newData.path;
         final duplicateOthers = await (_db.select(_db.songsTable)
               ..where((t) =>
                   t.path.lower().equals(newRowPath.toLowerCase()) &

@@ -154,7 +154,7 @@ class ImportBackupUseCase {
               'Backup file exceeds maximum allowed size of 10 MB');
         }
         final content = await (file as dynamic).readAsString();
-        return execute(content);
+        return await execute(content);
       } catch (e) {
         if (e is FormatException) rethrow;
         throw FormatException('Failed reading backup file: $e');

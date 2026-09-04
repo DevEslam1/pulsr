@@ -340,21 +340,22 @@ class YtDownloadService {
       // on local. Do not rescan the whole library here; deduplication is handled inside reconcile.
       // If needed, a lightweight single-file rescan can be done, but the reconciled row is sufficient.
 
-      return reconciled.fold(
-        (f) => Left(f),
+      final result = reconciled.fold(
+        (f) => Left<AppFailure, int>(f),
         (newId) {
           if (newId == null) {
             ErrorLogger.log('Download indexing missing library row: $videoId',
                 category: 'download');
-            return const Left(DownloadFailure(
+            return const Left<AppFailure, int>(DownloadFailure(
                 'Downloaded file was not found in the library'));
           }
           onProgress?.call(const YtDownloadProgress(YtDownloadStage.done, 1));
           ErrorLogger.addBreadcrumb('Download done: $videoId',
               category: 'download', data: {'newId': newId});
-          return Right(newId);
+          return Right<AppFailure, int>(newId);
         },
       );
+      return result;
     } on YtmException catch (e) {
       final classified = YtmErrorClassifier.classify(e);
       ErrorLogger.log('YTM download YtmException: ${e.code} → ${classified.message}',
