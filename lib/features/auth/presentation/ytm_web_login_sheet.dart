@@ -1,17 +1,26 @@
 // lib/features/auth/presentation/ytm_web_login_sheet.dart
 import 'dart:async';
+import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import '../../../core/constants/embedded_browser_ua.dart';
 import '../../../core/di/injection.dart';
-import '../../../core/services/ytm_account_service.dart';
+import '../../../data/services/ytm_account_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
+import '../utils/google_login_recovery.dart';
 
+import '../../../core/utils/error_logger.dart';
 class YtmWebLoginSheet extends StatefulWidget {
+  // Use the modern Google accounts sign-in flow (v3 identifier endpoint).
+  // The older ServiceLogin URL is more aggressively fingerprinted for
+  // embedded browsers — the v3 path goes through the same risk checks but
+  // is substantially less likely to show the "This browser may not be secure"
+  // interstitial for WebView UAs that pass the other signal checks.
   static const String googleSignInUrl =
-      'https://accounts.google.com/ServiceLogin?service=youtube&passive=true&continue=https%3A%2F%2Fmusic.youtube.com%2F&hl=en';
+      'https://accounts.google.com/v3/signin/identifier?continue=https%3A%2F%2Fmusic.youtube.com%2F&service=youtube&hl=en&flowName=GlifWebSignIn&flowEntry=ServiceLogin';
 
   final String? initialUrl;
   final String? title;
@@ -52,7 +61,12 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   InAppWebViewController? _webViewController;
   InAppWebViewSettings? _settings;
   bool _isLoading = true;
-  double _progress = 0.0;
+
+  // F-17: WebView progress ticks arrive many times per page load; they feed
+  // this notifier and rebuild only the small progress bar, not the whole
+  // ~1000-line sheet.
+  final ValueNotifier<double> _progressNotifier = ValueNotifier<double>(0.0);
+
   bool _isLoggedIn = false;
   String? _detectedCookies;
   bool _showHint = false;
@@ -68,7 +82,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       ).hasMatch(u);
 
   static bool _isAuthInProgressUrl(String u) => RegExp(
-        r'accounts\.google\.com|ServiceLogin|signin|/checkpoint/|consent\.',
+        r'accounts\.google\.com/v3/signin|accounts\.google\.com/ServiceLogin|/checkpoint/|consent\.google',
         caseSensitive: false,
       ).hasMatch(u);
 
@@ -88,6 +102,50 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   /// reload straight back to CookieMismatch forever.
   int _mismatchAutoNavCount = 0;
 
+  // --- Google "This browser or app may not be secure" block recovery ---
+  // UAs live in EmbeddedBrowserUa (single source; keep bumped — see file).
+  static String get mobileUserAgent => EmbeddedBrowserUa.mobile;
+  static String get desktopUserAgent => EmbeddedBrowserUa.desktop;
+
+  /// Returns the [UserScript] list to inject at AT_DOCUMENT_START.
+  ///
+  /// The script deletes navigator.userAgentData (Chromium-only, absent in
+  /// Safari) and aligns platform/vendor so Google's sign-in cannot fingerprint
+  /// the embedded WebView even after the UA string has been spoofed.
+  static UnmodifiableListView<UserScript> get _antiFingerPrintScripts =>
+      UnmodifiableListView([
+        UserScript(
+          source: EmbeddedBrowserUa.antiFingerprint,
+          injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+        ),
+      ]);
+
+  static const List<String> _blockPhrases = [
+    "couldn't sign you in",
+    'this browser or app may not be secure',
+  ];
+
+  final GoogleBlockRecovery _blockRecovery =
+      GoogleBlockRecovery(initialIdentity: BrowserIdentity.mobile);
+
+  /// Non-null while the automatic recovery ladder is running (drives the
+  /// inline status banner); prevents re-entry so the ladder never loops.
+  String? _blockStatus;
+
+  /// True after the 2 automatic retries were exhausted → recovery card.
+  bool _blockExhausted = false;
+
+  /// Identity override chosen by the ladder or the recovery card. Null =
+  /// use the default isYtm URL-based selection.
+  BrowserIdentity? _uaIdentityOverride;
+
+  /// Throttle for the block-page JS text scan (once per 2.5 s per page).
+  DateTime _lastBlockScanAt = DateTime.fromMillisecondsSinceEpoch(0);
+
+  String _uaFor(BrowserIdentity identity) => identity == BrowserIdentity.desktop
+      ? EmbeddedBrowserUa.desktop
+      : EmbeddedBrowserUa.mobile;
+
   @override
   void initState() {
     super.initState();
@@ -105,23 +163,13 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       });
     }
 
-    // Use a Chrome Mobile User-Agent that matches the platform.
-    // Google's sign-in flow blocks embedded WebViews detected via:
-    //  1. X-Requested-With header containing the app package name (suppressed below via requestedWithHeaderOriginAllowList: {})
-    //  2. Chromium Client Hints (sec-ch-ua) that expose the embedded context
-    //  3. useHybridComposition=true which exposes a different rendering pipeline fingerprint
-    //
-    // Chrome Mobile UA + useHybridComposition=false + empty requestedWithHeaderOriginAllowList
-    // is the combination that avoids all three detection vectors.
-    const userAgent =
-        'Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Mobile Safari/537.36';
+    final initialUa = _uaIdentityOverride != null
+        ? _uaFor(_uaIdentityOverride!)
+        : (widget.isBrowseMode ? desktopUserAgent : mobileUserAgent);
 
     _settings = InAppWebViewSettings(
-      userAgent: userAgent,
-      // useHybridComposition=false forces the WebView to use the full Chromium
-      // rendering pipeline. Hybrid mode exposes a different rendering fingerprint
-      // that Google detects and flags as "not secure". This is the primary fix.
-      useHybridComposition: false,
+      userAgent: initialUa,
+      useHybridComposition: true,
       javaScriptEnabled: true,
       javaScriptCanOpenWindowsAutomatically: true,
       supportMultipleWindows: true,
@@ -169,6 +217,17 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       if (_webViewController != null && !_isLoading) {
         final loggedIn = await _checkIfLoggedIn();
         if (loggedIn) return;
+
+        // Check for Google block during polling (detects SPA client-side rejections after tapping Next)
+        if (!widget.isBrowseMode && !_blockExhausted && _blockStatus == null) {
+          final isBlocked = _shouldScanForBlockPage()
+              ? await _scanPageForBlockText(_webViewController!)
+              : false;
+          if (isBlocked) {
+            _handleGoogleBlock();
+            return;
+          }
+        }
       }
       if (_pollIntervalSeconds < 3) {
         _pollIntervalSeconds = 3;
@@ -188,6 +247,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     _hintTimer?.cancel();
     _authPollTimer?.cancel();
     _cookieMismatchDebounce?.cancel();
+    _progressNotifier.dispose();
     super.dispose();
   }
 
@@ -206,7 +266,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           }
         });
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_updateNavState failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+    }
   }
 
   /// Called by the CookieMismatch page detection. Google's cross-domain OAuth cookie
@@ -214,20 +276,11 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   void _handleCookieMismatch() {
     // Hard cap on automatic bounces: when Google's third-party cookie state
     // is broken it redirects every reload straight back to CookieMismatch.
-    if (_mismatchAutoNavCount >= 3) {
+    const maxMismatchNav = 3;
+    if (_mismatchAutoNavCount >= maxMismatchNav) {
       debugPrint('[YtmWebLogin] CookieMismatch auto-navigation cap reached; '
-          'stopping and resetting cookies.');
-      _clearCookiesAndReset();
-      if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          const SnackBar(
-            content: Text(
-                'Google cookie mismatch detected. Resetting cookies — please sign in again.'),
-            behavior: SnackBarBehavior.floating,
-            duration: Duration(seconds: 4),
-          ),
-        );
-      }
+          'treating as Google block for recovery.');
+      _handleGoogleBlock();
       return;
     }
 
@@ -250,16 +303,22 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       final accountService = getIt<YtmAccountService>();
       // Scoped wipe: only YouTube/Google sign-in cookies, never the whole
       // device WebView cookie jar.
-      await accountService.clearSessionWebViewCookies();
+      await _clearWebViewCookiesAndCache();
       await accountService.logout();
-      await InAppWebViewController.clearAllCache();
       _isLoggedIn = false;
       _detectedCookies = null;
       _hadSuccessfulYtLoad = false;
       _mismatchAutoNavCount = 0;
+      // Manual "start over" also dismisses the block recovery card.
+      if (mounted && (_blockExhausted || _blockStatus != null)) {
+        setState(() {
+          _blockExhausted = false;
+          _blockStatus = null;
+        });
+      }
       final target =
           widget.isBrowseMode ? 'https://music.youtube.com' : googleSignInUrl;
-      _navigateTo(target);
+      unawaited(_navigateTo(target));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -274,12 +333,182 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     }
   }
 
-  void _navigateTo(String url) {
+  /// Shared cookie+cache wipe used by the toolbar button and the block
+  /// recovery ladder. Clears the scoped session cookies and the WebView cache
+  /// only — no session flags or navigation.
+  Future<void> _clearWebViewCookiesAndCache() async {
+    try {
+      final accountService = getIt<YtmAccountService>();
+      await accountService.clearSessionWebViewCookies();
+      await InAppWebViewController.clearAllCache();
+    } catch (e) {
+      debugPrint('[YtmWebLogin] Failed to clear WebView cookies/cache: $e');
+    }
+  }
+
+  // ---------- Google block detection & recovery ladder ----------
+
+  /// URL-level block signals: the dedicated `signin/blocked` path, or the
+  /// ServiceLogin / signin pages carrying an explicit error parameter.
+  bool _matchesBlockedUrl(Uri? uri) {
+    if (uri == null) return false;
+    final path = uri.path.toLowerCase();
+    if (path.contains('signin/blocked')) return true;
+    final hasErrorParam = uri.queryParameters.containsKey('error') ||
+        uri.queryParameters.containsKey('errorCode');
+    if (hasErrorParam &&
+        (path.contains('servicelogin') || path.contains('signin'))) {
+      return true;
+    }
+    return false;
+  }
+
+  bool _shouldScanForBlockPage() {
+    final now = DateTime.now();
+    if (now.difference(_lastBlockScanAt) <
+        const Duration(milliseconds: 2500)) {
+      return false;
+    }
+    _lastBlockScanAt = now;
+    return true;
+  }
+
+  /// Lightweight throttled JS evaluation: looks for Google's block-page
+  /// phrases in the document title/body text (first 4 KB, lowercased).
+  Future<bool> _scanPageForBlockText(InAppWebViewController controller) async {
+    try {
+      final raw = await controller.evaluateJavascript(source: '''
+(() => {
+  try {
+    if (window.__googleBlockDetected) return "couldn't sign you in";
+    if (!window.__blockObserverInstalled) {
+      window.__blockObserverInstalled = true;
+      const observer = new MutationObserver(() => {
+        if (document.body && (document.body.innerText || document.body.textContent || '').includes("couldn't sign you in")) {
+          window.__googleBlockDetected = true;
+          observer.disconnect();
+        }
+      });
+      if (document.body) {
+        observer.observe(document.body, { childList: true, subtree: true });
+      }
+    }
+    var t = (document.title || '');
+    var b = '';
+    try { b = (document.body && (document.body.innerText || document.body.textContent)) || ''; } catch (e) {}
+    return (t + '|' + b).slice(0, 8000).toLowerCase();
+  } catch (e) { return ''; }
+})()''');
+      final text = raw?.toString().toLowerCase() ?? '';
+      for (final phrase in _blockPhrases) {
+        if (text.contains(phrase)) return true;
+      }
+    } catch (e, st) {
+      ErrorLogger.log('_scanPageForBlockText failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+    }
+    return false;
+  }
+
+  /// Entry point of the automatic recovery ladder (max 2 retries, then the
+  /// manual recovery card — never loops).
+  void _handleGoogleBlock() {
+    if (!mounted || widget.isBrowseMode) return;
+    // Already recovering, or exhausted → stop; the card handles it manually.
+    if (_blockStatus != null || _blockExhausted) return;
+
+    final step = _blockRecovery.onBlocked();
+    if (step == null) {
+      debugPrint('[YtmWebLogin] Google block: retries exhausted.');
+      setState(() {
+        _blockExhausted = true;
+        _blockStatus = null;
+      });
+      return;
+    }
+    debugPrint('[YtmWebLogin] Google block detected → ladder attempt '
+        '${_blockRecovery.attempt}/${_blockRecovery.maxAttempts} '
+        '→ identity ${step.nextIdentity.name}');
+    setState(() {
+      _blockStatus =
+          'Google blocked the embedded browser — retrying with different browser identity (${_blockRecovery.attempt}/${_blockRecovery.maxAttempts})…';
+    });
+    unawaited(_runBlockRecoveryStep(step));
+  }
+
+  Future<void> _runBlockRecoveryStep(BlockRecoveryStep step) async {
+    try {
+      // 1. Clear cookies + cache, 2. switch browser identity, 3. reload.
+      await _clearWebViewCookiesAndCache();
+      _uaIdentityOverride = step.nextIdentity;
+      try {
+        await _webViewController?.setSettings(
+          settings: InAppWebViewSettings(
+              userAgent: _uaFor(step.nextIdentity)),
+        );
+      } catch (e, st) {
+        ErrorLogger.log('_runBlockRecoveryStep failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+      }
+      final target =
+          widget.isBrowseMode ? 'https://music.youtube.com' : googleSignInUrl;
+      await _webViewController?.loadUrl(
+          urlRequest: URLRequest(url: WebUri(target)));
+    } catch (e) {
+      debugPrint('[YtmWebLogin] Block recovery step failed: $e');
+    } finally {
+      if (mounted) setState(() => _blockStatus = null);
+    }
+  }
+
+  /// Recovery card "Retry": manual full ladder — reset attempts, clean
+  /// session, default identity selection, reload.
+  Future<void> _manualRetryFromBlock() async {
+    _blockRecovery.reset();
+    _uaIdentityOverride = null;
+    _hadSuccessfulYtLoad = false;
+    _mismatchAutoNavCount = 0;
+    if (mounted) {
+      setState(() {
+        _blockExhausted = false;
+        _blockStatus = 'Retrying sign-in with a clean session…';
+      });
+    }
+    await _clearWebViewCookiesAndCache();
+    await _navigateTo(
+        widget.isBrowseMode ? 'https://music.youtube.com' : googleSignInUrl);
+    if (mounted) setState(() => _blockStatus = null);
+  }
+
+  /// Recovery card identity toggle: switch UA mode and reload in place.
+  Future<void> _switchIdentityManually(BrowserIdentity identity) async {
+    _uaIdentityOverride = identity;
+    if (mounted) {
+      setState(() {
+        _blockExhausted = false;
+        _blockStatus =
+            'Reloading with ${identity.name} browser identity…';
+      });
+    }
+    await _navigateTo(
+        widget.isBrowseMode ? 'https://music.youtube.com' : googleSignInUrl);
+    if (mounted) setState(() => _blockStatus = null);
+  }
+
+  Future<void> _navigateTo(String url) async {
     _pollIntervalSeconds = 2;
     _scheduleNextAuthPoll();
-    _webViewController?.loadUrl(
-      urlRequest: URLRequest(url: WebUri(url)),
-    );
+    final targetUa = _uaIdentityOverride != null
+        ? _uaFor(_uaIdentityOverride!)
+        : (widget.isBrowseMode ? desktopUserAgent : mobileUserAgent);
+    try {
+      await _webViewController?.setSettings(
+        settings: InAppWebViewSettings(userAgent: targetUa),
+      );
+    } catch (e, st) {
+      ErrorLogger.log('_navigateTo failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+    }
+    final loadUrlFuture = _webViewController?.loadUrl(
+        urlRequest: URLRequest(url: WebUri(url)));
+    if (loadUrlFuture != null) unawaited(loadUrlFuture);
   }
 
   Future<bool> _checkIfLoggedIn([String? url]) {
@@ -295,7 +524,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     try {
       final webUri = await _webViewController?.getUrl();
       currentUrl ??= webUri?.toString();
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_detectLoginState failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+    }
 
     if (currentUrl != null) {
       if (currentUrl.startsWith('chrome-error://') ||
@@ -328,7 +559,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       for (final domain in domains) {
         final cookies = await cookieManager.getCookies(url: WebUri(domain));
         for (final c in cookies) {
-          jar[c.name] = c.value;
+          jar[c.name] = c.value as String? ?? '';
         }
       }
       final combinedCookies =
@@ -343,12 +574,14 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
             setState(() {});
             // Navigate to music.youtube.com to complete the OAuth redirect
             // and ensure music.youtube.com domain cookies are also set.
-            _navigateTo('https://music.youtube.com');
+            unawaited(_navigateTo('https://music.youtube.com'));
           }
         }
         return true;
       }
-    } catch (_) {}
+    } catch (e, st) {
+      ErrorLogger.log('_detectLoginState failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+    }
 
     // 2. Try native platform cookie manager
     final cookies = await accountService.getNativeCookiesFromDomains();
@@ -361,7 +594,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         await accountService.saveSession(cookies);
         if (mounted) {
           setState(() {});
-          _navigateTo('https://music.youtube.com');
+          unawaited(_navigateTo('https://music.youtube.com'));
         }
       }
       return true;
@@ -390,12 +623,14 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
             await accountService.saveSession(cookieStr);
             if (mounted) {
               setState(() {});
-              _navigateTo('https://music.youtube.com');
+              unawaited(_navigateTo('https://music.youtube.com'));
             }
           }
           return true;
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('toString failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+      }
     }
 
     return false;
@@ -423,13 +658,15 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           final domainCookies =
               await cookieManager.getCookies(url: WebUri(domain));
           for (final c in domainCookies) {
-            jar[c.name] = c.value;
+            jar[c.name] = c.value as String? ?? '';
           }
         }
         if (jar.isNotEmpty) {
           cookies = jar.entries.map((e) => '${e.key}=${e.value}').join('; ');
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('_forceSaveAndFinish failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+      }
     }
 
     // 2. Try native platform cookies
@@ -451,7 +688,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         if (cookieStr.isNotEmpty) {
           cookies = cookieStr;
         }
-      } catch (_) {}
+      } catch (e, st) {
+        ErrorLogger.log('toString failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+      }
     }
 
     if (cookies != null &&
@@ -494,8 +733,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     final totalHeight = media.size.height;
     final isBrowse = widget.isBrowseMode;
 
-    // Expand height cleanly down to the bottom of the screen
-    final targetHeight = (totalHeight - topPadding - (isBrowse ? 8 : 16))
+    // Expand height cleanly down to the bottom of the screen with proper status bar clearance
+    final safeTop = topPadding > 0 ? topPadding : 24.0;
+    final targetHeight = (totalHeight - safeTop - (isBrowse ? 8 : 16))
         .clamp(300.0, totalHeight);
 
     return Align(
@@ -524,7 +764,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
               ],
             ),
             child: SafeArea(
-              top: false,
+              top: true,
               bottom: true,
               child: Column(
                 children: [
@@ -674,6 +914,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                         ] else ...[
                           // LOGIN HEADER
                           Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
                               Icon(
                                 _isLoggedIn
@@ -681,32 +922,38 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                     : Icons.cloud_sync_rounded,
                                 color:
                                     _isLoggedIn ? p.success : Colors.redAccent,
-                                size: 24,
+                                size: 22,
                               ),
-                              const SizedBox(width: 10),
+                              const SizedBox(width: 8),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
                                     Text(
                                       _isLoggedIn
                                           ? 'Logged In Successfully'
                                           : 'Sign in to YouTube Music',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         color: p.textPrimary,
-                                        fontSize: 15,
+                                        fontSize: 14.5,
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
+                                    const SizedBox(height: 1),
                                     Text(
                                       _isLoggedIn
                                           ? 'Account connected! Tap "Done" to finish.'
-                                          : 'Connects your account to sync your Liked Music automatically',
+                                          : 'Connect account to sync Liked Music automatically',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
                                         color: _isLoggedIn
                                             ? p.success
                                             : p.textSecondary,
-                                        fontSize: 11.5,
+                                        fontSize: 11,
                                         fontWeight: _isLoggedIn
                                             ? FontWeight.w600
                                             : FontWeight.normal,
@@ -715,73 +962,137 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                   ],
                                 ),
                               ),
-                              const SizedBox(width: 8),
-                              // Done Button
-                              FilledButton(
-                                onPressed: _forceSaveAndFinish,
-                                style: FilledButton.styleFrom(
-                                  backgroundColor: _isLoggedIn
-                                      ? p.success
-                                      : p.surfaceContainerHigh,
-                                  foregroundColor: _isLoggedIn
-                                      ? Colors.white
-                                      : p.textPrimary,
-                                  elevation: _isLoggedIn ? 3 : 0,
-                                  visualDensity: VisualDensity.compact,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 8,
+                              const SizedBox(width: 6),
+                              // Action Controls
+                              if (_isLoggedIn) ...[
+                                FilledButton.icon(
+                                  onPressed: _forceSaveAndFinish,
+                                  icon: const Icon(
+                                    Icons.check_rounded,
+                                    size: 15,
+                                    color: Colors.white,
                                   ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    side: _isLoggedIn
-                                        ? BorderSide.none
-                                        : BorderSide(color: p.hairline),
+                                  label: const Text(
+                                    'Done',
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w700,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: p.success,
+                                    elevation: 2,
+                                    visualDensity: VisualDensity.compact,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
                                   ),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    if (_isLoggedIn) ...[
-                                      const Icon(
-                                        Icons.check_rounded,
-                                        size: 16,
-                                        color: Colors.white,
+                              ] else ...[
+                                FilledButton(
+                                  onPressed: _forceSaveAndFinish,
+                                  style: FilledButton.styleFrom(
+                                    backgroundColor: p.surfaceContainerHigh,
+                                    foregroundColor: p.textPrimary,
+                                    elevation: 0,
+                                    visualDensity: VisualDensity.compact,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 6,
+                                    ),
+                                    minimumSize: Size.zero,
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      side: BorderSide(color: p.hairline),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    'Done',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: p.textPrimary,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 2),
+                                IconButton(
+                                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                                  tooltip: 'Refresh page',
+                                  padding: const EdgeInsets.all(6),
+                                  constraints: const BoxConstraints(),
+                                  onPressed: () => _webViewController?.reload(),
+                                ),
+                                const SizedBox(width: 2),
+                                PopupMenuButton<String>(
+                                  icon: const Icon(Icons.more_vert_rounded, size: 18),
+                                  tooltip: 'More options',
+                                  padding: const EdgeInsets.all(6),
+                                  constraints: const BoxConstraints(),
+                                  onSelected: (action) {
+                                    switch (action) {
+                                      case 'ytm_web':
+                                        _navigateTo('https://music.youtube.com');
+                                        break;
+                                      case 'manual_cookies':
+                                        _showManualCookieDialog(context);
+                                        break;
+                                      case 'clear_cache':
+                                        _clearCookiesAndReset();
+                                        break;
+                                    }
+                                  },
+                                  itemBuilder: (context) => [
+                                    PopupMenuItem(
+                                      value: 'ytm_web',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.music_note_rounded,
+                                              size: 18, color: p.textSecondary),
+                                          const SizedBox(width: 8),
+                                          const Text('Open YouTube Music Web'),
+                                        ],
                                       ),
-                                      const SizedBox(width: 4),
-                                    ],
-                                    Text(
-                                      'Done',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w700,
-                                        color: _isLoggedIn
-                                            ? Colors.white
-                                            : p.textPrimary,
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'manual_cookies',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.vpn_key_rounded,
+                                              size: 18, color: p.textSecondary),
+                                          const SizedBox(width: 8),
+                                          const Text('Import Cookies Manually'),
+                                        ],
+                                      ),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'clear_cache',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.cleaning_services_rounded,
+                                              size: 18, color: p.textSecondary),
+                                          const SizedBox(width: 8),
+                                          const Text('Clear Cache & Reset'),
+                                        ],
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-                              const SizedBox(width: 4),
+                              ],
+                              const SizedBox(width: 2),
                               IconButton(
-                                icon:
-                                    const Icon(Icons.refresh_rounded, size: 20),
-                                tooltip: 'Refresh page',
-                                onPressed: () => _webViewController?.reload(),
-                              ),
-                              const SizedBox(width: 4),
-                              IconButton(
-                                icon: const Icon(
-                                    Icons.cleaning_services_rounded,
-                                    size: 20),
-                                tooltip: 'Clear cache & reset cookies',
-                                onPressed: _clearCookiesAndReset,
-                              ),
-                              const SizedBox(width: 4),
-                              IconButton(
-                                icon: const Icon(Icons.close_rounded, size: 20),
+                                icon: const Icon(Icons.close_rounded, size: 18),
                                 tooltip: 'Close',
+                                padding: const EdgeInsets.all(6),
+                                constraints: const BoxConstraints(),
                                 onPressed: () =>
                                     Navigator.of(context).pop(false),
                               ),
@@ -850,23 +1161,70 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                       ),
                     ),
 
-                  if (_isLoading || _progress < 1.0)
-                    LinearProgressIndicator(
-                      value: _isLoading ? null : _progress,
-                      backgroundColor: p.surfaceContainer,
-                      color: p.accent,
-                      minHeight: 2.5,
+                  // Inline status banner during the block recovery ladder.
+                  if (!isBrowse && _blockStatus != null)
+                    Container(
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border:
+                            Border.all(color: p.accent.withValues(alpha: 0.4)),
+                      ),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: p.accent),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              _blockStatus!,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: p.textPrimary),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  if (_isLoading || _progressNotifier.value < 1.0)
+                    ValueListenableBuilder<double>(
+                      valueListenable: _progressNotifier,
+                      builder: (context, progress, _) {
+                        if (!_isLoading && progress >= 1.0) {
+                          return const SizedBox.shrink();
+                        }
+                        return LinearProgressIndicator(
+                          value: _isLoading ? null : progress,
+                          backgroundColor: p.surfaceContainer,
+                          color: p.accent,
+                          minHeight: 2.5,
+                        );
+                      },
                     ),
                   const Divider(height: 1),
 
-                  // WebView Body
+                  // WebView Body — replaced by the recovery card once the
+                  // automatic retries against Google's block page are spent.
                   Expanded(
-                    child: ClipRRect(
+                    child: (!isBrowse && _blockExhausted)
+                        ? _buildBlockRecoveryCard(p)
+                        : ClipRRect(
                       child: InAppWebView(
                         initialUrlRequest: URLRequest(
                           url: WebUri(_currentUrl),
                         ),
                         initialSettings: _settings,
+                        initialUserScripts: _antiFingerPrintScripts,
                         gestureRecognizers: const <Factory<
                             OneSequenceGestureRecognizer>>{
                           Factory<OneSequenceGestureRecognizer>(
@@ -903,11 +1261,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                               (urlStr.contains('google.com/url') &&
                                   urlStr.contains('play.google.com'))) {
                             if (!widget.isBrowseMode) {
-                              controller.loadUrl(
-                                urlRequest: URLRequest(
-                                  url: WebUri(googleSignInUrl),
-                                ),
-                              );
+                              unawaited(_navigateTo(googleSignInUrl));
+                            } else {
+                              unawaited(_navigateTo('https://music.youtube.com'));
                             }
                             return NavigationActionPolicy.CANCEL;
                           }
@@ -919,18 +1275,47 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                           }
                           return NavigationActionPolicy.ALLOW;
                         },
-                        onLoadStart: (controller, url) {
+                        onLoadStart: (controller, url) async {
                           if (mounted) setState(() => _isLoading = true);
+                          final targetUa = _uaIdentityOverride != null
+                              ? _uaFor(_uaIdentityOverride!)
+                              : (widget.isBrowseMode ? desktopUserAgent : mobileUserAgent);
+                          try {
+                            await controller.setSettings(
+                              settings:
+                                  InAppWebViewSettings(userAgent: targetUa),
+                            );
+                          } catch (e, st) {
+                            ErrorLogger.log('startsWith failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+                          }
                         },
                         onProgressChanged: (controller, progress) {
-                          if (mounted) {
-                            setState(() => _progress = progress / 100);
-                          }
+                          // F-17: no setState — progress ticks only rebuild
+                          // the ValueListenableBuilder bar above.
+                          _progressNotifier.value = progress / 100;
                         },
                         onLoadStop: (controller, url) async {
                           if (mounted) setState(() => _isLoading = false);
                           await _updateNavState();
                           final urlStr = url?.toString() ?? '';
+                          final parsedUrl = Uri.tryParse(urlStr);
+                          final host = parsedUrl?.host ?? '';
+
+                          // --- Google block detection ("This browser or app
+                          // may not be secure") ---
+                          if (host == 'accounts.google.com' ||
+                              host == 'accounts.youtube.com') {
+                            final blockedByUrl = _matchesBlockedUrl(parsedUrl);
+                            final blockedByText = blockedByUrl
+                                ? false
+                                : (_shouldScanForBlockPage()
+                                    ? await _scanPageForBlockText(controller)
+                                    : false);
+                            if (blockedByUrl || blockedByText) {
+                              _handleGoogleBlock();
+                              return;
+                            }
+                          }
 
                           // Only bounce if Google navigated to an actual CookieMismatch or block error page.
                           if (_isCookieMismatchUrl(urlStr)) {
@@ -943,7 +1328,6 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                             return;
                           }
 
-                          final host = Uri.tryParse(urlStr)?.host ?? '';
                           // Do not capture on Google Sign-In or EU consent screens before the user finishes
                           if (_isAuthInProgressUrl(urlStr) ||
                               host == 'consent.youtube.com' ||
@@ -988,6 +1372,143 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     );
   }
 
+  /// Shown in place of the WebView once both automatic retries against
+  /// Google's embedded-browser block were exhausted.
+  Widget _buildBlockRecoveryCard(PulsrPalette p) {
+    final currentIdentity = _uaIdentityOverride ?? BrowserIdentity.desktop;
+    final otherIdentity = currentIdentity == BrowserIdentity.desktop
+        ? BrowserIdentity.mobile
+        : BrowserIdentity.desktop;
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: p.error.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: p.error.withValues(alpha: 0.35)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.gpp_bad_rounded, color: p.error, size: 22),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        "Google is blocking this sign-in",
+                        style: TextStyle(
+                            color: p.textPrimary,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  "Google blocks sign-in inside embedded browsers for some "
+                  "accounts, and the automatic retries (clearing cookies and "
+                  "switching the browser identity) didn't get past it.\n\n"
+                  "Pulsr captures your YouTube Music session from this "
+                  "embedded browser's cookies, so the sign-in has to happen "
+                  "here — signing in inside the app is required for the "
+                  "connection to be detected.",
+                  style: TextStyle(
+                      color: p.textSecondary, fontSize: 12.5, height: 1.4),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Current browser identity: ${currentIdentity.name} Chrome',
+                  style: TextStyle(
+                      color: p.textTertiary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 14),
+          FilledButton.icon(
+            onPressed: _manualRetryFromBlock,
+            icon: const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text('Retry',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+            style: FilledButton.styleFrom(
+              backgroundColor: p.accent,
+              foregroundColor: p.onAccent,
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () => _switchIdentityManually(otherIdentity),
+            icon: Icon(
+                otherIdentity == BrowserIdentity.mobile
+                    ? Icons.smartphone_rounded
+                    : Icons.desktop_windows_rounded,
+                size: 18),
+            label: Text(
+                otherIdentity == BrowserIdentity.mobile
+                    ? 'Use Mobile browser identity'
+                    : 'Use Desktop browser identity',
+                style: const TextStyle(fontWeight: FontWeight.w700)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: p.textPrimary,
+              side: BorderSide(color: p.hairline),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () {
+              setState(() => _blockExhausted = false);
+              _navigateTo('https://music.youtube.com');
+            },
+            icon: const Icon(Icons.music_note_rounded, size: 18),
+            label: const Text('Open YouTube Music web directly',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: p.textPrimary,
+              side: BorderSide(color: p.hairline),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () => _showManualCookieDialog(context),
+            icon: const Icon(Icons.vpn_key_rounded, size: 18),
+            label: const Text('Import Cookies / Token Manually',
+                style: TextStyle(fontWeight: FontWeight.w700)),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: p.textPrimary,
+              side: BorderSide(color: p.hairline),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Tip: if Google continues to block in-app sign-in on this device, paste your cookies from your browser using the button above.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: p.textTertiary, fontSize: 11),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _navChip({
     required String label,
     required IconData icon,
@@ -1020,6 +1541,109 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                 fontSize: 11,
                 fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showManualCookieDialog(BuildContext context) async {
+    final p = context.palette;
+    final textController = TextEditingController();
+    String? errorText;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          backgroundColor: p.surface,
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: p.accent.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(Icons.vpn_key_rounded, color: p.accent, size: 20),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'Import Cookies Manually',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'If Google blocks embedded browser login on this device, you can paste your raw cookie string (e.g. from browser DevTools on desktop) or cURL cookie header directly:',
+                  style: TextStyle(color: p.textSecondary, fontSize: 12.5, height: 1.4),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: textController,
+                  maxLines: 4,
+                  style: TextStyle(color: p.textPrimary, fontSize: 12, fontFamily: 'monospace'),
+                  decoration: InputDecoration(
+                    hintText: 'SAPISID=...; __Secure-3PSID=...; SID=...',
+                    hintStyle: TextStyle(color: p.textTertiary, fontSize: 11),
+                    filled: true,
+                    fillColor: p.surfaceContainer,
+                    errorText: errorText,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide(color: p.hairline),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: p.accent,
+                foregroundColor: p.onAccent,
+              ),
+              onPressed: () async {
+                final input = textController.text.trim();
+                if (input.isEmpty) {
+                  setDialogState(() => errorText = 'Please enter cookie text');
+                  return;
+                }
+                final accountService = getIt<YtmAccountService>();
+                String cookieStr = input;
+                if (cookieStr.toLowerCase().contains('cookie:')) {
+                  final idx = cookieStr.toLowerCase().indexOf('cookie:');
+                  cookieStr = cookieStr.substring(idx + 7).trim();
+                }
+                await accountService.saveSession(cookieStr);
+                final valid = await accountService.validateSession();
+                if (valid) {
+                  if (ctx.mounted) Navigator.pop(ctx);
+                  if (context.mounted) {
+                    setState(() {
+                      _isLoggedIn = true;
+                      _detectedCookies = cookieStr;
+                    });
+                    Navigator.of(context).pop(true);
+                  }
+                } else {
+                  setDialogState(() => errorText = 'Invalid or expired cookies (must include SAPISID and PSID)');
+                }
+              },
+              child: const Text('Connect'),
             ),
           ],
         ),

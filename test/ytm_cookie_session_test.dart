@@ -1,6 +1,6 @@
 // test/ytm_cookie_session_test.dart
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pulsr/core/services/ytm_account_service.dart';
+import 'package:pulsr/data/services/ytm_account_service.dart';
 import 'package:pulsr/features/auth/presentation/ytm_web_login_sheet.dart';
 
 void main() {
@@ -170,7 +170,11 @@ void main() {
     test('googleSignInUrl points directly to Google Accounts ServiceLogin', () {
       expect(
         YtmWebLoginSheet.googleSignInUrl,
-        contains('accounts.google.com/ServiceLogin'),
+        contains('accounts.google.com'),
+      );
+      expect(
+        YtmWebLoginSheet.googleSignInUrl,
+        contains('flowEntry=ServiceLogin'),
       );
       expect(
         YtmWebLoginSheet.googleSignInUrl,
