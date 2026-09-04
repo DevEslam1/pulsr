@@ -11,7 +11,6 @@ import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/pulsr_logo.dart';
 import '../../../data/scanner/media_scanner_service.dart';
 
-import '../../../core/utils/error_logger.dart';
 class OnboardingScreen extends StatefulWidget {
   final MediaScannerService scannerService;
 
@@ -43,9 +42,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         if (Platform.isAndroid) {
           try {
             await Permission.notification.request();
-          } catch (e, st) {
-            ErrorLogger.log('_handleGrantAccess failed', error: e, stackTrace: st, category: 'OnboardingScreen');
-          }
+          } catch (_) {}
         }
         await widget.scannerService.scanDeviceLibrary();
       } else {

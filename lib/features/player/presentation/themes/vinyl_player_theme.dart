@@ -198,6 +198,7 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
 
             // Seek Bar
             PlayerSeekBar(
+              position: state.position,
               duration: state.duration,
               activeColor: widget.props.activeColor,
               songId: song?.id,

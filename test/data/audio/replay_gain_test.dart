@@ -39,12 +39,12 @@ double calculateReplayGainVolume({
   final totalGainDb = (gainDb) + preampDb;
   var multiplier = math.pow(10.0, totalGainDb / 20.0).toDouble();
 
-  // Peak clipping prevention with -0.5 dB inter-sample peak headroom
-  final effectivePeak = (peak != null && peak > 0.0) ? peak : 1.0;
-  final interSampleHeadroom = math.pow(10.0, -0.5 / 20.0).toDouble(); // ~0.944 (-0.5 dB)
-  final maxGain = interSampleHeadroom / effectivePeak;
-  if (multiplier > maxGain) {
-    multiplier = maxGain;
+  // Peak clipping prevention
+  if (peak != null && peak > 0.0) {
+    final maxGain = 1.0 / peak;
+    if (multiplier > maxGain) {
+      multiplier = maxGain;
+    }
   }
 
   return (volume * multiplier).clamp(0.0, 1.0).toDouble();
@@ -103,44 +103,16 @@ void main() {
       expect(vol, closeTo(0.5, 0.01));
     });
 
-    test('Clipping prevention limits multiplier with -0.5 dB inter-sample headroom', () {
-      // +6 dB multiplier would be 2.0, but peak is 0.8 with -0.5 dB headroom (0.944) -> maxGain = 1.180
+    test('Clipping prevention limits multiplier to 1.0 / peak', () {
+      // +6 dB multiplier would be 2.0, but peak is 0.8 -> maxGain = 1.25
       final vol = calculateReplayGainVolume(
         volume: 0.5,
         mode: 'track',
         trackGain: 6.0206,
         trackPeak: 0.8,
       );
-      // Expected volume = 0.5 * 1.180 = 0.590
-      expect(vol, closeTo(0.590, 0.01));
-    });
-  });
-
-  group('ReplayGain Multiplier Basic Tests', () {
-    double calculateReplayGainMultiplier(double? replayGainDb,
-        {double baseVolume = 1.0}) {
-      if (replayGainDb == null || replayGainDb == 0.0) return baseVolume;
-      final mult = math.pow(10.0, replayGainDb / 20.0);
-      return (baseVolume * mult).clamp(0.0, 1.0).toDouble();
-    }
-
-    test('Null or 0 dB gain preserves base volume', () {
-      expect(calculateReplayGainMultiplier(null), equals(1.0));
-      expect(calculateReplayGainMultiplier(0.0), equals(1.0));
-      expect(calculateReplayGainMultiplier(null, baseVolume: 0.8), equals(0.8));
-    });
-
-    test('-6 dB gain halves the linear amplitude approximately', () {
-      final volume = calculateReplayGainMultiplier(-6.0206);
-      expect(volume, closeTo(0.5, 0.01));
-    });
-
-    test('+6 dB gain doubles linear amplitude and clamps to 1.0 max', () {
-      final volume = calculateReplayGainMultiplier(6.0, baseVolume: 0.4);
-      expect(volume, closeTo(0.8, 0.05));
-
-      final clamped = calculateReplayGainMultiplier(12.0, baseVolume: 1.0);
-      expect(clamped, equals(1.0));
+      // Expected volume = 0.5 * 1.25 = 0.625
+      expect(vol, closeTo(0.625, 0.01));
     });
   });
 }

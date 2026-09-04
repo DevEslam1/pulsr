@@ -1,11 +1,8 @@
 package com.pulsr.music
 
-import android.Manifest
-import android.content.pm.PackageManager
 import android.media.audiofx.Visualizer
 import android.os.Handler
 import android.os.Looper
-import androidx.core.content.ContextCompat
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.EventChannel
@@ -21,19 +18,13 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
     private var visualizer: Visualizer? = null
     private var eventSink: EventChannel.EventSink? = null
     private val mainHandler = Handler(Looper.getMainLooper())
-    private var context: android.content.Context? = null
 
     companion object {
         const val METHOD_CHANNEL = "com.pulsr.music/visualizer"
         const val EVENT_CHANNEL = "com.pulsr.music/visualizer_stream"
 
-        fun registerWith(flutterEngine: FlutterEngine, appContext: android.content.Context): VisualizerPlugin {
+        fun registerWith(flutterEngine: FlutterEngine): VisualizerPlugin {
             val plugin = VisualizerPlugin()
-            // Manual registration path: onAttachedToEngine never fires for
-            // plugins registered via registerWith, so the context must be
-            // provided here. Previously it stayed null and the visualizer
-            // could never start ("Context is null, cannot start visualizer").
-            plugin.context = appContext.applicationContext
             plugin.methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, METHOD_CHANNEL)
             plugin.methodChannel.setMethodCallHandler(plugin)
 
@@ -44,7 +35,6 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
     }
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-        context = binding.applicationContext
         methodChannel = MethodChannel(binding.binaryMessenger, METHOD_CHANNEL)
         methodChannel.setMethodCallHandler(this)
 
@@ -64,29 +54,18 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
         if (::eventChannel.isInitialized) {
             eventChannel.setStreamHandler(null)
         }
-        context = null
     }
 
     override fun onMethodCall(call: MethodCall, result: Result) {
         when (call.method) {
             "start", "setAudioSessionId" -> {
                 val audioSessionId = call.argument<Int>("audioSessionId") ?: 0
-                // Permission pre-check: Visualizer requires RECORD_AUDIO
-                val ctx = context
-                if (ctx == null) {
-                    result.error("NO_CONTEXT", "Context unavailable (plugin detached)", null)
-                    return
-                }
-                if (ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                    result.error("PERMISSION_DENIED", "RECORD_AUDIO permission not granted", null)
-                    return
-                }
                 stopVisualizer()
                 val success = startVisualizer(audioSessionId)
                 if (success) {
                     result.success(true)
                 } else {
-                    // Try global audio session 0 fallback if specific session failed (only if permission still granted)
+                    // Try global audio session 0 fallback if specific session failed
                     if (audioSessionId != 0) {
                         val fallbackSuccess = startVisualizer(0)
                         if (fallbackSuccess) {
@@ -94,7 +73,7 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
                             return
                         }
                     }
-                    result.error("VISUALIZER_UNAVAILABLE", "Failed to start visualizer for session $audioSessionId", null)
+                    result.success(false)
                 }
             }
             "stop", "releaseVisualizer" -> {
@@ -108,16 +87,6 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
     private var currentSessionId: Int = 0
 
     private fun startVisualizer(audioSessionId: Int): Boolean {
-        // Guard against teardown race where context was nulled
-        val ctx = context ?: run {
-            android.util.Log.w("VisualizerPlugin", "Context is null, cannot start visualizer")
-            return false
-        }
-        // Early permission guard at start path as well
-        if (audioSessionId != 0 && ContextCompat.checkSelfPermission(ctx, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-            android.util.Log.w("VisualizerPlugin", "RECORD_AUDIO permission not granted, cannot start visualizer")
-            return false
-        }
         stopVisualizer()
         currentSessionId = audioSessionId
         return try {
@@ -193,12 +162,13 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
             vis.enabled = true
             visualizer = vis
             true
-        } catch (e: SecurityException) {
-            android.util.Log.w("VisualizerPlugin", "Visualizer SecurityException (permission) for session $audioSessionId: ${e.message}")
-            false
         } catch (e: Throwable) {
             android.util.Log.w("VisualizerPlugin", "Hardware visualizer unavailable for session $audioSessionId: ${e.message}")
-            // Avoid recursive double fallback – caller already tries session 0
+            if (audioSessionId != 0) {
+                try {
+                    return startVisualizer(0)
+                } catch (_: Throwable) {}
+            }
             false
         }
     }

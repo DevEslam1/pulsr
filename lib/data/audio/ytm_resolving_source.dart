@@ -8,16 +8,14 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:mutex/mutex.dart';
 import 'package:path/path.dart' as p;
-import '../../core/constants/embedded_browser_ua.dart';
 import '../../core/di/injection.dart';
 import '../../core/errors/ytm_error_classifier.dart';
-import '../../data/services/ytm_cache_manager.dart';
-import '../../data/services/ytm_url_cache.dart';
+import '../../core/services/ytm_cache_manager.dart';
+import '../../core/services/ytm_url_cache.dart';
 import '../../core/telemetry/playback_latency_tracker.dart';
-import '../../core/utils/error_logger.dart';
 
 /// A [StreamAudioSource] for a YouTube Music track whose stream URL is resolved
 /// lazily, on the first byte request rather than up front.
@@ -63,11 +61,9 @@ class YtmResolvingSource extends StreamAudioSource {
   String? userAgent;
   String? cookies;
 
-  final Mutex _requestMutex = Mutex();
   LockCachingAudioSource? _inner;
   Future<LockCachingAudioSource>? _pending;
   DateTime? _resolvedExpiresAt;
-  String? _lastResolvedUrl;
 
   static final YtmCacheManager _cacheManager = YtmCacheManager();
 
@@ -82,89 +78,69 @@ class YtmResolvingSource extends StreamAudioSource {
 
   @override
   Future<StreamAudioResponse> request([int? start, int? end]) async {
-    return await _requestMutex.protect(() async {
-      // 1. Proactive expiry check: if URL is within 5 minutes of expiring, discard & re-resolve
-      if (_isExpiringSoon()) {
-        ErrorLogger.log(
-          'Stream URL for $videoId is expiring soon. Re-resolving...',
-          category: 'YtmResolvingSource',
-        );
+    // 1. Proactive expiry check: if URL is within 5 minutes of expiring, discard & re-resolve
+    if (_isExpiringSoon()) {
+      debugPrint(
+          '[YtmResolvingSource] Stream URL for $videoId is expiring soon. Re-resolving...');
+      _inner = null;
+      _pending = null;
+    }
+
+    try {
+      final inner = await _ensureInner();
+      try {
+        final res = await inner.request(start, end);
+        try {
+          _latency?.markStage(PlaybackStage.firstBytesReady);
+        } catch (_) {}
+        return res;
+      } catch (byteErr) {
+        final errStr = byteErr.toString().toLowerCase();
+
+        // Check if error represents a stale/forbidden stream URL (403/404/416)
+        final is403or404 = errStr.contains('403') ||
+            errStr.contains('forbidden') ||
+            errStr.contains('404') ||
+            errStr.contains('416');
+
+        debugPrint(
+            '[YtmResolvingSource] Byte stream error ($byteErr, isForbidden/Stale=$is403or404) for $videoId. Invalidating URL cache & retrying fresh resolution once...');
         _inner = null;
         _pending = null;
-      }
 
-      try {
-        final inner = await _ensureInner();
+        // Invalidate URL cache for this video
+        _effectiveUrlCache?.invalidate(videoId);
+
         try {
-          final res = await inner.request(start, end);
+          await _deleteCacheFilesFor(videoId);
+        } catch (_) {}
+
+        // Single retry through fresh resolution pipeline
+        try {
+          final freshInner = await _createInner(forceRefresh: true);
+          final res = await freshInner.request(start, end);
           try {
             _latency?.markStage(PlaybackStage.firstBytesReady);
-          } catch (e, st) {
-            ErrorLogger.log('request failed', error: e, stackTrace: st, category: 'YtmResolvingSource');
-          }
+          } catch (_) {}
           return res;
-        } catch (byteErr) {
-          final errStr = byteErr.toString().toLowerCase();
-
-          // Check if error represents a stale/forbidden stream URL (403/404/416/408)
-          final is403or404 =
-              errStr.contains('403') ||
-              errStr.contains('forbidden') ||
-              errStr.contains('404') ||
-              errStr.contains('408') ||
-              errStr.contains('416');
-
-          ErrorLogger.log(
-            'Byte stream error ($byteErr, isForbidden/Stale=$is403or404) for $videoId. Evicting dead URL & retrying fresh resolution once...',
-            category: 'YtmResolvingSource',
-          );
-          _inner = null;
-          _pending = null;
-
-          // Evict and blacklist dead URL in cache for this video
-          _effectiveUrlCache?.evictDeadUrl(videoId, _lastResolvedUrl);
-
-          try {
-            await _deleteCacheFilesFor(videoId);
-          } catch (e, st) {
-            ErrorLogger.log('request failed', error: e, stackTrace: st, category: 'YtmResolvingSource');
-          }
-
-          // Single retry through fresh resolution pipeline
-          try {
-            final freshInner = await _createInner(forceRefresh: true);
-            final res = await freshInner.request(start, end);
-            try {
-              _latency?.markStage(PlaybackStage.firstBytesReady);
-            } catch (e, st) {
-              ErrorLogger.log('request failed', error: e, stackTrace: st, category: 'YtmResolvingSource');
-            }
-            return res;
-          } catch (retryErr) {
-            // Classify failure to ensure structured diagnostics
-            final classified = YtmErrorClassifier.classify(retryErr);
-            ErrorLogger.log(
-              'Retry resolution failed ($retryErr): ${classified.message}',
-              error: retryErr,
-              category: 'YtmResolvingSource',
-            );
-            onError?.call(retryErr);
-            rethrow;
-          }
+        } catch (retryErr) {
+          // Classify failure to ensure structured diagnostics
+          final classified = YtmErrorClassifier.classify(retryErr);
+          debugPrint(
+              '[YtmResolvingSource] Retry resolution failed ($retryErr): ${classified.message}');
+          onError?.call(retryErr);
+          rethrow;
         }
-      } catch (err) {
-        _inner = null;
-        _pending = null;
-        final classified = YtmErrorClassifier.classify(err);
-        ErrorLogger.log(
-          'Initial resolution failed ($err): ${classified.message}',
-          error: err,
-          category: 'YtmResolvingSource',
-        );
-        onError?.call(err);
-        rethrow;
       }
-    });
+    } catch (err) {
+      _inner = null;
+      _pending = null;
+      final classified = YtmErrorClassifier.classify(err);
+      debugPrint(
+          '[YtmResolvingSource] Initial resolution failed ($err): ${classified.message}');
+      onError?.call(err);
+      rethrow;
+    }
   }
 
   bool _isExpiringSoon() {
@@ -180,101 +156,48 @@ class YtmResolvingSource extends StreamAudioSource {
     return _pending ??= _createInner();
   }
 
-  Future<LockCachingAudioSource> _createInner({
-    bool forceRefresh = false,
-  }) async {
+  Future<LockCachingAudioSource> _createInner(
+      {bool forceRefresh = false}) async {
     String? url;
     String? effectiveUa = userAgent;
     String? effectiveCookies = cookies;
 
     // Check Task 2 in-memory URL cache first when not force refreshing
     if (!forceRefresh) {
-      final cachedEntry = _effectiveUrlCache?.get(
-        videoId,
-        onStaleRevalidate: (vid) {
-          // Asynchronously trigger SWTR refresh without blocking current playback
-          unawaited(
-            resolve(forceRefresh: true)
-                .then((freshUrl) {
-                  _effectiveUrlCache?.put(
-                    vid,
-                    freshUrl,
-                    userAgent: effectiveUa,
-                    cookies: effectiveCookies,
-                  );
-                })
-                .catchError((_) {}),
-          );
-        },
-      );
+      final cachedEntry = _effectiveUrlCache?.get(videoId);
       if (cachedEntry != null && !cachedEntry.isExpired()) {
         url = cachedEntry.url;
         effectiveUa = cachedEntry.userAgent ?? effectiveUa;
         effectiveCookies = cachedEntry.cookies ?? effectiveCookies;
         _resolvedExpiresAt = cachedEntry.expiresAt;
-        ErrorLogger.log(
-          'Cache hit for $videoId (expires: $_resolvedExpiresAt)',
-          category: 'YtmResolvingSource',
-        );
         try {
           // Cache hit skips pluginEntered and marks urlObtained directly
           _latency?.markStage(PlaybackStage.urlObtained);
-        } catch (e, st) {
-          ErrorLogger.log('_createInner failed', error: e, stackTrace: st, category: 'YtmResolvingSource');
-        }
+        } catch (_) {}
       }
     }
 
     if (url == null) {
-      ErrorLogger.log(
-        'Resolving stream URL for $videoId (forceRefresh=$forceRefresh)...',
-        category: 'YtmResolvingSource',
-      );
       try {
         _latency?.markStage(PlaybackStage.pluginEntered);
-      } catch (e, st) {
-        ErrorLogger.log('_createInner failed', error: e, stackTrace: st, category: 'YtmResolvingSource');
-      }
+      } catch (_) {}
       url = await resolve(forceRefresh: forceRefresh);
       try {
         _latency?.markStage(PlaybackStage.urlObtained);
-      } catch (e, st) {
-        ErrorLogger.log('_createInner failed', error: e, stackTrace: st, category: 'YtmResolvingSource');
-      }
+      } catch (_) {}
 
-      // Parse 'expire' Unix timestamp and 'itag' from query
-      String? itag;
+      // Parse 'expire' Unix timestamp from query
       try {
         final uri = Uri.parse(url);
-        itag = uri.queryParameters['itag'];
         final expireParam = uri.queryParameters['expire'];
         if (expireParam != null) {
           final epochSeconds = int.tryParse(expireParam);
           if (epochSeconds != null && epochSeconds > 0) {
-            _resolvedExpiresAt = DateTime.fromMillisecondsSinceEpoch(
-              epochSeconds * 1000,
-            );
-          } else {
-            // Unparseable expire → conservative 1h proactive refresh.
             _resolvedExpiresAt =
-                DateTime.now().add(const Duration(hours: 1));
+                DateTime.fromMillisecondsSinceEpoch(epochSeconds * 1000);
           }
-        } else {
-          // No expire param (proxied/XDM URLs) → default 4h to match
-          // YtmUrlCache TTL so _isExpiringSoon() can still fire.
-          _resolvedExpiresAt =
-              DateTime.now().add(const Duration(hours: 4));
         }
-      } catch (e, st) {
-        ErrorLogger.log('tryParse failed, using fallback', error: e, stackTrace: st, category: 'YtmResolvingSource');
-        _resolvedExpiresAt =
-            DateTime.now().add(const Duration(hours: 1));
-      }
-
-      ErrorLogger.log(
-        'Resolved stream for $videoId (itag=$itag, expires=$_resolvedExpiresAt)',
-        category: 'YtmResolvingSource',
-      );
+      } catch (_) {}
 
       // Store resolved stream URL in cache
       _effectiveUrlCache?.put(
@@ -286,12 +209,15 @@ class YtmResolvingSource extends StreamAudioSource {
     }
 
     final cacheFile = await _cacheFileFor(videoId, url);
-    // Playback headers: send ONLY User-Agent to googlevideo CDN.
-    // Forwarding Cookie or Referer to googlevideo triggers 403 Forbidden on media stream fetch.
     final headers = <String, String>{
-      'User-Agent': (effectiveUa != null && effectiveUa.isNotEmpty)
-          ? effectiveUa
-          : EmbeddedBrowserUa.desktop,
+      if (effectiveUa != null && effectiveUa.isNotEmpty)
+        'User-Agent': effectiveUa
+      else
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36',
+      if (effectiveCookies != null && effectiveCookies.isNotEmpty)
+        'Cookie': effectiveCookies,
+      'Referer': 'https://music.youtube.com/',
     };
 
     // Serialize creation per cache path so two sources for the same videoId
@@ -300,37 +226,16 @@ class YtmResolvingSource extends StreamAudioSource {
     final completer = Completer<void>();
     if (_pathCreationLocks.length >= _maxPathCreationLocks &&
         !_pathCreationLocks.containsKey(pathKey)) {
-      final oldestKey = _pathCreationLocks.keys.first;
-      final previous = _pathCreationLocks[oldestKey];
-      // Only evict if previous future is completed (avoid removing in-flight lock)
-      if (previous != null && previous.isCompleted) {
-        _pathCreationLocks.remove(oldestKey);
-      } else if (previous != null) {
-        // In-flight lock at oldest slot — find first completed entry to evict instead
-        String? completedKey;
-        for (final entry in _pathCreationLocks.entries) {
-          if (entry.value.isCompleted) {
-            completedKey = entry.key;
-            break;
-          }
-        }
-        if (completedKey != null) {
-          _pathCreationLocks.remove(completedKey);
-        }
-      }
+      _pathCreationLocks.remove(_pathCreationLocks.keys.first);
     }
-    final existingLock = _pathCreationLocks.putIfAbsent(
-      pathKey,
-      () => completer,
-    );
+    final previous =
+        _pathCreationLocks.putIfAbsent(pathKey, () => completer.future);
 
-    if (!identical(existingLock, completer)) {
+    if (!identical(previous, completer.future)) {
       // Another creation is in progress; wait for it
       try {
-        await existingLock.future;
-      } catch (e, st) {
-        ErrorLogger.log('tryParse failed', error: e, stackTrace: st, category: 'YtmResolvingSource');
-      }
+        await previous;
+      } catch (_) {}
       final existing = _inner;
       if (existing != null) return existing;
     }
@@ -341,13 +246,10 @@ class YtmResolvingSource extends StreamAudioSource {
         headers: headers,
         cacheFile: cacheFile,
       );
-      _lastResolvedUrl = url;
       _inner = inner;
       try {
         _latency?.markStage(PlaybackStage.sourceSet);
-      } catch (e, st) {
-        ErrorLogger.log('tryParse failed', error: e, stackTrace: st, category: 'YtmResolvingSource');
-      }
+      } catch (_) {}
 
       // Trigger asynchronous background cache pruning if exceeding size limit
       _cacheManager.pruneIfExceedsLimit().ignore();
@@ -361,10 +263,7 @@ class YtmResolvingSource extends StreamAudioSource {
       if (!completer.isCompleted) {
         completer.complete();
       }
-      // Only remove our own lock; avoid deleting a newer owner's in-flight lock
-      if (identical(_pathCreationLocks[pathKey], completer)) {
-        _pathCreationLocks.remove(pathKey);
-      }
+      _pathCreationLocks.remove(pathKey);
     }
   }
 
@@ -378,16 +277,14 @@ class YtmResolvingSource extends StreamAudioSource {
       if (await f.exists()) {
         try {
           await f.delete();
-        } catch (e, st) {
-          ErrorLogger.log('_deleteCacheFilesFor failed', error: e, stackTrace: st, category: 'YtmResolvingSource');
-        }
+        } catch (_) {}
       }
     }
   }
 
   static const int _maxPathCreationLocks = 32;
-  static final LinkedHashMap<String, Completer<void>> _pathCreationLocks =
-      LinkedHashMap<String, Completer<void>>();
+  static final LinkedHashMap<String, Future<void>> _pathCreationLocks =
+      LinkedHashMap<String, Future<void>>();
 
   static Future<File> _cacheFileFor(String videoId, String url) async {
     final dir = await _cacheManager.getCacheDirectory();
@@ -398,9 +295,7 @@ class YtmResolvingSource extends StreamAudioSource {
     try {
       final mime = Uri.parse(url).queryParameters['mime'] ?? '';
       if (mime.contains('webm')) ext = 'webm';
-    } catch (e, st) {
-      ErrorLogger.log('_cacheFileFor failed', error: e, stackTrace: st, category: 'YtmResolvingSource');
-    }
+    } catch (_) {}
     return File(p.join(dir.path, '$hash.$ext'));
   }
 }

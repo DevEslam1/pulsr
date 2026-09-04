@@ -1,7 +1,7 @@
 // lib/features/library/presentation/duplicate_finder_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../../../domain/services/duplicate_finder_service.dart';
+import '../../../core/services/duplicate_finder_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../cubit/library_cubit.dart';
@@ -18,7 +18,6 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
   final DuplicateFinderService _finder = DuplicateFinderService();
   List<DuplicateGroup> _duplicateGroups = [];
   bool _isScanning = true;
-  int _scanGeneration = 0;
 
   @override
   void initState() {
@@ -26,14 +25,10 @@ class _DuplicateFinderScreenState extends State<DuplicateFinderScreen> {
     _scan();
   }
 
-  Future<void> _scan() async {
-    final generation = ++_scanGeneration;
+  void _scan() {
     setState(() => _isScanning = true);
     final songs = context.read<LibraryCubit>().state.songs;
-    // F-08: the regex-heavy scan runs on a background isolate so the first
-    // open / refresh does not freeze the UI isolate.
-    final duplicates = await _finder.findDuplicatesAsync(songs);
-    if (!mounted || generation != _scanGeneration) return;
+    final duplicates = _finder.findDuplicates(songs);
     setState(() {
       _duplicateGroups = duplicates;
       _isScanning = false;

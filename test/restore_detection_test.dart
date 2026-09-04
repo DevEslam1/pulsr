@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:pulsr/domain/services/restore_detection_service.dart';
+import 'package:pulsr/core/services/restore_detection_service.dart';
 import 'package:pulsr/data/scanner/media_scanner_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

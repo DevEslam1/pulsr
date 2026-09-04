@@ -45,7 +45,7 @@ void operator delete[](void* p, std::size_t) noexcept {
 }
 
 void runRtAllocGuardTest() {
-    std::cout << "\n=== [TEST 9/22] Real-Time Audio Zero-Allocation & Zero-Lock Guard Test (BUG-001) ===" << std::endl;
+    std::cout << "\n=== [TEST 9/12] Real-Time Audio Zero-Allocation & Zero-Lock Guard Test (BUG-001) ===" << std::endl;
     auto& engine = AudioDspEngine::instance();
     engine.setSampleRate(48000.0);
 

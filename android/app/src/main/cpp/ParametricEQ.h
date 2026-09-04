@@ -61,8 +61,10 @@ private:
     double preampLinear_ = 1.0;
     bool enabled_ = true;
 
-    // Per-channel Transposed Direct Form II state: 2 double-precision registers per band per channel
-    double s1_[MAX_CHANNELS][MAX_BANDS] = {};
-    double s2_[MAX_CHANNELS][MAX_BANDS] = {};
+    // Per-channel Direct Form II Transposed / Direct Form I state
+    double x1_[MAX_CHANNELS][MAX_BANDS] = {};
+    double x2_[MAX_CHANNELS][MAX_BANDS] = {};
+    double y1_[MAX_CHANNELS][MAX_BANDS] = {};
+    double y2_[MAX_CHANNELS][MAX_BANDS] = {};
     std::vector<float> tempBuf_;
 };

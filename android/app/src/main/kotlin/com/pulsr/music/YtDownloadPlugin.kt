@@ -92,21 +92,9 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
             }
             "getFreeDiskSpace" -> {
                 try {
-                    // Query public Music volume where MediaStore will actually save (primary external storage),
-                    // fallback to app-private external files dir. This ensures preflight reflects real partition.
-                    var targetDir: File? = null
-                    try {
-                        @Suppress("DEPRECATION")
-                        val publicMusic = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
-                        if (publicMusic != null && publicMusic.exists()) {
-                            targetDir = publicMusic
-                        }
-                    } catch (_: Exception) {}
-                    if (targetDir == null) {
-                        targetDir = currentContext.getExternalFilesDir(Environment.DIRECTORY_MUSIC)
-                            ?: currentContext.filesDir
-                    }
-                    val stat = android.os.StatFs(targetDir.path)
+                    val musicDir = currentContext.getExternalFilesDir(Environment.DIRECTORY_MUSIC)
+                        ?: currentContext.filesDir
+                    val stat = android.os.StatFs(musicDir.path)
                     val availableBytes = stat.availableBlocksLong * stat.blockSizeLong
                     result.success(availableBytes)
                 } catch (e: Exception) {
@@ -211,15 +199,9 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
             }
         }
 
-        // Pre-Q (API 28): no MediaStore.Downloads/IS_PENDING support and no
-        // reliably granted WRITE_EXTERNAL_STORAGE guarantee. Write into the
-        // app-specific external music dir (always writable, no permission
-        // needed) and index it via MediaScanner — the app's library discovers
-        // downloads through MediaStore + path-based playback, which works
-        // unchanged for app-specific files on API 28.
+        // Pre-Q: write straight into the public Music dir, then index it.
         @Suppress("DEPRECATION")
-        val musicDir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC)
-            ?: File(context.filesDir, "Music").apply { if (!exists()) mkdirs() }
+        val musicDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC)
         if (!musicDir.exists()) musicDir.mkdirs()
 
         var dest = File(musicDir, displayName)

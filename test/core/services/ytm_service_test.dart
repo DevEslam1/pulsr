@@ -4,15 +4,11 @@ import 'dart:async';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
-import 'package:pulsr/core/di/injection.dart';
-import 'package:pulsr/data/services/ytm_account_service.dart';
-import 'package:pulsr/data/services/ytm_service.dart';
+import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
 import 'package:pulsr/features/ytm_search/cubit/ytm_search_cubit.dart';
 
 class MockYtmService extends Mock implements YtmService {}
-
-class MockYtmAccountService extends Mock implements YtmAccountService {}
 
 const _channel = MethodChannel(YtmService.channelName);
 
@@ -36,14 +32,7 @@ Map<String, Object?> _resultRow({
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() {
-    YtmService.resetGlobalBlock();
-  });
-
-  tearDown(() {
-    _mockChannel((_) async => null);
-    YtmService.resetGlobalBlock();
-  });
+  tearDown(() => _mockChannel((_) async => null));
 
   group('YtmException classification properties', () {
     test('isNetwork flags timeout and network errors', () {
@@ -61,7 +50,7 @@ void main() {
               .isBotBlocked,
           isTrue);
       expect(const YtmException('YTM_FAILED', 'LOGIN_REQUIRED').isBotBlocked,
-          isFalse);
+          isTrue);
       expect(const YtmException('YTM_NETWORK').isBotBlocked, isFalse);
     });
 
@@ -69,8 +58,6 @@ void main() {
       expect(const YtmException('YTM_AUTH').isAuth, isTrue);
       expect(const YtmException('LOGIN_REQUIRED').isAuth, isTrue);
       expect(const YtmException('YTM_FAILED', 'Unauthenticated user').isAuth,
-          isTrue);
-      expect(const YtmException('YTM_FAILED', 'LOGIN_REQUIRED').isAuth,
           isTrue);
       expect(const YtmException('YTM_NETWORK').isAuth, isFalse);
     });
@@ -337,123 +324,6 @@ void main() {
       verifyNever(() => service.searchWithFallback(any()));
       expect(cubit.state.query, isEmpty);
       await cubit.close();
-    });
-  });
-
-  group('YtmService TTFA resolve budget', () {
-    test(
-        'a tier-1 account resolve hanging past the ~3s budget falls through '
-        'to the native tier instead of burning the 25s account timeout',
-        () async {
-      final account = MockYtmAccountService();
-      when(() => account.isLoggedIn).thenReturn(true);
-      when(() => account.resolvePlayerStream(any(),
-              quality: any(named: 'quality')))
-          .thenAnswer((_) => Completer<YtmStream?>().future);
-
-      getIt.registerSingleton<YtmAccountService>(account);
-      addTearDown(() {
-        try {
-          getIt.unregister<YtmAccountService>(instance: account);
-        } catch (_) {}
-      });
-
-      _mockChannel((call) async {
-        if (call.method == 'resolveStream') {
-          return {
-            'videoId': 'dQw4w9WgXcQ',
-            'url': 'https://native.example/audio.m4a',
-            'mimeType': 'audio/mp4',
-            'container': 'm4a',
-            'bitrateKbps': 128,
-            'durationMs': 213000,
-          };
-        }
-        return null;
-      });
-
-      final watch = Stopwatch()..start();
-      final stream = await YtmService().resolveStream('dQw4w9WgXcQ');
-      watch.stop();
-
-      expect(stream.url, equals('https://native.example/audio.m4a'));
-      // Tier-1 deadline is ~3s: the fallthrough must happen long before the
-      // account path's internal 25s timeout could elapse.
-      expect(watch.elapsed, lessThan(const Duration(seconds: 10)));
-      verify(() => account.resolvePlayerStream(any(),
-          quality: any(named: 'quality'))).called(1);
-    });
-
-    test('a healthy tier-2 native resolve is tagged as cacheHit=false',
-        () async {
-      _mockChannel((call) async {
-        if (call.method == 'resolveStream') {
-          return {
-            'videoId': 'dQw4w9WgXcQ',
-            'url': 'https://native.example/audio.m4a',
-            'mimeType': 'audio/mp4',
-            'container': 'm4a',
-            'bitrateKbps': 128,
-            'durationMs': 213000,
-          };
-        }
-        return null;
-      });
-
-      // No account service registered -> straight to the native tier.
-      final stream = await YtmService().resolveStream('dQw4w9WgXcQ');
-      expect(stream.url, equals('https://native.example/audio.m4a'));
-    });
-  });
-
-  group('YtmService sign-in-required fast-fail', () {
-    test('native YTM_SIGNIN_REQUIRED abort surfaces typed, not as auth', () async {
-      var calls = 0;
-      _mockChannel((call) async {
-        if (call.method == 'resolveStream') {
-          calls++;
-          throw PlatformException(code: 'YTM_SIGNIN_REQUIRED', message: 'Ladder aborted');
-        }
-        return null;
-      });
-
-      await expectLater(
-        YtmService().resolveStream('AAAAAAAAAAA'),
-        throwsA(
-          isA<YtmException>()
-              .having((e) => e.code, 'code', 'YTM_SIGNIN_REQUIRED')
-              // A device/IP gate for a guest is NOT a session-expiry verdict:
-              // it must not trigger the global auth-expired UI path.
-              .having((e) => e.isAuth, 'isAuth', isFalse),
-        ),
-      );
-      expect(calls, 1);
-    });
-
-    test('immediate retry within the negative-cache TTL fails fast', () async {
-      var calls = 0;
-      _mockChannel((call) async {
-        if (call.method == 'resolveStream') {
-          calls++;
-          throw PlatformException(code: 'YTM_SIGNIN_REQUIRED', message: 'Ladder aborted');
-        }
-        return null;
-      });
-
-      await expectLater(
-        YtmService().resolveStream('BBBBBBBBBBB'),
-        throwsA(
-          isA<YtmException>().having((e) => e.code, 'code', 'YTM_SIGNIN_REQUIRED'),
-        ),
-      );
-      await expectLater(
-        YtmService().resolveStream('BBBBBBBBBBB'),
-        throwsA(
-          isA<YtmException>().having((e) => e.code, 'code', 'YTM_SIGNIN_REQUIRED'),
-        ),
-      );
-      // The retry must not reach the native ladder again.
-      expect(calls, 1);
     });
   });
 }

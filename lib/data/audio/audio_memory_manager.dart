@@ -2,7 +2,6 @@
 import 'dart:collection';
 import 'package:just_audio/just_audio.dart';
 
-import '../../core/utils/error_logger.dart';
 /// Item stored in preloaded stream head cache.
 class PreloadedHead {
   final String key;
@@ -117,9 +116,7 @@ class AudioMemoryManager {
       if (prefetchPlayer != null && !prefetchPlayer.playing) {
         prefetchPlayer.stop().catchError((_) {});
       }
-    } catch (e, st) {
-      ErrorLogger.log('onAppBackgrounded failed', error: e, stackTrace: st, category: 'AudioMemoryManager');
-    }
+    } catch (_) {}
     onBackgroundReleaseRequested?.call();
   }
 

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pulsr/data/services/ytm_cache_manager.dart';
+import 'package:pulsr/core/services/ytm_cache_manager.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

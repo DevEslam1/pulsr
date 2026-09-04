@@ -6,7 +6,6 @@
 #include <cmath>
 #include <algorithm>
 #include <cstring>
-#include <atomic>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -15,7 +14,7 @@
 class SincResampler {
 public:
     static constexpr int NUM_PHASES = 32;
-    static constexpr int TAPS_PER_PHASE = 64;
+    static constexpr int TAPS_PER_PHASE = 32;
     static constexpr int TOTAL_TAPS = NUM_PHASES * TAPS_PER_PHASE;
     static constexpr int HALF_TAPS = TAPS_PER_PHASE / 2;
 
@@ -29,8 +28,6 @@ public:
     double getInRate() const { return inRate_; }
     double getOutRate() const { return outRate_; }
     double getRatio() const { return ratio_; }
-    bool isBypassed() const { return std::abs(inRate_ - outRate_) < 0.5; }
-    int getOverflowCount() const { return overflowCount_.load(std::memory_order_relaxed); }
 
     // Latency reporting in frames (exact group delay)
     int getLatencyFrames() const { return HALF_TAPS; }
@@ -38,8 +35,8 @@ public:
     // HARD CONTRACT: Consumes N input frames and returns exactly N output frames
     int processInterleaved(float* buffer, int frames, int channels = 2);
 
-    // Multi-channel planar processing: consumes inFrames and writes up to maxOutFrames
-    int processPlanar(const float* const* in, float* const* out, int inFrames, int channels, int maxOutFrames);
+    // Multi-channel planar processing: consumes frames and writes frames
+    int processPlanar(const float* const* in, float* const* out, int frames, int channels);
 
 private:
     void generatePolyphaseTable();
@@ -61,7 +58,6 @@ private:
     float ringBuf_[MAX_CHANNELS][FIFO_CAPACITY] = {};
     int writePos_ = 0;
     int availableFrames_ = 0;
-    std::atomic<int> overflowCount_{0};
 
     std::vector<float> tempOutBuf_;
 };

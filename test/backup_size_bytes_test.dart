@@ -37,9 +37,9 @@ void main() {
       final validJson = jsonEncode({
         'version': 1,
         'exportedAt': DateTime.now().toIso8601String(),
-        'playlists': <dynamic>[],
-        'favorites': <dynamic>[],
-        'playbackHistory': <dynamic>[],
+        'playlists': [],
+        'favorites': [],
+        'playbackHistory': [],
       });
 
       expect(utf8.encode(validJson).length,

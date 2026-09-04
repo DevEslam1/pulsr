@@ -16,36 +16,18 @@ import '../../../domain/usecases/playlist_io_usecases.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
-import '../../downloads/cubit/ytm_download_cubit.dart';
-import '../../downloads/presentation/widgets/ytm_download_button.dart';
+import '../../ytm_search/cubit/ytm_download_cubit.dart';
+import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 
-import '../../../core/utils/error_logger.dart';
-class PlaylistDetailScreen extends StatefulWidget {
+class PlaylistDetailScreen extends StatelessWidget {
   final PlaylistsTableData playlist;
   final PlaylistUseCases? playlistUseCases;
 
   const PlaylistDetailScreen(
       {super.key, required this.playlist, this.playlistUseCases});
 
-  @override
-  State<PlaylistDetailScreen> createState() => _PlaylistDetailScreenState();
-}
-
-class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
   PlaylistUseCases get _useCases =>
-      widget.playlistUseCases ?? getIt<PlaylistUseCases>();
-
-  /// Created once so StreamBuilder keeps a single drift subscription across
-  /// rebuilds — a fresh Stream per build tears down and re-subscribes the
-  /// watch, re-issuing the DB query on every rebuild. [playlist] is a route
-  /// argument and cannot change for this mount.
-  late final Stream<List<SongsTableData>> _songsStream =
-      widget.playlist.isSmart && widget.playlist.smartCriteria != null
-          ? _useCases.watchSmartPlaylistSongs(
-              SmartCriteria.fromJsonString(widget.playlist.smartCriteria!))
-          : _useCases
-              .watchPlaylistSongs(widget.playlist.id)
-              .map((res) => res.fold((l) => <SongsTableData>[], (r) => r));
+      playlistUseCases ?? getIt<PlaylistUseCases>();
 
   void _downloadPlaylist(BuildContext context, List<SongsTableData> songs) {
     if (songs.isEmpty) {
@@ -92,7 +74,7 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       return;
     }
     final exportUseCase = getIt<PlaylistExportUseCase>();
-    await exportUseCase.exportToFile(widget.playlist.name, songs);
+    await exportUseCase.exportToFile(playlist.name, songs);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -113,33 +95,36 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
       return;
     }
     final exportUseCase = getIt<PlaylistExportUseCase>();
-    final file = await exportUseCase.exportToFile(widget.playlist.name, songs);
+    final file = await exportUseCase.exportToFile(playlist.name, songs);
     try {
-      await SharePlus.instance.share(
-        ShareParams(
-          files: [XFile(file.path, mimeType: 'audio/x-mpegurl')],
-          text: 'Playlist: ${widget.playlist.name}',
-        ),
+      await Share.shareXFiles(
+        [XFile(file.path, mimeType: 'audio/x-mpegurl')],
+        text: 'Playlist: ${playlist.name}',
       );
     } finally {
       try {
         if (await file.exists()) {
           await file.delete();
         }
-      } catch (e, st) {
-        ErrorLogger.log('_sharePlaylist failed', error: e, stackTrace: st, category: 'PlaylistDetailScreen');
-      }
+      } catch (_) {}
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
-    final playlist = widget.playlist;
     final playlistUseCases = _useCases;
 
+    final Stream<List<SongsTableData>> songsStream =
+        playlist.isSmart && playlist.smartCriteria != null
+            ? playlistUseCases.watchSmartPlaylistSongs(
+                SmartCriteria.fromJsonString(playlist.smartCriteria!))
+            : playlistUseCases
+                .watchPlaylistSongs(playlist.id)
+                .map((res) => res.fold((l) => <SongsTableData>[], (r) => r));
+
     return StreamBuilder<List<SongsTableData>>(
-      stream: _songsStream,
+      stream: songsStream,
       builder: (context, snapshot) {
         final songs = snapshot.data ?? [];
 
@@ -248,118 +233,103 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                               ? 'No tracks match the rules for this smart playlist.'
                               : 'No tracks in this playlist yet.',
                         )
-                      : CustomScrollView(
-                          // Builder-based slivers (F-04): header as a box
-                          // adapter, track list virtualized.
-                          slivers: [
-                            SliverToBoxAdapter(
-                              // Header Controls
-                              child: Padding(
-                                padding: EdgeInsets.symmetric(
-                                    horizontal: Adaptive.pagePadding(context),
-                                    vertical: 12),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: ElevatedButton.icon(
-                                        onPressed: () {
-                                          context.read<PlayerCubit>().playSong(
-                                              songs.first,
-                                              queue: songs);
-                                        },
-                                        icon: const Icon(
-                                            Icons.play_arrow_rounded),
-                                        label: const Text('Play All'),
-                                      ),
+                      : ListView(
+                          padding: const EdgeInsets.only(bottom: 160),
+                          children: [
+                            // Header Controls
+                            Padding(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: Adaptive.pagePadding(context),
+                                  vertical: 12),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: ElevatedButton.icon(
+                                      onPressed: () {
+                                        context.read<PlayerCubit>().playSong(
+                                            songs.first,
+                                            queue: songs);
+                                      },
+                                      icon:
+                                          const Icon(Icons.play_arrow_rounded),
+                                      label: const Text('Play All'),
                                     ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: OutlinedButton.icon(
-                                        onPressed: () {
-                                          final shuffled =
-                                              List<SongsTableData>.from(songs)
-                                                ..shuffle();
-                                          context.read<PlayerCubit>().playSong(
-                                              shuffled.first,
-                                              queue: shuffled);
-                                        },
-                                        icon: Icon(Icons.shuffle_rounded,
-                                            color: p.accent),
-                                        label: const Text('Shuffle'),
-                                      ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed: () {
+                                        final shuffled =
+                                            List<SongsTableData>.from(songs)
+                                              ..shuffle();
+                                        context.read<PlayerCubit>().playSong(
+                                            shuffled.first,
+                                            queue: shuffled);
+                                      },
+                                      icon: Icon(Icons.shuffle_rounded,
+                                          color: p.accent),
+                                      label: const Text('Shuffle'),
                                     ),
-                                    if (AppConfig.ytmEnabled) ...[
-                                      const SizedBox(width: 8),
-                                      IconButton.filledTonal(
-                                        onPressed: () =>
-                                            _downloadPlaylist(context, songs),
-                                        icon: const Icon(
-                                            Icons.download_rounded,
-                                            size: 20),
-                                        style: IconButton.styleFrom(
-                                          backgroundColor: p.accent
-                                              .withValues(alpha: 0.15),
-                                          foregroundColor: p.accent,
-                                        ),
-                                        tooltip:
-                                            'Download all offline (3 active downloads)',
+                                  ),
+                                  if (AppConfig.ytmEnabled) ...[
+                                    const SizedBox(width: 8),
+                                    IconButton.filledTonal(
+                                      onPressed: () =>
+                                          _downloadPlaylist(context, songs),
+                                      icon: const Icon(Icons.download_rounded,
+                                          size: 20),
+                                      style: IconButton.styleFrom(
+                                        backgroundColor:
+                                            p.accent.withValues(alpha: 0.15),
+                                        foregroundColor: p.accent,
                                       ),
-                                    ],
+                                      tooltip:
+                                          'Download all offline (3 active downloads)',
+                                    ),
                                   ],
-                                ),
+                                ],
                               ),
                             ),
 
                             // Tracks List
-                            SliverPadding(
-                              padding:
-                                  const EdgeInsets.only(bottom: 160),
-                              sliver: SliverList.builder(
-                                itemCount: songs.length,
-                                itemBuilder: (context, index) {
-                                  final song = songs[index];
-                                  return SongTile(
-                                    song: song,
-                                    index: index,
-                                    subtitleOverride:
-                                        '${song.artist} • ${song.album}',
-                                    onTap: () => context
-                                        .read<PlayerCubit>()
-                                        .playSong(song, queue: songs),
-                                    onMorePressed: () =>
-                                        showModalBottomSheet<void>(
-                                      context: context,
-                                      useRootNavigator: true,
-                                      isScrollControlled: true,
-                                      backgroundColor: Colors.transparent,
-                                      builder: (_) => SongInfoSheet(song: song),
-                                    ),
-                                    trailing: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        if (AppConfig.ytmEnabled &&
-                                            song.remoteId != null &&
-                                            song.remoteId!.isNotEmpty)
-                                          YtmDownloadButton(song: song),
-                                        if (!playlist.isSmart)
-                                          IconButton(
-                                            icon: Icon(
-                                                Icons
-                                                    .remove_circle_outline_rounded,
-                                                size: 20,
-                                                color: p.textTertiary),
-                                            onPressed: () {
-                                              playlistUseCases
-                                                  .removeSongFromPlaylist(
-                                                      playlist.id, song.id);
-                                            },
-                                          ),
-                                      ],
-                                    ),
-                                  );
-                                },
+                            for (int i = 0; i < songs.length; i++)
+                              SongTile(
+                                song: songs[i],
+                                index: i,
+                                subtitleOverride:
+                                    '${songs[i].artist} • ${songs[i].album}',
+                                onTap: () => context
+                                    .read<PlayerCubit>()
+                                    .playSong(songs[i], queue: songs),
+                                onMorePressed: () => showModalBottomSheet(
+                                  context: context,
+                                  useRootNavigator: true,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (_) => SongInfoSheet(song: songs[i]),
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (AppConfig.ytmEnabled &&
+                                        songs[i].remoteId != null &&
+                                        songs[i].remoteId!.isNotEmpty)
+                                      YtmDownloadButton(song: songs[i]),
+                                    if (!playlist.isSmart)
+                                      IconButton(
+                                        icon: Icon(
+                                            Icons.remove_circle_outline_rounded,
+                                            size: 20,
+                                            color: p.textTertiary),
+                                        onPressed: () {
+                                          playlistUseCases
+                                              .removeSongFromPlaylist(
+                                                  playlist.id, songs[i].id);
+                                        },
+                                      ),
+                                  ],
+                                ),
                               ),
-                            ),
                           ],
                         ),
             ),

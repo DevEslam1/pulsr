@@ -8,8 +8,8 @@ import 'package:pulsr/core/constants/channels.dart';
 import 'package:pulsr/core/constants/prefs_keys.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/errors/ytm_error_classifier.dart';
-import 'package:pulsr/data/services/xdm_backend_service.dart';
-import 'package:pulsr/data/services/ytm_service.dart';
+import 'package:pulsr/core/services/xdm_backend_service.dart';
+import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/core/utils/ytm_rate_limiter.dart';
 import 'package:pulsr/domain/models/ytm_track.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -69,7 +69,7 @@ void main() {
         (MethodCall methodCall) async {
           if (methodCall.method == 'resolveStream') {
             return {
-              'videoId': 'test_video1',
+              'videoId': 'test_video_123',
               'url': 'https://googlevideo.com/native_stream',
               'mimeType': 'audio/mp4',
               'container': 'm4a',
@@ -83,7 +83,7 @@ void main() {
         },
       );
 
-      final stream = await ytmService.resolveStream('test_video1');
+      final stream = await ytmService.resolveStream('test_video_123');
       expect(stream, isNotNull);
       expect(stream.url, 'https://googlevideo.com/native_stream');
       expect(stream.title, 'Native Track');
@@ -108,11 +108,11 @@ void main() {
 
       // Backend returns stream successfully via /resolve/audio
       when(() => mockClient.get(
-            Uri.parse('https://test-backend.app/resolve/audio?videoId=fallback_vi'),
+            Uri.parse('https://test-backend.app/resolve/audio?videoId=fallback_vid'),
             headers: any(named: 'headers'),
           )).thenAnswer((_) async => http.Response(
             jsonEncode({
-              'videoId': 'fallback_vi',
+              'videoId': 'fallback_vid',
               'title': 'Fallback Track',
               'author': 'Fallback Artist',
               'audio': [
@@ -128,7 +128,7 @@ void main() {
             200,
           ));
 
-      final stream = await ytmService.resolveStream('fallback_vi');
+      final stream = await ytmService.resolveStream('fallback_vid');
       expect(stream, isNotNull);
       expect(stream.url, 'https://googlevideo.com/backend_fallback_stream');
       expect(stream.title, 'Fallback Track');

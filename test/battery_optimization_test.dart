@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pulsr/domain/services/battery_optimization_service.dart';
+import 'package:pulsr/core/services/battery_optimization_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {

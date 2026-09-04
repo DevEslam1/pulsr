@@ -34,6 +34,7 @@ class LyricsPlayerTheme extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: LyricsView(
             lyrics: state.lyrics,
+            currentPosition: state.position,
             isLoading: state.isLoadingLyrics,
             activeColor: props.activeColor,
           ),
@@ -95,6 +96,7 @@ class LyricsPlayerTheme extends StatelessWidget {
             ],
             const SizedBox(height: 12),
             PlayerSeekBar(
+              position: state.position,
               duration: state.duration,
               activeColor: props.activeColor,
               songId: song?.id,
@@ -212,6 +214,7 @@ class LyricsPlayerTheme extends StatelessWidget {
 
               // Seek Bar
               PlayerSeekBar(
+                position: state.position,
                 duration: state.duration,
                 activeColor: props.activeColor,
                 songId: song?.id,

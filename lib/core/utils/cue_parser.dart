@@ -16,9 +16,9 @@ class CueParser {
     Duration? currentStart;
 
     final fileRegex =
-        RegExp(r'^\s*FILE\s+"?([^"]*?)"?\s+([A-Z0-9]+)', caseSensitive: false);
+        RegExp(r'^\s*FILE\s+"?([^"]+?)"?\s+([A-Z0-9]+)', caseSensitive: false);
     final trackRegex =
-        RegExp(r'^\s*TRACK\s+(\d+)\s+(AUDIO|WAVE|MP3|AIFF)', caseSensitive: false);
+        RegExp(r'^\s*TRACK\s+(\d+)\s+AUDIO', caseSensitive: false);
     final titleRegex = RegExp(r'^\s*TITLE\s+"?([^"]+)"?', caseSensitive: false);
     final indexRegex = RegExp(r'^\s*INDEX\s+01\s+(\d{2}):(\d{2}):(\d{2})',
         caseSensitive: false);
@@ -68,8 +68,7 @@ class CueParser {
       if (indexMatch != null && currentTrackIndex > 0) {
         final minutes = int.tryParse(indexMatch.group(1) ?? '0') ?? 0;
         final seconds = int.tryParse(indexMatch.group(2) ?? '0') ?? 0;
-        final frames = (int.tryParse(indexMatch.group(3) ?? '0') ?? 0).clamp(0, 74);
-        if (seconds >= 60) continue;
+        final frames = int.tryParse(indexMatch.group(3) ?? '0') ?? 0;
         final ms = ((frames / 75.0) * 1000.0).round();
         currentStart =
             Duration(minutes: minutes, seconds: seconds, milliseconds: ms);
@@ -109,25 +108,6 @@ class CueParser {
       if (await file.exists()) {
         final content = await file.readAsString();
         return parse(content);
-      }
-      // Fallback: search any *.cue in directory (not just path_without_ext.cue)
-      try {
-        final dir = File(audioFilePath).parent;
-        final cueFiles = dir.listSync().where((e) => e.path.endsWith('.cue'));
-        for (final entity in cueFiles) {
-          try {
-            final f = File(entity.path);
-            if (await f.exists()) {
-              final content = await f.readAsString();
-              final parsed = parse(content);
-              if (parsed.isNotEmpty) return parsed;
-            }
-          } catch (e, st) {
-            ErrorLogger.log('findAndParseCue failed', error: e, stackTrace: st, category: 'CueParser');
-          }
-        }
-      } catch (e, st) {
-        ErrorLogger.log('findAndParseCue failed', error: e, stackTrace: st, category: 'CueParser');
       }
     } catch (e, st) {
       ErrorLogger.log('Failed to read external .cue file for $audioFilePath',

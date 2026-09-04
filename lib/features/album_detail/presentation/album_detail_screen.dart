@@ -28,13 +28,6 @@ class AlbumDetailScreen extends StatefulWidget {
 class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
   late GetAlbumsUseCase _useCase;
 
-  /// Created once so StreamBuilder keeps a single drift subscription across
-  /// rebuilds — a fresh Stream per build tears down and re-subscribes the
-  /// watch, re-issuing the DB query on every rebuild. [album] is a route
-  /// argument and cannot change for this mount.
-  late final Stream<Result<List<SongsTableData>>> _songsStream =
-      _useCase.watchAlbumSongs(widget.album.id);
-
   @override
   void initState() {
     super.initState();
@@ -53,7 +46,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
 
     return Scaffold(
       body: StreamBuilder<Result<List<SongsTableData>>>(
-        stream: _songsStream,
+        stream: _useCase.watchAlbumSongs(album.id),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return _AlbumErrorView(onRetry: () => setState(() {}));
@@ -160,7 +153,7 @@ class _AlbumDetailScreenState extends State<AlbumDetailScreen> {
                         onTap: () => context
                             .read<PlayerCubit>()
                             .playSong(songs[index], queue: songs),
-                        onMorePressed: () => showModalBottomSheet<void>(
+                        onMorePressed: () => showModalBottomSheet(
                           context: context,
                           useRootNavigator: true,
                           isScrollControlled: true,

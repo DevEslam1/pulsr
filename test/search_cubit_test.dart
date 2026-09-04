@@ -65,7 +65,7 @@ void main() {
       );
 
       cubit.onQueryChanged('Beat');
-      await Future<void>.delayed(const Duration(milliseconds: 350));
+      await Future.delayed(const Duration(milliseconds: 300));
 
       expect(cubit.state.query, equals('Beat'));
       expect(cubit.state.results.length, equals(1));
@@ -97,7 +97,7 @@ void main() {
       );
 
       cubit.onQueryChanged('Beat');
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await Future.delayed(const Duration(milliseconds: 300));
 
       cubit.clearQuery();
       expect(cubit.state.query, isEmpty);
@@ -143,14 +143,14 @@ void main() {
       );
 
       cubit.onQueryChanged('Beat');
-      await Future<void>.delayed(const Duration(milliseconds: 400));
+      await Future.delayed(const Duration(milliseconds: 400));
 
       // Both songs match "beat" somewhere
       expect(cubit.state.results.length, equals(2));
 
       // Filter by Artists only: only "Beat Maker" matches
       cubit.setFilter('Artists');
-      await Future<void>.delayed(const Duration(milliseconds: 400));
+      await Future.delayed(const Duration(milliseconds: 400));
       expect(cubit.state.selectedFilter, equals('Artists'));
       expect(cubit.state.results.length, equals(1));
       expect(cubit.state.results.first.artist, equals('Beat Maker'));
@@ -180,7 +180,7 @@ void main() {
       );
 
       cubit.onQueryChanged('   ');
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+      await Future.delayed(const Duration(milliseconds: 300));
 
       expect(cubit.state.query, equals('   '));
       expect(cubit.state.results, isEmpty);

@@ -133,7 +133,7 @@
             android:textSize="11sp"
             android:fontFamily="sans-serif-medium" />
 
-        <TextView
+        <View
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:layout_weight="1" />
@@ -164,7 +164,7 @@
             android:src="@drawable/ic_widget_shuffle"
             android:contentDescription="Shuffle" />
 
-        <TextView
+        <View
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:layout_weight="1" />
@@ -216,7 +216,7 @@
             android:src="@drawable/ic_widget_skip_next"
             android:contentDescription="Next" />
 
-        <TextView
+        <View
             android:layout_width="0dp"
             android:layout_height="0dp"
             android:layout_weight="1" />

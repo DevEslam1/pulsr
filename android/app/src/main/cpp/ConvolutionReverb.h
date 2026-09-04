@@ -3,7 +3,6 @@
 
 #include "DspParams.h"
 #include "FftUtil.h"
-#include "SincResampler.h"
 #include <vector>
 #include <cmath>
 #include <memory>
@@ -26,7 +25,7 @@ public:
     static constexpr int PARTITION_SIZE = 512;
     static constexpr int FFT_SIZE = PARTITION_SIZE * 2; // 1024
     static constexpr int MAX_PREDELAY_SAMPLES = 153600; // 153,600 samples max predelay capacity (R2)
-    static constexpr int MAX_PREALLOC_PARTITIONS = 512;
+    static constexpr int MAX_PREALLOC_PARTITIONS = 2048;
 
     ConvolutionReverb();
     void setSampleRate(double sampleRate);
@@ -39,9 +38,7 @@ public:
     void applyParams(const ReverbParamSet& params);
     void reset();
 
-    bool loadCustomIR(const float* irInterleaved, int frames, int channels, double irSampleRate = 0.0);
-    std::shared_ptr<const PreparedIr> getPreparedIr() const { return preparedIr_; }
-    ReverbPreset getPreset() const { return preset_; }
+    bool loadCustomIR(const float* irInterleaved, int frames, int channels);
 
     // Reverb wet-path block latency: 512 samples in partitioned mode, 0 in direct FIR
     int getReverbLatencyFrames() const {
@@ -49,20 +46,16 @@ public:
         return (preparedIr_->numPartitions == 0) ? 0 : PARTITION_SIZE;
     }
 
-    void prepareForBlockSize(int maxFrames);
     void process(const float* inL, const float* inR, float* outL, float* outR, int frames);
     void processInterleaved(float* buffer, int frames, int channels = 2);
-    int getPredelayCapacity() const { return static_cast<int>(predelayRingL_.size()); }
 
 private:
     void updatePreparedIr();
     void preparePartitions();
     void ensurePredelayCapacity();
     void ensureScratchCapacity(int frames);
-    void processCore(const float* inL, const float* inR, float* outL, float* outR, int frames, float dryGain, float wetGain);
 
     double sampleRate_ = 48000.0;
-    double coreRate_ = 48000.0;
     ReverbPreset preset_ = ReverbPreset::Room;
     double targetWet_ = 0.20;
     double smoothedWet_ = 0.20;
@@ -71,16 +64,6 @@ private:
     float smoothedPredelaySamples_ = 0.0f;
     double damping_ = 0.5;
     bool enabled_ = false;
-
-    // Fixed-rate wet path resamplers for sample rates > 48kHz
-    SincResampler wetInResampler_;
-    SincResampler wetOutResampler_;
-    std::vector<float> resampleInL_;
-    std::vector<float> resampleInR_;
-    std::vector<float> resampleWetL_;
-    std::vector<float> resampleWetR_;
-    std::vector<float> resampleOutL_;
-    std::vector<float> resampleOutR_;
 
     // Prepared IR snapshot pointer
     std::shared_ptr<const PreparedIr> preparedIr_;
@@ -120,10 +103,4 @@ private:
     std::vector<float> scratchInR_;
     std::vector<float> scratchOutL_;
     std::vector<float> scratchOutR_;
-
-    // Cached raw custom IR for rate resynchronization
-    std::vector<float> rawCustomIr_;
-    int rawCustomFrames_ = 0;
-    int rawCustomChannels_ = 2;
-    double rawCustomSampleRate_ = 48000.0;
 };

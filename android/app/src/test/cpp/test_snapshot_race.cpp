@@ -8,7 +8,7 @@
 #include <random>
 
 void runSnapshotRaceTest() {
-    std::cout << "\n=== [TEST 11/22] High-Concurrency Snapshot Race Test (4 Writers vs 1 Audio Reader) ===" << std::endl;
+    std::cout << "\n=== [TEST 11/11] High-Concurrency Snapshot Race Test (4 Writers vs 1 Audio Reader) ===" << std::endl;
     auto& engine = AudioDspEngine::instance();
     engine.setSampleRate(48000.0);
     engine.setActiveStages(0xFFFFFFFF);
@@ -86,67 +86,5 @@ void runSnapshotRaceTest() {
         assert(finalParams->sampleRate == testRates[(iterations - 1) % 5]);
         assert(finalParams->activeStages == testStages[(iterations - 1) % 4]);
         std::cout << "  ✓ Interleaved 2-writer test completed with zero lost updates." << std::endl;
-    }
-
-    // 3. A1 (N-01): Concurrent publishParams (preset changes) + setSampleRate stress test
-    {
-        std::cout << "  Running A1 concurrent preset mutations vs setSampleRate stress test..." << std::endl;
-        std::atomic<bool> stressRunning{true};
-        const double testRates[] = {44100.0, 48000.0, 88200.0, 96000.0, 192000.0};
-        const int iterations = 1000;
-
-        std::thread writerSR([&]() {
-            for (int i = 0; i < iterations; ++i) {
-                engine.setSampleRate(testRates[i % 5]);
-                std::this_thread::yield();
-            }
-            stressRunning.store(false);
-        });
-
-        std::thread writerPresets([&]() {
-            int p = 0;
-            while (stressRunning.load(std::memory_order_relaxed)) {
-                auto current = engine.getParams();
-                if (current) {
-                    auto updated = std::make_shared<DspParamSnapshot>(*current);
-                    updated->generation = current->generation + 1;
-                    updated->reverb.preset = p % 8; // 0..7 synthetic presets
-                    updated->reverb.damping = 0.1 * ((p % 9) + 1);
-                    updated->reverb.preparedIr = PreparedIr::createSynthetic(
-                        current->sampleRate,
-                        updated->reverb.preset,
-                        static_cast<float>(updated->reverb.damping));
-                    engine.publishParams(updated);
-                }
-                p++;
-                std::this_thread::yield();
-            }
-        });
-
-        std::thread readerVerify([&]() {
-            while (stressRunning.load(std::memory_order_relaxed)) {
-                auto snap = engine.getParams();
-                if (snap && snap->reverb.preparedIr && snap->reverb.preset != static_cast<int>(ReverbPreset::Custom)) {
-                    int actualSr = snap->reverb.preparedIr->createdSampleRate;
-                    bool isValidSr = (actualSr == 44100 || actualSr == 48000 || actualSr == 88200 || actualSr == 96000 || actualSr == 192000 || actualSr == 0);
-                    assert(isValidSr);
-                }
-                std::this_thread::yield();
-            }
-        });
-
-        writerSR.join();
-        writerPresets.join();
-        readerVerify.join();
-
-        // Final verification after quiescence
-        auto snap = engine.getParams();
-        assert(snap != nullptr);
-        if (snap->reverb.preparedIr && snap->reverb.preset != static_cast<int>(ReverbPreset::Custom)) {
-            int actualSr = snap->reverb.preparedIr->createdSampleRate;
-            bool isValidSr = (actualSr == 44100 || actualSr == 48000 || actualSr == 88200 || actualSr == 96000 || actualSr == 192000 || actualSr == 0);
-            assert(isValidSr);
-        }
-        std::cout << "  ✓ A1 snapshot race test passed: all published IRs match valid snapshot sample rates." << std::endl;
     }
 }

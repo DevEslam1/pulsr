@@ -1,6 +1,6 @@
 // test/core/services/ytm_url_cache_test.dart
 import 'package:flutter_test/flutter_test.dart';
-import 'package:pulsr/data/services/ytm_url_cache.dart';
+import 'package:pulsr/core/services/ytm_url_cache.dart';
 import 'package:pulsr/core/telemetry/clock.dart';
 
 void main() {
@@ -110,42 +110,6 @@ void main() {
       expect(smallCache.get('a'), isNull);
       expect(smallCache.get('b'), isNotNull);
       expect(smallCache.get('c'), isNotNull);
-    });
-
-    test('Stale-While-Revalidate triggers background refresh callback in second half of TTL', () {
-      cache.put('vidSWTR', 'https://googlevideo.com/swtr');
-      bool refreshed = false;
-
-      // Advance by 1h (age < 2h = ttl/2) -> fresh, no callback triggered
-      clock.advance(const Duration(hours: 1));
-      final freshEntry = cache.get('vidSWTR', onStaleRevalidate: (_) => refreshed = true);
-      expect(freshEntry, isNotNull);
-      expect(freshEntry!.isStaleWhileRevalidate(clock.now()), isFalse);
-      expect(refreshed, isFalse);
-
-      // Advance past 2h (age = 2h 30m >= ttl/2) -> SWTR window: returns entry AND triggers callback
-      clock.advance(const Duration(hours: 1, minutes: 30));
-      final swtrEntry = cache.get('vidSWTR', onStaleRevalidate: (vid) {
-        expect(vid, equals('vidSWTR'));
-        refreshed = true;
-      });
-      expect(swtrEntry, isNotNull);
-      expect(swtrEntry!.isStaleWhileRevalidate(clock.now()), isTrue);
-      expect(refreshed, isTrue);
-    });
-
-    test('evictDeadUrl blacklists dead 403 URL and prevents re-serving', () {
-      cache.put('vidDead', 'https://googlevideo.com/dead');
-      expect(cache.get('vidDead'), isNotNull);
-
-      // Evict dead URL
-      cache.evictDeadUrl('vidDead', 'https://googlevideo.com/dead');
-      expect(cache.get('vidDead'), isNull);
-
-      // Even if put back with old dead URL, get rejects it until fresh distinct URL
-      cache.put('vidDead', 'https://googlevideo.com/fresh');
-      expect(cache.get('vidDead'), isNotNull);
-      expect(cache.getUrl('vidDead'), equals('https://googlevideo.com/fresh'));
     });
   });
 }

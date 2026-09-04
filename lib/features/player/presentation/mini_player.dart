@@ -31,15 +31,7 @@ class MiniPlayer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // F-22: select only the two swipe settings instead of watching the whole
-    // SettingsCubit state (any settings change used to rebuild the mini
-    // player).
-    final swipeLeftAction =
-        context.select<SettingsCubit, MiniPlayerSwipeAction>(
-            (c) => c.state.miniPlayerSwipeLeft);
-    final swipeRightAction =
-        context.select<SettingsCubit, MiniPlayerSwipeAction>(
-            (c) => c.state.miniPlayerSwipeRight);
+    final settingsState = context.watch<SettingsCubit>().state;
     final p = context.palette;
 
     return BlocBuilder<PlayerCubit, PlayerState>(
@@ -68,10 +60,12 @@ class MiniPlayer extends StatelessWidget {
             onHorizontalDragEnd: (d) {
               final v = d.primaryVelocity ?? 0;
               if (v < -200) {
-                _handleSwipe(cubit, swipeLeftAction, isLeft: true);
+                _handleSwipe(cubit, settingsState.miniPlayerSwipeLeft,
+                    isLeft: true);
               }
               if (v > 200) {
-                _handleSwipe(cubit, swipeRightAction, isLeft: false);
+                _handleSwipe(cubit, settingsState.miniPlayerSwipeRight,
+                    isLeft: false);
               }
             },
             child: Padding(
@@ -186,7 +180,7 @@ class MiniPlayer extends StatelessWidget {
   }
 }
 
-class _MiniPlayerProgressBar extends StatefulWidget {
+class _MiniPlayerProgressBar extends StatelessWidget {
   final Duration duration;
   final Color activeAccent;
   final Color hairlineColor;
@@ -200,54 +194,37 @@ class _MiniPlayerProgressBar extends StatefulWidget {
   });
 
   @override
-  State<_MiniPlayerProgressBar> createState() => _MiniPlayerProgressBarState();
-}
-
-class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar> {
-  DateTime _lastSeek = DateTime.fromMillisecondsSinceEpoch(0);
-  void _throttledSeek(Duration pos) {
-    final now = DateTime.now();
-    if (now.difference(_lastSeek).inMilliseconds < 100) return;
-    _lastSeek = now;
-    widget.onSeek(pos);
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final cubit = context.read<PlayerCubit>();
     return Directionality(
       textDirection: TextDirection.ltr,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final trackWidth = constraints.maxWidth;
-          // FIX(BUG-14): Listen to raw un-throttled position stream for smooth progress bar updates
-          return StreamBuilder<Duration>(
-            stream: cubit.rawPositionStream,
-            initialData: cubit.state.position,
-            builder: (context, snapshot) {
-              final position = snapshot.data ?? Duration.zero;
-              final progress = widget.duration.inMilliseconds > 0
-                  ? (position.inMilliseconds / widget.duration.inMilliseconds)
+          return BlocSelector<PlayerCubit, PlayerState, Duration>(
+            selector: (s) => s.position,
+            builder: (context, position) {
+              final progress = duration.inMilliseconds > 0
+                  ? (position.inMilliseconds / duration.inMilliseconds)
                       .clamp(0.0, 1.0)
                   : 0.0;
 
               return GestureDetector(
                 behavior: HitTestBehavior.opaque,
                 onTapDown: (details) {
-                  if (trackWidth > 0 && widget.duration.inMilliseconds > 0) {
+                  if (trackWidth > 0 && duration.inMilliseconds > 0) {
                     final ratio =
                         (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
-                    final seekMs = (widget.duration.inMilliseconds * ratio).round();
-                    _throttledSeek(Duration(milliseconds: seekMs));
+                    final seekMs = (duration.inMilliseconds * ratio).round();
+                    onSeek(Duration(milliseconds: seekMs));
                   }
                 },
                 onHorizontalDragStart: (_) {},
                 onHorizontalDragUpdate: (details) {
-                  if (trackWidth > 0 && widget.duration.inMilliseconds > 0) {
+                  if (trackWidth > 0 && duration.inMilliseconds > 0) {
                     final ratio =
                         (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
-                    final seekMs = (widget.duration.inMilliseconds * ratio).round();
-                    _throttledSeek(Duration(milliseconds: seekMs));
+                    final seekMs = (duration.inMilliseconds * ratio).round();
+                    onSeek(Duration(milliseconds: seekMs));
                   }
                 },
                 child: SizedBox(
@@ -258,7 +235,7 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar> {
                     children: [
                       Positioned.fill(
                         child: ColoredBox(
-                            color: widget.hairlineColor.withValues(alpha: 0.35)),
+                            color: hairlineColor.withValues(alpha: 0.35)),
                       ),
                       Align(
                         alignment: Alignment.centerLeft,
@@ -270,13 +247,13 @@ class _MiniPlayerProgressBarState extends State<_MiniPlayerProgressBar> {
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
-                                  widget.activeAccent.withValues(alpha: 0.7),
-                                  widget.activeAccent,
+                                  activeAccent.withValues(alpha: 0.7),
+                                  activeAccent,
                                 ],
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: widget.activeAccent.withValues(alpha: 0.45),
+                                  color: activeAccent.withValues(alpha: 0.45),
                                   blurRadius: 4,
                                 ),
                               ],

@@ -1,5 +1,4 @@
 // lib/features/settings/presentation/widgets/backup_section.dart
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -7,7 +6,6 @@ import 'dart:typed_data';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../../../../core/di/injection.dart';
 import '../../../../core/theme/aura_theme.dart';
@@ -15,7 +13,6 @@ import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../domain/usecases/backup_usecases.dart';
 import '../../cubit/settings_cubit.dart';
 
-import '../../../../core/utils/error_logger.dart';
 class BackupSection extends StatefulWidget {
   const BackupSection({super.key});
 
@@ -59,16 +56,16 @@ class _BackupSectionState extends State<BackupSection> {
       final fileName = 'pulsr_backup_$timestamp.json';
       final bytes = Uint8List.fromList(utf8.encode(jsonContent));
 
-      final outputFileUri = await FilePicker.saveFile(
+      final outputFile = await FilePicker.platform.saveFile(
         dialogTitle: 'Export Backup JSON',
         fileName: fileName,
-        mimeType: 'application/json',
+        type: FileType.custom,
+        allowedExtensions: ['json'],
         bytes: bytes,
       );
 
-      if (outputFileUri != null) {
-        final filePath = outputFileUri.toFilePath();
-        final file = File(filePath);
+      if (outputFile != null && outputFile.isNotEmpty) {
+        final file = File(outputFile);
         if (!await file.exists() || (await file.length()) == 0) {
           await file.writeAsString(jsonContent);
         }
@@ -98,28 +95,16 @@ class _BackupSectionState extends State<BackupSection> {
   }
 
   Future<void> _importBackup(BuildContext context) async {
-    final files = await FilePicker.pickFiles(
+    final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['json'],
     );
 
-    if (files.isEmpty) return;
-    final picked = files.single;
-    String? filePath = picked.path;
-    // FIX(file_picker 12): bytes removed — materialize readAsBytes to temp
-    // for SAF cloud providers when path is null.
-    if (filePath == null) {
-      try {
-        final bytes = await picked.readAsBytes();
-        final tempDir = await getTemporaryDirectory();
-        final tmp = File('${tempDir.path}/${picked.name}');
-        await tmp.writeAsBytes(bytes);
-        filePath = tmp.path;
-      } catch (e, st) {
-        ErrorLogger.log('_importBackup failed, using fallback', error: e, stackTrace: st, category: 'BackupSection');
-        return;
-      }
+    if (result == null || result.files.single.path == null) {
+      return;
     }
+
+    final filePath = result.files.single.path!;
     final file = File(filePath);
 
     if (!await file.exists()) {
@@ -222,7 +207,7 @@ class _BackupSectionState extends State<BackupSection> {
 
         if (!context.mounted) return;
 
-        unawaited(showDialog(
+        showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
             backgroundColor: Theme.of(context).colorScheme.surface,
@@ -264,7 +249,7 @@ class _BackupSectionState extends State<BackupSection> {
               ),
             ],
           ),
-        ));
+        );
       }
     } catch (e) {
       if (context.mounted) {

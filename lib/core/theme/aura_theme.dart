@@ -112,8 +112,6 @@ class PulsrPalette extends ThemeExtension<PulsrPalette> {
       favorite: Color.lerp(favorite, other.favorite, t) ?? favorite,
       success: Color.lerp(success, other.success, t) ?? success,
       error: Color.lerp(error, other.error, t) ?? error,
-      // isDark is discrete (bool) — cannot be interpolated; threshold at 0.5 avoids flash
-      // during theme animation while all colors cross-fade smoothly via Color.lerp above.
       isDark: t < 0.5 ? isDark : other.isDark,
     );
   }

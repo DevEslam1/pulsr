@@ -14,7 +14,7 @@ import '../../../settings/cubit/settings_state.dart';
 import '../../../sheets/add_to_playlist_sheet.dart';
 import '../../../sheets/sleep_timer_sheet.dart';
 import '../../../sheets/song_info_sheet.dart';
-import '../../../downloads/presentation/widgets/ytm_download_button.dart';
+import '../../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../widgets/audio_quality_badge.dart';
 import '../widgets/audio_quality_sheet.dart';
 import '../widgets/audio_visualizer.dart';
@@ -109,7 +109,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                     icon: Icon(Icons.more_vert_rounded, color: p.textPrimary),
                     onPressed: () {
                       if (song != null) {
-                        showModalBottomSheet<void>(
+                        showModalBottomSheet(
                           context: context,
                           builder: (_) => SongInfoSheet(song: song),
                         );
@@ -160,6 +160,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                           ? LyricsView(
                               key: const ValueKey('lyrics_view'),
                               lyrics: state.lyrics,
+                              currentPosition: state.position,
                               isLoading: state.isLoadingLyrics,
                               activeColor: activeColor,
                               source: state.lyricsSource,
@@ -310,6 +311,7 @@ class ClassicPlayerTheme extends StatelessWidget {
 
                       // Seek Bar
                       PlayerSeekBar(
+                        position: state.position,
                         duration: state.duration,
                         activeColor: activeColor,
                         songId: state.currentSong?.id,
@@ -367,7 +369,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                                     : p.textSecondary,
                               ),
                               onPressed: () {
-                                showModalBottomSheet<void>(
+                                showModalBottomSheet(
                                   context: context,
                                   isScrollControlled: true,
                                   backgroundColor: Colors.transparent,
@@ -379,7 +381,12 @@ class ClassicPlayerTheme extends StatelessWidget {
                             IconButton(
                               icon: Icon(Icons.speed_rounded,
                                   color: p.textSecondary),
-                              onPressed: () => SpeedPickerSheet.show(context),
+                              onPressed: () {
+                                showModalBottomSheet(
+                                  context: context,
+                                  builder: (_) => const SpeedPickerSheet(),
+                                );
+                              },
                               tooltip: context.l10n.playbackSpeed,
                             ),
                             IconButton(
@@ -400,7 +407,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                                     : p.textSecondary,
                               ),
                               onPressed: () {
-                                showModalBottomSheet<void>(
+                                showModalBottomSheet(
                                   context: context,
                                   useRootNavigator: true,
                                   isScrollControlled: true,
@@ -415,7 +422,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                                   color: p.textSecondary),
                               onPressed: () {
                                 if (song != null) {
-                                  showModalBottomSheet<void>(
+                                  showModalBottomSheet(
                                     context: context,
                                     useRootNavigator: true,
                                     isScrollControlled: true,

@@ -49,13 +49,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
     private var channel: MethodChannel? = null
     private var context: Context? = null
     private val mainHandler = Handler(Looper.getMainLooper())
-    // TTFA (Item: plugin executor width): acquirePermit parks a pool thread
-    // per blocked caller, so a 3-thread pool starves whenever >3 YTM calls
-    // overlap (e.g. play resolve + search + pre-resolution + rate-limited
-    // browse calls). 6 threads = the OkHttp Dispatcher maxRequestsPerHost
-    // budget; each parked waiter is a parked semaphore await (no spinning),
-    // so the extra threads cost idle-time only.
-    private val executor: ExecutorService = Executors.newFixedThreadPool(6)
+    private val executor: ExecutorService = Executors.newFixedThreadPool(3)
 
     companion object {
         private const val TAG = "YtmExtractorPlugin"
@@ -74,9 +68,6 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             plugin.channel = channel
             channel.setMethodCallHandler(plugin)
             context?.let { PoTokenManager.init(it) }
-            // TTFA telemetry: one-way relay of key native timings to Dart
-            // (attached to the Sentry playback transaction). Non-blocking.
-            YtmMetricsRegistry.timingRelay = plugin::relayTiming
             return plugin
         }
     }
@@ -181,41 +172,6 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             "getLimitedMode" -> {
                 result.success(PoTokenManager.isLimitedMode)
             }
-            "acquirePermit" -> {
-                val bucketName = call.argument<String>("bucket") ?: "BROWSE"
-                val bucket = runCatching { RateLimiter.Bucket.valueOf(bucketName) }.getOrDefault(RateLimiter.Bucket.BROWSE)
-                runOffMainThread(result) {
-                    RateLimiter.shared.acquirePermit(bucket)
-                    true
-                }
-            }
-            "releasePermit" -> {
-                RateLimiter.shared.releasePermit()
-                result.success(true)
-            }
-            "onRateLimited" -> {
-                val retryAfter = call.argument<Number>("retryAfter")?.toLong()
-                val backoff = RateLimiter.shared.onRateLimited(retryAfter)
-                result.success(backoff)
-            }
-            "onSuccess" -> {
-                RateLimiter.shared.onSuccess()
-                result.success(true)
-            }
-            "getMetrics" -> {
-                result.success(YtmMetricsRegistry.snapshotAll())
-            }
-            "recordMetric" -> {
-                val operation = call.argument<String>("operation") ?: "unknown"
-                val latencyMs = (call.argument<Number>("latencyMs") ?: 0).toLong()
-                val isError = call.argument<Boolean>("isError") ?: false
-                YtmMetricsRegistry.record(operation, latencyMs, isError)
-                result.success(true)
-            }
-            "resetMetrics" -> {
-                YtmMetricsRegistry.resetAll()
-                result.success(true)
-            }
             "getPoTokenState" -> {
                 result.success(
                     mapOf(
@@ -239,7 +195,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                     PoTokenManager.setDataSyncId(dataSyncId)
                     mapOf(
                         "poToken" to PoTokenManager.accountPoTokenForSync(dataSyncId),
-                        "visitorData" to PoTokenManager.visitorData.ifEmpty { PoTokenManager.sessionVisitorData },
+                        "visitorData" to PoTokenManager.sessionVisitorData.ifEmpty { PoTokenManager.visitorData },
                     )
                 }
             }
@@ -251,28 +207,6 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                     PoTokenManager.setDataSyncId(dataSyncId)
                 }
                 result.success(true)
-            }
-            "updateClientVersion" -> {
-                val clientName = call.argument<String>("clientName")
-                val version = call.argument<String>("version")
-                if (clientName != null && version != null) {
-                    val type = runCatching { InnertubeClient.ClientType.valueOf(clientName) }.getOrNull()
-                    if (type != null) {
-                        ClientCapabilityMatrix.updateClientVersion(type, version)
-                        result.success(true)
-                        return
-                    }
-                }
-                result.success(false)
-            }
-            "updateCapabilityMatrix" -> {
-                val json = call.argument<String>("json")
-                if (!json.isNullOrEmpty()) {
-                    ClientCapabilityMatrix.loadFromJson(json)
-                    result.success(true)
-                    return
-                }
-                result.success(false)
             }
             "search" -> {
                 val query = call.argument<String>("query")?.trim()
@@ -347,12 +281,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
     }
 
     private fun runOffMainThread(result: MethodChannel.Result, work: () -> Any?) {
-        val submittedAt = System.currentTimeMillis()
         executor.execute {
-            // TTFA telemetry: cheap measure of how long the call waited for a
-            // pool thread before running.
-            val queueWaitMs = System.currentTimeMillis() - submittedAt
-            YtmMetricsRegistry.recordRelayed("executor.queue_wait", queueWaitMs)
             try {
                 ensureExtractorReady()
                 val value = work()
@@ -370,47 +299,9 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         }
     }
 
-    /**
-     * TTFA telemetry: forwards one key native timing over the plugin channel
-     * to Dart (playback_latency_tracker attaches it to the Sentry playback
-     * transaction). Safe from any thread — the invoke is posted to
-     * [mainHandler] and never blocks the caller.
-     */
-    private fun relayTiming(
-        name: String,
-        durationMs: Long,
-        isError: Boolean,
-        attrs: Map<String, Any?>?
-    ) {
-        val ch = channel ?: return
-        val payload = HashMap<String, Any?>(8)
-        payload["name"] = name
-        payload["durationMs"] = durationMs
-        payload["isError"] = isError
-        if (!attrs.isNullOrEmpty()) payload["attrs"] = attrs
-        mainHandler.post {
-            runCatching { ch.invokeMethod("nativeTiming", payload) }
-        }
-    }
-
     private fun errorCodeFor(e: Throwable): String {
-        if (e is InnertubeClient.YtmSignInRequiredAbortException) {
-            return "YTM_SIGNIN_REQUIRED"
-        }
         if (e is InnertubeClient.InnertubeException) {
             return e.signal.code
-        }
-        if (e is PoTokenException.WebViewUnavailable || e is BadWebViewException) {
-            return "PO_TOKEN_BROKEN"
-        }
-        if (e is PoTokenException.Timeout) {
-            return "PO_TOKEN_TIMEOUT"
-        }
-        if (e is PoTokenException.Invalidated) {
-            return "PO_TOKEN_INVALID"
-        }
-        if (e is PoTokenException) {
-            return "PO_TOKEN_UNAVAILABLE"
         }
         val msg = e.message?.lowercase() ?: ""
         if (msg.contains("not a bot") || msg.contains("login_required") || msg.contains("recaptcha") || msg.contains("bot_block")) {
@@ -809,16 +700,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         if (ctx != null) {
             val client = InnertubeClient(ctx)
             try {
-                val res = client.resolvePlayerStream(videoId, quality)
-                val streamUrl = res["url"] as? String
-                if (streamUrl != null) {
-                    val uriHost = runCatching { java.net.URI(streamUrl).host }.getOrNull()
-                    if (uriHost != null) {
-                        val pinnedFamily = YtmHttpClient.getPinnedIpFamily(uriHost)
-                        ProxyManager.setPinnedIpFamily(pinnedFamily)
-                    }
-                }
-                return res
+                return client.resolvePlayerStream(videoId, quality)
             } catch (e: Throwable) {
                 innertubeError = e
                 Log.w(TAG, "Native Innertube stream extraction failed for $videoId: ${e.message}. Attempting NewPipeExtractor fallback...")
@@ -869,7 +751,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             "title" to info.name,
             "artist" to (info.uploaderName ?: ""),
             "artworkUrl" to bestArtwork(info.thumbnails),
-            "userAgent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.7204.93 Safari/537.36",
+            "userAgent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
         )
     }
 

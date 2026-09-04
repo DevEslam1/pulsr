@@ -1,31 +1,5 @@
 // lib/domain/models/audio_output_info.dart
 
-/// Per-format direct-playback capability (from Android's
-/// isDirectPlaybackSupported probe).
-class AudioDirectFormat {
-  final String encoding; // 'float' | '24' | '32'
-  final int sampleRate;
-  final bool supported;
-
-  const AudioDirectFormat({
-    required this.encoding,
-    required this.sampleRate,
-    required this.supported,
-  });
-
-  factory AudioDirectFormat.fromMap(Map<dynamic, dynamic> map) => AudioDirectFormat(
-        encoding: map['encoding'] as String? ?? '',
-        sampleRate: (map['sampleRate'] as num?)?.toInt() ?? 0,
-        supported: (map['supported'] as bool?) ?? false,
-      );
-
-  Map<String, dynamic> toMap() => {
-        'encoding': encoding,
-        'sampleRate': sampleRate,
-        'supported': supported,
-      };
-}
-
 class AudioDeviceEntry {
   final int id;
   final String name;
@@ -90,31 +64,6 @@ class AudioOutputInfo {
   final int? nativeSampleRate;
   final int? nativeFramesPerBuffer;
 
-  // Extended for exclusive-for-all
-  final bool isDirectSupported;
-  final bool isOffloadSupported;
-  final String? bitPerfectFailureReason;
-  final String activeDeviceType; // usb/wired/bt/builtin/hdmi
-  final bool isBluetooth;
-
-  // Phase 4: output-path capability diagnostics
-  final List<AudioDirectFormat> directFormats;
-  final int usbAudioClass; // 0 = none/unknown, 1 = UAC1, 2 = UAC2, 3 = UAC3
-  final String? usbDacLabel;
-
-  // Bluetooth codec control (populated when isBluetooth == true)
-  final String? btCodecName;           // 'SBC' | 'AAC' | 'aptX' | 'aptX HD' | 'LDAC' | 'LC3'
-  final int? btSampleRateHz;           // 44100 / 48000 / 88200 / 96000
-  final int? btBitDepth;               // 16 / 24 / 32
-  final int? btLdacQualityMode;        // 0=Best Effort, 1=Mobile, 2=Standard, 3=Maximum (990kbps)
-  final bool btCodecConnected;         // true when codec status was read successfully
-  final bool btA2dpPresent;            // true when A2DP device detected in audio routing (even without permission)
-  final String? btReason;              // 'permission_required' | 'proxy_initializing' | 'no_device_connected'
-  final List<String> btSelectableCodecs;
-  final List<String> btSupportedCodecs;
-  final List<int> btSelectableSampleRates;
-  final List<int> btSelectableBitDepths;
-
   const AudioOutputInfo({
     required this.deviceName,
     required this.isUsbDac,
@@ -128,26 +77,6 @@ class AudioOutputInfo {
     this.targetBitDepth = 0,
     this.nativeSampleRate,
     this.nativeFramesPerBuffer,
-    this.isDirectSupported = false,
-    this.isOffloadSupported = false,
-    this.bitPerfectFailureReason,
-    this.activeDeviceType = 'builtin',
-    this.isBluetooth = false,
-    this.directFormats = const [],
-    this.usbAudioClass = 0,
-    this.usbDacLabel,
-    // BT codec
-    this.btCodecName,
-    this.btSampleRateHz,
-    this.btBitDepth,
-    this.btLdacQualityMode,
-    this.btCodecConnected = false,
-    this.btA2dpPresent = false,
-    this.btReason,
-    this.btSelectableCodecs = const [],
-    this.btSupportedCodecs = const [],
-    this.btSelectableSampleRates = const [],
-    this.btSelectableBitDepths = const [],
   });
 
   factory AudioOutputInfo.fromMap(Map<dynamic, dynamic> map) {
@@ -181,47 +110,6 @@ class AudioOutputInfo {
       targetBitDepth: (map['targetBitDepth'] as num?)?.toInt() ?? 0,
       nativeSampleRate: (map['nativeSampleRate'] as num?)?.toInt(),
       nativeFramesPerBuffer: (map['nativeFramesPerBuffer'] as num?)?.toInt(),
-      isDirectSupported: (map['isDirectSupported'] as bool?) ?? false,
-      isOffloadSupported: (map['isOffloadSupported'] as bool?) ?? false,
-      bitPerfectFailureReason: map['bitPerfectFailureReason'] as String?,
-      activeDeviceType: (map['activeDeviceType'] as String?) ?? 'builtin',
-      isBluetooth: (map['isBluetooth'] as bool?) ?? false,
-      directFormats: () {
-        final raw = map['directFormats'];
-        final out = <AudioDirectFormat>[];
-        if (raw is List) {
-          for (final d in raw) {
-            if (d is Map) out.add(AudioDirectFormat.fromMap(d));
-          }
-        }
-        return out;
-      }(),
-      usbAudioClass: (map['usbAudioClass'] as num?)?.toInt() ?? 0,
-      usbDacLabel: map['usbDacLabel'] as String?,
-      // BT codec fields
-      btCodecName: map['btCodecName'] as String?,
-      btSampleRateHz: (map['btSampleRateHz'] as num?)?.toInt(),
-      btBitDepth: (map['btBitDepth'] as num?)?.toInt(),
-      btLdacQualityMode: (map['btLdacQualityMode'] as num?)?.toInt(),
-      btCodecConnected: (map['btCodecConnected'] as bool?) ?? false,
-      btA2dpPresent: (map['btA2dpPresent'] as bool?) ?? false,
-      btReason: map['btReason'] as String?,
-      btSelectableCodecs: () {
-        final raw = map['btSelectableCodecs'];
-        return (raw is List) ? raw.whereType<String>().toList() : const <String>[];
-      }(),
-      btSupportedCodecs: () {
-        final raw = map['btSupportedCodecs'];
-        return (raw is List) ? raw.whereType<String>().toList() : const <String>[];
-      }(),
-      btSelectableSampleRates: () {
-        final raw = map['btSelectableSampleRates'];
-        return (raw is List) ? raw.whereType<num>().map((n) => n.toInt()).toList() : const <int>[];
-      }(),
-      btSelectableBitDepths: () {
-        final raw = map['btSelectableBitDepths'];
-        return (raw is List) ? raw.whereType<num>().map((n) => n.toInt()).toList() : const <int>[];
-      }(),
     );
   }
 
@@ -237,27 +125,6 @@ class AudioOutputInfo {
       'availableDevices': availableDevices.map((d) => d.toMap()).toList(),
       'targetSampleRate': targetSampleRate,
       'targetBitDepth': targetBitDepth,
-      'nativeSampleRate': nativeSampleRate,
-      'nativeFramesPerBuffer': nativeFramesPerBuffer,
-      'isDirectSupported': isDirectSupported,
-      'isOffloadSupported': isOffloadSupported,
-      'bitPerfectFailureReason': bitPerfectFailureReason,
-      'activeDeviceType': activeDeviceType,
-      'isBluetooth': isBluetooth,
-      'directFormats': directFormats.map((d) => d.toMap()).toList(),
-      'usbAudioClass': usbAudioClass,
-      'usbDacLabel': usbDacLabel,
-      'btCodecName': btCodecName,
-      'btSampleRateHz': btSampleRateHz,
-      'btBitDepth': btBitDepth,
-      'btLdacQualityMode': btLdacQualityMode,
-      'btCodecConnected': btCodecConnected,
-      'btA2dpPresent': btA2dpPresent,
-      'btReason': btReason,
-      'btSelectableCodecs': btSelectableCodecs,
-      'btSupportedCodecs': btSupportedCodecs,
-      'btSelectableSampleRates': btSelectableSampleRates,
-      'btSelectableBitDepths': btSelectableBitDepths,
     };
   }
 
@@ -272,27 +139,6 @@ class AudioOutputInfo {
     List<AudioDeviceEntry>? availableDevices,
     int? targetSampleRate,
     int? targetBitDepth,
-    int? nativeSampleRate,
-    int? nativeFramesPerBuffer,
-    bool? isDirectSupported,
-    bool? isOffloadSupported,
-    String? bitPerfectFailureReason,
-    String? activeDeviceType,
-    bool? isBluetooth,
-    List<AudioDirectFormat>? directFormats,
-    int? usbAudioClass,
-    String? usbDacLabel,
-    String? btCodecName,
-    int? btSampleRateHz,
-    int? btBitDepth,
-    int? btLdacQualityMode,
-    bool? btCodecConnected,
-    bool? btA2dpPresent,
-    String? btReason,
-    List<String>? btSelectableCodecs,
-    List<String>? btSupportedCodecs,
-    List<int>? btSelectableSampleRates,
-    List<int>? btSelectableBitDepths,
   }) {
     return AudioOutputInfo(
       deviceName: deviceName ?? this.deviceName,
@@ -306,27 +152,6 @@ class AudioOutputInfo {
       availableDevices: availableDevices ?? this.availableDevices,
       targetSampleRate: targetSampleRate ?? this.targetSampleRate,
       targetBitDepth: targetBitDepth ?? this.targetBitDepth,
-      nativeSampleRate: nativeSampleRate ?? this.nativeSampleRate,
-      nativeFramesPerBuffer: nativeFramesPerBuffer ?? this.nativeFramesPerBuffer,
-      isDirectSupported: isDirectSupported ?? this.isDirectSupported,
-      isOffloadSupported: isOffloadSupported ?? this.isOffloadSupported,
-      bitPerfectFailureReason: bitPerfectFailureReason ?? this.bitPerfectFailureReason,
-      activeDeviceType: activeDeviceType ?? this.activeDeviceType,
-      isBluetooth: isBluetooth ?? this.isBluetooth,
-      directFormats: directFormats ?? this.directFormats,
-      usbAudioClass: usbAudioClass ?? this.usbAudioClass,
-      usbDacLabel: usbDacLabel ?? this.usbDacLabel,
-      btCodecName: btCodecName ?? this.btCodecName,
-      btSampleRateHz: btSampleRateHz ?? this.btSampleRateHz,
-      btBitDepth: btBitDepth ?? this.btBitDepth,
-      btLdacQualityMode: btLdacQualityMode ?? this.btLdacQualityMode,
-      btCodecConnected: btCodecConnected ?? this.btCodecConnected,
-      btA2dpPresent: btA2dpPresent ?? this.btA2dpPresent,
-      btReason: btReason ?? this.btReason,
-      btSelectableCodecs: btSelectableCodecs ?? this.btSelectableCodecs,
-      btSupportedCodecs: btSupportedCodecs ?? this.btSupportedCodecs,
-      btSelectableSampleRates: btSelectableSampleRates ?? this.btSelectableSampleRates,
-      btSelectableBitDepths: btSelectableBitDepths ?? this.btSelectableBitDepths,
     );
   }
 

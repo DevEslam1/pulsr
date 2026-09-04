@@ -6,7 +6,7 @@
 #include <cmath>
 
 void runSampleRateChangeTest() {
-    std::cout << "\n=== [TEST 10/22] Dynamic Sample Rate Transition Test (44.1k -> 96k -> 768k) ===" << std::endl;
+    std::cout << "\n=== [TEST 10/11] Dynamic Sample Rate Transition Test (48k -> 96k -> 768k) ===" << std::endl;
     auto& engine = AudioDspEngine::instance();
 
     const double testRates[] = {44100.0, 48000.0, 88200.0, 96000.0, 192000.0, 384000.0, 768000.0, 48000.0};
@@ -45,19 +45,4 @@ void runSampleRateChangeTest() {
     }
 
     std::cout << "  ✓ All 8 sample rate transitions up to 768kHz remained stable, finite, and bounded." << std::endl;
-
-    // A2 (B-05): Direct ConvolutionReverb::setSampleRate must regenerate preparedIr for non-custom presets
-    {
-        std::cout << "  Running A2 ConvolutionReverb setSampleRate non-custom regeneration test..." << std::endl;
-        ConvolutionReverb reverb;
-        reverb.setSampleRate(44100.0);
-        reverb.setPreset(ReverbPreset::Hall);
-        assert(reverb.getPreparedIr() != nullptr);
-        assert(reverb.getPreparedIr()->createdSampleRate == 44100);
-
-        reverb.setSampleRate(96000.0);
-        assert(reverb.getPreparedIr() != nullptr);
-        assert(reverb.getPreparedIr()->createdSampleRate == 48000);
-        std::cout << "  ✓ A2 ConvolutionReverb::setSampleRate successfully regenerated IR at 48kHz effective core rate." << std::endl;
-    }
 }

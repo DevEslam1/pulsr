@@ -9,7 +9,6 @@ import '../../core/errors/failures.dart';
 import '../../data/db/app_database.dart';
 import '../repositories/music_repository_interface.dart';
 
-import '../../core/utils/error_logger.dart';
 @singleton
 class PlaylistExportUseCase {
   /// Generates #EXTM3U formatted string for a list of songs.
@@ -95,8 +94,7 @@ class PlaylistImportUseCase {
       final bytes = await file.readAsBytes();
       try {
         content = utf8.decode(bytes);
-      } catch (e, st) {
-        ErrorLogger.log('importPlaylistFromFile failed, using fallback', error: e, stackTrace: st, category: 'PlaylistIoUsecases');
+      } catch (_) {
         content = latin1.decode(bytes);
       }
 

@@ -12,7 +12,6 @@
 class SpatialPanner {
 public:
     SpatialPanner();
-    void setSampleRate(double sampleRate);
     void setBalance(double balance); // -1.0 (left) to +1.0 (right)
     void setMono(bool mono);
     double getBalance() const { return targetBalance_; }
@@ -24,7 +23,6 @@ public:
     void processInterleaved(float* buffer, int frames, int channels = 2);
 
 private:
-    double sampleRate_ = 48000.0;
     double targetBalance_ = 0.0;
     double smoothedBalance_ = 0.0;
     bool mono_ = false;

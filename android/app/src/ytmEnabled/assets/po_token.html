@@ -1,36 +1,29 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>BotGuard Helper</title>
-  <script>
+<html lang="en"><head><title></title><script>
 /**
  * Factory method to create and load a BotGuardClient instance.
- * @param {Object} challengeData - Configuration options for the BotGuardClient.
- * @returns {Promise<Object>} A promise that resolves to a loaded BotGuardClient instance.
+ * @param options - Configuration options for the BotGuardClient.
+ * @returns A promise that resolves to a loaded BotGuardClient instance.
  */
 function loadBotGuard(challengeData) {
-  const globalScope = (typeof window !== 'undefined') ? window : (typeof globalThis !== 'undefined' ? globalThis : this);
-  const vm = globalScope[challengeData.globalName];
-  const program = challengeData.program;
+  this.vm = this[challengeData.globalName];
+  this.program = challengeData.program;
+  this.vmFunctions = {};
+  this.syncSnapshotFunction = null;
 
-  if (!vm) {
-    return Promise.reject(new Error('[BotGuardClient]: VM not found in the global object'));
-  }
+  if (!this.vm)
+    throw new Error('[BotGuardClient]: VM not found in the global object');
 
-  if (typeof vm.a !== 'function') {
-    return Promise.reject(new Error('[BotGuardClient]: Could not load program (vm.a is not a function)'));
-  }
+  if (!this.vm.a)
+    throw new Error('[BotGuardClient]: Could not load program');
 
-  let vmFunctions = {};
-
-  const vmFunctionsCallback = function(
+  const vmFunctionsCallback = function (
     asyncSnapshotFunction,
     shutdownFunction,
     passEventFunction,
     checkCameraFunction
   ) {
-    vmFunctions = {
+    this.vmFunctions = {
       asyncSnapshotFunction: asyncSnapshotFunction,
       shutdownFunction: shutdownFunction,
       passEventFunction: passEventFunction,
@@ -38,125 +31,97 @@ function loadBotGuard(challengeData) {
     };
   };
 
-  try {
-    vm.a(program, vmFunctionsCallback, true, challengeData.userInteractionElement || null, function() { /* no-op */ }, [ [], [] ]);
-  } catch (err) {
-    return Promise.reject(new Error('[BotGuardClient]: vm.a execution failed: ' + (err && err.message ? err.message : err)));
-  }
+  this.syncSnapshotFunction = this.vm.a(this.program, vmFunctionsCallback, true, this.userInteractionElement, function () {/** no-op */ }, [ [], [] ])[0]
 
-  return new Promise(function(resolve, reject) {
-    let elapsedMs = 0;
-    const intervalMs = 5;
-    const timeoutMs = 10000;
-
-    if (window._botGuardIntervalId) {
-      clearInterval(window._botGuardIntervalId);
-      window._botGuardIntervalId = null;
-    }
-
-    window._botGuardIntervalId = setInterval(function() {
-      if (typeof vmFunctions.asyncSnapshotFunction === 'function') {
-        if (window._botGuardIntervalId) {
-          clearInterval(window._botGuardIntervalId);
-          window._botGuardIntervalId = null;
-        }
-        resolve({
-          snapshot: function(args) {
-            return new Promise(function(snapResolve, snapReject) {
-              if (typeof vmFunctions.asyncSnapshotFunction !== 'function') {
-                return snapReject(new Error('[BotGuardClient]: Async snapshot function not found'));
-              }
-              try {
-                vmFunctions.asyncSnapshotFunction(function(response) {
-                  snapResolve(response);
-                }, [
-                  args.contentBinding,
-                  args.signedTimestamp,
-                  args.webPoSignalOutput,
-                  args.skipPrivacyBuffer
-                ]);
-              } catch (snapErr) {
-                snapReject(new Error('[BotGuardClient]: Snapshot invocation error: ' + (snapErr && snapErr.message ? snapErr.message : snapErr)));
-              }
-            });
-          }
-        });
-        return;
+  // an asynchronous function runs in the background and it will eventually call
+  // `vmFunctionsCallback`, however we need to manually tell JavaScript to pass
+  // control to the things running in the background by interrupting this async
+  // function in any way, e.g. with a delay of 1ms. The loop is most probably not
+  // needed but is there just because.
+  return new Promise(function (resolve, reject) {
+    i = 0
+    refreshIntervalId = setInterval(function () {
+      if (!!this.vmFunctions.asyncSnapshotFunction) {
+        resolve(this)
+        clearInterval(refreshIntervalId);
       }
-
-      elapsedMs += intervalMs;
-      if (elapsedMs >= timeoutMs) {
-        if (window._botGuardIntervalId) {
-          clearInterval(window._botGuardIntervalId);
-          window._botGuardIntervalId = null;
-        }
-        reject(new Error('[BotGuardClient]: asyncSnapshotFunction is null after ' + (timeoutMs / 1000) + ' seconds timeout'));
+      if (i >= 10000) {
+        reject("asyncSnapshotFunction is null even after 10 seconds")
+        clearInterval(refreshIntervalId);
       }
-    }, intervalMs);
+      i += 1;
+    }, 1);
+  })
+}
+
+/**
+ * Takes a snapshot asynchronously.
+ * @returns The snapshot result.
+ * @example
+ * ```ts
+ * const result = await botguard.snapshot({
+ *   contentBinding: {
+ *     c: "a=6&a2=10&b=SZWDwKVIuixOp7Y4euGTgwckbJA&c=1729143849&d=1&t=7200&c1a=1&c6a=1&c6b=1&hh=HrMb5mRWTyxGJphDr0nW2Oxonh0_wl2BDqWuLHyeKLo",
+ *     e: "ENGAGEMENT_TYPE_VIDEO_LIKE",
+ *     encryptedVideoId: "P-vC09ZJcnM"
+ *    }
+ * });
+ *
+ * console.log(result);
+ * ```
+ */
+function snapshot(args) {
+  return new Promise(function (resolve, reject) {
+    if (!this.vmFunctions.asyncSnapshotFunction)
+      return reject(new Error('[BotGuardClient]: Async snapshot function not found'));
+
+    this.vmFunctions.asyncSnapshotFunction(function (response) { resolve(response) }, [
+      args.contentBinding,
+      args.signedTimestamp,
+      args.webPoSignalOutput,
+      args.skipPrivacyBuffer
+    ]);
   });
 }
 
-window.disposeBotGuard = function() {
-  if (window._botGuardIntervalId) {
-    clearInterval(window._botGuardIntervalId);
-    window._botGuardIntervalId = null;
-  }
-};
-
 function runBotGuard(challengeData) {
-  if (!challengeData || !challengeData.interpreterJavascript) {
-    return Promise.reject(new Error('[BotGuardClient]: Invalid challengeData'));
-  }
-
   const interpreterJavascript = challengeData.interpreterJavascript.privateDoNotAccessOrElseSafeScriptWrappedValue;
+
   if (interpreterJavascript) {
-    try {
-      new Function(interpreterJavascript)();
-    } catch (evalErr) {
-      return Promise.reject(new Error('[BotGuardClient]: Failed to execute interpreter script: ' + (evalErr && evalErr.message ? evalErr.message : evalErr)));
-    }
-  } else {
-    return Promise.reject(new Error('[BotGuardClient]: Could not load VM (interpreter script missing)'));
-  }
+    new Function(interpreterJavascript)();
+  } else throw new Error('Could not load VM');
 
   const webPoSignalOutput = [];
   return loadBotGuard({
     globalName: challengeData.globalName,
+    globalObj: this,
     program: challengeData.program
-  }).then(function(botguard) {
-    return botguard.snapshot({ webPoSignalOutput: webPoSignalOutput });
-  }).then(function(botguardResponse) {
-    return { webPoSignalOutput: webPoSignalOutput, botguardResponse: botguardResponse };
-  });
+  }).then(function (botguard) {
+    return botguard.snapshot({ webPoSignalOutput: webPoSignalOutput })
+  }).then(function (botguardResponse) {
+    return { webPoSignalOutput: webPoSignalOutput, botguardResponse: botguardResponse }
+  })
 }
 
 function obtainPoToken(webPoSignalOutput, integrityToken, identifier) {
-  if (!Array.isArray(webPoSignalOutput) || webPoSignalOutput.length === 0) {
-    throw new Error('PMD:Undefined');
-  }
-
   const getMinter = webPoSignalOutput[0];
-  if (typeof getMinter !== 'function') {
+
+  if (!getMinter)
     throw new Error('PMD:Undefined');
-  }
 
   const mintCallback = getMinter(integrityToken);
-  if (typeof mintCallback !== 'function') {
+
+  if (!(mintCallback instanceof Function))
     throw new Error('APF:Failed');
-  }
 
   const result = mintCallback(identifier);
-  if (!result) {
-    throw new Error('YNJ:Undefined');
-  }
 
-  if (!(result instanceof Uint8Array)) {
+  if (!result)
+    throw new Error('YNJ:Undefined');
+
+  if (!(result instanceof Uint8Array))
     throw new Error('ODM:Invalid');
-  }
 
   return result;
 }
-  </script>
-</head>
-<body></body>
-</html>
+</script></head><body></body></html>

@@ -1,11 +1,9 @@
-import 'dart:async';
+// lib/data/repositories/music_repository.dart
 import 'dart:io';
 import 'dart:math';
 import 'package:drift/drift.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../../core/constants/prefs_keys.dart';
 import '../../core/errors/failures.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/models/genre_item.dart';
@@ -35,17 +33,10 @@ class MusicRepository implements IMusicRepository {
         ..where((t) =>
             t.isMissing.equals(false) &
             t.source.equals(SongSource.local) &
-            t.path.like('ytmusic://%').not() &
-            t.path.equals('').not());
+            t.path.like('ytmusic://%').not());
 
       if (searchQuery != null && searchQuery.trim().isNotEmpty) {
-        final sanitizedQuery = searchQuery
-            .trim()
-            .toLowerCase()
-            .replaceAll(r'\', r'\\')
-            .replaceAll('%', r'\%')
-            .replaceAll('_', r'\_');
-        final pattern = '%$sanitizedQuery%';
+        final pattern = '%${searchQuery.trim().toLowerCase()}%';
         query.where((t) =>
             t.title.lower().like(pattern) |
             t.artist.lower().like(pattern) |
@@ -61,11 +52,7 @@ class MusicRepository implements IMusicRepository {
             .toList();
 
         for (final prefix in sanitizedFolders) {
-          final escapedPrefix = prefix
-              .replaceAll(r'\', r'\\')
-              .replaceAll('%', r'\%')
-              .replaceAll('_', r'\_');
-          query.where((t) => t.path.like('$escapedPrefix%').not());
+          query.where((t) => t.path.like('$prefix%').not());
         }
       }
 
@@ -103,7 +90,7 @@ class MusicRepository implements IMusicRepository {
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
           .handleError(
-            (Object e) => Left<AppFailure, List<SongsTableData>>(
+            (e) => Left<AppFailure, List<SongsTableData>>(
                 DatabaseFailure('Failed to watch songs', e)),
           );
     } catch (e) {
@@ -123,8 +110,7 @@ class MusicRepository implements IMusicRepository {
         ..where((t) =>
             t.isMissing.equals(false) &
             t.source.equals(SongSource.local) &
-            t.path.like('ytmusic://%').not() &
-            t.path.equals('').not());
+            t.path.like('ytmusic://%').not());
       if (sortBy == 'title') {
         query.orderBy([
           (t) => OrderingTerm(
@@ -175,9 +161,8 @@ class MusicRepository implements IMusicRepository {
   @override
   Future<Result<SongsTableData?>> getSongByPath(String path) async {
     try {
-      // FIX(BUG-16): Exclude remote ytmusic:// sentinels from local path queries
       final song = await (_db.select(_db.songsTable)
-            ..where((t) => t.path.equals(path) & t.path.like('ytmusic://%').not()))
+            ..where((t) => t.path.equals(path)))
           .getSingleOrNull();
       return Right(song);
     } catch (e) {
@@ -218,24 +203,13 @@ class MusicRepository implements IMusicRepository {
   Future<Result<SongsTableData?>> findMatchingLocalSong(
       {String? remoteId, String? title, String? artist}) async {
     try {
-      // FIX(D1): Guard nullable params early before querying
-      if ((remoteId == null || remoteId.isEmpty) &&
-          (title == null ||
-              title.trim().isEmpty ||
-              artist == null ||
-              artist.trim().isEmpty)) {
-        return const Right(null);
-      }
-
       // 1. Try matching by remoteId first
       if (remoteId != null && remoteId.isNotEmpty) {
-        // FIX(BUG-16): Ensure local row query excludes ytmusic:// sentinels
         final byRemoteId = await (_db.select(_db.songsTable)
               ..where((t) =>
                   t.remoteId.equals(remoteId) &
                   t.source.equals(SongSource.local) &
-                  t.isMissing.equals(false) &
-                  t.path.like('ytmusic://%').not())
+                  t.isMissing.equals(false))
               ..limit(1))
             .getSingleOrNull();
         if (byRemoteId != null) return Right(byRemoteId);
@@ -246,12 +220,10 @@ class MusicRepository implements IMusicRepository {
           title.trim().isNotEmpty &&
           artist != null &&
           artist.trim().isNotEmpty) {
-        // FIX(BUG-16): Ensure local metadata match excludes ytmusic:// sentinels
         final byMeta = await (_db.select(_db.songsTable)
               ..where((t) =>
                   t.source.equals(SongSource.local) &
                   t.isMissing.equals(false) &
-                  t.path.like('ytmusic://%').not() &
                   t.title.lower().equals(title.trim().toLowerCase()) &
                   t.artist.lower().equals(artist.trim().toLowerCase()))
               ..limit(1))
@@ -269,22 +241,10 @@ class MusicRepository implements IMusicRepository {
   Future<Result<List<SongsTableData>>> getSongsByIds(List<int> ids) async {
     if (ids.isEmpty) return const Right([]);
     try {
-      // FIX: chunk to 500 (SQLite ~999 var limit), filter missing, restore
-      // caller order (IN returns arbitrary order) so playlists/queues keep order.
-      final ordered = <SongsTableData>[];
-      for (var i = 0; i < ids.length; i += 500) {
-        final chunk =
-            ids.sublist(i, (i + 500 > ids.length) ? ids.length : i + 500);
-        final songs = await (_db.select(_db.songsTable)
-              ..where((t) => t.id.isIn(chunk) & t.isMissing.equals(false)))
-            .get();
-        final byId = {for (final s in songs) s.id: s};
-        for (final id in chunk) {
-          final s = byId[id];
-          if (s != null) ordered.add(s);
-        }
-      }
-      return Right(ordered);
+      final songs = await (_db.select(_db.songsTable)
+            ..where((t) => t.id.isIn(ids)))
+          .get();
+      return Right(songs);
     } catch (e) {
       return Left(DatabaseFailure('Failed to fetch songs by ids', e));
     }
@@ -302,7 +262,7 @@ class MusicRepository implements IMusicRepository {
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((Object e) => Left<AppFailure, List<SongsTableData>>(
+          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch favorites', e)));
     } catch (e) {
       return Stream.value(
@@ -378,6 +338,7 @@ class MusicRepository implements IMusicRepository {
             ..where((t) =>
                 t.lastPlayed.isNotNull() &
                 t.isMissing.equals(false) &
+                t.source.equals(SongSource.local) &
                 t.path.like('ytmusic://%').not())
             ..orderBy([
               (t) => OrderingTerm(
@@ -386,7 +347,7 @@ class MusicRepository implements IMusicRepository {
             ..limit(limit))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((Object e) => Left<AppFailure, List<SongsTableData>>(
+          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch recently played', e)));
     } catch (e) {
       return Stream.value(
@@ -402,6 +363,7 @@ class MusicRepository implements IMusicRepository {
             ..where((t) =>
                 t.lastPlayed.isNotNull() &
                 t.isMissing.equals(false) &
+                t.source.equals(SongSource.local) &
                 t.path.like('ytmusic://%').not())
             ..orderBy([
               (t) => OrderingTerm(
@@ -430,7 +392,7 @@ class MusicRepository implements IMusicRepository {
             ..limit(limit))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((Object e) => Left<AppFailure, List<SongsTableData>>(
+          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch recently added', e)));
     } catch (e) {
       return Stream.value(
@@ -454,7 +416,7 @@ class MusicRepository implements IMusicRepository {
             ..limit(limit))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((Object e) => Left<AppFailure, List<SongsTableData>>(
+          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch top played', e)));
     } catch (e) {
       return Stream.value(
@@ -481,8 +443,7 @@ class MusicRepository implements IMusicRepository {
       if (updatedVal != null) {
         return Right(updatedVal);
       }
-      // FIX(BUG-27): Explicit failure with songId when not found
-      return Left(DatabaseFailure('Song not found (id=$songId)'));
+      return const Left(DatabaseFailure('Song not found'));
     } catch (e) {
       return Left(DatabaseFailure('Failed to toggle favorite', e));
     }
@@ -495,23 +456,15 @@ class MusicRepository implements IMusicRepository {
       return const Right(null);
     }
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final lastSongId =
-          _lastRecordedSongId ?? prefs.getInt(PrefsKeys.historyLastSongId);
-      final lastTimeMs = _lastRecordedTime?.millisecondsSinceEpoch ??
-          prefs.getInt(PrefsKeys.historyLastTimeMs);
       final now = DateTime.now();
-      final nowMs = now.millisecondsSinceEpoch;
-      // FIX(S1-FU): Dedupe play-history across in-memory calls and cold restarts within 1500ms using PrefsKeys
-      if (lastSongId == songId &&
-          lastTimeMs != null &&
-          (nowMs - lastTimeMs) < 1500) {
+      if (_lastRecordedSongId == songId &&
+          _lastRecordedTime != null &&
+          now.difference(_lastRecordedTime!).inMilliseconds < 1500) {
         return const Right(null);
       }
       _lastRecordedSongId = songId;
       _lastRecordedTime = now;
-      unawaited(prefs.setInt(PrefsKeys.historyLastSongId, songId));
-      unawaited(prefs.setInt(PrefsKeys.historyLastTimeMs, nowMs));
+      final nowMs = now.millisecondsSinceEpoch;
       await _db.transaction(() async {
         final song = await (_db.select(_db.songsTable)
               ..where((t) => t.id.equals(songId)))
@@ -559,7 +512,7 @@ class MusicRepository implements IMusicRepository {
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((albums) => Right<AppFailure, List<AlbumsTableData>>(albums))
-          .handleError((Object e) => Left<AppFailure, List<AlbumsTableData>>(
+          .handleError((e) => Left<AppFailure, List<AlbumsTableData>>(
               DatabaseFailure('Failed to watch albums', e)));
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch albums', e)));
@@ -583,7 +536,7 @@ class MusicRepository implements IMusicRepository {
             ]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((Object e) => Left<AppFailure, List<SongsTableData>>(
+          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch album songs', e)));
     } catch (e) {
       return Stream.value(
@@ -635,7 +588,7 @@ class MusicRepository implements IMusicRepository {
             ..orderBy([(t) => OrderingTerm(expression: t.name)]))
           .watch()
           .map((artists) => Right<AppFailure, List<ArtistsTableData>>(artists))
-          .handleError((Object e) => Left<AppFailure, List<ArtistsTableData>>(
+          .handleError((e) => Left<AppFailure, List<ArtistsTableData>>(
               DatabaseFailure('Failed to watch artists', e)));
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch artists', e)));
@@ -653,7 +606,7 @@ class MusicRepository implements IMusicRepository {
                 t.path.like('ytmusic://%').not()))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((Object e) => Left<AppFailure, List<SongsTableData>>(
+          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch artist songs', e)));
     } catch (e) {
       return Stream.value(
@@ -697,7 +650,7 @@ class MusicRepository implements IMusicRepository {
             ..where((t) => t.artistId.equals(artistId)))
           .watch()
           .map((albums) => Right<AppFailure, List<AlbumsTableData>>(albums))
-          .handleError((Object e) => Left<AppFailure, List<AlbumsTableData>>(
+          .handleError((e) => Left<AppFailure, List<AlbumsTableData>>(
               DatabaseFailure('Failed to watch artist albums', e)));
     } catch (e) {
       return Stream.value(
@@ -714,7 +667,7 @@ class MusicRepository implements IMusicRepository {
           .watch()
           .map((playlists) =>
               Right<AppFailure, List<PlaylistsTableData>>(playlists))
-          .handleError((Object e) => Left<AppFailure, List<PlaylistsTableData>>(
+          .handleError((e) => Left<AppFailure, List<PlaylistsTableData>>(
               DatabaseFailure('Failed to watch playlists', e)));
     } catch (e) {
       return Stream.value(
@@ -814,7 +767,7 @@ class MusicRepository implements IMusicRepository {
           .watch()
           .map((rows) => Right<AppFailure, List<SongsTableData>>(
               rows.map((row) => row.readTable(_db.songsTable)).toList()))
-          .handleError((Object e) => Left<AppFailure, List<SongsTableData>>(
+          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch playlist songs', e)));
     } catch (e) {
       return Stream.value(
@@ -947,7 +900,7 @@ class MusicRepository implements IMusicRepository {
           .watch()
           .map((folders) =>
               Right<AppFailure, List<ExcludedFoldersTableData>>(folders))
-          .handleError((Object e) => Left<AppFailure, List<ExcludedFoldersTableData>>(
+          .handleError((e) => Left<AppFailure, List<ExcludedFoldersTableData>>(
               DatabaseFailure('Failed to watch excluded folders', e)));
     } catch (e) {
       return Stream.value(
@@ -992,34 +945,17 @@ class MusicRepository implements IMusicRepository {
       List<int> songIds, int currentIndex, int positionMs) async {
     try {
       await _db.transaction(() async {
-        // FIX(BUG-09): Perform in-place upsert/replacement matching existing row IDs
-        // to prevent temporary empty-table window on process kill.
-        final existing = await (_db.select(_db.queueItemsTable)
-              ..orderBy([(t) => OrderingTerm(expression: t.orderIndex)]))
-            .get();
+        await _db.delete(_db.queueItemsTable).go();
         await _db.batch((batch) {
           for (int i = 0; i < songIds.length; i++) {
-            final companion = QueueItemsTableCompanion(
-              id: i < existing.length ? Value(existing[i].id) : const Value.absent(),
-              songId: Value(songIds[i]),
-              orderIndex: Value(i),
-              isCurrent: Value(i == currentIndex),
-              positionMs: Value(i == currentIndex ? positionMs : 0),
-            );
             batch.insert(
               _db.queueItemsTable,
-              companion,
-              mode: InsertMode.insertOrReplace,
-            );
-          }
-          if (existing.length > songIds.length) {
-            final surplusIds = existing
-                .sublist(songIds.length)
-                .map((e) => e.id)
-                .toList();
-            batch.deleteWhere(
-              _db.queueItemsTable,
-              (t) => t.id.isIn(surplusIds),
+              QueueItemsTableCompanion.insert(
+                songId: songIds[i],
+                orderIndex: i,
+                isCurrent: Value(i == currentIndex),
+                positionMs: Value(i == currentIndex ? positionMs : 0),
+              ),
             );
           }
         });
@@ -1050,114 +986,25 @@ class MusicRepository implements IMusicRepository {
     required List<ArtistsTableCompanion> artists,
   }) async {
     try {
-      // 1. Fetch existing songs mapping by lowercase normalized path
-      final existingSongs = await (_db.select(_db.songsTable)
-            ..where((t) => t.path.isNotNull() & t.path.equals('').not()))
-          .get();
-
-      final existingByPath = <String, SongsTableData>{};
-      for (final s in existingSongs) {
-        existingByPath[s.path.toLowerCase().replaceAll('\\', '/')] = s;
-      }
-
-      // 2. Align companions to existing rows by path to update in place and preserve metadata
-      final reconciledSongs = <SongsTableCompanion>[];
-      for (final companion in songs) {
-        final path = companion.path.value.toLowerCase().replaceAll('\\', '/');
-        final existing = existingByPath[path];
-
-        if (existing != null) {
-          // Preserve existing ID and all rich user/download metadata.
-          // FIX: also preserve enriched audio-header fields + clear isMissing
-          // so a rescanned track reappears immediately with quality intact.
-          reconciledSongs.add(
-            companion.copyWith(
-              id: Value(existing.id),
-              isDownloaded: Value(existing.isDownloaded),
-              remoteId: Value(existing.remoteId),
-              remoteArtworkUrl: Value(existing.remoteArtworkUrl),
-              isFavorite: Value(existing.isFavorite),
-              playCount: Value(existing.playCount),
-              lastPlayed: Value(existing.lastPlayed),
-              lastPositionMs: Value(existing.lastPositionMs),
-              source: Value(existing.source),
-              isMissing: const Value(false),
-              codec: Value(existing.codec),
-              bitDepth: Value(existing.bitDepth),
-              bitrateKbps: Value(existing.bitrateKbps),
-              sampleRate: Value(existing.sampleRate),
-              loudnessRange: Value(existing.loudnessRange),
-            ),
-          );
-        } else {
-          reconciledSongs.add(companion);
-        }
-      }
-
-      // 3. Batch insert/update outside transaction (batch is not transaction-aware)
-      await _db.batch((batch) {
-        batch.insertAllOnConflictUpdate(_db.songsTable, reconciledSongs);
-        batch.insertAllOnConflictUpdate(_db.albumsTable, albums);
-        batch.insertAllOnConflictUpdate(_db.artistsTable, artists);
-
-      // SCAN-DEBUG: commit point of a scan sync (pairs with LibraryCubit
-      // watchSongs breadcrumbs for the 'count > 0 but UI empty' investigation).
-      ErrorLogger.addBreadcrumb(
-          'syncScannedMusic committed: songs=${songs.length} albums=${albums.length} artists=${artists.length}',
-          category: 'scanner');
+      await _db.transaction(() async {
+        await _db.batch((batch) {
+          batch.insertAllOnConflictUpdate(_db.songsTable, songs);
+          batch.insertAllOnConflictUpdate(_db.albumsTable, albums);
+          batch.insertAllOnConflictUpdate(_db.artistsTable, artists);
+        });
       });
-
-      // 4. Deduplicate duplicate paths in a dedicated transaction (no batch inside)
+      // FIX: Deduplicate by file path after scan — prevents downloaded song appearing twice when scanner
+      // inserts a new row for a path already owned by a reconciled YTM row. Keep the downloaded/isDownloaded or lowest id.
       try {
-        final dupPaths = await _db.customSelect(
-          "SELECT lower(path) as lp FROM songs "
-          "WHERE path != '' AND path NOT LIKE 'ytmusic://%' "
-          "GROUP BY lower(path) HAVING COUNT(*) > 1",
-        ).get();
-
-        for (final row in dupPaths) {
-          final lp = row.data['lp'] as String;
-          final candidates = await _db.customSelect(
-            "SELECT id, is_downloaded FROM songs "
-            "WHERE lower(path) = ? AND path != '' AND path NOT LIKE 'ytmusic://%' "
-            "ORDER BY is_downloaded DESC, id ASC",
-            variables: [Variable.withString(lp)],
-          ).get();
-          if (candidates.isEmpty) continue;
-          final survivingId = candidates.first.data['id'] as int;
-
-          await _db.transaction(() async {
-            for (final c in candidates.skip(1)) {
-              final dupeId = c.data['id'] as int;
-              try {
-                await _db.customStatement(
-                  'UPDATE playlist_entries SET song_id = ? WHERE song_id = ?',
-                  [survivingId, dupeId],
-                );
-                await _db.customStatement(
-                  'UPDATE queue_items SET song_id = ? WHERE song_id = ?',
-                  [survivingId, dupeId],
-                );
-                await _db.customStatement(
-                  'DELETE FROM songs WHERE id = ?',
-                  [dupeId],
-                );
-              } catch (e, st) {
-                ErrorLogger.log('music_repository failed', error: e, stackTrace: st, category: 'MusicRepository');
-              }
-            }
-          });
-        }
-      } catch (e, st) {
-        ErrorLogger.log('music_repository failed', error: e, stackTrace: st, category: 'MusicRepository');
-      }
-
+        await _db.customStatement(
+          "DELETE FROM songs WHERE id NOT IN (SELECT MIN(id) FROM songs WHERE path != '' AND path NOT LIKE 'ytmusic://%' GROUP BY lower(path)) AND path != '' AND path NOT LIKE 'ytmusic://%' AND lower(path) IN (SELECT lower(path) FROM songs WHERE path != '' AND path NOT LIKE 'ytmusic://%' GROUP BY lower(path) HAVING COUNT(*) > 1);",
+        );
+      } catch (_) {}
       return const Right(null);
     } catch (e) {
       return Left(DatabaseFailure('Failed to sync scanned music', e));
     }
   }
-
 
   @override
   Future<Result<int>> cleanupOrphanedSongs(Set<int> scannedSongIds) async {
@@ -1167,110 +1014,38 @@ class MusicRepository implements IMusicRepository {
         return const Right(0);
       }
 
-      // 1. Fetch unscanned local songs outside the transaction.
-      // FIX: chunk-safe — isNotIn() with >999 vars crashes SQLite. Fetch all
-      // local rows once and exclude in Dart (libraries are ~10k rows max).
-      final allLocal = await (_db.select(_db.songsTable)
+      // 1. Fetch unscanned local songs outside the transaction
+      final unscannedSongs = await (_db.select(_db.songsTable)
             ..where((t) =>
+                t.id.isNotIn(scannedSongIds) &
                 t.id.isBiggerThanValue(0) &
                 t.source.equals(SongSource.local)))
           .get();
-      final unscannedSongs =
-          allLocal.where((s) => !scannedSongIds.contains(s.id)).toList();
 
       // 2. Perform bounded async disk checks (max 16 concurrent) without blocking database locks
       final trulyMissingIds = <int>[];
       final reappearedIds = <int>[];
       const chunkSize = 16;
 
-      // Build a fast lookup of every file path covered by the current scan so
-      // we can skip orphan-marking for songs whose file is still on disk but was
-      // given a different MediaStore ID (common after downloading a YTM track).
-      // Also: never mark a downloaded song as missing — its row is managed by
-      // reconcileDownloadedSong and may legitimately have an ID not in scannedSongIds.
-      final scannedPaths = <String>{};
-      // Fetch the actual file paths for all scannedSongIds in chunks of 500
-      // (SQLite var limit) to build the set.
-      if (scannedSongIds.isNotEmpty) {
-        try {
-          final idList = scannedSongIds.toList();
-          for (var i = 0; i < idList.length; i += 500) {
-            final chunk = idList.sublist(
-                i, (i + 500 > idList.length) ? idList.length : i + 500);
-            final scannedRows = await (_db.select(_db.songsTable)
-                  ..where((t) => t.id.isIn(chunk)))
-                .get();
-            for (final r in scannedRows) {
-              if (r.path.isNotEmpty) scannedPaths.add(r.path.toLowerCase());
+      for (var i = 0; i < unscannedSongs.length; i += chunkSize) {
+        final end = (i + chunkSize < unscannedSongs.length)
+            ? i + chunkSize
+            : unscannedSongs.length;
+        final chunk = unscannedSongs.sublist(i, end);
+        await Future.wait(chunk.map((song) async {
+          if (song.path.isEmpty) {
+            trulyMissingIds.add(song.id);
+          } else if (song.path.startsWith('content:')) {
+            reappearedIds.add(song.id);
+          } else {
+            final exists = await File(song.path).exists();
+            if (exists) {
+              reappearedIds.add(song.id);
+            } else {
+              trulyMissingIds.add(song.id);
             }
           }
-        } catch (e, st) {
-          ErrorLogger.log('cleanupOrphanedSongs failed', error: e, stackTrace: st, category: 'MusicRepository');
-        }
-      }
-
-      // Isolate-friendly disk check: use compute for large orphan sets to avoid main-isolate ANR
-      // For < 200 items, do cheap chunked async; for larger, offload to isolate
-      if (unscannedSongs.length > 500) {
-        for (var i = 0; i < unscannedSongs.length; i += chunkSize) {
-          final end = (i + chunkSize < unscannedSongs.length)
-              ? i + chunkSize
-              : unscannedSongs.length;
-          final chunk = unscannedSongs.sublist(i, end);
-          await Future.wait(chunk.map((song) async {
-            if (song.isDownloaded) {
-              reappearedIds.add(song.id);
-              return;
-            }
-            if (song.path.isNotEmpty &&
-                scannedPaths.contains(song.path.toLowerCase())) {
-              reappearedIds.add(song.id);
-              return;
-            }
-            if (song.path.isEmpty) {
-              trulyMissingIds.add(song.id);
-            } else if (song.path.startsWith('content:')) {
-              reappearedIds.add(song.id);
-            } else {
-              final exists = await File(song.path).exists();
-              if (exists) {
-                reappearedIds.add(song.id);
-              } else {
-                trulyMissingIds.add(song.id);
-              }
-            }
-          }));
-        }
-      } else {
-        for (var i = 0; i < unscannedSongs.length; i += chunkSize) {
-          final end = (i + chunkSize < unscannedSongs.length)
-              ? i + chunkSize
-              : unscannedSongs.length;
-          final chunk = unscannedSongs.sublist(i, end);
-          await Future.wait(chunk.map((song) async {
-            if (song.isDownloaded) {
-              reappearedIds.add(song.id);
-              return;
-            }
-            if (song.path.isNotEmpty &&
-                scannedPaths.contains(song.path.toLowerCase())) {
-              reappearedIds.add(song.id);
-              return;
-            }
-            if (song.path.isEmpty) {
-              trulyMissingIds.add(song.id);
-            } else if (song.path.startsWith('content:')) {
-              reappearedIds.add(song.id);
-            } else {
-              final exists = await File(song.path).exists();
-              if (exists) {
-                reappearedIds.add(song.id);
-              } else {
-                trulyMissingIds.add(song.id);
-              }
-            }
-          }));
-        }
+        }));
       }
 
       int markedMissingCount = 0;
@@ -1372,32 +1147,6 @@ class MusicRepository implements IMusicRepository {
     }
   }
 
-  // FIX(D3): Single unified helper for reassigning FKs and deleting duplicate path rows
-  Future<void> _dedupeByPath(String newPath, int survivingId) async {
-    final dupes = await (_db.select(_db.songsTable)
-          ..where((t) =>
-              t.path.lower().equals(newPath.toLowerCase()) &
-              t.id.equals(survivingId).not()))
-        .get();
-    for (final dupe in dupes) {
-      try {
-        await (_db.update(_db.playlistEntriesTable)
-              ..where((t) => t.songId.equals(dupe.id)))
-            .write(PlaylistEntriesTableCompanion(songId: Value(survivingId)));
-        await (_db.update(_db.queueItemsTable)
-              ..where((t) => t.songId.equals(dupe.id)))
-            .write(QueueItemsTableCompanion(songId: Value(survivingId)));
-        await (_db.update(_db.playHistoryTable)
-              ..where((t) => t.songId.equals(dupe.id)))
-            .write(PlayHistoryTableCompanion(songId: Value(survivingId)));
-        await (_db.delete(_db.songsTable)..where((t) => t.id.equals(dupe.id)))
-            .go();
-      } catch (e, st) {
-        ErrorLogger.log('_dedupeByPath failed', error: e, stackTrace: st, category: 'MusicRepository');
-      }
-    }
-  }
-
   @override
   Future<Result<int?>> reconcileDownloadedSong({
     required int oldId,
@@ -1406,111 +1155,117 @@ class MusicRepository implements IMusicRepository {
   }) async {
     try {
       int? survivingId;
-      final fileExists = await File(newPath).exists();
+      // Step 1: Read + Compute outside transaction
+      final oldRow = await (_db.select(_db.songsTable)
+            ..where((t) => t.id.equals(oldId)))
+          .getSingleOrNull();
 
-      // FIX(D3): Wrap entire reconcile lifecycle in a single atomic transaction
-      await _db.transaction(() async {
-        final oldRow = await (_db.select(_db.songsTable)
-              ..where((t) => t.id.equals(oldId)))
-            .getSingleOrNull();
+      // Find the row the scanner minted for the downloaded file.
+      var newRow = await (_db.select(_db.songsTable)
+            ..where((t) => t.path.equals(newPath))
+            ..orderBy([
+              (t) =>
+                  OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)
+            ])
+            ..limit(1))
+          .getSingleOrNull();
 
-        // Find the row the scanner minted for the downloaded file.
-        var newRow = await (_db.select(_db.songsTable)
-              ..where((t) => t.path.equals(newPath))
+      // Fallback: match on normalized metadata
+      final matchMetadata = oldRow ?? fallbackSong;
+      if (newRow == null && matchMetadata != null) {
+        newRow = await (_db.select(_db.songsTable)
+              ..where((t) =>
+                  t.source.equals(SongSource.local) &
+                  t.title.lower().equals(matchMetadata.title.toLowerCase()) &
+                  t.artist.lower().equals(matchMetadata.artist.toLowerCase()) &
+                  t.durationMs.isBetweenValues(matchMetadata.durationMs - 5000,
+                      matchMetadata.durationMs + 5000))
               ..orderBy([
-                (t) =>
-                    OrderingTerm(expression: t.dateAdded, mode: OrderingMode.desc)
+                (t) => OrderingTerm(
+                    expression: t.dateAdded, mode: OrderingMode.desc)
               ])
               ..limit(1))
             .getSingleOrNull();
 
-        // Fallback: match on normalized metadata
-        final matchMetadata = oldRow ?? fallbackSong;
-        if (newRow == null && matchMetadata != null) {
-          newRow = await (_db.select(_db.songsTable)
-                ..where((t) =>
-                    t.source.equals(SongSource.local) &
-                    t.title.lower().equals(matchMetadata.title.toLowerCase()) &
-                    t.artist.lower().equals(matchMetadata.artist.toLowerCase()) &
-                    t.durationMs.isBetweenValues(matchMetadata.durationMs - 5000,
-                        matchMetadata.durationMs + 5000))
-                ..orderBy([
-                  (t) => OrderingTerm(
-                      expression: t.dateAdded, mode: OrderingMode.desc)
-                ])
-                ..limit(1))
-              .getSingleOrNull();
+        // Verify the matched row is not flagged as missing (R3-02)
+        if (newRow != null && newRow.isMissing) {
+          newRow = null;
         }
+      }
 
-        final targetRow = newRow;
+      final fileExists = await File(newPath).exists();
 
-        if (targetRow == null) {
+      // Step 2: Write phase in focused transaction
+      await _db.transaction(() async {
+        if (newRow == null) {
           if (fileExists) {
             final nowSec = DateTime.now().millisecondsSinceEpoch ~/ 1000;
-            final baseSong = oldRow ?? fallbackSong;
-            if (baseSong != null) {
-              if (oldRow != null) {
-                await (_db.update(_db.songsTable)
-                      ..where((t) => t.id.equals(oldId)))
-                    .write(
-                  SongsTableCompanion(
-                    path: Value(newPath),
-                    source: const Value(SongSource.local),
-                    isMissing: const Value(false),
-                    isDownloaded: const Value(true),
-                    dateAdded: Value(
-                        (oldRow.dateAdded ?? 0) > 0 ? oldRow.dateAdded! : nowSec),
-                    pendingDownloadPath: const Value(null),
-                  ),
-                );
-              } else {
-                await _db.into(_db.songsTable).insert(
-                      SongsTableCompanion(
-                        id: Value(oldId),
-                        title: Value(baseSong.title),
-                        artist: Value(baseSong.artist),
-                        album: Value(baseSong.album.isNotEmpty
-                            ? baseSong.album
-                            : 'YouTube Music'),
-                        durationMs: Value(baseSong.durationMs),
-                        path: Value(newPath),
-                        source: const Value(SongSource.local),
-                        isMissing: const Value(false),
-                        isDownloaded: const Value(true),
-                        remoteId: Value(baseSong.remoteId),
-                        remoteArtworkUrl: Value(baseSong.remoteArtworkUrl),
-                        dateAdded: Value(nowSec),
-                      ),
-                      mode: InsertMode.insertOrReplace,
-                    );
-              }
+            if (oldRow != null) {
+              await (_db.update(_db.songsTable)
+                    ..where((t) => t.id.equals(oldId)))
+                  .write(
+                SongsTableCompanion(
+                  path: Value(newPath),
+                  source: const Value(SongSource.local),
+                  isMissing: const Value(false),
+                  isDownloaded: const Value(true),
+                  dateAdded: Value(
+                      (oldRow.dateAdded ?? 0) > 0 ? oldRow.dateAdded! : nowSec),
+                  pendingDownloadPath: const Value(null),
+                ),
+              );
               survivingId = oldId;
-              await _dedupeByPath(newPath, survivingId!);
+              // FIX: Clean any other row that already owns this path (scanner may have inserted it first)
+              try {
+                final dupes = await (_db.select(_db.songsTable)
+                      ..where((t) => t.path.lower().equals(newPath.toLowerCase()) & t.id.equals(oldId).not()))
+                    .get();
+                for (final d in dupes) {
+                  await (_db.update(_db.playlistEntriesTable)..where((t) => t.songId.equals(d.id)))
+                      .write(PlaylistEntriesTableCompanion(songId: Value(oldId)));
+                  await (_db.update(_db.queueItemsTable)..where((t) => t.songId.equals(d.id)))
+                      .write(QueueItemsTableCompanion(songId: Value(oldId)));
+                  await (_db.delete(_db.songsTable)..where((t) => t.id.equals(d.id))).go();
+                }
+              } catch (_) {}
+            } else if (fallbackSong != null) {
+              await _db.into(_db.songsTable).insert(
+                    SongsTableCompanion(
+                      id: Value(oldId),
+                      title: Value(fallbackSong.title),
+                      artist: Value(fallbackSong.artist),
+                      album: Value(fallbackSong.album.isNotEmpty
+                          ? fallbackSong.album
+                          : 'YouTube Music'),
+                      durationMs: Value(fallbackSong.durationMs),
+                      path: Value(newPath),
+                      source: const Value(SongSource.local),
+                      isMissing: const Value(false),
+                      isDownloaded: const Value(true),
+                      remoteId: Value(fallbackSong.remoteId),
+                      remoteArtworkUrl: Value(fallbackSong.remoteArtworkUrl),
+                      dateAdded: Value(nowSec),
+                    ),
+                    mode: InsertMode.insertOrReplace,
+                  );
+              survivingId = oldId;
+              try {
+                final dupes2 = await (_db.select(_db.songsTable)
+                      ..where((t) => t.path.lower().equals(newPath.toLowerCase()) & t.id.equals(oldId).not()))
+                    .get();
+                for (final d in dupes2) {
+                  await (_db.delete(_db.songsTable)..where((t) => t.id.equals(d.id))).go();
+                }
+              } catch (_) {}
             }
           }
           return;
         }
 
-        // Target row exists from scanner
-        if (targetRow.isMissing || targetRow.path != newPath) {
-          await (_db.update(_db.songsTable)
-                ..where((t) => t.id.equals(targetRow.id)))
-              .write(SongsTableCompanion(
-            path: Value(newPath),
-            isMissing: const Value(false),
-            isDownloaded: const Value(true),
-          ));
-        }
-
-        final targetId = targetRow.id;
+        final targetId = newRow.id;
         survivingId = targetId;
 
-        if (oldRow == null || oldRow.id == targetId) {
-          await _dedupeByPath(newPath, survivingId!);
-          return;
-        }
-        final oldData = oldRow;
-        final newData = targetRow;
+        if (oldRow == null || oldRow.id == targetId) return;
 
         try {
           final duplicatePlaylists =
@@ -1549,41 +1304,39 @@ class MusicRepository implements IMusicRepository {
           try {
             await (_db.update(_db.songsTable)..where((t) => t.id.equals(oldId)))
                 .write(const SongsTableCompanion(isMissing: Value(true)));
-          } catch (e, st) {
-            ErrorLogger.log('equals failed', error: e, stackTrace: st, category: 'MusicRepository');
-          }
+          } catch (_) {}
         }
 
         // Merge stats (don't clobber — the scanned row may predate the download).
         final int? mergedLastPlayed;
-        if (oldData.lastPlayed != null && newData.lastPlayed != null) {
-          mergedLastPlayed = oldData.lastPlayed! > newData.lastPlayed!
-              ? oldData.lastPlayed
-              : newData.lastPlayed;
+        if (oldRow.lastPlayed != null && newRow.lastPlayed != null) {
+          mergedLastPlayed = oldRow.lastPlayed! > newRow.lastPlayed!
+              ? oldRow.lastPlayed
+              : newRow.lastPlayed;
         } else {
-          mergedLastPlayed = oldData.lastPlayed ?? newData.lastPlayed;
+          mergedLastPlayed = oldRow.lastPlayed ?? newRow.lastPlayed;
         }
         final keepOldPosition =
-            (oldData.lastPlayed ?? 0) > (newData.lastPlayed ?? 0);
+            (oldRow.lastPlayed ?? 0) > (newRow.lastPlayed ?? 0);
 
-        final String effectiveTitle = (oldData.title.isNotEmpty &&
-                !oldData.title.toLowerCase().startsWith('ytdl_'))
-            ? oldData.title
-            : newData.title;
-        final String effectiveArtist = (oldData.artist.isNotEmpty &&
-                oldData.artist != '<unknown>' &&
-                oldData.artist != 'Unknown')
-            ? oldData.artist
-            : newData.artist;
-        final String effectiveAlbum = (oldData.album.isNotEmpty &&
-                oldData.album != '<unknown>' &&
-                oldData.album != 'Unknown')
-            ? oldData.album
-            : newData.album;
-        final String? effectiveRemoteArt = (oldData.remoteArtworkUrl != null &&
-                oldData.remoteArtworkUrl!.isNotEmpty)
-            ? oldData.remoteArtworkUrl
-            : newData.remoteArtworkUrl;
+        final String effectiveTitle = (oldRow.title.isNotEmpty &&
+                !oldRow.title.toLowerCase().startsWith('ytdl_'))
+            ? oldRow.title
+            : newRow.title;
+        final String effectiveArtist = (oldRow.artist.isNotEmpty &&
+                oldRow.artist != '<unknown>' &&
+                oldRow.artist != 'Unknown')
+            ? oldRow.artist
+            : newRow.artist;
+        final String effectiveAlbum = (oldRow.album.isNotEmpty &&
+                oldRow.album != '<unknown>' &&
+                oldRow.album != 'Unknown')
+            ? oldRow.album
+            : newRow.album;
+        final String? effectiveRemoteArt = (oldRow.remoteArtworkUrl != null &&
+                oldRow.remoteArtworkUrl!.isNotEmpty)
+            ? oldRow.remoteArtworkUrl
+            : newRow.remoteArtworkUrl;
 
         await (_db.update(_db.songsTable)..where((t) => t.id.equals(targetId)))
             .write(
@@ -1591,14 +1344,15 @@ class MusicRepository implements IMusicRepository {
             title: Value(effectiveTitle),
             artist: Value(effectiveArtist),
             album: Value(effectiveAlbum),
-            genre: Value(oldData.genre ?? newData.genre),
-            isFavorite: Value(oldData.isFavorite || newData.isFavorite),
-            playCount: Value(oldData.playCount + newData.playCount),
+            genre: Value(oldRow.genre ?? newRow.genre),
+            isFavorite: Value(oldRow.isFavorite || newRow.isFavorite),
+            playCount: Value(oldRow.playCount + newRow.playCount),
             lastPlayed: Value(mergedLastPlayed),
             lastPositionMs: Value(keepOldPosition
-                ? oldData.lastPositionMs
-                : newData.lastPositionMs),
-            remoteId: Value(oldData.remoteId ?? newData.remoteId),
+                ? oldRow.lastPositionMs
+                : newRow.lastPositionMs),
+            // Carry the video id and online remoteArtworkUrl
+            remoteId: Value(oldRow.remoteId ?? newRow.remoteId),
             remoteArtworkUrl: Value(effectiveRemoteArt),
             source: const Value(SongSource.local),
             isDownloaded: const Value(true),
@@ -1606,8 +1360,24 @@ class MusicRepository implements IMusicRepository {
           ),
         );
 
-        // Delete any duplicate rows matching path using unified helper
-        await _dedupeByPath(newPath, survivingId!);
+        // FIX: Remove any other duplicate path rows that the scanner may have inserted in parallel
+        // This guarantees a single entry per file path after download, fixing "repeats twice on local"
+        final newRowPath = newRow.path;
+        final duplicateOthers = await (_db.select(_db.songsTable)
+              ..where((t) =>
+                  t.path.lower().equals(newRowPath.toLowerCase()) &
+                  t.id.isNotIn([oldId, targetId])))
+            .get();
+        for (final dupe in duplicateOthers) {
+          try {
+            // Move any playlist/queue/history refs to surviving target before deleting duplicate
+            await (_db.update(_db.playlistEntriesTable)..where((t) => t.songId.equals(dupe.id)))
+                .write(PlaylistEntriesTableCompanion(songId: Value(targetId)));
+            await (_db.update(_db.queueItemsTable)..where((t) => t.songId.equals(dupe.id)))
+                .write(QueueItemsTableCompanion(songId: Value(targetId)));
+            await (_db.delete(_db.songsTable)..where((t) => t.id.equals(dupe.id))).go();
+          } catch (_) {}
+        }
       });
       return Right(survivingId);
     } catch (e) {
@@ -1701,7 +1471,7 @@ class MusicRepository implements IMusicRepository {
             .where((g) => g.name.isNotEmpty)
             .toList();
         return Right<AppFailure, List<GenreItem>>(list);
-      }).handleError((Object e) => Left<AppFailure, List<GenreItem>>(
+      }).handleError((e) => Left<AppFailure, List<GenreItem>>(
           DatabaseFailure('Failed to watch genres', e)));
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch genres', e)));
@@ -1749,7 +1519,7 @@ class MusicRepository implements IMusicRepository {
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((Object e) => Left<AppFailure, List<SongsTableData>>(
+          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch genre songs', e)));
     } catch (e) {
       return Stream.value(
@@ -1801,7 +1571,7 @@ class MusicRepository implements IMusicRepository {
             .where((y) => y.year > 0)
             .toList();
         return Right<AppFailure, List<YearItem>>(list);
-      }).handleError((Object e) => Left<AppFailure, List<YearItem>>(
+      }).handleError((e) => Left<AppFailure, List<YearItem>>(
           DatabaseFailure('Failed to watch years', e)));
     } catch (e) {
       return Stream.value(Left(DatabaseFailure('Failed to watch years', e)));
@@ -1820,7 +1590,7 @@ class MusicRepository implements IMusicRepository {
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
-          .handleError((Object e) => Left<AppFailure, List<SongsTableData>>(
+          .handleError((e) => Left<AppFailure, List<SongsTableData>>(
               DatabaseFailure('Failed to watch year songs', e)));
     } catch (e) {
       return Stream.value(

@@ -58,7 +58,7 @@ class JustAudioPlayerBackend implements AudioPlayerBackend {
   final AudioPlayer _player;
 
   JustAudioPlayerBackend([AudioPlayer? player])
-    : _player = player ?? AudioPlayer();
+      : _player = player ?? AudioPlayer();
 
   AudioPlayer get player => _player;
 
@@ -124,12 +124,11 @@ class JustAudioPlayerBackend implements AudioPlayerBackend {
     bool preload = true,
     int? initialIndex,
     Duration? initialPosition,
-  }) => _player.setAudioSource(
-    source,
-    preload: preload,
-    initialIndex: initialIndex,
-    initialPosition: initialPosition,
-  );
+  }) =>
+      _player.setAudioSource(source,
+          preload: preload,
+          initialIndex: initialIndex,
+          initialPosition: initialPosition);
   @override
   Future<Duration?> setAudioSources(
     List<AudioSource> children, {
@@ -137,16 +136,16 @@ class JustAudioPlayerBackend implements AudioPlayerBackend {
     int? initialIndex,
     Duration? initialPosition,
     ShuffleOrder? shuffleOrder,
-  }) => _player.setAudioSource(
-    // ignore: deprecated_member_use
-    ConcatenatingAudioSource(
-      children: children,
-      shuffleOrder: shuffleOrder ?? DefaultShuffleOrder(),
-    ),
-    preload: preload,
-    initialIndex: initialIndex,
-    initialPosition: initialPosition,
-  );
+  }) =>
+      _player.setAudioSource(
+        ConcatenatingAudioSource(
+          children: children,
+          shuffleOrder: shuffleOrder ?? DefaultShuffleOrder(),
+        ),
+        preload: preload,
+        initialIndex: initialIndex,
+        initialPosition: initialPosition,
+      );
   @override
   Future<void> setShuffleModeEnabled(bool enabled) =>
       _player.setShuffleModeEnabled(enabled);

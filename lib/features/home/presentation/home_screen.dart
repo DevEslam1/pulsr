@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
@@ -18,15 +17,14 @@ import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
 import '../../../core/config/app_config.dart';
-import '../../../data/services/ytm_account_service.dart';
-import '../../../data/services/ytm_service.dart';
+import '../../../core/services/ytm_account_service.dart';
+import '../../../core/services/ytm_service.dart';
 import '../../../domain/models/ytm_track.dart';
-import '../../downloads/cubit/ytm_download_cubit.dart';
-import '../../downloads/presentation/widgets/ytm_download_button.dart';
+import '../../ytm_search/cubit/ytm_download_cubit.dart';
+import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 
 import 'package:go_router/go_router.dart';
 
-import '../../../core/utils/error_logger.dart';
 class HomeScreen extends StatefulWidget {
   final YtmService? ytmService;
   final YtmAccountService? ytmAccountService;
@@ -57,15 +55,6 @@ class _HomeScreenState extends State<HomeScreen> {
   final Map<String, Future<List<YtmTrack>>> _categoryFutures = {};
   final Map<String, DateTime> _categoryFetchTimestamps = {};
   static const Duration _categoryTtl = Duration(minutes: 10);
-
-  // DB watch streams cached so setState-driven rebuilds do not hand
-  // StreamBuilder a fresh Stream (which tears down and re-subscribes the
-  // drift watch — re-issuing a DB query per rebuild). Lazy finals keep the
-  // first-access timing identical to the previous build-time call.
-  late final Stream<Result<List<SongsTableData>>> _recentlyPlayedStream =
-      _getSongsUseCase.watchRecentlyPlayed();
-  late final Stream<Result<List<SongsTableData>>> _recentlyAddedStream =
-      _getSongsUseCase.watchRecentlyAdded();
 
   List<String> get _onlineCategories {
     final isLoggedIn = _ytmAccountService.isLoggedIn;
@@ -162,16 +151,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 final recs =
                     await account.fetchHomeRecommendations(maxTracks: 50);
                 if (recs.isNotEmpty) return recs;
-              } catch (e, st) {
-                ErrorLogger.log('_getCategoryFuture failed', error: e, stackTrace: st, category: 'HomeScreen');
-              }
+              } catch (_) {}
             }
             try {
               final trending = await _ytmService.trending(limit: 25);
               if (trending.isNotEmpty) return trending;
-            } catch (e, st) {
-              ErrorLogger.log('_getCategoryFuture failed', error: e, stackTrace: st, category: 'HomeScreen');
-            }
+            } catch (_) {}
             return await _ytmService.searchWithFallback(
                 _categoryQueries['Recommended For You'] ?? 'top hits music',
                 limit: 25);
@@ -180,9 +165,7 @@ class _HomeScreenState extends State<HomeScreen> {
             try {
               final trending = await _ytmService.trending(limit: 25);
               if (trending.isNotEmpty) return trending;
-            } catch (e, st) {
-              ErrorLogger.log('_getCategoryFuture failed', error: e, stackTrace: st, category: 'HomeScreen');
-            }
+            } catch (_) {}
             return await _ytmService.searchWithFallback(
                 _categoryQueries['Trending Egypt'] ?? 'أغاني مصرية جديدة تريند',
                 limit: 25);
@@ -190,7 +173,7 @@ class _HomeScreenState extends State<HomeScreen> {
           final query = _categoryQueries[category] ?? '$category songs';
           return await _ytmService.searchWithFallback(query, limit: 25);
         } catch (e) {
-          unawaited(_categoryFutures.remove(category));
+          _categoryFutures.remove(category);
           _categoryFetchTimestamps.remove(category);
           rethrow;
         }
@@ -249,16 +232,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   });
                 }
               },
-              // CustomScrollView so the Top Charts tiles below virtualize
-              // (F-13) instead of inflating eagerly as ListView children.
-              child: CustomScrollView(
+              child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(
                     parent: BouncingScrollPhysics()),
-                slivers: [
+                padding: const EdgeInsets.only(bottom: 160),
+                children: [
                   // ---------- Header ----------
-                  SliverToBoxAdapter(child: Padding(
+                  Padding(
                     padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context),
-                        24, Adaptive.pagePadding(context), 0),
+                        16, Adaptive.pagePadding(context), 0),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
@@ -305,12 +287,12 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ],
                     ),
-                  )),
+                  ),
 
                   // ---------- Segmented Tab Selector (Local vs Online) ----------
                   if (showOnlineTab) ...[
-                    const SliverToBoxAdapter(child: SizedBox(height: 16)),
-                    SliverToBoxAdapter(child: Container(
+                    const SizedBox(height: 16),
+                    Container(
                       margin: EdgeInsets.symmetric(
                           horizontal: Adaptive.pagePadding(context)),
                       padding: const EdgeInsets.all(4),
@@ -343,12 +325,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         ],
                       ),
                     ),
-                  ),
                   ],
 
                   // ---------- Quick Discovery Tools Row ----------
-                  const SliverToBoxAdapter(child: SizedBox(height: 12)),
-                  SliverToBoxAdapter(child: SizedBox(
+                  const SizedBox(height: 12),
+                  SizedBox(
                     height: 38,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
@@ -394,19 +375,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ],
                     ),
-                  )),
-                  const SliverToBoxAdapter(child: SizedBox(height: 14)),
+                  ),
+                  const SizedBox(height: 14),
 
                   // ---------- Content (Local vs Online) ----------
                   if (currentTab == 0)
-                    SliverToBoxAdapter(
-                        child: _buildLocalView(
-                            context, p, getSongsUseCase, playerCubit, isTablet))
+                    _buildLocalView(
+                        context, p, getSongsUseCase, playerCubit, isTablet)
                   else if (showOnlineTab)
-                    ..._buildOnlineView(context, p, playerCubit, isTablet),
-                  // Bottom spacing preserved from the previous ListView's
-                  // `padding: EdgeInsets.only(bottom: 160)`.
-                  const SliverToBoxAdapter(child: SizedBox(height: 160)),
+                    _buildOnlineView(context, p, playerCubit, isTablet),
                 ],
               ),
             ),
@@ -534,7 +511,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // ---------- Recently played ----------
         StreamBuilder<Result<List<SongsTableData>>>(
-          stream: _recentlyPlayedStream,
+          stream: getSongsUseCase.watchRecentlyPlayed(),
           builder: (context, snapshot) {
             if (snapshot.hasError) {
               return _SectionError(onRetry: () => setState(() {}));
@@ -638,7 +615,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // ---------- Recently added ----------
         StreamBuilder<Result<List<SongsTableData>>>(
-          stream: _recentlyAddedStream,
+          stream: getSongsUseCase.watchRecentlyAdded(),
           builder: (context, snapshot) {
             if (snapshot.hasError) {
               return _SectionError(onRetry: () => setState(() {}));
@@ -655,7 +632,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   SongTile(
                     song: song,
                     onTap: () => playerCubit.playSong(song, queue: songs),
-                    onMorePressed: () => showModalBottomSheet<void>(
+                    onMorePressed: () => showModalBottomSheet(
                       context: context,
                       useRootNavigator: true,
                       isScrollControlled: true,
@@ -671,17 +648,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Returns slivers (F-13): the Top Charts tiles of the category section
-  /// below are virtualized through [SliverList.builder].
-  List<Widget> _buildOnlineView(
+  Widget _buildOnlineView(
     BuildContext context,
     PulsrPalette p,
     PlayerCubit playerCubit,
     bool isTablet,
   ) {
-    return <Widget>[
-      // ---------- Search YouTube Music Action Banner ----------
-      SliverToBoxAdapter(child: Padding(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ---------- Search YouTube Music Action Banner ----------
+        Padding(
           padding: EdgeInsets.symmetric(
               horizontal: Adaptive.pagePadding(context), vertical: 12),
           child: InkWell(
@@ -742,10 +719,10 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
           ),
-        )),
+        ),
 
         // ---------- Quick Moods & Vibe Cards ----------
-        SliverToBoxAdapter(child: Padding(
+        Padding(
           padding: EdgeInsets.symmetric(
               horizontal: Adaptive.pagePadding(context), vertical: 6),
           child: Row(
@@ -785,12 +762,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-        )),
+        ),
 
-        const SliverToBoxAdapter(child: SizedBox(height: 10)),
+        const SizedBox(height: 10),
 
         // ---------- Category Chips ----------
-        SliverToBoxAdapter(child: SingleChildScrollView(
+        SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           physics: const BouncingScrollPhysics(),
           padding:
@@ -836,9 +813,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
             ],
           ),
-        )),
+        ),
 
-        const SliverToBoxAdapter(child: SizedBox(height: 8)),
+        const SizedBox(height: 8),
 
         // ---------- Online Category Content (Carousel + Top Charts) ----------
         _OnlineCategorySection(
@@ -852,7 +829,8 @@ class _HomeScreenState extends State<HomeScreen> {
           playerCubit: playerCubit,
           onRetry: () => _retryCategory(_selectedOnlineCategory),
         ),
-    ];
+      ],
+    );
   }
 }
 
@@ -880,7 +858,7 @@ class _OnlineCategorySection extends StatelessWidget {
       future: future,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return SliverToBoxAdapter(child: Column(
+          return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SectionHeader(title: title),
@@ -940,11 +918,11 @@ class _OnlineCategorySection extends StatelessWidget {
                 ),
               ),
             ],
-          ));
+          );
         }
 
         if (snapshot.hasError || (snapshot.data ?? const []).isEmpty) {
-          return SliverToBoxAdapter(child: Padding(
+          return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
             child: Center(
               child: Column(
@@ -965,62 +943,51 @@ class _OnlineCategorySection extends StatelessWidget {
                 ],
               ),
             ),
-          ));
+          );
         }
 
         final tracks = snapshot.data!;
         final songs = [for (final track in tracks) track.toSongData()];
-        // YtmDownloadCubit is an app-lifetime @singleton: BlocProvider.value
-        // does NOT take ownership, so this section rebuilding/unmounting can
-        // never close the shared instance (use-after-close would kill
-        // download UI updates elsewhere in the app).
-        return BlocProvider<YtmDownloadCubit>.value(
-          value: getIt<YtmDownloadCubit>(),
-          // Sliver group (F-13): the Top Charts tiles below are built lazily
-          // by SliverList.builder instead of inflating eagerly as Column
-          // children of the outer scroll view.
-          child: SliverMainAxisGroup(slivers: [
-            SliverToBoxAdapter(child: SectionHeader(title: title)),
-            SliverToBoxAdapter(child: SizedBox(
-              height: isTablet ? 232 : 212,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: EdgeInsets.symmetric(
-                    horizontal: Adaptive.pagePadding(context)),
-                itemCount: songs.length,
-                itemBuilder: (context, index) {
-                  final song = songs[index];
-                  return _TrendingCard(
-                    song: song,
-                    onTap: () => playerCubit.playSong(song, queue: songs),
-                  );
-                },
+        return BlocProvider<YtmDownloadCubit>(
+          create: (_) => getIt<YtmDownloadCubit>(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SectionHeader(title: title),
+              SizedBox(
+                height: isTablet ? 232 : 212,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(
+                      horizontal: Adaptive.pagePadding(context)),
+                  itemCount: songs.length,
+                  itemBuilder: (context, index) {
+                    final song = songs[index];
+                    return _TrendingCard(
+                      song: song,
+                      onTap: () => playerCubit.playSong(song, queue: songs),
+                    );
+                  },
+                ),
               ),
-            )),
-            const SliverToBoxAdapter(child: SizedBox(height: 16)),
-            SliverToBoxAdapter(
-                child:
-                    SectionHeader(title: 'Top Charts & Songs (${songs.length})')),
-            SliverList.builder(
-              itemCount: songs.length,
-              itemBuilder: (context, index) {
-                final song = songs[index];
-                return SongTile(
-                  song: song,
-                  index: index + 1,
-                  onTap: () => playerCubit.playSong(song, queue: songs),
-                  trailing: YtmDownloadButton(song: song),
-                  onMorePressed: () => showModalBottomSheet<void>(
+              const SizedBox(height: 16),
+              SectionHeader(title: 'Top Charts & Songs (${songs.length})'),
+              for (int i = 0; i < songs.length; i++)
+                SongTile(
+                  song: songs[i],
+                  index: i + 1,
+                  onTap: () => playerCubit.playSong(songs[i], queue: songs),
+                  trailing: YtmDownloadButton(song: songs[i]),
+                  onMorePressed: () => showModalBottomSheet(
                     context: context,
                     useRootNavigator: true,
                     isScrollControlled: true,
                     backgroundColor: Colors.transparent,
-                    builder: (_) => SongInfoSheet(song: song),
+                    builder: (_) => SongInfoSheet(song: songs[i]),
                   ),
-                );
-              },
-            ),
-          ]),
+                ),
+            ],
+          ),
         );
       },
     );

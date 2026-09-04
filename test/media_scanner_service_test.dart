@@ -44,16 +44,7 @@ void main() {
           MediaScannerService.isSystemIgnoredPath(
               '/storage/emulated/0/Music/Albums/Track01.flac'),
           isFalse);
-      expect(
-          MediaScannerService.isSystemIgnoredPath(
-              '/storage/emulated/0/Music/Opus_Collection/Beethoven_Opus_131.flac'),
-          isFalse);
-      expect(
-          MediaScannerService.isSystemIgnoredPath(
-              '/storage/emulated/0/Download/great_song.opus'),
-          isFalse);
     });
-
 
     test('scanProgress stream provides stream of scan progression', () async {
       expect(scannerService.scanProgress, isA<Stream<double>>());

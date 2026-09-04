@@ -9,9 +9,7 @@ import '../../core/utils/error_logger.dart';
 enum CrossfadeCurve {
   linear('Linear', 'Equal slope linear volume ramp'),
   equalPower(
-    'Equal Power',
-    'Constant perceived acoustic loudness (sine/cosine)',
-  ),
+      'Equal Power', 'Constant perceived acoustic loudness (sine/cosine)'),
   sCurve('S-Curve', 'Smooth ease-in ease-out transition'),
   exponential('Exponential', 'Natural logarithmic acoustic response'),
   djCutDrop('DJ Cut/Drop', 'Aggressive club DJ blend with quick drop-in');
@@ -52,10 +50,7 @@ class CrossfadeManager {
   bool isCrossfading = false;
   int? pendingIndex;
   int _fadeId = 0;
-  int _cancelGeneration = 0;
   Completer<void>? _crossfadeCompleter;
-  final Map<int, Completer<void>> _activeFadeCompleters =
-      <int, Completer<void>>{};
 
   Mutex get mutex => _fadeMutex;
 
@@ -69,9 +64,7 @@ class CrossfadeManager {
 
   /// Calculates beat-aligned duration if BPM is provided.
   static Duration calculateBpmAlignedDuration(
-    Duration baseDuration,
-    double? bpm,
-  ) {
+      Duration baseDuration, double? bpm) {
     if (bpm == null || bpm <= 40.0 || bpm >= 240.0) return baseDuration;
     final secondsPerBeat = 60.0 / bpm;
     // Align to nearest 2, 4, 8, or 16 beats
@@ -93,8 +86,7 @@ class CrossfadeManager {
 
     final alignedSeconds = bestBeats * secondsPerBeat;
     return Duration(
-      milliseconds: (alignedSeconds * 1000).round().clamp(1000, 20000),
-    );
+        milliseconds: (alignedSeconds * 1000).round().clamp(1000, 20000));
   }
 
   /// Returns the effective crossfade duration, optionally aligned to song [bpm].
@@ -117,8 +109,7 @@ class CrossfadeManager {
         return f * f * (3.0 - 2.0 * f);
 
       case CrossfadeCurve.exponential:
-        // FIX(BUG-24): Smooth continuous exponential formula without discontinuity at f=0
-        return ((math.pow(2.0, 10.0 * f) - 1.0) / 1023.0).clamp(0.0, 1.0);
+        return f == 0.0 ? 0.0 : math.pow(2.0, 10.0 * (f - 1.0)).toDouble();
 
       case CrossfadeCurve.djCutDrop:
         // Sharp attack after midpoint
@@ -130,10 +121,8 @@ class CrossfadeManager {
 
   /// Evaluates both old (fade-out) and new (fade-in) gains for a given [fraction] (0.0 to 1.0)
   /// ensuring constant acoustic power for equal-power curves ($cos^2 + sin^2 = 1.0$).
-  (double oldGain, double newGain) evaluateGainPair(
-    double fraction, {
-    bool isRepeatOne = false,
-  }) {
+  (double oldGain, double newGain) evaluateGainPair(double fraction,
+      {bool isRepeatOne = false}) {
     final f = fraction.clamp(0.0, 1.0);
     if (isRepeatOne) {
       // Linear equal-gain for identical correlated signals
@@ -149,20 +138,19 @@ class CrossfadeManager {
         final s = f * f * (3.0 - 2.0 * f);
         return (1.0 - s, s);
       case CrossfadeCurve.exponential:
-        // FIX(BUG-24): Continuous normalized exponential response without 0-bound jump
-        final inGain = ((math.pow(2.0, 10.0 * f) - 1.0) / 1023.0).clamp(0.0, 1.0);
-        final outGain = ((math.pow(2.0, 10.0 * (1.0 - f)) - 1.0) / 1023.0).clamp(0.0, 1.0);
+        final inGain =
+            f == 0.0 ? 0.0 : math.pow(2.0, 10.0 * (f - 1.0)).toDouble();
+        final outGain = (1.0 - f) == 0.0
+            ? 0.0
+            : math.pow(2.0, 10.0 * ((1.0 - f) - 1.0)).toDouble();
         return (outGain, inGain);
       case CrossfadeCurve.djCutDrop:
-        final inGain =
-            f < 0.2
-                ? f * 1.5
-                : (0.3 + 0.7 * math.sin((f - 0.2) / 0.8 * (math.pi / 2)));
-        final outGain =
-            (1.0 - f) < 0.2
-                ? (1.0 - f) * 1.5
-                : (0.3 +
-                    0.7 * math.sin(((1.0 - f) - 0.2) / 0.8 * (math.pi / 2)));
+        final inGain = f < 0.2
+            ? f * 1.5
+            : (0.3 + 0.7 * math.sin((f - 0.2) / 0.8 * (math.pi / 2)));
+        final outGain = (1.0 - f) < 0.2
+            ? (1.0 - f) * 1.5
+            : (0.3 + 0.7 * math.sin(((1.0 - f) - 0.2) / 0.8 * (math.pi / 2)));
         return (outGain, inGain);
     }
   }
@@ -195,14 +183,12 @@ class CrossfadeManager {
     // Clamp duration to min(configured, remaining - 500ms)
     final maxAllowedFade =
         remainingTrackDuration - const Duration(milliseconds: 500);
-    final clampedDuration =
-        configuredCrossfade > maxAllowedFade
-            ? maxAllowedFade
-            : configuredCrossfade;
-    final effectiveFade =
-        clampedDuration < const Duration(milliseconds: 500)
-            ? const Duration(milliseconds: 500)
-            : clampedDuration;
+    final clampedDuration = configuredCrossfade > maxAllowedFade
+        ? maxAllowedFade
+        : configuredCrossfade;
+    final effectiveFade = clampedDuration < const Duration(milliseconds: 500)
+        ? const Duration(milliseconds: 500)
+        : clampedDuration;
 
     return TransitionDecision(
       type: TransitionType.crossfade,
@@ -221,10 +207,6 @@ class CrossfadeManager {
     Duration fadeDuration,
     int fadeId,
   ) async {
-    if (fadeId >= _fadeId) {
-      _fadeId = fadeId;
-    }
-
     if (fadeDuration == Duration.zero) {
       await player.setVolume(to.clamp(0.0, 1.0));
       return;
@@ -237,23 +219,14 @@ class CrossfadeManager {
     }
 
     final completer = Completer<void>();
-    _activeFadeCompleters[fadeId] = completer;
     final stopwatch = Stopwatch()..start();
-    final gen = _cancelGeneration;
-
-    void finish() {
-      _activeFadeCompleters.remove(fadeId);
-      if (!completer.isCompleted) {
-        completer.complete();
-      }
-    }
 
     late final Timer timer;
-    timer = Timer.periodic(const Duration(milliseconds: 16), (t) {
-      if (_fadeId != fadeId || gen != _cancelGeneration) {
+    timer = Timer.periodic(const Duration(milliseconds: 33), (t) {
+      if (_fadeId != fadeId) {
         t.cancel();
         _activeTimers.remove(t);
-        finish();
+        if (!completer.isCompleted) completer.complete();
         return;
       }
 
@@ -274,92 +247,17 @@ class CrossfadeManager {
         );
         t.cancel();
         _activeTimers.remove(t);
-        finish();
+        if (!completer.isCompleted) completer.complete();
         return;
       }
 
       if (fraction >= 1.0) {
         t.cancel();
         _activeTimers.remove(t);
-        finish();
+        if (!completer.isCompleted) completer.complete();
       }
     });
 
-    _activeTimers.add(timer);
-    return completer.future;
-  }
-
-  /// Constant-power crossfade for two players using [evaluateGainPair] to avoid -3dB dip at 50%.
-  Future<void> crossfadePair(
-    AudioPlayer outgoing,
-    AudioPlayer incoming,
-    double fromVolume,
-    double toVolume,
-    Duration fadeDuration,
-    int fadeId, {
-    bool isRepeatOne = false,
-  }) async {
-    if (fadeId >= _fadeId) {
-      _fadeId = fadeId;
-    }
-
-    if (fadeDuration == Duration.zero) {
-      await outgoing.setVolume(0.0);
-      await incoming.setVolume(toVolume.clamp(0.0, 1.0));
-      return;
-    }
-    final totalMs = fadeDuration.inMilliseconds.toDouble();
-    if (totalMs <= 0) {
-      await outgoing.setVolume(0.0);
-      await incoming.setVolume(toVolume.clamp(0.0, 1.0));
-      return;
-    }
-    final completer = Completer<void>();
-    _activeFadeCompleters[fadeId] = completer;
-    final stopwatch = Stopwatch()..start();
-    final gen = _cancelGeneration;
-
-    void finish() {
-      _activeFadeCompleters.remove(fadeId);
-      if (!completer.isCompleted) {
-        completer.complete();
-      }
-    }
-
-    late final Timer timer;
-    timer = Timer.periodic(const Duration(milliseconds: 16), (t) {
-      if (_fadeId != fadeId || gen != _cancelGeneration) {
-        t.cancel();
-        _activeTimers.remove(t);
-        finish();
-        return;
-      }
-      final elapsed = stopwatch.elapsedMilliseconds.toDouble();
-      final fraction = (elapsed / totalMs).clamp(0.0, 1.0);
-      final gains = evaluateGainPair(fraction, isRepeatOne: isRepeatOne);
-      final outVol = gains.$1 * fromVolume;
-      final inVol = gains.$2 * toVolume;
-      try {
-        outgoing.setVolume(outVol.clamp(0.0, 1.0));
-        incoming.setVolume(inVol.clamp(0.0, 1.0));
-      } catch (e, st) {
-        ErrorLogger.log(
-          'Error adjusting volume during crossfadePair',
-          error: e,
-          stackTrace: st,
-          category: 'CrossfadeManager',
-        );
-        t.cancel();
-        _activeTimers.remove(t);
-        finish();
-        return;
-      }
-      if (fraction >= 1.0) {
-        t.cancel();
-        _activeTimers.remove(t);
-        finish();
-      }
-    });
     _activeTimers.add(timer);
     return completer.future;
   }
@@ -374,32 +272,19 @@ class CrossfadeManager {
         isCrossfading || _activeTimers.isNotEmpty || _fadeTimer != null;
     if (!hadActiveFade) return;
 
-    _cancelGeneration++; // Invalidate all in-flight timers
     _fadeId++; // Invalidate any in-progress fade timers
-    final activeTimers = List<Timer>.from(_activeTimers);
-    for (final t in activeTimers) {
-      if (!t.isActive) continue;
+    for (final t in _activeTimers) {
       t.cancel();
     }
     _activeTimers.clear();
-    final activeCompleters = Map<int, Completer<void>>.from(
-      _activeFadeCompleters,
-    );
-    _activeFadeCompleters.clear();
-    for (final completer in activeCompleters.values) {
-      if (!completer.isCompleted) completer.complete();
-    }
     _fadeTimer?.cancel();
     _fadeTimer = null;
     isCrossfading = false; // Set BEFORE stopping players
     pendingIndex = null;
 
     try {
-      // FIX(BUG-13): Skip stop & volume set if player already idle
-      if (inactivePlayer.processingState != ProcessingState.idle) {
-        await inactivePlayer.stop();
-        await inactivePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));
-      }
+      await inactivePlayer.stop();
+      await inactivePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));
       await activePlayer.setVolume(restoreVolume.clamp(0.0, 1.0));
     } catch (e, st) {
       ErrorLogger.log(
@@ -410,6 +295,7 @@ class CrossfadeManager {
       );
     }
 
+    // Complete the completer exactly once
     final completer = _crossfadeCompleter;
     _crossfadeCompleter = null;
     if (completer != null && !completer.isCompleted) {
@@ -455,12 +341,6 @@ class CrossfadeManager {
     _fadeId++;
     _fadeTimer?.cancel();
     _fadeTimer = null;
-    for (final t in _activeTimers) {
-      t.cancel();
-    }
-    _activeTimers.clear();
-    isCrossfading = false;
-    pendingIndex = null;
     if (_crossfadeCompleter != null && !_crossfadeCompleter!.isCompleted) {
       _crossfadeCompleter!.complete();
     }

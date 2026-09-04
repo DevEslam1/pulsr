@@ -1,13 +1,10 @@
-import 'dart:async';
-import 'dart:io';
 import 'package:file_picker/file_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/di/injection.dart';
-import '../../../data/services/ytm_account_service.dart';
-import '../../../data/services/ytm_service.dart';
+import '../../../core/services/ytm_account_service.dart';
+import '../../../core/services/ytm_service.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
@@ -18,11 +15,10 @@ import '../../../domain/usecases/playlist_io_usecases.dart';
 import '../../auth/presentation/ytm_web_login_sheet.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
-import '../../downloads/cubit/ytm_download_cubit.dart';
+import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../cubit/playlist_cubit.dart';
 import '../cubit/playlist_state.dart';
 
-import '../../../core/utils/error_logger.dart';
 enum _PlaylistTabMode { local, online }
 
 class PlaylistsScreen extends StatefulWidget {
@@ -37,9 +33,8 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
 
   void _showCreateDialog(BuildContext context, PlaylistCubit cubit) {
     final controller = TextEditingController();
-    showDialog<void>(
+    showDialog(
       context: context,
-      useRootNavigator: true,
       builder: (ctx) => AlertDialog(
         title: Text(context.l10n.createPlaylist,
             style: const TextStyle(fontWeight: FontWeight.w800)),
@@ -68,29 +63,14 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
   }
 
   Future<void> _importPlaylist(BuildContext context) async {
-    final files = await FilePicker.pickFiles(
+    final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['m3u', 'm3u8'],
     );
-    if (files.isEmpty) return;
-    final picked = files.single;
-    // FIX(file_picker 12 / platform_interface 3.2): PlatformFile.bytes was
-    // removed — use path when available, else materialize readAsByteStream
-    // (SAF / cloud providers like Drive on Android 10+ where path is null).
-    String? filePath = picked.path;
-    if (filePath == null) {
-      try {
-        final bytes = await picked.readAsBytes();
-        final tempDir = await getTemporaryDirectory();
-        final tempFile = File('${tempDir.path}/${picked.name}');
-        await tempFile.writeAsBytes(bytes);
-        filePath = tempFile.path;
-      } catch (e, st) {
-        ErrorLogger.log('_importPlaylist failed, using fallback', error: e, stackTrace: st, category: 'PlaylistsScreen');
-        return;
-      }
-    }
-    final playlistName = picked.name.replaceAll(
+    if (result == null || result.files.single.path == null) return;
+
+    final filePath = result.files.single.path!;
+    final playlistName = result.files.single.name.replaceAll(
       RegExp(r'\.m3u8?$', caseSensitive: false),
       '',
     );
@@ -110,7 +90,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
         );
       },
       (importResult) {
-        showDialog<void>(
+        showDialog(
           context: context,
           builder: (ctx) => AlertDialog(
             title: Text(context.l10n.playlistImported,
@@ -130,7 +110,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
 
   void _showAddOnlinePlaylistDialog(BuildContext context, PlaylistCubit cubit) {
     final controller = TextEditingController();
-    showDialog<void>(
+    showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(context.l10n.addYouTubePlaylist,
@@ -224,16 +204,12 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                     }
                   }
                 },
-                // CustomScrollView with builder slivers (F-12): the playlist
-                // grids below virtualize via SliverGrid.builder instead of
-                // shrink-wrapping every card into one frame.
-                child: CustomScrollView(
+                child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  slivers: [
-                    // From the former ListView padding (top: 12).
-                    const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                  padding: const EdgeInsets.only(bottom: 160, top: 12),
+                  children: [
                     // Liked songs hero card (Local favorites)
-                    SliverToBoxAdapter(child: Padding(
+                    Padding(
                       padding: EdgeInsets.symmetric(
                           horizontal: Adaptive.pagePadding(context)),
                       child: _PlaylistHeroCard(
@@ -252,10 +228,10 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                           });
                         },
                       ),
-                    )),
+                    ),
 
                     // SMART PLAYLISTS Header
-                    SliverToBoxAdapter(child: Padding(
+                    Padding(
                       padding: EdgeInsets.only(
                           left: Adaptive.pagePadding(context),
                           top: 24,
@@ -267,10 +243,9 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                             .labelSmall
                             ?.copyWith(color: p.textTertiary),
                       ),
-                    )),
-
+                    ),
                     if (smartPlaylists.isEmpty)
-                      SliverToBoxAdapter(child: Padding(
+                      Padding(
                         padding: EdgeInsets.symmetric(
                             horizontal: Adaptive.pagePadding(context)),
                         child: InkWell(
@@ -295,13 +270,14 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                             ),
                           ),
                         ),
-                      ))
+                      )
                     else
-                      SliverPadding(
+                      Padding(
                         padding: EdgeInsets.symmetric(
                             horizontal: Adaptive.pagePadding(context)),
-                        // F-12: virtualized grid.
-                        sliver: SliverGrid.builder(
+                        child: GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
                           gridDelegate:
                               SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: columns,
@@ -329,7 +305,7 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                       ),
 
                     // ── YOUR PLAYLISTS SECTION ──────────────────────────────
-                    SliverToBoxAdapter(child: Padding(
+                    Padding(
                       padding: EdgeInsets.fromLTRB(
                           Adaptive.pagePadding(context),
                           28,
@@ -347,10 +323,10 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                           ),
                         ],
                       ),
-                    )),
+                    ),
 
                     // ── TABS UNDER YOUR PLAYLISTS (Local vs Online) ─────────
-                    SliverToBoxAdapter(child: Padding(
+                    Padding(
                       padding: EdgeInsets.symmetric(
                           horizontal: Adaptive.pagePadding(context)),
                       child: SizedBox(
@@ -388,15 +364,15 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                           },
                         ),
                       ),
-                    )),
+                    ),
 
-                    const SliverToBoxAdapter(child: SizedBox(height: 16)),
+                    const SizedBox(height: 16),
 
                     // ── TAB CONTENT ─────────────────────────────────────────
                     if (_selectedTab == _PlaylistTabMode.local) ...[
                       // LOCAL PLAYLISTS VIEW
                       if (userPlaylists.isEmpty)
-                        SliverToBoxAdapter(child: EmptyStateWidget(
+                        EmptyStateWidget(
                           icon: Icons.playlist_add_rounded,
                           title: context.l10n.emptyPlaylists,
                           subtitle: context.l10n.emptyPlaylistsSubtitle,
@@ -407,13 +383,14 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                           secondaryActionLabel: 'Import M3U',
                           secondaryActionIcon: Icons.file_upload_rounded,
                           onSecondaryAction: () => _importPlaylist(context),
-                        ))
+                        )
                       else
-                        SliverPadding(
+                        Padding(
                           padding: EdgeInsets.symmetric(
                               horizontal: Adaptive.pagePadding(context)),
-                          // F-12: virtualized grid.
-                          sliver: SliverGrid.builder(
+                          child: GridView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
                             gridDelegate:
                                 SliverGridDelegateWithFixedCrossAxisCount(
                               crossAxisCount: columns,
@@ -448,8 +425,6 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
                             _showAddOnlinePlaylistDialog(context, cubit),
                       ),
                     ],
-                    // From the former ListView padding (bottom: 160).
-                    const SliverPadding(padding: EdgeInsets.only(bottom: 160)),
                   ],
                 ),
               ),
@@ -492,10 +467,9 @@ class _OnlinePlaylistsContent extends StatelessWidget {
       final ytmService = getIt<YtmService>();
       final tracks =
           await ytmService.getPlaylistTracks(playlist.playlistId, limit: 200);
-      if (!context.mounted) return;
       if (tracks.isNotEmpty) {
         final songs = tracks.map((t) => t.toSongData()).toList();
-        unawaited(playerCubit.playSong(songs.first, queue: songs));
+        playerCubit.playSong(songs.first, queue: songs);
       } else {
         scaffoldMessenger.showSnackBar(
           const SnackBar(
@@ -503,7 +477,6 @@ class _OnlinePlaylistsContent extends StatelessWidget {
         );
       }
     } catch (e) {
-      if (!context.mounted) return;
       scaffoldMessenger.showSnackBar(
         SnackBar(content: Text('Failed to load playlist: $e')),
       );
@@ -526,7 +499,6 @@ class _OnlinePlaylistsContent extends StatelessWidget {
       final ytmService = getIt<YtmService>();
       final tracks =
           await ytmService.getPlaylistTracks(playlist.playlistId, limit: 200);
-      if (!context.mounted) return;
       if (tracks.isNotEmpty) {
         final songs = tracks.map((t) => t.toSongData()).toList();
         final downloadCubit = getIt<YtmDownloadCubit>();
@@ -548,7 +520,6 @@ class _OnlinePlaylistsContent extends StatelessWidget {
         );
       }
     } catch (e) {
-      if (!context.mounted) return;
       scaffoldMessenger.showSnackBar(
         SnackBar(content: Text('Failed to load playlist: $e')),
       );
@@ -617,7 +588,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
       valueListenable: ytmAccount.loginState,
       builder: (context, isLoggedIn, _) {
         if (!isLoggedIn) {
-          return SliverToBoxAdapter(child: Center(
+          return Center(
             child: Padding(
               padding: EdgeInsets.symmetric(
                 horizontal: Adaptive.pagePadding(context),
@@ -666,7 +637,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                       onPressed: () async {
                         final ok = await YtmWebLoginSheet.show(context);
                         if (ok == true) {
-                          unawaited(cubit.autoFetchOnlineLibrary(force: true));
+                          cubit.autoFetchOnlineLibrary(force: true);
                         }
                       },
                       icon: const Icon(Icons.login_rounded, size: 18),
@@ -682,7 +653,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                 ),
               ),
             ),
-          ));
+          );
         }
 
         return ValueListenableBuilder<YtmOnlineState>(
@@ -690,12 +661,11 @@ class _OnlinePlaylistsContent extends StatelessWidget {
           builder: (context, online, _) {
             final columns = Adaptive.gridColumns(context, minItemWidth: 170);
 
-            // Slivers (F-12): the account / added playlist grids below
-            // virtualize via SliverGrid.builder.
-            return SliverMainAxisGroup(
-              slivers: [
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 // Liked Music Online Hero Card
-                SliverToBoxAdapter(child: Padding(
+                Padding(
                   padding: EdgeInsets.symmetric(
                       horizontal: Adaptive.pagePadding(context)),
                   child: _LikedMusicOnlineCard(
@@ -714,10 +684,10 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                       }
                     },
                   ),
-                )),
+                ),
 
                 // ── ACCOUNT PLAYLISTS SECTION ─────────────────────────
-                SliverToBoxAdapter(child: Padding(
+                Padding(
                   padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context),
                       24, Adaptive.pagePadding(context), 10),
                   child: Row(
@@ -748,11 +718,11 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                         ),
                     ],
                   ),
-                )),
+                ),
 
                 if (online.accountStatus == YtmFetchStatus.loading &&
                     online.accountPlaylists.isEmpty)
-                  SliverToBoxAdapter(child: Padding(
+                  Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Center(
                       child: Column(
@@ -769,10 +739,10 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                         ],
                       ),
                     ),
-                  ))
+                  )
                 else if (online.accountStatus == YtmFetchStatus.error &&
                     online.accountPlaylists.isEmpty)
-                  SliverToBoxAdapter(child: Padding(
+                  Padding(
                     padding: EdgeInsets.symmetric(
                         horizontal: Adaptive.pagePadding(context),
                         vertical: 10),
@@ -803,9 +773,9 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                         ],
                       ),
                     ),
-                  ))
+                  )
                 else if (online.accountPlaylists.isEmpty)
-                  SliverToBoxAdapter(child: Padding(
+                  Padding(
                     padding: EdgeInsets.symmetric(
                         horizontal: Adaptive.pagePadding(context)),
                     child: Container(
@@ -830,13 +800,14 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                         ],
                       ),
                     ),
-                  ))
+                  )
                 else
-                  SliverPadding(
+                  Padding(
                     padding: EdgeInsets.symmetric(
                         horizontal: Adaptive.pagePadding(context)),
-                    // F-12: virtualized grid.
-                    sliver: SliverGrid.builder(
+                    child: GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: columns,
                         crossAxisSpacing: 14,
@@ -858,7 +829,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
 
                 // ── ADDED PLAYLISTS SECTION ─────────────────────────────
                 if (online.customPlaylists.isNotEmpty) ...[
-                  SliverToBoxAdapter(child: Padding(
+                  Padding(
                     padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context),
                         24, Adaptive.pagePadding(context), 10),
                     child: Text(
@@ -868,12 +839,13 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                           .labelSmall
                           ?.copyWith(color: p.textTertiary),
                     ),
-                  )),
-                  SliverPadding(
+                  ),
+                  Padding(
                     padding: EdgeInsets.symmetric(
                         horizontal: Adaptive.pagePadding(context)),
-                    // F-12: virtualized grid.
-                    sliver: SliverGrid.builder(
+                    child: GridView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
                       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                         crossAxisCount: columns,
                         crossAxisSpacing: 14,
@@ -902,7 +874,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                 ],
 
                 // Add YouTube Playlist Button
-                SliverToBoxAdapter(child: Padding(
+                Padding(
                   padding: EdgeInsets.fromLTRB(Adaptive.pagePadding(context),
                       16, Adaptive.pagePadding(context), 0),
                   child: InkWell(
@@ -928,7 +900,7 @@ class _OnlinePlaylistsContent extends StatelessWidget {
                       ),
                     ),
                   ),
-                )),
+                ),
               ],
             );
           },

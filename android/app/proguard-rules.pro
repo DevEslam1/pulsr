@@ -38,11 +38,6 @@
 -keepclasseswithmembernames class * {
     native <methods>;
 }
-# Keep the JNI bridge classes
--keep class com.pulsr.music.NativeAudioBridge { *; }
--keep class com.pulsr.music.AudioEffectsPlugin { *; }
-# Keep DSP param classes used by JNI
--keep class com.pulsr.music.dsp.** { *; }
 
 # Android WebView & JavascriptInterface (PoToken WebView & BotGuard)
 -keepattributes JavascriptInterface

@@ -19,12 +19,6 @@ abstract class IDownloadRepository {
   /// Deletes a download task and any local file associated with it.
   Future<Either<AppFailure, Unit>> deleteDownload(String videoId);
 
-  /// Reorders the queued tasks by the given list of videoIds (FIFO queue re-sequencing).
-  Future<Either<AppFailure, Unit>> reorderQueue(List<String> orderedVideoIds);
-
-  /// Moves a specific queued task to the front of the queue to be processed next.
-  Future<Either<AppFailure, Unit>> prioritizeDownload(String videoId);
-
   /// Single broadcast stream of download task state transitions and progress updates.
   Stream<DownloadTask> observeDownloads();
 

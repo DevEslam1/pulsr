@@ -62,12 +62,10 @@ class SleepTimerManager {
 
     if (duration < const Duration(seconds: 1)) {
       // Sub-second timer for unit tests
-      _countdownTicker = Timer(duration, () async {
+      Timer(duration, () async {
         if (_isArmed && _sleepFadeToken == currentToken) {
           _remainingDuration = Duration.zero;
-          if (!_sleepTimerRemainingSubject.isClosed) {
-            _sleepTimerRemainingSubject.add(null);
-          }
+          _sleepTimerRemainingSubject.add(null);
           await _executeExpiration(currentToken);
         }
       });
@@ -166,15 +164,12 @@ class SleepTimerManager {
 
   void _applyFadeOutStep(AudioPlayer? player, double fraction) {
     if (player == null || !player.playing) return;
-    // FIX(BUG-25): Capture pre-fade volume once at fade start to prevent volume ratcheting down
     _preFadeVolume ??= player.volume;
     try {
       final target =
           (_preFadeVolume! * fraction.clamp(0.0, 1.0)).clamp(0.0, 1.0);
       player.setVolume(target);
-    } catch (e, st) {
-      ErrorLogger.log('_applyFadeOutStep failed', error: e, stackTrace: st, category: 'SleepTimerManager');
-    }
+    } catch (_) {}
   }
 
   Future<void> _executeExpiration(int token) async {
@@ -195,9 +190,7 @@ class SleepTimerManager {
       if (_preFadeVolume != null && player != null) {
         try {
           await player.setVolume(_preFadeVolume!);
-        } catch (e, st) {
-          ErrorLogger.log('_executeExpiration failed', error: e, stackTrace: st, category: 'SleepTimerManager');
-        }
+        } catch (_) {}
         _preFadeVolume = null;
       }
       _clearPersistedState();
@@ -221,9 +214,7 @@ class SleepTimerManager {
     if (_preFadeVolume != null && _lastPlayerGetter != null) {
       try {
         _lastPlayerGetter!().setVolume(_preFadeVolume!);
-      } catch (e, st) {
-        ErrorLogger.log('cancelSleepTimer failed', error: e, stackTrace: st, category: 'SleepTimerManager');
-      }
+      } catch (_) {}
       _preFadeVolume = null;
     }
     _clearPersistedState();
@@ -241,33 +232,6 @@ class SleepTimerManager {
     SharedPreferences.getInstance().then((prefs) {
       prefs.remove(PrefsKeys.sleepTimerTarget);
     }).catchError((_) {});
-  }
-
-  // FIX(BUG-18): Restore sleep timer on app restart if target timestamp is in the future
-  Future<void> restoreTimerState({
-    required Future<void> Function() onTimerExpired,
-    required AudioPlayer Function() getActivePlayer,
-  }) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final targetMs = prefs.getInt(PrefsKeys.sleepTimerTarget);
-      if (targetMs != null) {
-        final nowMs = DateTime.now().millisecondsSinceEpoch;
-        final diffMs = targetMs - nowMs;
-        if (diffMs > 1000) {
-          startSleepTimer(
-            Duration(milliseconds: diffMs),
-            fadeOut: true,
-            onTimerExpired: onTimerExpired,
-            getActivePlayer: getActivePlayer,
-          );
-        } else {
-          _clearPersistedState();
-        }
-      }
-    } catch (e, st) {
-      ErrorLogger.log('Function failed', error: e, stackTrace: st, category: 'SleepTimerManager');
-    }
   }
 
   void dispose() {

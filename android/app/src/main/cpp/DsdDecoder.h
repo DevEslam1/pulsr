@@ -25,7 +25,6 @@ public:
     void setBitOrder(DsdBitOrder bitOrder) { bitOrder_ = bitOrder; }
     DsdBitOrder getBitOrder() const { return bitOrder_; }
     double getDecimationRatio() const { return decimationRatio_; }
-    int getTargetRate() const { return targetRate_; }
     int getExpectedPcmFrames(int byteCount) const {
         if (decimationRatio_ <= 0.0 || byteCount <= 0) return 0;
         return static_cast<int>(std::ceil((byteCount * 8.0) / decimationRatio_)) + 64;
@@ -39,24 +38,24 @@ public:
 private:
     void generateFilters();
 
-    // Stage 2 Anti-Aliasing Decimation FIR filter coefficients
-    static constexpr int DECIMATION_TAPS = 383;
-    static constexpr int DECIMATION_HALF = DECIMATION_TAPS / 2;
-    float decimationCoeffs_[DECIMATION_TAPS] = {};
+    // Stage 2 Halfband FIR filter coefficients (symmetric, zero-every-second tap)
+    static constexpr int HALFBAND_TAPS = 31;
+    static constexpr int HALFBAND_HALF = HALFBAND_TAPS / 2;
+    float halfbandCoeffs_[HALFBAND_TAPS] = {};
 
-    // CIC stage 1 integrators & combs (signed 64-bit to prevent overflow/drift)
+    // CIC stage 1 integrators & combs (uint32_t for well-defined mod 2^32 wrap)
     struct CicState {
-        int64_t int1 = 0, int2 = 0, int3 = 0;
-        int64_t comb1 = 0, comb2 = 0, comb3 = 0;
-        int64_t comb1_d = 0, comb2_d = 0, comb3_d = 0;
+        uint32_t int1 = 0, int2 = 0, int3 = 0;
+        uint32_t comb1 = 0, comb2 = 0, comb3 = 0;
+        uint32_t comb1_d = 0, comb2_d = 0, comb3_d = 0;
     };
     CicState cicL_;
     CicState cicR_;
     int cicCount_ = 0;
 
     // Stage 2 ring buffer
-    float stage2RingL_[DECIMATION_TAPS] = {};
-    float stage2RingR_[DECIMATION_TAPS] = {};
+    float stage2RingL_[HALFBAND_TAPS] = {};
+    float stage2RingR_[HALFBAND_TAPS] = {};
     int stage2WriteIdx_ = 0;
 
     // 5Hz DC blocker states

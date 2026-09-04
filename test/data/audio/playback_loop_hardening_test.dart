@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/errors/failures.dart';
-import 'package:pulsr/data/services/ytm_service.dart';
+import 'package:pulsr/core/services/ytm_service.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
 import 'package:pulsr/data/audio/ytm_resolving_source.dart';
 import 'package:pulsr/data/db/app_database.dart';
@@ -26,10 +26,6 @@ class StubPulsrAudioHandler extends BaseAudioHandler
     implements PulsrAudioHandler {
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
-
-  final StreamController<SongsTableData> _onTrackChangedController = StreamController<SongsTableData>.broadcast();
-  @override
-  Stream<SongsTableData> get onTrackChanged => _onTrackChangedController.stream;
 
   double _vol = 1.0;
   @override
@@ -95,52 +91,6 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   bool get hasOemAudio => false;
   @override
   List<String> get detectedOemEngines => const [];
-
-  // Phase 1 DSP expansion stage surface (mirror PulsrAudioHandler)
-  @override
-  bool get isSaturationEnabled => false;
-  @override
-  double get saturationDrive => 0.0;
-  @override
-  double get saturationMix => 0.5;
-  @override
-  double get saturationTilt => 0.0;
-  @override
-  bool get isStereoWidthEnabled => false;
-  @override
-  double get stereoWidth => 1.0;
-  @override
-  bool get isLoudnessContourEnabled => false;
-  @override
-  double get loudnessContourIntensity => 0.0;
-  @override
-  bool get isSubCrossoverEnabled => false;
-  @override
-  double get subCrossoverCornerHz => 80.0;
-  @override
-  double get subCrossoverSlopeDbPerOct => 24.0;
-  @override
-  double get subCrossoverGain => 0.8;
-  @override
-  bool get isDynamicEqEnabled => false;
-  @override
-  List<DynamicEqBandConfig> get dynamicEqBands => const [];
-  @override
-  Future<void> setSaturation(bool enabled,
-          {double? drive, double? mix, double? tilt}) async {}
-  @override
-  Future<void> setStereoWidth(bool enabled, {double? width}) async {}
-  @override
-  Future<void> setLoudnessContour(bool enabled, {double? intensity}) async {}
-  @override
-  Future<void> setSubCrossover(bool enabled,
-          {double? cornerHz, double? slopeDbPerOct, double? gain}) async {}
-  @override
-  Future<void> setDynamicEq(bool enabled) async {}
-  @override
-  Future<void> setDynamicEqBand(int index, DynamicEqBandConfig band) async {}
-  @override
-  Future<void> get effectsReady => Future<void>.value();
   @override
   Duration get crossfadeDuration => Duration.zero;
   @override
@@ -235,10 +185,7 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   @override
   Future<void> validatePlayerState() async {}
   @override
-  Future<void> skipToQueueItem(int index) async {}
-  @override
   void dispose() {
-    _onTrackChangedController.close();
     _positionController.close();
     _errorController.close();
   }
@@ -384,27 +331,6 @@ void main() {
       expect(cubit.state.currentSong?.title, 'Local Track 2');
     });
 
-    test('mediaItem emission updates both currentSong and currentIndex in sync with queue',
-        () async {
-      // 1. Initialize cubit with queue [songA, songB] playing songA (index 0)
-      await cubit.playSong(songA, queue: [songA, songB]);
-      expect(cubit.state.currentIndex, 0);
-      expect(cubit.state.currentSong?.id, 101);
-
-      // 2. Simulate external/earpod track transition to songB (index 1) via mediaItem
-      stubAudioHandler.mediaItem.add(const MediaItem(
-        id: '102',
-        title: 'Local Track 2',
-        artist: 'Artist 2',
-        album: 'Album 2',
-      ));
-      await pumpEventQueue();
-
-      // 3. Both currentSong and currentIndex must be immediately updated to index 1
-      expect(cubit.state.currentSong?.id, 102);
-      expect(cubit.state.currentIndex, 1);
-    });
-
     test('saveCurrentPositionImmediate completes asynchronously without errors',
         () async {
       await expectLater(
@@ -432,7 +358,7 @@ void main() {
         }();
 
         pool.add(fut);
-        unawaited(fut.whenComplete(() => pool.remove(fut)));
+        fut.whenComplete(() => pool.remove(fut));
         if (pool.length >= maxConcurrency) {
           await Future.any(pool);
         }

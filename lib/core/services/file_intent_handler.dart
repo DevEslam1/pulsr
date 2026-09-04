@@ -1,6 +1,5 @@
-﻿import 'dart:async';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -17,16 +16,17 @@ import '../../domain/repositories/music_repository_interface.dart';
 import '../../features/player/cubit/player_cubit.dart';
 import '../constants/channels.dart';
 import '../network/proxy_config.dart';
-import '../../data/services/ytm_service.dart';
+import 'ytm_service.dart';
 
 @singleton
 class FileIntentHandler {
   static const MethodChannel _channel = MethodChannel(PulsrChannels.fileOpener);
   static int _tempIdCounter = 0;
   static int _getNextTempId() {
-    _tempIdCounter++;
-    final unique = DateTime.now().microsecondsSinceEpoch;
-    return -(unique * 1000 + (_tempIdCounter % 1000));
+    final rand = math.Random().nextInt(1 << 16);
+    return (DateTime.now().millisecondsSinceEpoch * -1) -
+        (++_tempIdCounter * 65536) -
+        rand;
   }
 
   final IMusicRepository _repository;
@@ -36,43 +36,21 @@ class FileIntentHandler {
     _initChannel();
   }
 
-  final Set<String> _recentUris = <String>{};
-  Timer? _recentClearTimer;
-
   void _initChannel() {
     _channel.setMethodCallHandler((call) async {
-      try {
-        if (call.method == 'onAudioFileOpened') {
-          final uri = call.arguments as String?;
-          if (uri != null) {
-            await handleAudioUri(uri);
-          }
+      if (call.method == 'onAudioFileOpened') {
+        final uri = call.arguments as String?;
+        if (uri != null) {
+          await handleAudioUri(uri);
         }
-      } catch (e, st) {
-        ErrorLogger.log('FileIntent channel handler error', error: e, stackTrace: st, category: 'FileIntentHandler');
       }
     });
   }
 
-  void dispose() {
-    _channel.setMethodCallHandler(null);
-    _recentClearTimer?.cancel();
-  }
-
-  bool _isDuplicateUri(String uri) {
-    if (_recentUris.contains(uri)) return true;
-    _recentUris.add(uri);
-    _recentClearTimer?.cancel();
-    _recentClearTimer = Timer(const Duration(seconds: 3), () => _recentUris.clear());
-    return false;
-  }
-
   Future<void> checkInitialUri() async {
-    if (kIsWeb) return;
-    if (!Platform.isAndroid) return;
     try {
       final initialUri =
-          await _channel.invokeMethod<String>('getInitialAudioUri').timeout(const Duration(seconds: 2));
+          await _channel.invokeMethod<String>('getInitialAudioUri');
       if (initialUri != null) {
         await handleAudioUri(initialUri);
       }
@@ -125,7 +103,7 @@ class FileIntentHandler {
 
     try {
       final ytmService = getIt<YtmService>();
-      final stream = await ytmService.resolveStream(videoId).timeout(const Duration(seconds: 12));
+      final stream = await ytmService.resolveStream(videoId);
 
       final track = YtmTrack(
         videoId: videoId,
@@ -137,7 +115,7 @@ class FileIntentHandler {
 
       final song = track.toSongData();
       await _playerCubit.playSong(song);
-      unawaited(rootNavigatorKey.currentContext?.push('/now-playing'));
+      rootNavigatorKey.currentContext?.push('/now-playing');
     } catch (e, st) {
       ErrorLogger.log('Failed to resolve YouTube link: $videoId',
           error: e, stackTrace: st, category: 'FileIntentHandler');
@@ -154,7 +132,6 @@ class FileIntentHandler {
   }
 
   Future<void> handleAudioUri(String uriOrPath) async {
-    if (_isDuplicateUri(uriOrPath)) return;
     try {
       final videoId = extractYouTubeVideoId(uriOrPath);
       if (videoId != null && AppConfig.ytmEnabled) {
@@ -165,8 +142,7 @@ class FileIntentHandler {
       String cleanPath;
       try {
         cleanPath = Uri.decodeFull(uriOrPath);
-      } catch (e, st) {
-        ErrorLogger.log('handleAudioUri failed, using fallback', error: e, stackTrace: st, category: 'FileIntentHandler');
+      } catch (_) {
         cleanPath = uriOrPath;
       }
       if (cleanPath.startsWith('file://')) {
@@ -177,21 +153,13 @@ class FileIntentHandler {
           } else {
             cleanPath = cleanPath.replaceFirst('file://', '');
           }
-        } catch (e, st) {
-          ErrorLogger.log('handleAudioUri failed, using fallback', error: e, stackTrace: st, category: 'FileIntentHandler');
+        } catch (_) {
           cleanPath = cleanPath.replaceFirst('file://', '');
         }
       }
 
-      // 1. Check if it's a PLAYABLE audio file FIRST (fast-path).
-      // content:// URIs skip the extension gate: file managers and media providers
-      // frequently hand out extension-less URIs (content://media/.../<id>, msf:<id>)
-      // that ARE audio (MainActivity.isAudioIntent already gated by intent mime type
-      // audio/* before invoking Dart). The extension check would falsely reject them
-      // with "Format not supported" and the song would never play.
-      final isContentUri =
-          cleanPath.startsWith('content:') || uriOrPath.startsWith('content:');
-      if (isContentUri || AudioFormats.isSupportedExtension(cleanPath)) {
+      // 1. Check if it's a PLAYABLE audio file FIRST (fast-path)
+      if (AudioFormats.isSupportedExtension(cleanPath)) {
         // Proceed directly to audio handling below
       } else {
         // 2. Only check for proxy/text files if NOT audio
@@ -209,20 +177,18 @@ class FileIntentHandler {
               if (proxies.isNotEmpty) {
                 final navCtx = rootNavigatorKey.currentContext;
                 if (navCtx != null && navCtx.mounted) {
-                  unawaited(navCtx.push('/proxy-settings', extra: content));
+                  navCtx.push('/proxy-settings', extra: content);
                 }
                 return;
               }
             }
-          } catch (e, st) {
-            ErrorLogger.log('handleAudioUri failed', error: e, stackTrace: st, category: 'FileIntentHandler');
-          }
+          } catch (_) {}
         } else {
           final parsedProxies = ProxyEntry.parseList(uriOrPath);
           if (parsedProxies.isNotEmpty) {
             final navCtx = rootNavigatorKey.currentContext;
             if (navCtx != null && navCtx.mounted) {
-              unawaited(navCtx.push('/proxy-settings', extra: uriOrPath));
+              navCtx.push('/proxy-settings', extra: uriOrPath);
             }
             return;
           }
@@ -253,7 +219,7 @@ class FileIntentHandler {
         await _playerCubit.playSong(match);
         final navCtx = rootNavigatorKey.currentContext;
         if (navCtx != null && navCtx.mounted) {
-          unawaited(navCtx.push('/now-playing'));
+          navCtx.push('/now-playing');
         }
         return;
       }
@@ -271,20 +237,7 @@ class FileIntentHandler {
             : null;
         if (segment != null && segment.isNotEmpty) {
           final decoded = Uri.decodeComponent(segment);
-          // Media-provider URIs end in opaque ids ("1000000123", "msf:1000000123").
-          // Prefer a readable display name from query params when present,
-          // otherwise fall back to a generic title instead of the raw id.
-          final qpTitle = parsedUri?.queryParameters['displayName'] ??
-              parsedUri?.queryParameters['title'];
-          if (qpTitle != null && qpTitle.trim().isNotEmpty) {
-            title = p.withoutExtension(qpTitle.trim());
-          } else if (decoded.contains('.') &&
-              !decoded.endsWith('.') &&
-              !decoded.contains(':')) {
-            title = p.withoutExtension(decoded);
-          } else {
-            title = 'Audio Track';
-          }
+          title = p.withoutExtension(decoded);
         }
       } else {
         final file = File(cleanPath);
@@ -296,9 +249,7 @@ class FileIntentHandler {
           if (await file.exists()) {
             fileSize = await file.length();
           }
-        } catch (e, st) {
-          ErrorLogger.log('contains failed', error: e, stackTrace: st, category: 'FileIntentHandler');
-        }
+        } catch (_) {}
       }
 
       final tempSong = SongsTableData(
@@ -321,7 +272,7 @@ class FileIntentHandler {
       await _playerCubit.playSong(tempSong);
       final navCtx = rootNavigatorKey.currentContext;
       if (navCtx != null && navCtx.mounted) {
-        unawaited(navCtx.push('/now-playing'));
+        navCtx.push('/now-playing');
       }
     } catch (e, st) {
       final context = rootNavigatorKey.currentContext;
@@ -338,5 +289,3 @@ class FileIntentHandler {
     }
   }
 }
-
-

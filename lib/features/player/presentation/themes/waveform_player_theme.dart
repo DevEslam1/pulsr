@@ -98,6 +98,7 @@ class WaveformPlayerTheme extends StatelessWidget {
 
             // Waveform Seek Bar
             PlayerSeekBar(
+              position: state.position,
               duration: state.duration,
               activeColor: props.activeColor,
               songId: song?.id,

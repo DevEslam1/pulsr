@@ -2,7 +2,6 @@
 import 'package:fake_async/fake_async.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/utils/ytm_rate_limiter.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   group('YtmRateLimiter backoff', () {
@@ -26,7 +25,7 @@ void main() {
         // duration let the second caller through almost immediately.
         expect(elapsedAtDone.length, 2);
         for (final d in elapsedAtDone) {
-          expect(d, greaterThanOrEqualTo(const Duration(milliseconds: 1950)));
+          expect(d, greaterThan(const Duration(seconds: 2)));
           // 2s base + up to 1s jitter + small token-wait margin.
           expect(d, lessThan(const Duration(seconds: 6)));
         }
@@ -79,56 +78,6 @@ void main() {
             reason: 'backoff must stay capped near 30s');
         expect(waited, greaterThan(const Duration(seconds: 8)));
       });
-    });
-  });
-
-  group('YtmRateLimiter launch backoff clamp', () {
-    test('a persisted 429 spiral is clamped to <=2s at restore', () async {
-      YtmRateLimiter.debugReset();
-      SharedPreferences.setMockInitialValues({
-        'ytm_rate_limiter_backoff_until':
-            DateTime.now().add(const Duration(hours: 1)).millisecondsSinceEpoch,
-        'ytm_rate_limiter_backend_backoff_until':
-            DateTime.now().add(const Duration(days: 1)).millisecondsSinceEpoch,
-      });
-
-      await YtmRateLimiter.shared.restore();
-
-      // The prior session had ~1h/1d left; restore must cap both buckets at
-      // the 2s clamp (plus small slack for the time restore() itself takes).
-      expect(YtmRateLimiter.shared.isCoolingDown, isTrue);
-      expect(
-        YtmRateLimiter.shared.cooldownRemaining,
-        lessThanOrEqualTo(const Duration(milliseconds: 2500)),
-      );
-      expect(YtmRateLimiter.shared.isBackendCoolingDown, isTrue);
-      expect(
-        YtmRateLimiter.shared.backendCooldownRemaining,
-        lessThanOrEqualTo(const Duration(milliseconds: 2500)),
-      );
-    });
-
-    test('a small persisted backoff under the clamp is kept as-is', () async {
-      YtmRateLimiter.debugReset();
-      // The legacy SharedPreferences instance (and its value cache) is cached
-      // process-wide, so rather than re-seeding mock initial values, write
-      // the short backoff through the live instance before restoring.
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(
-        'ytm_rate_limiter_backoff_until',
-        DateTime.now()
-            .add(const Duration(milliseconds: 500))
-            .millisecondsSinceEpoch,
-      );
-
-      await YtmRateLimiter.shared.restore();
-
-      expect(YtmRateLimiter.shared.isCoolingDown, isTrue);
-      expect(
-        YtmRateLimiter.shared.cooldownRemaining,
-        lessThanOrEqualTo(const Duration(milliseconds: 500)),
-        reason: 'short backoffs must not be extended up to the clamp',
-      );
     });
   });
 }

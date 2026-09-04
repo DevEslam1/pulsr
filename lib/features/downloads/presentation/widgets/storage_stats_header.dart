@@ -1,24 +1,15 @@
+// lib/features/downloads/presentation/widgets/storage_stats_header.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../domain/models/download_task.dart';
 import '../../../../l10n/generated/app_localizations.dart';
-import '../../cubit/downloads_cubit.dart';
-import '../../cubit/downloads_state.dart';
 
-/// Storage usage banner for the downloads hub: used/free bytes and a
-/// determinate fill bar.
-///
-/// When [stats] is omitted the header subscribes to [DownloadsCubit] and
-/// selects only [StorageStats], so per-task progress ticks never rebuild it.
-/// Zero/total-free edge cases are guarded by [StorageStats.usedPercentage]
-/// and [_formatBytes].
 class StorageStatsHeader extends StatelessWidget {
-  final StorageStats? stats;
+  final StorageStats stats;
 
   const StorageStatsHeader({
     super.key,
-    this.stats,
+    required this.stats,
   });
 
   String _formatBytes(int bytes) {
@@ -35,21 +26,6 @@ class StorageStatsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Local copy so the nullable field is promoted without `!`.
-    final provided = stats;
-    if (provided != null) {
-      return _buildContent(context, provided);
-    }
-
-    return BlocSelector<DownloadsCubit, DownloadsState, StorageStats>(
-      selector: (state) => state.storageStats,
-      builder: (context, stats) {
-        return _buildContent(context, stats);
-      },
-    );
-  }
-
-  Widget _buildContent(BuildContext context, StorageStats stats) {
     final p = context.palette;
     final l10n = AppLocalizations.of(context)!;
     final usedStr = _formatBytes(stats.usedBytes);

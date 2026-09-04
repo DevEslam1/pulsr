@@ -34,7 +34,6 @@ object PoTokenManager {
 
     private const val LRU_CAPACITY = 64
     private const val TOKEN_TTL_SECONDS = 1800L // 30 minutes
-    private const val WEBVIEW_RECOVERY_COOLDOWN_MS = 5 * 60 * 1000L // transient WebView failures are retried after this cooldown
     const val EXPIRING_SOON_MARGIN_SECONDS = PoTokenStore.REFRESH_MARGIN_SECONDS // 30 minutes
 
     @Volatile
@@ -65,30 +64,8 @@ object PoTokenManager {
     var webViewBroken: Boolean = false
         private set
 
-    @Volatile
-    private var webViewBrokenAt: Long = 0L
-
     val isLimitedMode: Boolean
         get() = webViewBroken || (isExpired() && visitorData.isEmpty())
-
-    /**
-     * True when the BotGuard WebView is currently considered broken. The
-     * broken state auto-recovers after a cooldown so one transient WebView
-     * failure (renderer crash, OOM) cannot disable poToken minting for the
-     * whole process lifetime - that would force tokenless clients and
-     * guarantee bot-gates on WEB_REMIX / ANDROID_MUSIC.
-     */
-    fun webViewBrokenNow(): Boolean {
-        if (!webViewBroken) return false
-        val elapsed = android.os.SystemClock.elapsedRealtime() - webViewBrokenAt
-        if (elapsed >= WEBVIEW_RECOVERY_COOLDOWN_MS) {
-            Log.i(TAG, "WebView recovery cooldown elapsed (" + (elapsed / 1000L) + "s) - retrying BotGuard WebView")
-            webViewBroken = false
-            webViewBrokenAt = 0L
-            return false
-        }
-        return true
-    }
 
     @Volatile
     private var generator: PoTokenGenerator? = null
@@ -164,7 +141,7 @@ object PoTokenManager {
      * Triggered periodically when a YTM screen is visible to refresh when TTL < 20%.
      */
     fun checkAndRefreshVisibleScreen() {
-        if (isTtlCritical() && !webViewBrokenNow()) {
+        if (isTtlCritical() && !webViewBroken) {
             CoroutineScope(Dispatchers.IO).launch {
                 runCatching { ensureReady() }
             }
@@ -190,7 +167,7 @@ object PoTokenManager {
      * Ensures attestation state and generator are ready.
      */
     suspend fun ensureReady(): Boolean = withContext(Dispatchers.IO) {
-        if (webViewBrokenNow()) {
+        if (webViewBroken) {
             return@withContext visitorData.isNotEmpty()
         }
 
@@ -218,7 +195,6 @@ object PoTokenManager {
                 } catch (e: BadWebViewException) {
                     Log.e(TAG, "System WebView is broken for BotGuard: ${e.message}", e)
                     webViewBroken = true
-                    webViewBrokenAt = android.os.SystemClock.elapsedRealtime()
                     visitorData.isNotEmpty()
                 } catch (t: Throwable) {
                     Log.e(TAG, "Failed to ensure PoToken readiness: ${t.message}", t)
@@ -235,17 +211,13 @@ object PoTokenManager {
     }
 
     fun ensureReadySync(): Boolean {
-        if (webViewBrokenNow()) return visitorData.isNotEmpty()
+        if (webViewBroken) return visitorData.isNotEmpty()
         if (isReady && !isExpiringSoon() && generator != null) return true
 
         return kotlinx.coroutines.runBlocking(Dispatchers.IO) {
             ensureReady()
         }
     }
-
-    private val mintMutex = Mutex()
-    private val inFlightTokens = mutableMapOf<String, kotlinx.coroutines.Deferred<String>>()
-    private val mintLock = Any()
 
     /**
      * Generates or retrieves cached poToken strictly bound to current [visitorData].
@@ -269,7 +241,7 @@ object PoTokenManager {
         }
 
         // 3. If WebView is broken, fallback to last streaming token
-        if (webViewBrokenNow()) {
+        if (webViewBroken) {
             synchronized(tokenLru) {
                 val fallback = tokenLru.get(identifier)?.token
                 if (!fallback.isNullOrEmpty()) return fallback
@@ -278,146 +250,55 @@ object PoTokenManager {
             return ""
         }
 
-        // 4. Use existing warm generator if available with synchronized single-flight per identifier
-        val tokenKey = "$currentVisitor:$identifier"
-        synchronized(mintLock) {
-            // Re-check LRU inside lock
-            synchronized(tokenLru) {
-                val cached = tokenLru.get(identifier)
-                if (cached != null && cached.visitorDataBound == currentVisitor && (now - cached.timestamp) < TOKEN_TTL_SECONDS) {
-                    return cached.token
-                }
-            }
-
-            val gen = generator
-            if (gen != null && !gen.isExpired()) {
-                // TTFA telemetry: mint duration + cold/warm flag (warm = a
-                // valid generator already existed).
-                val mintStart = System.currentTimeMillis()
-                return try {
-                    val minted = gen.generatePoToken(identifier)
-                    YtmMetricsRegistry.recordRelayed(
-                        "poToken.mint",
-                        System.currentTimeMillis() - mintStart,
-                        attrs = mapOf("cold" to false)
-                    )
-                    synchronized(tokenLru) {
-                        tokenLru.put(identifier, CachedToken(minted, visitorData, Instant.now().epochSecond))
-                    }
-                    minted
-                } catch (t: Throwable) {
-                    YtmMetricsRegistry.recordRelayed(
-                        "poToken.mint",
-                        System.currentTimeMillis() - mintStart,
-                        isError = true,
-                        attrs = mapOf("cold" to false)
-                    )
-                    Log.w(TAG, "Minting poToken failed with warm generator: ${t.message}", t)
-                    synchronized(tokenLru) {
-                        tokenLru.get(identifier)?.token ?: streamingPoToken
-                    }
-                }
-            }
-
-            // 5. If we have a valid stored streaming token, return it and warm generator in background
-            if (streamingPoToken.isNotEmpty() && !isExpired()) {
-                triggerBackgroundRefresh()
-                return streamingPoToken
-            }
-
-            // 6. Cold path fallback: synchronous generation — release mintLock
-            // before the expensive WebView init to avoid blocking other
-            // identifiers (streamResolverPool 3 + extractor 6 can deadlock if
-            // the lock is held across runBlocking).
-        }
-
-        // Outside synchronized(mintLock)
-        val coldMintStart = System.currentTimeMillis()
-        ensureReadySync()
-
-        synchronized(mintLock) {
-            // Re-check after cold init (another thread may have minted)
-            synchronized(tokenLru) {
-                val cached = tokenLru.get(identifier)
-                if (cached != null && cached.visitorDataBound == visitorData && (Instant.now().epochSecond - cached.timestamp) < TOKEN_TTL_SECONDS) {
-                    return cached.token
-                }
-            }
-
-            val activeGen = generator
-            if (activeGen == null || activeGen.isExpired()) {
-                synchronized(tokenLru) {
-                    return tokenLru.get(identifier)?.token ?: streamingPoToken
-                }
-            }
-
+        // 4. Use existing warm generator if available
+        val gen = generator
+        if (gen != null && !gen.isExpired()) {
             return try {
-                val minted = activeGen.generatePoToken(identifier)
-                // TTFA telemetry: cold mint (generator had to be created on
-                // the synchronous path — the expensive first-play case).
-                YtmMetricsRegistry.recordRelayed(
-                    "poToken.mint",
-                    System.currentTimeMillis() - coldMintStart,
-                    attrs = mapOf("cold" to true)
-                )
+                val minted = gen.generatePoToken(identifier)
                 synchronized(tokenLru) {
                     tokenLru.put(identifier, CachedToken(minted, visitorData, Instant.now().epochSecond))
                 }
                 minted
             } catch (t: Throwable) {
-                YtmMetricsRegistry.recordRelayed(
-                    "poToken.mint",
-                    System.currentTimeMillis() - coldMintStart,
-                    isError = true,
-                    attrs = mapOf("cold" to true)
-                )
-                Log.w(TAG, "Minting poToken failed for $identifier: ${t.message}", t)
+                Log.w(TAG, "Minting poToken failed with warm generator: ${t.message}", t)
                 synchronized(tokenLru) {
                     tokenLru.get(identifier)?.token ?: streamingPoToken
                 }
             }
         }
+
+        // 5. If we have a valid stored streaming token, return it and warm generator in background
+        if (streamingPoToken.isNotEmpty() && !isExpired()) {
+            triggerBackgroundRefresh()
+            return streamingPoToken
+        }
+
+        // 6. Cold path fallback: synchronous generation
+        ensureReadySync()
+
+        val activeGen = generator
+        if (activeGen == null || activeGen.isExpired()) {
+            synchronized(tokenLru) {
+                return tokenLru.get(identifier)?.token ?: streamingPoToken
+            }
+        }
+
+        return try {
+            val minted = activeGen.generatePoToken(identifier)
+            synchronized(tokenLru) {
+                tokenLru.put(identifier, CachedToken(minted, visitorData, Instant.now().epochSecond))
+            }
+            minted
+        } catch (t: Throwable) {
+            Log.w(TAG, "Minting poToken failed for $identifier: ${t.message}", t)
+            synchronized(tokenLru) {
+                tokenLru.get(identifier)?.token ?: streamingPoToken
+            }
+        }
     }
 
     suspend fun poTokenFor(identifier: String): String = withContext(Dispatchers.IO) {
-        val currentVisitor = visitorData
-        val tokenKey = "$currentVisitor:$identifier"
-
-        // Check LRU cache first
-        val now = Instant.now().epochSecond
-        synchronized(tokenLru) {
-            val cached = tokenLru.get(identifier)
-            if (cached != null && cached.visitorDataBound == currentVisitor && (now - cached.timestamp) < TOKEN_TTL_SECONDS) {
-                return@withContext cached.token
-            }
-        }
-
-        if (identifier == currentVisitor && streamingPoToken.isNotEmpty() && !isExpired()) {
-            return@withContext streamingPoToken
-        }
-
-        // Single-flight via Deferred map
-        val deferred = mintMutex.withLock {
-            // Check cache again under lock
-            synchronized(tokenLru) {
-                val cached = tokenLru.get(identifier)
-                if (cached != null && cached.visitorDataBound == currentVisitor && (now - cached.timestamp) < TOKEN_TTL_SECONDS) {
-                    return@withContext cached.token
-                }
-            }
-
-            inFlightTokens[tokenKey] ?: CoroutineScope(Dispatchers.IO).async {
-                poTokenForSync(identifier)
-            }.also { inFlightTokens[tokenKey] = it }
-        }
-
-        try {
-            deferred.await()
-        } finally {
-            mintMutex.withLock {
-                inFlightTokens.remove(tokenKey)
-            }
-        }
+        poTokenForSync(identifier)
     }
 
     fun setDataSyncId(id: String) {
@@ -447,28 +328,9 @@ object PoTokenManager {
 
     /**
      * Invalidation on BotChallenge or PoTokenInvalid:
-     * Soft path (default): drops minted streaming tokens + generator but
-     * PRESERVES dataSyncId/sessionVisitorData/visitorData. Wiping the
-     * account-bound dataSyncId forces the next auth resolve to mint as guest
-     * → guaranteed LOGIN_REQUIRED until re-bootstrap. Full wipe is only for
-     * explicit logout / PoTokenInvalid-hard via [invalidateHard].
+     * Drops all tokens, visitorData, and generator so next call mints a completely fresh set.
      */
     fun invalidate() {
-        invalidateSoft()
-    }
-
-    fun invalidateSoft() {
-        val oldGen = generator
-        generator = null
-        expiryInstant = 0L
-        streamingPoToken = ""
-        oldGen?.let { Handler(Looper.getMainLooper()).post { it.close() } }
-        synchronized(tokenLru) {
-            tokenLru.evictAll()
-        }
-    }
-
-    fun invalidateHard() {
         val oldGen = generator
         generator = null
         expiryInstant = 0L
@@ -489,34 +351,8 @@ object PoTokenManager {
         }
     }
 
-    /**
-     * Deterministic NewPipe statics guard: [YoutubeParsingHelper.getClientVersion]
-     * scrapes HTML through NewPipe's global Downloader, which is null until
-     * [NewPipe.init] runs. The plugin's ensureExtractorReady() does that on
-     * extractor calls, but a PoToken refresh can fire first (preWarm /
-     * ensurePoTokenReady) - previously that raced into:
-     * "Downloader.get(...) on a null object reference" NPEs inside
-     * YoutubeParsingHelper. Idempotent, thread-safe, no-op after init.
-     */
-    private fun ensureNewPipeDownloader(ctx: Context) {
-        if (NewPipe.getDownloader() != null) return
-        synchronized(this) {
-            if (NewPipe.getDownloader() != null) return
-            val locale = java.util.Locale.getDefault()
-            NewPipe.init(
-                PulsrDownloader(ctx),
-                org.schabi.newpipe.extractor.localization.Localization.fromLocale(locale),
-                org.schabi.newpipe.extractor.localization.ContentCountry(
-                    locale.country.ifBlank { "US" }
-                ),
-            )
-            Log.i(TAG, "NewPipe downloader initialized on demand for PoToken refresh")
-        }
-    }
-
     private fun refreshInternal() {
         val ctx = appContext ?: throw IllegalStateException("PoTokenManager is not initialized with Context")
-        ensureNewPipeDownloader(ctx)
 
         val oldGen = generator
         generator = null

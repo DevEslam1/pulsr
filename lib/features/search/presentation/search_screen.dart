@@ -11,10 +11,10 @@ import '../../../core/widgets/song_tile.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
-import '../../downloads/cubit/ytm_download_cubit.dart';
+import '../../ytm_search/cubit/ytm_download_cubit.dart';
 import '../../ytm_search/cubit/ytm_search_cubit.dart';
 import '../../ytm_search/cubit/ytm_search_state.dart';
-import '../../downloads/presentation/widgets/ytm_download_button.dart';
+import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 import '../cubit/search_cubit.dart';
 import '../cubit/search_state.dart';
 
@@ -28,15 +28,9 @@ class SearchScreen extends StatefulWidget {
 class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
 
-  /// YtmSearchCubit is factory-registered: created once here and owned by
-  /// this State (not by BlocProvider's `create:`), so ancestor rebuilds
-  /// (theme/locale/SettingsCubit) can never recreate it and drop the
-  /// in-progress online query. Closed in [dispose].
-  YtmSearchCubit? _ytmSearchCubit;
-
   /// 0 = Local Music, 1 = Online Stream
   int _selectedTab = 0;
-  StreamSubscription<void>? _settingsSub;
+  StreamSubscription? _settingsSub;
 
   bool _isOnlineAvailable(BuildContext context) {
     final offlineOnly =
@@ -54,12 +48,7 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
-
-    // Compile-time flag: the online tab (and its cubit) only exists when YTM
-    // is enabled, mirroring the conditional provider in [build].
-    if (AppConfig.ytmEnabled) {
-      _ytmSearchCubit = getIt<YtmSearchCubit>();
-    }
+    _searchController.addListener(_onControllerChanged);
 
     // Reset to local tab if offline-only mode gets enabled
     _settingsSub = context.read<SettingsCubit?>()?.stream.listen((settings) {
@@ -69,15 +58,14 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
 
-  // NOTE (F-03): no TextEditingController listener here — the whole screen no
-  // longer rebuilds per keystroke. The clear button watches the controller
-  // through a ValueListenableBuilder, and result updates are driven by the
-  // SearchCubit emit (onChanged below).
+  void _onControllerChanged() {
+    if (mounted) setState(() {});
+  }
 
   @override
   void dispose() {
     _settingsSub?.cancel();
-    _ytmSearchCubit?.close();
+    _searchController.removeListener(_onControllerChanged);
     _searchController.dispose();
     super.dispose();
   }
@@ -122,11 +110,8 @@ class _SearchScreenState extends State<SearchScreen> {
     if (!AppConfig.ytmEnabled) return scaffold;
     return MultiBlocProvider(
       providers: [
-        BlocProvider<YtmSearchCubit>.value(value: _ytmSearchCubit!),
-        // YtmDownloadCubit is an app-lifetime @singleton provided at root (main.dart).
-        // BlocProvider.value does NOT take ownership, so leaving this screen can
-        // never close the shared singleton (use-after-close would kill download UI updates).
-        BlocProvider<YtmDownloadCubit>.value(value: getIt<YtmDownloadCubit>()),
+        BlocProvider(create: (_) => getIt<YtmSearchCubit>()),
+        BlocProvider(create: (_) => getIt<YtmDownloadCubit>()),
       ],
       child: scaffold,
     );
@@ -214,19 +199,13 @@ class _SearchScreenState extends State<SearchScreen> {
                               : context.l10n.searchPlaceholder,
                           prefixIcon:
                               Icon(Icons.search_rounded, color: p.textTertiary),
-                          suffixIcon: ValueListenableBuilder<TextEditingValue>(
-                            valueListenable: _searchController,
-                            builder: (context, value, _) {
-                              if (value.text.isEmpty) {
-                                return const SizedBox.shrink();
-                              }
-                              return IconButton(
-                                icon: Icon(Icons.clear_rounded,
-                                    color: p.textTertiary),
-                                onPressed: () => _clear(context),
-                              );
-                            },
-                          ),
+                          suffixIcon: _searchController.text.isNotEmpty
+                              ? IconButton(
+                                  icon: Icon(Icons.clear_rounded,
+                                      color: p.textTertiary),
+                                  onPressed: () => _clear(context),
+                                )
+                              : null,
                         ),
                       ),
                     ),
@@ -436,26 +415,23 @@ class _SearchScreenState extends State<SearchScreen> {
         onPrimaryAction: () => _clear(context),
       );
     }
-    // Builder-based list: only the visible SongTiles are inflated per frame
-    // (F-03) instead of constructing every match up front.
-    return ListView.builder(
+    return ListView(
       padding: const EdgeInsets.only(bottom: 160, top: 4),
-      itemCount: state.results.length,
-      itemBuilder: (context, index) {
-        final song = state.results[index];
-        return SongTile(
-          song: song,
-          subtitleOverride: '${song.artist} • ${song.album}',
-          onTap: () => playerCubit.playSong(song, queue: state.results),
-          onMorePressed: () => showModalBottomSheet<void>(
-            context: context,
-            useRootNavigator: true,
-            isScrollControlled: true,
-            backgroundColor: Colors.transparent,
-            builder: (_) => SongInfoSheet(song: song),
+      children: [
+        for (final song in state.results)
+          SongTile(
+            song: song,
+            subtitleOverride: '${song.artist} • ${song.album}',
+            onTap: () => playerCubit.playSong(song, queue: state.results),
+            onMorePressed: () => showModalBottomSheet(
+              context: context,
+              useRootNavigator: true,
+              isScrollControlled: true,
+              backgroundColor: Colors.transparent,
+              builder: (_) => SongInfoSheet(song: song),
+            ),
           ),
-        );
-      },
+      ],
     );
   }
 }

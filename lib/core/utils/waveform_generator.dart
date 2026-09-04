@@ -41,17 +41,8 @@ class WaveformGenerator {
   List<double> _generateDeterministicWaveform(int songId, int count,
       [String? filePath]) {
     final List<double> raw = [];
-    // Use stable hash (Dart String.hashCode is randomized per run) -> use simple djb2
-    int stableHash(String s) {
-      int h = 5381;
-      for (final c in s.codeUnits) {
-        h = ((h << 5) + h) ^ c;
-      }
-      return h;
-    }
-
     final int rawSeed = filePath != null && filePath.isNotEmpty
-        ? (songId ^ stableHash(filePath))
+        ? (songId ^ filePath.hashCode)
         : songId;
     final int seed = rawSeed.abs() & 0x7FFFFFFF;
     final Random random = Random(seed);

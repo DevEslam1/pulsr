@@ -149,17 +149,6 @@ internal object ClientCapabilityMatrix {
             Log.w(TAG, "Failed loading $ASSET_FILE from assets, using built-in matrix defaults: ${e.message}")
             capabilities = defaultCapabilities
         }
-        validateClientChain()
-    }
-
-    fun validateClientChain() {
-        val priorities = capabilities.values.map { it.priority }.sorted()
-        for (i in 1 until priorities.size) {
-            val gap = priorities[i] - priorities[i - 1]
-            if (gap > 3) {
-                Log.w(TAG, "Priority gap ($gap) between ${priorities[i - 1]} and ${priorities[i]}")
-            }
-        }
     }
 
     fun loadFromJson(jsonString: String) {
@@ -209,12 +198,25 @@ internal object ClientCapabilityMatrix {
         )
     }
 
-    fun updateClientVersion(clientType: InnertubeClient.ClientType, newVersion: String) {
-        val current = capabilities[clientType] ?: defaultCapabilities[clientType] ?: return
-        val updated = current.copy(defaultClientVersion = newVersion)
-        val mutable = capabilities.toMutableMap()
-        mutable[clientType] = updated
-        capabilities = mutable
-        Log.d(TAG, "Updated client ${clientType.name} version override to $newVersion")
+    fun getEligibleClients(
+        supportsStreamResolve: Boolean = false,
+        supportsSearch: Boolean = false,
+        supportsBrowse: Boolean = false,
+        hasPoToken: Boolean = false,
+        isLoggedIn: Boolean = false,
+        hasJsSignatureEngine: Boolean = true
+    ): List<InnertubeClient.ClientType> {
+        return capabilities.values
+            .filter { cap ->
+                if (supportsStreamResolve && !cap.supportsStreamResolve) return@filter false
+                if (supportsSearch && !cap.supportsSearch) return@filter false
+                if (supportsBrowse && !cap.supportsBrowse) return@filter false
+                if (cap.requiresPoToken && !hasPoToken) return@filter false
+                if (cap.requiresLogin && !isLoggedIn) return@filter false
+                if (cap.requiresJsSignature && !hasJsSignatureEngine) return@filter false
+                true
+            }
+            .sortedByDescending { it.priority }
+            .map { it.clientType }
     }
 }

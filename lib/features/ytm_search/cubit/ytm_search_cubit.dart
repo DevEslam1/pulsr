@@ -1,27 +1,18 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
-import '../../../core/bloc/base_cubit.dart';
 
-import '../../../core/di/injection.dart';
 import '../../../core/errors/ytm_error_classifier.dart';
 import '../../../core/services/file_intent_handler.dart';
-import '../../../data/services/ytm_service.dart';
-import '../../../data/services/ytm_url_cache.dart';
+import '../../../core/services/ytm_service.dart';
 import '../../../domain/models/ytm_track.dart';
 import 'ytm_search_state.dart';
 
-import '../../../core/utils/error_logger.dart';
-import '../../../core/utils/app_logger.dart';
 @injectable
-class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
+class YtmSearchCubit extends Cubit<YtmSearchState> {
   final YtmService _service;
   Timer? _debounceTimer;
-
-  /// TTFA: delay before pre-resolving the first search result so the warm-up
-  /// does not contend with the user's likely immediate tap on that result.
-  static const Duration _firstResultPreResolveDelay = Duration(milliseconds: 500);
 
   int _generation = 0;
 
@@ -30,22 +21,21 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
         super(const YtmSearchState());
 
   void onQueryChanged(String query) {
-    _generation++;
-    safeEmit(state.copyWith(query: query));
+    emit(state.copyWith(query: query));
     _debounceTimer?.cancel();
-    _debounceTimer = autoTimer(Timer(const Duration(milliseconds: 300), () {
+    _debounceTimer = Timer(const Duration(milliseconds: 250), () {
       _executeSearch(query);
-    }));
+    });
   }
 
   void clearQuery() {
     _debounceTimer?.cancel();
     _generation++;
-    safeEmit(const YtmSearchState());
+    emit(const YtmSearchState());
   }
 
   void clearError() {
-    safeEmit(state.copyWith(errorMessage: null));
+    emit(state.copyWith(errorMessage: null));
   }
 
   Future<void> retry() => _executeSearch(state.query);
@@ -58,21 +48,16 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
     final generation = ++_generation;
 
     if (query.trim().isEmpty) {
-      safeEmit(state.copyWith(results: [], isLoading: false, errorMessage: null));
+      emit(state.copyWith(results: [], isLoading: false, errorMessage: null));
       return;
     }
 
-    safeEmit(state.copyWith(isLoading: true, errorMessage: null));
+    emit(state.copyWith(isLoading: true, errorMessage: null));
     try {
-      // FIX: gate expensive regex behind quick contains check to avoid hot-path burn on every keystroke
-      final videoId = (query.contains('youtu') || query.contains('youtube.com') || query.contains('youtu.be'))
-          ? FileIntentHandler.extractYouTubeVideoId(query)
-          : null;
+      final videoId = FileIntentHandler.extractYouTubeVideoId(query);
       if (videoId != null) {
         try {
-          final stream = await _service
-              .resolveStream(videoId)
-              .timeout(const Duration(seconds: 20));
+          final stream = await _service.resolveStream(videoId);
           if (generation != _generation || isClosed) return;
           final track = YtmTrack(
             videoId: videoId,
@@ -81,101 +66,44 @@ class YtmSearchCubit extends PulsrCubit<YtmSearchState> {
             duration: stream.duration,
             artworkUrl: stream.artworkUrl,
           );
-          safeEmit(state.copyWith(
+          emit(state.copyWith(
               results: [track], isLoading: false, errorMessage: null));
-          _scheduleFirstResultPreResolve(track.videoId, generation);
           return;
-        } catch (e) {
-          // Fallthrough to regular search if resolving by ID fails
-          AppLogger.debug('_executeSearch failed (non-fatal): $e', category: 'YtmSearchCubit');
+        } catch (_) {
+          // Fall through to regular search if resolving by ID fails
         }
       }
 
       final results = await _service.searchWithFallback(query);
       if (generation != _generation || isClosed) return;
-      safeEmit(state.copyWith(
+      emit(state.copyWith(
           results: results, isLoading: false, errorMessage: null));
-      if (results.isNotEmpty) {
-        _scheduleFirstResultPreResolve(results.first.videoId, generation);
-      }
     } on YtmException catch (e) {
       if (generation != _generation || isClosed) return;
 
-      // Auto-recovery: On bot block or recaptcha, invalidate poToken and retry
-      // with exponential backoff + jitter (immediate retry hammers the ladder
-      // and escalates IP blocks). Depth bound 2.
+      // Auto-recovery: On bot block or recaptcha, invalidate poToken and retry with depth bound
       if (e.isBotBlocked && !isRetryAfterBotBlock && retryDepth < 2) {
-        final backoffMs =
-            1000 * (1 << retryDepth) + DateTime.now().millisecond % 500;
-        await Future<void>.delayed(Duration(milliseconds: backoffMs));
-        if (generation != _generation || isClosed) return;
-        try {
-          await _service.invalidatePoToken();
-          await _service.ensurePoTokenReady().timeout(
-              const Duration(seconds: 10));
-        } catch (e, st) {
-          ErrorLogger.log('delayed failed', error: e, stackTrace: st, category: 'YtmSearchCubit');
-        }
+        await _service.invalidatePoToken();
+        await _service.ensurePoTokenReady();
         if (generation != _generation || isClosed) return;
         return _executeSearch(query,
             isRetryAfterBotBlock: true, retryDepth: retryDepth + 1);
       }
 
       final errorInfo = YtmErrorClassifier.classify(e);
-      safeEmit(state.copyWith(
+      emit(state.copyWith(
           isLoading: false, results: [], errorMessage: errorInfo.message));
     } catch (e) {
       if (generation != _generation || isClosed) return;
       final errorInfo = YtmErrorClassifier.classify(e);
-      safeEmit(state.copyWith(
+      emit(state.copyWith(
           isLoading: false, results: [], errorMessage: errorInfo.message));
     }
   }
 
-  /// TTFA: pre-resolves ONLY the first search result after a short delay so
-  /// the user's likely immediate tap finds a warm stream URL. Cheap and
-  /// cancellable: single timer per search generation (auto-cancelled on cubit
-  /// close), skipped on stale generations, and skipped when the URL is
-  /// already cached. Unawaited and fail-safe — never blocks or crashes.
-  void _scheduleFirstResultPreResolve(String videoId, int generation) {
-    if (videoId.isEmpty) return;
-    autoTimer(Timer(_firstResultPreResolveDelay, () {
-      if (generation != _generation || isClosed) return;
-      unawaited(_preResolveFirstResult(videoId));
-    }));
+  @override
+  Future<void> close() {
+    _debounceTimer?.cancel();
+    return super.close();
   }
-
-  Future<void> _preResolveFirstResult(String videoId) async {
-    try {
-      final urlCache =
-          getIt.isRegistered<YtmUrlCache>() ? getIt<YtmUrlCache>() : null;
-      if (urlCache != null && urlCache.contains(videoId)) return;
-      final stream = await _service
-          .resolveStream(videoId)
-          .timeout(const Duration(seconds: 15));
-      if (isClosed) return;
-      urlCache?.putStream(stream);
-    } on TimeoutException {
-      // Best-effort only — playback resolves lazily on tap.
-      debugPrint('[YtmSearchCubit] First-result pre-resolve timed out');
-    } catch (e) {
-      // Pre-resolution is best-effort; playback resolves lazily on tap.
-      // Don't prefetch on rate-limit/bot-block — it escalates the block.
-      try {
-        final info = YtmErrorClassifier.classify(e);
-        if (info.signal == YtmBlockSignal.rateLimited ||
-            info.signal == YtmBlockSignal.botChallenge ||
-            info.signal == YtmBlockSignal.ipBlocked) {
-          debugPrint(
-              '[YtmSearchCubit] Pre-resolve skipped (block signal: ${info.signal})');
-          return;
-        }
-      } catch (e, st) {
-        ErrorLogger.log('_preResolveFirstResult failed', error: e, stackTrace: st, category: 'YtmSearchCubit');
-      }
-      debugPrint('[YtmSearchCubit] First-result pre-resolve failed: $e');
-    }
-  }
-
-  // Debounce timer is registered with PulsrCubit; cancelled automatically.
 }

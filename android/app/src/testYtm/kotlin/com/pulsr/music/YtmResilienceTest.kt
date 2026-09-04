@@ -99,8 +99,8 @@ class YtmResilienceTest {
 
         val limiter = RateLimiter(clock = fakeClock, respectfulMode = false)
 
-        // Drain burst permits up to capacity
-        for (i in 0 until RateLimiter.Bucket.PLAYER.maxTokens) {
+        // Drain burst permits
+        for (i in 0 until 10) {
             limiter.acquirePermit(RateLimiter.Bucket.PLAYER)
             limiter.releasePermit()
         }

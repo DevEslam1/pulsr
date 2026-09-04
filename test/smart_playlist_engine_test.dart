@@ -244,7 +244,7 @@ void main() {
       expect(resPlays.map((s) => s.title), isNot(contains('NinetiesSong')));
     });
 
-    test('unsupported rule field like bpm returns empty when no valid rules exist', () async {
+    test('bpm rule field is ignored safely and returns all songs', () async {
       await insertSong(id: 401, title: 'Song1');
       await insertSong(id: 402, title: 'Song2');
 
@@ -259,7 +259,7 @@ void main() {
       );
 
       final result = await engine.evaluateCriteria(criteria);
-      expect(result.length, 0);
+      expect(result.length, 2);
     });
 
     test('empty criteria returns all songs', () async {

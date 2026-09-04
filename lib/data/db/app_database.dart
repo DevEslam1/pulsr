@@ -1,11 +1,9 @@
 // lib/data/db/app_database.dart
 import 'package:drift/drift.dart';
-import '../../core/utils/error_logger.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 import 'package:injectable/injectable.dart';
 import 'tables.dart';
 
-import '../../core/utils/app_logger.dart';
 export 'tables.dart' show SongSource;
 
 part 'app_database.g.dart';
@@ -28,19 +26,18 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.e);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 9;
 
-  static Future<void> _dropLegacyFtsTable(
+  static Future<void> _createFtsTable(
       Future<void> Function(String) executeSql) async {
-    // FIX(D2): Option A - Fully remove legacy FTS virtual table & triggers as search uses indexed LIKE with ESCAPE
-    try {
-      await executeSql("DROP TRIGGER IF EXISTS songs_fts_insert;");
-      await executeSql("DROP TRIGGER IF EXISTS songs_fts_delete;");
-      await executeSql("DROP TRIGGER IF EXISTS songs_fts_update;");
-      await executeSql("DROP TABLE IF EXISTS songs_fts;");
-    } catch (e, st) {
-      ErrorLogger.log('Function failed', error: e, stackTrace: st, category: 'AppDatabase');
-    }
+    await executeSql(
+        "CREATE VIRTUAL TABLE IF NOT EXISTS songs_fts USING fts5(title, artist, album, content='songs', content_rowid='id', tokenize='unicode61 remove_diacritics 1');");
+    await executeSql(
+        "CREATE TRIGGER IF NOT EXISTS songs_fts_insert AFTER INSERT ON songs BEGIN INSERT INTO songs_fts(rowid, title, artist, album) VALUES (new.id, new.title, new.artist, new.album); END;");
+    await executeSql(
+        "CREATE TRIGGER IF NOT EXISTS songs_fts_delete AFTER DELETE ON songs BEGIN INSERT INTO songs_fts(songs_fts, rowid, title, artist, album) VALUES('delete', old.id, old.title, old.artist, old.album); END;");
+    await executeSql(
+        "CREATE TRIGGER IF NOT EXISTS songs_fts_update AFTER UPDATE ON songs BEGIN INSERT INTO songs_fts(songs_fts, rowid, title, artist, album) VALUES('delete', old.id, old.title, old.artist, old.album); INSERT INTO songs_fts(rowid, title, artist, album) VALUES (new.id, new.title, new.artist, new.album); END;");
   }
 
   static Future<void> _createIndexes(
@@ -55,8 +52,6 @@ class AppDatabase extends _$AppDatabase {
         'CREATE INDEX IF NOT EXISTS idx_songs_artist_id ON songs (artist_id);');
     await executeSql(
         'CREATE INDEX IF NOT EXISTS idx_songs_path ON songs (path);');
-    await executeSql(
-        "CREATE INDEX IF NOT EXISTS idx_songs_path_nocase ON songs (path COLLATE NOCASE) WHERE path != '' AND path NOT LIKE 'ytmusic://%';");
     await executeSql(
         'CREATE INDEX IF NOT EXISTS idx_songs_genre ON songs (genre);');
     await executeSql(
@@ -102,118 +97,84 @@ class AppDatabase extends _$AppDatabase {
           await m.createAll();
           await _createIndexes(customStatement);
           await _createRemoteSourceIndexes(customStatement);
-          await _dropLegacyFtsTable(customStatement);
+          await _createFtsTable(customStatement);
         },
         onUpgrade: (Migrator m, int from, int to) async {
-          // FIX(BUG-26): Guard onUpgrade migrations so they only run when strictly upgrading
-          if (from < to) {
-            Future<bool> hasColumn(String table, String column) async {
-              try {
-                final rows =
-                    await customSelect('PRAGMA table_info($table);').get();
-                return rows.any((r) => r.data['name'] == column);
-              } catch (e) {
-                AppLogger.debug('hasColumn failed (non-fatal): $e', category: 'AppDatabase');
-                return false; // Table doesn't exist yet
-              }
-            }
-
-            if (from < 2) {
-              await m.createTable(excludedFoldersTable);
-            }
-            if (from < 4) {
-              if (!await hasColumn('songs', 'is_missing')) {
-                await m.addColumn(songsTable, songsTable.isMissing);
-              }
-            }
-            // FIX: crash-retry safe — every addColumn guarded by hasColumn.
-            // Unconditional addColumn (old from<5/from<6) throws "duplicate
-            // column" if a previous upgrade attempt partially completed.
-            if (from < 5) {
-              if (!await hasColumn('songs', 'source')) {
-                await m.addColumn(songsTable, songsTable.source);
-              }
-              if (!await hasColumn('songs', 'remote_id')) {
-                await m.addColumn(songsTable, songsTable.remoteId);
-              }
-              if (!await hasColumn('songs', 'remote_artwork_url')) {
-                await m.addColumn(songsTable, songsTable.remoteArtworkUrl);
-              }
-              if (!await hasColumn('songs', 'pending_download_path')) {
-                await m.addColumn(songsTable, songsTable.pendingDownloadPath);
-              }
-            }
-            if (from < 6) {
-              if (!await hasColumn('songs', 'sample_rate')) {
-                await m.addColumn(songsTable, songsTable.sampleRate);
-              }
-              if (!await hasColumn('songs', 'bit_depth')) {
-                await m.addColumn(songsTable, songsTable.bitDepth);
-              }
-              if (!await hasColumn('songs', 'bitrate_kbps')) {
-                await m.addColumn(songsTable, songsTable.bitrateKbps);
-              }
-              if (!await hasColumn('songs', 'codec')) {
-                await m.addColumn(songsTable, songsTable.codec);
-              }
-            }
-            if (from < 7) {
-              if (!await hasColumn('songs', 'replay_gain_track')) {
-                await m.addColumn(songsTable, songsTable.replayGainTrack);
-              }
-              if (!await hasColumn('songs', 'replay_gain_album')) {
-                await m.addColumn(songsTable, songsTable.replayGainAlbum);
-              }
-              if (!await hasColumn('songs', 'replay_gain_track_peak')) {
-                await m.addColumn(songsTable, songsTable.replayGainTrackPeak);
-              }
-              if (!await hasColumn('songs', 'replay_gain_album_peak')) {
-                await m.addColumn(songsTable, songsTable.replayGainAlbumPeak);
-              }
-              if (!await hasColumn('songs', 'is_downloaded')) {
-                await m.addColumn(songsTable, songsTable.isDownloaded);
-              }
-              try {
-                if (await hasColumn('songs', 'replay_gain')) {
-                  await customStatement(
-                      'UPDATE songs SET replay_gain_track = replay_gain WHERE replay_gain IS NOT NULL;');
-                }
-              } catch (e, st) {
-                ErrorLogger.log('hasColumn failed', error: e, stackTrace: st, category: 'AppDatabase');
-              }
-            }
-            if (from < 8) {
-              if (!await hasColumn('songs', 'loudness_range')) {
-                await m.addColumn(songsTable, songsTable.loudnessRange);
-              }
-            }
-            if (from < 9) {
-              await _dropLegacyFtsTable(customStatement);
-            }
-            if (from < 10) {
-              await _dropLegacyFtsTable(customStatement);
+          if (from < 2) {
+            await m.createTable(excludedFoldersTable);
+          }
+          if (from < 4) {
+            await m.addColumn(songsTable, songsTable.isMissing);
+          }
+          if (from < 5) {
+            await m.addColumn(songsTable, songsTable.source);
+            await m.addColumn(songsTable, songsTable.remoteId);
+            await m.addColumn(songsTable, songsTable.remoteArtworkUrl);
+            await m.addColumn(songsTable, songsTable.pendingDownloadPath);
+          }
+          if (from < 6) {
+            await m.addColumn(songsTable, songsTable.sampleRate);
+            await m.addColumn(songsTable, songsTable.bitDepth);
+            await m.addColumn(songsTable, songsTable.bitrateKbps);
+            await m.addColumn(songsTable, songsTable.codec);
+          }
+          Future<bool> hasColumn(String table, String column) async {
+            try {
+              final rows =
+                  await customSelect('PRAGMA table_info($table);').get();
+              return rows.any((r) => r.data['name'] == column);
+            } catch (_) {
+              return false; // Table doesn't exist yet
             }
           }
+
+          if (from < 7) {
+            if (!await hasColumn('songs', 'replay_gain_track')) {
+              await m.addColumn(songsTable, songsTable.replayGainTrack);
+            }
+            if (!await hasColumn('songs', 'replay_gain_album')) {
+              await m.addColumn(songsTable, songsTable.replayGainAlbum);
+            }
+            if (!await hasColumn('songs', 'replay_gain_track_peak')) {
+              await m.addColumn(songsTable, songsTable.replayGainTrackPeak);
+            }
+            if (!await hasColumn('songs', 'replay_gain_album_peak')) {
+              await m.addColumn(songsTable, songsTable.replayGainAlbumPeak);
+            }
+            if (!await hasColumn('songs', 'is_downloaded')) {
+              await m.addColumn(songsTable, songsTable.isDownloaded);
+            }
+            try {
+              if (await hasColumn('songs', 'replay_gain')) {
+                await customStatement(
+                    'UPDATE songs SET replay_gain_track = replay_gain WHERE replay_gain IS NOT NULL;');
+              }
+            } catch (_) {}
+          }
+          if (from < 8) {
+            if (!await hasColumn('songs', 'loudness_range')) {
+              await m.addColumn(songsTable, songsTable.loudnessRange);
+            }
+          }
+          if (from < 9) {
+            await _createFtsTable(customStatement);
+            // Backfill existing rows
+            try {
+              await customStatement(
+                  "INSERT INTO songs_fts(songs_fts) VALUES('rebuild');");
+            } catch (_) {}
+          }
+          // Must run after every addColumn above: several indexes cover columns a
+          // later branch introduces, so creating them mid-ladder fails on an older
+          // database. Every statement is IF NOT EXISTS, so re-running is free.
           await _createIndexes(customStatement);
           await _createRemoteSourceIndexes(customStatement);
-          await _dropLegacyFtsTable(customStatement);
         },
         beforeOpen: (details) async {
           await customStatement('PRAGMA foreign_keys = ON;');
           await customStatement('PRAGMA journal_mode = WAL;');
           await customStatement('PRAGMA synchronous = NORMAL;');
           await customStatement('PRAGMA case_sensitive_like = OFF;');
-          // SELF-HEAL: re-assert indexes on every open. All statements are
-          // CREATE ... IF NOT EXISTS (near-zero cost), and this guarantees
-          // installs created before the idx_songs_path_nocase SQL fix gain
-          // the corrected index without a schema bump.
-          try {
-            await _createIndexes(customStatement);
-            await _createRemoteSourceIndexes(customStatement);
-          } catch (e, st) {
-            ErrorLogger.log('Index self-heal failed',
-                error: e, stackTrace: st, category: 'Database');
-          }
         },
       );
 }

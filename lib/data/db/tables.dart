@@ -2,15 +2,6 @@
 import 'package:drift/drift.dart';
 
 /// Allowed values for [SongsTable.source].
-/// Backed by enum for type safety while keeping String storage for drift compat.
-enum SongSourceEnum { local, youtube }
-
-extension SongSourceEnumX on SongSourceEnum {
-  String get value => name;
-}
-
-/// Legacy string constants for DB storage (keep for migration compat).
-/// Prefer [SongSourceEnum] in new code.
 abstract final class SongSource {
   /// A file indexed by MediaStore. `path` points at the filesystem.
   static const String local = 'local';
@@ -18,11 +9,6 @@ abstract final class SongSource {
   /// A YouTube track that has no local file yet. `path` holds a
   /// `ytmusic://<videoId>` sentinel, so any path-based feature must skip it.
   static const String youtube = 'youtube';
-
-  static bool isValid(String v) => v == local || v == youtube;
-
-  static SongSourceEnum toEnum(String v) =>
-      v == youtube ? SongSourceEnum.youtube : SongSourceEnum.local;
 }
 
 class SongsTable extends Table {

@@ -19,22 +19,20 @@ void main() {
   late FileIntentHandler fileIntentHandler;
 
   setUpAll(() {
-    registerFallbackValue(
-      const SongsTableData(
-        id: 1,
-        title: 'fallback',
-        artist: 'fallback',
-        album: 'fallback',
-        durationMs: 180000,
-        path: '/fallback.mp3',
-        source: SongSource.local,
-        isFavorite: false,
-        isMissing: false,
-        isDownloaded: false,
-        playCount: 0,
-        lastPositionMs: 0,
-      ),
-    );
+    registerFallbackValue(const SongsTableData(
+      id: 1,
+      title: 'fallback',
+      artist: 'fallback',
+      album: 'fallback',
+      durationMs: 180000,
+      path: '/fallback.mp3',
+      source: SongSource.local,
+      isFavorite: false,
+      isMissing: false,
+      isDownloaded: false,
+      playCount: 0,
+      lastPositionMs: 0,
+    ));
   });
 
   setUp(() {
@@ -61,40 +59,38 @@ void main() {
         lastPositionMs: 0,
       );
 
-      when(
-        () => repository.getSongByPath('/storage/music/queen.mp3'),
-      ).thenAnswer((_) async => const Right(existingSong));
+      when(() => repository.getSongByPath('/storage/music/queen.mp3'))
+          .thenAnswer(
+        (_) async => const Right(existingSong),
+      );
 
       await fileIntentHandler.handleAudioUri('file:///storage/music/queen.mp3');
 
       verify(() => playerCubit.playSong(existingSong)).called(1);
     });
 
-    test(
-      'Plays external unregistered audio file with synthetic metadata',
-      () async {
-        when(
-          () => repository.getSongByPath('/storage/downloads/new_podcast.flac'),
-        ).thenAnswer((_) async => const Right(null));
-        when(
-          () => repository.getSongByUri('/storage/downloads/new_podcast.flac'),
-        ).thenAnswer((_) async => const Right(null));
+    test('Plays external unregistered audio file with synthetic metadata',
+        () async {
+      when(() =>
+              repository.getSongByPath('/storage/downloads/new_podcast.flac'))
+          .thenAnswer(
+        (_) async => const Right(null),
+      );
+      when(() => repository.getSongByUri('/storage/downloads/new_podcast.flac'))
+          .thenAnswer(
+        (_) async => const Right(null),
+      );
 
-        await fileIntentHandler.handleAudioUri(
-          '/storage/downloads/new_podcast.flac',
-        );
+      await fileIntentHandler
+          .handleAudioUri('/storage/downloads/new_podcast.flac');
 
-        final captured =
-            verify(() => playerCubit.playSong(captureAny())).captured;
-        expect(captured.length, equals(1));
-        final capturedSong = captured.first as SongsTableData;
-        expect(capturedSong.id, isNegative);
-        expect(capturedSong.title, equals('new_podcast'));
-        expect(
-          capturedSong.path,
-          equals('/storage/downloads/new_podcast.flac'),
-        );
-      },
-    );
+      final captured =
+          verify(() => playerCubit.playSong(captureAny())).captured;
+      expect(captured.length, equals(1));
+      final capturedSong = captured.first as SongsTableData;
+      expect(capturedSong.id, isNegative);
+      expect(capturedSong.title, equals('new_podcast'));
+      expect(capturedSong.path, equals('/storage/downloads/new_podcast.flac'));
+    });
   });
 }

@@ -4,12 +4,10 @@ import 'dart:math' as math;
 import 'package:drift/drift.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../core/utils/backup_crypto.dart';
 import '../../core/utils/error_logger.dart';
 import '../../data/db/app_database.dart';
 import '../repositories/music_repository_interface.dart';
 
-import '../../core/utils/app_logger.dart';
 class ImportResult {
   final int restoredFavoritesCount;
   final int restoredPlaylistsCount;
@@ -34,7 +32,7 @@ class ExportBackupUseCase {
 
   ExportBackupUseCase(this._repository);
 
-  Future<String> execute({bool encrypt = false, String? passphrase}) async {
+  Future<String> execute() async {
     // 1. Favorites
     final favoritesResult = await _repository.getFavorites();
     final favoritesSongs =
@@ -95,11 +93,7 @@ class ExportBackupUseCase {
       'replayGainPreampWithoutRg': prefs.getDouble('setting_replay_gain_preamp_without_rg') ?? -3.0,
       'wifiOnlyMode': prefs.getBool('setting_wifi_only_mode') ?? false,
       'offlineOnlyMode': prefs.getBool('setting_offline_only_mode') ?? false,
-      // FIX: canonical key is setting_bit_perfect_output (PrefsKeys.bitPerfectOutput).
-      // Read both (new + legacy) so old backups still restore.
-      'bitPerfectMode': prefs.getBool('setting_bit_perfect_output') ??
-          prefs.getBool('setting_bit_perfect') ??
-          false,
+      'bitPerfectMode': prefs.getBool('setting_bit_perfect') ?? false,
       'dspPreference': prefs.getString('setting_dsp_preference') ?? 'native',
       'streamingQuality': prefs.getString('setting_streaming_quality') ?? 'high',
       'downloadQuality': prefs.getString('setting_download_quality') ?? 'high',
@@ -138,22 +132,7 @@ class ExportBackupUseCase {
       'excludedFolders': excludedFolders,
     };
 
-    final rawJson = const JsonEncoder.withIndent('  ').convert(backupPayload);
-    if (encrypt) {
-      if (passphrase == null || passphrase.isEmpty) {
-        throw ArgumentError(
-            'Passphrase required for encrypted backup (refusing insecure default salt)');
-      }
-      if (passphrase == BackupCrypto.defaultAppSalt) {
-        throw ArgumentError('Insecure passphrase rejected');
-      }
-      final envelope = BackupCrypto.encryptBackup(
-        rawJson,
-        passphrase: passphrase,
-      );
-      return const JsonEncoder.withIndent('  ').convert(envelope);
-    }
-    return rawJson;
+    return const JsonEncoder.withIndent('  ').convert(backupPayload);
   }
 }
 
@@ -167,58 +146,36 @@ class ImportBackupUseCase {
   ImportBackupUseCase(this._repository, this._db);
 
   Future<ImportResult> executeFromFile(Object file) async {
-    if (file is String) {
-      return execute(file);
-    }
-    try {
-      // Strongly typed handling for File and XFile/PlatformFile cases
-      String content;
-      int length;
-      if (file is List<int>) {
-        content = utf8.decode(file);
-        length = file.length;
-      } else {
-        // Attempt File-like interface via dynamic but with explicit type checks
-        final dynamic f = file;
-        try {
-          length = await f.length() as int;
-        } catch (e) {
-          // Fallback: try reading content directly and measure bytes
-          AppLogger.debug('executeFromFile failed (non-fatal): $e', category: 'BackupUsecases');
-          final c = await f.readAsString() as String;
-          length = utf8.encode(c).length;
-          if (length > maxBackupSizeBytes) {
-            throw const FormatException(
-                'Backup file exceeds maximum allowed size of 10 MB');
-          }
-          return await execute(c);
-        }
-        if (length > maxBackupSizeBytes) {
+    if (file is! String) {
+      try {
+        final len = await (file as dynamic).length();
+        if (len > maxBackupSizeBytes) {
           throw const FormatException(
               'Backup file exceeds maximum allowed size of 10 MB');
         }
-        content = await f.readAsString() as String;
+        final content = await (file as dynamic).readAsString();
+        return execute(content);
+      } catch (e) {
+        if (e is FormatException) rethrow;
+        throw FormatException('Failed reading backup file: $e');
       }
-      if (utf8.encode(content).length > maxBackupSizeBytes) {
+    }
+    return execute(file);
+  }
+
+  Future<ImportResult> execute(String jsonString) async {
+    // Cheap length check first (chars) to avoid double alloc for size check — prevents OOM on low RAM
+    if (jsonString.length > maxBackupSizeBytes) {
+      if (utf8.encode(jsonString).length > maxBackupSizeBytes) {
         throw const FormatException(
             'Backup file exceeds maximum allowed size of 10 MB');
       }
-      return await execute(content);
-    } catch (e) {
-      if (e is FormatException || e is ArgumentError) rethrow;
-      throw FormatException('Failed reading backup file: $e');
-    }
-  }
-
-  Future<ImportResult> execute(String jsonString, {String? passphrase}) async {
-    // Single utf8 encode to avoid double allocation on large payloads (10 MB)
-    final encoded = utf8.encode(jsonString);
-    if (encoded.length > maxBackupSizeBytes) {
+    } else if (utf8.encode(jsonString).length > maxBackupSizeBytes) {
       throw const FormatException(
           'Backup file exceeds maximum allowed size of 10 MB');
     }
 
-    dynamic decoded;
+    final dynamic decoded;
     try {
       decoded = jsonDecode(jsonString);
     } catch (e, st) {
@@ -230,28 +187,6 @@ class ImportBackupUseCase {
     if (decoded is! Map<String, dynamic>) {
       throw const FormatException(
           'Invalid backup payload: root object must be a JSON map');
-    }
-
-    // Encrypted Backup Envelope handling: supports v2 (legacy) and v3 (AES-GCM)
-    final version = decoded['version'];
-    final format = decoded['format'];
-    final isEncryptedEnvelope = version == 2 ||
-        version == 3 ||
-        format == BackupCrypto.formatV2 ||
-        format == BackupCrypto.formatV3 ||
-        (decoded.containsKey('ciphertext') &&
-            decoded.containsKey('salt') &&
-            decoded.containsKey('iv'));
-    if (isEncryptedEnvelope) {
-      final decryptedPlaintext = BackupCrypto.decryptBackup(
-        decoded,
-        passphrase: passphrase ?? BackupCrypto.defaultAppSalt,
-      );
-      final innerDecoded = jsonDecode(decryptedPlaintext);
-      if (innerDecoded is! Map<String, dynamic>) {
-        throw const FormatException('Decrypted backup payload is not a valid JSON object');
-      }
-      decoded = innerDecoded;
     }
 
     final data = decoded;
@@ -291,20 +226,14 @@ class ImportBackupUseCase {
       final normPath = path.replaceAll('\\', '/').toLowerCase();
       final segments = normPath.split('/');
 
-      // 3. Parent + Filename fallback (lazy init) - avoid repeated split/allocations
+      // 3. Parent + Filename fallback (lazy init)
       if (segments.length >= 2) {
-        lazyParentFilenameMap ??= () {
-          final map = <String, SongsTableData>{};
-          for (final s in allSongs) {
-            final norm = s.path.replaceAll('\\', '/').toLowerCase();
-            final parts = norm.split('/');
-            if (parts.length >= 2) {
-              final key = '${parts[parts.length - 2]}/${parts.last}';
-              map.putIfAbsent(key, () => s);
-            }
-          }
-          return map;
-        }();
+        lazyParentFilenameMap ??= {
+          for (final s in allSongs)
+            if (s.path.replaceAll('\\', '/').split('/').length >= 2)
+              '${s.path.replaceAll('\\', '/').split('/')[s.path.replaceAll('\\', '/').split('/').length - 2].toLowerCase()}/${s.path.replaceAll('\\', '/').split('/').last.toLowerCase()}':
+                  s
+        };
         final parentAndFilename =
             '${segments[segments.length - 2]}/${segments.last}';
         final match = lazyParentFilenameMap![parentAndFilename];
@@ -360,74 +289,68 @@ class ImportBackupUseCase {
       });
     }
 
-    // 2. Restore Playlists (per-playlist, avoid nested drift transactions)
+    // 2. Restore Playlists (Transaction per playlist)
     int restoredPlaylistsCount = 0;
     if (data['playlists'] != null && data['playlists'] is List) {
       final playlistsList = data['playlists'] as List;
-
-      Future<void> restoreSinglePlaylist(dynamic item) async {
+      for (final item in playlistsList) {
         if (item is Map<String, dynamic> && item.containsKey('name')) {
-          final name = item['name'] as String? ?? 'Restored Playlist';
-          final isSmart = item['isSmart'] as bool? ?? false;
-          final smartCriteria = item['smartCriteria'] as String?;
-          final songPaths = (item['songPaths'] is List)
-              ? (item['songPaths'] as List).whereType<String>().toList()
-              : <String>[];
+          await _db.transaction(() async {
+            final name = item['name'] as String? ?? 'Restored Playlist';
+            final isSmart = item['isSmart'] as bool? ?? false;
+            final smartCriteria = item['smartCriteria'] as String?;
+            final songPaths = (item['songPaths'] is List)
+                ? (item['songPaths'] as List).whereType<String>().toList()
+                : <String>[];
 
-          final existingPlaylistsRes = await _repository.getPlaylists();
-          final existingList = existingPlaylistsRes.fold(
-              (l) => <PlaylistsTableData>[], (r) => r);
-          final existing =
-              existingList.where((p) => p.name == name).firstOrNull;
+            final existingPlaylistsRes = await _repository.getPlaylists();
+            final existingList = existingPlaylistsRes.fold(
+                (l) => <PlaylistsTableData>[], (r) => r);
+            final existing =
+                existingList.where((p) => p.name == name).firstOrNull;
 
-          int? playlistId;
-          if (existing != null) {
-            playlistId = existing.id;
-            if (isSmart && smartCriteria != null) {
-              await _repository.updateSmartPlaylist(
-                  existing.id, name, smartCriteria);
+            int? playlistId;
+            if (existing != null) {
+              playlistId = existing.id;
+              if (isSmart && smartCriteria != null) {
+                await _repository.updateSmartPlaylist(
+                    existing.id, name, smartCriteria);
+              }
+            } else {
+              final createRes = await _repository.createPlaylist(
+                name,
+                isSmart: isSmart,
+                smartCriteria: smartCriteria,
+              );
+              playlistId = createRes.fold(
+                (f) => null,
+                (id) => id,
+              );
             }
-          } else {
-            final createRes = await _repository.createPlaylist(
-              name,
-              isSmart: isSmart,
-              smartCriteria: smartCriteria,
-            );
-            playlistId = createRes.fold(
-              (f) => null,
-              (id) => id,
-            );
-          }
 
-          if (playlistId != null) {
-            if (!isSmart) {
-              final matchedSongIds = <int>[];
-              for (final path in songPaths) {
-                final matched = matchPath(path);
-                if (matched != null) {
-                  if (!matchedSongIds.contains(matched.id)) {
-                    matchedSongIds.add(matched.id);
+            if (playlistId != null) {
+              if (!isSmart) {
+                final matchedSongIds = <int>[];
+                for (final path in songPaths) {
+                  final matched = matchPath(path);
+                  if (matched != null) {
+                    if (!matchedSongIds.contains(matched.id)) {
+                      matchedSongIds.add(matched.id);
+                    }
+                  } else {
+                    unmatchedPaths.add(path);
                   }
-                } else {
-                  unmatchedPaths.add(path);
+                }
+
+                if (matchedSongIds.isNotEmpty) {
+                  await _repository.addSongsToPlaylist(
+                      playlistId, matchedSongIds);
                 }
               }
-
-              if (matchedSongIds.isNotEmpty) {
-                await _repository.addSongsToPlaylist(
-                    playlistId, matchedSongIds);
-              }
+              restoredPlaylistsCount++;
             }
-            restoredPlaylistsCount++;
-          }
+          });
         }
-      }
-
-      // Process playlists in batches of 10 (Fix B-42)
-      for (var i = 0; i < playlistsList.length; i += 10) {
-        final batch = playlistsList.sublist(
-            i, math.min(i + 10, playlistsList.length));
-        await Future.wait(batch.map((item) => restoreSinglePlaylist(item)));
       }
     }
 
@@ -490,24 +413,18 @@ class ImportBackupUseCase {
             'setting_eq_preset', jsonEncode(settings['eqPreset']));
       }
       // Restore extended settings with validation
-      if (settings['replayGainMode'] is String) await prefs.setString('setting_replay_gain_mode', settings['replayGainMode'] as String);
+      if (settings['replayGainMode'] is String) await prefs.setString('setting_replay_gain_mode', settings['replayGainMode']);
       if (settings['replayGainPreampWithRg'] is num) await prefs.setDouble('setting_replay_gain_preamp_with_rg', (settings['replayGainPreampWithRg'] as num).toDouble());
       if (settings['replayGainPreampWithoutRg'] is num) await prefs.setDouble('setting_replay_gain_preamp_without_rg', (settings['replayGainPreampWithoutRg'] as num).toDouble());
-      if (settings['wifiOnlyMode'] is bool) await prefs.setBool('setting_wifi_only_mode', settings['wifiOnlyMode'] as bool);
-      if (settings['offlineOnlyMode'] is bool) await prefs.setBool('setting_offline_only_mode', settings['offlineOnlyMode'] as bool);
-      // FIX: write canonical key (legacy alias too for old readers).
-      if (settings['bitPerfectMode'] is bool) {
-        await prefs.setBool(
-            'setting_bit_perfect_output', settings['bitPerfectMode'] as bool);
-        await prefs.setBool(
-            'setting_bit_perfect', settings['bitPerfectMode'] as bool);
-      }
-      if (settings['dspPreference'] is String) await prefs.setString('setting_dsp_preference', settings['dspPreference'] as String);
-      if (settings['streamingQuality'] is String) await prefs.setString('setting_streaming_quality', settings['streamingQuality'] as String);
-      if (settings['downloadQuality'] is String) await prefs.setString('setting_download_quality', settings['downloadQuality'] as String);
-      if (settings['isLosslessMode'] is bool) await prefs.setBool('setting_lossless', settings['isLosslessMode'] as bool);
-      if (settings['eqEnabled'] is bool) await prefs.setBool('setting_eq_enabled', settings['eqEnabled'] as bool);
-      if (settings['eqGains'] is String) await prefs.setString('setting_eq_gains', settings['eqGains'] as String);
+      if (settings['wifiOnlyMode'] is bool) await prefs.setBool('setting_wifi_only_mode', settings['wifiOnlyMode']);
+      if (settings['offlineOnlyMode'] is bool) await prefs.setBool('setting_offline_only_mode', settings['offlineOnlyMode']);
+      if (settings['bitPerfectMode'] is bool) await prefs.setBool('setting_bit_perfect', settings['bitPerfectMode']);
+      if (settings['dspPreference'] is String) await prefs.setString('setting_dsp_preference', settings['dspPreference']);
+      if (settings['streamingQuality'] is String) await prefs.setString('setting_streaming_quality', settings['streamingQuality']);
+      if (settings['downloadQuality'] is String) await prefs.setString('setting_download_quality', settings['downloadQuality']);
+      if (settings['isLosslessMode'] is bool) await prefs.setBool('setting_lossless', settings['isLosslessMode']);
+      if (settings['eqEnabled'] is bool) await prefs.setBool('setting_eq_enabled', settings['eqEnabled']);
+      if (settings['eqGains'] is String) await prefs.setString('setting_eq_gains', settings['eqGains']);
       if (settings['playbackSpeed'] is num) await prefs.setDouble('setting_playback_speed', (settings['playbackSpeed'] as num).toDouble());
 
       restoredSettingsCount = settings.length;

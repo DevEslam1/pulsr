@@ -1,15 +1,7 @@
 // lib/core/utils/ytm_rate_limiter.dart
 import 'dart:async';
-import 'dart:math' as math;
-import 'package:mutex/mutex.dart';
+import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
-
-import 'error_logger.dart';
-/// Request priority classes for rate limiting.
-enum YtmRequestPriority {
-  interactive,
-  background,
-}
 
 /// Dart-side adaptive token-bucket rate limiter for YouTube Music API requests.
 ///
@@ -27,11 +19,6 @@ class YtmRateLimiter {
   static const String _keyBackendLastRefill = 'ytm_rate_limiter_backend_last_refill';
   static const String _keyBackendBackoffUntil = 'ytm_rate_limiter_backend_backoff_until';
 
-  /// TTFA: backoff restored from a previous session is clamped to this at
-  /// launch so a prior session's 429 spiral cannot silently delay the first
-  /// play. In-session adaptive AIMD backoff is unaffected.
-  static const Duration launchBackoffClamp = Duration(seconds: 2);
-
   SharedPreferences? _prefs;
 
   // Native YTM pacing bucket
@@ -40,15 +27,11 @@ class YtmRateLimiter {
 
   double _tokens = _maxTokens.toDouble();
   DateTime _lastRefill = DateTime.now();
-  final _random = math.Random.secure();
-  final _mutex = Mutex();
+  final _random = Random();
 
   DateTime _backoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
-  static const int maxAdaptiveMultiplier = 8;
   int _adaptiveMultiplier = 1;
-  int get adaptiveMultiplier => _adaptiveMultiplier;
   DateTime _lastSuccess = DateTime.now();
-  DateTime get lastSuccess => _lastSuccess;
 
   // Dedicated Backend bucket (higher cap, 10/s refill, no client-side pacing floors)
   static const int _backendMaxTokens = 30;
@@ -97,10 +80,8 @@ class YtmRateLimiter {
       }
       if (savedBackoff != null) {
         final deadline = DateTime.fromMillisecondsSinceEpoch(savedBackoff);
-        final clamp = DateTime.now().add(launchBackoffClamp);
         if (deadline.isAfter(DateTime.now())) {
-          // Clamp at launch: never restore more than launchBackoffClamp.
-          _backoffUntil = deadline.isBefore(clamp) ? deadline : clamp;
+          _backoffUntil = deadline;
         }
       }
 
@@ -115,15 +96,11 @@ class YtmRateLimiter {
       }
       if (savedBBackoff != null) {
         final deadline = DateTime.fromMillisecondsSinceEpoch(savedBBackoff);
-        final clamp = DateTime.now().add(launchBackoffClamp);
         if (deadline.isAfter(DateTime.now())) {
-          // Clamp at launch: never restore more than launchBackoffClamp.
-          _backendBackoffUntil = deadline.isBefore(clamp) ? deadline : clamp;
+          _backendBackoffUntil = deadline;
         }
       }
-    } catch (e, st) {
-      ErrorLogger.log('restore failed', error: e, stackTrace: st, category: 'YtmRateLimiter');
-    }
+    } catch (_) {}
   }
 
   void _persist() {
@@ -175,7 +152,7 @@ class YtmRateLimiter {
       final result = await future;
       return result;
     } finally {
-      unawaited(_inFlightRequests.remove(key));
+      _inFlightRequests.remove(key);
     }
   }
 
@@ -194,77 +171,52 @@ class YtmRateLimiter {
   }
 
   /// Acquires a permit before making a native YTM request.
-  /// [priority] ensures interactive requests (user taps) take precedence over background bursts
-  /// (pre-resolving, queue restore, metadata fetch) and never get starved.
-  Future<void> acquirePermit({YtmRequestPriority priority = YtmRequestPriority.interactive}) async {
-    await _mutex.protect(() async {
-      final now = DateTime.now();
-      if (now.isBefore(_backoffUntil)) {
-        // Interactive requests during backoff still wait out the minimum backoff,
-        // but background requests are strictly queued
-        await Future<void>.delayed(_backoffUntil.difference(now));
-      }
+  Future<void> acquirePermit() async {
+    final now = DateTime.now();
+    if (now.isBefore(_backoffUntil)) {
+      await Future<void>.delayed(_backoffUntil.difference(now));
+    }
 
-      _refill();
-
-      // Background requests must leave a minimum reserve of 2.0 tokens for interactive requests
-      if (priority == YtmRequestPriority.background && _tokens < 2.0) {
-        final waitMs = ((2.0 - _tokens) / _refillRate * 1000).ceil().clamp(50, 1000);
-        await Future<void>.delayed(Duration(milliseconds: waitMs));
-        _refill();
-      }
-
-      if (_tokens >= 1.0) {
-        _tokens -= 1.0;
-        _persist();
-        return;
-      }
-
-      // Wait for the next token to become available
-      final waitMs = ((1.0 - _tokens) / _refillRate * 1000).ceil();
-      await Future<void>.delayed(Duration(milliseconds: waitMs));
-      _refill();
-      _tokens = (_tokens - 1.0).clamp(0.0, _maxTokens.toDouble());
+    _refill();
+    if (_tokens >= 1.0) {
+      _tokens -= 1.0;
       _persist();
-    });
+      return;
+    }
+
+    // Wait for the next token to become available
+    final waitMs = ((1.0 - _tokens) / _refillRate * 1000).ceil();
+    await Future<void>.delayed(Duration(milliseconds: waitMs));
+    _refill();
+    _tokens = (_tokens - 1.0).clamp(0.0, _maxTokens.toDouble());
+    _persist();
   }
 
   /// Acquires a permit before making a backend microservice request.
-  Future<void> acquireBackendPermit({YtmRequestPriority priority = YtmRequestPriority.interactive}) async {
-    await _mutex.protect(() async {
-      final now = DateTime.now();
-      if (now.isBefore(_backendBackoffUntil)) {
-        await Future<void>.delayed(_backendBackoffUntil.difference(now));
-      }
+  Future<void> acquireBackendPermit() async {
+    final now = DateTime.now();
+    if (now.isBefore(_backendBackoffUntil)) {
+      await Future<void>.delayed(_backendBackoffUntil.difference(now));
+    }
 
-      _refillBackend();
-
-      // Background requests leave a reserve of 5.0 tokens for backend interactive requests
-      if (priority == YtmRequestPriority.background && _backendTokens < 5.0) {
-        final waitMs = ((5.0 - _backendTokens) / _backendRefillRate * 1000).ceil().clamp(50, 1000);
-        await Future<void>.delayed(Duration(milliseconds: waitMs));
-        _refillBackend();
-      }
-
-      if (_backendTokens >= 1.0) {
-        _backendTokens -= 1.0;
-        _persist();
-        return;
-      }
-
-      final waitMs = ((1.0 - _backendTokens) / _backendRefillRate * 1000).ceil();
-      await Future<void>.delayed(Duration(milliseconds: waitMs));
-      _refillBackend();
-      _backendTokens = (_backendTokens - 1.0).clamp(0.0, _backendMaxTokens.toDouble());
+    _refillBackend();
+    if (_backendTokens >= 1.0) {
+      _backendTokens -= 1.0;
       _persist();
-    });
+      return;
+    }
+
+    final waitMs = ((1.0 - _backendTokens) / _backendRefillRate * 1000).ceil();
+    await Future<void>.delayed(Duration(milliseconds: waitMs));
+    _refillBackend();
+    _backendTokens = (_backendTokens - 1.0).clamp(0.0, _backendMaxTokens.toDouble());
+    _persist();
   }
 
   /// Called when a 429 rate-limit response is received from native YouTube.
   void onRateLimited([int? retryAfterSeconds]) {
     final now = DateTime.now();
-    _adaptiveMultiplier =
-        math.min(_adaptiveMultiplier + 1, maxAdaptiveMultiplier);
+    _adaptiveMultiplier = (_adaptiveMultiplier * 2).clamp(1, 16);
 
     if (retryAfterSeconds != null && retryAfterSeconds > 0) {
       _backoffUntil = now.add(Duration(seconds: retryAfterSeconds));
@@ -295,7 +247,9 @@ class YtmRateLimiter {
   /// Called on a successful native request to reset backoff state.
   void onSuccess() {
     final now = DateTime.now();
-    _adaptiveMultiplier = 1;
+    if (now.difference(_lastSuccess).inMinutes > 10) {
+      _adaptiveMultiplier = 1;
+    }
     _lastSuccess = now;
     _backoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
     _persist();

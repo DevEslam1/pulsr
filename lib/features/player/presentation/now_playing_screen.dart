@@ -28,17 +28,10 @@ class NowPlayingScreen extends StatelessWidget {
       listenWhen: (prev, curr) => prev.currentSong?.id != curr.currentSong?.id,
       listener: (context, state) {
         final song = state.currentSong;
-        // Read fresh SettingsCubit state to avoid stale closure (was capturing build's settingsState)
-        final themeSource = context.read<SettingsCubit>().state.themeColorSource;
-        if (song != null && themeSource == ThemeColorSource.artwork) {
+        if (song != null && settingsState.dynamicThemingEnabled) {
           context.read<DynamicThemeCubit>().updateFromSong(song);
         }
       },
-      // Skip rebuilds for position-only ticks (~5x/sec while playing). The
-      // widgets that truly need live position (seek bar, lyrics highlight)
-      // subscribe to it themselves via BlocSelector, so the visual output per
-      // tick is unchanged — only the rebuild scope shrinks to the leaves.
-      buildWhen: (prev, curr) => curr.differsFromBeyondPosition(prev),
       builder: (context, state) {
         final cubit = context.read<PlayerCubit>();
         final dynamicTheme = context.watch<DynamicThemeCubit>().state;
@@ -140,9 +133,7 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
   late final AnimationController _animController;
   late final CurvedAnimation _curvedAnimation;
   late Animation<double> _anim;
-  late Animation<double> _fade;
   double _dragOffset = 0.0;
-  bool _dragging = false;
 
   @override
   void initState() {
@@ -156,12 +147,10 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
       curve: Curves.easeOutCubic,
     );
     _anim = Tween<double>(begin: 0.0, end: 0.0).animate(_curvedAnimation);
-    _fade = const AlwaysStoppedAnimation<double>(1.0);
-    // The controller drives the release animation: the listener only records
-    // the value — the translate/fade below are driven by the animation itself,
-    // so there is no setState (and no full-screen rebuild) per tick.
     _animController.addListener(() {
-      _dragOffset = _anim.value;
+      setState(() {
+        _dragOffset = _anim.value;
+      });
     });
   }
 
@@ -176,7 +165,6 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
     if (details.primaryDelta != null) {
       final newOffset = _dragOffset + details.primaryDelta!;
       if (newOffset >= 0) {
-        _dragging = true;
         setState(() {
           _dragOffset = newOffset;
         });
@@ -185,52 +173,31 @@ class _SwipeDownToDismissState extends State<_SwipeDownToDismiss>
   }
 
   void _onVerticalDragEnd(DragEndDetails details) {
-    _dragging = false;
     final velocity = details.primaryVelocity ?? 0;
     if (_dragOffset > 100 || velocity > 450) {
       widget.onDismiss();
     } else if (_dragOffset > 0) {
-      _animController.stop();
       _anim =
           Tween<double>(begin: _dragOffset, end: 0.0).animate(_curvedAnimation);
-      _fade = Tween<double>(
-              begin: _fadeFor(_dragOffset, MediaQuery.sizeOf(context).height),
-              end: 1.0)
-          .animate(_curvedAnimation);
       _animController.forward(from: 0.0);
     }
-  }
-
-  /// Same fade curve as before: opacity = 1 - dragProgress * 0.4.
-  double _fadeFor(double offset, double screenHeight) {
-    final progress = (offset / screenHeight).clamp(0.0, 1.0);
-    return (1.0 - progress * 0.4).clamp(0.0, 1.0);
   }
 
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.sizeOf(context).height;
+    final progress = (_dragOffset / screenHeight).clamp(0.0, 1.0);
 
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onVerticalDragUpdate: _onVerticalDragUpdate,
       onVerticalDragEnd: _onVerticalDragEnd,
-      child: AnimatedBuilder(
-        animation: _animController,
-        builder: (context, child) {
-          final offset = _dragging ? _dragOffset : _anim.value;
-          return Transform.translate(
-            offset: Offset(0, offset),
-            child: FadeTransition(
-              opacity: _dragging
-                  ? AlwaysStoppedAnimation<double>(
-                      _fadeFor(offset, screenHeight))
-                  : _fade,
-              child: child!,
-            ),
-          );
-        },
-        child: widget.child,
+      child: Transform.translate(
+        offset: Offset(0, _dragOffset),
+        child: Opacity(
+          opacity: (1.0 - progress * 0.4).clamp(0.0, 1.0),
+          child: widget.child,
+        ),
       ),
     );
   }

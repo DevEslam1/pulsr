@@ -1,5 +1,4 @@
 // lib/domain/usecases/playlist_usecases.dart
-import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 import '../../core/errors/failures.dart';
 import '../../data/db/app_database.dart';
@@ -49,15 +48,7 @@ class PlaylistUseCases {
     return _repository.deletePlaylist(playlistId);
   }
 
-  Future<Result<void>> addSongToPlaylist(int playlistId, int songId) async {
-    final existing = await _repository.getPlaylistSongs(playlistId);
-    final isDuplicate = existing.fold(
-      (_) => false,
-      (songs) => songs.any((s) => s.id == songId),
-    );
-    if (isDuplicate) {
-      return Left(ValidationFailure('Song is already in this playlist'));
-    }
+  Future<Result<void>> addSongToPlaylist(int playlistId, int songId) {
     return _repository.addSongToPlaylist(playlistId, songId);
   }
 

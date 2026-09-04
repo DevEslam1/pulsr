@@ -20,8 +20,6 @@ void main() {
     when(() => mockPlayerB.setVolume(any())).thenAnswer((_) async {});
     when(() => mockPlayerA.stop()).thenAnswer((_) async {});
     when(() => mockPlayerB.stop()).thenAnswer((_) async {});
-    when(() => mockPlayerA.processingState).thenReturn(ProcessingState.ready);
-    when(() => mockPlayerB.processingState).thenReturn(ProcessingState.ready);
   });
 
   tearDown(() {

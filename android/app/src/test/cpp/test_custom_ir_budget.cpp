@@ -7,7 +7,7 @@
 #include <cmath>
 
 void runCustomIrBudgetTest() {
-    std::cout << "\n=== [TEST 13/22] Custom IR Budget, Capping & Cache Hit Test ===" << std::endl;
+    std::cout << "\n=== [TEST 13/13] Custom IR Budget, Capping & Cache Hit Test (BUG-004, BUG-005, NEW-2, NEW-9) ===" << std::endl;
 
     // 1. Test Damping multiplier and cache hits (BUG-004)
     PreparedIr::clearSyntheticCache();

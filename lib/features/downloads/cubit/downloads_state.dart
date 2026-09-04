@@ -1,194 +1,39 @@
-// lib/features/downloads/cubit/downloads_state.dart
-// DL-19: Typed failures and retryable classification.
-
 import 'package:flutter/foundation.dart';
-import '../../../core/errors/failures.dart';
 import '../../../domain/models/download_task.dart';
-import '../../../domain/models/retry_policy.dart';
 
-/// Read-only view over the task map that also accepts lookups by either
-/// task id or videoId (downloads may be keyed by either, and two tasks can
-/// share one videoId at different qualities). All mutating members throw
-/// [UnsupportedError]; updates flow exclusively through [DownloadsState.copyWith].
-class DownloadTaskMap implements Map<String, DownloadTask> {
-  final Map<String, DownloadTask> _inner;
-
-  const DownloadTaskMap([this._inner = const {}]);
-
-  @override
-  DownloadTask? operator [](Object? key) {
-    if (key == null) return null;
-    final direct = _inner[key];
-    if (direct != null) return direct;
-    for (final task in _inner.values) {
-      if (task.videoId == key || task.id == key) {
-        return task;
-      }
-    }
-    return null;
-  }
-
-  @override
-  bool containsKey(Object? key) {
-    if (key == null) return false;
-    if (_inner.containsKey(key)) return true;
-    for (final task in _inner.values) {
-      if (task.videoId == key || task.id == key) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  @override
-  bool containsValue(Object? value) => _inner.containsValue(value);
-
-  @override
-  Iterable<MapEntry<String, DownloadTask>> get entries => _inner.entries;
-
-  @override
-  Iterable<String> get keys => _inner.keys;
-
-  @override
-  Iterable<DownloadTask> get values => _inner.values;
-
-  @override
-  int get length => _inner.length;
-
-  @override
-  bool get isEmpty => _inner.isEmpty;
-
-  @override
-  bool get isNotEmpty => _inner.isNotEmpty;
-
-  @override
-  void operator []=(String key, DownloadTask value) => throw UnsupportedError('Immutable');
-  @override
-  void clear() => throw UnsupportedError('Immutable');
-  @override
-  void addAll(Map<String, DownloadTask> other) => throw UnsupportedError('Immutable');
-  @override
-  void addEntries(Iterable<MapEntry<String, DownloadTask>> newEntries) => throw UnsupportedError('Immutable');
-  @override
-  DownloadTask putIfAbsent(String key, DownloadTask Function() ifAbsent) => throw UnsupportedError('Immutable');
-  @override
-  DownloadTask? remove(Object? key) => throw UnsupportedError('Immutable');
-  @override
-  void removeWhere(bool Function(String key, DownloadTask value) test) => throw UnsupportedError('Immutable');
-  @override
-  DownloadTask update(String key, DownloadTask Function(DownloadTask value) update, {DownloadTask Function()? ifAbsent}) => throw UnsupportedError('Immutable');
-  @override
-  void updateAll(DownloadTask Function(String key, DownloadTask value) update) => throw UnsupportedError('Immutable');
-  @override
-  Map<K2, V2> map<K2, V2>(MapEntry<K2, V2> Function(String key, DownloadTask value) convert) => _inner.map(convert);
-  @override
-  void forEach(void Function(String key, DownloadTask action) action) => _inner.forEach(action);
-  @override
-  Map<K2, V2> cast<K2, V2>() => _inner.cast<K2, V2>();
-}
-
-/// Immutable state of the downloads hub.
-///
-/// [tasks] holds the authoritative task set; [failure]/[errorMessage] carry
-/// the last typed failure (with retryability derived from
-/// [RetryPolicy.isRetryableError] via [isErrorRetryable]). Derived getters
-/// ([activeCount], [pausedCount], …) compute counts on demand — the state
-/// never stores duplicated counters.
 class DownloadsState {
   final Map<String, DownloadTask> tasks;
   final StorageStats storageStats;
   final bool isLoading;
   final String? errorMessage;
-  final AppFailure? failure;
-  final bool showNotificationPermissionBanner;
 
   const DownloadsState({
-    this.tasks = const DownloadTaskMap(),
+    this.tasks = const {},
     this.storageStats = const StorageStats(),
     this.isLoading = false,
     this.errorMessage,
-    this.failure,
-    this.showNotificationPermissionBanner = false,
   });
 
-  List<DownloadTask> get taskList {
-    final list = tasks.values.toList();
-    return List<DownloadTask>.unmodifiable(list);
-  }
-
-  DownloadTask? byId(String idOrVideoId) =>
-      tasks[idOrVideoId] ??
-      tasks.values.cast<DownloadTask?>().firstWhere(
-            (t) => t?.videoId == idOrVideoId || t?.id == idOrVideoId,
-            orElse: () => null,
-          );
+  List<DownloadTask> get taskList => tasks.values.toList()
+    ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
 
   int get activeCount =>
       tasks.values.where((t) => t.status.isActive).length;
 
-  int get queuedCount =>
-      tasks.values.where((t) => t.status == DownloadStatus.queued).length;
-
-  int get pausedCount =>
-      tasks.values.where((t) => t.status == DownloadStatus.paused || t.status == DownloadStatus.interrupted).length;
-
-  bool get hasPausedTasks => pausedCount > 0;
-
   int get completedCount =>
       tasks.values.where((t) => t.status == DownloadStatus.complete).length;
-
-  int get failedCount =>
-      tasks.values.where((t) => t.status == DownloadStatus.failed).length;
-
-  /// Failed tasks whose failure is transient (network/timeout/interrupted) and
-  /// therefore safe to auto- or manually-retry without user intervention.
-  List<DownloadTask> get transientFailures => tasks.values
-      .where((t) => t.status == DownloadStatus.failed && t.isTransientFailure)
-      .toList();
-
-  /// Failed tasks whose failure is permanent (storage full, permission,
-  /// bot-blocked, feature disabled) — retrying without user action is futile.
-  List<DownloadTask> get permanentFailures => tasks.values
-      .where(
-          (t) => t.status == DownloadStatus.failed && !t.isTransientFailure)
-      .toList();
-
-  bool get hasFailure => failure != null || (errorMessage?.isNotEmpty ?? false);
-
-  bool get isErrorRetryable => failure != null
-      ? RetryPolicy.isRetryableError(failure!.message)
-      : RetryPolicy.isRetryableError(errorMessage);
-
-  DownloadsState clearTransient() {
-    return DownloadsState(
-      tasks: tasks,
-      storageStats: storageStats,
-      isLoading: isLoading,
-      errorMessage: null,
-      failure: null,
-      showNotificationPermissionBanner: showNotificationPermissionBanner,
-    );
-  }
 
   DownloadsState copyWith({
     Map<String, DownloadTask>? tasks,
     StorageStats? storageStats,
     bool? isLoading,
     String? errorMessage,
-    bool clearErrorMessage = false,
-    AppFailure? failure,
-    bool clearFailure = false,
-    bool? showNotificationPermissionBanner,
   }) {
     return DownloadsState(
-      tasks: tasks != null ? (tasks is DownloadTaskMap ? tasks : DownloadTaskMap(Map<String, DownloadTask>.unmodifiable(tasks))) : this.tasks,
+      tasks: tasks ?? this.tasks,
       storageStats: storageStats ?? this.storageStats,
       isLoading: isLoading ?? this.isLoading,
-      errorMessage:
-          clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
-      failure: clearFailure ? null : (failure ?? this.failure),
-      showNotificationPermissionBanner:
-          showNotificationPermissionBanner ?? this.showNotificationPermissionBanner,
+      errorMessage: errorMessage,
     );
   }
 
@@ -199,9 +44,7 @@ class DownloadsState {
           runtimeType == other.runtimeType &&
           isLoading == other.isLoading &&
           errorMessage == other.errorMessage &&
-          failure == other.failure &&
           storageStats == other.storageStats &&
-          showNotificationPermissionBanner == other.showNotificationPermissionBanner &&
           mapEquals(tasks, other.tasks);
 
   @override
@@ -210,7 +53,5 @@ class DownloadsState {
         storageStats,
         isLoading,
         errorMessage,
-        failure,
-        showNotificationPermissionBanner,
       );
 }

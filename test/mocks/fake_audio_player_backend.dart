@@ -231,14 +231,14 @@ class FakeAudioPlayerBackend implements AudioPlayerBackend {
 
   @override
   Future<void> dispose() async {
-    await _positionController.close();
-    await _durationController.close();
-    await _bufferedPositionController.close();
-    await _playerStateController.close();
-    await _processingStateController.close();
-    await _playingController.close();
-    await _volumeController.close();
-    await _speedController.close();
-    await _sequenceStateController.close();
+    _positionController.close();
+    _durationController.close();
+    _bufferedPositionController.close();
+    _playerStateController.close();
+    _processingStateController.close();
+    _playingController.close();
+    _volumeController.close();
+    _speedController.close();
+    _sequenceStateController.close();
   }
 }

@@ -312,8 +312,6 @@
   "autoMix": "مزيج تلقائي",
   "topPlayedTracks": "الأكثر استماعًا",
   "audioAndPlayback": "الصوت والتشغيل",
-  "playback": "التشغيل",
-  "audioAndSound": "الصوت والصوتيات",
   "equalizerAndSoundEffects": "معادل الصوت والتأثيرات",
   "themeAndAppearance": "المظهر والسمة",
   "accentColor": "اللون المميز",
@@ -433,159 +431,14 @@
   "storageFree": "المساحة المتوفرة",
   "resume": "استئناف",
   "downloadErrorNoSpace": "التخزين ممتلئ — حرّر مساحة وأعد المحاولة",
-  "downloadErrorStorage": "التخزين ممتلئ — حرّر مساحة وأعد المحاولة",
-  "downloadErrorPermission": "تم رفض إذن التخزين. يرجى منح الإذن من الإعدادات.",
-  "downloadErrorInterrupted": "انقطع التنزيل. انقر للاستئناف.",
-  "downloadErrorDisabled": "التنزيلات غير متوفرة أو معطلة في هذا الإصدار.",
-  "downloadErrorTransition": "انتقال حالة عملية تنزيل غير صالح.",
   "downloadErrorRateLimited": "يوتيوب مشغول. فترة تبريد…",
   "downloadErrorNetwork": "لا يوجد اتصال. تحقق من الشبكة.",
-  "downloadErrorBotChallenge": "مطلوب التحقق من يوتيوب — افتح التطبيق لإكماله",
+  "downloadErrorBotChallenge": "تم تشغيل التحقق من يوتيوب. جارٍ إعادة المحاولة…",
   "downloadErrorUnavailable": "هذا المسار غير متوفر.",
   "downloadWifiOnly": "وضع Wi-Fi فقط نشط. اتصل بالشبكة للتنزيل.",
-  "downloadErrorAlreadyQueued": "هذه الأغنية موجودة بالفعل في قائمة التنزيل.",
-  "downloadErrorCorrupt": "الملف الذي تم تنزيله تالف أو غير مكتمل. يرجى إعادة المحاولة.",
-  "downloadErrorInvalidTransition": "انتقال حالة عملية تنزيل غير صالح.",
-  "downloadErrorTimeout": "انتهت مهلة التنزيل. يرجى إعادة المحاولة.",
   "dspEnginePreference": "تفضيل محرك معالجة الصوت (DSP)",
   "dspEnginePreferenceSubtitle": "اختر محرك الاستوديو المدمج أو مؤثرات النظام الأصلية",
   "dspEngineNative": "محرك DSP استوديو مدمج (بدون تأخير)",
   "dspEngineOem": "مؤثرات نظام الجهاز / OEM",
-  "dspEngineAuto": "تلقائي (تفضيل المدمج)",
-  "audioStageDegraded": "تم تجاوز مرحلة الصوت \"{stage}\" لمنع التقطيع بسبب الحمل العالي.",
-  "stageEq": "معادل الصوت البارامتري",
-  "stageReverb": "صدى الالتفاف",
-  "stageCrossfeed": "التغذية المتقاطعة",
-  "stageLimiter": "محدد الذروة الاستباقي",
-  "stageResampler": "إعادة تشكيل العينات",
-  "stagePanner": "التوجيه المكاني",
-  "dspSaturationTitle": "التشبع التوافقي",
-  "dspSaturationSubtitle": "مُثير توافقي بأسلوب الأنبوب والشريط",
-  "dspSaturationDrive": "مقدار الدفع",
-  "dspSaturationMix": "نسبة المزج",
-  "dspSaturationTilt": "إبراز الحدة",
-  "dspStereoWidthTitle": "عرض الاستريو",
-  "dspStereoWidthSubtitle": "تحكم مستقل بحقل متوسط/جانبي (Mid/Side)",
-  "dspStereoWidthAmount": "العرض",
-  "dspLoudnessTitle": "منحنى الجهارة",
-  "dspLoudnessSubtitle": "تعويض نبرة مرتبط بمستوى الصوت (فليتشر-مونسون)",
-  "dspLoudnessIntensity": "الشدة",
-  "dspLoudnessReplayGainNote": "مكمّل لـ ReplayGain: يعاير ReplayGain الجهارة بين المقاطع، وهذا المنحنى يكيّف النبرة مع مستوى استماعك.",
-  "dspSubCrossoverTitle": "كروس أوفر السابووفر",
-  "dspSubCrossoverSubtitle": "إعادة توجيه الباس إلى نقطة ساب أحادية مجمّعة",
-  "dspSubCrossoverCorner": "تردد التقاطع",
-  "dspSubCrossoverSubLevel": "مستوى الساب",
-  "dspSubCrossoverNote": "إعادة توجيه باس: يُضاف مجموع أحادي مُرشَّح تمرير منخفض إلى القناتين؛ وليس توجيهاً حقيقياً متعدد القنوات (LFE).",
-  "dspDynamicEqTitle": "المعادل الديناميكي",
-  "dspDynamicEqSubtitle": "يخفض الرنينات فقط عند تجاوز طاقة النطاق للعتبة",
-  "dspDynamicEqFrequency": "تردد النطاق",
-  "dspDynamicEqThreshold": "العتبة",
-  "dspDynamicEqRatio": "نسبة الضغط",
-  "dspDynamicEqAttack": "زمن الهجوم",
-  "dspDynamicEqRelease": "زمن التحرر",
-  "dspDynamicEqMaxCut": "أقصى خفض",
-  "blockedByBitPerfectShort": "محظور بواسطة وضع البت المثالي",
-  "rcTitle": "تصحيح الغرفة",
-  "rcSubtitle": "قِس استجابة غرفتك بنغمة قصيرة وطبّق معادِلاً يخفّض الانحرافات",
-  "rcStart": "ابدأ القياس",
-  "rcMeasuring": "جارٍ القياس - ابقَ هادئاً...",
-  "rcResult": "الاستجابة المقاسة (أعلى) والتصحيح المُقترَح (أسفل)",
-  "rcApply": "تطبيق",
-  "rcDiscard": "تجاهل",
-  "rcMicNeeded": "إذن الميكروفون مطلوب للقياس",
-  "rcQuietHint": "أبقِ الغرفة هادئة ودع النغمة تعمل بمستوى الاستماع المعتاد عبر مكبرات الصوت",
-  "rcKeepPlayerPaused": "يبقى تشغيل الموسيقى متوقفاً أثناء تصحيح الغرفة",
-  "rcApplied": "تم تطبيق إعداد تصحيح الغرفة",
-  "deviceProfilesTitle": "ملفات إعدادات الأجهزة",
-  "deviceProfilesSubtitle": "تذكّر إعدادات الصوت لكل جهاز إخراج",
-  "autoDeviceSwitch": "تبديل تلقائي عند تغيير الجهاز",
-  "noDevicesSeen": "لم يتم اكتشاف أي أجهزة إخراج بعد",
-  "applyProfileNow": "تطبيق",
-  "forgetDevice": "حذف",
-  "currentDeviceBadge": "الحالي",
-  "profileDropdownLabel": "الملف",
-  "undo": "تراجع",
-  "downloadDeletedSnackbar": "تم حذف \"{title}\"",
-  "@downloadDeletedSnackbar": {
-    "placeholders": {
-      "title": {
-        "type": "String"
-      }
-    }
-  },
-  "statusEmbedding": "جارٍ تضمين الوسوم…",
-  "etaLabel": "الوقت المتبقي: {seconds} ث",
-  "@etaLabel": {
-    "placeholders": {
-      "seconds": {
-        "type": "int"
-      }
-    }
-  },
-  "downloadTileSemantics": "{title} {artist} {status} {progress}",
-  "@downloadTileSemantics": {
-    "placeholders": {
-      "title": {
-        "type": "String"
-      },
-      "artist": {
-        "type": "String"
-      },
-      "status": {
-        "type": "String"
-      },
-      "progress": {
-        "type": "String"
-      }
-    }
-  },
-  "downloadActionsSemantics": "إجراءات التنزيل لـ {title}",
-  "@downloadActionsSemantics": {
-    "placeholders": {
-      "title": {
-        "type": "String"
-      }
-    }
-  },
-  "systemEffectsTitle": "مؤثرات الصوت للنظام (Dolby Atmos / DAP)",
-  "systemEffectsSubtitleBypassed": "✓ تم التجاوز: تم تعطيل مؤثرات النظام",
-  "systemEffectsSubtitleActive": "نشط: مؤثرات صوت النظام قيد المعالجة",
-  "systemEffectsSubtitleUnsupported": "لم يتم العثور على مؤثرات Dolby/DAP على هذا الجهاز",
-  "systemEffectsAuto": "تلقائي",
-  "systemEffectsTryDisable": "محاولة التعطيل",
-  "systemEffectsLeaveOn": "إبقاء التشغيل",
-  "bluetoothLatencyTitle": "مزامنة زمن استجابة البلوتوث (AVRCP / الكلمات)",
-  "bluetoothLatencySubtitle": "تعويض تأخير ذاكرة التخزين المؤقت للبلوتوث ({offset} مللي ثانية).",
-  "clearEntireQueueConfirm": "مسح قائمة الانتظار بالكامل؟",
-  "shuffleQueueAction": "خلط قائمة الانتظار",
-  "saveAsPlaylistAction": "حفظ كقائمة تشغيل",
-  "clearAction": "مسح",
-  "playlistNameLabel": "اسم قائمة التشغيل",
-  "queueSavedAs": "تم حفظ القائمة باسم \"{name}\" ({count} مقاطع)",
-  "@queueSavedAs": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      },
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "failedToCreatePlaylist": "تعذر إنشاء قائمة التشغيل: {error}",
-  "@failedToCreatePlaylist": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
-  "errorSavingPlaylist": "خطأ في حفظ قائمة التشغيل: {error}",
-  "@errorSavingPlaylist": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  }
+  "dspEngineAuto": "تلقائي (تفضيل المدمج)"
 }

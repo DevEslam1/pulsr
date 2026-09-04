@@ -1,46 +1,25 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:pulsr/features/downloads/cubit/ytm_download_cubit.dart';
-import 'package:pulsr/features/downloads/presentation/widgets/ytm_download_button.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../player/cubit/player_cubit.dart';
+import '../cubit/ytm_download_cubit.dart';
 import '../cubit/ytm_search_cubit.dart';
 import '../cubit/ytm_search_state.dart';
+import 'widgets/ytm_download_button.dart';
 
-class YtmSearchScreen extends StatefulWidget {
+class YtmSearchScreen extends StatelessWidget {
   const YtmSearchScreen({super.key});
-
-  @override
-  State<YtmSearchScreen> createState() => _YtmSearchScreenState();
-}
-
-class _YtmSearchScreenState extends State<YtmSearchScreen> {
-  /// YtmSearchCubit is factory-registered: created once here and owned by
-  /// this State (not by BlocProvider's `create:`), so ancestor rebuilds
-  /// (theme/locale) can never recreate it and drop the in-progress query.
-  /// Closed in [dispose].
-  late final YtmSearchCubit _searchCubit = getIt<YtmSearchCubit>();
-
-  @override
-  void dispose() {
-    _searchCubit.close();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider<YtmSearchCubit>.value(value: _searchCubit),
-        // YtmDownloadCubit is an app-lifetime @singleton provided at root (main.dart).
-        // BlocProvider.value does NOT take ownership, so leaving this screen can
-        // never close the shared singleton (use-after-close would kill download UI updates).
-        BlocProvider<YtmDownloadCubit>.value(value: getIt<YtmDownloadCubit>()),
+        BlocProvider(create: (_) => getIt<YtmSearchCubit>()),
+        BlocProvider(create: (_) => getIt<YtmDownloadCubit>()),
       ],
       child: const _YtmSearchView(),
     );
@@ -84,11 +63,10 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                   children: [
                     Padding(
                       padding: EdgeInsets.fromLTRB(
-                        Adaptive.pagePadding(context),
-                        12,
-                        Adaptive.pagePadding(context),
-                        6,
-                      ),
+                          Adaptive.pagePadding(context),
+                          12,
+                          Adaptive.pagePadding(context),
+                          6),
                       child: TextField(
                         controller: _searchController,
                         autofocus: true,
@@ -96,23 +74,18 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
                         onChanged: cubit.onQueryChanged,
                         decoration: InputDecoration(
                           hintText: 'Songs on YouTube Music…',
-                          prefixIcon: Icon(
-                            Icons.search_rounded,
-                            color: p.textTertiary,
-                          ),
-                          suffixIcon:
-                              state.query.isNotEmpty
-                                  ? IconButton(
-                                    icon: Icon(
-                                      Icons.clear_rounded,
-                                      color: p.textTertiary,
-                                    ),
-                                    onPressed: () {
-                                      _searchController.clear();
-                                      cubit.clearQuery();
-                                    },
-                                  )
-                                  : null,
+                          prefixIcon:
+                              Icon(Icons.search_rounded, color: p.textTertiary),
+                          suffixIcon: state.query.isNotEmpty
+                              ? IconButton(
+                                  icon: Icon(Icons.clear_rounded,
+                                      color: p.textTertiary),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    cubit.clearQuery();
+                                  },
+                                )
+                              : null,
                         ),
                       ),
                     ),
@@ -154,22 +127,23 @@ class _YtmSearchViewState extends State<_YtmSearchView> {
     if (state.results.isEmpty) {
       return state.hasSearched
           ? EmptyStateWidget(
-            icon: Icons.search_off_rounded,
-            title: 'No Results Found',
-            subtitle: 'No YouTube Music matches for "${state.query.trim()}".',
-          )
+              icon: Icons.search_off_rounded,
+              title: 'No Results Found',
+              subtitle: 'No YouTube Music matches for "${state.query.trim()}".',
+            )
           : const EmptyStateWidget(
-            icon: Icons.travel_explore_rounded,
-            title: 'Search YouTube Music',
-            subtitle: 'Stream and download songs from YouTube Music, ad-free.',
-          );
+              icon: Icons.travel_explore_rounded,
+              title: 'Search YouTube Music',
+              subtitle:
+                  'Stream and download songs from YouTube Music, ad-free.',
+            );
     }
 
     final songs = [for (final track in state.results) track.toSongData()];
     return RefreshIndicator(
       onRefresh: () async {
-        unawaited(cubit.retry());
-        await Future<void>.delayed(const Duration(milliseconds: 300));
+        cubit.retry();
+        await Future.delayed(const Duration(milliseconds: 300));
       },
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(),

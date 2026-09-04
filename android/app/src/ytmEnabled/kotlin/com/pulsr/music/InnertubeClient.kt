@@ -23,10 +23,6 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
 import java.util.zip.GZIPInputStream
 
 /**
@@ -46,8 +42,6 @@ internal class InnertubeClient(
     private val rateLimiter: RateLimiter = RateLimiter.shared,
     private val resolutionStrategy: ResolutionStrategy = ResolutionStrategy(context, cookieStore, PoTokenManager)
 ) {
-    private val consecutiveBotBlocks = AtomicInteger(0)
-    private val lastBotBlockTimestamp = AtomicLong(0L)
     enum class ClientType(
         val clientName: String,
         val clientVersion: String,
@@ -143,10 +137,7 @@ internal class InnertubeClient(
                     }.format(Date())
                     "2.$dateStr.01.00"
                 }
-                else -> {
-                    val matrixVersion = runCatching { ClientCapabilityMatrix.getCapability(this).defaultClientVersion }.getOrNull()
-                    if (!matrixVersion.isNullOrEmpty()) matrixVersion else clientVersion
-                }
+                else -> clientVersion
             }
     }
 
@@ -156,18 +147,6 @@ internal class InnertubeClient(
         val traceId: String = UUID.randomUUID().toString(),
         cause: Throwable? = null,
     ) : Exception("[$traceId] [${signal.name}] $message", cause)
-
-    /**
-     * Thrown when the ladder aborts early because
-     * [LadderAbortPolicy.DEFAULT_THRESHOLD] consecutive clients returned
-     * LOGIN_REQUIRED - a device/IP-level gate where walking the remaining
-     * clients cannot succeed. Surfaces to Dart as YTM_SIGNIN_REQUIRED so the
-     * UI can offer sign-in instead of a misleading timeout.
-     */
-    class YtmSignInRequiredAbortException(
-        val clientsTried: Int,
-        traceId: String,
-    ) : Exception("[$traceId] Ladder aborted after $clientsTried consecutive LOGIN_REQUIRED client responses")
 
     /**
      * Resolves audio stream formats for [videoId] through dynamic fallback ladder:
@@ -185,7 +164,7 @@ internal class InnertubeClient(
         // Authenticated cold-start datasyncId bootstrap if needed
         if (cookieStore.isSessionValid() && PoTokenManager.dataSyncId.isEmpty()) {
             try {
-                requestBrowse("FEmusic_home", ClientType.WEB_REMIX)
+                requestPlayer(videoId, ClientType.WEB_REMIX)
             } catch (t: Throwable) {
                 Log.w(TAG, "Datasync bootstrap call failed for $videoId: ${t.message}")
             }
@@ -195,20 +174,10 @@ internal class InnertubeClient(
         var lastSignal: YtmBlockSignal = YtmBlockSignal.RateLimited
         val traceId = UUID.randomUUID().toString()
 
-        // TTFA fast-fail: several consecutive LOGIN_REQUIRED responses from
-        // different clients indicate a device/IP-level gate. Walking the rest
-        // of the chain cannot succeed and only burns the executor, the rate
-        // limiter and the user's time - abort with a typed signal instead.
-        val loginAbortPolicy = LadderAbortPolicy(
-            countOnlyAuthenticatedClients = cookieStore.isSessionValid(),
-        )
-        val clientsAttempted = java.util.concurrent.atomic.AtomicInteger(0)
-
         fun attemptClient(client: ClientType): Map<String, Any?>? {
             if (Thread.currentThread().isInterrupted) return null
             try {
                 Log.d(TAG, "[$traceId] Attempting player resolution for $videoId using client: ${client.name}")
-                clientsAttempted.incrementAndGet()
                 val playerJson = requestPlayer(videoId, client)
                 if (Thread.currentThread().isInterrupted) return null
 
@@ -221,45 +190,13 @@ internal class InnertubeClient(
                     val parsedSignal = YtmBlockSignal.parse(200, status, playability)
                     lastSignal = parsedSignal
                     Log.w(TAG, "[$traceId] Client ${client.name} returned status $status -> $parsedSignal")
-                    // Only count LOGIN_REQUIRED toward the abort threshold if this client
-                    // actually sent session cookies. Unauthenticated clients failing with
-                    // LOGIN_REQUIRED when the user IS signed in is expected behavior (they
-                    // have no cookies) and must not prematurely abort the signed-in ladder.
-                    val isAuthClient = client.isWeb && cookieStore.isSessionValid()
-                    loginAbortPolicy.onLoginRequired(status.equals("LOGIN_REQUIRED", ignoreCase = true), isAuthenticatedClient = isAuthClient)
                     if ((parsedSignal == YtmBlockSignal.BotChallenge || parsedSignal == YtmBlockSignal.PoTokenInvalid) &&
                         (client == ClientType.ANDROID_MUSIC || client == ClientType.WEB_REMIX)) {
-                        val now = System.currentTimeMillis()
-                        val lastBlock = lastBotBlockTimestamp.getAndSet(now)
-                        val count = if (now - lastBlock < 30_000L) consecutiveBotBlocks.incrementAndGet() else consecutiveBotBlocks.apply { set(1) }.get()
                         PoTokenManager.evictMintedTokens()
-                        if (count >= 2) {
-                            if (cookieStore.isSessionValid()) {
-                                // Logged in: a bot gate is an attestation problem, not a
-                                // session problem. resetFingerprint() rotates the device
-                                // identity (invalidating every minted token) and
-                                // clearCookies() destroys the user's Google session, which
-                                // surfaces as "sign in required although logged in". Only
-                                // re-attest: soft-invalidate poTokens and re-mint.
-                                Log.w(TAG, "[$traceId] Encountered $count consecutive bot blocks while signed in. Re-attesting poToken (identity and session preserved).")
-                                PoTokenManager.invalidate()
-                                PoTokenManager.triggerBackgroundRefresh()
-                            } else {
-                                // Guest: rotating the guest identity is safe and gives
-                                // the next resolve a fresh fingerprint + attestation.
-                                Log.w(TAG, "[$traceId] Encountered $count consecutive bot blocks (guest). Rotating identity and clearing cookies...")
-                                PoTokenManager.invalidate()
-                                FingerprintStore.resetFingerprint(context)
-                                YtmCookieStore.getInstance(context).clearCookies()
-                            }
-                            consecutiveBotBlocks.set(0)
-                        } else {
-                            PoTokenManager.triggerBackgroundRefresh()
-                        }
+                        PoTokenManager.triggerBackgroundRefresh()
                     }
                     return null
                 }
-                consecutiveBotBlocks.set(0)
 
                 val streamingData = playerJson.optJSONObject("streamingData")
                 val adaptiveFormats = streamingData?.optJSONArray("adaptiveFormats") ?: JSONArray()
@@ -276,7 +213,6 @@ internal class InnertubeClient(
 
                 if (audioFormats.isEmpty()) {
                     lastSignal = YtmBlockSignal.PoTokenInvalid
-                    loginAbortPolicy.onLoginRequired(false)
                     return null
                 }
 
@@ -307,15 +243,6 @@ internal class InnertubeClient(
                 val title = videoDetails?.optString("title") ?: ""
                 val author = videoDetails?.optString("author") ?: ""
 
-                // Pre-stream validation check: 1-byte ranged GET (fixes C-03)
-                val validateStart = System.currentTimeMillis()
-                val isValid = validateStreamUrl(selectedUrl, client.userAgent, traceId)
-                YtmMetricsRegistry.record("stream.validate", System.currentTimeMillis() - validateStart, isError = !isValid)
-                if (!isValid) {
-                    Log.w(TAG, "[$traceId] Resolved URL for ${client.name} failed 1-byte pre-validation. Escalating ladder...")
-                    return null
-                }
-
                 Log.i(TAG, "[$traceId] Successfully resolved $videoId via ${client.name} (itag: ${selected.optInt("itag")}, bitrate: $selectedBitrate)")
                 YtmHttpClient.preConnect(selectedUrl)
                 return mapOf(
@@ -335,7 +262,6 @@ internal class InnertubeClient(
             } catch (t: Throwable) {
                 Log.w(TAG, "[$traceId] Failed resolving with ${client.name}: ${t.message}")
                 lastException = t
-                loginAbortPolicy.onLoginRequired(false)
                 return null
             }
         }
@@ -370,11 +296,9 @@ internal class InnertubeClient(
                     val (client, res) = done.get()
                     if (res != null) {
                         for (f in activeFutures) { if (f != done) f.cancel(true) }
-                        ClientFailureTracker.recordSuccess(client)
                         winnerStore.recordWinningClient(trackType, client)
                         return res
                     } else {
-                        ClientFailureTracker.recordFailure(client)
                         winnerStore.recordFailure(trackType, client)
                         activeFutures.remove(done)
                         break
@@ -406,17 +330,11 @@ internal class InnertubeClient(
                     val (client, res) = done.get()
                     if (res != null) {
                         for (f in activeFutures) { if (f != done) f.cancel(true) }
-                        ClientFailureTracker.recordSuccess(client)
                         winnerStore.recordWinningClient(trackType, client)
                         return res
                     } else {
-                        ClientFailureTracker.recordFailure(client)
                         winnerStore.recordFailure(trackType, client)
                         activeFutures.remove(done)
-                        if (loginAbortPolicy.shouldAbort()) {
-                            for (f in activeFutures) f.cancel(true)
-                            activeFutures.clear()
-                        }
                     }
                 } catch (_: Throwable) {
                     activeFutures.remove(done)
@@ -434,23 +352,13 @@ internal class InnertubeClient(
         // Fallback: sequential check on remaining candidates in chain
         val remainingClients = clientChain.drop(2)
         for (client in remainingClients) {
-            if (loginAbortPolicy.shouldAbort()) break
             val res = attemptClient(client)
             if (res != null) {
-                ClientFailureTracker.recordSuccess(client)
                 winnerStore.recordWinningClient(trackType, client)
                 return res
             } else {
-                ClientFailureTracker.recordFailure(client)
                 winnerStore.recordFailure(trackType, client)
             }
-        }
-
-        if (loginAbortPolicy.shouldAbort()) {
-            throw YtmSignInRequiredAbortException(
-                clientsTried = clientsAttempted.get(),
-                traceId = traceId,
-            )
         }
 
         throw InnertubeException(
@@ -501,69 +409,10 @@ internal class InnertubeClient(
         return null
     }
 
-    private val validatedUrls = ConcurrentHashMap<String, Long>()
-
-    private fun validateStreamUrl(
-        url: String,
-        userAgent: String = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/138.0.0.0 Safari/537.36",
-        traceId: String = ""
-    ): Boolean {
-        val now = System.currentTimeMillis()
-        val lastVal = validatedUrls[url]
-        if (lastVal != null && (now - lastVal) < 300_000L) {
-            return true // Fast path: recently validated within 5 minutes
-        }
-
-        return try {
-            val req = okhttp3.Request.Builder()
-                .url(url)
-                .addHeader("Range", "bytes=0-0")
-                .addHeader("User-Agent", userAgent)
-                .build()
-            val client = YtmHttpClient.okHttpClient.newBuilder()
-                .callTimeout(3500, TimeUnit.MILLISECONDS)
-                .readTimeout(2500, TimeUnit.MILLISECONDS)
-                .build()
-            client.newCall(req).execute().use { resp ->
-                val code = resp.code
-                val contentType = resp.header("Content-Type") ?: ""
-                val ok = (code in 200..206) && (contentType.startsWith("audio/") || contentType.startsWith("video/")) && !contentType.contains("text/html")
-                if (ok) {
-                    validatedUrls[url] = now
-                } else {
-                    Log.w(TAG, "[$traceId] Pre-validation failed: code=$code, contentType=$contentType")
-                }
-                ok
-            }
-        } catch (e: Throwable) {
-            Log.w(TAG, "[$traceId] Pre-validation error: ${e.javaClass.simpleName}: ${e.message}")
-            false
-        }
-    }
-
     fun requestPlayer(videoId: String, clientType: ClientType): JSONObject {
         val endpoint = "${clientType.endpointHost}/youtubei/v1/player?prettyPrint=false&key=$API_KEY"
         val payload = buildPlayerBody(videoId, clientType)
-        // TTFA telemetry: report each ladder client attempt with its RTT so
-        // the Dart/Sentry layer can attribute resolve latency per client.
-        val start = System.currentTimeMillis()
-        return try {
-            val json = postWithRetry(endpoint, payload, clientType, RateLimiter.Bucket.PLAYER)
-            YtmMetricsRegistry.recordRelayed(
-                "ladder.client_attempt",
-                System.currentTimeMillis() - start,
-                attrs = mapOf("client" to clientType.name)
-            )
-            json
-        } catch (t: Throwable) {
-            YtmMetricsRegistry.recordRelayed(
-                "ladder.client_attempt",
-                System.currentTimeMillis() - start,
-                isError = true,
-                attrs = mapOf("client" to clientType.name)
-            )
-            throw t
-        }
+        return postWithRetry(endpoint, payload, clientType, RateLimiter.Bucket.PLAYER)
     }
 
     fun requestBrowse(browseId: String, clientType: ClientType = ClientType.WEB_REMIX): JSONObject {
@@ -623,17 +472,12 @@ internal class InnertubeClient(
                     .header("x-youtube-client-name", clientType.clientNameId)
                     .header("x-youtube-client-version", clientType.effectiveClientVersion)
 
-                // Attach visitorData if available. Player requests carry a BotGuard
-                // poToken bound to the minting session's visitorData, so they MUST
-                // send that same visitorData: pairing the token with the (different)
-                // authenticated session visitorData makes YouTube reject the
-                // attestation -> LOGIN_REQUIRED although logged in.
+                // Attach visitorData if available
                 val authedWeb = clientType.isWeb && cookieStore.isSessionValid()
-                val visitorData = when {
-                    bucket == RateLimiter.Bucket.PLAYER && PoTokenManager.visitorData.isNotEmpty() ->
-                        PoTokenManager.visitorData
-                    authedWeb -> PoTokenManager.sessionVisitorData
-                    else -> PoTokenManager.visitorData
+                val visitorData = if (authedWeb) {
+                    PoTokenManager.sessionVisitorData.ifEmpty { PoTokenManager.visitorData }
+                } else {
+                    PoTokenManager.visitorData
                 }
                 if (visitorData.isNotEmpty()) {
                     reqBuilder.header("X-Goog-Visitor-Id", visitorData)
@@ -703,10 +547,7 @@ internal class InnertubeClient(
                 if (code in 500..599) {
                     Log.w(TAG, "[$traceId] Server error ($code) on attempt $attempt. Retrying...")
                     response.close()
-                    // TTFA: the old 1s/2s/4s sleep ladder burned the
-                    // tap-to-audio budget on the synchronous play path. Cap
-                    // the 5xx backoff at <=300ms (plus small jitter).
-                    Thread.sleep(minOf(200L, 100L shl attempt) + (0..100).random())
+                    Thread.sleep((1000L shl attempt) + (0..500).random())
                     continue
                 }
 
@@ -784,14 +625,12 @@ internal class InnertubeClient(
             root.put("thirdParty", JSONObject().put("embedUrl", "https://www.youtube.com/watch?v=$videoId"))
         }
 
-        val cap = ClientCapabilityMatrix.getCapability(clientType)
-        val requiresPo = cap.requiresPoToken
-        val hasPo = requiresPo && (PoTokenManager.isReady || (!PoTokenManager.webViewBrokenNow() && !PoTokenManager.isLimitedMode && PoTokenManager.ensureReadySync()))
+        val hasPo = PoTokenManager.isReady || (!PoTokenManager.webViewBroken && !PoTokenManager.isLimitedMode && PoTokenManager.ensureReadySync())
 
         val playbackContext = JSONObject()
         val contentPlaybackContext = JSONObject().apply {
             put("html5Preference", "HTML5_PREF_WANTS")
-            if (requiresPo && !clientType.isWeb && hasPo) {
+            if (!clientType.isWeb && hasPo) {
                 val tokenTarget = PoTokenManager.visitorData.ifEmpty { videoId }
                 val poToken = PoTokenManager.poTokenForSync(tokenTarget)
                 if (poToken.isNotEmpty()) {
@@ -802,20 +641,10 @@ internal class InnertubeClient(
         playbackContext.put("contentPlaybackContext", contentPlaybackContext)
         root.put("playbackContext", playbackContext)
 
-        if (requiresPo && clientType.isWeb && hasPo) {
+        if (clientType.isWeb && hasPo) {
             val dataSyncId = PoTokenManager.dataSyncId
-            val poToken = if (cookieStore.isSessionValid()) {
-                if (dataSyncId.isNotEmpty()) {
-                    // Authenticated path: use account-bound token minted against dataSyncId.
-                    PoTokenManager.accountPoTokenForSync(dataSyncId)
-                } else {
-                    // dataSyncId not yet bootstrapped (e.g. right after login before the
-                    // first browse response has been harvested). Fall back to the guest
-                    // streaming poToken so WEB_REMIX still receives a valid attestation
-                    // rather than an empty string that BotGuard will reject with LOGIN_REQUIRED.
-                    val tokenTarget = PoTokenManager.visitorData.ifEmpty { videoId }
-                    PoTokenManager.poTokenForSync(tokenTarget)
-                }
+            val poToken = if (cookieStore.isSessionValid() && dataSyncId.isNotEmpty()) {
+                PoTokenManager.accountPoTokenForSync(dataSyncId)
             } else {
                 val tokenTarget = PoTokenManager.visitorData.ifEmpty { videoId }
                 PoTokenManager.poTokenForSync(tokenTarget)
@@ -825,13 +654,6 @@ internal class InnertubeClient(
                     "serviceIntegrityDimensions",
                     JSONObject().put("poToken", poToken),
                 )
-                // Keep the context visitorData identical to the minting
-                // session's visitorData the attached token is bound to.
-                val contextObj = root.optJSONObject("context")
-                val clientObj = contextObj?.optJSONObject("client")
-                if (PoTokenManager.visitorData.isNotEmpty() && clientObj != null) {
-                    clientObj.put("visitorData", PoTokenManager.visitorData)
-                }
             }
         }
 

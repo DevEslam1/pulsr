@@ -1,10 +1,10 @@
 // lib/features/settings/presentation/proxy_settings_screen.dart
-import 'dart:async';
 import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../core/constants/app_radii.dart';
 import '../../../core/network/proxy_config.dart';
 import '../../../core/theme/aura_theme.dart';
 import '../../../core/utils/adaptive.dart';
@@ -12,7 +12,6 @@ import '../../../core/utils/l10n_extensions.dart';
 import '../cubit/settings_cubit.dart';
 import '../cubit/settings_state.dart';
 
-import '../../../core/utils/error_logger.dart';
 class ProxySettingsScreen extends StatefulWidget {
   final String? initialImportText;
 
@@ -208,8 +207,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
             ),
             child: Material(
               color: p.surfaceContainerHigh,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(28)),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
               clipBehavior: Clip.antiAlias,
               child: SafeArea(
                 top: false,
@@ -220,227 +218,213 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                     top: 20,
                     bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: p.accentContainer,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Icon(Icons.file_upload_outlined,
-                                    color: p.accent, size: 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: p.accentContainer,
+                                borderRadius: BorderRadius.circular(10),
                               ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Import Proxies',
-                                style: TextStyle(
-                                  color: p.textPrimary,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 18,
-                                ),
+                              child: Icon(Icons.file_upload_outlined,
+                                  color: p.accent, size: 20),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              'Import Proxies',
+                              style: TextStyle(
+                                color: p.textPrimary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 18,
                               ),
-                            ],
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.close_rounded,
-                                color: p.textSecondary),
-                            onPressed: () => Navigator.of(ctx).pop(),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Text(
-                        'Paste proxy lines or pick a text file. Lines will be parsed automatically.',
-                        style: TextStyle(color: p.textSecondary, fontSize: 13),
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          OutlinedButton.icon(
-                            onPressed: () async {
-                              final data =
-                                  await Clipboard.getData(Clipboard.kTextPlain);
-                              if (data != null &&
-                                  data.text != null &&
-                                  data.text!.isNotEmpty) {
-                                textController.text = data.text!;
-                              }
-                            },
-                            icon: Icon(Icons.content_paste_rounded,
-                                size: 16, color: p.accent),
-                            label: Text('Paste Clipboard',
-                                style: TextStyle(
-                                    color: p.textPrimary, fontSize: 12)),
-                            style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: p.hairline),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10)),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          OutlinedButton.icon(
-                            onPressed: () async {
-                              try {
-                                final files =
-                                    await FilePicker.pickFiles(
-                                  type: FileType.custom,
-                                  allowedExtensions: [
-                                    'txt',
-                                    'csv',
-                                    'list',
-                                    'conf'
-                                  ],
-                                );
-                                if (files.isNotEmpty) {
-                                  final picked = files.first;
-                                  String? content;
-                                  if (picked.path != null) {
-                                    final file = File(picked.path!);
-                                    content = await file.readAsString();
-                                  } else {
-                                    // FIX(file_picker 12): bytes removed — use
-                                    // readAsBytes for SAF/cloud providers.
-                                    try {
-                                      final bytes =
-                                          await picked.readAsBytes();
-                                      content =
-                                          String.fromCharCodes(bytes);
-                                    } catch (e, st) {
-                                      ErrorLogger.log('fromCharCodes failed', error: e, stackTrace: st, category: 'ProxySettingsScreen');
-                                    }
-                                  }
-                                  if (content != null) {
-                                    textController.text = content;
-                                  }
-                                }
-                              } catch (e) {
-                                if (ctx.mounted) {
-                                  ScaffoldMessenger.of(ctx).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Failed to pick file: $e'),
-                                      behavior: SnackBarBehavior.floating,
-                                    ),
-                                  );
-                                }
-                              }
-                            },
-                            icon: Icon(Icons.folder_open_rounded,
-                                size: 16, color: p.accent),
-                            label: Text('Pick File',
-                                style: TextStyle(
-                                    color: p.textPrimary, fontSize: 12)),
-                            style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: p.hairline),
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10)),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 12, vertical: 8),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        controller: textController,
-                        maxLines: 6,
-                        style: TextStyle(
-                            color: p.textPrimary,
-                            fontFamily: 'monospace',
-                            fontSize: 12),
-                        decoration: InputDecoration(
-                          hintText:
-                              '31.59.20.176:6754:username:password\n45.38.107.97:6014\nsocks5://user:pass@127.0.0.1:1080',
-                          hintStyle: TextStyle(
-                              color: p.textTertiary,
-                              fontFamily: 'monospace',
-                              fontSize: 12),
-                          filled: true,
-                          fillColor: p.surface,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: p.hairline),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: p.hairline),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(color: p.accent, width: 2),
+                          ],
+                        ),
+                        IconButton(
+                          icon:
+                              Icon(Icons.close_rounded, color: p.textSecondary),
+                          onPressed: () => Navigator.of(ctx).pop(),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Paste proxy lines or pick a text file. Lines will be parsed automatically.',
+                      style: TextStyle(color: p.textSecondary, fontSize: 13),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final data =
+                                await Clipboard.getData(Clipboard.kTextPlain);
+                            if (data != null &&
+                                data.text != null &&
+                                data.text!.isNotEmpty) {
+                              textController.text = data.text!;
+                            }
+                          },
+                          icon: Icon(Icons.content_paste_rounded,
+                              size: 16, color: p.accent),
+                          label: Text('Paste Clipboard',
+                              style: TextStyle(
+                                  color: p.textPrimary, fontSize: 12)),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: p.hairline),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton(
-                            onPressed: () => Navigator.of(ctx).pop(),
-                            child: Text('Cancel',
-                                style: TextStyle(color: p.textSecondary)),
-                          ),
-                          const SizedBox(width: 8),
-                          FilledButton.icon(
-                            onPressed: () async {
-                              final raw = textController.text.trim();
-                              if (raw.isEmpty) return;
-                              final count = await context
-                                  .read<SettingsCubit>()
-                                  .importProxiesFromText(raw);
-                              if (ctx.mounted) {
-                                Navigator.of(ctx).pop();
+                        const SizedBox(width: 8),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            try {
+                              final result =
+                                  await FilePicker.platform.pickFiles(
+                                type: FileType.custom,
+                                allowedExtensions: [
+                                  'txt',
+                                  'csv',
+                                  'list',
+                                  'conf'
+                                ],
+                              );
+                              if (result != null && result.files.isNotEmpty) {
+                                final path = result.files.first.path;
+                                if (path != null) {
+                                  final file = File(path);
+                                  final content = await file.readAsString();
+                                  textController.text = content;
+                                }
                               }
-                              if (mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
+                            } catch (e) {
+                              if (ctx.mounted) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
                                   SnackBar(
-                                    content: Row(
-                                      children: [
-                                        Icon(Icons.check_circle_rounded,
-                                            color: p.success, size: 20),
-                                        const SizedBox(width: 10),
-                                        Text(
-                                            'Successfully imported $count new proxies'),
-                                      ],
-                                    ),
-                                    backgroundColor: p.surfaceContainerHigh,
+                                    content: Text('Failed to pick file: $e'),
                                     behavior: SnackBarBehavior.floating,
                                   ),
                                 );
                               }
-                            },
-                            style: FilledButton.styleFrom(
-                              backgroundColor: p.accent,
-                              foregroundColor: p.onAccent,
-                              shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12)),
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 16, vertical: 10),
-                            ),
-                            icon: const Icon(Icons.download_rounded, size: 18),
-                            label: const Text('Import & Parse',
-                                style: TextStyle(fontWeight: FontWeight.w700)),
+                            }
+                          },
+                          icon: Icon(Icons.folder_open_rounded,
+                              size: 16, color: p.accent),
+                          label: Text('Pick File',
+                              style: TextStyle(
+                                  color: p.textPrimary, fontSize: 12)),
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: p.hairline),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
                           ),
-                        ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: textController,
+                      maxLines: 6,
+                      style: TextStyle(
+                          color: p.textPrimary,
+                          fontFamily: 'monospace',
+                          fontSize: 12),
+                      decoration: InputDecoration(
+                        hintText:
+                            '31.59.20.176:6754:username:password\n45.38.107.97:6014\nsocks5://user:pass@127.0.0.1:1080',
+                        hintStyle: TextStyle(
+                            color: p.textTertiary,
+                            fontFamily: 'monospace',
+                            fontSize: 12),
+                        filled: true,
+                        fillColor: p.surface,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: p.hairline),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: p.hairline),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: p.accent, width: 2),
+                        ),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.of(ctx).pop(),
+                          child: Text('Cancel',
+                              style: TextStyle(color: p.textSecondary)),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.icon(
+                          onPressed: () async {
+                            final raw = textController.text.trim();
+                            if (raw.isEmpty) return;
+                            final count = await context
+                                .read<SettingsCubit>()
+                                .importProxiesFromText(raw);
+                            if (ctx.mounted) {
+                              Navigator.of(ctx).pop();
+                            }
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Row(
+                                    children: [
+                                      Icon(Icons.check_circle_rounded,
+                                          color: p.success, size: 20),
+                                      const SizedBox(width: 10),
+                                      Text(
+                                          'Successfully imported $count new proxies'),
+                                    ],
+                                  ),
+                                  backgroundColor: p.surfaceContainerHigh,
+                                  behavior: SnackBarBehavior.floating,
+                                ),
+                              );
+                            }
+                          },
+                          style: FilledButton.styleFrom(
+                            backgroundColor: p.accent,
+                            foregroundColor: p.onAccent,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 10),
+                          ),
+                          icon: const Icon(Icons.download_rounded, size: 18),
+                          label: const Text('Import & Parse',
+                              style: TextStyle(fontWeight: FontWeight.w700)),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
-        );
-      },
-    );
+        ),
+      );
+    },
+  );
   }
 
   @override
@@ -748,7 +732,7 @@ class _ProxySettingsScreenState extends State<ProxySettingsScreen> {
                       ),
                     );
                     if (confirm == true && mounted) {
-                      unawaited(context.read<SettingsCubit>().clearProxyList());
+                      context.read<SettingsCubit>().clearProxyList();
                     }
                   },
                   borderRadius: BorderRadius.circular(6),

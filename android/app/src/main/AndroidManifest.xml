@@ -2,50 +2,24 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET"/>
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
     <!-- B-07: downloads need a dataSync FGS to survive Doze/App Standby; Android 14+ requires typed permission -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
-    <!-- Android 15 (API 35+) prefers mediaProcessing for heavy media work (audio encode/tag/publish);
-         the download FGS selects this type at runtime on API 35+ and dataSync on API 34. -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
-    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
-    <!-- WRITE_EXTERNAL_STORAGE removed: downloads are written to the app-specific
-         external files dir and published via MediaStore (IS_PENDING on API 29+,
-         MediaScanner indexing of app-specific files on API 28). Nothing in the
-         app writes to shared storage directly on any API level. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29"/>
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
-    <!-- Bluetooth codec control: read and set A2DP codec (LDAC/aptX/AAC/SBC) like Developer Options.
-         BLUETOOTH_CONNECT is required on API 31+; BLUETOOTH covers API 26-30.
-         Neither permission enables microphone or any data collection. -->
-    <uses-permission android:name="android.permission.BLUETOOTH"
-        android:maxSdkVersion="30"/>
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"
-        android:minSdkVersion="31"/>
-    <uses-permission android:name="android.permission.WRITE_SETTINGS" tools:ignore="ProtectedPermissions"/>
-    <!-- Play Console Policy Justification: android.permission.RECORD_AUDIO is required strictly for the
-         hardware-accelerated live audio visualizer DSP pipeline (android.media.audiofx.Visualizer) to render
-         real-time frequency spectrum waveforms. It is NEVER used to capture microphone audio, record user
-         conversations, or transmit audio data off-device. It is requested at runtime ONLY when the user opens
-         the visualizer screen; if denied, Pulsr gracefully falls back to synthetic simulated waveforms. -->
+    <!-- Required solely for the audio visualizer; requested at runtime only when the user enables it -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
-    <uses-feature android:name="android.hardware.usb.host" android:required="false"/>
-    <uses-feature android:name="android.hardware.microphone" android:required="false"/>
 
     <!-- Custom signature permission to protect internal widget & playback broadcasts -->
     <permission android:name="com.pulsr.music.permission.WIDGET_CONTROL"
         android:protectionLevel="signature" />
     <uses-permission android:name="com.pulsr.music.permission.WIDGET_CONTROL" />
 
-    <!-- allowBackup is intentionally disabled (false) to prevent automated ADB or
-         cloud backup extraction of cached audio, offline database, and user auth sessions/tokens. -->
     <application
         android:label="${appName}"
         android:name="${applicationName}"
@@ -54,13 +28,15 @@
         android:supportsRtl="true"
         android:networkSecurityConfig="@xml/network_security_config"
         android:enableOnBackInvokedCallback="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
         tools:replace="android:allowBackup">
 
         <meta-data
             android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc" />
         <activity
-            android:name="com.pulsr.music.MainActivity"
+            android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""
@@ -104,6 +80,38 @@
                 <data android:mimeType="application/flac" />
                 <data android:mimeType="application/x-flac" />
                 <data android:mimeType="application/x-matroska" />
+                <data android:host="*" />
+                <!-- Layered pathPattern matchers for filenames with multiple dots -->
+                <data android:pathPattern=".*\\.mp3" />
+                <data android:pathPattern=".*\\..*\\.mp3" />
+                <data android:pathPattern=".*\\..*\\..*\\.mp3" />
+                <data android:pathPattern=".*\\.flac" />
+                <data android:pathPattern=".*\\..*\\.flac" />
+                <data android:pathPattern=".*\\..*\\..*\\.flac" />
+                <data android:pathPattern=".*\\.wav" />
+                <data android:pathPattern=".*\\..*\\.wav" />
+                <data android:pathPattern=".*\\..*\\..*\\.wav" />
+                <data android:pathPattern=".*\\.aac" />
+                <data android:pathPattern=".*\\..*\\.aac" />
+                <data android:pathPattern=".*\\..*\\..*\\.aac" />
+                <data android:pathPattern=".*\\.m4a" />
+                <data android:pathPattern=".*\\..*\\.m4a" />
+                <data android:pathPattern=".*\\..*\\..*\\.m4a" />
+                <data android:pathPattern=".*\\.ogg" />
+                <data android:pathPattern=".*\\..*\\.ogg" />
+                <data android:pathPattern=".*\\..*\\..*\\.ogg" />
+                <data android:pathPattern=".*\\.opus" />
+                <data android:pathPattern=".*\\..*\\.opus" />
+                <data android:pathPattern=".*\\..*\\..*\\.opus" />
+                <data android:pathPattern=".*\\.mka" />
+                <data android:pathPattern=".*\\..*\\.mka" />
+                <data android:pathPattern=".*\\..*\\..*\\.mka" />
+                <data android:pathPattern=".*\\.dsf" />
+                <data android:pathPattern=".*\\..*\\.dsf" />
+                <data android:pathPattern=".*\\..*\\..*\\.dsf" />
+                <data android:pathPattern=".*\\.dff" />
+                <data android:pathPattern=".*\\..*\\.dff" />
+                <data android:pathPattern=".*\\..*\\..*\\.dff" />
             </intent-filter>
             <!-- Intent filter to receive shared text/audio/URLs via Android share sheet -->
             <intent-filter android:label="${appName}">
@@ -117,21 +125,18 @@
         
         <service android:name="com.ryanheise.audioservice.AudioService"
             android:foregroundServiceType="mediaPlayback"
-            android:exported="true"
-            tools:ignore="Instantiatable">
+            android:exported="true" tools:ignore="Instantiatable">
             <intent-filter>
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
 
-        <!-- B-07: Dedicated foreground service for YouTube downloads.
+        <!-- B-07: Dedicated foreground service for YouTube downloads (dataSync).
              Keeps downloads alive when app is backgrounded / screen off.
              Shows progress notification with pause/cancel actions; auto-stops when queue drains.
-             Runtime selection (DownloadService.ensureForeground): API 35+ -> mediaProcessing,
-             API 34 -> dataSync, below -> plain startForeground. The mediaPlayback type on the
-             audio_service AudioService above is intentionally untouched. -->
-        <service android:name="com.pulsr.music.DownloadService"
-            android:foregroundServiceType="dataSync|mediaProcessing"
+             Android 14+ requires foregroundServiceType="dataSync" matching the permission above. -->
+        <service android:name=".DownloadService"
+            android:foregroundServiceType="dataSync"
             android:exported="false"
             android:stopWithTask="false" />
 
@@ -143,7 +148,7 @@
         </receiver>
 
         <receiver
-            android:name="com.pulsr.music.NowPlayingWidget"
+            android:name=".NowPlayingWidget"
             android:label="${appName} Widget"
             android:exported="true">
             <intent-filter>
@@ -173,6 +178,5 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
-        <package android:name="com.google.android.gms" />
     </queries>
 </manifest>

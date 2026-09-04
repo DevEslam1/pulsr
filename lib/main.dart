@@ -12,17 +12,16 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 import 'core/config/app_config.dart';
 import 'core/di/injection.dart';
 import 'core/network/app_http_overrides.dart';
-import 'data/services/artwork_cache_manager.dart';
+import 'core/services/artwork_cache_manager.dart';
 import 'core/theme/aura_theme.dart';
 import 'core/theme/dynamic_theme_cubit.dart';
 import 'core/widgets/cached_artwork.dart';
 import 'core/router/app_router.dart';
-import 'domain/services/auth_service.dart';
+import 'core/services/auth_service.dart';
 import 'core/services/file_intent_handler.dart';
-import 'domain/services/restore_detection_service.dart';
-import 'data/services/ytm_account_service.dart';
-import 'data/services/ytm_service.dart';
-import 'core/errors/ytm_error_classifier.dart';
+import 'core/services/restore_detection_service.dart';
+import 'core/services/ytm_account_service.dart';
+import 'core/services/ytm_service.dart';
 import 'core/utils/error_logger.dart';
 import 'core/utils/ytm_rate_limiter.dart';
 import 'data/audio/audio_handler.dart';
@@ -32,6 +31,7 @@ import 'domain/repositories/music_repository_interface.dart';
 import 'domain/usecases/get_songs_usecase.dart';
 import 'domain/usecases/get_albums_usecase.dart';
 import 'domain/usecases/get_artists_usecase.dart';
+import 'domain/usecases/get_favorites_usecase.dart';
 import 'domain/usecases/toggle_favorite_usecase.dart';
 import 'domain/usecases/search_music_usecase.dart';
 import 'domain/usecases/playlist_usecases.dart';
@@ -45,25 +45,19 @@ import 'features/playlists/cubit/playlist_cubit.dart';
 import 'features/search/cubit/search_cubit.dart';
 import 'features/settings/cubit/settings_cubit.dart';
 import 'features/settings/cubit/settings_state.dart';
-import 'features/home_widget/widget_service.dart';
-import 'features/downloads/cubit/ytm_download_cubit.dart';
+import 'features/widgets/widget_service.dart';
+import 'features/ytm_search/cubit/ytm_download_cubit.dart';
 import 'domain/repositories/download_repository_interface.dart';
 import 'features/downloads/cubit/downloads_cubit.dart';
-import 'core/bloc/app_bloc_observer.dart';
-
-bool _diFailedGlobal = false;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  Bloc.observer = AppBlocObserver();
   HttpOverrides.global = AppHttpOverrides.instance;
   try {
     AppConfig.validateConfiguration();
   } catch (e, st) {
     ErrorLogger.log('AppConfig.validateConfiguration error',
         error: e, stackTrace: st, category: 'Startup');
-    // Fail-fast for prod misconfig (Play Store compliance) — don't continue with invalid env
-    if (e is StateError && e.message.contains('CRITICAL')) rethrow;
   }
 
   ErrorLogger.onCrashReported = (error, stackTrace, category) {
@@ -74,7 +68,7 @@ Future<void> main() async {
   ErrorLogger.initialize();
 
   // System Chrome configuration for true edge-to-edge UI
-  unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -85,60 +79,11 @@ Future<void> main() async {
     ),
   );
 
-  bool diFailed = false;
   try {
     await configureDependencies().timeout(const Duration(seconds: 15));
   } catch (e, st) {
-    diFailed = true;
     ErrorLogger.log('DI configureDependencies failed or timed out',
         error: e, stackTrace: st, category: 'Startup');
-    // Don't rethrow here - let PulsrApp show fallback UI if critical services missing
-  }
-  // If critical services not registered after DI, mark failed for UI
-  if (!getIt.isRegistered<PulsrAudioHandler>() || !getIt.isRegistered<AppDatabase>()) {
-    diFailed = true;
-  }
-  // Pass flag to app via global
-  _diFailedGlobal = diFailed;
-
-  // TTFA: pre-warm the native BotGuard WebView + capability matrix right after
-  // DI is ready so the first stream resolve never pays cold WebView startup.
-  // Never blocks app startup: unawaited, fail-safe.
-  void preWarmYtm() {
-    try {
-      if (!getIt.isRegistered<YtmService>()) return;
-      getIt<YtmService>()
-          .preWarm()
-          .timeout(const Duration(seconds: 12))
-          .catchError((Object e, StackTrace st) {
-            ErrorLogger.log('YtmService preWarm failed or timed out',
-                error: e, stackTrace: st, category: 'Startup');
-          });
-    } catch (e, st) {
-      ErrorLogger.log('YtmService preWarm could not be started',
-          error: e, stackTrace: st, category: 'Startup');
-    }
-  }
-
-  // TTFA: kick off YtmAccountService.init() right after preWarm instead of
-  // deferring 10s, so cookie/dataSyncId state is ready before a typical first
-  // tap. Still fully background/unawaited — the WebView CookieManager read no
-  // longer races the first-interaction window because preWarm loads the
-  // WebView first; loginState listeners update reactively when this completes.
-  void initYtmAccount() {
-    try {
-      if (!getIt.isRegistered<YtmAccountService>()) return;
-      getIt<YtmAccountService>()
-          .init()
-          .timeout(const Duration(seconds: 15))
-          .catchError((Object e, StackTrace st) {
-            ErrorLogger.log('YtmAccountService init failed or timed out',
-                error: e, stackTrace: st, category: 'Startup');
-          });
-    } catch (e, st) {
-      ErrorLogger.log('YtmAccountService init could not be started',
-          error: e, stackTrace: st, category: 'Startup');
-    }
   }
 
   // Defer heavy post-DI tasks to AFTER runApp to eliminate Davey! 1223ms jank on OnePlus
@@ -148,12 +93,16 @@ Future<void> main() async {
     Future.microtask(() async {
       try {
         await Future.wait([
-          YtmRateLimiter.shared.restore().timeout(const Duration(seconds: 8)).catchError((Object e, StackTrace st) {
+          YtmRateLimiter.shared.restore().timeout(const Duration(seconds: 8)).catchError((e, st) {
             ErrorLogger.log('YtmRateLimiter restore failed or timed out',
                 error: e, stackTrace: st, category: 'Startup');
           }),
-          getIt<AuthService>().initialize().timeout(const Duration(seconds: 8)).catchError((Object e, StackTrace st) {
+          getIt<AuthService>().initialize().timeout(const Duration(seconds: 8)).catchError((e, st) {
             ErrorLogger.log('AuthService initialize failed or timed out',
+                error: e, stackTrace: st, category: 'Startup');
+          }),
+          getIt<YtmAccountService>().init().timeout(const Duration(seconds: 8)).catchError((e, st) {
+            ErrorLogger.log('YtmAccountService init failed or timed out',
                 error: e, stackTrace: st, category: 'Startup');
           }),
         ]);
@@ -162,9 +111,6 @@ Future<void> main() async {
             error: e, stackTrace: st, category: 'Startup');
       }
     });
-
-    preWarmYtm();
-    initYtmAccount();
   }
 
   if (AppConfig.sentryDsn.isNotEmpty) {
@@ -218,29 +164,16 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
 
   @override
   void didHaveMemoryPressure() {
+    // Trim artwork and stream caches on GC pressure (LOG-14 14MB/59MB)
     try {
       getIt<ArtworkCacheManager>().clearAllCache();
-    } catch (e, st) {
-      ErrorLogger.log('didHaveMemoryPressure failed', error: e, stackTrace: st, category: 'Main');
-    }
+    } catch (_) {}
     try {
-      final cache = getIt.isRegistered<ArtworkLruCache>()
-          ? getIt<ArtworkLruCache>()
-          : null;
-      cache?.trimForMemoryPressure();
-    } catch (e, st) {
-      ErrorLogger.log('didHaveMemoryPressure failed', error: e, stackTrace: st, category: 'Main');
-    }
-    // FIX: also drop dynamic-theme palette LRU (50 cached states + images).
-    try {
-      if (getIt.isRegistered<DynamicThemeCubit>()) {
-        // resetToDefault clears debounce; palettes cleared in close only —
-        // best-effort trim here via reset when no custom color is showing.
-        final theme = getIt<DynamicThemeCubit>();
-        if (!theme.state.hasCustomArtworkColor) theme.resetToDefault();
-      }
-    } catch (e, st) {
-      ErrorLogger.log('LRU failed', error: e, stackTrace: st, category: 'Main');
+      // ignore: avoid_dynamic_calls
+      (getIt.get<ArtworkLruCache>() as dynamic)?.trimForMemoryPressure();
+    } catch (_) {
+      // Fallback direct trim
+      try { ArtworkLruCache().trimForMemoryPressure(); } catch (_) {}
     }
   }
 
@@ -259,22 +192,6 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
 
           final ctx = rootNavigatorKey.currentContext;
           if (ctx == null || !ctx.mounted) return;
-
-          final loopBreaker = LoginLoopBreaker.shared;
-          if (!loopBreaker.canAutoRelogin) {
-            ScaffoldMessenger.of(ctx)
-              ..hideCurrentSnackBar()
-              ..showSnackBar(
-                const SnackBar(
-                  content: Text(
-                      'YouTube rejected this session. Please try again in a few minutes.'),
-                  behavior: SnackBarBehavior.floating,
-                  duration: Duration(seconds: 6),
-                ),
-              );
-            return;
-          }
-
           ScaffoldMessenger.of(ctx)
             ..hideCurrentSnackBar()
             ..showSnackBar(
@@ -285,17 +202,12 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                 duration: const Duration(seconds: 6),
                 action: SnackBarAction(
                   label: 'Sign In',
-                  onPressed: () {
-                    loopBreaker.record();
-                    YtmWebLoginSheet.show(ctx);
-                  },
+                  onPressed: () => YtmWebLoginSheet.show(ctx),
                 ),
               ),
             );
         });
-      } catch (e, st) {
-        ErrorLogger.log('_listenForYtmSessionExpiry failed', error: e, stackTrace: st, category: 'Main');
-      }
+      } catch (_) {}
     });
   }
 
@@ -322,25 +234,6 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
   void _autoScanOnStartup() {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-      // Defer media scan and restore reconciliation by 2 seconds after first frame
-      // so first launch and relaunch render instantly without dropped frames or thread contention.
-      await Future<void>.delayed(const Duration(seconds: 2));
-      if (!mounted) return;
-      // Serialize with audio handler restore to avoid deleting YTM placeholder rows while queue is being restored
-      try {
-        if (getIt.isRegistered<PulsrAudioHandler>()) {
-          try {
-            await getIt<PulsrAudioHandler>().effectsReady.timeout(const Duration(seconds: 5));
-          } catch (e, st) {
-            ErrorLogger.log('delayed failed', error: e, stackTrace: st, category: 'Main');
-          }
-          // Small grace period to let restoreLastPlaybackSession's DB read finish
-          await Future<void>.delayed(const Duration(milliseconds: 300));
-        }
-      } catch (e, st) {
-        ErrorLogger.log('delayed failed', error: e, stackTrace: st, category: 'Main');
-      }
-      if (!mounted) return;
       try {
         final scanner = getIt<MediaScannerService>();
         await RestoreDetectionService.checkAndHandleRestore(scanner);
@@ -365,36 +258,6 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    if (_diFailedGlobal) {
-      return MaterialApp(
-        debugShowCheckedModeBanner: false,
-        home: Scaffold(
-          backgroundColor: const Color(0xFF0A0C12),
-          body: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 48),
-                  const SizedBox(height: 16),
-                  const Text('Pulsr failed to initialize',
-                      style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 8),
-                  const Text('Core services did not start. Please restart the app. If this persists, clear app data or reinstall.',
-                      style: TextStyle(color: Colors.white70, fontSize: 14), textAlign: TextAlign.center),
-                  const SizedBox(height: 24),
-                  ElevatedButton(
-                    onPressed: () => SystemNavigator.pop(),
-                    child: const Text('Close App'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
     return MultiRepositoryProvider(
       providers: [
         RepositoryProvider<AppDatabase>.value(value: getIt<AppDatabase>()),
@@ -410,6 +273,8 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
             value: getIt<GetAlbumsUseCase>()),
         RepositoryProvider<GetArtistsUseCase>.value(
             value: getIt<GetArtistsUseCase>()),
+        RepositoryProvider<GetFavoritesUseCase>.value(
+            value: getIt<GetFavoritesUseCase>()),
         RepositoryProvider<ToggleFavoriteUseCase>.value(
             value: getIt<ToggleFavoriteUseCase>()),
         RepositoryProvider<SearchMusicUseCase>.value(
@@ -424,36 +289,33 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
       ],
       child: MultiBlocProvider(
         providers: [
-          // FIX: singletons must use .value — create: would close() the shared
-          // getIt instance when this subtree disposes, leaving a closed cubit
-          // for later getIt<X>() lookups (StateError: Cannot emit after close).
-          BlocProvider<DynamicThemeCubit>.value(
-            value: getIt<DynamicThemeCubit>(),
+          BlocProvider<DynamicThemeCubit>(
+            create: (_) => getIt<DynamicThemeCubit>(),
           ),
-          BlocProvider<PlayerCubit>.value(
-            value: getIt<PlayerCubit>(),
+          BlocProvider<PlayerCubit>(
+            create: (_) => getIt<PlayerCubit>(),
           ),
-          BlocProvider<LibraryCubit>.value(
-            value: getIt<LibraryCubit>(),
+          BlocProvider<LibraryCubit>(
+            create: (_) => getIt<LibraryCubit>(),
           ),
-          BlocProvider<SearchCubit>.value(
-            value: getIt<SearchCubit>(),
+          BlocProvider<SearchCubit>(
+            create: (_) => getIt<SearchCubit>(),
           ),
-          BlocProvider<PlaylistCubit>.value(
-            value: getIt<PlaylistCubit>(),
+          BlocProvider<PlaylistCubit>(
+            create: (_) => getIt<PlaylistCubit>(),
           ),
-          BlocProvider<SettingsCubit>.value(
-            value: getIt<SettingsCubit>(),
+          BlocProvider<SettingsCubit>(
+            create: (_) => getIt<SettingsCubit>(),
           ),
-          BlocProvider<AuthCubit>.value(
-            value: getIt<AuthCubit>(),
+          BlocProvider<AuthCubit>(
+            create: (_) => getIt<AuthCubit>(),
           ),
-          BlocProvider<DownloadsCubit>.value(
-            value: getIt<DownloadsCubit>(),
+          BlocProvider<DownloadsCubit>(
+            create: (_) => getIt<DownloadsCubit>(),
           ),
           if (AppConfig.ytmEnabled)
-            BlocProvider<YtmDownloadCubit>.value(
-              value: getIt<YtmDownloadCubit>(),
+            BlocProvider<YtmDownloadCubit>(
+              create: (_) => getIt<YtmDownloadCubit>(),
             ),
         ],
         child: MultiBlocListener(
@@ -521,11 +383,11 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                   return DynamicColorBuilder(
                     builder: (lightDynamic, darkDynamic) {
                       // Resolve the accent seed per brightness.
-                      Color resolveAccent(dynamic dynamicScheme) {
+                      Color resolveAccent(ColorScheme? dynamicScheme) {
                         switch (settingsConfig.colorSource) {
                           case ThemeColorSource.system:
                             if (dynamicScheme != null) {
-                              return dynamicScheme.primary as Color;
+                              return dynamicScheme.primary;
                             }
                             return dynamicThemeConfig.hasCustomArtwork
                                 ? dynamicThemeConfig.primaryColor

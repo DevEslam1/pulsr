@@ -1,19 +1,11 @@
 // android/app/src/main/cpp/SpatialPanner.cpp
 #include "SpatialPanner.h"
 #include <algorithm>
-#include <cmath>
 
 SpatialPanner::SpatialPanner() {
-    setSampleRate(48000.0);
     setBalance(0.0);
     setMono(false);
     reset();
-}
-
-void SpatialPanner::setSampleRate(double sampleRate) {
-    if (sampleRate < 8000.0) sampleRate = 8000.0;
-    if (sampleRate > 768000.0) sampleRate = 768000.0;
-    sampleRate_ = sampleRate;
 }
 
 void SpatialPanner::setBalance(double balance) {
@@ -39,9 +31,7 @@ void SpatialPanner::reset() {
 void SpatialPanner::process(float* L, float* R, int frames) {
     if (!L || !R || frames <= 0) return;
 
-    // Explicit 15ms time-constant smoothing derived from sampleRate_ and frame count
-    constexpr double kTau = 0.015;
-    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
+    const double smoothFactor = 0.05; // Quick ~10ms smoothing per block
     smoothedBalance_ += smoothFactor * (targetBalance_ - smoothedBalance_);
 
     const double theta = (smoothedBalance_ + 1.0) * (M_PI / 4.0);
@@ -74,9 +64,7 @@ void SpatialPanner::processInterleaved(float* buffer, int frames, int channels) 
         return;
     }
 
-    // Explicit 15ms time-constant smoothing derived from sampleRate_ and frame count
-    constexpr double kTau = 0.015;
-    const double smoothFactor = 1.0 - std::exp(-static_cast<double>(frames) / (sampleRate_ * kTau));
+    const double smoothFactor = 0.05;
     smoothedBalance_ += smoothFactor * (targetBalance_ - smoothedBalance_);
 
     const double theta = (smoothedBalance_ + 1.0) * (M_PI / 4.0);

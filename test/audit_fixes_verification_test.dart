@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/core/constants/channels.dart';
-import 'package:pulsr/data/services/ytm_account_service.dart';
+import 'package:pulsr/core/services/ytm_account_service.dart';
 import 'package:pulsr/data/audio/adaptive_buffer_engine.dart';
 import 'package:pulsr/data/audio/battery_aware_playback.dart';
 import 'package:pulsr/data/audio/crossfade_manager.dart';

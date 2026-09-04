@@ -312,8 +312,6 @@
   "autoMix": "Mezcla automática",
   "topPlayedTracks": "Más reproducidas",
   "audioAndPlayback": "Audio y reproducción",
-  "playback": "Reproducción",
-  "audioAndSound": "Audio y sonido",
   "equalizerAndSoundEffects": "Ecualizador y efectos de sonido",
   "themeAndAppearance": "Tema y apariencia",
   "accentColor": "Color de acento",
@@ -433,159 +431,14 @@
   "storageFree": "Espacio libre",
   "resume": "Reanudar",
   "downloadErrorNoSpace": "Sin espacio — libera almacenamiento y reintenta",
-  "downloadErrorStorage": "Sin espacio — libera almacenamiento y reintenta",
-  "downloadErrorPermission": "Permiso de almacenamiento denegado. Concede el permiso en Configuración.",
-  "downloadErrorInterrupted": "Descarga interrumpida. Toca para reanudar.",
-  "downloadErrorDisabled": "Las descargas están deshabilitadas o no disponibles en esta versión.",
-  "downloadErrorTransition": "Transición de estado de descarga no válida.",
   "downloadErrorRateLimited": "YouTube está ocupado. Enfriando…",
   "downloadErrorNetwork": "Sin conexión. Revisa tu red.",
-  "downloadErrorBotChallenge": "Se requiere verificación de YouTube — abre la aplicación para completarla",
+  "downloadErrorBotChallenge": "Verificación de YouTube activada. Reintentando…",
   "downloadErrorUnavailable": "Esta pista no está disponible.",
   "downloadWifiOnly": "Modo solo Wi-Fi activo. Conéctate al Wi-Fi para descargar.",
-  "downloadErrorAlreadyQueued": "Esta canción ya está en la cola de descarga.",
-  "downloadErrorCorrupt": "El archivo descargado estaba dañado o incompleto. Vuelve a intentarlo.",
-  "downloadErrorInvalidTransition": "Transición de estado de descarga no válida.",
-  "downloadErrorTimeout": "Se agotó el tiempo de descarga. Vuelve a intentarlo.",
   "dspEnginePreference": "Preferencia de motor DSP",
   "dspEnginePreferenceSubtitle": "Elija el motor DSP nativo o los efectos del sistema OEM",
   "dspEngineNative": "DSP nativo de estudio (Cero latencia)",
   "dspEngineOem": "AudioFX del sistema / OEM",
-  "dspEngineAuto": "Automático (Preferir nativo)",
-  "audioStageDegraded": "La etapa de audio \"{stage}\" se omitió para evitar interrupciones por alta carga.",
-  "stageEq": "Ecualizador paramétrico",
-  "stageReverb": "Reverberación de convolución",
-  "stageCrossfeed": "Crossfeed",
-  "stageLimiter": "Limitador predictivo",
-  "stageResampler": "Remuestreador",
-  "stagePanner": "Panoramizador espacial",
-  "dspSaturationTitle": "Saturación Armónica",
-  "dspSaturationSubtitle": "Exciter armónico estilo válvula/cinta",
-  "dspSaturationDrive": "Nivel de excitación",
-  "dspSaturationMix": "Mezcla",
-  "dspSaturationTilt": "Énfasis de agudos",
-  "dspStereoWidthTitle": "Ancho Estéreo",
-  "dspStereoWidthSubtitle": "Control independiente de campo Mid/Side",
-  "dspStereoWidthAmount": "Ancho",
-  "dspLoudnessTitle": "Contorno de Sonoridad",
-  "dspLoudnessSubtitle": "Compensación de tono según el volumen (Fletcher–Munson)",
-  "dspLoudnessIntensity": "Intensidad",
-  "dspLoudnessReplayGainNote": "Complementa ReplayGain: ReplayGain iguala la sonoridad entre pistas, mientras este contorno adapta el tono a tu volumen de escucha.",
-  "dspSubCrossoverTitle": "Cruce de Subwoofer",
-  "dspSubCrossoverSubtitle": "Redirección de graves a una suma mono tipo sub",
-  "dspSubCrossoverCorner": "Frecuencia de cruce",
-  "dspSubCrossoverSubLevel": "Nivel del sub",
-  "dspSubCrossoverNote": "Redirección de graves: se suma una señal mono filtrada en paso bajo a ambos canales; no es un enrutado multicanal LFE real.",
-  "dspDynamicEqTitle": "Ecualizador Dinámico",
-  "dspDynamicEqSubtitle": "Corta resonancias solo cuando la energía de la banda supera el umbral",
-  "dspDynamicEqFrequency": "Frecuencia de banda",
-  "dspDynamicEqThreshold": "Umbral",
-  "dspDynamicEqRatio": "Relación",
-  "dspDynamicEqAttack": "Ataque",
-  "dspDynamicEqRelease": "Liberación",
-  "dspDynamicEqMaxCut": "Corte máximo",
-  "blockedByBitPerfectShort": "Bloqueado por Bit-Perfect",
-  "rcTitle": "Corrección de sala",
-  "rcSubtitle": "Mide tu sala con un barrido de tonos y ajusta una EQ que aplane la respuesta",
-  "rcStart": "Iniciar medición",
-  "rcMeasuring": "Midiendo - guarda silencio...",
-  "rcResult": "Respuesta medida (arriba) y corrección ajustada (abajo)",
-  "rcApply": "Aplicar",
-  "rcDiscard": "Descartar",
-  "rcMicNeeded": "Se necesita permiso de micrófono para la medición",
-  "rcQuietHint": "Mantén la sala en silencio y deja que el barrido suene a tu nivel de escucha habitual",
-  "rcKeepPlayerPaused": "La música permanece en pausa mientras la corrección de sala está activa",
-  "rcApplied": "Preset de corrección de sala aplicado",
-  "deviceProfilesTitle": "Perfiles de dispositivo",
-  "deviceProfilesSubtitle": "Ajustes de sonido recordados por dispositivo de salida",
-  "autoDeviceSwitch": "Cambio automático al cambiar de dispositivo",
-  "noDevicesSeen": "Aún no se han detectado dispositivos de salida",
-  "applyProfileNow": "Aplicar",
-  "forgetDevice": "Olvidar",
-  "currentDeviceBadge": "Actual",
-  "profileDropdownLabel": "Perfil",
-  "undo": "Deshacer",
-  "downloadDeletedSnackbar": "Se eliminó \"{title}\"",
-  "@downloadDeletedSnackbar": {
-    "placeholders": {
-      "title": {
-        "type": "String"
-      }
-    }
-  },
-  "statusEmbedding": "Insertando etiquetas…",
-  "etaLabel": "Tiempo restante: {seconds}s",
-  "@etaLabel": {
-    "placeholders": {
-      "seconds": {
-        "type": "int"
-      }
-    }
-  },
-  "downloadTileSemantics": "{title} {artist} {status} {progress}",
-  "@downloadTileSemantics": {
-    "placeholders": {
-      "title": {
-        "type": "String"
-      },
-      "artist": {
-        "type": "String"
-      },
-      "status": {
-        "type": "String"
-      },
-      "progress": {
-        "type": "String"
-      }
-    }
-  },
-  "downloadActionsSemantics": "Acciones de descarga para {title}",
-  "@downloadActionsSemantics": {
-    "placeholders": {
-      "title": {
-        "type": "String"
-      }
-    }
-  },
-  "systemEffectsTitle": "Efectos de audio del sistema (Dolby Atmos / DAP)",
-  "systemEffectsSubtitleBypassed": "✓ Desactivado: Efectos del sistema omitidos",
-  "systemEffectsSubtitleActive": "Activo: Los efectos OEM están procesando el audio",
-  "systemEffectsSubtitleUnsupported": "No se detectó Dolby/DAP en este dispositivo",
-  "systemEffectsAuto": "Automático",
-  "systemEffectsTryDisable": "Intentar desactivar",
-  "systemEffectsLeaveOn": "Dejar activo",
-  "bluetoothLatencyTitle": "Sincronización de latencia Bluetooth (AVRCP / Letras)",
-  "bluetoothLatencySubtitle": "Compensa la latencia del búfer del códec Bluetooth ({offset} ms).",
-  "clearEntireQueueConfirm": "¿Vaciar toda la cola?",
-  "shuffleQueueAction": "Mezclar cola",
-  "saveAsPlaylistAction": "Guardar como lista",
-  "clearAction": "Vaciar",
-  "playlistNameLabel": "Nombre de la lista",
-  "queueSavedAs": "Cola guardada como «{name}» ({count} pistas)",
-  "@queueSavedAs": {
-    "placeholders": {
-      "name": {
-        "type": "String"
-      },
-      "count": {
-        "type": "int"
-      }
-    }
-  },
-  "failedToCreatePlaylist": "No se pudo crear la lista: {error}",
-  "@failedToCreatePlaylist": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  },
-  "errorSavingPlaylist": "Error al guardar la lista: {error}",
-  "@errorSavingPlaylist": {
-    "placeholders": {
-      "error": {
-        "type": "String"
-      }
-    }
-  }
+  "dspEngineAuto": "Automático (Preferir nativo)"
 }

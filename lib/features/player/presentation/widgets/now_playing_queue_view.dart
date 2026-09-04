@@ -1,4 +1,4 @@
-﻿// lib/features/player/presentation/widgets/now_playing_queue_view.dart
+// lib/features/player/presentation/widgets/now_playing_queue_view.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:on_audio_query/on_audio_query.dart';
@@ -6,7 +6,6 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/widgets/cached_artwork.dart';
 import '../../../../core/widgets/song_tile.dart';
 import '../../cubit/player_cubit.dart';
-import '../../../../core/utils/list_content_diff.dart';
 import '../../cubit/player_state.dart';
 
 class NowPlayingQueueView extends StatelessWidget {
@@ -17,14 +16,6 @@ class NowPlayingQueueView extends StatelessWidget {
     final p = context.palette;
 
     return BlocBuilder<PlayerCubit, PlayerState>(
-      // Queue view only cares about queue contents + slot/index; position ticks
-      // (10Hz while playing) must not rebuild this subtree.
-      buildWhen: (a, b) =>
-          listContentDiffers(a.queue, b.queue) ||
-          a.queue.length != b.queue.length ||
-          a.activeQueueSlot != b.activeQueueSlot ||
-          a.currentIndex != b.currentIndex ||
-          a.currentSong?.id != b.currentSong?.id,
       builder: (context, state) {
         final cubit = context.read<PlayerCubit>();
         final queue = state.queue;

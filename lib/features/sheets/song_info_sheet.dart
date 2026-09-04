@@ -1,5 +1,4 @@
 // lib/features/sheets/song_info_sheet.dart
-import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -29,19 +28,11 @@ class SongInfoSheet extends StatelessWidget {
     if (song.path.isNotEmpty && !song.path.startsWith('ytmusic://')) {
       final exists = await File(song.path).exists();
       if (exists) {
-        unawaited(
-          SharePlus.instance.share(
-            ShareParams(files: [XFile(song.path)], text: text),
-          ),
-        );
+        Share.shareXFiles([XFile(song.path)], text: text);
         return;
       }
     }
-    unawaited(
-      SharePlus.instance.share(
-        ShareParams(text: text),
-      ),
-    );
+    Share.share(text);
   }
 
   Future<void> _setRingtone(BuildContext context, String type) async {
@@ -61,7 +52,6 @@ class SongInfoSheet extends StatelessWidget {
           if (!context.mounted) return;
           final proceed = await showDialog<bool>(
             context: context,
-            useRootNavigator: true,
             builder: (ctx) => AlertDialog(
               title: Text(context.l10n.permissionRequired),
               content: Text(
@@ -126,7 +116,7 @@ class SongInfoSheet extends StatelessWidget {
 
   void _showRingtoneOptions(BuildContext context) {
     final p = context.palette;
-    showModalBottomSheet<void>(
+    showModalBottomSheet(
       context: context,
       useRootNavigator: true,
       backgroundColor: p.surface,
@@ -201,7 +191,7 @@ class SongInfoSheet extends StatelessWidget {
       child: ConstrainedBox(
         constraints: BoxConstraints(
           maxWidth: Adaptive.sheetConstraints(context).maxWidth,
-          maxHeight: MediaQuery.sizeOf(context).height * 0.88,
+          maxHeight: MediaQuery.of(context).size.height * 0.88,
         ),
         child: Material(
           color: p.surface,

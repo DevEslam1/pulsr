@@ -19,10 +19,8 @@ class LrcParser {
     final lines = lrcContent.split(RegExp(r'\r?\n'));
     final List<LyricsLine> result = [];
 
-    // Match tags like [01:23], [01:23.45], [01:23.456], [01:23:45], [01:02:03.45]
-    final RegExp timeExp = RegExp(
-      r'\[(?:(\d{1,2}):)?(\d{1,3}):(\d{2})(?:[.:](\d{1,3}))?\]',
-    );
+    // Match tags like [01:23.45] or [01:23.456] or [01:23.4] or [01:23] or [120:00.00]
+    final RegExp timeExp = RegExp(r'\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]');
 
     for (final line in lines) {
       final matches = timeExp.allMatches(line).toList();
@@ -36,15 +34,13 @@ class LrcParser {
       }
 
       for (final match in matches) {
-        final hours = match.group(1) != null ? int.parse(match.group(1)!) : 0;
-        final minutes = int.parse(match.group(2)!);
-        final seconds = int.parse(match.group(3)!);
-        final fractionStr = match.group(4) ?? '0';
+        final minutes = int.parse(match.group(1)!);
+        final seconds = int.parse(match.group(2)!);
+        final fractionStr = match.group(3) ?? '0';
         final milliseconds =
             int.parse(fractionStr.padRight(3, '0').substring(0, 3));
 
         final totalDuration = Duration(
-          hours: hours,
           minutes: minutes,
           seconds: seconds,
           milliseconds: milliseconds,
@@ -127,15 +123,13 @@ class LrcParser {
     return null;
   }
 
-  /// Attempts to fetch embedded lyrics via platform channel with timeout guard.
+  /// Attempts to fetch embedded lyrics via platform channel.
   static Future<String?> getEmbeddedLyrics(String audioFilePath) async {
     try {
-      final String? lyrics = await _lyricsChannel
-          .invokeMethod<String>(
-            'getEmbeddedLyrics',
-            {'filePath': audioFilePath},
-          )
-          .timeout(const Duration(seconds: 4), onTimeout: () => null);
+      final String? lyrics = await _lyricsChannel.invokeMethod<String>(
+        'getEmbeddedLyrics',
+        {'filePath': audioFilePath},
+      );
       if (lyrics != null && lyrics.trim().isNotEmpty) {
         return lyrics.trim();
       }
@@ -222,12 +216,12 @@ class LrcParser {
         artist.isNotEmpty) {
       try {
         if (lrclibService != null) {
-          resolved = await ((lrclibService as dynamic).fetchLyrics(
+          resolved = await (lrclibService as dynamic).fetchLyrics(
             trackName: trackTitle,
             artistName: artist,
             albumName: album,
             durationSeconds: durationSec,
-          )) as LyricsResult?;
+          );
         }
       } catch (e, st) {
         ErrorLogger.log('Failed to fetch lyrics from LRCLIB for $trackTitle',
@@ -240,11 +234,6 @@ class LrcParser {
       final evictedKey = _lyricsCache.keys.first;
       _lyricsCache.remove(evictedKey);
       _negativeCacheTimes.remove(evictedKey);
-    }
-    // Bound negative cache growth: prune oldest if >100
-    if (_negativeCacheTimes.length > 100) {
-      final oldest = _negativeCacheTimes.keys.first;
-      _negativeCacheTimes.remove(oldest);
     }
     _lyricsCache[cacheKey] = resolved;
     if (resolved == null) {

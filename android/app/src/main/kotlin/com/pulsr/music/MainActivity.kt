@@ -16,11 +16,9 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : AudioServiceActivity() {
     private val LYRICS_CHANNEL = "com.pulsr.music/lyrics"
     private val FILE_OPENER_CHANNEL = "com.pulsr.music/file_opener"
-    private val BATTERY_CHANNEL = "com.pulsr.music/battery_optimization"
     private val pendingAudioUris = ArrayDeque<String>()
     private var fileOpenerChannel: MethodChannel? = null
     private var lyricsChannel: MethodChannel? = null
-    private var batteryChannel: MethodChannel? = null
     private var audioEffectsPlugin: AudioEffectsPlugin? = null
     private var tagEditorPlugin: TagEditorPlugin? = null
     private var visualizerPlugin: VisualizerPlugin? = null
@@ -31,10 +29,7 @@ class MainActivity : AudioServiceActivity() {
     private var waveformPlugin: WaveformPlugin? = null
     private var proxyPlugin: ProxyPlugin? = null
     private var hiResDacPlugin: HiResDacPlugin? = null
-    private var roomCorrectionPlugin: RoomCorrectionPlugin? = null
     private val lyricsExecutor = java.util.concurrent.Executors.newFixedThreadPool(2)
-    // Compiled proxy regex to avoid per-call recompilation DOS
-    private val proxyPattern = Regex("""\b(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3}):(\d{2,5})\b""")
  
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -81,7 +76,8 @@ class MainActivity : AudioServiceActivity() {
     }
 
     private fun isProxyText(text: String): Boolean {
-        return proxyPattern.containsMatchIn(text) && proxyPattern.find(text)?.let { m ->
+        val pattern = Regex("""\b(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3}):(\d{2,5})\b""")
+        return pattern.containsMatchIn(text) && pattern.find(text)?.let { m ->
             val octets = (1..4).map { m.groupValues[it].toIntOrNull() ?: 256 }
             val port = m.groupValues[5].toIntOrNull() ?: 0
             octets.all { it in 0..255 } && port in 1..65535
@@ -112,16 +108,10 @@ class MainActivity : AudioServiceActivity() {
 
         if (uri.scheme?.equals("content", ignoreCase = true) == true) {
             try {
-                val hasPersistable = (intent.flags and Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION) != 0
-                val readFlag = intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION
-                if (hasPersistable && readFlag != 0) {
-                    contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                } else if (readFlag != 0) {
-                    // No persistable grant available; we will open immediately via ContentResolver.openInputStream fallback
-                    Log.d("MainActivity", "No persistable URI permission for $uri, using transient grant")
+                val flags = intent.flags and (Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                if (flags != 0) {
+                    contentResolver.takePersistableUriPermission(uri, flags and Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
-            } catch (e: SecurityException) {
-                Log.d("MainActivity", "Persistable URI grant denied for $uri: ${e.message}")
             } catch (e: Exception) {
                 Log.d("MainActivity", "Persistable URI grant not supported or failed for $uri: ${e.message}")
             }
@@ -144,7 +134,7 @@ class MainActivity : AudioServiceActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         tagEditorPlugin = TagEditorPlugin.registerWith(flutterEngine, applicationContext)
-        visualizerPlugin = VisualizerPlugin.registerWith(flutterEngine, applicationContext)
+        visualizerPlugin = VisualizerPlugin.registerWith(flutterEngine)
         ringtonePlugin = RingtonePlugin.registerWith(flutterEngine, applicationContext)
         audioEffectsPlugin = AudioEffectsPlugin.registerWith(flutterEngine, applicationContext)
         scrobblerPlugin = ScrobblerPlugin.registerWith(flutterEngine, applicationContext)
@@ -153,7 +143,6 @@ class MainActivity : AudioServiceActivity() {
         waveformPlugin = WaveformPlugin.registerWith(flutterEngine, applicationContext)
         proxyPlugin = ProxyPlugin.registerWith(flutterEngine, applicationContext)
         hiResDacPlugin = HiResDacPlugin(applicationContext, flutterEngine.dartExecutor.binaryMessenger)
-        roomCorrectionPlugin = RoomCorrectionPlugin.registerWith(flutterEngine, applicationContext)
  
         val fileChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, FILE_OPENER_CHANNEL)
         fileOpenerChannel = fileChannel
@@ -203,20 +192,14 @@ class MainActivity : AudioServiceActivity() {
             }
         }
 
-        batteryChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, BATTERY_CHANNEL)
-        batteryChannel!!.setMethodCallHandler { call, result ->
+        val batteryChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.pulsr.music/battery_optimization")
+        batteryChannel.setMethodCallHandler { call, result ->
             when (call.method) {
                 "isIgnoringBatteryOptimizations" -> {
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        try {
-                            val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
-                            // MIUI / OEMs may return null PowerManager; treat as whitelisted to avoid perpetual prompt
-                            val isIgnoring = powerManager?.isIgnoringBatteryOptimizations(packageName) ?: true
-                            result.success(isIgnoring)
-                        } catch (e: Exception) {
-                            // SecurityException on some OEMs or dead service - assume whitelisted
-                            result.success(true)
-                        }
+                        val powerManager = getSystemService(Context.POWER_SERVICE) as? PowerManager
+                        val isIgnoring = powerManager?.isIgnoringBatteryOptimizations(packageName) ?: false
+                        result.success(isIgnoring)
                     } else {
                         result.success(true)
                     }
@@ -283,12 +266,6 @@ class MainActivity : AudioServiceActivity() {
         fileOpenerChannel = null
         lyricsChannel?.setMethodCallHandler(null)
         lyricsChannel = null
-        batteryChannel?.setMethodCallHandler(null)
-        batteryChannel = null
-        // Bound pending URIs to avoid unbounded growth on spam
-        synchronized(pendingAudioUris) {
-            while (pendingAudioUris.size > 20) pendingAudioUris.removeFirstOrNull()
-        }
         super.cleanUpFlutterEngine(flutterEngine)
     }
 }

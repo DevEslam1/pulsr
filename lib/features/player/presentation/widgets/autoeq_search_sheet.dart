@@ -1,6 +1,6 @@
 // lib/features/player/presentation/widgets/autoeq_search_sheet.dart
 import 'package:flutter/material.dart';
-import '../../../../domain/services/autoeq_service.dart';
+import '../../../../core/services/autoeq_service.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../data/audio/equalizer_manager.dart';
 

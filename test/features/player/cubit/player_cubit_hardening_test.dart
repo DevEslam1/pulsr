@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/constants/prefs_keys.dart';
-import 'package:pulsr/data/services/scrobbler_service.dart';
+import 'package:pulsr/core/services/scrobbler_service.dart';
 import 'package:pulsr/data/audio/audio_handler.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/domain/models/audio_effects_config.dart';
@@ -37,8 +37,6 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   int? get currentAudioSessionId => null;
   @override
   Stream<int?> get audioSessionIdStream => Stream<int?>.empty();
-  @override
-  Stream<SongsTableData> get onTrackChanged => Stream<SongsTableData>.empty();
   @override
   Future<void> setVolume(double volume) async {
     _vol = volume;
@@ -177,52 +175,6 @@ class TestPulsrAudioHandler extends BaseAudioHandler
   bool get hasOemAudio => false;
   @override
   List<String> get detectedOemEngines => const [];
-
-  // Phase 1 DSP expansion stage surface (mirror PulsrAudioHandler)
-  @override
-  bool get isSaturationEnabled => false;
-  @override
-  double get saturationDrive => 0.0;
-  @override
-  double get saturationMix => 0.5;
-  @override
-  double get saturationTilt => 0.0;
-  @override
-  bool get isStereoWidthEnabled => false;
-  @override
-  double get stereoWidth => 1.0;
-  @override
-  bool get isLoudnessContourEnabled => false;
-  @override
-  double get loudnessContourIntensity => 0.0;
-  @override
-  bool get isSubCrossoverEnabled => false;
-  @override
-  double get subCrossoverCornerHz => 80.0;
-  @override
-  double get subCrossoverSlopeDbPerOct => 24.0;
-  @override
-  double get subCrossoverGain => 0.8;
-  @override
-  bool get isDynamicEqEnabled => false;
-  @override
-  List<DynamicEqBandConfig> get dynamicEqBands => const [];
-  @override
-  Future<void> setSaturation(bool enabled,
-          {double? drive, double? mix, double? tilt}) async {}
-  @override
-  Future<void> setStereoWidth(bool enabled, {double? width}) async {}
-  @override
-  Future<void> setLoudnessContour(bool enabled, {double? intensity}) async {}
-  @override
-  Future<void> setSubCrossover(bool enabled,
-          {double? cornerHz, double? slopeDbPerOct, double? gain}) async {}
-  @override
-  Future<void> setDynamicEq(bool enabled) async {}
-  @override
-  Future<void> setDynamicEqBand(int index, DynamicEqBandConfig band) async {}
-  @override
-  Future<void> get effectsReady => Future<void>.value();
 
   @override
   Future<void> setCrossfeed(bool enabled,
@@ -378,7 +330,7 @@ void main() {
       await cubit.playSong(sampleSong1);
 
       // Wait for debounce timer (2s)
-      await Future<void>.delayed(const Duration(milliseconds: 2100));
+      await Future.delayed(const Duration(milliseconds: 2100));
 
       final prefs = await SharedPreferences.getInstance();
       final raw = prefs.getString(PrefsKeys.queueSlots);

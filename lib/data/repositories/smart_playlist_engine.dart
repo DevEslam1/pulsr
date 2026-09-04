@@ -23,11 +23,9 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
     if (criteria.rules.isNotEmpty) {
       query.where((t) {
         Expression<bool>? combined;
-        bool hasValidRule = false;
         for (final rule in criteria.rules) {
           final expr = _buildRuleExpression(t, rule);
           if (expr == null) continue;
-          hasValidRule = true;
           if (combined == null) {
             combined = expr;
           } else {
@@ -35,7 +33,6 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
                 criteria.matchAll ? (combined & expr) : (combined | expr);
           }
         }
-        if (!hasValidRule) return const Constant(false);
         return combined ?? const Constant(true);
       });
     }
@@ -248,15 +245,10 @@ class SmartPlaylistEngine implements ISmartPlaylistEngine {
       case SmartRuleField.lastPlayed:
         if (rule.operator == SmartOperator.withinDays) {
           final days = valInt ?? 30;
-          // FIX: dual-unit — production writes ms, legacy/tests use sec.
-          // Match either so Recently Played works for both.
-          final nowMs = DateTime.now().millisecondsSinceEpoch;
-          final cutoffMs = nowMs - (days * 86400000);
-          final cutoffSec = cutoffMs ~/ 1000;
+          final cutoffSec =
+              DateTime.now().millisecondsSinceEpoch ~/ 1000 - (days * 86400);
           return t.lastPlayed.isNotNull() &
-              (t.lastPlayed.isBiggerOrEqualValue(cutoffMs) |
-                  t.lastPlayed.isBiggerOrEqualValue(cutoffSec) &
-                      t.lastPlayed.isSmallerThanValue(1000000000000));
+              t.lastPlayed.isBiggerOrEqualValue(cutoffSec);
         }
         if (rule.operator == SmartOperator.between) {
           final b = _parseIntBetween(valStr);

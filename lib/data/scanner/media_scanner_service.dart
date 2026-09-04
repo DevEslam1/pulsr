@@ -4,13 +4,11 @@ import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../core/constants/audio_formats.dart';
 import '../../core/constants/channels.dart';
-import '../../core/errors/failures.dart';
 import '../../core/utils/error_logger.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../db/app_database.dart';
@@ -33,22 +31,8 @@ class MediaScannerService {
   Future<bool> checkPermission() async {
     if (Platform.isAndroid) {
       final audio = await Permission.audio.status;
-      // On Android 13+ Permission.storage is auto-denied; only audio matters. Also handle limited grant.
-      if (audio.isGranted || audio.isLimited) return true;
-      // Legacy fallback for Android <=12
-      try {
-        final sdkInt = (await const MethodChannel(PulsrChannels.audioEffects)
-                .invokeMethod<int>('getSdkInt')
-                .timeout(const Duration(milliseconds: 800))) ??
-            33;
-        if (sdkInt <= 32) {
-          final storage = await Permission.storage.status;
-          return storage.isGranted;
-        }
-      } catch (e, st) {
-        ErrorLogger.log('checkPermission failed', error: e, stackTrace: st, category: 'MediaScannerService');
-      }
-      return false;
+      final storage = await Permission.storage.status;
+      return audio.isGranted || storage.isGranted;
     } else if (Platform.isIOS) {
       final status = await Permission.mediaLibrary.status;
       return status.isGranted;
@@ -59,27 +43,10 @@ class MediaScannerService {
   Future<bool> requestPermission() async {
     if (Platform.isAndroid) {
       final audioStatus = await Permission.audio.request();
-      // FIX: Android 14 partial grant (isLimited) must count as granted —
-      // checkPermission() already accepts it, request path must match.
-      if (audioStatus.isGranted || audioStatus.isLimited) return true;
-      if (audioStatus.isPermanentlyDenied) {
-        return false; // Caller should show openAppSettings rationale
-      }
-      // Only request legacy storage on Android <=12; on 13+ it is auto-denied and triggers Play warning
-      try {
-        final sdkInt = (await const MethodChannel(PulsrChannels.audioEffects)
-                .invokeMethod<int>('getSdkInt').timeout(const Duration(seconds: 2))) ??
-            33;
-        if (sdkInt <= 32 && !audioStatus.isPermanentlyDenied) {
-          final storageStatus = await Permission.storage.request();
-          return storageStatus.isGranted;
-        }
-      } catch (e, st) {
-        ErrorLogger.log('timeout failed, using fallback', error: e, stackTrace: st, category: 'MediaScannerService');
-        if (!audioStatus.isPermanentlyDenied) {
-          final storageStatus = await Permission.storage.request();
-          return storageStatus.isGranted;
-        }
+      if (audioStatus.isGranted) return true;
+      if (!audioStatus.isPermanentlyDenied) {
+        final storageStatus = await Permission.storage.request();
+        return storageStatus.isGranted;
       }
       return false;
     } else if (Platform.isIOS) {
@@ -89,51 +56,18 @@ class MediaScannerService {
     return true;
   }
 
-  Future<bool> shouldShowAudioPermissionRationale() async {
-    if (!Platform.isAndroid) return false;
-    try {
-      return await Permission.audio.shouldShowRequestRationale;
-    } catch (e, st) {
-      ErrorLogger.log('shouldShowAudioPermissionRationale failed, using fallback', error: e, stackTrace: st, category: 'MediaScannerService');
-      return false;
-    }
-  }
-
-  /// On Android 14+ (API 34+), returns true if user granted partial visual media access
-  /// (READ_MEDIA_VISUAL_USER_SELECTED) rather than full access.
-  Future<bool> isVisualMediaPartialAccess() async {
-    if (!Platform.isAndroid) return false;
-    try {
-      final status = await Permission.photos.status;
-      return status.isLimited;
-    } catch (e, st) {
-      ErrorLogger.log('isVisualMediaPartialAccess failed, using fallback', error: e, stackTrace: st, category: 'MediaScannerService');
-      return false;
-    }
-  }
-
-  Future<bool> requestPhotosPermission() async {
-    if (!Platform.isAndroid) return true;
-    try {
-      final status = await Permission.photos.request();
-      return status.isGranted || status.isLimited;
-    } catch (e, st) {
-      ErrorLogger.log('requestPhotosPermission failed, using fallback', error: e, stackTrace: st, category: 'MediaScannerService');
-      return false;
-    }
-  }
-
-  bool get shouldShowPermissionRationaleSync => false; // deprecated, use shouldShowAudioPermissionRationale() async
-
   static const List<String> systemIgnoredPathPatterns = [
+    // WhatsApp
     '/whatsapp/media/whatsapp voice notes/',
     '/whatsapp/media/whatsapp audio/',
     '/android/media/com.whatsapp/',
     '/com.whatsapp.w4b/',
+    // Telegram
     '/telegram/telegram audio/',
     '/telegram/telegram voice/',
     '/android/media/org.telegram.messenger/',
     '/android/media/org.telegram.plus/',
+    // Call & Voice recordings
     '/recordings/',
     '/callrecordings/',
     '/call_recordings/',
@@ -145,6 +79,7 @@ class MediaScannerService {
     '/audio_recorder/',
     '/miui/sound_recorder/',
     '/samsung/voicerecorder/',
+    // System tones & cache
     '/ringtones/',
     '/notifications/',
     '/alarms/',
@@ -154,56 +89,38 @@ class MediaScannerService {
   ];
 
   static bool isSystemIgnoredPath(String filePath) {
-    final normalized = filePath.toLowerCase().replaceAll('\\', '/');
-    final segments = normalized.split('/').where((s) => s.isNotEmpty).toList();
-
-    // Segment-aware check to avoid false positives like "/Music/my recordings fav/"
-    // where substring "recordings" appears but not as a dedicated folder segment.
+    final lower = filePath.toLowerCase().replaceAll('\\', '/');
     for (final pattern in systemIgnoredPathPatterns) {
-      final trimmed = pattern.replaceAll('/', '');
-      if (trimmed.isEmpty) continue;
-      if (segments.contains(trimmed)) return true;
-      // Fallback to contains for multi-segment patterns like "whatsapp/media/whatsapp voice notes"
-      if (pattern.contains('/') && normalized.contains(pattern)) {
-        // Double-check segment containment for the last component to reduce false positive
-        final lastSeg = pattern.split('/').where((s) => s.isNotEmpty).last;
-        if (segments.contains(lastSeg)) return true;
-      }
+      if (lower.contains(pattern)) return true;
     }
-
-    final fileName = segments.lastOrNull ?? '';
-
-    // WhatsApp audio/voice note prefixes
-    if (fileName.startsWith('ptt-') || (fileName.startsWith('aud-') && fileName.length > 20)) {
-      if (normalized.contains('whatsapp') || normalized.contains('com.whatsapp')) {
-        return true;
-      }
+    final fileName = lower.split('/').lastOrNull ?? '';
+    if (fileName.startsWith('ptt-') ||
+        (fileName.startsWith('aud-') && fileName.length > 20)) {
+      if (lower.contains('whatsapp') || lower.contains('opus')) return true;
     }
-
-    // Ignore known system dot folders and markers
+    // Ignore only known system dot folders — user dot folders like .my_collection are now allowed
+    final parts = lower.split('/');
     const knownSystemDotFolders = {'.thumbnails', '.trash', '.cache', '.nomedia'};
-    if (segments.any((p) => knownSystemDotFolders.contains(p))) {
+    if (parts.any((p) => knownSystemDotFolders.contains(p))) {
       return true;
     }
     return false;
   }
-
 
   Future<int> scanDeviceLibrary({
     bool ignoreShortFiles = true,
     int minDurationSec = 30,
     bool autoHideSystemMedia = true,
   }) async {
-    if (!_progressController.isClosed) _progressController.add(0.0);
+    _progressController.add(0.0);
     try {
       final hasPermission = await checkPermission();
       if (!hasPermission) {
-        // FIX: don't return 0 (indistinguishable from empty library) — throw
-        // so scanDeviceLibraryResilient maps to a typed failure.
-        throw const PermissionFailure('Storage permission denied for scan');
+        final granted = await requestPermission();
+        if (!granted) return 0;
       }
 
-      if (!_progressController.isClosed) _progressController.add(0.1);
+      _progressController.add(0.1);
       final excludedRes = await _repository.getExcludedFolderPaths();
       final excludedFolders = excludedRes.fold((l) => <String>[], (r) => r);
 
@@ -227,7 +144,7 @@ class MediaScannerService {
           'Scanner started with ${songs.length} raw MediaStore songs',
           category: 'scanner');
 
-      if (!_progressController.isClosed) _progressController.add(0.3);
+      _progressController.add(0.3);
 
       // Offload CPU-heavy metadata parsing and aggregation to background isolate
       final parseInput = _ScanMediaInput(
@@ -240,7 +157,7 @@ class MediaScannerService {
 
       final parseResult =
           await compute(_parseScannedMediaInIsolate, parseInput);
-      if (!_progressController.isClosed) _progressController.add(0.7);
+      _progressController.add(0.7);
 
       await _repository.syncScannedMusic(
         songs: parseResult.songs,
@@ -248,11 +165,11 @@ class MediaScannerService {
         artists: parseResult.artists,
       );
 
-      if (!_progressController.isClosed) _progressController.add(0.9);
+      _progressController.add(0.9);
 
       // Clean up orphaned entries
       await _repository.cleanupOrphanedSongs(parseResult.validSongIds);
-      if (!_progressController.isClosed) _progressController.add(1.0);
+      _progressController.add(1.0);
 
       ErrorLogger.addBreadcrumb(
           'Scanner completed: ${parseResult.songs.length} valid songs indexed',
@@ -266,44 +183,14 @@ class MediaScannerService {
     }
   }
 
-  /// Resilient wrapper that captures failures as typed [AppFailure] (T10 requirement)
-  Future<Either<AppFailure, int>> scanDeviceLibraryResilient({
-    bool ignoreShortFiles = true,
-    int minDurationSec = 30,
-    bool autoHideSystemMedia = true,
-  }) async {
-    try {
-      final count = await scanDeviceLibrary(
-        ignoreShortFiles: ignoreShortFiles,
-        minDurationSec: minDurationSec,
-        autoHideSystemMedia: autoHideSystemMedia,
-      );
-      return Right(count);
-    } catch (e, st) {
-      ErrorLogger.log('scanDeviceLibraryResilient failed',
-          error: e, stackTrace: st, category: 'scanner');
-      if (e is PermissionFailure) return Left(e);
-      return Left(StorageFailure(e.toString()));
-    }
-  }
-
   Future<void> rescanSingleFile(String path) async {
-    if (!Platform.isAndroid || path.isEmpty) return;
-    if (!path.startsWith('content:')) {
-      try {
-        final f = File(path);
-        if (!await f.exists()) return;
-      } catch (e, st) {
-        ErrorLogger.log('rescanSingleFile failed', error: e, stackTrace: st, category: 'MediaScannerService');
-      }
-    }
     const channel = MethodChannel(PulsrChannels.tagEditor);
     try {
       final Map<dynamic, dynamic>? tags =
           await channel.invokeMapMethod<dynamic, dynamic>('readTags', {
         'path': path,
         'includeArtwork': false,
-      }).timeout(const Duration(seconds: 5));
+      });
       if (tags != null) {
         final title = (tags['title'] as String?)?.trim();
         final artist = (tags['artist'] as String?)?.trim();
@@ -315,13 +202,9 @@ class MediaScannerService {
         final year = yearStr != null ? int.tryParse(yearStr) : null;
         final trackNumber = trackStr != null ? int.tryParse(trackStr) : null;
 
-        final defaultTitle = path.contains('/')
-            ? path.split('/').last.replaceAll(RegExp(r'\.[^.]+$'), '')
-            : 'Unknown Song';
-
         await _repository.updateSongTags(
           path: path,
-          title: (title != null && title.isNotEmpty) ? title : defaultTitle,
+          title: (title != null && title.isNotEmpty) ? title : 'Unknown Song',
           artist:
               (artist != null && artist.isNotEmpty) ? artist : 'Unknown Artist',
           album: (album != null && album.isNotEmpty) ? album : 'Unknown Album',
@@ -359,7 +242,7 @@ class MediaScannerService {
           await channel.invokeMapMethod<dynamic, dynamic>('readTags', {
         'path': path,
         'includeArtwork': false,
-      }).timeout(const Duration(seconds: 5));
+      });
       if (tags == null) return;
 
       final sampleRate = _asInt(tags['sampleRate']);
@@ -388,7 +271,7 @@ class MediaScannerService {
     }
   }
 
-  /// Batch enriches audio quality sequentially to avoid MethodChannel flood.
+  /// Batch enriches audio quality for multiple songs, processing in batches of 10 concurrently.
   Future<void> enrichAudioQualityBatch(
     List<SongsTableData> songs, {
     void Function(int processed, int total)? onProgress,
@@ -406,10 +289,11 @@ class MediaScannerService {
     final total = eligible.length;
     int processed = 0;
 
-    for (final song in eligible) {
-      if (_progressController.isClosed) break;
-      await enrichAudioQuality(song.id, song.path);
-      processed++;
+    for (int i = 0; i < eligible.length; i += 10) {
+      final batch = eligible.sublist(i, (i + 10).clamp(0, eligible.length));
+      await Future.wait(
+          batch.map((song) => enrichAudioQuality(song.id, song.path)));
+      processed += batch.length;
       onProgress?.call(processed, total);
     }
   }
@@ -418,14 +302,7 @@ class MediaScannerService {
   /// Standard PCM sample peak misses peaks occurring between samples during DAC reconstruction.
   static double computeTruePeak(List<int> samples, {int bitDepth = 16}) {
     if (samples.isEmpty) return 0.0;
-    double maxInt;
-    if (bitDepth >= 32) {
-      maxInt = 2147483648.0;
-    } else if (bitDepth == 24) {
-      maxInt = 8388608.0;
-    } else {
-      maxInt = (1 << (bitDepth - 1)).toDouble();
-    }
+    final maxInt = (1 << (bitDepth - 1)).toDouble();
     double maxTruePeak = 0.0;
 
     for (int i = 0; i < samples.length - 1; i++) {
@@ -582,9 +459,7 @@ _ScanMediaResult _parseScannedMediaInIsolate(_ScanMediaInput input) {
     final int? year = parseInt(raw['year']);
     final artistId = parseInt(raw['artist_id']) ?? parseInt(raw['artistId']);
     final albumId = parseInt(raw['album_id']) ?? parseInt(raw['albumId']);
-    final uri = parseString(raw['_uri']) ??
-        parseString(raw['uri']) ??
-        (Platform.isAndroid ? 'content://media/external/audio/media/$id' : null);
+    final uri = parseString(raw['_uri']) ?? parseString(raw['uri']);
     final track = parseInt(raw['track']);
     final dateAdded = parseInt(raw['date_added']) ?? parseInt(raw['dateAdded']);
     final size = parseInt(raw['_size']) ?? parseInt(raw['size']);
