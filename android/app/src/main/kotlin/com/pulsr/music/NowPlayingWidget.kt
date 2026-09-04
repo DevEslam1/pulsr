@@ -141,6 +141,25 @@ class NowPlayingWidget : AppWidgetProvider() {
                     controls.sendCustomAction("toggleFavorite", null)
                 }
             }
+            ACTION_SHUFFLE -> {
+                val isShuffle = getSafeBoolean(prefs, "isShuffle", false)
+                prefs.edit().putBoolean("isShuffle", !isShuffle).apply()
+                performMediaAction(context) { controls, _, _, _ ->
+                    controls.sendCustomAction("toggleShuffle", null)
+                }
+            }
+            ACTION_REPEAT -> {
+                val currentRepeat = getSafeString(prefs, "repeatMode", "off") ?: "off"
+                val nextRepeat = when (currentRepeat) {
+                    "off" -> "all"
+                    "all" -> "one"
+                    else -> "off"
+                }
+                prefs.edit().putString("repeatMode", nextRepeat).apply()
+                performMediaAction(context) { controls, _, _, _ ->
+                    controls.sendCustomAction("toggleRepeat", null)
+                }
+            }
         }
 
         scheduleDebouncedWidgetUpdate(context, 300L)
@@ -182,6 +201,8 @@ class NowPlayingWidget : AppWidgetProvider() {
         const val ACTION_FORWARD = "com.pulsr.music.widget.FORWARD"
         const val ACTION_SEEK_RATIO = "com.pulsr.music.widget.SEEK_RATIO"
         const val ACTION_FAVORITE = "com.pulsr.music.widget.FAVORITE"
+        const val ACTION_SHUFFLE = "com.pulsr.music.widget.SHUFFLE"
+        const val ACTION_REPEAT = "com.pulsr.music.widget.REPEAT"
         const val EXTRA_RATIO = "extra_ratio"
 
         private var cachedMediaBrowser: MediaBrowserCompat? = null
@@ -518,21 +539,33 @@ class NowPlayingWidget : AppWidgetProvider() {
             val isShuffle = getSafeBoolean(data, "isShuffle", false)
             if (layoutId == R.layout.widget_now_playing) {
                 views.setViewVisibility(R.id.widget_shuffle, if (isShuffle) View.VISIBLE else View.GONE)
+                views.setImageViewResource(R.id.widget_shuffle, R.drawable.ic_widget_shuffle)
             } else {
                 views.setViewVisibility(R.id.widget_shuffle, View.VISIBLE)
-                views.setImageViewResource(R.id.widget_shuffle, R.drawable.ic_widget_shuffle)
+                views.setImageViewResource(
+                    R.id.widget_shuffle,
+                    if (isShuffle) R.drawable.ic_widget_shuffle else R.drawable.ic_widget_shuffle_off
+                )
             }
 
             val repeatMode = getSafeString(data, "repeatMode", "off") ?: "off"
             if (layoutId == R.layout.widget_now_playing) {
                 views.setViewVisibility(R.id.widget_repeat, if (repeatMode != "off") View.VISIBLE else View.GONE)
+                views.setImageViewResource(
+                    R.id.widget_repeat,
+                    if (repeatMode == "one") R.drawable.ic_widget_repeat_one else R.drawable.ic_widget_repeat
+                )
             } else {
                 views.setViewVisibility(R.id.widget_repeat, View.VISIBLE)
+                views.setImageViewResource(
+                    R.id.widget_repeat,
+                    when (repeatMode) {
+                        "one" -> R.drawable.ic_widget_repeat_one
+                        "all" -> R.drawable.ic_widget_repeat
+                        else -> R.drawable.ic_widget_repeat_off
+                    }
+                )
             }
-            views.setImageViewResource(
-                R.id.widget_repeat,
-                if (repeatMode == "one") R.drawable.ic_widget_repeat_one else R.drawable.ic_widget_repeat
-            )
 
             // ---- Artwork (async decode on cache miss to avoid ANR) ----
             val artworkPath = getSafeString(data, "artwork")
@@ -673,6 +706,14 @@ class NowPlayingWidget : AppWidgetProvider() {
             views.setOnClickPendingIntent(
                 R.id.widget_favorite,
                 createBroadcastPendingIntent(context, ACTION_FAVORITE, 106)
+            )
+            views.setOnClickPendingIntent(
+                R.id.widget_shuffle,
+                createBroadcastPendingIntent(context, ACTION_SHUFFLE, 107)
+            )
+            views.setOnClickPendingIntent(
+                R.id.widget_repeat,
+                createBroadcastPendingIntent(context, ACTION_REPEAT, 108)
             )
 
             // ---- 10 Granular Slider Seek Tap Zones (10% steps) ----

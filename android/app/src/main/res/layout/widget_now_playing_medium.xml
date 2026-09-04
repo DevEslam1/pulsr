@@ -33,7 +33,7 @@
             android:layout_weight="1"
             android:orientation="vertical"
             android:layout_marginStart="14dp"
-            android:layout_marginEnd="6dp">
+            android:layout_marginEnd="8dp">
 
             <TextView
                 android:id="@+id/widget_title"
@@ -41,8 +41,9 @@
                 android:layout_height="wrap_content"
                 android:text="Pulsr Music"
                 android:textColor="#FFFFFF"
-                android:textSize="15.5sp"
+                android:textSize="16sp"
                 android:textStyle="bold"
+                android:fontFamily="sans-serif-medium"
                 android:maxLines="1"
                 android:ellipsize="end" />
 
@@ -50,10 +51,11 @@
                 android:id="@+id/widget_artist"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="2.5dp"
                 android:text="Nothing playing"
-                android:textColor="#B3A8AC"
+                android:textColor="#A3ABB8"
                 android:textSize="13sp"
+                android:fontFamily="sans-serif"
                 android:maxLines="1"
                 android:ellipsize="end" />
 
@@ -61,10 +63,11 @@
                 android:id="@+id/widget_album"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="1dp"
+                android:layout_marginTop="1.5dp"
                 android:text=""
-                android:textColor="#8E7E84"
-                android:textSize="11.5sp"
+                android:textColor="#788294"
+                android:textSize="12sp"
+                android:fontFamily="sans-serif"
                 android:maxLines="1"
                 android:ellipsize="end"
                 android:visibility="gone" />
@@ -75,7 +78,8 @@
             android:id="@+id/widget_favorite"
             android:layout_width="36dp"
             android:layout_height="36dp"
-            android:padding="6dp"
+            android:padding="7dp"
+            android:background="@drawable/widget_secondary_button_background"
             android:src="@drawable/ic_widget_heart"
             android:contentDescription="Toggle Favorite" />
     </LinearLayout>
@@ -91,7 +95,7 @@
             android:id="@+id/widget_progress"
             style="@android:style/Widget.ProgressBar.Horizontal"
             android:layout_width="match_parent"
-            android:layout_height="6dp"
+            android:layout_height="5dp"
             android:layout_gravity="center_vertical"
             android:max="1000"
             android:progress="0"
@@ -129,7 +133,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="0:00"
-            android:textColor="#8E7E84"
+            android:textColor="#848D9C"
             android:textSize="11sp"
             android:fontFamily="sans-serif-medium" />
 
@@ -143,7 +147,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="0:00"
-            android:textColor="#8E7E84"
+            android:textColor="#848D9C"
             android:textSize="11sp"
             android:fontFamily="sans-serif-medium" />
     </LinearLayout>
@@ -153,14 +157,15 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:gravity="center"
+        android:gravity="center_vertical"
         android:layout_marginTop="8dp">
 
         <ImageView
             android:id="@+id/widget_shuffle"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:padding="6dp"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:padding="7.5dp"
+            android:background="@drawable/widget_secondary_button_background"
             android:src="@drawable/ic_widget_shuffle"
             android:contentDescription="Shuffle" />
 
@@ -173,8 +178,8 @@
             android:id="@+id/btn_prev"
             android:layout_width="38dp"
             android:layout_height="38dp"
-            android:padding="7dp"
-            android:background="@android:color/transparent"
+            android:padding="8dp"
+            android:background="@drawable/widget_secondary_button_background"
             android:src="@drawable/ic_widget_skip_prev"
             android:contentDescription="Previous" />
 
@@ -182,18 +187,19 @@
             android:id="@+id/btn_rewind"
             android:layout_width="34dp"
             android:layout_height="34dp"
-            android:padding="6dp"
-            android:background="@android:color/transparent"
+            android:layout_marginStart="5dp"
+            android:padding="7dp"
+            android:background="@drawable/widget_secondary_button_background"
             android:src="@drawable/ic_widget_rewind"
             android:contentDescription="Rewind 10s" />
 
         <ImageButton
             android:id="@+id/btn_play_pause"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
+            android:layout_width="50dp"
+            android:layout_height="50dp"
             android:layout_marginStart="8dp"
             android:layout_marginEnd="8dp"
-            android:padding="11dp"
+            android:padding="12dp"
             android:background="@drawable/widget_play_button_background"
             android:src="@drawable/ic_widget_play"
             android:contentDescription="Play/Pause" />
@@ -202,8 +208,9 @@
             android:id="@+id/btn_forward"
             android:layout_width="34dp"
             android:layout_height="34dp"
-            android:padding="6dp"
-            android:background="@android:color/transparent"
+            android:layout_marginEnd="5dp"
+            android:padding="7dp"
+            android:background="@drawable/widget_secondary_button_background"
             android:src="@drawable/ic_widget_forward"
             android:contentDescription="Forward 10s" />
 
@@ -211,8 +218,8 @@
             android:id="@+id/btn_next"
             android:layout_width="38dp"
             android:layout_height="38dp"
-            android:padding="7dp"
-            android:background="@android:color/transparent"
+            android:padding="8dp"
+            android:background="@drawable/widget_secondary_button_background"
             android:src="@drawable/ic_widget_skip_next"
             android:contentDescription="Next" />
 
@@ -223,9 +230,10 @@
 
         <ImageView
             android:id="@+id/widget_repeat"
-            android:layout_width="32dp"
-            android:layout_height="32dp"
-            android:padding="6dp"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:padding="7.5dp"
+            android:background="@drawable/widget_secondary_button_background"
             android:src="@drawable/ic_widget_repeat"
             android:contentDescription="Repeat" />
     </LinearLayout>
