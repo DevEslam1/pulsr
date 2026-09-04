@@ -339,8 +339,14 @@ class CrossfadeManager {
   /// Disposes active timers and resources.
   void dispose() {
     _fadeId++;
+    for (final t in _activeTimers) {
+      t.cancel();
+    }
+    _activeTimers.clear();
     _fadeTimer?.cancel();
     _fadeTimer = null;
+    isCrossfading = false;
+    pendingIndex = null;
     if (_crossfadeCompleter != null && !_crossfadeCompleter!.isCompleted) {
       _crossfadeCompleter!.complete();
     }

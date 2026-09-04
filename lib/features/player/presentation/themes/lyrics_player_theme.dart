@@ -24,7 +24,9 @@ class LyricsPlayerTheme extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isTwoPane = context.isTwoPane || constraints.maxWidth >= 680;
+        final isTwoPane = (context.isLandscape ||
+                constraints.maxWidth > constraints.maxHeight) &&
+            constraints.maxWidth >= 640;
 
         final lyricsContainer = Container(
           decoration: BoxDecoration(

@@ -87,8 +87,15 @@ class MinimalPlayerTheme extends StatelessWidget {
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final isTwoPane =
-                      context.isTwoPane || constraints.maxWidth >= 680;
+                  final isTwoPane = (context.isLandscape ||
+                          constraints.maxWidth > constraints.maxHeight) &&
+                      constraints.maxWidth >= 640;
+
+                  final double artSize = isTwoPane
+                      ? (constraints.maxHeight * 0.72).clamp(200.0, 320.0)
+                      : (context.isTablet
+                          ? (constraints.maxHeight * 0.44).clamp(300.0, 440.0)
+                          : 320.0);
 
                   final centerDisplay = Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -145,8 +152,8 @@ class MinimalPlayerTheme extends StatelessWidget {
                                     : Center(
                                         child: ConstrainedBox(
                                           constraints: BoxConstraints(
-                                            maxHeight: isTwoPane ? 240 : 320,
-                                            maxWidth: isTwoPane ? 240 : 320,
+                                            maxHeight: artSize,
+                                            maxWidth: artSize,
                                           ),
                                           child: AspectRatio(
                                             aspectRatio: 1.0,
@@ -282,8 +289,10 @@ class MinimalPlayerTheme extends StatelessWidget {
                       Padding(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 20, vertical: 4),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
                             IconButton(
                               icon: Icon(
@@ -378,6 +387,7 @@ class MinimalPlayerTheme extends StatelessWidget {
                           ],
                         ),
                       ),
+                    ),
                     ],
                   );
 

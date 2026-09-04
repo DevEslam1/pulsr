@@ -58,13 +58,22 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isTwoPane = context.isTwoPane || constraints.maxWidth >= 680;
+        final isTwoPane = (context.isLandscape ||
+                constraints.maxWidth > constraints.maxHeight) &&
+            constraints.maxWidth >= 640;
+
+        final double cassetteMaxHeight = isTwoPane
+            ? (constraints.maxHeight * 0.72).clamp(200.0, 300.0)
+            : (context.isTablet
+                ? (constraints.maxHeight * 0.38).clamp(280.0, 400.0)
+                : 300.0);
+        final double cassetteMaxWidth = cassetteMaxHeight * 1.5;
 
         final cassetteBody = Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxHeight: isTwoPane ? 240 : 300,
-              maxWidth: isTwoPane ? 360 : 420,
+              maxHeight: cassetteMaxHeight,
+              maxWidth: cassetteMaxWidth,
             ),
             child: AspectRatio(
               aspectRatio: 1.5,

@@ -35,6 +35,23 @@ abstract class Adaptive {
     return isLandscape(context) || (w >= tabletBreakpoint && w > h);
   }
 
+  static bool isTabletPortrait(BuildContext context) =>
+      isTablet(context) && !isLandscape(context);
+
+  static bool isTabletLandscape(BuildContext context) =>
+      isTablet(context) && isLandscape(context);
+
+  static bool isLargeTablet(BuildContext context) =>
+      widthOf(context) >= 900;
+
+  /// Optimal column count for song/track tile lists across phone, tablet portrait, and tablet landscape
+  static int trackGridColumns(BuildContext context) {
+    final w = widthOf(context);
+    if (w >= 1200) return 3;
+    if (w >= tabletBreakpoint || (isLandscape(context) && w >= 600)) return 2;
+    return 1;
+  }
+
   /// Responsive column count for grids dynamically computed from available width.
   static int gridColumns(
     BuildContext context, {
@@ -75,7 +92,11 @@ extension AdaptiveContextX on BuildContext {
   bool get isLandscape =>
       MediaQuery.orientationOf(this) == Orientation.landscape;
   bool get isTablet => Adaptive.isTablet(this);
+  bool get isTabletPortrait => Adaptive.isTabletPortrait(this);
+  bool get isTabletLandscape => Adaptive.isTabletLandscape(this);
+  bool get isLargeTablet => Adaptive.isLargeTablet(this);
   bool get isTwoPane => Adaptive.isTwoPane(this);
+  int get trackGridColumns => Adaptive.trackGridColumns(this);
   double get pagePadding => Adaptive.pagePadding(this);
   WindowClass get windowClass => Adaptive.windowOf(this);
 

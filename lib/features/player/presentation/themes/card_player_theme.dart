@@ -163,8 +163,15 @@ class CardPlayerTheme extends StatelessWidget {
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final isTwoPane =
-                        context.isTwoPane || constraints.maxWidth >= 680;
+                    final isTwoPane = (context.isLandscape ||
+                            constraints.maxWidth > constraints.maxHeight) &&
+                        constraints.maxWidth >= 640;
+
+                    final double artSize = isTwoPane
+                        ? (constraints.maxHeight * 0.72).clamp(240.0, 360.0)
+                        : (context.isTablet
+                            ? (constraints.maxHeight * 0.44).clamp(320.0, 480.0)
+                            : 340.0);
 
                     final centerDisplay = GestureDetector(
                       onTap: () => cubit.toggleLyricsVisibility(),
@@ -209,8 +216,8 @@ class CardPlayerTheme extends StatelessWidget {
                                     key: const ValueKey('artwork_card'),
                                     child: ConstrainedBox(
                                       constraints: BoxConstraints(
-                                        maxHeight: isTwoPane ? 280 : 340,
-                                        maxWidth: isTwoPane ? 280 : 340,
+                                        maxHeight: artSize,
+                                        maxWidth: artSize,
                                       ),
                                       child: AspectRatio(
                                         aspectRatio: 1.0,
@@ -407,9 +414,10 @@ class CardPlayerTheme extends StatelessWidget {
 
                           const SizedBox(height: 6),
 
-                          // Bottom Action Strip
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
                               IconButton(
                                 icon: Icon(
@@ -513,6 +521,7 @@ class CardPlayerTheme extends StatelessWidget {
                               ),
                             ],
                           ),
+                        ),
                         ],
                       ),
                     );

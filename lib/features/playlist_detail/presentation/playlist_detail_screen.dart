@@ -22,9 +22,14 @@ import '../../ytm_search/presentation/widgets/ytm_download_button.dart';
 class PlaylistDetailScreen extends StatelessWidget {
   final PlaylistsTableData playlist;
   final PlaylistUseCases? playlistUseCases;
+  final bool isEmbedded;
 
-  const PlaylistDetailScreen(
-      {super.key, required this.playlist, this.playlistUseCases});
+  const PlaylistDetailScreen({
+    super.key,
+    required this.playlist,
+    this.playlistUseCases,
+    this.isEmbedded = false,
+  });
 
   PlaylistUseCases get _useCases =>
       playlistUseCases ?? getIt<PlaylistUseCases>();
@@ -132,6 +137,7 @@ class PlaylistDetailScreen extends StatelessWidget {
 
         return Scaffold(
           appBar: AppBar(
+            automaticallyImplyLeading: !isEmbedded,
             title: Row(
               children: [
                 if (playlist.isSmart) ...[

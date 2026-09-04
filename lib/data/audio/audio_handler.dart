@@ -56,9 +56,9 @@ class PulsrAudioHandler extends BaseAudioHandler
         config: const AudioServiceConfig(
           androidNotificationChannelId: 'com.pulsr.music.audio',
           androidNotificationChannelName: 'Pulsr Audio Playback',
-          androidNotificationOngoing: false,
+          androidNotificationOngoing: true,
           androidNotificationClickStartsActivity: true,
-          androidStopForegroundOnPause: false,
+          androidStopForegroundOnPause: true,
           androidResumeOnClick: true,
           androidNotificationIcon: 'drawable/ic_notification',
         ),
@@ -91,6 +91,14 @@ class PulsrAudioHandler extends BaseAudioHandler
   int _currentIndex = 0;
   bool _queueDirty = false;
   double? _preDuckVolume;
+  // ignore: unused_field
+  double? _preDuckInactiveVolume;
+  // ignore: unused_field, prefer_final_fields
+  bool _duckActive = false;
+  // ignore: unused_field, prefer_final_fields
+  bool _pauseInterruptionActive = false;
+  // ignore: unused_field
+  DateTime? _lastNoisyTime;
   int _consecutiveFailures = 0;
   DateTime? _lastGaplessChangeTime;
   int _rapidGaplessChangeCount = 0;
@@ -855,46 +863,102 @@ class PulsrAudioHandler extends BaseAudioHandler
       _subscriptions.add(
         session.interruptionEventStream.listen((event) async {
           if (event.begin) {
-            _wasPlayingBeforeInterruption = _activePlayer.playing;
-            if (_wasPlayingBeforeInterruption) {
-              switch (event.type) {
-                case AudioInterruptionType.duck:
+            switch (event.type) {
+              case AudioInterruptionType.duck:
+                // Stack-safe: a second duck begin while already ducked must not
+                // clobber the saved pre-duck level. Duck both engines so a
+                // navigation prompt during a crossfade doesn't blast the fade-in.
+                if (!_duckActive && _activePlayer.playing) {
+                  _duckActive = true;
                   _preDuckVolume = _activePlayer.volume;
+                  _preDuckInactiveVolume = _inactivePlayer.volume;
                   await _activePlayer.setVolume(0.3 * (_preDuckVolume ?? 1.0));
-                  break;
-                case AudioInterruptionType.pause:
-                case AudioInterruptionType.unknown:
+                  if (_crossfadeManager.isCrossfading) {
+                    await _inactivePlayer
+                        .setVolume(0.3 * (_preDuckInactiveVolume ?? 0.0));
+                  }
+                }
+                break;
+              case AudioInterruptionType.pause:
+                // Stack-safe: keep the original pre-interruption state so an
+                // overlapping duck + call doesn't lose the resume decision.
+                if (!_pauseInterruptionActive) {
+                  _wasPlayingBeforeInterruption = _activePlayer.playing;
+                  _pauseInterruptionActive = true;
+                }
+                if (_wasPlayingBeforeInterruption) {
+                  if (_crossfadeManager.isCrossfading) {
+                    await _crossfadeManager.cancel(
+                        _inactivePlayer, _activePlayer,
+                        restoreVolume: _preCrossfadeVolume ?? _volume);
+                  }
                   await _activePlayer.pause();
-                  break;
-              }
+                }
+                break;
+              case AudioInterruptionType.unknown:
+                // Permanent/unknown loss: pause, never auto-resume, free DSP.
+                if (!_pauseInterruptionActive) {
+                  _wasPlayingBeforeInterruption = _activePlayer.playing;
+                  _pauseInterruptionActive = true;
+                }
+                _wasPlayingBeforeInterruption = false;
+                if (_crossfadeManager.isCrossfading) {
+                  await _crossfadeManager.cancel(
+                      _inactivePlayer, _activePlayer,
+                      restoreVolume: _preCrossfadeVolume ?? _volume);
+                }
+                await _activePlayer.pause();
+                break;
             }
           } else {
             switch (event.type) {
               case AudioInterruptionType.duck:
-                if (_preDuckVolume != null) {
-                  final expectedDucked = 0.3 * (_preDuckVolume ?? 1.0);
-                  if ((_activePlayer.volume - expectedDucked).abs() < 0.05) {
-                    await _activePlayer.setVolume(_preDuckVolume ?? 1.0);
+                if (_duckActive) {
+                  _duckActive = false;
+                  if (_preDuckVolume != null) {
+                    final expectedDucked = 0.3 * (_preDuckVolume ?? 1.0);
+                    if ((_activePlayer.volume - expectedDucked).abs() < 0.05) {
+                      await _activePlayer.setVolume(_preDuckVolume ?? 1.0);
+                    }
+                    _preDuckVolume = null;
                   }
-                  _preDuckVolume = null;
+                  if (_preDuckInactiveVolume != null) {
+                    final expectedInactive =
+                        0.3 * (_preDuckInactiveVolume ?? 0.0);
+                    if ((_inactivePlayer.volume - expectedInactive).abs() <
+                        0.05) {
+                      await _inactivePlayer
+                          .setVolume(_preDuckInactiveVolume ?? 0.0);
+                    }
+                    _preDuckInactiveVolume = null;
+                  }
                 }
                 break;
               case AudioInterruptionType.pause:
-                if (_wasPlayingBeforeInterruption) {
-                  _wasPlayingBeforeInterruption = false;
-                  final prefs =
-                      _cachedPrefs ?? await SharedPreferences.getInstance();
-                  final resume =
-                      prefs.getBool(PrefsKeys.resumeAfterInterruption) ?? true;
-                  if (resume && !_activePlayer.playing) {
-                    await _activePlayer.play();
+                if (_pauseInterruptionActive) {
+                  _pauseInterruptionActive = false;
+                  if (_wasPlayingBeforeInterruption) {
+                    _wasPlayingBeforeInterruption = false;
+                    final prefs =
+                        _cachedPrefs ?? await SharedPreferences.getInstance();
+                    final resume =
+                        prefs.getBool(PrefsKeys.resumeAfterInterruption) ??
+                            true;
+                    if (resume && !_activePlayer.playing) {
+                      await _activePlayer.play();
+                    }
                   }
                 }
                 _preDuckVolume = null;
+                _preDuckInactiveVolume = null;
+                _duckActive = false;
                 break;
               case AudioInterruptionType.unknown:
                 _wasPlayingBeforeInterruption = false;
+                _pauseInterruptionActive = false;
                 _preDuckVolume = null;
+                _preDuckInactiveVolume = null;
+                _duckActive = false;
                 break;
             }
           }
@@ -902,12 +966,23 @@ class PulsrAudioHandler extends BaseAudioHandler
       );
 
       _subscriptions.add(
-        session.becomingNoisyEventStream.listen((_) {
-          if (_crossfadeManager.isCrossfading) {
-            _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
-                restoreVolume: _volume);
+        session.becomingNoisyEventStream.listen((_) async {
+          // Debounce: wired + BT stacks can emit noisy twice for one unplug.
+          final now = DateTime.now();
+          if (_lastNoisyTime != null &&
+              now.difference(_lastNoisyTime!) <
+                  const Duration(milliseconds: 800)) {
+            return;
           }
-          pause();
+          _lastNoisyTime = now;
+          if (!_activePlayer.playing && !_crossfadeManager.isCrossfading) {
+            return;
+          }
+          if (_crossfadeManager.isCrossfading) {
+            await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
+                restoreVolume: _preCrossfadeVolume ?? _volume);
+          }
+          await pause();
         }),
       );
     } catch (e, st) {
@@ -2147,6 +2222,7 @@ class PulsrAudioHandler extends BaseAudioHandler
             : AudioServiceShuffleMode.all);
         return !currentShuffle;
       case 'cycleRepeat':
+      case 'toggleRepeat':
         final currentLoop = _activePlayer.loopMode;
         if (currentLoop == LoopMode.off) {
           await setRepeatMode(AudioServiceRepeatMode.all);

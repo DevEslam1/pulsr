@@ -163,8 +163,9 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final isTwoPane =
-                      context.isTwoPane || constraints.maxWidth >= 680;
+                  final isTwoPane = (context.isLandscape ||
+                          constraints.maxWidth > constraints.maxHeight) &&
+                      constraints.maxWidth >= 640;
 
                   final centerDisplay = GestureDetector(
                     onTap: () => cubit.toggleLyricsVisibility(),
@@ -211,8 +212,13 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                     turns: _rotationController,
                                     child: LayoutBuilder(
                                       builder: (context, vinylConstraints) {
-                                        final maxDimension =
-                                            isTwoPane ? 280.0 : 340.0;
+                                        final maxDimension = isTwoPane
+                                            ? (constraints.maxHeight * 0.72)
+                                                .clamp(240.0, 360.0)
+                                            : (context.isTablet
+                                                ? (constraints.maxHeight * 0.44)
+                                                    .clamp(320.0, 480.0)
+                                                : 340.0);
                                         final vinylSize = math.min(
                                           math.min(vinylConstraints.maxWidth,
                                                   vinylConstraints.maxHeight) *
@@ -417,8 +423,10 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                       Padding(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 4),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
                             IconButton(
                               icon: Icon(
@@ -510,17 +518,18 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                               },
                               tooltip: context.l10n.addToPlaylist,
                             ),
-                            IconButton(
-                              icon: Icon(
-                                Icons.queue_music_rounded,
-                                color: state.isQueueVisible
-                                    ? activeColor
-                                    : p.textSecondary,
+                              IconButton(
+                                icon: Icon(
+                                  Icons.queue_music_rounded,
+                                  color: state.isQueueVisible
+                                      ? activeColor
+                                      : p.textSecondary,
+                                ),
+                                onPressed: () => cubit.toggleQueueVisibility(),
+                                tooltip: context.l10n.queue,
                               ),
-                              onPressed: () => cubit.toggleQueueVisibility(),
-                              tooltip: context.l10n.queue,
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ],

@@ -44,11 +44,16 @@ class MediaScannerService {
     if (Platform.isAndroid) {
       final audioStatus = await Permission.audio.request();
       if (audioStatus.isGranted || audioStatus.isLimited) return true;
-      if (!audioStatus.isPermanentlyDenied) {
-        final storageStatus = await Permission.storage.request();
-        return storageStatus.isGranted || storageStatus.isLimited;
-      }
-      return false;
+      // On Android 13+ Permission.storage (READ_EXTERNAL_STORAGE, maxSdk 32)
+      // is always denied — requesting it after audio denial only produces a
+      // second instant-deny dialog. Only touch it when it can still succeed:
+      // pre-13 devices on first run, or upgrades where it was already granted.
+      final storageCurrent = await Permission.storage.status;
+      if (storageCurrent.isGranted || storageCurrent.isLimited) return true;
+      if (storageCurrent.isPermanentlyDenied) return false;
+      if (audioStatus.isPermanentlyDenied) return false;
+      final storageStatus = await Permission.storage.request();
+      return storageStatus.isGranted || storageStatus.isLimited;
     } else if (Platform.isIOS) {
       final status = await Permission.mediaLibrary.request();
       return status.isGranted || status.isLimited;

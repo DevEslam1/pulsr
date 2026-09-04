@@ -404,76 +404,96 @@ class _LibraryScreenState extends State<LibraryScreen>
     final showAlphabet = songs.length >= 15;
     final alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ#'.split('');
 
+    final trackCols = context.trackGridColumns;
+
+    Widget buildSongItem(SongsTableData song, int index) {
+      return Dismissible(
+        key: ValueKey('song_${song.id}'),
+        background: Container(
+          color: p.accentContainer,
+          alignment: AlignmentDirectional.centerStart,
+          padding: const EdgeInsetsDirectional.only(start: 24),
+          child: Row(children: [
+            Icon(Icons.playlist_play_rounded, color: p.accent),
+            const SizedBox(width: 8),
+            Text(context.l10n.playNext,
+                style: TextStyle(
+                    color: p.accent, fontWeight: FontWeight.w700))
+          ]),
+        ),
+        secondaryBackground: Container(
+          color: p.favorite.withValues(alpha: 0.2),
+          alignment: AlignmentDirectional.centerEnd,
+          padding: const EdgeInsetsDirectional.only(end: 24),
+          child:
+              Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+            Text(context.l10n.favorite,
+                style: TextStyle(
+                    color: p.favorite, fontWeight: FontWeight.w700)),
+            const SizedBox(width: 8),
+            Icon(Icons.favorite_rounded, color: p.favorite)
+          ]),
+        ),
+        confirmDismiss: (direction) async {
+          if (direction == DismissDirection.startToEnd) {
+            playerCubit.playNext(song);
+          } else {
+            cubit.toggleFavorite(song.id);
+          }
+          return false;
+        },
+        child: SongTile(
+          song: song,
+          selected: state.selectedSongIds.contains(song.id),
+          onTap: () {
+            if (state.isMultiSelectMode) {
+              cubit.toggleSongSelection(song.id);
+            } else {
+              playerCubit.playSong(song, queue: songs);
+            }
+          },
+          onLongPress: () => cubit.toggleSongSelection(song.id),
+          onMorePressed: () => showModalBottomSheet(
+            context: context,
+            useRootNavigator: true,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            builder: (_) => SongInfoSheet(song: song),
+          ),
+        ),
+      );
+    }
+
     return RefreshIndicator(
       onRefresh: () => _handleRefresh(context),
       child: Stack(
         children: [
-          ListView.builder(
-            physics: const AlwaysScrollableScrollPhysics(),
-            controller: _songsScrollController,
-            itemExtent: songs.length > 500 ? 58.0 : null,
-            padding:
-                const EdgeInsets.only(bottom: 160, top: 8, left: 4, right: 4),
-            itemCount: songs.length,
-            itemBuilder: (context, index) {
-              final song = songs[index];
-              return Dismissible(
-                key: ValueKey('song_${song.id}'),
-                background: Container(
-                  color: p.accentContainer,
-                  alignment: AlignmentDirectional.centerStart,
-                  padding: const EdgeInsetsDirectional.only(start: 24),
-                  child: Row(children: [
-                    Icon(Icons.playlist_play_rounded, color: p.accent),
-                    const SizedBox(width: 8),
-                    Text(context.l10n.playNext,
-                        style: TextStyle(
-                            color: p.accent, fontWeight: FontWeight.w700))
-                  ]),
-                ),
-                secondaryBackground: Container(
-                  color: p.favorite.withValues(alpha: 0.2),
-                  alignment: AlignmentDirectional.centerEnd,
-                  padding: const EdgeInsetsDirectional.only(end: 24),
-                  child:
-                      Row(mainAxisAlignment: MainAxisAlignment.end, children: [
-                    Text(context.l10n.favorite,
-                        style: TextStyle(
-                            color: p.favorite, fontWeight: FontWeight.w700)),
-                    const SizedBox(width: 8),
-                    Icon(Icons.favorite_rounded, color: p.favorite)
-                  ]),
-                ),
-                confirmDismiss: (direction) async {
-                  if (direction == DismissDirection.startToEnd) {
-                    playerCubit.playNext(song);
-                  } else {
-                    cubit.toggleFavorite(song.id);
-                  }
-                  return false;
-                },
-                child: SongTile(
-                  song: song,
-                  selected: state.selectedSongIds.contains(song.id),
-                  onTap: () {
-                    if (state.isMultiSelectMode) {
-                      cubit.toggleSongSelection(song.id);
-                    } else {
-                      playerCubit.playSong(song, queue: songs);
-                    }
-                  },
-                  onLongPress: () => cubit.toggleSongSelection(song.id),
-                  onMorePressed: () => showModalBottomSheet(
-                    context: context,
-                    useRootNavigator: true,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (_) => SongInfoSheet(song: song),
+          trackCols > 1
+              ? GridView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  controller: _songsScrollController,
+                  padding: const EdgeInsets.only(
+                      bottom: 160, top: 8, left: 6, right: 6),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: trackCols,
+                    mainAxisExtent: 64,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 4,
                   ),
+                  itemCount: songs.length,
+                  itemBuilder: (context, index) =>
+                      buildSongItem(songs[index], index),
+                )
+              : ListView.builder(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  controller: _songsScrollController,
+                  itemExtent: songs.length > 500 ? 58.0 : null,
+                  padding: const EdgeInsets.only(
+                      bottom: 160, top: 8, left: 4, right: 4),
+                  itemCount: songs.length,
+                  itemBuilder: (context, index) =>
+                      buildSongItem(songs[index], index),
                 ),
-              );
-            },
-          ),
           if (showAlphabet)
             PositionedDirectional(
               end: 4,
@@ -519,6 +539,7 @@ class _LibraryScreenState extends State<LibraryScreen>
   ) {
     final p = context.palette;
     final downloaded = state.songs.where((s) => _isOnlineDownload(s)).toList();
+    final trackCols = context.trackGridColumns;
 
     if (downloaded.isEmpty) {
       return _buildEmpty(
@@ -620,73 +641,147 @@ class _LibraryScreenState extends State<LibraryScreen>
 
           // ---------- List of Downloaded Songs ----------
           Expanded(
-            child: ListView.builder(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding:
-                  const EdgeInsets.only(bottom: 160, top: 4, left: 4, right: 4),
-              itemCount: downloaded.length,
-              itemBuilder: (context, index) {
-                final song = downloaded[index];
-                return Dismissible(
-                  key: ValueKey('dl_${song.id}'),
-                  background: Container(
-                    color: p.accentContainer,
-                    alignment: Alignment.centerLeft,
-                    padding: const EdgeInsets.only(left: 24),
-                    child: Row(children: [
-                      Icon(Icons.playlist_play_rounded, color: p.accent),
-                      const SizedBox(width: 8),
-                      Text(context.l10n.playNext,
-                          style: TextStyle(
-                              color: p.accent, fontWeight: FontWeight.w700)),
-                    ]),
-                  ),
-                  secondaryBackground: Container(
-                    color: p.favorite.withValues(alpha: 0.2),
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: 24),
-                    child: Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          Text(context.l10n.favorite,
-                              style: TextStyle(
-                                  color: p.favorite,
-                                  fontWeight: FontWeight.w700)),
-                          const SizedBox(width: 8),
-                          Icon(Icons.favorite_rounded, color: p.favorite),
-                        ]),
-                  ),
-                  confirmDismiss: (direction) async {
-                    if (direction == DismissDirection.startToEnd) {
-                      playerCubit.playNext(song);
-                    } else {
-                      cubit.toggleFavorite(song.id);
-                    }
-                    return false;
-                  },
-                  child: SongTile(
-                    song: song,
-                    index: index + 1,
-                    selected: state.selectedSongIds.contains(song.id),
-                    onTap: () {
-                      if (state.isMultiSelectMode) {
-                        cubit.toggleSongSelection(song.id);
-                      } else {
-                        playerCubit.playSong(song, queue: downloaded);
-                      }
-                    },
-                    onLongPress: () => cubit.toggleSongSelection(song.id),
-                    onMorePressed: () => showModalBottomSheet(
-                      context: context,
-                      useRootNavigator: true,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => SongInfoSheet(song: song),
+            child: trackCols > 1
+                ? GridView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.only(
+                        bottom: 160, top: 4, left: 6, right: 6),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: trackCols,
+                      mainAxisExtent: 64,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 4,
                     ),
+                    itemCount: downloaded.length,
+                    itemBuilder: (context, index) {
+                      final song = downloaded[index];
+                      return Dismissible(
+                        key: ValueKey('dl_${song.id}'),
+                        background: Container(
+                          color: p.accentContainer,
+                          alignment: Alignment.centerLeft,
+                          padding: const EdgeInsets.only(left: 24),
+                          child: Row(children: [
+                            Icon(Icons.playlist_play_rounded, color: p.accent),
+                            const SizedBox(width: 8),
+                            Text(context.l10n.playNext,
+                                style: TextStyle(
+                                    color: p.accent, fontWeight: FontWeight.w700)),
+                          ]),
+                        ),
+                        secondaryBackground: Container(
+                          color: p.favorite.withValues(alpha: 0.2),
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 24),
+                          child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Text(context.l10n.favorite,
+                                    style: TextStyle(
+                                        color: p.favorite,
+                                        fontWeight: FontWeight.w700)),
+                                const SizedBox(width: 8),
+                                Icon(Icons.favorite_rounded, color: p.favorite),
+                              ]),
+                        ),
+                        confirmDismiss: (direction) async {
+                          if (direction == DismissDirection.startToEnd) {
+                            playerCubit.playNext(song);
+                          } else {
+                            cubit.toggleFavorite(song.id);
+                          }
+                          return false;
+                        },
+                        child: SongTile(
+                          song: song,
+                          index: index + 1,
+                          selected: state.selectedSongIds.contains(song.id),
+                          onTap: () {
+                            if (state.isMultiSelectMode) {
+                              cubit.toggleSongSelection(song.id);
+                            } else {
+                              playerCubit.playSong(song, queue: downloaded);
+                            }
+                          },
+                          onLongPress: () => cubit.toggleSongSelection(song.id),
+                          onMorePressed: () => showModalBottomSheet(
+                            context: context,
+                            useRootNavigator: true,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (_) => SongInfoSheet(song: song),
+                          ),
+                        ),
+                      );
+                    },
+                  )
+                : ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding:
+                        const EdgeInsets.only(bottom: 160, top: 4, left: 4, right: 4),
+                    itemCount: downloaded.length,
+                    itemBuilder: (context, index) {
+                      final song = downloaded[index];
+                      return Dismissible(
+                        key: ValueKey('dl_${song.id}'),
+                        background: Container(
+                          color: p.accentContainer,
+                          alignment: Alignment.centerLeft,
+                          padding: const EdgeInsets.only(left: 24),
+                          child: Row(children: [
+                            Icon(Icons.playlist_play_rounded, color: p.accent),
+                            const SizedBox(width: 8),
+                            Text(context.l10n.playNext,
+                                style: TextStyle(
+                                    color: p.accent, fontWeight: FontWeight.w700)),
+                          ]),
+                        ),
+                        secondaryBackground: Container(
+                          color: p.favorite.withValues(alpha: 0.2),
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 24),
+                          child: Row(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              children: [
+                                Text(context.l10n.favorite,
+                                    style: TextStyle(
+                                        color: p.favorite,
+                                        fontWeight: FontWeight.w700)),
+                                const SizedBox(width: 8),
+                                Icon(Icons.favorite_rounded, color: p.favorite),
+                              ]),
+                        ),
+                        confirmDismiss: (direction) async {
+                          if (direction == DismissDirection.startToEnd) {
+                            playerCubit.playNext(song);
+                          } else {
+                            cubit.toggleFavorite(song.id);
+                          }
+                          return false;
+                        },
+                        child: SongTile(
+                          song: song,
+                          index: index + 1,
+                          selected: state.selectedSongIds.contains(song.id),
+                          onTap: () {
+                            if (state.isMultiSelectMode) {
+                              cubit.toggleSongSelection(song.id);
+                            } else {
+                              playerCubit.playSong(song, queue: downloaded);
+                            }
+                          },
+                          onLongPress: () => cubit.toggleSongSelection(song.id),
+                          onMorePressed: () => showModalBottomSheet(
+                            context: context,
+                            useRootNavigator: true,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (_) => SongInfoSheet(song: song),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
         ],
       ),

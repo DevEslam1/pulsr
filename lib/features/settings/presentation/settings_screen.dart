@@ -47,8 +47,8 @@ class SettingsScreen extends StatelessWidget {
           appBar: AppBar(title: Text(context.l10n.settings)),
           body: Center(
             child: ConstrainedBox(
-              constraints:
-                  const BoxConstraints(maxWidth: 760), // readable on tablets
+              constraints: BoxConstraints(
+                  maxWidth: context.isTabletLandscape ? 1040 : 760),
               child: ListView(
                 padding: EdgeInsets.only(
                     bottom: 160,

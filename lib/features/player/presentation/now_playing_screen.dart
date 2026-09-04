@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/theme/dynamic_theme_cubit.dart';
+import '../../../core/utils/adaptive.dart';
 import '../../settings/cubit/settings_cubit.dart';
 import '../../settings/cubit/settings_state.dart';
 import '../cubit/player_cubit.dart';
@@ -96,10 +97,9 @@ class NowPlayingScreen extends StatelessWidget {
               child: Center(
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
-                    maxWidth: MediaQuery.orientationOf(context) ==
-                            Orientation.landscape
-                        ? 960
-                        : 560,
+                    maxWidth: context.isLandscape
+                        ? (context.isTablet ? 1160.0 : 960.0)
+                        : (context.isTablet ? 780.0 : 560.0),
                   ),
                   child: Directionality(
                     textDirection: TextDirection.ltr,

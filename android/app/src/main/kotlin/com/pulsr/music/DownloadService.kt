@@ -47,10 +47,19 @@ class DownloadService : Service() {
                 putExtra(EXTRA_VIDEO_ID, videoId)
                 putExtra(EXTRA_TITLE, title)
             }
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(intent)
-            } else {
-                context.startService(intent)
+            // Android 12+ throws ForegroundServiceStartNotAllowedException when
+            // starting an FGS from the background. Never let that crash the app;
+            // the Dart side falls back to a WorkManager-safe path.
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
+            } catch (_: IllegalStateException) {
+                try { context.startService(intent) } catch (_: Exception) {}
+            } catch (_: SecurityException) {
+                try { context.startService(intent) } catch (_: Exception) {}
             }
         }
 
@@ -61,14 +70,21 @@ class DownloadService : Service() {
                 putExtra(EXTRA_TITLE, title)
                 putExtra(EXTRA_PROGRESS, progress)
             }
-            context.startService(intent)
+            try {
+                context.startService(intent)
+            } catch (_: IllegalStateException) {
+                // Background start blocked (Android 8+ background execution limits) — drop the update.
+            } catch (_: SecurityException) {
+            }
         }
 
         fun stop(context: Context) {
             val intent = Intent(context, DownloadService::class.java).apply {
                 action = ACTION_STOP
             }
-            context.startService(intent)
+            try {
+                context.startService(intent)
+            } catch (_: Exception) {}
         }
     }
 
@@ -124,7 +140,9 @@ class DownloadService : Service() {
     private fun ensureForeground(title: String, progress: Int) {
         val n = notificationFor(title, progress)
         if (!foregroundStarted) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // FOREGROUND_SERVICE_TYPE_DATA_SYNC exists only on API 34+. Passing
+            // it on API 29-33 throws IllegalArgumentException -> crash.
+            if (Build.VERSION.SDK_INT >= 34) {
                 startForeground(NOTIFICATION_ID, n, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
             } else {
                 startForeground(NOTIFICATION_ID, n)

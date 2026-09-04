@@ -628,18 +628,44 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 SectionHeader(title: context.l10n.recentlyAdded),
-                for (final song in songs.take(10))
-                  SongTile(
-                    song: song,
-                    onTap: () => playerCubit.playSong(song, queue: songs),
-                    onMorePressed: () => showModalBottomSheet(
-                      context: context,
-                      useRootNavigator: true,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => SongInfoSheet(song: song),
+                if (context.trackGridColumns > 1)
+                  GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: EdgeInsets.symmetric(
+                        horizontal: Adaptive.pagePadding(context)),
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: context.trackGridColumns,
+                      mainAxisExtent: 64,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 4,
                     ),
-                  ),
+                    itemCount: songs.take(12).length,
+                    itemBuilder: (context, index) => SongTile(
+                      song: songs[index],
+                      onTap: () => playerCubit.playSong(songs[index], queue: songs),
+                      onMorePressed: () => showModalBottomSheet(
+                        context: context,
+                        useRootNavigator: true,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (_) => SongInfoSheet(song: songs[index]),
+                      ),
+                    ),
+                  )
+                else
+                  for (final song in songs.take(10))
+                    SongTile(
+                      song: song,
+                      onTap: () => playerCubit.playSong(song, queue: songs),
+                      onMorePressed: () => showModalBottomSheet(
+                        context: context,
+                        useRootNavigator: true,
+                        isScrollControlled: true,
+                        backgroundColor: Colors.transparent,
+                        builder: (_) => SongInfoSheet(song: song),
+                      ),
+                    ),
               ],
             );
           },
@@ -972,20 +998,48 @@ class _OnlineCategorySection extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               SectionHeader(title: 'Top Charts & Songs (${songs.length})'),
-              for (int i = 0; i < songs.length; i++)
-                SongTile(
-                  song: songs[i],
-                  index: i + 1,
-                  onTap: () => playerCubit.playSong(songs[i], queue: songs),
-                  trailing: YtmDownloadButton(song: songs[i]),
-                  onMorePressed: () => showModalBottomSheet(
-                    context: context,
-                    useRootNavigator: true,
-                    isScrollControlled: true,
-                    backgroundColor: Colors.transparent,
-                    builder: (_) => SongInfoSheet(song: songs[i]),
+              if (context.trackGridColumns > 1)
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  padding: EdgeInsets.symmetric(
+                      horizontal: Adaptive.pagePadding(context)),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: context.trackGridColumns,
+                    mainAxisExtent: 64,
+                    crossAxisSpacing: 10,
+                    mainAxisSpacing: 4,
                   ),
-                ),
+                  itemCount: songs.length,
+                  itemBuilder: (context, i) => SongTile(
+                    song: songs[i],
+                    index: i + 1,
+                    onTap: () => playerCubit.playSong(songs[i], queue: songs),
+                    trailing: YtmDownloadButton(song: songs[i]),
+                    onMorePressed: () => showModalBottomSheet(
+                      context: context,
+                      useRootNavigator: true,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => SongInfoSheet(song: songs[i]),
+                    ),
+                  ),
+                )
+              else
+                for (int i = 0; i < songs.length; i++)
+                  SongTile(
+                    song: songs[i],
+                    index: i + 1,
+                    onTap: () => playerCubit.playSong(songs[i], queue: songs),
+                    trailing: YtmDownloadButton(song: songs[i]),
+                    onMorePressed: () => showModalBottomSheet(
+                      context: context,
+                      useRootNavigator: true,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => SongInfoSheet(song: songs[i]),
+                    ),
+                  ),
             ],
           ),
         );

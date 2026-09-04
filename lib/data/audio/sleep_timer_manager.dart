@@ -18,6 +18,7 @@ enum SleepTimerMode {
 /// wall-clock DateTime.now(), guaranteeing accurate timing across Android Doze and CPU deep sleep.
 class SleepTimerManager {
   Timer? _countdownTicker;
+  Timer? _oneShotTimer;
   SleepTimerMode _mode = SleepTimerMode.duration;
   Duration _remainingDuration = Duration.zero;
   int _remainingTracks = 0;
@@ -61,8 +62,9 @@ class SleepTimerManager {
     _persistTimerState(duration);
 
     if (duration < const Duration(seconds: 1)) {
-      // Sub-second timer for unit tests
-      Timer(duration, () async {
+      // Sub-second timer for unit tests — tracked so cancel/dispose can stop it.
+      _oneShotTimer?.cancel();
+      _oneShotTimer = Timer(duration, () async {
         if (_isArmed && _sleepFadeToken == currentToken) {
           _remainingDuration = Duration.zero;
           _sleepTimerRemainingSubject.add(null);
@@ -186,10 +188,15 @@ class SleepTimerManager {
       ErrorLogger.log('Error triggering sleep timer callback',
           error: e, stackTrace: st, category: 'SleepTimer');
     } finally {
-      // Restore pre-fade volume cleanly
+      // Restore pre-fade volume cleanly — but only if the player is still
+      // sitting at (or below) the faded level. If the user touched volume
+      // mid-fade, don't clobber their choice.
       if (_preFadeVolume != null && player != null) {
         try {
-          await player.setVolume(_preFadeVolume!);
+          final current = player.volume;
+          if (current <= _preFadeVolume! + 0.02) {
+            await player.setVolume(_preFadeVolume!.clamp(0.0, 1.0));
+          }
         } catch (_) {}
         _preFadeVolume = null;
       }
@@ -200,6 +207,8 @@ class SleepTimerManager {
   void _sleepCountdownTickerCancel() {
     _countdownTicker?.cancel();
     _countdownTicker = null;
+    _oneShotTimer?.cancel();
+    _oneShotTimer = null;
     _sleepTimerRemainingSubject.add(null);
   }
 
