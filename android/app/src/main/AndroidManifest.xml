@@ -148,7 +148,7 @@
         </receiver>
 
         <receiver
-            android:name=".NowPlayingWidget"
+            android:name="com.pulsr.music.NowPlayingWidget"
             android:label="${appName} Widget"
             android:exported="true">
             <intent-filter>
