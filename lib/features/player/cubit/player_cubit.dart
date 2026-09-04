@@ -31,7 +31,7 @@ import '../../../core/services/hires_audio_service.dart';
 import '../../../core/services/settings_profiles_service.dart';
 import '../../../domain/models/audio_output_info.dart';
 import '../../settings/cubit/settings_cubit.dart';
-import '../../home_widget/widget_service.dart';
+import '../../widgets/widget_service.dart';
 import 'player_state.dart';
 
 class _QueueSlotData {

@@ -1456,11 +1456,7 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String downloadTileSemantics(
-    String title,
-    String artist,
-    String status,
-    String progress,
-  ) {
+      String title, String artist, String status, String progress) {
     return '$title $artist $status $progress';
   }
 

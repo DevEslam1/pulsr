@@ -88,7 +88,7 @@ class MinimalPlayerTheme extends StatelessWidget {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final isTwoPane =
-                      context.isTwoPane || constraints.maxWidth >= 680;
+                      context.isLandscape && (context.isTwoPane || constraints.maxWidth >= 680);
 
                   final centerDisplay = Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),

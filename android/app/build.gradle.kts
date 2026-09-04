@@ -33,7 +33,7 @@ android {
 
         externalNativeBuild {
             cmake {
-                cppFlags += listOf("-std=c++20", "-O3", "-ffast-math")
+                cppFlags += listOf("-std=c++20")
             }
         }
     }

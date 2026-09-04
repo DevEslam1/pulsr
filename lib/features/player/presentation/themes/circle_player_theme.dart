@@ -164,7 +164,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final isTwoPane =
-                      context.isTwoPane || constraints.maxWidth >= 680;
+                      context.isLandscape && (context.isTwoPane || constraints.maxWidth >= 680);
 
                   final centerDisplay = GestureDetector(
                     onTap: () => cubit.toggleLyricsVisibility(),

@@ -58,7 +58,8 @@ class _CassettePlayerThemeState extends State<CassettePlayerTheme>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isTwoPane = context.isTwoPane || constraints.maxWidth >= 680;
+        final isTwoPane =
+            context.isLandscape && (context.isTwoPane || constraints.maxWidth >= 680);
 
         final cassetteBody = Center(
           child: ConstrainedBox(

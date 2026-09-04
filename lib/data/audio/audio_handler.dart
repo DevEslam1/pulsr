@@ -142,6 +142,10 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// join, so the two are mutually exclusive by construction.
   bool get _gaplessMode => _crossfadeManager.duration <= Duration.zero;
 
+  final StreamController<SongsTableData> _onTrackChangedSubject =
+      StreamController<SongsTableData>.broadcast();
+  Stream<SongsTableData> get onTrackChanged => _onTrackChangedSubject.stream;
+
   Timer? _savePositionDebounce;
   final StreamController<Duration> _positionSubject =
       StreamController<Duration>.broadcast();
@@ -625,6 +629,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         debugPrint('[AudioHandler] Corrupted file flagged at $path: $error');
       },
     );
+
 
     _memoryManager = AudioMemoryManager(
       onEvictOldestCacheRequested: () {
@@ -1559,6 +1564,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         }
 
         mediaItem.add(_songToMediaItem(nextSong, artUri));
+        _onTrackChangedSubject.add(nextSong);
         _repository.recordPlayHistory(nextSong.id);
         _broadcastState(_activePlayer.playbackEvent);
 
@@ -1770,6 +1776,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     final fastArtUri =
         song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
     mediaItem.add(_songToMediaItem(song, fastArtUri));
+    _onTrackChangedSubject.add(song);
 
     final sources = _buildAudioSources(_songs);
 
@@ -1937,6 +1944,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     final fastArtUri =
         song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
     mediaItem.add(_songToMediaItem(song, fastArtUri));
+    _onTrackChangedSubject.add(song);
     await _activePlayer.setVolume(_calculateReplayGainVolume(song));
     _repository.recordPlayHistory(song.id);
     _broadcastState(_activePlayer.playbackEvent);
@@ -2015,6 +2023,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
     final item = _songToMediaItem(song, fastArtUri);
     mediaItem.add(item);
+    _onTrackChangedSubject.add(song);
 
     // Resolve high-res artwork in background without blocking audio source loading
     ArtworkUriResolver.resolveArtworkUri(song).then((artUri) {
@@ -2931,6 +2940,57 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
+  Future<void> get effectsReady => Future<void>.value();
+
+  bool get isSaturationEnabled => _equalizerManager.isSaturationEnabled;
+  double get saturationDrive => _equalizerManager.saturationDrive;
+  double get saturationMix => _equalizerManager.saturationMix;
+  double get saturationTilt => _equalizerManager.saturationTilt;
+  Future<void> setSaturation(
+    bool enabled, {
+    double? drive,
+    double? mix,
+    double? tilt,
+  }) => _equalizerManager.setSaturation(
+    enabled,
+    drive: drive,
+    mix: mix,
+    tilt: tilt,
+  );
+  bool get isStereoWidthEnabled => _equalizerManager.isStereoWidthEnabled;
+  double get stereoWidth => _equalizerManager.stereoWidth;
+  Future<void> setStereoWidth(bool enabled, {double? width}) =>
+      _equalizerManager.setStereoWidth(enabled, width: width);
+  bool get isLoudnessContourEnabled =>
+      _equalizerManager.isLoudnessContourEnabled;
+  double get loudnessContourIntensity =>
+      _equalizerManager.loudnessContourIntensity;
+  Future<void> setLoudnessContour(bool enabled, {double? intensity}) =>
+      _equalizerManager.setLoudnessContour(enabled, intensity: intensity);
+  bool get isSubCrossoverEnabled => _equalizerManager.isSubCrossoverEnabled;
+  double get subCrossoverCornerHz => _equalizerManager.subCrossoverCornerHz;
+  double get subCrossoverSlopeDbPerOct =>
+      _equalizerManager.subCrossoverSlopeDbPerOct;
+  double get subCrossoverGain => _equalizerManager.subCrossoverGain;
+  Future<void> setSubCrossover(
+    bool enabled, {
+    double? cornerHz,
+    double? slopeDbPerOct,
+    double? gain,
+  }) => _equalizerManager.setSubCrossover(
+    enabled,
+    cornerHz: cornerHz,
+    slopeDbPerOct: slopeDbPerOct,
+    gain: gain,
+  );
+  bool get isDynamicEqEnabled => _equalizerManager.isDynamicEqEnabled;
+  List<DynamicEqBandConfig> get dynamicEqBands =>
+      _equalizerManager.dynamicEqBands;
+  Future<void> setDynamicEq(bool enabled) =>
+      _equalizerManager.setDynamicEq(enabled);
+  Future<void> setDynamicEqBand(int index, DynamicEqBandConfig band) =>
+      _equalizerManager.setDynamicEqBand(index, band);
+
   @override
   Future<void> stop() async {
     _sleepTimerManager.cancelSleepTimer();
@@ -2965,6 +3025,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (!_positionSubject.isClosed) _positionSubject.close();
     if (!_audioSessionIdSubject.isClosed) _audioSessionIdSubject.close();
     if (!_errorSubject.isClosed) _errorSubject.close();
+    if (!_onTrackChangedSubject.isClosed) _onTrackChangedSubject.close();
     _equalizerManager.dispose();
     _crossfadeManager.dispose();
     AudioEffectsChannel().releaseEffects();

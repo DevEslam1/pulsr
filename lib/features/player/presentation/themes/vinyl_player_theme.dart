@@ -59,7 +59,8 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isTwoPane = context.isTwoPane || constraints.maxWidth >= 680;
+        final isTwoPane =
+            context.isLandscape && (context.isTwoPane || constraints.maxWidth >= 680);
 
         final turntableDisc = Center(
           child: ConstrainedBox(

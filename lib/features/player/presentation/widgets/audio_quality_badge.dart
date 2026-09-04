@@ -11,12 +11,14 @@ class AudioQualityBadge extends StatelessWidget {
   final SongsTableData? song;
   final Color activeColor;
   final bool compact;
+  final bool showDevice;
 
   const AudioQualityBadge({
     super.key,
     required this.song,
     required this.activeColor,
     this.compact = false,
+    this.showDevice = true,
   });
 
   @override
@@ -89,52 +91,57 @@ class AudioQualityBadge extends StatelessWidget {
               ),
             ],
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(
-                isUsb ? Icons.usb_rounded : info.icon,
-                size: compact ? 12 : 14,
-                color: isUsb ? const Color(0xFFFFD700) : info.badgeColor,
-              ),
-              const SizedBox(width: 6),
-              Text(
-                info.shortBadgeLabel,
-                style: TextStyle(
-                  color: isUsb ? const Color(0xFFFFD700) : Colors.white,
-                  fontSize: compact ? 10 : 11.5,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 0.6,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  isUsb ? Icons.usb_rounded : info.icon,
+                  size: compact ? 12 : 14,
+                  color: isUsb ? const Color(0xFFFFD700) : info.badgeColor,
                 ),
-              ),
-              const SizedBox(width: 6),
-              Container(
-                width: 3,
-                height: 3,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.5),
+                const SizedBox(width: 6),
+                Text(
+                  info.shortBadgeLabel,
+                  style: TextStyle(
+                    color: isUsb ? const Color(0xFFFFD700) : Colors.white,
+                    fontSize: compact ? 10 : 11.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                isBitPerfect
-                    ? '$deviceShortName • Direct'
-                    : '$deviceShortName • ${outputRate}kHz/${outputBitDepth}b',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.9),
-                  fontSize: compact ? 9.5 : 11,
-                  fontWeight: FontWeight.w700,
+                if (showDevice) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    width: 3,
+                    height: 3,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    isBitPerfect
+                        ? '$deviceShortName • Direct'
+                        : '$deviceShortName • ${outputRate}kHz/${outputBitDepth}b',
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.9),
+                      fontSize: compact ? 9.5 : 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.tune_rounded,
+                  size: compact ? 11 : 13,
+                  color: (isUsb ? const Color(0xFFFFD700) : info.badgeColor)
+                      .withValues(alpha: 0.8),
                 ),
-              ),
-              const SizedBox(width: 4),
-              Icon(
-                Icons.tune_rounded,
-                size: compact ? 11 : 13,
-                color: (isUsb ? const Color(0xFFFFD700) : info.badgeColor)
-                    .withValues(alpha: 0.8),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

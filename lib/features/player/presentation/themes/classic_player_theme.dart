@@ -127,7 +127,7 @@ class ClassicPlayerTheme extends StatelessWidget {
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final isTwoPane =
-                      context.isTwoPane || constraints.maxWidth >= 680;
+                      context.isLandscape && (context.isTwoPane || constraints.maxWidth >= 680);
 
                   final centerDisplay = GestureDetector(
                     onTap: () => cubit.toggleLyricsVisibility(),
@@ -171,8 +171,12 @@ class ClassicPlayerTheme extends StatelessWidget {
                                   key: const ValueKey('artwork_view'),
                                   child: ConstrainedBox(
                                     constraints: BoxConstraints(
-                                      maxHeight: isTwoPane ? 280 : 340,
-                                      maxWidth: isTwoPane ? 280 : 340,
+                                      maxHeight: isTwoPane
+                                          ? 280
+                                          : (context.isTablet ? 420 : 340),
+                                      maxWidth: isTwoPane
+                                          ? 280
+                                          : (context.isTablet ? 420 : 340),
                                     ),
                                     child: AspectRatio(
                                       aspectRatio: 1.0,
@@ -338,9 +342,11 @@ class ClassicPlayerTheme extends StatelessWidget {
                       // Bottom Action Strip
                       Padding(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 6),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            horizontal: 8, vertical: 6),
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
                             IconButton(
                               icon: Icon(
@@ -439,6 +445,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                             ),
                           ],
                         ),
+                        ),
                       ),
                     ],
                   );
@@ -452,12 +459,16 @@ class ClassicPlayerTheme extends StatelessWidget {
                         children: [
                           Expanded(
                             flex: 5,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Expanded(child: centerDisplay),
-                                visualizer,
-                              ],
+                            child: Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  centerDisplay,
+                                  const SizedBox(height: 8),
+                                  visualizer,
+                                ],
+                              ),
                             ),
                           ),
                           const SizedBox(width: 16),
