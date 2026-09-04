@@ -28,7 +28,14 @@ class MockToggleFavoriteUseCase extends Mock implements ToggleFavoriteUseCase {}
 
 class MockMediaScannerService extends Mock implements MediaScannerService {}
 
-class MockWidgetService extends Mock implements WidgetService {}
+class MockWidgetService extends Mock implements WidgetService {
+  @override
+  Future<void> updateProgress({
+    required bool isPlaying,
+    Duration position = Duration.zero,
+    Duration duration = Duration.zero,
+  }) async {}
+}
 
 class TestPulsrAudioHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler

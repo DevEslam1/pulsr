@@ -239,7 +239,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                     PoTokenManager.setDataSyncId(dataSyncId)
                     mapOf(
                         "poToken" to PoTokenManager.accountPoTokenForSync(dataSyncId),
-                        "visitorData" to PoTokenManager.sessionVisitorData.ifEmpty { PoTokenManager.visitorData },
+                        "visitorData" to PoTokenManager.visitorData.ifEmpty { PoTokenManager.sessionVisitorData },
                     )
                 }
             }

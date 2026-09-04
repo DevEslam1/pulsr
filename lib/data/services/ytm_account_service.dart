@@ -1550,8 +1550,11 @@ class YtmAccountService {
           final account = await getIt<YtmService>().getAccountPoToken(dsid);
           poToken = account?['poToken'] as String?;
           final vd = account?['visitorData'] as String?;
+          // Prefer the minting session's visitorData: the account poToken is
+          // bound to it, and WEB_REMIX rejects a token whose request
+          // visitorData differs -> LOGIN_REQUIRED although logged in.
           visitorData =
-              _sessionVisitorData ?? (vd != null && vd.isNotEmpty ? vd : null);
+              (vd != null && vd.isNotEmpty) ? vd : _sessionVisitorData;
         } catch (e) {
           debugPrint('[YTM_ACCOUNT] Account poToken minting failed: $e');
         }
@@ -1565,7 +1568,10 @@ class YtmAccountService {
         try {
           final poState = await getIt<YtmService>().getPoTokenState();
           poToken = poState?['streamingPoToken'] as String?;
-          visitorData ??= poState?['visitorData'] as String?;
+          // The global streaming token is bound to the global visitorData -
+          // adopt it so token binding and request stay consistent.
+          final stateVd = poState?['visitorData'] as String?;
+          if (stateVd != null && stateVd.isNotEmpty) visitorData = stateVd;
         } catch (e, st) {
           ErrorLogger.log('wait failed', error: e, stackTrace: st, category: 'YtmAccountService');
         }
@@ -1599,7 +1605,10 @@ class YtmAccountService {
               'WEB_REMIX',
             ];
 
-    for (final client in clientChain) {
+    // webRemixRetried bounds the WEB_REMIX re-mint retry below to one attempt.
+    var webRemixRetried = false;
+    for (var i = 0; i < clientChain.length; i++) {
+      final client = clientChain[i];
       try {
         final isWeb =
             client == 'WEB_REMIX' ||
@@ -1745,8 +1754,49 @@ class YtmAccountService {
                 );
               }
               debugPrint(
-                '[YTM_ACCOUNT] WEB_REMIX bot challenge detected, trying next client without logout',
+                '[YTM_ACCOUNT] WEB_REMIX bot challenge detected (poTokenAttached: $hadPoToken)',
               );
+              // Bounded single retry: the attestation was rejected, so
+              // invalidate, re-mint, and retry WEB_REMIX exactly once before
+              // falling back to tokenless clients (which usually fail and end
+              // the resolve as YTM_AUTH despite a valid session).
+              if (!webRemixRetried && poToken != null && poToken.isNotEmpty) {
+                webRemixRetried = true;
+                try {
+                  await getIt<YtmService>().invalidatePoToken();
+                  await getIt<YtmService>().ensurePoTokenReady();
+                  String? freshToken;
+                  String? freshVd;
+                  final dsidRetry = _dataSyncId;
+                  if (dsidRetry != null && dsidRetry.isNotEmpty) {
+                    final account =
+                        await getIt<YtmService>().getAccountPoToken(dsidRetry);
+                    freshToken = account?['poToken'] as String?;
+                    freshVd = account?['visitorData'] as String?;
+                  }
+                  if (freshToken == null || freshToken.isEmpty) {
+                    final poState =
+                        await getIt<YtmService>().getPoTokenState();
+                    freshToken = poState?['streamingPoToken'] as String?;
+                    freshVd = poState?['visitorData'] as String?;
+                  }
+                  if (freshToken != null && freshToken.isNotEmpty) {
+                    poToken = freshToken;
+                    if (freshVd != null && freshVd.isNotEmpty) {
+                      visitorData = freshVd;
+                    }
+                    debugPrint(
+                      '[YTM_ACCOUNT] WEB_REMIX retrying once with freshly minted poToken',
+                    );
+                    i--;
+                    continue;
+                  }
+                } catch (e) {
+                  debugPrint(
+                    '[YTM_ACCOUNT] WEB_REMIX poToken re-mint failed: $e',
+                  );
+                }
+              }
             }
             continue;
 

@@ -234,10 +234,24 @@ internal class InnertubeClient(
                         val count = if (now - lastBlock < 30_000L) consecutiveBotBlocks.incrementAndGet() else consecutiveBotBlocks.apply { set(1) }.get()
                         PoTokenManager.evictMintedTokens()
                         if (count >= 2) {
-                            Log.w(TAG, "[$traceId] Encountered $count consecutive bot blocks. Rotating identity and clearing cookies...")
-                            PoTokenManager.invalidate()
-                            FingerprintStore.resetFingerprint(context)
-                            YtmCookieStore.getInstance(context).clearCookies()
+                            if (cookieStore.isSessionValid()) {
+                                // Logged in: a bot gate is an attestation problem, not a
+                                // session problem. resetFingerprint() rotates the device
+                                // identity (invalidating every minted token) and
+                                // clearCookies() destroys the user's Google session, which
+                                // surfaces as "sign in required although logged in". Only
+                                // re-attest: soft-invalidate poTokens and re-mint.
+                                Log.w(TAG, "[$traceId] Encountered $count consecutive bot blocks while signed in. Re-attesting poToken (identity and session preserved).")
+                                PoTokenManager.invalidate()
+                                PoTokenManager.triggerBackgroundRefresh()
+                            } else {
+                                // Guest: rotating the guest identity is safe and gives
+                                // the next resolve a fresh fingerprint + attestation.
+                                Log.w(TAG, "[$traceId] Encountered $count consecutive bot blocks (guest). Rotating identity and clearing cookies...")
+                                PoTokenManager.invalidate()
+                                FingerprintStore.resetFingerprint(context)
+                                YtmCookieStore.getInstance(context).clearCookies()
+                            }
                             consecutiveBotBlocks.set(0)
                         } else {
                             PoTokenManager.triggerBackgroundRefresh()
@@ -609,12 +623,17 @@ internal class InnertubeClient(
                     .header("x-youtube-client-name", clientType.clientNameId)
                     .header("x-youtube-client-version", clientType.effectiveClientVersion)
 
-                // Attach visitorData if available
+                // Attach visitorData if available. Player requests carry a BotGuard
+                // poToken bound to the minting session's visitorData, so they MUST
+                // send that same visitorData: pairing the token with the (different)
+                // authenticated session visitorData makes YouTube reject the
+                // attestation -> LOGIN_REQUIRED although logged in.
                 val authedWeb = clientType.isWeb && cookieStore.isSessionValid()
-                val visitorData = if (authedWeb) {
-                    PoTokenManager.sessionVisitorData
-                } else {
-                    PoTokenManager.visitorData
+                val visitorData = when {
+                    bucket == RateLimiter.Bucket.PLAYER && PoTokenManager.visitorData.isNotEmpty() ->
+                        PoTokenManager.visitorData
+                    authedWeb -> PoTokenManager.sessionVisitorData
+                    else -> PoTokenManager.visitorData
                 }
                 if (visitorData.isNotEmpty()) {
                     reqBuilder.header("X-Goog-Visitor-Id", visitorData)
@@ -767,7 +786,7 @@ internal class InnertubeClient(
 
         val cap = ClientCapabilityMatrix.getCapability(clientType)
         val requiresPo = cap.requiresPoToken
-        val hasPo = requiresPo && (PoTokenManager.isReady || (!PoTokenManager.webViewBroken && !PoTokenManager.isLimitedMode && PoTokenManager.ensureReadySync()))
+        val hasPo = requiresPo && (PoTokenManager.isReady || (!PoTokenManager.webViewBrokenNow() && !PoTokenManager.isLimitedMode && PoTokenManager.ensureReadySync()))
 
         val playbackContext = JSONObject()
         val contentPlaybackContext = JSONObject().apply {
@@ -806,6 +825,13 @@ internal class InnertubeClient(
                     "serviceIntegrityDimensions",
                     JSONObject().put("poToken", poToken),
                 )
+                // Keep the context visitorData identical to the minting
+                // session's visitorData the attached token is bound to.
+                val contextObj = root.optJSONObject("context")
+                val clientObj = contextObj?.optJSONObject("client")
+                if (PoTokenManager.visitorData.isNotEmpty() && clientObj != null) {
+                    clientObj.put("visitorData", PoTokenManager.visitorData)
+                }
             }
         }
 

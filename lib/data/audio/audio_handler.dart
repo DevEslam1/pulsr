@@ -311,16 +311,19 @@ class PulsrAudioHandler extends BaseAudioHandler
             ? artUri
             : null;
 
-    if (finalArtUri == null &&
-        song.artworkUri != null &&
-        song.artworkUri!.isNotEmpty) {
-      final parsed = Uri.tryParse(song.artworkUri!);
-      if (parsed != null &&
-          parsed.hasScheme &&
-          (parsed.host.isNotEmpty ||
-              parsed.scheme == 'file' ||
-              parsed.scheme == 'content')) {
-        finalArtUri = parsed;
+    if (finalArtUri == null) {
+      final rawArt = song.artworkUri ?? song.remoteArtworkUrl;
+      if (rawArt != null && rawArt.isNotEmpty) {
+        final parsed = Uri.tryParse(rawArt);
+        if (parsed != null &&
+            parsed.hasScheme &&
+            (parsed.host.isNotEmpty ||
+                parsed.scheme == 'file' ||
+                parsed.scheme == 'content' ||
+                parsed.scheme == 'http' ||
+                parsed.scheme == 'https')) {
+          finalArtUri = parsed;
+        }
       }
     }
 
@@ -379,6 +382,24 @@ class PulsrAudioHandler extends BaseAudioHandler
     _volume = volume.clamp(0.0, 1.0);
     final song = currentSong;
     await _activePlayer.setVolume(_calculateReplayGainVolume(song));
+    if (_crossfadeManager.isCrossfading) {
+      try {
+        final pendingIdx = _crossfadeManager.pendingIndex;
+        final incomingSong = (pendingIdx != null &&
+                pendingIdx >= 0 &&
+                pendingIdx < _songs.length)
+            ? _songs[pendingIdx]
+            : null;
+        await _inactivePlayer.setVolume(_calculateReplayGainVolume(incomingSong));
+      } catch (e, st) {
+        ErrorLogger.log(
+          'setVolume: updating inactivePlayer during crossfade failed',
+          error: e,
+          stackTrace: st,
+          category: 'AudioHandler',
+        );
+      }
+    }
     // Keep the loudness contour synced to the current volume-stage value so
     // the Fletcher-Munson lift tracks the listening level.
     await _equalizerManager.updateLoudnessVolume(_volume);
@@ -1041,7 +1062,10 @@ class PulsrAudioHandler extends BaseAudioHandler
           (seqState) {
             if (!isTargetActive()) return;
             final index = seqState.currentIndex;
-            if (_gaplessMode && index != null && index >= 0 && index < _songs.length) {
+            if (_gaplessMode &&
+                index != null &&
+                index >= 0 &&
+                index < _songs.length) {
               if (index != _lastGaplessIndex ||
                   mediaItem.value?.id != _songs[index].id.toString()) {
                 _onGaplessIndexChanged(index);
@@ -1065,14 +1089,13 @@ class PulsrAudioHandler extends BaseAudioHandler
             // Native gapless advance: the concat moved to a new item on its own.
             // Reconcile our queue model, notification, history and position-save
             // off this single source of truth instead of a manual skip.
-            if (_gaplessMode &&
-                isTargetActive() &&
-                index != null &&
-                (index != _lastGaplessIndex ||
-                    (index >= 0 &&
-                        index < _songs.length &&
-                        mediaItem.value?.id != _songs[index].id.toString()))) {
-              _onGaplessIndexChanged(index);
+            if (_gaplessMode && isTargetActive() && index != null) {
+              if (index >= 0 && index < _songs.length) {
+                if (index != _lastGaplessIndex ||
+                    mediaItem.value?.id != _songs[index].id.toString()) {
+                  _onGaplessIndexChanged(index);
+                }
+              }
             }
           },
           onError: (Object e, StackTrace st) {
@@ -1541,6 +1564,8 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (!forceRefresh) {
       final cached = _streamCache[cacheKey];
       if (cached != null && cached.expires.isAfter(DateTime.now())) {
+        _streamCache.remove(cacheKey);
+        _streamCache[cacheKey] = cached;
         try {
           _latencyTracker?.markStage(PlaybackStage.urlObtained);
         } catch (e, st) {
@@ -1563,12 +1588,12 @@ class PulsrAudioHandler extends BaseAudioHandler
         } catch (e, st) {
           ErrorLogger.log('_resolveStreamUrl failed', error: e, stackTrace: st, category: 'AudioHandler');
         }
-        _streamCache[cacheKey] = (
+        _addToStreamCache(cacheKey, (
           url: preResolved.url,
           userAgent: preResolved.userAgent,
           cookies: preResolved.cookies,
           expires: preResolved.expiresAt,
-        );
+        ));
         return (
           url: preResolved.url,
           userAgent: preResolved.userAgent,
@@ -1632,6 +1657,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     String key,
     ({String url, DateTime expires, String? userAgent, String? cookies}) entry,
   ) {
+    _streamCache.remove(key);
     if (_streamCache.length >= _maxStreamCacheEntries) {
       _streamCache.remove(_streamCache.keys.first);
     }
@@ -2245,9 +2271,26 @@ class PulsrAudioHandler extends BaseAudioHandler
             : 44100.0;
     AudioEffectsChannel().resyncForTrack(sr, channels: 2).ignore();
 
-    final artUri = await ArtworkUriResolver.resolveArtworkUri(song);
-    mediaItem.add(_songToMediaItem(song, artUri));
+    final fastArt = song.artworkUri ?? song.remoteArtworkUrl;
+    final fastArtUri = fastArt != null ? Uri.tryParse(fastArt) : null;
+    mediaItem.add(_songToMediaItem(song, fastArtUri));
     _onTrackChangedSubject.add(song);
+
+    unawaited(
+      ArtworkUriResolver.resolveArtworkUri(song).then((artUri) {
+        if (_currentIndex == _lastGaplessIndex &&
+            mediaItem.value?.id == song.id.toString()) {
+          mediaItem.add(_songToMediaItem(song, artUri));
+        }
+      }).catchError((Object e, StackTrace st) {
+        ErrorLogger.log(
+          'Artwork resolution failed for ${song.title}',
+          error: e,
+          stackTrace: st,
+          category: 'AudioHandler',
+        );
+      }),
+    );
 
     final concat = _buildConcat(_songs);
 
@@ -2374,17 +2417,44 @@ class PulsrAudioHandler extends BaseAudioHandler
             : 44100.0;
     AudioEffectsChannel().resyncForTrack(sr, channels: 2).ignore();
 
-    // Await artwork resolution before broadcasting mediaItem (never emit null/placeholder first)
-    final artUri = await ArtworkUriResolver.resolveArtworkUri(song);
-    mediaItem.add(_songToMediaItem(song, artUri));
+    // Fast-path: emit mediaItem immediately using synchronously-parsed artworkUri/remoteArtworkUrl
+    // so the player screen and system notification update without waiting on resolver.
+    final fastArt = song.artworkUri ?? song.remoteArtworkUrl;
+    final fastArtUri = fastArt != null ? Uri.tryParse(fastArt) : null;
+    mediaItem.add(_songToMediaItem(song, fastArtUri));
+    // Single source of truth: emit on onTrackChanged stream immediately on same frame
+    _onTrackChangedSubject.add(song);
     _broadcastState(_activePlayer.playbackEvent);
     _saveCurrentPosition();
 
-    await _activePlayer.setVolume(_calculateReplayGainVolume(song));
-    unawaited(_repository.recordPlayHistory(song.id));
+    // Asynchronously resolve artwork and re-emit mediaItem if this track is still current.
+    unawaited(
+      ArtworkUriResolver.resolveArtworkUri(song).then((artUri) {
+        if (_currentIndex == index &&
+            mediaItem.value?.id == song.id.toString()) {
+          mediaItem.add(_songToMediaItem(song, artUri));
+        }
+      }).catchError((Object e, StackTrace st) {
+        ErrorLogger.log(
+          'Artwork resolution failed for ${song.title}',
+          error: e,
+          stackTrace: st,
+          category: 'AudioHandler',
+        );
+      }),
+    );
 
-    // Single source of truth: emit on onTrackChanged stream
-    _onTrackChangedSubject.add(song);
+    try {
+      await _activePlayer.setVolume(_calculateReplayGainVolume(song));
+    } catch (e, st) {
+      ErrorLogger.log(
+        'Error applying ReplayGain volume during track change',
+        error: e,
+        stackTrace: st,
+        category: 'AudioHandler',
+      );
+    }
+    unawaited(_repository.recordPlayHistory(song.id));
 
     if (_songs.length > index + 1) {
       unawaited(_tripleBufferPipeline.preloadNext(_songs[index + 1]));
@@ -2411,6 +2481,17 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (_gaplessSource == null) return;
     final childCount = _gaplessSource!.length;
     if (index >= childCount) return;
+
+    // Fast-drop duplicate callbacks for the exact same track
+    if (index == _currentIndex &&
+        mediaItem.value?.id == _songs[index].id.toString()) {
+      return;
+    }
+    if (_lastGaplessIndex == index &&
+        mediaItem.value?.id == _songs[index].id.toString()) {
+      return;
+    }
+    _lastGaplessIndex = index;
 
     // Detect rapid un-commanded auto-skips (e.g. failing corrupted files loop)
     final now = DateTime.now();
@@ -2497,9 +2578,27 @@ class PulsrAudioHandler extends BaseAudioHandler
     _preResolveCurrentAndNext();
 
     final song = _songs[index];
-    final artUri = await ArtworkUriResolver.resolveArtworkUri(song);
-    final item = _songToMediaItem(song, artUri);
+    final fastArt = song.artworkUri ?? song.remoteArtworkUrl;
+    final fastArtUri = fastArt != null ? Uri.tryParse(fastArt) : null;
+    final item = _songToMediaItem(song, fastArtUri);
     mediaItem.add(item);
+    _onTrackChangedSubject.add(song);
+
+    unawaited(
+      ArtworkUriResolver.resolveArtworkUri(song).then((artUri) {
+        if (_currentIndex == index &&
+            mediaItem.value?.id == song.id.toString()) {
+          mediaItem.add(_songToMediaItem(song, artUri));
+        }
+      }).catchError((Object e, StackTrace st) {
+        ErrorLogger.log(
+          'Artwork resolution failed for ${song.title}',
+          error: e,
+          stackTrace: st,
+          category: 'AudioHandler',
+        );
+      }),
+    );
 
     // Kick off background prefetch for next track immediately so next skip is instant
     if (index + 1 < _songs.length) {
@@ -2551,7 +2650,6 @@ class PulsrAudioHandler extends BaseAudioHandler
       if (generation != _playGeneration) return;
       await _activePlayer.setVolume(_calculateReplayGainVolume(song));
       await _activePlayer.play();
-      _onTrackChangedSubject.add(song);
       final sessionId = _activePlayer.androidAudioSessionId;
       if (sessionId != null && sessionId > 0) {
         _currentAudioSessionId = sessionId;
@@ -2658,6 +2756,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (_activePlayer.processingState == ProcessingState.idle && currentSong != null) {
       if (_gaplessMode) {
         await _loadGaplessQueue();
+        return;
       } else {
         await playSongAt(_currentIndex);
         return;
@@ -2740,6 +2839,9 @@ class PulsrAudioHandler extends BaseAudioHandler
                 ) ??
                 0;
             await _activePlayer.seek(Duration.zero, index: firstTag);
+          } else if (nextIdx == _currentIndex) {
+            await _activePlayer.seek(Duration.zero);
+            _saveCurrentPosition();
           } else {
             await _activePlayer.pause();
             await _activePlayer.seek(Duration.zero);

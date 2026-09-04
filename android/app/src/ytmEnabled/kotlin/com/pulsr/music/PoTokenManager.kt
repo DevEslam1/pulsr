@@ -34,6 +34,7 @@ object PoTokenManager {
 
     private const val LRU_CAPACITY = 64
     private const val TOKEN_TTL_SECONDS = 1800L // 30 minutes
+    private const val WEBVIEW_RECOVERY_COOLDOWN_MS = 5 * 60 * 1000L // transient WebView failures are retried after this cooldown
     const val EXPIRING_SOON_MARGIN_SECONDS = PoTokenStore.REFRESH_MARGIN_SECONDS // 30 minutes
 
     @Volatile
@@ -64,8 +65,30 @@ object PoTokenManager {
     var webViewBroken: Boolean = false
         private set
 
+    @Volatile
+    private var webViewBrokenAt: Long = 0L
+
     val isLimitedMode: Boolean
         get() = webViewBroken || (isExpired() && visitorData.isEmpty())
+
+    /**
+     * True when the BotGuard WebView is currently considered broken. The
+     * broken state auto-recovers after a cooldown so one transient WebView
+     * failure (renderer crash, OOM) cannot disable poToken minting for the
+     * whole process lifetime - that would force tokenless clients and
+     * guarantee bot-gates on WEB_REMIX / ANDROID_MUSIC.
+     */
+    fun webViewBrokenNow(): Boolean {
+        if (!webViewBroken) return false
+        val elapsed = android.os.SystemClock.elapsedRealtime() - webViewBrokenAt
+        if (elapsed >= WEBVIEW_RECOVERY_COOLDOWN_MS) {
+            Log.i(TAG, "WebView recovery cooldown elapsed (" + (elapsed / 1000L) + "s) - retrying BotGuard WebView")
+            webViewBroken = false
+            webViewBrokenAt = 0L
+            return false
+        }
+        return true
+    }
 
     @Volatile
     private var generator: PoTokenGenerator? = null
@@ -141,7 +164,7 @@ object PoTokenManager {
      * Triggered periodically when a YTM screen is visible to refresh when TTL < 20%.
      */
     fun checkAndRefreshVisibleScreen() {
-        if (isTtlCritical() && !webViewBroken) {
+        if (isTtlCritical() && !webViewBrokenNow()) {
             CoroutineScope(Dispatchers.IO).launch {
                 runCatching { ensureReady() }
             }
@@ -167,7 +190,7 @@ object PoTokenManager {
      * Ensures attestation state and generator are ready.
      */
     suspend fun ensureReady(): Boolean = withContext(Dispatchers.IO) {
-        if (webViewBroken) {
+        if (webViewBrokenNow()) {
             return@withContext visitorData.isNotEmpty()
         }
 
@@ -195,6 +218,7 @@ object PoTokenManager {
                 } catch (e: BadWebViewException) {
                     Log.e(TAG, "System WebView is broken for BotGuard: ${e.message}", e)
                     webViewBroken = true
+                    webViewBrokenAt = android.os.SystemClock.elapsedRealtime()
                     visitorData.isNotEmpty()
                 } catch (t: Throwable) {
                     Log.e(TAG, "Failed to ensure PoToken readiness: ${t.message}", t)
@@ -211,7 +235,7 @@ object PoTokenManager {
     }
 
     fun ensureReadySync(): Boolean {
-        if (webViewBroken) return visitorData.isNotEmpty()
+        if (webViewBrokenNow()) return visitorData.isNotEmpty()
         if (isReady && !isExpiringSoon() && generator != null) return true
 
         return kotlinx.coroutines.runBlocking(Dispatchers.IO) {
@@ -245,7 +269,7 @@ object PoTokenManager {
         }
 
         // 3. If WebView is broken, fallback to last streaming token
-        if (webViewBroken) {
+        if (webViewBrokenNow()) {
             synchronized(tokenLru) {
                 val fallback = tokenLru.get(identifier)?.token
                 if (!fallback.isNullOrEmpty()) return fallback

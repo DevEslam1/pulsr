@@ -82,7 +82,7 @@ internal class ResolutionStrategy(
         val activeClients = eligible.filter { !ClientFailureTracker.isBlacklisted(it) }
         val candidatePool = activeClients.ifEmpty { eligible }
 
-        val hasPoToken = !limitedMode && poTokenManager.isReady && !poTokenManager.webViewBroken
+        val hasPoToken = !limitedMode && poTokenManager.isReady && !poTokenManager.webViewBrokenNow()
 
         // 3. Partition: clients not requiring PO token or matching current readiness first
         val primary = candidatePool.filter { client ->
