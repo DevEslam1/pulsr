@@ -60,4 +60,66 @@ class PrefsKeys {
   static const String stereoBalance = 'setting_stereo_balance';
   static const String monoMix = 'setting_mono_mix';
   static const String sincResamplerEnabled = 'setting_sinc_resampler_enabled';
+  // Phase 1 DSP expansion stages
+  static const String saturationEnabled = 'setting_saturation_enabled';
+  static const String saturationDrive = 'setting_saturation_drive';
+  static const String saturationMix = 'setting_saturation_mix';
+  static const String saturationTilt = 'setting_saturation_tilt';
+  static const String stereoWidthEnabled = 'setting_stereo_width_enabled';
+  static const String stereoWidth = 'setting_stereo_width';
+  static const String loudnessContourEnabled =
+      'setting_loudness_contour_enabled';
+  static const String loudnessContourIntensity =
+      'setting_loudness_contour_intensity';
+  static const String subCrossoverEnabled = 'setting_sub_crossover_enabled';
+  static const String subCrossoverCornerHz = 'setting_sub_crossover_corner_hz';
+  static const String subCrossoverSlopeDbPerOct =
+      'setting_sub_crossover_slope_db_per_oct';
+  static const String subCrossoverGain = 'setting_sub_crossover_gain';
+  static const String dynamicEqEnabled = 'setting_dynamic_eq_enabled';
+  static const String dynamicEqBands = 'setting_dynamic_eq_bands';
+
+  // FIX(N1): Artwork cache disk limit key
+  static const String settingMaxCacheSizeMb = 'setting_max_cache_size_mb';
+
+  // FIX(B3): Cloud sync preferences keys
+  static const String cloudSyncLastTimestamp = 'cloud_sync_last_timestamp';
+  static const String cloudSyncFavoritesEnabled = 'cloud_sync_favorites_enabled';
+  static const String cloudSyncPlaylistsEnabled = 'cloud_sync_playlists_enabled';
+  static const String cloudSyncDocHashes = 'cloud_sync_doc_hashes_v1';
+
+  // FIX(S1-FU): History deduplication keys
+  static const String historyLastSongId = 'history_last_song_id';
+  static const String historyLastTimeMs = 'history_last_time_ms';
+
+  // FIX(B2): Canonical SharedPreferences keys for Scrobbler service
+  static const String scrobbleLastKey = 'last_scrobble_key';
+  static const String scrobbleLastTime = 'last_scrobble_time';
+  static const String scrobbleLastId = 'last_scrobbled_id';
+  static const String scrobbleLastTimestamp = 'last_scrobbled_timestamp';
+  static const String scrobblePendingSong = 'scrobbler_last_song';
+  static const String scrobblePendingTime = 'scrobbler_last_time';
+  static const String scrobblePendingPos = 'scrobbler_last_position';
+  static const String scrobblePendingDuration = 'scrobbler_last_duration';
+  static const String scrobblePendingArtist = 'scrobbler_last_artist';
+  static const String scrobblePendingTrack = 'scrobbler_last_track';
+  static const String scrobblePendingAlbum = 'scrobbler_last_album';
+  static const String scrobbleOfflineQueue = 'scrobbler_offline_queue';
+
+  static const String systemEffectsPolicy = 'setting_system_effects_policy';
+  static const String bluetoothLatencyOffsetMs = 'setting_bluetooth_latency_offset_ms';
+
+  // Aliases for backwards compatibility with tests and services
+  static const String scrobblerLastSong = scrobblePendingSong;
+  static const String scrobblerLastTime = scrobblePendingTime;
+  static const String scrobblerLastPos = scrobblePendingPos;
+  static const String scrobblerLastArtist = scrobblePendingArtist;
+  static const String scrobblerLastTrack = scrobblePendingTrack;
+  static const String scrobblerLastAlbum = scrobblePendingAlbum;
+  static const String scrobblerLastDuration = scrobblePendingDuration;
+  static const String scrobblerLastScrobbledKey = scrobbleLastKey;
+  static const String scrobblerLastScrobbledTime = scrobbleLastTime;
+  static const String scrobblerLastScrobbledId = scrobbleLastId;
+  static const String scrobblerLastScrobbledTimestamp = scrobbleLastTimestamp;
+  static const String scrobblerOfflineQueue = scrobbleOfflineQueue;
 }

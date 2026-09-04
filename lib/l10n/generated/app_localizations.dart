@@ -64,7 +64,7 @@ import 'app_localizations_es.dart';
 /// property.
 abstract class AppLocalizations {
   AppLocalizations(String locale)
-      : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -87,17 +87,17 @@ abstract class AppLocalizations {
   /// of delegates is preferred or required.
   static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
       <LocalizationsDelegate<dynamic>>[
-    delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-  ];
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('ar'),
     Locale('en'),
-    Locale('es')
+    Locale('es'),
   ];
 
   /// No description provided for @appTitle.
@@ -1588,6 +1588,18 @@ abstract class AppLocalizations {
   /// **'Audio & Playback'**
   String get audioAndPlayback;
 
+  /// No description provided for @playback.
+  ///
+  /// In en, this message translates to:
+  /// **'Playback'**
+  String get playback;
+
+  /// No description provided for @audioAndSound.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio & Sound'**
+  String get audioAndSound;
+
   /// No description provided for @equalizerAndSoundEffects.
   ///
   /// In en, this message translates to:
@@ -2302,6 +2314,36 @@ abstract class AppLocalizations {
   /// **'Storage full — free up space and retry'**
   String get downloadErrorNoSpace;
 
+  /// No description provided for @downloadErrorStorage.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage full — free up space and retry'**
+  String get downloadErrorStorage;
+
+  /// No description provided for @downloadErrorPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Storage permission denied. Please grant permission in Settings.'**
+  String get downloadErrorPermission;
+
+  /// No description provided for @downloadErrorInterrupted.
+  ///
+  /// In en, this message translates to:
+  /// **'Download was interrupted. Tap to resume.'**
+  String get downloadErrorInterrupted;
+
+  /// No description provided for @downloadErrorDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloads are disabled or unavailable in this build.'**
+  String get downloadErrorDisabled;
+
+  /// No description provided for @downloadErrorTransition.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid download state transition.'**
+  String get downloadErrorTransition;
+
   /// No description provided for @downloadErrorRateLimited.
   ///
   /// In en, this message translates to:
@@ -2332,6 +2374,30 @@ abstract class AppLocalizations {
   /// **'Wi-Fi Only Mode is active. Connect to Wi-Fi to download.'**
   String get downloadWifiOnly;
 
+  /// No description provided for @downloadErrorAlreadyQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'This song is already in the download queue.'**
+  String get downloadErrorAlreadyQueued;
+
+  /// No description provided for @downloadErrorCorrupt.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded file was corrupted or incomplete. Please retry.'**
+  String get downloadErrorCorrupt;
+
+  /// No description provided for @downloadErrorInvalidTransition.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid download state transition.'**
+  String get downloadErrorInvalidTransition;
+
+  /// No description provided for @downloadErrorTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'Download timed out. Please retry.'**
+  String get downloadErrorTimeout;
+
   /// No description provided for @dspEnginePreference.
   ///
   /// In en, this message translates to:
@@ -2361,6 +2427,413 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Automatic (Prefer Native)'**
   String get dspEngineAuto;
+
+  /// No description provided for @audioStageDegraded.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio stage \"{stage}\" was bypassed to prevent stutter under high load.'**
+  String audioStageDegraded(String stage);
+
+  /// No description provided for @stageEq.
+  ///
+  /// In en, this message translates to:
+  /// **'Parametric EQ'**
+  String get stageEq;
+
+  /// No description provided for @stageReverb.
+  ///
+  /// In en, this message translates to:
+  /// **'Convolution Reverb'**
+  String get stageReverb;
+
+  /// No description provided for @stageCrossfeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Crossfeed'**
+  String get stageCrossfeed;
+
+  /// No description provided for @stageLimiter.
+  ///
+  /// In en, this message translates to:
+  /// **'Lookahead Limiter'**
+  String get stageLimiter;
+
+  /// No description provided for @stageResampler.
+  ///
+  /// In en, this message translates to:
+  /// **'Resampler'**
+  String get stageResampler;
+
+  /// No description provided for @stagePanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Spatial Panner'**
+  String get stagePanner;
+
+  /// No description provided for @dspSaturationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Harmonic Saturation'**
+  String get dspSaturationTitle;
+
+  /// No description provided for @dspSaturationSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tube/tape-style harmonic exciter'**
+  String get dspSaturationSubtitle;
+
+  /// No description provided for @dspSaturationDrive.
+  ///
+  /// In en, this message translates to:
+  /// **'Drive'**
+  String get dspSaturationDrive;
+
+  /// No description provided for @dspSaturationMix.
+  ///
+  /// In en, this message translates to:
+  /// **'Mix'**
+  String get dspSaturationMix;
+
+  /// No description provided for @dspSaturationTilt.
+  ///
+  /// In en, this message translates to:
+  /// **'Tilt Emphasis'**
+  String get dspSaturationTilt;
+
+  /// No description provided for @dspStereoWidthTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stereo Width'**
+  String get dspStereoWidthTitle;
+
+  /// No description provided for @dspStereoWidthSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Independent Mid/Side field control'**
+  String get dspStereoWidthSubtitle;
+
+  /// No description provided for @dspStereoWidthAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Width'**
+  String get dspStereoWidthAmount;
+
+  /// No description provided for @dspLoudnessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Loudness Contour'**
+  String get dspLoudnessTitle;
+
+  /// No description provided for @dspLoudnessSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fletcher–Munson volume-linked tone compensation'**
+  String get dspLoudnessSubtitle;
+
+  /// No description provided for @dspLoudnessIntensity.
+  ///
+  /// In en, this message translates to:
+  /// **'Intensity'**
+  String get dspLoudnessIntensity;
+
+  /// No description provided for @dspLoudnessReplayGainNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Complements ReplayGain: ReplayGain levels loudness across tracks, while this contour adapts tone to your listening volume.'**
+  String get dspLoudnessReplayGainNote;
+
+  /// No description provided for @dspSubCrossoverTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Subwoofer Crossover'**
+  String get dspSubCrossoverTitle;
+
+  /// No description provided for @dspSubCrossoverSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bass redirection into a summed mono sub tap'**
+  String get dspSubCrossoverSubtitle;
+
+  /// No description provided for @dspSubCrossoverCorner.
+  ///
+  /// In en, this message translates to:
+  /// **'Crossover Corner'**
+  String get dspSubCrossoverCorner;
+
+  /// No description provided for @dspSubCrossoverSubLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Sub Level'**
+  String get dspSubCrossoverSubLevel;
+
+  /// No description provided for @dspSubCrossoverNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Bass redirection: a low-passed mono sum is added to both channels — this is not true multichannel LFE routing.'**
+  String get dspSubCrossoverNote;
+
+  /// No description provided for @dspDynamicEqTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Dynamic EQ'**
+  String get dspDynamicEqTitle;
+
+  /// No description provided for @dspDynamicEqSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cuts resonances only when band energy exceeds the threshold'**
+  String get dspDynamicEqSubtitle;
+
+  /// No description provided for @dspDynamicEqFrequency.
+  ///
+  /// In en, this message translates to:
+  /// **'Band Frequency'**
+  String get dspDynamicEqFrequency;
+
+  /// No description provided for @dspDynamicEqThreshold.
+  ///
+  /// In en, this message translates to:
+  /// **'Threshold'**
+  String get dspDynamicEqThreshold;
+
+  /// No description provided for @dspDynamicEqRatio.
+  ///
+  /// In en, this message translates to:
+  /// **'Ratio'**
+  String get dspDynamicEqRatio;
+
+  /// No description provided for @dspDynamicEqAttack.
+  ///
+  /// In en, this message translates to:
+  /// **'Attack'**
+  String get dspDynamicEqAttack;
+
+  /// No description provided for @dspDynamicEqRelease.
+  ///
+  /// In en, this message translates to:
+  /// **'Release'**
+  String get dspDynamicEqRelease;
+
+  /// No description provided for @dspDynamicEqMaxCut.
+  ///
+  /// In en, this message translates to:
+  /// **'Max Cut'**
+  String get dspDynamicEqMaxCut;
+
+  /// No description provided for @blockedByBitPerfectShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Blocked by Bit-Perfect'**
+  String get blockedByBitPerfectShort;
+
+  /// No description provided for @rcTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Room Correction'**
+  String get rcTitle;
+
+  /// No description provided for @rcSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Measure your room with a short tone sweep and fit an EQ that flattens the response'**
+  String get rcSubtitle;
+
+  /// No description provided for @rcStart.
+  ///
+  /// In en, this message translates to:
+  /// **'Start measurement'**
+  String get rcStart;
+
+  /// No description provided for @rcMeasuring.
+  ///
+  /// In en, this message translates to:
+  /// **'Measuring - stay quiet...'**
+  String get rcMeasuring;
+
+  /// No description provided for @rcResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Measured response (top) and fitted correction (bottom)'**
+  String get rcResult;
+
+  /// No description provided for @rcApply.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get rcApply;
+
+  /// No description provided for @rcDiscard.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get rcDiscard;
+
+  /// No description provided for @rcMicNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Microphone permission is required for the measurement'**
+  String get rcMicNeeded;
+
+  /// No description provided for @rcQuietHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep the room quiet and let the sweep play out loud at your normal listening level'**
+  String get rcQuietHint;
+
+  /// No description provided for @rcKeepPlayerPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Music playback stays paused while Room Correction is active'**
+  String get rcKeepPlayerPaused;
+
+  /// No description provided for @rcApplied.
+  ///
+  /// In en, this message translates to:
+  /// **'Room Correction preset applied'**
+  String get rcApplied;
+
+  /// No description provided for @deviceProfilesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Device Profiles'**
+  String get deviceProfilesTitle;
+
+  /// No description provided for @deviceProfilesSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sound settings remembered per output device'**
+  String get deviceProfilesSubtitle;
+
+  /// No description provided for @autoDeviceSwitch.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-switch on device change'**
+  String get autoDeviceSwitch;
+
+  /// No description provided for @noDevicesSeen.
+  ///
+  /// In en, this message translates to:
+  /// **'No output devices seen yet'**
+  String get noDevicesSeen;
+
+  /// No description provided for @applyProfileNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get applyProfileNow;
+
+  /// No description provided for @forgetDevice.
+  ///
+  /// In en, this message translates to:
+  /// **'Forget'**
+  String get forgetDevice;
+
+  /// No description provided for @currentDeviceBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get currentDeviceBadge;
+
+  /// No description provided for @profileDropdownLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get profileDropdownLabel;
+
+  /// No description provided for @undo.
+  ///
+  /// In en, this message translates to:
+  /// **'Undo'**
+  String get undo;
+
+  /// No description provided for @downloadDeletedSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted \"{title}\"'**
+  String downloadDeletedSnackbar(String title);
+
+  /// No description provided for @statusEmbedding.
+  ///
+  /// In en, this message translates to:
+  /// **'Embedding tags…'**
+  String get statusEmbedding;
+
+  /// No description provided for @etaLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'ETA: {seconds}s'**
+  String etaLabel(int seconds);
+
+  /// No description provided for @downloadTileSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'{title} {artist} {status} {progress}'**
+  String downloadTileSemantics(
+    String title,
+    String artist,
+    String status,
+    String progress,
+  );
+
+  /// No description provided for @downloadActionsSemantics.
+  ///
+  /// In en, this message translates to:
+  /// **'Download actions for {title}'**
+  String downloadActionsSemantics(String title);
+
+  /// No description provided for @systemEffectsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'System Audio Effects (Dolby Atmos / DAP)'**
+  String get systemEffectsTitle;
+
+  /// No description provided for @systemEffectsSubtitleBypassed.
+  ///
+  /// In en, this message translates to:
+  /// **'✓ Bypassed: System effects disabled on output-mix session'**
+  String get systemEffectsSubtitleBypassed;
+
+  /// No description provided for @systemEffectsSubtitleActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active: OEM sound effects are processing audio'**
+  String get systemEffectsSubtitleActive;
+
+  /// No description provided for @systemEffectsSubtitleUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'No OEM Dolby/DAP detected on this device'**
+  String get systemEffectsSubtitleUnsupported;
+
+  /// No description provided for @systemEffectsAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto'**
+  String get systemEffectsAuto;
+
+  /// No description provided for @systemEffectsTryDisable.
+  ///
+  /// In en, this message translates to:
+  /// **'Try to disable'**
+  String get systemEffectsTryDisable;
+
+  /// No description provided for @systemEffectsLeaveOn.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave on'**
+  String get systemEffectsLeaveOn;
+
+  /// No description provided for @bluetoothLatencyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bluetooth Latency Sync (AVRCP / Lyrics)'**
+  String get bluetoothLatencyTitle;
+
+  /// No description provided for @bluetoothLatencySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Compensates for Bluetooth audio codec buffer latency ({offset} ms). Volume deferral: AVRCP absolute volume active.'**
+  String bluetoothLatencySubtitle(int offset);
 }
 
 class _AppLocalizationsDelegate
@@ -2392,8 +2865,9 @@ AppLocalizations lookupAppLocalizations(Locale locale) {
   }
 
   throw FlutterError(
-      'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
-      'an issue with the localizations generation tool. Please file an issue '
-      'on GitHub with a reproducible sample app and the gen-l10n configuration '
-      'that was used.');
+    'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
+    'an issue with the localizations generation tool. Please file an issue '
+    'on GitHub with a reproducible sample app and the gen-l10n configuration '
+    'that was used.',
+  );
 }

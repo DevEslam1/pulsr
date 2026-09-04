@@ -33,8 +33,9 @@ private:
     double delayUs_ = 350.0;
     double feedDb_ = -9.0;
     double fcut_ = 650.0;
-    int delaySamples_ = 17;
-    float feedLevel_ = 0.3548f;
+    float delaySamplesFloat_ = 16.8f;
+    float targetFeedLevel_ = 0.3548f;
+    float smoothedFeedLevel_ = 0.3548f;
     float lpCoeff_ = 0.087f;
     bool enabled_ = false;
 

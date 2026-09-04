@@ -5,17 +5,72 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_radii.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/adaptive.dart';
+import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/audio/headphone_profiles_repository.dart';
 import '../../../../domain/models/audio_effects_config.dart';
 import '../../../../domain/models/eq_preset.dart';
 import '../../../../domain/models/headphone_profile.dart';
 import '../../cubit/player_cubit.dart';
+import '../../../../core/utils/list_content_diff.dart';
 import '../../cubit/player_state.dart';
+import 'dart:async';
+
+import '../../../../data/audio/audio_effects_channel.dart';
 import '../../../../data/audio/equalizer_manager.dart';
 import 'eq_curve_visualizer.dart';
 import 'autoeq_search_sheet.dart';
 import 'compressor_limiter_sheet.dart';
+import 'dsp_inspector_sheet.dart';
 import '../../../../core/di/injection.dart';
+import '../../../../core/constants/audio_feature_info.dart';
+import '../../../settings/cubit/settings_cubit.dart';
+
+// Rebuild gate for the whole DSP sheet. Every user-facing toggle/slider field
+// MUST be listed here or its switch will not flip until the sheet is reopened
+// (state emits, engine applies, but BlocBuilder skips the rebuild).
+// Position/playback fields stay excluded on purpose (10 Hz ticks).
+bool dspSheetRebuildGate(PlayerState a, PlayerState b) {
+  return a.isEqEnabled != b.isEqEnabled ||
+      a.eqPreset.name != b.eqPreset.name ||
+      a.eqPreset.bassBoost != b.eqPreset.bassBoost ||
+      a.isVirtualizerEnabled != b.isVirtualizerEnabled ||
+      a.virtualizerStrength != b.virtualizerStrength ||
+      a.isDynamicsEnabled != b.isDynamicsEnabled ||
+      a.dynamicsPreset != b.dynamicsPreset ||
+      a.selectedHeadphoneProfile != b.selectedHeadphoneProfile ||
+      a.isSpatializerEnabled != b.isSpatializerEnabled ||
+      a.isSpatializerSupported != b.isSpatializerSupported ||
+      a.volumeBoost != b.volumeBoost ||
+      a.stereoBalance != b.stereoBalance ||
+      a.monoMix != b.monoMix ||
+      a.isCrossfeedEnabled != b.isCrossfeedEnabled ||
+      a.crossfeedDelayUs != b.crossfeedDelayUs ||
+      a.crossfeedFeedDb != b.crossfeedFeedDb ||
+      a.isLimiterEnabled != b.isLimiterEnabled ||
+      a.limiterThresholdDb != b.limiterThresholdDb ||
+      a.limiterReleaseMs != b.limiterReleaseMs ||
+      a.isReverbEnabled != b.isReverbEnabled ||
+      a.reverbPreset != b.reverbPreset ||
+      a.reverbWetDry != b.reverbWetDry ||
+      a.isSincResamplerEnabled != b.isSincResamplerEnabled ||
+      a.hasOemAudio != b.hasOemAudio ||
+      listContentDiffers(a.detectedOemEngines, b.detectedOemEngines) ||
+      a.isSaturationEnabled != b.isSaturationEnabled ||
+      a.saturationDrive != b.saturationDrive ||
+      a.saturationMix != b.saturationMix ||
+      a.saturationTilt != b.saturationTilt ||
+      a.isStereoWidthEnabled != b.isStereoWidthEnabled ||
+      a.stereoWidth != b.stereoWidth ||
+      a.isLoudnessContourEnabled != b.isLoudnessContourEnabled ||
+      a.loudnessContourIntensity != b.loudnessContourIntensity ||
+      a.isSubCrossoverEnabled != b.isSubCrossoverEnabled ||
+      a.subCrossoverCornerHz != b.subCrossoverCornerHz ||
+      a.subCrossoverSlopeDbPerOct != b.subCrossoverSlopeDbPerOct ||
+      a.subCrossoverGain != b.subCrossoverGain ||
+      a.isDynamicEqEnabled != b.isDynamicEqEnabled ||
+      listContentDiffers(a.dynamicEqBands, b.dynamicEqBands) ||
+      a.errorMessage != b.errorMessage;
+}
 
 class EqualizerSheet extends StatefulWidget {
   const EqualizerSheet({super.key});
@@ -30,6 +85,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   final TextEditingController _searchController = TextEditingController();
   final HeadphoneProfilesRepository _headphoneRepo =
       HeadphoneProfilesRepository();
+
+  StreamSubscription<int>? _degradedSessionSub;
+  bool _degradeSnackQueued = false;
 
   String _selectedCategory = 'All';
   String _searchQuery = '';
@@ -54,6 +112,22 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _loadHeadphoneProfiles();
+    _listenForDspAutoDegrade();
+  }
+
+  /// Surfaces the native DSP auto-degrade safety net: when the engine bypasses
+  /// stages to prevent stutter, show ONE snack per degraded session (re-arms after
+  /// full recovery) so the user understands why effects stopped.
+  void _listenForDspAutoDegrade() {
+    try {
+      _degradedSessionSub = AudioEffectsChannel().onAutoDegradedSessionStarted.listen(
+        (mask) {
+          if (!mounted) return;
+          _degradeSnackQueued = true;
+          setState(() {});
+        },
+      );
+    } catch (_) {}
   }
 
   Future<void> _loadHeadphoneProfiles() async {
@@ -67,9 +141,71 @@ class _EqualizerSheetState extends State<EqualizerSheet>
 
   @override
   void dispose() {
+    _degradedSessionSub?.cancel();
     _tabController.dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  String? _dspBlockedReason(BuildContext context) {
+    try {
+      final settings = context.watch<SettingsCubit>().state;
+      return AudioConflicts.dspBlockedByBitPerfect(
+        bitPerfectOutput: settings.bitPerfectOutput,
+        bypassDspOnBitPerfect: settings.bypassDspOnBitPerfect,
+        device: settings.currentOutputDevice,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool get _nativePcmEffectsAvailable => true;
+
+  void _showFeatureInfo(BuildContext context, AudioFeatureInfo info, {String? conflictReason}) {
+    final p = context.palette;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: p.surface,
+        title: Row(
+          children: [
+            Container(padding: const EdgeInsets.all(8), decoration: BoxDecoration(color: p.accentContainer, borderRadius: BorderRadius.circular(8)), child: Icon(Icons.info_outline_rounded, color: p.accent, size: 18)),
+            const SizedBox(width: 10),
+            Expanded(child: Text(info.title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15))),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(info.subtitle, style: TextStyle(color: p.textSecondary, fontWeight: FontWeight.w600, fontSize: 12)),
+              const SizedBox(height: 10),
+              Text(info.description, style: TextStyle(color: p.textPrimary, fontSize: 13, height: 1.4)),
+              if (info.conflictsWith != null) ...[
+                const SizedBox(height: 12),
+                Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: Colors.amber.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10), border: Border.all(color: Colors.amber.withValues(alpha: 0.4))), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 18), const SizedBox(width: 8), Expanded(child: Text('Conflicts with: ${info.conflictsWith}', style: TextStyle(color: p.textSecondary, fontSize: 11, fontWeight: FontWeight.w600)))])),
+              ],
+              if (conflictReason != null) ...[
+                const SizedBox(height: 12),
+                Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: p.error.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10), border: Border.all(color: p.error.withValues(alpha: 0.4))), child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.block_rounded, color: p.error, size: 18), const SizedBox(width: 8), Expanded(child: Text(conflictReason, style: TextStyle(color: p.error, fontSize: 11, fontWeight: FontWeight.w600)))])),
+              ],
+            ],
+          ),
+        ),
+        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Got it'))],
+      ),
+    );
+  }
+
+  Widget _conflictBanner(String reason, PulsrPalette p) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(color: p.error.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10), border: Border.all(color: p.error.withValues(alpha: 0.3))),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Icon(Icons.block_rounded, color: p.error, size: 16), const SizedBox(width: 8), Expanded(child: Text(reason, style: TextStyle(color: p.error, fontSize: 11, fontWeight: FontWeight.w600)))]),
+    );
   }
 
   Future<void> _showSaveCustomPresetDialog(
@@ -101,14 +237,17 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     );
     if (name != null && name.isNotEmpty) {
       final id = 'custom_${DateTime.now().millisecondsSinceEpoch}';
+      // Read from the cubit at tap time: with the F-10 gating, this build's
+      // captured `state` may predate the latest band-drag gains.
+      final currentEq = cubit.state.eqPreset;
       final profile = HeadphoneProfile(
         id: id,
         name: name,
         brand: 'User Custom',
         model: name,
         category: 'Custom',
-        gains: List<double>.from(state.eqPreset.gains),
-        bassBoost: state.eqPreset.bassBoost,
+        gains: List<double>.from(currentEq.gains),
+        bassBoost: currentEq.bassBoost,
       );
       await _headphoneRepo.addCustomProfile(profile);
       await cubit.applyHeadphoneProfile(profile);
@@ -169,145 +308,430 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       );
     }
 
-    return BlocBuilder<PlayerCubit, PlayerState>(
-      builder: (context, state) {
-        final cubit = context.read<PlayerCubit>();
+    return BlocListener<PlayerCubit, PlayerState>(
+      listenWhen: (prev, curr) => prev.errorMessage != curr.errorMessage && curr.errorMessage != null,
+      listener: (ctx, state) {
+        final msg = state.errorMessage;
+        if (msg != null && msg.isNotEmpty) {
+          ScaffoldMessenger.maybeOf(ctx)?.showSnackBar(SnackBar(content: Text(msg), backgroundColor: Theme.of(ctx).colorScheme.error, behavior: SnackBarBehavior.floating));
+          ctx.read<PlayerCubit>().clearError();
+        }
+      },
+      child: BlocBuilder<PlayerCubit, PlayerState>(
+        // DSP sheet ignores playback/position fields entirely - position ticks at
+        // 10Hz were rebuilding the whole equalizer UI for nothing.
+        //
+        // F-10: eqPreset identity changes on EVERY band-drag delta. The gains
+        // are consumed exclusively by per-band BlocSelectors and the curve
+        // selector further down, so only the preset's name/bassBoost gate this
+        // full-sheet rebuild - a drag rebuilds just the dragged slider + curve.
+        buildWhen: dspSheetRebuildGate,
+        builder: (context, state) {
+          final cubit = context.read<PlayerCubit>();
+          final dspBlockedGlobal = _dspBlockedReason(context);
 
-        return Align(
-          alignment: Alignment.bottomCenter,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: Adaptive.sheetConstraints(context).maxWidth,
-              maxHeight: MediaQuery.sizeOf(context).height *
-                  (context.isLandscape ? 0.95 : 0.84),
-            ),
-            child: Material(
-              color: p.surface,
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(28)),
-              clipBehavior: Clip.antiAlias,
-              child: SafeArea(
-                top: false,
-                child: Column(
-                  children: [
-                    // Top Handle
-                    const SizedBox(height: 12),
-                    Center(
-                      child: Container(
-                        width: 40,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: p.hairline,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
+          // One snack per DSP auto-degrade session (re-arms after recovery).
+          if (_degradeSnackQueued) {
+            _degradeSnackQueued = false;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                SnackBar(
+                  content: Text(context.l10n.audioStageDegraded('DSP')),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            });
+          }
 
-                    // Header Title + Global EQ Toggle
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: p.accent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(10),
+          return Align(
+            alignment: Alignment.bottomCenter,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxWidth: Adaptive.sheetConstraints(context).maxWidth,
+                maxHeight: MediaQuery.sizeOf(context).height *
+                    (context.isLandscape ? 0.95 : 0.84),
+              ),
+              child: Material(
+                color: p.surface,
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(28)),
+                clipBehavior: Clip.antiAlias,
+                child: SafeArea(
+                  top: false,
+                  child: Column(
+                    children: [
+                      // Top Handle & Inspector Bar
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                        child: Row(
+                          children: [
+                            const SizedBox(width: 32),
+                            const Spacer(),
+                            Container(
+                              width: 40,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: p.hairline,
+                                borderRadius: BorderRadius.circular(2),
+                              ),
                             ),
-                            child: Icon(Icons.graphic_eq_rounded,
-                                color: p.accent, size: 20),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Audio Engine & Effects',
-                                  style: TextStyle(
-                                      fontSize: 17,
-                                      fontWeight: FontWeight.w800,
-                                      color: p.textPrimary),
-                                ),
-                                Text(
-                                  state.isEqEnabled
-                                      ? (state.selectedHeadphoneProfile != null
-                                          ? 'Tuned for ${state.selectedHeadphoneProfile!.name}'
-                                          : 'Preset: ${state.eqPreset.name}')
-                                      : 'Audio effects bypassed',
-                                  style: TextStyle(
-                                      fontSize: 11,
-                                      color: p.textTertiary,
-                                      fontWeight: FontWeight.w500),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
+                            const Spacer(),
+                            IconButton(
+                              tooltip: 'DSP Signal Inspector & Debug',
+                              icon: Icon(Icons.sensors_rounded,
+                                  color: p.accent, size: 20),
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                  minWidth: 32, minHeight: 32),
+                              onPressed: () => DspInspectorSheet.show(context),
                             ),
-                          ),
-                          Switch.adaptive(
-                            value: state.isEqEnabled,
-                            activeTrackColor: p.accent,
-                            activeThumbColor: p.onAccent,
-                            onChanged: (val) => cubit.setEqualizerEnabled(val),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // Tabs Navigation
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Container(
-                        height: 38,
-                        decoration: BoxDecoration(
-                          color: p.surfaceContainer,
-                          borderRadius: BorderRadius.circular(19),
-                          border: Border.all(color: p.hairline),
-                        ),
-                        child: TabBar(
-                          controller: _tabController,
-                          tabAlignment: TabAlignment.fill,
-                          indicator: BoxDecoration(
-                            color: p.accent,
-                            borderRadius: BorderRadius.circular(19),
-                          ),
-                          indicatorSize: TabBarIndicatorSize.tab,
-                          labelColor: p.onAccent,
-                          unselectedLabelColor: p.textSecondary,
-                          labelStyle: const TextStyle(
-                              fontWeight: FontWeight.w700, fontSize: 12),
-                          dividerColor: Colors.transparent,
-                          tabs: const [
-                            Tab(text: 'Equalizer'),
-                            Tab(text: 'AutoEq'),
-                            Tab(text: 'Spatial & DSP'),
                           ],
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
+                      const SizedBox(height: 6),
 
-                    // Tab Content
-                    Expanded(
-                      child: TabBarView(
-                        controller: _tabController,
-                        children: [
-                          _buildEqualizerTab(context, cubit, state, p),
-                          _buildAutoEqTab(context, cubit, state, p),
-                          _buildSpatialDynamicsTab(context, cubit, state, p),
-                        ],
+                      // Separated EQ and DSP Master Toggles
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Column(
+                          children: [
+                            // 1. Equalizer (EQ) Toggle Card
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: state.isEqEnabled
+                                    ? p.accent.withValues(alpha: 0.08)
+                                    : p.surfaceContainer,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: state.isEqEnabled
+                                      ? p.accent.withValues(alpha: 0.35)
+                                      : p.hairline,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: state.isEqEnabled
+                                          ? p.accent.withValues(alpha: 0.2)
+                                          : p.surfaceContainerHigh,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      Icons.graphic_eq_rounded,
+                                      color: state.isEqEnabled
+                                          ? p.accent
+                                          : p.textSecondary,
+                                      size: 18,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Text(
+                                              'Equalizer (EQ)',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w700,
+                                                color: p.textPrimary,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 5,
+                                                      vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: state.isEqEnabled
+                                                    ? (dspBlockedGlobal != null
+                                                        ? p.error.withValues(
+                                                            alpha: 0.15)
+                                                        : p.accent.withValues(
+                                                            alpha: 0.2))
+                                                    : p.surfaceContainerHigh,
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                dspBlockedGlobal != null
+                                                    ? 'BLOCKED'
+                                                    : (state.isEqEnabled
+                                                        ? 'ON'
+                                                        : 'OFF'),
+                                                style: TextStyle(
+                                                  fontSize: 9.5,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: dspBlockedGlobal != null
+                                                      ? p.error
+                                                      : (state.isEqEnabled
+                                                          ? p.accent
+                                                          : p.textTertiary),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          dspBlockedGlobal != null
+                                              ? 'Blocked: Bit-Perfect bypass active'
+                                              : (state.isEqEnabled
+                                                  ? (state.selectedHeadphoneProfile !=
+                                                          null
+                                                      ? 'Tuned for ${state.selectedHeadphoneProfile!.name}'
+                                                      : 'Preset: ${state.eqPreset.name}')
+                                                  : 'Equalizer curves bypassed'),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: dspBlockedGlobal != null
+                                                ? p.error
+                                                : p.textTertiary,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(Icons.info_outline_rounded,
+                                        size: 16, color: p.textTertiary),
+                                    visualDensity: VisualDensity.compact,
+                                    tooltip: 'About Equalizer',
+                                    onPressed: () => _showFeatureInfo(
+                                      context,
+                                      AudioFeatureRegistry.equalizer,
+                                      conflictReason: dspBlockedGlobal,
+                                    ),
+                                  ),
+                                  Opacity(
+                                    opacity: dspBlockedGlobal != null &&
+                                            !state.isEqEnabled
+                                        ? 0.45
+                                        : 1.0,
+                                    child: Switch.adaptive(
+                                      // Keep saved choices for restoration, but never
+                                      // display an active switch while bit-perfect
+                                      // output is bypassing the processing path.
+                                      value: dspBlockedGlobal == null && state.isEqEnabled,
+                                      activeTrackColor: p.accent,
+                                      activeThumbColor: p.onAccent,
+                                      onChanged: dspBlockedGlobal != null &&
+                                              !state.isEqEnabled
+                                          ? null
+                                          : (val) =>
+                                              cubit.setEqualizerEnabled(val),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+
+                            // 2. DSP & Spatial Effects Toggle Card
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: state.isDspActive
+                                    ? p.accent.withValues(alpha: 0.08)
+                                    : p.surfaceContainer,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: state.isDspActive
+                                      ? p.accent.withValues(alpha: 0.35)
+                                      : p.hairline,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: state.isDspActive
+                                          ? p.accent.withValues(alpha: 0.2)
+                                          : p.surfaceContainerHigh,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Icon(
+                                      Icons.multitrack_audio_rounded,
+                                      color: state.isDspActive
+                                          ? p.accent
+                                          : p.textSecondary,
+                                      size: 18,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Text(
+                                              'DSP & Spatial Effects',
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w700,
+                                                color: p.textPrimary,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                      horizontal: 5,
+                                                      vertical: 1.5),
+                                              decoration: BoxDecoration(
+                                                color: state.isDspActive
+                                                    ? (dspBlockedGlobal != null
+                                                        ? p.error.withValues(
+                                                            alpha: 0.15)
+                                                        : p.accent.withValues(
+                                                            alpha: 0.2))
+                                                    : p.surfaceContainerHigh,
+                                                borderRadius:
+                                                    BorderRadius.circular(4),
+                                              ),
+                                              child: Text(
+                                                dspBlockedGlobal != null
+                                                    ? 'BLOCKED'
+                                                    : (state.isDspActive
+                                                        ? 'ON'
+                                                        : 'OFF'),
+                                                style: TextStyle(
+                                                  fontSize: 9.5,
+                                                  fontWeight: FontWeight.w800,
+                                                  color: dspBlockedGlobal != null
+                                                      ? p.error
+                                                      : (state.isDspActive
+                                                          ? p.accent
+                                                          : p.textTertiary),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          dspBlockedGlobal != null
+                                              ? 'Blocked: Bit-Perfect bypass active'
+                                              : (state.isDspActive
+                                                  ? '${state.activeDspStagesCount} active effects (Reverb, Limiter...)'
+                                                  : 'All DSP effects bypassed'),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: dspBlockedGlobal != null
+                                                ? p.error
+                                                : p.textTertiary,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  IconButton(
+                                    icon: Icon(Icons.info_outline_rounded,
+                                        size: 16, color: p.textTertiary),
+                                    visualDensity: VisualDensity.compact,
+                                    tooltip: 'About DSP Engine',
+                                    onPressed: () => _showFeatureInfo(
+                                      context,
+                                      AudioFeatureRegistry.spatializer,
+                                      conflictReason: dspBlockedGlobal,
+                                    ),
+                                  ),
+                                  Opacity(
+                                    opacity: dspBlockedGlobal != null &&
+                                            !state.isDspActive
+                                        ? 0.45
+                                        : 1.0,
+                                    child: Switch.adaptive(
+                                      value: state.isDspActive,
+                                      activeTrackColor: p.accent,
+                                      activeThumbColor: p.onAccent,
+                                      onChanged: dspBlockedGlobal != null &&
+                                              !state.isDspActive
+                                          ? null
+                                          : (val) =>
+                                              cubit.setDspEffectsEnabled(val),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 10),
+
+                      // Tabs Navigation
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Container(
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: p.surfaceContainer,
+                            borderRadius: BorderRadius.circular(19),
+                            border: Border.all(color: p.hairline),
+                          ),
+                          child: TabBar(
+                            controller: _tabController,
+                            tabAlignment: TabAlignment.fill,
+                            indicator: BoxDecoration(
+                              color: p.accent,
+                              borderRadius: BorderRadius.circular(19),
+                            ),
+                            indicatorSize: TabBarIndicatorSize.tab,
+                            labelColor: p.onAccent,
+                            unselectedLabelColor: p.textSecondary,
+                            labelStyle: const TextStyle(
+                                fontWeight: FontWeight.w700, fontSize: 12),
+                            dividerColor: Colors.transparent,
+                            tabs: const [
+                              Tab(text: 'Equalizer'),
+                              Tab(text: 'AutoEq'),
+                              Tab(text: 'Spatial & DSP'),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Tab Content
+                      Expanded(
+                        child: TabBarView(
+                          controller: _tabController,
+                          children: [
+                            _buildEqualizerTab(context, cubit, state, p),
+                            _buildAutoEqTab(context, cubit, state, p),
+                            _buildSpatialDynamicsTab(context, cubit, state, p),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -320,6 +744,8 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   ) {
     final preset = state.eqPreset;
     final isEnabled = state.isEqEnabled;
+    final dspBlocked = _dspBlockedReason(context);
+    final effectiveEnabled = isEnabled && dspBlocked == null;
 
     // Gain staging calculations for Volume Boost
     final preampDb = state.selectedHeadphoneProfile?.preampGain ?? 0.0;
@@ -331,6 +757,18 @@ class _EqualizerSheetState extends State<EqualizerSheet>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (dspBlocked != null) _conflictBanner(dspBlocked, p),
+          if (dspBlocked != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  IconButton(icon: Icon(Icons.info_outline_rounded, size: 18, color: p.accent), onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.equalizer, conflictReason: dspBlocked)),
+                  const SizedBox(width: 4),
+                  Expanded(child: Text('DSP disabled by Bit-Perfect bypass. Disable Bit-Perfect or Ã¢Â€ÂœBypass DSPÃ¢Â€Â in Settings to re-enable.', style: TextStyle(color: p.textSecondary, fontSize: 11))),
+                ],
+              ),
+            ),
           // Presets Carousel & Actions Header
           Row(
             children: [
@@ -362,7 +800,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                             fontWeight: FontWeight.w700,
                             fontSize: 12,
                           ),
-                          onSelected: (_) {
+                          onSelected: dspBlocked != null ? null : (_) {
                             if (!state.isEqEnabled) {
                               cubit.setEqualizerEnabled(true);
                             }
@@ -376,34 +814,38 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               ),
               const SizedBox(width: 8),
               // A/B Comparison Toggle
-              GestureDetector(
-                onTapDown: (_) {
-                  setState(() => _isAbComparing = true);
-                  cubit.startAbComparison();
-                },
-                onTapUp: (_) {
-                  setState(() => _isAbComparing = false);
-                  cubit.endAbComparison();
-                },
-                onTapCancel: () {
-                  setState(() => _isAbComparing = false);
-                  cubit.endAbComparison();
-                },
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: _isAbComparing ? p.accent : p.surfaceContainer,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                        color: _isAbComparing ? p.accent : p.hairline),
-                  ),
-                  child: Text(
-                    'A/B Flat',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                      color: _isAbComparing ? p.onAccent : p.textSecondary,
+              IgnorePointer(
+                ignoring: dspBlocked != null,
+                child: Opacity(
+                  opacity: dspBlocked != null ? 0.45 : 1.0,
+                  child: GestureDetector(
+                    onTapDown: (_) {
+                      setState(() => _isAbComparing = true);
+                      cubit.startAbComparison();
+                    },
+                    onTapUp: (_) {
+                      setState(() => _isAbComparing = false);
+                      cubit.endAbComparison();
+                    },
+                    onTapCancel: () {
+                      setState(() => _isAbComparing = false);
+                      cubit.endAbComparison();
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: _isAbComparing ? p.accent : p.surfaceContainer,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: _isAbComparing ? p.accent : p.hairline),
+                      ),
+                      child: Text(
+                        'A/B Flat',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: _isAbComparing ? p.onAccent : p.textSecondary,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -411,7 +853,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               const SizedBox(width: 6),
               // Reset to Flat button
               TextButton.icon(
-                onPressed: () => cubit.resetToFlat(),
+                onPressed: dspBlocked != null ? null : () => cubit.resetToFlat(),
                 icon: Icon(Icons.restore_rounded,
                     size: 16, color: p.textSecondary),
                 label: Text('Reset',
@@ -427,7 +869,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               const SizedBox(width: 4),
               // Save Custom Preset button
               TextButton.icon(
-                onPressed: () => _showSaveCustomPresetDialog(cubit, state),
+                onPressed: dspBlocked != null ? null : () => _showSaveCustomPresetDialog(cubit, state),
                 icon:
                     Icon(Icons.bookmark_add_rounded, size: 16, color: p.accent),
                 label: Text('Save',
@@ -497,7 +939,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                   onPressed: () {
-                    showModalBottomSheet(
+                    showModalBottomSheet<void>(
                       context: context,
                       useRootNavigator: true,
                       isScrollControlled: true,
@@ -522,7 +964,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10)),
                   onPressed: () {
-                    showModalBottomSheet(
+                    showModalBottomSheet<void>(
                       context: context,
                       useRootNavigator: true,
                       isScrollControlled: true,
@@ -613,7 +1055,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           ),
                         ),
                         Text(
-                          '${state.selectedHeadphoneProfile!.brand} • '
+                          '${state.selectedHeadphoneProfile!.brand} Ã¢Â€Â¢ '
                           'Preamp: ${state.selectedHeadphoneProfile!.preampGain.toStringAsFixed(1)} dB',
                           style: TextStyle(fontSize: 10, color: p.textTertiary),
                         ),
@@ -635,7 +1077,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             const SizedBox(height: 12),
           ],
 
-          // Real-time Frequency Response Curve Visualizer
+          // Real-time Frequency Response Curve Visualizer.
+          // F-10/F-24: the gains come from a dedicated BlocSelector (band
+          // drags repaint only the curve), and the RepaintBoundary keeps the
+          // curve repaint inside its own layer instead of propagating to the
+          // ancestor layers during drags.
           Container(
             height: 64,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -644,10 +1090,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               borderRadius: AppRadii.cardRadius,
               border: Border.all(color: p.hairline),
             ),
-            child: EqCurveVisualizer(
-              gains: preset.gains,
-              activeColor: isEnabled ? p.accent : p.textTertiary,
-              height: 52,
+            child: BlocSelector<PlayerCubit, PlayerState, List<double>>(
+              selector: (s) => s.eqPreset.gains,
+              builder: (context, gains) => RepaintBoundary(
+                child: EqCurveVisualizer(
+                  gains: gains,
+                  activeColor: effectiveEnabled ? p.accent : p.textTertiary,
+                  height: 52,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 14),
@@ -663,29 +1114,35 @@ class _EqualizerSheetState extends State<EqualizerSheet>
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: List.generate(_bandLabels.length, (index) {
-                final gain =
-                    index < preset.gains.length ? preset.gains[index] : 0.0;
+                // F-10: each band subscribes to its own gain via
+                // BlocSelector, so a band-drag delta rebuilds only the
+                // dragged slider (plus the curve) instead of the whole sheet.
                 return Expanded(
-                  child: RepaintBoundary(
-                    child: _VerticalEqSlider(
-                      value: gain,
-                      label: _bandLabels[index],
-                      isEnabled: isEnabled,
-                      accentColor: p.accent,
-                      trackColor: p.hairline,
-                      surfaceColor: p.surface,
-                      textColor: p.textPrimary,
-                      onInteraction: () {
-                        if (!state.isEqEnabled) {
-                          cubit.setEqualizerEnabled(true);
-                        }
-                      },
-                      onChanged: (val) {
-                        if (!state.isEqEnabled) {
-                          cubit.setEqualizerEnabled(true);
-                        }
-                        cubit.setBandGain(index, val);
-                      },
+                  child: BlocSelector<PlayerCubit, PlayerState, double>(
+                    selector: (s) => index < s.eqPreset.gains.length
+                        ? s.eqPreset.gains[index]
+                        : 0.0,
+                    builder: (context, gain) => RepaintBoundary(
+                      child: _VerticalEqSlider(
+                        value: gain,
+                        label: _bandLabels[index],
+                        isEnabled: effectiveEnabled,
+                        accentColor: p.accent,
+                        trackColor: p.hairline,
+                        surfaceColor: p.surface,
+                        textColor: p.textPrimary,
+                        onInteraction: () {
+                          if (!state.isEqEnabled) {
+                            cubit.setEqualizerEnabled(true);
+                          }
+                        },
+                        onChanged: (val) {
+                          if (!state.isEqEnabled) {
+                            cubit.setEqualizerEnabled(true);
+                          }
+                          cubit.setBandGain(index, val);
+                        },
+                      ),
                     ),
                   ),
                 );
@@ -718,12 +1175,19 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Bass Enhancer',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            fontSize: 13,
-                            color: p.textPrimary),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              'Bass Enhancer',
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                  color: p.textPrimary),
+                            ),
+                          ),
+                          IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Bass Boost', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.bassBoost, conflictReason: dspBlocked)),
+                        ],
                       ),
                       Text(
                         '${(preset.bassBoost * 100).round()}% punch',
@@ -749,7 +1213,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         value: preset.bassBoost.clamp(0.0, 1.0),
                         min: 0.0,
                         max: 1.0,
-                        onChanged: (val) {
+                        onChanged: dspBlocked != null ? null : (val) {
                           if (!state.isEqEnabled) {
                             cubit.setEqualizerEnabled(true);
                           }
@@ -795,12 +1259,19 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Volume Boost',
-                            style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13,
-                                color: p.textPrimary),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  'Volume Boost',
+                                  style: TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13,
+                                      color: p.textPrimary),
+                                ),
+                              ),
+                              IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Volume Boost', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.volumeBoost, conflictReason: dspBlocked)),
+                            ],
                           ),
                           Text(
                             state.volumeBoost > 0
@@ -862,7 +1333,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     value: state.volumeBoost.clamp(0.0, 1.0),
                     min: 0.0,
                     max: 1.0,
-                    onChanged: (val) {
+                    onChanged: dspBlocked != null ? null : (val) {
                       if (!state.isEqEnabled) cubit.setEqualizerEnabled(true);
                       cubit.setVolumeBoost(val);
                     },
@@ -990,10 +1461,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   ),
                 ),
                 Switch.adaptive(
-                  value: state.isSpatializerEnabled,
+                  value: dspBlocked == null && state.isSpatializerEnabled,
                   activeTrackColor: p.accent,
                   activeThumbColor: p.onAccent,
-                  onChanged: (val) => cubit.setSpatializerEnabled(val),
+                  onChanged: dspBlocked != null
+                      ? null
+                      : (val) => cubit.setSpatializerEnabled(val),
                 ),
               ],
             ),
@@ -1249,7 +1722,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        '${profile.brand} • ${profile.category}',
+                                        '${profile.brand} Ã¢Â€Â¢ ${profile.category}',
                                         style: TextStyle(
                                             fontSize: 11,
                                             color: p.textTertiary),
@@ -1345,11 +1818,18 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     PlayerState state,
     PulsrPalette p,
   ) {
+    final dspBlocked = _dspBlockedReason(context);
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (dspBlocked != null) _conflictBanner(dspBlocked, p),
+          if (dspBlocked != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text('All DSP is bypassed by Bit-Perfect. Disable it in Settings to re-enable.', style: TextStyle(color: p.textSecondary, fontSize: 11)),
+            ),
           // Support Detection Banner
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1471,16 +1951,19 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Spatializer', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.spatializer, conflictReason: dspBlocked)),
+                  const SizedBox(width: 4),
                   Switch.adaptive(
-                    value: state.isSpatializerEnabled,
+                    value: dspBlocked == null && state.isSpatializerEnabled,
                     activeTrackColor: p.accent,
                     activeThumbColor: p.onAccent,
-                    onChanged: (val) => cubit.setSpatializerEnabled(val),
+                    onChanged: dspBlocked != null ? null : (val) => cubit.setSpatializerEnabled(val),
                   ),
                 ],
               ),
             ),
+            if (dspBlocked != null)
+              Padding(padding: const EdgeInsets.only(top: 8), child: Text('Blocked by Bit-Perfect', style: TextStyle(color: p.error, fontSize: 10, fontWeight: FontWeight.w600))),
             const SizedBox(height: 16),
           ],
 
@@ -1537,20 +2020,22 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Virtualizer', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.virtualizer, conflictReason: dspBlocked)),
+                    const SizedBox(width: 4),
                     Switch.adaptive(
-                      value: state.isVirtualizerEnabled,
+                      value: dspBlocked == null && state.isVirtualizerEnabled,
                       activeTrackColor: p.accent,
                       activeThumbColor: p.onAccent,
-                      onChanged: (val) => cubit.setVirtualizerEnabled(val),
+                      onChanged: dspBlocked != null ? null : (val) => cubit.setVirtualizerEnabled(val),
                     ),
                   ],
                 ),
+                if (dspBlocked != null) Padding(padding: const EdgeInsets.only(top: 6, bottom: 8), child: Text('Blocked by Bit-Perfect', style: TextStyle(color: p.error, fontSize: 10, fontWeight: FontWeight.w600))),
                 const SizedBox(height: 16),
 
                 // Soundstage visual slider
                 Opacity(
-                  opacity: state.isVirtualizerEnabled ? 1.0 : 0.35,
+                  opacity: dspBlocked != null ? 0.35 : (state.isVirtualizerEnabled ? 1.0 : 0.35),
                   child: Column(
                     children: [
                       Row(
@@ -1649,12 +2134,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Dynamics', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.dynamics, conflictReason: dspBlocked)),
+                    const SizedBox(width: 4),
                     Switch.adaptive(
-                      value: state.isDynamicsEnabled,
+                      value: dspBlocked == null && state.isDynamicsEnabled,
                       activeTrackColor: p.accent,
                       activeThumbColor: p.onAccent,
-                      onChanged: (val) {
+                      onChanged: dspBlocked != null ? null : (val) {
                         cubit.setDynamicsPreset(
                           val
                               ? (state.dynamicsPreset == DynamicsPreset.off
@@ -1667,11 +2153,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     ),
                   ],
                 ),
+                if (dspBlocked != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Blocked by Bit-Perfect', style: TextStyle(color: p.error, fontSize: 10, fontWeight: FontWeight.w600))),
                 const SizedBox(height: 14),
 
                 // Dynamics Preset Cards Grid
                 Opacity(
-                  opacity: state.isDynamicsEnabled ? 1.0 : 0.35,
+                  opacity: dspBlocked != null ? 0.35 : (state.isDynamicsEnabled ? 1.0 : 0.35),
                   child: Column(
                     children: DynamicsPreset.values
                         .where((d) => d != DynamicsPreset.off)
@@ -1681,10 +2168,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 8),
                         child: InkWell(
-                          onTap: state.isDynamicsEnabled
+                          onTap: dspBlocked != null ? null : (state.isDynamicsEnabled
                               ? () =>
                                   cubit.setDynamicsPreset(preset, enabled: true)
-                              : null,
+                              : null),
                           borderRadius: BorderRadius.circular(10),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
@@ -1801,16 +2288,20 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Crossfeed', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.crossfeed, conflictReason: dspBlocked)),
+                    const SizedBox(width: 4),
                     Switch.adaptive(
-                      value: state.isCrossfeedEnabled,
+                      value: dspBlocked == null && state.isCrossfeedEnabled,
                       activeTrackColor: p.accent,
                       activeThumbColor: p.onAccent,
-                      onChanged: (val) => cubit.setCrossfeed(val),
+                      onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                          ? null
+                          : (val) => cubit.setCrossfeed(val),
                     ),
                   ],
                 ),
-                if (state.isCrossfeedEnabled) ...[
+                if (dspBlocked != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Blocked by Bit-Perfect', style: TextStyle(color: p.error, fontSize: 10, fontWeight: FontWeight.w600))),
+                if (dspBlocked == null && state.isCrossfeedEnabled) ...[
                   const SizedBox(height: 14),
                   // Delay slider
                   Row(
@@ -1822,7 +2313,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               color: p.textSecondary,
                               fontWeight: FontWeight.w600)),
                       Text(
-                        '${state.crossfeedDelayUs.round()} µs',
+                        '${state.crossfeedDelayUs.round()} Ã‚Âµs',
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
@@ -1942,16 +2433,20 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Limiter', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.limiter, conflictReason: dspBlocked)),
+                    const SizedBox(width: 4),
                     Switch.adaptive(
-                      value: state.isLimiterEnabled,
+                      value: dspBlocked == null && state.isLimiterEnabled,
                       activeTrackColor: p.accent,
                       activeThumbColor: p.onAccent,
-                      onChanged: (val) => cubit.setLookaheadLimiter(val),
+                      onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                          ? null
+                          : (val) => cubit.setLookaheadLimiter(val),
                     ),
                   ],
                 ),
-                if (state.isLimiterEnabled) ...[
+                if (dspBlocked != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Blocked by Bit-Perfect', style: TextStyle(color: p.error, fontSize: 10, fontWeight: FontWeight.w600))),
+                if (dspBlocked == null && state.isLimiterEnabled) ...[
                   const SizedBox(height: 14),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2060,14 +2555,21 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'Stereo Balance & Mono Mix',
-                                  style: TextStyle(
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 14,
-                                      color: p.textPrimary),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: Text(
+                                        'Stereo Balance & Mono Mix',
+                                        style: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            fontSize: 14,
+                                            color: p.textPrimary),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Stereo Balance', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.panner, conflictReason: dspBlocked)),
+                                  ],
                                 ),
                                 Text(
                                   'Left / Right acoustic panning balance',
@@ -2094,15 +2596,18 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                     : p.textSecondary)),
                         const SizedBox(width: 4),
                         Switch.adaptive(
-                          value: state.monoMix,
+                          value: dspBlocked == null && state.monoMix,
                           activeTrackColor: p.accent,
                           activeThumbColor: p.onAccent,
-                          onChanged: (val) => cubit.setMonoMix(val),
+                          onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                              ? null
+                              : (val) => cubit.setMonoMix(val),
                         ),
                       ],
                     ),
                   ],
                 ),
+                if (dspBlocked != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Blocked by Bit-Perfect', style: TextStyle(color: p.error, fontSize: 10, fontWeight: FontWeight.w600))),
                 const SizedBox(height: 14),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2111,27 +2616,23 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w800,
-                            color: state.stereoBalance < -0.05
-                                ? p.accent
-                                : p.textSecondary)),
+                            color: dspBlocked != null ? p.textTertiary : (state.stereoBalance < -0.05 ? p.accent : p.textSecondary))),
                     Text(
-                      state.stereoBalance.abs() < 0.05
+                      dspBlocked != null ? 'Blocked' : (state.stereoBalance.abs() < 0.05
                           ? 'Center'
                           : (state.stereoBalance < 0
                               ? 'Left ${(-state.stereoBalance * 100).round()}%'
-                              : 'Right ${(state.stereoBalance * 100).round()}%'),
+                              : 'Right ${(state.stereoBalance * 100).round()}%')),
                       style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
-                          color: p.accent),
+                          color: dspBlocked != null ? p.error : p.accent),
                     ),
                     Text('R',
                         style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w800,
-                            color: state.stereoBalance > 0.05
-                                ? p.accent
-                                : p.textSecondary)),
+                            color: dspBlocked != null ? p.textTertiary : (state.stereoBalance > 0.05 ? p.accent : p.textSecondary))),
                   ],
                 ),
                 SliderTheme(
@@ -2139,16 +2640,16 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     trackHeight: 4,
                     thumbShape:
                         const RoundSliderThumbShape(enabledThumbRadius: 6),
-                    activeTrackColor: p.accent,
+                    activeTrackColor: dspBlocked != null ? p.textTertiary : p.accent,
                     inactiveTrackColor: p.surface,
-                    thumbColor: p.accent,
+                    thumbColor: dspBlocked != null ? p.textTertiary : p.accent,
                   ),
                   child: Slider(
                     value: state.stereoBalance.clamp(-1.0, 1.0),
                     min: -1.0,
                     max: 1.0,
                     divisions: 40,
-                    onChanged: (val) => cubit.setStereoBalance(val),
+                    onChanged: dspBlocked != null ? null : (val) => cubit.setStereoBalance(val),
                   ),
                 ),
               ],
@@ -2209,16 +2710,20 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Reverb', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.reverb, conflictReason: dspBlocked)),
+                    const SizedBox(width: 4),
                     Switch.adaptive(
-                      value: state.isReverbEnabled,
+                      value: dspBlocked == null && state.isReverbEnabled,
                       activeTrackColor: p.accent,
                       activeThumbColor: p.onAccent,
-                      onChanged: (val) => cubit.setReverb(val),
+                      onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                          ? null
+                          : (val) => cubit.setReverb(val),
                     ),
                   ],
                 ),
-                if (state.isReverbEnabled) ...[
+                if (dspBlocked != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Blocked by Bit-Perfect', style: TextStyle(color: p.error, fontSize: 10, fontWeight: FontWeight.w600))),
+                if (dspBlocked == null && state.isReverbEnabled) ...[
                   const SizedBox(height: 14),
                   // Room presets chips
                   Wrap(
@@ -2275,6 +2780,22 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               ],
             ),
           ),
+          const SizedBox(height: 16),
+
+          // 3. Harmonic Saturation / Exciter (Phase 1 DSP expansion)
+          _buildSaturationCard(context, state, cubit, dspBlocked, p),
+          const SizedBox(height: 16),
+
+          // 4. Stereo Width — Mid/Side (Phase 1 DSP expansion)
+          _buildStereoWidthCard(context, state, cubit, dspBlocked, p),
+          const SizedBox(height: 16),
+
+          // 5. Subwoofer Crossover — bass redirection (Phase 1 DSP expansion)
+          _buildSubCrossoverCard(context, state, cubit, dspBlocked, p),
+          const SizedBox(height: 16),
+
+          // 6. Dynamic EQ (Phase 1 DSP expansion)
+          _buildDynamicEqCard(context, state, cubit, dspBlocked, p),
         ],
       ),
     );
@@ -2297,6 +2818,546 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         fontSize: 11,
       ),
       onSelected: (_) => cubit.setReverb(true, preset: presetIdx),
+    );
+  }
+
+  // ---- Phase 1 DSP expansion cards ----
+
+  /// Shared label/value header + slider row used by the expansion cards,
+  /// matching the visual style of the Crossfeed/Limiter sliders above.
+  Widget _buildDspSliderRow({
+    required BuildContext context,
+    required PulsrPalette p,
+    required String label,
+    required String valueText,
+    required double value,
+    required double min,
+    required double max,
+    int? divisions,
+    required ValueChanged<double> onChanged,
+  }) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label,
+                style: TextStyle(
+                    fontSize: 12,
+                    color: p.textSecondary,
+                    fontWeight: FontWeight.w600)),
+            Text(valueText,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: p.accent)),
+          ],
+        ),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            trackHeight: 4,
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
+            activeTrackColor: p.accent,
+            inactiveTrackColor: p.surface,
+            thumbColor: p.accent,
+          ),
+          child: Slider(
+            value: value.clamp(min, max),
+            min: min,
+            max: max,
+            divisions: divisions,
+            onChanged: onChanged,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSaturationCard(BuildContext context, PlayerState state,
+      PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
+    final l10n = context.l10n;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: AppRadii.cardRadius,
+        border: Border.all(color: p.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.waves_rounded, color: p.accent, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(l10n.dspSaturationTitle,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: p.textPrimary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          Text(l10n.dspSaturationSubtitle,
+                              style: TextStyle(
+                                  fontSize: 11, color: p.textTertiary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                  icon: Icon(Icons.info_outline_rounded,
+                      size: 16, color: p.textTertiary),
+                  visualDensity: VisualDensity.compact,
+                  tooltip: l10n.dspSaturationTitle,
+                  onPressed: () => _showFeatureInfo(
+                      context, AudioFeatureRegistry.saturation,
+                      conflictReason: dspBlocked)),
+              const SizedBox(width: 4),
+              Switch.adaptive(
+                value: dspBlocked == null && state.isSaturationEnabled,
+                activeTrackColor: p.accent,
+                activeThumbColor: p.onAccent,
+                onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                    ? null
+                    : (val) => cubit.setSaturation(val),
+              ),
+            ],
+          ),
+          if (dspBlocked != null)
+            Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(l10n.blockedByBitPerfectShort,
+                    style: TextStyle(
+                        color: p.error,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600))),
+          if (dspBlocked == null && state.isSaturationEnabled) ...[
+            const SizedBox(height: 14),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspSaturationDrive,
+              valueText: '${(state.saturationDrive * 100).round()}%',
+              value: state.saturationDrive,
+              min: 0.0,
+              max: 1.0,
+              divisions: 20,
+              onChanged: (val) => cubit.setSaturation(true, drive: val),
+            ),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspSaturationMix,
+              valueText: '${(state.saturationMix * 100).round()}% Wet',
+              value: state.saturationMix,
+              min: 0.0,
+              max: 1.0,
+              divisions: 20,
+              onChanged: (val) => cubit.setSaturation(true, mix: val),
+            ),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspSaturationTilt,
+              valueText: '${(state.saturationTilt * 100).round()}%',
+              value: state.saturationTilt,
+              min: 0.0,
+              max: 1.0,
+              divisions: 20,
+              onChanged: (val) => cubit.setSaturation(true, tilt: val),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStereoWidthCard(BuildContext context, PlayerState state,
+      PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
+    final l10n = context.l10n;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: AppRadii.cardRadius,
+        border: Border.all(color: p.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.compare_arrows_rounded,
+                          color: p.accent, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(l10n.dspStereoWidthTitle,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: p.textPrimary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          Text(l10n.dspStereoWidthSubtitle,
+                              style: TextStyle(
+                                  fontSize: 11, color: p.textTertiary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                  icon: Icon(Icons.info_outline_rounded,
+                      size: 16, color: p.textTertiary),
+                  visualDensity: VisualDensity.compact,
+                  tooltip: l10n.dspStereoWidthTitle,
+                  onPressed: () => _showFeatureInfo(
+                      context, AudioFeatureRegistry.stereoWidth,
+                      conflictReason: dspBlocked)),
+              const SizedBox(width: 4),
+              Switch.adaptive(
+                value: dspBlocked == null && state.isStereoWidthEnabled,
+                activeTrackColor: p.accent,
+                activeThumbColor: p.onAccent,
+                onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                    ? null
+                    : (val) => cubit.setStereoWidth(val),
+              ),
+            ],
+          ),
+          if (dspBlocked != null)
+            Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(l10n.blockedByBitPerfectShort,
+                    style: TextStyle(
+                        color: p.error,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600))),
+          if (dspBlocked == null && state.isStereoWidthEnabled) ...[
+            const SizedBox(height: 14),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspStereoWidthAmount,
+              valueText: state.stereoWidth.toStringAsFixed(2),
+              value: state.stereoWidth,
+              min: 0.0,
+              max: 2.0,
+              divisions: 40,
+              onChanged: (val) => cubit.setStereoWidth(true, width: val),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSubCrossoverCard(BuildContext context, PlayerState state,
+      PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
+    final l10n = context.l10n;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: AppRadii.cardRadius,
+        border: Border.all(color: p.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.speaker_rounded, color: p.accent, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(l10n.dspSubCrossoverTitle,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: p.textPrimary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          Text(l10n.dspSubCrossoverSubtitle,
+                              style: TextStyle(
+                                  fontSize: 11, color: p.textTertiary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                  icon: Icon(Icons.info_outline_rounded,
+                      size: 16, color: p.textTertiary),
+                  visualDensity: VisualDensity.compact,
+                  tooltip: l10n.dspSubCrossoverTitle,
+                  onPressed: () => _showFeatureInfo(
+                      context, AudioFeatureRegistry.subCrossover,
+                      conflictReason: dspBlocked)),
+              const SizedBox(width: 4),
+              Switch.adaptive(
+                value: dspBlocked == null && state.isSubCrossoverEnabled,
+                activeTrackColor: p.accent,
+                activeThumbColor: p.onAccent,
+                onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                    ? null
+                    : (val) => cubit.setSubCrossover(val),
+              ),
+            ],
+          ),
+          if (dspBlocked != null)
+            Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(l10n.blockedByBitPerfectShort,
+                    style: TextStyle(
+                        color: p.error,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600))),
+          if (dspBlocked == null && state.isSubCrossoverEnabled) ...[
+            const SizedBox(height: 14),
+            // Honest copy: this is bass redirection, not multichannel LFE.
+            Text(l10n.dspSubCrossoverNote,
+                style: TextStyle(fontSize: 10, color: p.textTertiary)),
+            const SizedBox(height: 10),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspSubCrossoverCorner,
+              valueText: '${state.subCrossoverCornerHz.round()} Hz',
+              value: state.subCrossoverCornerHz,
+              min: 60.0,
+              max: 150.0,
+              divisions: 18,
+              onChanged: (val) => cubit.setSubCrossover(true, cornerHz: val),
+            ),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspSubCrossoverSubLevel,
+              valueText: '${(state.subCrossoverGain * 100).round()}%',
+              value: state.subCrossoverGain,
+              min: 0.0,
+              max: 1.0,
+              divisions: 20,
+              onChanged: (val) => cubit.setSubCrossover(true, gain: val),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDynamicEqCard(BuildContext context, PlayerState state,
+      PlayerCubit cubit, String? dspBlocked, PulsrPalette p) {
+    final l10n = context.l10n;
+    final band = state.dynamicEqBands.isNotEmpty
+        ? state.dynamicEqBands.first
+        : const DynamicEqBandConfig();
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: p.surfaceContainer,
+        borderRadius: AppRadii.cardRadius,
+        border: Border.all(color: p.hairline),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: p.accent.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(Icons.graphic_eq_rounded,
+                          color: p.accent, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(l10n.dspDynamicEqTitle,
+                              style: TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                  color: p.textPrimary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                          Text(l10n.dspDynamicEqSubtitle,
+                              style: TextStyle(
+                                  fontSize: 11, color: p.textTertiary),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                  icon: Icon(Icons.info_outline_rounded,
+                      size: 16, color: p.textTertiary),
+                  visualDensity: VisualDensity.compact,
+                  tooltip: l10n.dspDynamicEqTitle,
+                  onPressed: () => _showFeatureInfo(
+                      context, AudioFeatureRegistry.dynamicEq,
+                      conflictReason: dspBlocked)),
+              const SizedBox(width: 4),
+              Switch.adaptive(
+                value: dspBlocked == null && state.isDynamicEqEnabled,
+                activeTrackColor: p.accent,
+                activeThumbColor: p.onAccent,
+                onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                    ? null
+                    : (val) => cubit.setDynamicEq(val),
+              ),
+            ],
+          ),
+          if (dspBlocked != null)
+            Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(l10n.blockedByBitPerfectShort,
+                    style: TextStyle(
+                        color: p.error,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600))),
+          if (dspBlocked == null && state.isDynamicEqEnabled) ...[
+            const SizedBox(height: 14),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspDynamicEqFrequency,
+              valueText:
+                  '${band.frequency.round()} Hz',
+              value: band.frequency,
+              min: 60.0,
+              max: 12000.0,
+              divisions: 64,
+              onChanged: (val) =>
+                  cubit.setDynamicEqBand(0, band.copyWith(frequency: val)),
+            ),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspDynamicEqThreshold,
+              valueText: '${band.thresholdDb.toStringAsFixed(0)} dB',
+              value: band.thresholdDb,
+              min: -60.0,
+              max: 0.0,
+              divisions: 60,
+              onChanged: (val) =>
+                  cubit.setDynamicEqBand(0, band.copyWith(thresholdDb: val)),
+            ),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspDynamicEqRatio,
+              valueText: '${band.ratio.toStringAsFixed(1)} : 1',
+              value: band.ratio,
+              min: 1.0,
+              max: 8.0,
+              divisions: 35,
+              onChanged: (val) =>
+                  cubit.setDynamicEqBand(0, band.copyWith(ratio: val)),
+            ),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspDynamicEqAttack,
+              valueText: '${band.attackMs.toStringAsFixed(1)} ms',
+              value: band.attackMs,
+              min: 0.1,
+              max: 50.0,
+              divisions: 50,
+              onChanged: (val) =>
+                  cubit.setDynamicEqBand(0, band.copyWith(attackMs: val)),
+            ),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspDynamicEqRelease,
+              valueText: '${band.releaseMs.round()} ms',
+              value: band.releaseMs,
+              min: 20.0,
+              max: 1000.0,
+              divisions: 49,
+              onChanged: (val) =>
+                  cubit.setDynamicEqBand(0, band.copyWith(releaseMs: val)),
+            ),
+            _buildDspSliderRow(
+              context: context,
+              p: p,
+              label: l10n.dspDynamicEqMaxCut,
+              valueText: '${band.maxCutDb.toStringAsFixed(0)} dB',
+              value: band.maxCutDb,
+              min: -24.0,
+              max: 0.0,
+              divisions: 24,
+              onChanged: (val) =>
+                  cubit.setDynamicEqBand(0, band.copyWith(maxCutDb: val)),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

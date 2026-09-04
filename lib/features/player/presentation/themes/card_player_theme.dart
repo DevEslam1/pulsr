@@ -148,7 +148,7 @@ class CardPlayerTheme extends StatelessWidget {
                           Icon(Icons.more_vert_rounded, color: textTitleColor),
                       onPressed: () {
                         if (song != null) {
-                          showModalBottomSheet(
+                          showModalBottomSheet<void>(
                             context: context,
                             builder: (_) => SongInfoSheet(song: song),
                           );
@@ -163,15 +163,8 @@ class CardPlayerTheme extends StatelessWidget {
               Expanded(
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final isTwoPane = (context.isLandscape ||
-                            constraints.maxWidth > constraints.maxHeight) &&
-                        constraints.maxWidth >= 640;
-
-                    final double artSize = isTwoPane
-                        ? (constraints.maxHeight * 0.72).clamp(240.0, 360.0)
-                        : (context.isTablet
-                            ? (constraints.maxHeight * 0.44).clamp(320.0, 480.0)
-                            : 340.0);
+                    final isTwoPane =
+                        context.isTwoPane || constraints.maxWidth >= 680;
 
                     final centerDisplay = GestureDetector(
                       onTap: () => cubit.toggleLyricsVisibility(),
@@ -204,7 +197,6 @@ class CardPlayerTheme extends StatelessWidget {
                             ? LyricsView(
                                 key: const ValueKey('lyrics_view'),
                                 lyrics: state.lyrics,
-                                currentPosition: state.position,
                                 isLoading: state.isLoadingLyrics,
                                 activeColor: activeColor,
                                 source: state.lyricsSource,
@@ -216,8 +208,8 @@ class CardPlayerTheme extends StatelessWidget {
                                     key: const ValueKey('artwork_card'),
                                     child: ConstrainedBox(
                                       constraints: BoxConstraints(
-                                        maxHeight: artSize,
-                                        maxWidth: artSize,
+                                        maxHeight: isTwoPane ? 280 : 340,
+                                        maxWidth: isTwoPane ? 280 : 340,
                                       ),
                                       child: AspectRatio(
                                         aspectRatio: 1.0,
@@ -388,7 +380,6 @@ class CardPlayerTheme extends StatelessWidget {
 
                           // Seek Bar
                           PlayerSeekBar(
-                            position: state.position,
                             duration: state.duration,
                             activeColor: activeColor,
                             songId: state.currentSong?.id,
@@ -414,10 +405,9 @@ class CardPlayerTheme extends StatelessWidget {
 
                           const SizedBox(height: 6),
 
-                          FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          // Bottom Action Strip
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
                             children: [
                               IconButton(
                                 icon: Icon(
@@ -444,7 +434,7 @@ class CardPlayerTheme extends StatelessWidget {
                                       : iconActionColor,
                                 ),
                                 onPressed: () {
-                                  showModalBottomSheet(
+                                  showModalBottomSheet<void>(
                                     context: context,
                                     isScrollControlled: true,
                                     backgroundColor: Colors.transparent,
@@ -456,12 +446,7 @@ class CardPlayerTheme extends StatelessWidget {
                               IconButton(
                                 icon: Icon(Icons.speed_rounded,
                                     color: iconActionColor),
-                                onPressed: () {
-                                  showModalBottomSheet(
-                                    context: context,
-                                    builder: (_) => const SpeedPickerSheet(),
-                                  );
-                                },
+                                onPressed: () => SpeedPickerSheet.show(context),
                                 tooltip: context.l10n.playbackSpeed,
                               ),
                               IconButton(
@@ -482,7 +467,7 @@ class CardPlayerTheme extends StatelessWidget {
                                       : iconActionColor,
                                 ),
                                 onPressed: () {
-                                  showModalBottomSheet(
+                                  showModalBottomSheet<void>(
                                     context: context,
                                     useRootNavigator: true,
                                     isScrollControlled: true,
@@ -497,7 +482,7 @@ class CardPlayerTheme extends StatelessWidget {
                                     color: iconActionColor),
                                 onPressed: () {
                                   if (song != null) {
-                                    showModalBottomSheet(
+                                    showModalBottomSheet<void>(
                                       context: context,
                                       useRootNavigator: true,
                                       isScrollControlled: true,
@@ -521,7 +506,6 @@ class CardPlayerTheme extends StatelessWidget {
                               ),
                             ],
                           ),
-                        ),
                         ],
                       ),
                     );

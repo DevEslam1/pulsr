@@ -146,7 +146,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                     icon: Icon(Icons.more_vert_rounded, color: p.textPrimary),
                     onPressed: () {
                       if (song != null) {
-                        showModalBottomSheet(
+                        showModalBottomSheet<void>(
                           context: context,
                           builder: (_) => SongInfoSheet(song: song),
                         );
@@ -163,9 +163,8 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final isTwoPane = (context.isLandscape ||
-                          constraints.maxWidth > constraints.maxHeight) &&
-                      constraints.maxWidth >= 640;
+                  final isTwoPane =
+                      context.isTwoPane || constraints.maxWidth >= 680;
 
                   final centerDisplay = GestureDetector(
                     onTap: () => cubit.toggleLyricsVisibility(),
@@ -198,7 +197,6 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                           ? LyricsView(
                               key: const ValueKey('lyrics_view'),
                               lyrics: state.lyrics,
-                              currentPosition: state.position,
                               isLoading: state.isLoadingLyrics,
                               activeColor: activeColor,
                               source: state.lyricsSource,
@@ -212,13 +210,8 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                     turns: _rotationController,
                                     child: LayoutBuilder(
                                       builder: (context, vinylConstraints) {
-                                        final maxDimension = isTwoPane
-                                            ? (constraints.maxHeight * 0.72)
-                                                .clamp(240.0, 360.0)
-                                            : (context.isTablet
-                                                ? (constraints.maxHeight * 0.44)
-                                                    .clamp(320.0, 480.0)
-                                                : 340.0);
+                                        final maxDimension =
+                                            isTwoPane ? 280.0 : 340.0;
                                         final vinylSize = math.min(
                                           math.min(vinylConstraints.maxWidth,
                                                   vinylConstraints.maxHeight) *
@@ -393,7 +386,6 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
 
                       // Seek Bar
                       PlayerSeekBar(
-                        position: state.position,
                         duration: state.duration,
                         activeColor: activeColor,
                         songId: state.currentSong?.id,
@@ -423,10 +415,8 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                       Padding(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 4),
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
                           children: [
                             IconButton(
                               icon: Icon(
@@ -453,7 +443,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                     : p.textSecondary,
                               ),
                               onPressed: () {
-                                showModalBottomSheet(
+                                showModalBottomSheet<void>(
                                   context: context,
                                   isScrollControlled: true,
                                   backgroundColor: Colors.transparent,
@@ -465,12 +455,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                             IconButton(
                               icon: Icon(Icons.speed_rounded,
                                   color: p.textSecondary),
-                              onPressed: () {
-                                showModalBottomSheet(
-                                  context: context,
-                                  builder: (_) => const SpeedPickerSheet(),
-                                );
-                              },
+                              onPressed: () => SpeedPickerSheet.show(context),
                               tooltip: context.l10n.playbackSpeed,
                             ),
                             IconButton(
@@ -491,7 +476,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                     : p.textSecondary,
                               ),
                               onPressed: () {
-                                showModalBottomSheet(
+                                showModalBottomSheet<void>(
                                   context: context,
                                   useRootNavigator: true,
                                   isScrollControlled: true,
@@ -506,7 +491,7 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                                   color: p.textSecondary),
                               onPressed: () {
                                 if (song != null) {
-                                  showModalBottomSheet(
+                                  showModalBottomSheet<void>(
                                     context: context,
                                     useRootNavigator: true,
                                     isScrollControlled: true,
@@ -518,18 +503,17 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                               },
                               tooltip: context.l10n.addToPlaylist,
                             ),
-                              IconButton(
-                                icon: Icon(
-                                  Icons.queue_music_rounded,
-                                  color: state.isQueueVisible
-                                      ? activeColor
-                                      : p.textSecondary,
-                                ),
-                                onPressed: () => cubit.toggleQueueVisibility(),
-                                tooltip: context.l10n.queue,
+                            IconButton(
+                              icon: Icon(
+                                Icons.queue_music_rounded,
+                                color: state.isQueueVisible
+                                    ? activeColor
+                                    : p.textSecondary,
                               ),
-                            ],
-                          ),
+                              onPressed: () => cubit.toggleQueueVisibility(),
+                              tooltip: context.l10n.queue,
+                            ),
+                          ],
                         ),
                       ),
                     ],

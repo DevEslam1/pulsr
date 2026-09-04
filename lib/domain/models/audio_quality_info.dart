@@ -1,7 +1,7 @@
 // lib/domain/models/audio_quality_info.dart
 import 'package:flutter/material.dart';
 import '../../data/db/app_database.dart';
-import '../../features/settings/cubit/settings_state.dart';
+import 'ytm_audio_quality.dart';
 
 enum AudioQualityTier {
   hiResLossless,

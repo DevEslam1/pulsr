@@ -100,15 +100,21 @@ void ParametricEQ::applyParams(const EqParamSet& params) {
         bands_[i].enabled = p.enabled;
         bands_[i].solo = p.solo;
         bands_[i].mute = p.mute;
+        computeCoeffs(bands_[i], bands_[i].smoothedGainDb);
     }
 }
 
 void ParametricEQ::reset() {
-    std::memset(x1_, 0, sizeof(x1_));
-    std::memset(x2_, 0, sizeof(x2_));
-    std::memset(y1_, 0, sizeof(y1_));
-    std::memset(y2_, 0, sizeof(y2_));
+    std::memset(s1_, 0, sizeof(s1_));
+    std::memset(s2_, 0, sizeof(s2_));
+    smoothedPreampDb_ = targetPreampDb_;
+    preampLinear_ = std::pow(10.0, smoothedPreampDb_ / 20.0);
+    for (int i = 0; i < bandCount_; ++i) {
+        bands_[i].smoothedGainDb = bands_[i].targetGainDb;
+        computeCoeffs(bands_[i], bands_[i].smoothedGainDb);
+    }
 }
+
 
 void ParametricEQ::computeCoeffs(EQBandState& band, double gainDb) {
     // Check if bypass optimization applies
@@ -132,12 +138,13 @@ void ParametricEQ::computeCoeffs(EQBandState& band, double gainDb) {
     const double cosW = std::cos(w0);
     const double sinW = std::sin(w0);
     const double A = std::pow(10.0, gainDb / 40.0);
-    const double alpha = sinW / (2.0 * std::max(band.q, 0.05));
+    const double q = std::max(band.q, 0.05);
+    const double alpha = sinW / (2.0 * q);
 
     double b0 = 1.0, b1 = 0.0, b2 = 0.0, a0 = 1.0, a1 = 0.0, a2 = 0.0;
 
     switch (band.type) {
-        case FilterType::Peaking:
+        case FilterType::Peaking: {
             b0 = 1.0 + alpha * A;
             b1 = -2.0 * cosW;
             b2 = 1.0 - alpha * A;
@@ -145,6 +152,7 @@ void ParametricEQ::computeCoeffs(EQBandState& band, double gainDb) {
             a1 = -2.0 * cosW;
             a2 = 1.0 - alpha / A;
             break;
+        }
 
         case FilterType::LowShelf: {
             const double sqrtA = std::sqrt(A);
@@ -274,8 +282,14 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
     // Update and smooth band gains & recompute coeffs
     for (int b = 0; b < bandCount_; ++b) {
         auto& band = bands_[b];
+        const bool wasBypass = band.bypass;
         if (hasSolo && !band.solo) {
             band.bypass = true;
+            if (!wasBypass) {
+                for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
+                    s1_[ch][b] = s2_[ch][b] = 0.0;
+                }
+            }
             continue;
         }
 
@@ -286,9 +300,15 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
             band.smoothedGainDb = band.targetGainDb;
             computeCoeffs(band, band.smoothedGainDb);
         }
+
+        if (wasBypass && !band.bypass) {
+            for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
+                s1_[ch][b] = s2_[ch][b] = 0.0;
+            }
+        }
     }
 
-    // Process biquad cascaded filters per band across all channels
+    // Process biquad cascaded filters per band across all channels (TDF-II)
     for (int b = 0; b < bandCount_; ++b) {
         const auto& band = bands_[b];
         if (band.bypass) continue;
@@ -300,35 +320,47 @@ void ParametricEQ::processInterleaved(float* buffer, int frames, int channels) {
         const double a2 = band.coeffs.a2;
 
         for (int ch = 0; ch < channels; ++ch) {
-            double x1 = x1_[ch][b];
-            double x2 = x2_[ch][b];
-            double y1 = y1_[ch][b];
-            double y2 = y2_[ch][b];
+            double s1 = s1_[ch][b];
+            double s2 = s2_[ch][b];
 
             float* chPtr = buffer + ch;
             for (int f = 0; f < frames; ++f) {
                 const double x0 = static_cast<double>(*chPtr);
-                const double y0 = b0 * x0 + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2;
+                if (!std::isfinite(x0)) {
+                    *chPtr = 0.0f;
+                    s1 = 0.0;
+                    s2 = 0.0;
+                    chPtr += channels;
+                    continue;
+                }
 
-                x2 = x1;
-                x1 = x0;
-                y2 = y1;
-                y1 = y0;
+                // Transposed Direct Form II Difference Equation:
+                // y[n] = b0 * x[n] + s1[n-1]
+                // s1[n] = b1 * x[n] - a1 * y[n] + s2[n-1]
+                // s2[n] = b2 * x[n] - a2 * y[n]
+                double y0 = b0 * x0 + s1;
+
+                if (!std::isfinite(y0)) {
+                    // Filter blowup detected: reset registers and bypass frame
+                    s1 = 0.0;
+                    s2 = 0.0;
+                    y0 = x0;
+                } else {
+                    s1 = b1 * x0 - a1 * y0 + s2;
+                    s2 = b2 * x0 - a2 * y0;
+                }
 
                 *chPtr = static_cast<float>(y0);
                 chPtr += channels;
             }
 
-            // Flush denormals
-            if (std::abs(y1) < 1e-25) y1 = 0.0;
-            if (std::abs(y2) < 1e-25) y2 = 0.0;
-            if (std::abs(x1) < 1e-25) x1 = 0.0;
-            if (std::abs(x2) < 1e-25) x2 = 0.0;
+            // Flush denormals & ensure state is strictly finite
+            if (std::abs(s1) < 1e-25 || !std::isfinite(s1)) s1 = 0.0;
+            if (std::abs(s2) < 1e-25 || !std::isfinite(s2)) s2 = 0.0;
 
-            x1_[ch][b] = x1;
-            x2_[ch][b] = x2;
-            y1_[ch][b] = y1;
-            y2_[ch][b] = y2;
+            s1_[ch][b] = s1;
+            s2_[ch][b] = s2;
         }
     }
 }
+

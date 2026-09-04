@@ -1,8 +1,11 @@
-// android/app/src/main/cpp/SincResampler.cpp
 #include "SincResampler.h"
 #include <cmath>
 #include <cstring>
+#include <cstdio>
 #include <algorithm>
+#if defined(__ANDROID__)
+#include <android/log.h>
+#endif
 #if defined(__ARM_NEON)
 #include <arm_neon.h>
 #endif
@@ -187,6 +190,14 @@ int SincResampler::processInterleaved(float* buffer, int frames, int channels) {
 
     // Prevent availableFrames_ growth past capacity
     if (availableFrames_ > FIFO_CAPACITY - 256) {
+#if defined(__ANDROID__)
+        __android_log_print(ANDROID_LOG_WARN, "PulsrDSP",
+            "SincResampler: FIFO buffer overflow (%d > %d), dropping oldest frames",
+            availableFrames_, FIFO_CAPACITY - 256);
+#else
+        fprintf(stderr, "SincResampler: FIFO buffer overflow (%d > %d), dropping oldest frames\n",
+            availableFrames_, FIFO_CAPACITY - 256);
+#endif
         availableFrames_ = FIFO_CAPACITY - 256;
     }
 
@@ -195,27 +206,29 @@ int SincResampler::processInterleaved(float* buffer, int frames, int channels) {
     return frames;
 }
 
-int SincResampler::processPlanar(const float* const* in, float* const* out, int frames, int channels) {
-    if (!enabled_ || frames <= 0 || std::abs(ratio_ - 1.0) < 1e-5) {
+int SincResampler::processPlanar(const float* const* in, float* const* out, int inFrames, int channels, int maxOutFrames) {
+    if (!enabled_ || inFrames <= 0 || std::abs(ratio_ - 1.0) < 1e-5) {
+        int count = std::min(inFrames, maxOutFrames);
         if (in != out) {
             for (int ch = 0; ch < channels; ++ch) {
-                std::memcpy(out[ch], in[ch], frames * sizeof(float));
+                std::memcpy(out[ch], in[ch], count * sizeof(float));
             }
         }
-        return frames;
+        return count;
     }
 
     channels = std::clamp(channels, 1, MAX_CHANNELS);
 
-    for (int f = 0; f < frames; ++f) {
+    for (int f = 0; f < inFrames; ++f) {
         for (int ch = 0; ch < channels; ++ch) {
             ringBuf_[ch][writePos_] = in[ch][f];
         }
         writePos_ = (writePos_ + 1) % FIFO_CAPACITY;
     }
-    availableFrames_ += frames;
+    availableFrames_ += inFrames;
 
-    for (int outF = 0; outF < frames; ++outF) {
+    int outFrames = 0;
+    while (phase_ < static_cast<double>(availableFrames_ - HALF_TAPS) && outFrames < maxOutFrames) {
         const double samplePos = phase_;
         const int baseInt = static_cast<int>(std::floor(samplePos));
         const double frac = samplePos - static_cast<double>(baseInt);
@@ -237,9 +250,10 @@ int SincResampler::processPlanar(const float* const* in, float* const* out, int 
 
                 sum += ringBuf_[ch][ringIndex] * coeffs[tap];
             }
-            out[ch][outF] = sum;
+            out[ch][outFrames] = sum;
         }
 
+        outFrames++;
         phase_ += ratio_;
     }
 
@@ -249,5 +263,17 @@ int SincResampler::processPlanar(const float* const* in, float* const* out, int 
         availableFrames_ = std::max(0, availableFrames_ - consumedInt);
     }
 
-    return frames;
+    if (availableFrames_ > FIFO_CAPACITY - 256) {
+#if defined(__ANDROID__)
+        __android_log_print(ANDROID_LOG_WARN, "PulsrDSP",
+            "SincResampler: FIFO buffer overflow (%d > %d), dropping oldest frames",
+            availableFrames_, FIFO_CAPACITY - 256);
+#else
+        fprintf(stderr, "SincResampler: FIFO buffer overflow (%d > %d), dropping oldest frames\n",
+            availableFrames_, FIFO_CAPACITY - 256);
+#endif
+        availableFrames_ = FIFO_CAPACITY - 256;
+    }
+
+    return outFrames;
 }

@@ -59,21 +59,13 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isTwoPane = (context.isLandscape ||
-                constraints.maxWidth > constraints.maxHeight) &&
-            constraints.maxWidth >= 640;
-
-        final double discSize = isTwoPane
-            ? (constraints.maxHeight * 0.72).clamp(240.0, 360.0)
-            : (context.isTablet
-                ? (constraints.maxHeight * 0.44).clamp(320.0, 480.0)
-                : 340.0);
+        final isTwoPane = context.isTwoPane || constraints.maxWidth >= 680;
 
         final turntableDisc = Center(
           child: ConstrainedBox(
             constraints: BoxConstraints(
-              maxHeight: discSize,
-              maxWidth: discSize,
+              maxHeight: isTwoPane ? 280 : 340,
+              maxWidth: isTwoPane ? 280 : 340,
             ),
             child: AspectRatio(
               aspectRatio: 1.0,
@@ -206,7 +198,6 @@ class _VinylPlayerThemeState extends State<VinylPlayerTheme>
 
             // Seek Bar
             PlayerSeekBar(
-              position: state.position,
               duration: state.duration,
               activeColor: widget.props.activeColor,
               songId: song?.id,

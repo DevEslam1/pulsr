@@ -7,10 +7,18 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../domain/models/lyrics_line.dart';
 import '../../cubit/player_cubit.dart';
+import '../../cubit/player_state.dart';
 
 class LyricsView extends StatefulWidget {
+  /// Playback position used to highlight the active line.
+  ///
+  /// Optional for backwards compatibility: when null (the preferred usage from
+  /// the player themes), the view derives the highlighted line from
+  /// `PlayerCubit` itself via a [BlocSelector], so position ticks only
+  /// rebuild the subtree when the active line actually changes. When
+  /// non-null, the given value drives highlighting as before.
+  final Duration? currentPosition;
   final List<LyricsLine> lyrics;
-  final Duration currentPosition;
   final bool isLoading;
   final Color activeColor;
   final LyricsSource source;
@@ -18,8 +26,8 @@ class LyricsView extends StatefulWidget {
 
   const LyricsView({
     super.key,
+    this.currentPosition,
     required this.lyrics,
-    required this.currentPosition,
     this.isLoading = false,
     this.activeColor = Colors.white,
     this.source = LyricsSource.none,
@@ -34,8 +42,17 @@ class _LyricsViewState extends State<LyricsView> {
   final ScrollController _scrollController = ScrollController();
   int _lastActiveIndex = -1;
 
-  bool get _isSynced =>
-      widget.lyrics.any((line) => line.timestamp > Duration.zero);
+  // `_isSynced` is an O(n) scan; cache it keyed by lyrics list identity.
+  List<LyricsLine>? _syncedCheckSource;
+  bool _syncedCache = false;
+
+  bool get _isSynced {
+    if (!identical(_syncedCheckSource, widget.lyrics)) {
+      _syncedCheckSource = widget.lyrics;
+      _syncedCache = widget.lyrics.any((line) => line.timestamp > Duration.zero);
+    }
+    return _syncedCache;
+  }
 
   LyricsSource get _effectiveSource {
     if (widget.source != LyricsSource.none) return widget.source;
@@ -43,14 +60,12 @@ class _LyricsViewState extends State<LyricsView> {
     return LyricsSource.none;
   }
 
-  @override
-  void didUpdateWidget(covariant LyricsView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.lyrics.isEmpty || !_isSynced) return;
-
-    final currentMs = widget.currentPosition.inMilliseconds;
+  /// O(n) scan mapping a position to the index of the active lyric line
+  /// (last line whose timestamp is <= position). Returns -1 before the first
+  /// line's timestamp.
+  int _activeIndexOf(Duration position) {
+    final currentMs = position.inMilliseconds;
     int activeIndex = -1;
-
     for (int i = 0; i < widget.lyrics.length; i++) {
       if (widget.lyrics[i].timestamp.inMilliseconds <= currentMs) {
         activeIndex = i;
@@ -58,7 +73,20 @@ class _LyricsViewState extends State<LyricsView> {
         break;
       }
     }
+    return activeIndex;
+  }
 
+  @override
+  void didUpdateWidget(covariant LyricsView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Provided-position path: react to parent-driven position updates.
+    if (widget.currentPosition == null || widget.lyrics.isEmpty || !_isSynced) {
+      return;
+    }
+    _handleActiveLine(_activeIndexOf(widget.currentPosition!));
+  }
+
+  void _handleActiveLine(int activeIndex) {
     if (activeIndex != -1 && activeIndex != _lastActiveIndex) {
       _lastActiveIndex = activeIndex;
       _scrollToActive(activeIndex);
@@ -134,47 +162,23 @@ class _LyricsViewState extends State<LyricsView> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final p = context.palette;
+  /// The [BlocSelector] maps position -> active line index, so its subtree
+  /// (the lyrics list) only rebuilds when the active line actually changes,
+  /// not on every ~200 ms position tick.
+  Widget _buildSyncedList() {
+    return BlocSelector<PlayerCubit, PlayerState, int>(
+      // Unsynced (plain-text) lyrics must not drive highlight/auto-scroll:
+      // map them to -1 (no active line) exactly like the provided-position
+      // path, so _lastActiveIndex is never polluted with a bogus index.
+      selector: (s) => _isSynced ? _activeIndexOf(s.position) : -1,
+      builder: (context, activeIndex) {
+        _handleActiveLine(activeIndex);
+        return _buildLyricsList(activeIndex: activeIndex);
+      },
+    );
+  }
 
-    if (widget.isLoading) {
-      return Center(
-        child: CircularProgressIndicator(color: widget.activeColor),
-      );
-    }
-
-    if (widget.lyrics.isEmpty) {
-      return Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.lyrics_outlined, size: 48, color: p.textTertiary),
-              const SizedBox(height: 12),
-              Text(
-                context.l10n.noLyricsFound,
-                style: TextStyle(
-                  color: p.textPrimary,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Place a .lrc file in the same folder as your audio track or embed lyrics into file tags.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                    color: p.textSecondary, fontSize: 13, height: 1.4),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    final currentMs = widget.currentPosition.inMilliseconds;
+  Widget _buildLyricsList({required int activeIndex}) {
     final source = _effectiveSource;
     final isSynced = _isSynced;
 
@@ -194,12 +198,7 @@ class _LyricsViewState extends State<LyricsView> {
               itemBuilder: (context, index) {
                 final line = widget.lyrics[index];
                 if (isSynced) {
-                  final nextLineMs = index + 1 < widget.lyrics.length
-                      ? widget.lyrics[index + 1].timestamp.inMilliseconds
-                      : double.infinity;
-                  final isCurrent =
-                      currentMs >= line.timestamp.inMilliseconds &&
-                          currentMs < nextLineMs;
+                  final isCurrent = index == activeIndex;
 
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 4),
@@ -269,5 +268,57 @@ class _LyricsViewState extends State<LyricsView> {
         ],
       ),
     );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = context.palette;
+
+    if (widget.isLoading) {
+      return Center(
+        child: CircularProgressIndicator(color: widget.activeColor),
+      );
+    }
+
+    if (widget.lyrics.isEmpty) {
+      return Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.lyrics_outlined, size: 48, color: p.textTertiary),
+              const SizedBox(height: 12),
+              Text(
+                context.l10n.noLyricsFound,
+                style: TextStyle(
+                  color: p.textPrimary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Place a .lrc file in the same folder as your audio track or embed lyrics into file tags.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    color: p.textSecondary, fontSize: 13, height: 1.4),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Self-subscribing path (preferred): highlight + auto-scroll react to the
+    // cubit without the parent theme rebuilding per tick.
+    if (widget.currentPosition == null) {
+      return _buildSyncedList();
+    }
+
+    // Provided-position path (backwards compatible).
+    final activeIndex =
+        _isSynced ? _activeIndexOf(widget.currentPosition!) : -1;
+    return _buildLyricsList(activeIndex: activeIndex);
   }
 }

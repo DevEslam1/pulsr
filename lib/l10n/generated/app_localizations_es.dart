@@ -793,6 +793,12 @@ class AppLocalizationsEs extends AppLocalizations {
   String get audioAndPlayback => 'Audio y reproducción';
 
   @override
+  String get playback => 'Reproducción';
+
+  @override
+  String get audioAndSound => 'Audio y sonido';
+
+  @override
   String get equalizerAndSoundEffects => 'Ecualizador y efectos de sonido';
 
   @override
@@ -1196,6 +1202,26 @@ class AppLocalizationsEs extends AppLocalizations {
       'Sin espacio — libera almacenamiento y reintenta';
 
   @override
+  String get downloadErrorStorage =>
+      'Sin espacio — libera almacenamiento y reintenta';
+
+  @override
+  String get downloadErrorPermission =>
+      'Permiso de almacenamiento denegado. Concede el permiso en Configuración.';
+
+  @override
+  String get downloadErrorInterrupted =>
+      'Descarga interrumpida. Toca para reanudar.';
+
+  @override
+  String get downloadErrorDisabled =>
+      'Las descargas están deshabilitadas o no disponibles en esta versión.';
+
+  @override
+  String get downloadErrorTransition =>
+      'Transición de estado de descarga no válida.';
+
+  @override
   String get downloadErrorRateLimited => 'YouTube está ocupado. Enfriando…';
 
   @override
@@ -1213,6 +1239,22 @@ class AppLocalizationsEs extends AppLocalizations {
       'Modo solo Wi-Fi activo. Conéctate al Wi-Fi para descargar.';
 
   @override
+  String get downloadErrorAlreadyQueued =>
+      'Esta canción ya está en la cola de descarga.';
+
+  @override
+  String get downloadErrorCorrupt =>
+      'El archivo descargado estaba dañado o incompleto. Vuelve a intentarlo.';
+
+  @override
+  String get downloadErrorInvalidTransition =>
+      'Transición de estado de descarga no válida.';
+
+  @override
+  String get downloadErrorTimeout =>
+      'Se agotó el tiempo de descarga. Vuelve a intentarlo.';
+
+  @override
   String get dspEnginePreference => 'Preferencia de motor DSP';
 
   @override
@@ -1227,4 +1269,238 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get dspEngineAuto => 'Automático (Preferir nativo)';
+
+  @override
+  String audioStageDegraded(String stage) {
+    return 'La etapa de audio \"$stage\" se omitió para evitar interrupciones por alta carga.';
+  }
+
+  @override
+  String get stageEq => 'Ecualizador paramétrico';
+
+  @override
+  String get stageReverb => 'Reverberación de convolución';
+
+  @override
+  String get stageCrossfeed => 'Crossfeed';
+
+  @override
+  String get stageLimiter => 'Limitador predictivo';
+
+  @override
+  String get stageResampler => 'Remuestreador';
+
+  @override
+  String get stagePanner => 'Panoramizador espacial';
+
+  @override
+  String get dspSaturationTitle => 'Saturación Armónica';
+
+  @override
+  String get dspSaturationSubtitle => 'Exciter armónico estilo válvula/cinta';
+
+  @override
+  String get dspSaturationDrive => 'Nivel de excitación';
+
+  @override
+  String get dspSaturationMix => 'Mezcla';
+
+  @override
+  String get dspSaturationTilt => 'Énfasis de agudos';
+
+  @override
+  String get dspStereoWidthTitle => 'Ancho Estéreo';
+
+  @override
+  String get dspStereoWidthSubtitle =>
+      'Control independiente de campo Mid/Side';
+
+  @override
+  String get dspStereoWidthAmount => 'Ancho';
+
+  @override
+  String get dspLoudnessTitle => 'Contorno de Sonoridad';
+
+  @override
+  String get dspLoudnessSubtitle =>
+      'Compensación de tono según el volumen (Fletcher–Munson)';
+
+  @override
+  String get dspLoudnessIntensity => 'Intensidad';
+
+  @override
+  String get dspLoudnessReplayGainNote =>
+      'Complementa ReplayGain: ReplayGain iguala la sonoridad entre pistas, mientras este contorno adapta el tono a tu volumen de escucha.';
+
+  @override
+  String get dspSubCrossoverTitle => 'Cruce de Subwoofer';
+
+  @override
+  String get dspSubCrossoverSubtitle =>
+      'Redirección de graves a una suma mono tipo sub';
+
+  @override
+  String get dspSubCrossoverCorner => 'Frecuencia de cruce';
+
+  @override
+  String get dspSubCrossoverSubLevel => 'Nivel del sub';
+
+  @override
+  String get dspSubCrossoverNote =>
+      'Redirección de graves: se suma una señal mono filtrada en paso bajo a ambos canales; no es un enrutado multicanal LFE real.';
+
+  @override
+  String get dspDynamicEqTitle => 'Ecualizador Dinámico';
+
+  @override
+  String get dspDynamicEqSubtitle =>
+      'Corta resonancias solo cuando la energía de la banda supera el umbral';
+
+  @override
+  String get dspDynamicEqFrequency => 'Frecuencia de banda';
+
+  @override
+  String get dspDynamicEqThreshold => 'Umbral';
+
+  @override
+  String get dspDynamicEqRatio => 'Relación';
+
+  @override
+  String get dspDynamicEqAttack => 'Ataque';
+
+  @override
+  String get dspDynamicEqRelease => 'Liberación';
+
+  @override
+  String get dspDynamicEqMaxCut => 'Corte máximo';
+
+  @override
+  String get blockedByBitPerfectShort => 'Bloqueado por Bit-Perfect';
+
+  @override
+  String get rcTitle => 'Corrección de sala';
+
+  @override
+  String get rcSubtitle =>
+      'Mide tu sala con un barrido de tonos y ajusta una EQ que aplane la respuesta';
+
+  @override
+  String get rcStart => 'Iniciar medición';
+
+  @override
+  String get rcMeasuring => 'Midiendo - guarda silencio...';
+
+  @override
+  String get rcResult =>
+      'Respuesta medida (arriba) y corrección ajustada (abajo)';
+
+  @override
+  String get rcApply => 'Aplicar';
+
+  @override
+  String get rcDiscard => 'Descartar';
+
+  @override
+  String get rcMicNeeded => 'Se necesita permiso de micrófono para la medición';
+
+  @override
+  String get rcQuietHint =>
+      'Mantén la sala en silencio y deja que el barrido suene a tu nivel de escucha habitual';
+
+  @override
+  String get rcKeepPlayerPaused =>
+      'La música permanece en pausa mientras la corrección de sala está activa';
+
+  @override
+  String get rcApplied => 'Preset de corrección de sala aplicado';
+
+  @override
+  String get deviceProfilesTitle => 'Perfiles de dispositivo';
+
+  @override
+  String get deviceProfilesSubtitle =>
+      'Ajustes de sonido recordados por dispositivo de salida';
+
+  @override
+  String get autoDeviceSwitch => 'Cambio automático al cambiar de dispositivo';
+
+  @override
+  String get noDevicesSeen => 'Aún no se han detectado dispositivos de salida';
+
+  @override
+  String get applyProfileNow => 'Aplicar';
+
+  @override
+  String get forgetDevice => 'Olvidar';
+
+  @override
+  String get currentDeviceBadge => 'Actual';
+
+  @override
+  String get profileDropdownLabel => 'Perfil';
+
+  @override
+  String get undo => 'Deshacer';
+
+  @override
+  String downloadDeletedSnackbar(String title) {
+    return 'Se eliminó \"$title\"';
+  }
+
+  @override
+  String get statusEmbedding => 'Insertando etiquetas…';
+
+  @override
+  String etaLabel(int seconds) {
+    return 'Tiempo restante: ${seconds}s';
+  }
+
+  @override
+  String downloadTileSemantics(
+    String title,
+    String artist,
+    String status,
+    String progress,
+  ) {
+    return '$title $artist $status $progress';
+  }
+
+  @override
+  String downloadActionsSemantics(String title) {
+    return 'Acciones de descarga para $title';
+  }
+
+  @override
+  String get systemEffectsTitle =>
+      'Efectos de audio del sistema (Dolby Atmos / DAP)';
+
+  @override
+  String get systemEffectsSubtitleBypassed =>
+      '✓ Desactivado: Efectos del sistema omitidos';
+
+  @override
+  String get systemEffectsSubtitleActive =>
+      'Activo: Los efectos OEM están procesando el audio';
+
+  @override
+  String get systemEffectsSubtitleUnsupported =>
+      'No se detectó Dolby/DAP en este dispositivo';
+
+  @override
+  String get systemEffectsAuto => 'Automático';
+
+  @override
+  String get systemEffectsTryDisable => 'Intentar desactivar';
+
+  @override
+  String get systemEffectsLeaveOn => 'Dejar activo';
+
+  @override
+  String get bluetoothLatencyTitle =>
+      'Sincronización de latencia Bluetooth (AVRCP / Letras)';
+
+  @override
+  String bluetoothLatencySubtitle(int offset) {
+    return 'Compensa la latencia del búfer del códec Bluetooth ($offset ms).';
+  }
 }

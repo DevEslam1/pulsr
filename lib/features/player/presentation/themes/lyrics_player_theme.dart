@@ -24,9 +24,7 @@ class LyricsPlayerTheme extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isTwoPane = (context.isLandscape ||
-                constraints.maxWidth > constraints.maxHeight) &&
-            constraints.maxWidth >= 640;
+        final isTwoPane = context.isTwoPane || constraints.maxWidth >= 680;
 
         final lyricsContainer = Container(
           decoration: BoxDecoration(
@@ -36,7 +34,6 @@ class LyricsPlayerTheme extends StatelessWidget {
           clipBehavior: Clip.antiAlias,
           child: LyricsView(
             lyrics: state.lyrics,
-            currentPosition: state.position,
             isLoading: state.isLoadingLyrics,
             activeColor: props.activeColor,
           ),
@@ -98,7 +95,6 @@ class LyricsPlayerTheme extends StatelessWidget {
             ],
             const SizedBox(height: 12),
             PlayerSeekBar(
-              position: state.position,
               duration: state.duration,
               activeColor: props.activeColor,
               songId: song?.id,
@@ -216,7 +212,6 @@ class LyricsPlayerTheme extends StatelessWidget {
 
               // Seek Bar
               PlayerSeekBar(
-                position: state.position,
                 duration: state.duration,
                 activeColor: props.activeColor,
                 songId: song?.id,

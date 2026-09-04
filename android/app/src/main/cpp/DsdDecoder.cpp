@@ -13,28 +13,32 @@ DsdDecoder::DsdDecoder() {
 }
 
 void DsdDecoder::generateFilters() {
-    // Design 31-tap Halfband Lowpass Filter with Blackman-Harris window
+    // Stage 1 output sample rate is (44100 * dsdRate) / 8 = 352.8 kHz for DSD64
+    const double stage1Rate = (44100.0 * static_cast<double>(dsdRate_)) / 8.0;
+    // Anti-aliasing cutoff at 0.42 * targetRate_ (e.g. 20.16 kHz for 48kHz target rate)
+    const double cutoff = std::min(0.48, (0.42 * static_cast<double>(targetRate_)) / stage1Rate);
+
     double sum = 0.0;
-    for (int i = 0; i < HALFBAND_TAPS; ++i) {
-        int n = i - HALFBAND_HALF;
+    for (int i = 0; i < DECIMATION_TAPS; ++i) {
+        int n = i - DECIMATION_HALF;
         double val = 0.0;
         if (n == 0) {
-            val = 0.5;
-        } else if (n % 2 != 0) {
-            val = std::sin(M_PI * n * 0.5) / (M_PI * n);
+            val = 2.0 * cutoff;
+        } else {
+            val = std::sin(2.0 * M_PI * cutoff * n) / (M_PI * n);
         }
 
-        // Blackman-Harris window
-        double w = 2.0 * M_PI * i / (HALFBAND_TAPS - 1);
+        // 4-term Blackman-Harris window for > 92 dB stopband attenuation
+        double w = 2.0 * M_PI * i / (DECIMATION_TAPS - 1);
         double win = 0.35875 - 0.48829 * std::cos(w) + 0.14128 * std::cos(2.0 * w) - 0.01168 * std::cos(3.0 * w);
-        halfbandCoeffs_[i] = static_cast<float>(val * win);
-        sum += halfbandCoeffs_[i];
+        decimationCoeffs_[i] = static_cast<float>(val * win);
+        sum += decimationCoeffs_[i];
     }
 
     if (std::abs(sum) > 1e-6) {
         float invSum = static_cast<float>(1.0 / sum);
-        for (int i = 0; i < HALFBAND_TAPS; ++i) {
-            halfbandCoeffs_[i] *= invSum;
+        for (int i = 0; i < DECIMATION_TAPS; ++i) {
+            decimationCoeffs_[i] *= invSum;
         }
     }
 
@@ -99,11 +103,11 @@ int DsdDecoder::decodeDsdBytes(const uint8_t* dsdL, const uint8_t* dsdR, int byt
                 bitValR = (bR >> (7 - bit)) & 1;
             }
 
-            // Convert 0/1 to bipolar -1/+1 unsigned delta (mod 2^32)
-            const uint32_t xL = bitValL ? 1u : static_cast<uint32_t>(-1);
-            const uint32_t xR = bitValR ? 1u : static_cast<uint32_t>(-1);
+            // Convert 0/1 to bipolar -1/+1 signed int64_t
+            const int64_t xL = bitValL ? 1 : -1;
+            const int64_t xR = bitValR ? 1 : -1;
 
-            // --- STAGE 1: CIC Integrators (order 3, mod 2^32 wrapping) ---
+            // --- STAGE 1: CIC Integrators (order 3, signed 64-bit) ---
             cicL_.int1 += xL;
             cicL_.int2 += cicL_.int1;
             cicL_.int3 += cicL_.int2;
@@ -118,39 +122,37 @@ int DsdDecoder::decodeDsdBytes(const uint8_t* dsdL, const uint8_t* dsdR, int byt
             if (cicCount_ >= 8) {
                 cicCount_ = 0;
 
-                // CIC Comb filters (mod 2^32 wrapping)
-                uint32_t c1L = cicL_.int3 - cicL_.comb1_d;
+                // CIC Comb filters (signed 64-bit)
+                int64_t c1L = cicL_.int3 - cicL_.comb1_d;
                 cicL_.comb1_d = cicL_.int3;
-                uint32_t c2L = c1L - cicL_.comb2_d;
+                int64_t c2L = c1L - cicL_.comb2_d;
                 cicL_.comb2_d = c1L;
-                uint32_t c3L = c2L - cicL_.comb3_d;
+                int64_t c3L = c2L - cicL_.comb3_d;
                 cicL_.comb3_d = c2L;
 
-                uint32_t c1R = cicR_.int3 - cicR_.comb1_d;
+                int64_t c1R = cicR_.int3 - cicR_.comb1_d;
                 cicR_.comb1_d = cicR_.int3;
-                uint32_t c2R = c1R - cicR_.comb2_d;
+                int64_t c2R = c1R - cicR_.comb2_d;
                 cicR_.comb2_d = c1R;
-                uint32_t c3R = c2R - cicR_.comb3_d;
+                int64_t c3R = c2R - cicR_.comb3_d;
                 cicR_.comb3_d = c2R;
 
-                // Scale CIC output (cast diff to signed int32_t, 8^3 = 512)
-                const int32_t diffL = static_cast<int32_t>(c3L);
-                const int32_t diffR = static_cast<int32_t>(c3R);
-                const float cicOutL = static_cast<float>(diffL) * (1.0f / 512.0f);
-                const float cicOutR = static_cast<float>(diffR) * (1.0f / 512.0f);
+                // Scale CIC output (8^3 = 512 gain)
+                const float cicOutL = static_cast<float>(c3L) * (1.0f / 512.0f);
+                const float cicOutR = static_cast<float>(c3R) * (1.0f / 512.0f);
 
-                // --- STAGE 2: Halfband Filter ---
+                // --- STAGE 2: Anti-Aliasing Decimation Filter ---
                 stage2RingL_[stage2WriteIdx_] = cicOutL;
                 stage2RingR_[stage2WriteIdx_] = cicOutR;
-                stage2WriteIdx_ = (stage2WriteIdx_ + 1) % HALFBAND_TAPS;
+                stage2WriteIdx_ = (stage2WriteIdx_ + 1) % DECIMATION_TAPS;
 
-                float halfbandOutL = 0.0f;
-                float halfbandOutR = 0.0f;
+                float decimationOutL = 0.0f;
+                float decimationOutR = 0.0f;
 
-                for (int tap = 0; tap < HALFBAND_TAPS; ++tap) {
-                    int rIdx = (stage2WriteIdx_ - 1 - tap + HALFBAND_TAPS) % HALFBAND_TAPS;
-                    halfbandOutL += stage2RingL_[rIdx] * halfbandCoeffs_[tap];
-                    halfbandOutR += stage2RingR_[rIdx] * halfbandCoeffs_[tap];
+                for (int tap = 0; tap < DECIMATION_TAPS; ++tap) {
+                    int rIdx = (stage2WriteIdx_ - 1 - tap + DECIMATION_TAPS) % DECIMATION_TAPS;
+                    decimationOutL += stage2RingL_[rIdx] * decimationCoeffs_[tap];
+                    decimationOutR += stage2RingR_[rIdx] * decimationCoeffs_[tap];
                 }
 
                 // --- STAGE 3: Fractional Phase Accumulator to target rate ---
@@ -160,8 +162,8 @@ int DsdDecoder::decodeDsdBytes(const uint8_t* dsdL, const uint8_t* dsdR, int byt
 
                     // --- STAGE 4: 5Hz DC Blocker Highpass Filter ---
                     // y[n] = x[n] - x[n-1] + R * y[n-1]
-                    const float sL = halfbandOutL * headroomScale;
-                    const float sR = halfbandOutR * headroomScale;
+                    const float sL = decimationOutL * headroomScale;
+                    const float sR = decimationOutR * headroomScale;
 
                     const float dcOutL = sL - dcPrevInL_ + dcPole_ * dcPrevOutL_;
                     const float dcOutR = sR - dcPrevInR_ + dcPole_ * dcPrevOutR_;

@@ -1,6 +1,10 @@
 // android/app/src/main/cpp/FftUtil.h
 #pragma once
 
+#if defined(__FAST_MATH__)
+#error "-ffast-math leaked into the DSP build — check CMake / gradle compiler flags"
+#endif
+
 #include <cmath>
 #include <vector>
 #include <complex>

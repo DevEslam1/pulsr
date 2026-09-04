@@ -24,12 +24,7 @@ class WaveformPlayerTheme extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final isTwoPane = (context.isLandscape ||
-                constraints.maxWidth > constraints.maxHeight) &&
-            constraints.maxWidth >= 640;
-
-        final double discSize =
-            isTwoPane ? 140.0 : (context.isTablet ? 240.0 : 170.0);
+        final isTwoPane = context.isTwoPane || constraints.maxWidth >= 680;
 
         final visualizerDisplay = Stack(
           alignment: Alignment.center,
@@ -45,8 +40,8 @@ class WaveformPlayerTheme extends StatelessWidget {
             // Center Album Art Floating Disc
             if (song != null)
               Container(
-                width: discSize,
-                height: discSize,
+                width: isTwoPane ? 140 : 170,
+                height: isTwoPane ? 140 : 170,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   boxShadow: [
@@ -62,7 +57,7 @@ class WaveformPlayerTheme extends StatelessWidget {
                 child: CachedArtwork(
                   id: song.id,
                   type: ArtworkType.AUDIO,
-                  size: discSize,
+                  size: isTwoPane ? 140 : 170,
                   borderRadius: 999,
                   fallbackIcon: Icons.music_note_rounded,
                 ),
@@ -103,7 +98,6 @@ class WaveformPlayerTheme extends StatelessWidget {
 
             // Waveform Seek Bar
             PlayerSeekBar(
-              position: state.position,
               duration: state.duration,
               activeColor: props.activeColor,
               songId: song?.id,

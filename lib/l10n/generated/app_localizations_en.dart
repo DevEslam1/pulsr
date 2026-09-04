@@ -790,6 +790,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get audioAndPlayback => 'Audio & Playback';
 
   @override
+  String get playback => 'Playback';
+
+  @override
+  String get audioAndSound => 'Audio & Sound';
+
+  @override
   String get equalizerAndSoundEffects => 'Equalizer & Sound Effects';
 
   @override
@@ -1191,6 +1197,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get downloadErrorNoSpace => 'Storage full — free up space and retry';
 
   @override
+  String get downloadErrorStorage => 'Storage full — free up space and retry';
+
+  @override
+  String get downloadErrorPermission =>
+      'Storage permission denied. Please grant permission in Settings.';
+
+  @override
+  String get downloadErrorInterrupted =>
+      'Download was interrupted. Tap to resume.';
+
+  @override
+  String get downloadErrorDisabled =>
+      'Downloads are disabled or unavailable in this build.';
+
+  @override
+  String get downloadErrorTransition => 'Invalid download state transition.';
+
+  @override
   String get downloadErrorRateLimited => 'YouTube is busy. Cooling down…';
 
   @override
@@ -1208,6 +1232,21 @@ class AppLocalizationsEn extends AppLocalizations {
       'Wi-Fi Only Mode is active. Connect to Wi-Fi to download.';
 
   @override
+  String get downloadErrorAlreadyQueued =>
+      'This song is already in the download queue.';
+
+  @override
+  String get downloadErrorCorrupt =>
+      'Downloaded file was corrupted or incomplete. Please retry.';
+
+  @override
+  String get downloadErrorInvalidTransition =>
+      'Invalid download state transition.';
+
+  @override
+  String get downloadErrorTimeout => 'Download timed out. Please retry.';
+
+  @override
   String get dspEnginePreference => 'DSP Engine Preference';
 
   @override
@@ -1222,4 +1261,236 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dspEngineAuto => 'Automatic (Prefer Native)';
+
+  @override
+  String audioStageDegraded(String stage) {
+    return 'Audio stage \"$stage\" was bypassed to prevent stutter under high load.';
+  }
+
+  @override
+  String get stageEq => 'Parametric EQ';
+
+  @override
+  String get stageReverb => 'Convolution Reverb';
+
+  @override
+  String get stageCrossfeed => 'Crossfeed';
+
+  @override
+  String get stageLimiter => 'Lookahead Limiter';
+
+  @override
+  String get stageResampler => 'Resampler';
+
+  @override
+  String get stagePanner => 'Spatial Panner';
+
+  @override
+  String get dspSaturationTitle => 'Harmonic Saturation';
+
+  @override
+  String get dspSaturationSubtitle => 'Tube/tape-style harmonic exciter';
+
+  @override
+  String get dspSaturationDrive => 'Drive';
+
+  @override
+  String get dspSaturationMix => 'Mix';
+
+  @override
+  String get dspSaturationTilt => 'Tilt Emphasis';
+
+  @override
+  String get dspStereoWidthTitle => 'Stereo Width';
+
+  @override
+  String get dspStereoWidthSubtitle => 'Independent Mid/Side field control';
+
+  @override
+  String get dspStereoWidthAmount => 'Width';
+
+  @override
+  String get dspLoudnessTitle => 'Loudness Contour';
+
+  @override
+  String get dspLoudnessSubtitle =>
+      'Fletcher–Munson volume-linked tone compensation';
+
+  @override
+  String get dspLoudnessIntensity => 'Intensity';
+
+  @override
+  String get dspLoudnessReplayGainNote =>
+      'Complements ReplayGain: ReplayGain levels loudness across tracks, while this contour adapts tone to your listening volume.';
+
+  @override
+  String get dspSubCrossoverTitle => 'Subwoofer Crossover';
+
+  @override
+  String get dspSubCrossoverSubtitle =>
+      'Bass redirection into a summed mono sub tap';
+
+  @override
+  String get dspSubCrossoverCorner => 'Crossover Corner';
+
+  @override
+  String get dspSubCrossoverSubLevel => 'Sub Level';
+
+  @override
+  String get dspSubCrossoverNote =>
+      'Bass redirection: a low-passed mono sum is added to both channels — this is not true multichannel LFE routing.';
+
+  @override
+  String get dspDynamicEqTitle => 'Dynamic EQ';
+
+  @override
+  String get dspDynamicEqSubtitle =>
+      'Cuts resonances only when band energy exceeds the threshold';
+
+  @override
+  String get dspDynamicEqFrequency => 'Band Frequency';
+
+  @override
+  String get dspDynamicEqThreshold => 'Threshold';
+
+  @override
+  String get dspDynamicEqRatio => 'Ratio';
+
+  @override
+  String get dspDynamicEqAttack => 'Attack';
+
+  @override
+  String get dspDynamicEqRelease => 'Release';
+
+  @override
+  String get dspDynamicEqMaxCut => 'Max Cut';
+
+  @override
+  String get blockedByBitPerfectShort => 'Blocked by Bit-Perfect';
+
+  @override
+  String get rcTitle => 'Room Correction';
+
+  @override
+  String get rcSubtitle =>
+      'Measure your room with a short tone sweep and fit an EQ that flattens the response';
+
+  @override
+  String get rcStart => 'Start measurement';
+
+  @override
+  String get rcMeasuring => 'Measuring - stay quiet...';
+
+  @override
+  String get rcResult =>
+      'Measured response (top) and fitted correction (bottom)';
+
+  @override
+  String get rcApply => 'Apply';
+
+  @override
+  String get rcDiscard => 'Discard';
+
+  @override
+  String get rcMicNeeded =>
+      'Microphone permission is required for the measurement';
+
+  @override
+  String get rcQuietHint =>
+      'Keep the room quiet and let the sweep play out loud at your normal listening level';
+
+  @override
+  String get rcKeepPlayerPaused =>
+      'Music playback stays paused while Room Correction is active';
+
+  @override
+  String get rcApplied => 'Room Correction preset applied';
+
+  @override
+  String get deviceProfilesTitle => 'Device Profiles';
+
+  @override
+  String get deviceProfilesSubtitle =>
+      'Sound settings remembered per output device';
+
+  @override
+  String get autoDeviceSwitch => 'Auto-switch on device change';
+
+  @override
+  String get noDevicesSeen => 'No output devices seen yet';
+
+  @override
+  String get applyProfileNow => 'Apply';
+
+  @override
+  String get forgetDevice => 'Forget';
+
+  @override
+  String get currentDeviceBadge => 'Current';
+
+  @override
+  String get profileDropdownLabel => 'Profile';
+
+  @override
+  String get undo => 'Undo';
+
+  @override
+  String downloadDeletedSnackbar(String title) {
+    return 'Deleted \"$title\"';
+  }
+
+  @override
+  String get statusEmbedding => 'Embedding tags…';
+
+  @override
+  String etaLabel(int seconds) {
+    return 'ETA: ${seconds}s';
+  }
+
+  @override
+  String downloadTileSemantics(
+    String title,
+    String artist,
+    String status,
+    String progress,
+  ) {
+    return '$title $artist $status $progress';
+  }
+
+  @override
+  String downloadActionsSemantics(String title) {
+    return 'Download actions for $title';
+  }
+
+  @override
+  String get systemEffectsTitle => 'System Audio Effects (Dolby Atmos / DAP)';
+
+  @override
+  String get systemEffectsSubtitleBypassed =>
+      '✓ Bypassed: System effects disabled on output-mix session';
+
+  @override
+  String get systemEffectsSubtitleActive =>
+      'Active: OEM sound effects are processing audio';
+
+  @override
+  String get systemEffectsSubtitleUnsupported =>
+      'No OEM Dolby/DAP detected on this device';
+
+  @override
+  String get systemEffectsAuto => 'Auto';
+
+  @override
+  String get systemEffectsTryDisable => 'Try to disable';
+
+  @override
+  String get systemEffectsLeaveOn => 'Leave on';
+
+  @override
+  String get bluetoothLatencyTitle => 'Bluetooth Latency Sync (AVRCP / Lyrics)';
+
+  @override
+  String bluetoothLatencySubtitle(int offset) {
+    return 'Compensates for Bluetooth audio codec buffer latency ($offset ms). Volume deferral: AVRCP absolute volume active.';
+  }
 }

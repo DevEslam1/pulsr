@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import '../../../core/network/proxy_config.dart';
 import '../../../domain/models/audio_output_info.dart';
+import '../../../domain/models/ytm_audio_quality.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
+
+export '../../../domain/models/ytm_audio_quality.dart';
 
 part 'settings_state.freezed.dart';
 
@@ -34,8 +37,6 @@ enum NowPlayingDoubleTapAction { toggleFavorite, toggleLyrics, none }
 enum NowPlayingArtworkSwipeAction { nextPrev, none }
 
 enum ReplayGainMode { off, track, album, auto }
-
-enum YtmAudioQuality { low, medium, high }
 
 enum ExtractorEngine { auto, remoteYtdlp, onDevice }
 
@@ -84,7 +85,7 @@ abstract class SettingsState with _$SettingsState {
     @Default(false) bool isTestingAllProxies,
     // Extractor & Backend Settings
     @Default(ExtractorEngine.auto) ExtractorEngine extractorEngine,
-    @Default(true) bool ytdlpBackendEnabled,
+    @Default(false) bool ytdlpBackendEnabled,
     @Default('https://xdm-backend-10763667121.europe-west1.run.app')
     String ytdlpBackendUrl,
     @Default('') String ytdlpBackendToken,
@@ -115,6 +116,12 @@ abstract class SettingsState with _$SettingsState {
     @Default(false) bool monoMix,
     @Default(true) bool sincResamplerEnabled,
     @Default('native') String dspPreference,
+    // System audio effects (Dolby Atmos / vendor)
+    @Default('auto') String systemEffectsPolicy,
+    @Default('unknown') String systemEffectsStatus,
+    @Default(<String>[]) List<String> systemEffectsBundles,
+    // Bluetooth quality & sync
+    @Default(150) int bluetoothLatencyOffsetMs,
   }) = _SettingsState;
 
   Color get customAccentColor => Color(customAccentColorValue);

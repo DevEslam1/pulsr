@@ -109,7 +109,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                     icon: Icon(Icons.more_vert_rounded, color: p.textPrimary),
                     onPressed: () {
                       if (song != null) {
-                        showModalBottomSheet(
+                        showModalBottomSheet<void>(
                           context: context,
                           builder: (_) => SongInfoSheet(song: song),
                         );
@@ -126,15 +126,8 @@ class ClassicPlayerTheme extends StatelessWidget {
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final isTwoPane = (context.isLandscape ||
-                          constraints.maxWidth > constraints.maxHeight) &&
-                      constraints.maxWidth >= 640;
-
-                  final double artSize = isTwoPane
-                      ? (constraints.maxHeight * 0.72).clamp(240.0, 360.0)
-                      : (context.isTablet
-                          ? (constraints.maxHeight * 0.44).clamp(320.0, 480.0)
-                          : 340.0);
+                  final isTwoPane =
+                      context.isTwoPane || constraints.maxWidth >= 680;
 
                   final centerDisplay = GestureDetector(
                     onTap: () => cubit.toggleLyricsVisibility(),
@@ -167,7 +160,6 @@ class ClassicPlayerTheme extends StatelessWidget {
                           ? LyricsView(
                               key: const ValueKey('lyrics_view'),
                               lyrics: state.lyrics,
-                              currentPosition: state.position,
                               isLoading: state.isLoadingLyrics,
                               activeColor: activeColor,
                               source: state.lyricsSource,
@@ -179,8 +171,8 @@ class ClassicPlayerTheme extends StatelessWidget {
                                   key: const ValueKey('artwork_view'),
                                   child: ConstrainedBox(
                                     constraints: BoxConstraints(
-                                      maxHeight: artSize,
-                                      maxWidth: artSize,
+                                      maxHeight: isTwoPane ? 280 : 340,
+                                      maxWidth: isTwoPane ? 280 : 340,
                                     ),
                                     child: AspectRatio(
                                       aspectRatio: 1.0,
@@ -257,7 +249,6 @@ class ClassicPlayerTheme extends StatelessWidget {
                                         .textTheme
                                         .headlineSmall
                                         ?.copyWith(
-                                          fontSize: context.isTablet ? 26 : null,
                                           fontWeight: FontWeight.w900,
                                           color: p.textPrimary,
                                         ),
@@ -271,7 +262,6 @@ class ClassicPlayerTheme extends StatelessWidget {
                                         .textTheme
                                         .titleMedium
                                         ?.copyWith(
-                                          fontSize: context.isTablet ? 17 : null,
                                           color: p.textSecondary,
                                           fontWeight: FontWeight.w600,
                                         ),
@@ -304,7 +294,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                                 color: song?.isFavorite == true
                                     ? p.favorite
                                     : p.textSecondary,
-                                size: context.isTablet ? 32 : 28,
+                                size: 28,
                               ),
                               onPressed: () {
                                 if (song != null) {
@@ -316,11 +306,10 @@ class ClassicPlayerTheme extends StatelessWidget {
                         ),
                       ),
 
-                      SizedBox(height: context.isTablet ? 14 : 8),
+                      const SizedBox(height: 8),
 
                       // Seek Bar
                       PlayerSeekBar(
-                        position: state.position,
                         duration: state.duration,
                         activeColor: activeColor,
                         songId: state.currentSong?.id,
@@ -328,7 +317,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                         onSeek: (pos) => cubit.seek(pos),
                       ),
 
-                      SizedBox(height: context.isTablet ? 14 : 6),
+                      const SizedBox(height: 6),
 
                       // Controls
                       PlayerControls(
@@ -336,7 +325,7 @@ class ClassicPlayerTheme extends StatelessWidget {
                         isShuffle: state.isShuffle,
                         repeatMode: state.repeatMode,
                         primaryColor: activeColor,
-                        mainButtonSize: isTwoPane ? 56 : (context.isTablet ? 72 : 64),
+                        mainButtonSize: isTwoPane ? 56 : 64,
                         onPlayPause: () => cubit.togglePlayPause(),
                         onNext: () => cubit.next(),
                         onPrevious: () => cubit.previous(),
@@ -344,119 +333,111 @@ class ClassicPlayerTheme extends StatelessWidget {
                         onToggleRepeat: () => cubit.toggleRepeat(),
                       ),
 
-                      SizedBox(height: context.isTablet ? 16 : 10),
+                      const SizedBox(height: 10),
 
                       // Bottom Action Strip
                       Padding(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 16, vertical: 6),
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                            children: [
-                              IconButton(
-                                icon: Icon(
-                                  Icons.settings_input_component_rounded,
-                                  color: settingsState
-                                              .currentOutputDevice?.isUsbDac ==
-                                          true
-                                      ? const Color(0xFFFFD700)
-                                      : p.textSecondary,
-                                ),
-                                onPressed: () {
-                                  if (song != null) {
-                                    AudioQualitySheet.show(
-                                        context, song, activeColor);
-                                  }
-                                },
-                                tooltip: 'Audio Output & DAC',
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                          children: [
+                            IconButton(
+                              icon: Icon(
+                                Icons.settings_input_component_rounded,
+                                color: settingsState
+                                            .currentOutputDevice?.isUsbDac ==
+                                        true
+                                    ? const Color(0xFFFFD700)
+                                    : p.textSecondary,
                               ),
-                              IconButton(
-                                icon: Icon(
-                                  Icons.equalizer_rounded,
-                                  color: state.isEqEnabled
-                                      ? activeColor
-                                      : p.textSecondary,
-                                ),
-                                onPressed: () {
-                                  showModalBottomSheet(
-                                    context: context,
-                                    isScrollControlled: true,
-                                    backgroundColor: Colors.transparent,
-                                    builder: (_) => const EqualizerSheet(),
-                                  );
-                                },
-                                tooltip: context.l10n.equalizer,
+                              onPressed: () {
+                                if (song != null) {
+                                  AudioQualitySheet.show(
+                                      context, song, activeColor);
+                                }
+                              },
+                              tooltip: 'Audio Output & DAC',
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.equalizer_rounded,
+                                color: state.isEqEnabled
+                                    ? activeColor
+                                    : p.textSecondary,
                               ),
-                              IconButton(
-                                icon: Icon(Icons.speed_rounded,
-                                    color: p.textSecondary),
-                                onPressed: () {
-                                  showModalBottomSheet(
-                                    context: context,
-                                    builder: (_) => const SpeedPickerSheet(),
-                                  );
-                                },
-                                tooltip: context.l10n.playbackSpeed,
+                              onPressed: () {
+                                showModalBottomSheet<void>(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (_) => const EqualizerSheet(),
+                                );
+                              },
+                              tooltip: context.l10n.equalizer,
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.speed_rounded,
+                                  color: p.textSecondary),
+                              onPressed: () => SpeedPickerSheet.show(context),
+                              tooltip: context.l10n.playbackSpeed,
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.lyrics_rounded,
+                                color: state.isLyricsVisible
+                                    ? activeColor
+                                    : p.textSecondary,
                               ),
-                              IconButton(
-                                icon: Icon(
-                                  Icons.lyrics_rounded,
-                                  color: state.isLyricsVisible
-                                      ? activeColor
-                                      : p.textSecondary,
-                                ),
-                                onPressed: () => cubit.toggleLyricsVisibility(),
-                                tooltip: context.l10n.lyrics,
+                              onPressed: () => cubit.toggleLyricsVisibility(),
+                              tooltip: context.l10n.lyrics,
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.timer_outlined,
+                                color: state.sleepTimerRemaining != null
+                                    ? activeColor
+                                    : p.textSecondary,
                               ),
-                              IconButton(
-                                icon: Icon(
-                                  Icons.timer_outlined,
-                                  color: state.sleepTimerRemaining != null
-                                      ? activeColor
-                                      : p.textSecondary,
-                                ),
-                                onPressed: () {
-                                  showModalBottomSheet(
+                              onPressed: () {
+                                showModalBottomSheet<void>(
+                                  context: context,
+                                  useRootNavigator: true,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (_) => const SleepTimerSheet(),
+                                );
+                              },
+                              tooltip: context.l10n.sleepTimer,
+                            ),
+                            IconButton(
+                              icon: Icon(Icons.playlist_add_rounded,
+                                  color: p.textSecondary),
+                              onPressed: () {
+                                if (song != null) {
+                                  showModalBottomSheet<void>(
                                     context: context,
                                     useRootNavigator: true,
                                     isScrollControlled: true,
                                     backgroundColor: Colors.transparent,
-                                    builder: (_) => const SleepTimerSheet(),
+                                    builder: (_) =>
+                                        AddToPlaylistSheet(song: song),
                                   );
-                                },
-                                tooltip: context.l10n.sleepTimer,
+                                }
+                              },
+                              tooltip: context.l10n.addToPlaylist,
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                Icons.queue_music_rounded,
+                                color: state.isQueueVisible
+                                    ? activeColor
+                                    : p.textSecondary,
                               ),
-                              IconButton(
-                                icon: Icon(Icons.playlist_add_rounded,
-                                    color: p.textSecondary),
-                                onPressed: () {
-                                  if (song != null) {
-                                    showModalBottomSheet(
-                                      context: context,
-                                      useRootNavigator: true,
-                                      isScrollControlled: true,
-                                      backgroundColor: Colors.transparent,
-                                      builder: (_) =>
-                                          AddToPlaylistSheet(song: song),
-                                    );
-                                  }
-                                },
-                                tooltip: context.l10n.addToPlaylist,
-                              ),
-                              IconButton(
-                                icon: Icon(
-                                  Icons.queue_music_rounded,
-                                  color: state.isQueueVisible
-                                      ? activeColor
-                                      : p.textSecondary,
-                                ),
-                                onPressed: () => cubit.toggleQueueVisibility(),
-                                tooltip: context.l10n.queue,
-                              ),
-                            ],
-                          ),
+                              onPressed: () => cubit.toggleQueueVisibility(),
+                              tooltip: context.l10n.queue,
+                            ),
+                          ],
                         ),
                       ),
                     ],

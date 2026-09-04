@@ -796,6 +796,12 @@ class AppLocalizationsAr extends AppLocalizations {
   String get audioAndPlayback => 'الصوت والتشغيل';
 
   @override
+  String get playback => 'التشغيل';
+
+  @override
+  String get audioAndSound => 'الصوت والصوتيات';
+
+  @override
   String get equalizerAndSoundEffects => 'معادل الصوت والتأثيرات';
 
   @override
@@ -1203,6 +1209,23 @@ class AppLocalizationsAr extends AppLocalizations {
   String get downloadErrorNoSpace => 'التخزين ممتلئ — حرّر مساحة وأعد المحاولة';
 
   @override
+  String get downloadErrorStorage => 'التخزين ممتلئ — حرّر مساحة وأعد المحاولة';
+
+  @override
+  String get downloadErrorPermission =>
+      'تم رفض إذن التخزين. يرجى منح الإذن من الإعدادات.';
+
+  @override
+  String get downloadErrorInterrupted => 'انقطع التنزيل. انقر للاستئناف.';
+
+  @override
+  String get downloadErrorDisabled =>
+      'التنزيلات غير متوفرة أو معطلة في هذا الإصدار.';
+
+  @override
+  String get downloadErrorTransition => 'انتقال حالة عملية تنزيل غير صالح.';
+
+  @override
   String get downloadErrorRateLimited => 'يوتيوب مشغول. فترة تبريد…';
 
   @override
@@ -1219,6 +1242,21 @@ class AppLocalizationsAr extends AppLocalizations {
   String get downloadWifiOnly => 'وضع Wi-Fi فقط نشط. اتصل بالشبكة للتنزيل.';
 
   @override
+  String get downloadErrorAlreadyQueued =>
+      'هذه الأغنية موجودة بالفعل في قائمة التنزيل.';
+
+  @override
+  String get downloadErrorCorrupt =>
+      'الملف الذي تم تنزيله تالف أو غير مكتمل. يرجى إعادة المحاولة.';
+
+  @override
+  String get downloadErrorInvalidTransition =>
+      'انتقال حالة عملية تنزيل غير صالح.';
+
+  @override
+  String get downloadErrorTimeout => 'انتهت مهلة التنزيل. يرجى إعادة المحاولة.';
+
+  @override
   String get dspEnginePreference => 'تفضيل محرك معالجة الصوت (DSP)';
 
   @override
@@ -1233,4 +1271,234 @@ class AppLocalizationsAr extends AppLocalizations {
 
   @override
   String get dspEngineAuto => 'تلقائي (تفضيل المدمج)';
+
+  @override
+  String audioStageDegraded(String stage) {
+    return 'تم تجاوز مرحلة الصوت \"$stage\" لمنع التقطيع بسبب الحمل العالي.';
+  }
+
+  @override
+  String get stageEq => 'معادل الصوت البارامتري';
+
+  @override
+  String get stageReverb => 'صدى الالتفاف';
+
+  @override
+  String get stageCrossfeed => 'التغذية المتقاطعة';
+
+  @override
+  String get stageLimiter => 'محدد الذروة الاستباقي';
+
+  @override
+  String get stageResampler => 'إعادة تشكيل العينات';
+
+  @override
+  String get stagePanner => 'التوجيه المكاني';
+
+  @override
+  String get dspSaturationTitle => 'التشبع التوافقي';
+
+  @override
+  String get dspSaturationSubtitle => 'مُثير توافقي بأسلوب الأنبوب والشريط';
+
+  @override
+  String get dspSaturationDrive => 'مقدار الدفع';
+
+  @override
+  String get dspSaturationMix => 'نسبة المزج';
+
+  @override
+  String get dspSaturationTilt => 'إبراز الحدة';
+
+  @override
+  String get dspStereoWidthTitle => 'عرض الاستريو';
+
+  @override
+  String get dspStereoWidthSubtitle => 'تحكم مستقل بحقل متوسط/جانبي (Mid/Side)';
+
+  @override
+  String get dspStereoWidthAmount => 'العرض';
+
+  @override
+  String get dspLoudnessTitle => 'منحنى الجهارة';
+
+  @override
+  String get dspLoudnessSubtitle =>
+      'تعويض نبرة مرتبط بمستوى الصوت (فليتشر-مونسون)';
+
+  @override
+  String get dspLoudnessIntensity => 'الشدة';
+
+  @override
+  String get dspLoudnessReplayGainNote =>
+      'مكمّل لـ ReplayGain: يعاير ReplayGain الجهارة بين المقاطع، وهذا المنحنى يكيّف النبرة مع مستوى استماعك.';
+
+  @override
+  String get dspSubCrossoverTitle => 'كروس أوفر السابووفر';
+
+  @override
+  String get dspSubCrossoverSubtitle =>
+      'إعادة توجيه الباس إلى نقطة ساب أحادية مجمّعة';
+
+  @override
+  String get dspSubCrossoverCorner => 'تردد التقاطع';
+
+  @override
+  String get dspSubCrossoverSubLevel => 'مستوى الساب';
+
+  @override
+  String get dspSubCrossoverNote =>
+      'إعادة توجيه باس: يُضاف مجموع أحادي مُرشَّح تمرير منخفض إلى القناتين؛ وليس توجيهاً حقيقياً متعدد القنوات (LFE).';
+
+  @override
+  String get dspDynamicEqTitle => 'المعادل الديناميكي';
+
+  @override
+  String get dspDynamicEqSubtitle =>
+      'يخفض الرنينات فقط عند تجاوز طاقة النطاق للعتبة';
+
+  @override
+  String get dspDynamicEqFrequency => 'تردد النطاق';
+
+  @override
+  String get dspDynamicEqThreshold => 'العتبة';
+
+  @override
+  String get dspDynamicEqRatio => 'نسبة الضغط';
+
+  @override
+  String get dspDynamicEqAttack => 'زمن الهجوم';
+
+  @override
+  String get dspDynamicEqRelease => 'زمن التحرر';
+
+  @override
+  String get dspDynamicEqMaxCut => 'أقصى خفض';
+
+  @override
+  String get blockedByBitPerfectShort => 'محظور بواسطة وضع البت المثالي';
+
+  @override
+  String get rcTitle => 'تصحيح الغرفة';
+
+  @override
+  String get rcSubtitle =>
+      'قِس استجابة غرفتك بنغمة قصيرة وطبّق معادِلاً يخفّض الانحرافات';
+
+  @override
+  String get rcStart => 'ابدأ القياس';
+
+  @override
+  String get rcMeasuring => 'جارٍ القياس - ابقَ هادئاً...';
+
+  @override
+  String get rcResult => 'الاستجابة المقاسة (أعلى) والتصحيح المُقترَح (أسفل)';
+
+  @override
+  String get rcApply => 'تطبيق';
+
+  @override
+  String get rcDiscard => 'تجاهل';
+
+  @override
+  String get rcMicNeeded => 'إذن الميكروفون مطلوب للقياس';
+
+  @override
+  String get rcQuietHint =>
+      'أبقِ الغرفة هادئة ودع النغمة تعمل بمستوى الاستماع المعتاد عبر مكبرات الصوت';
+
+  @override
+  String get rcKeepPlayerPaused =>
+      'يبقى تشغيل الموسيقى متوقفاً أثناء تصحيح الغرفة';
+
+  @override
+  String get rcApplied => 'تم تطبيق إعداد تصحيح الغرفة';
+
+  @override
+  String get deviceProfilesTitle => 'ملفات إعدادات الأجهزة';
+
+  @override
+  String get deviceProfilesSubtitle => 'تذكّر إعدادات الصوت لكل جهاز إخراج';
+
+  @override
+  String get autoDeviceSwitch => 'تبديل تلقائي عند تغيير الجهاز';
+
+  @override
+  String get noDevicesSeen => 'لم يتم اكتشاف أي أجهزة إخراج بعد';
+
+  @override
+  String get applyProfileNow => 'تطبيق';
+
+  @override
+  String get forgetDevice => 'حذف';
+
+  @override
+  String get currentDeviceBadge => 'الحالي';
+
+  @override
+  String get profileDropdownLabel => 'الملف';
+
+  @override
+  String get undo => 'تراجع';
+
+  @override
+  String downloadDeletedSnackbar(String title) {
+    return 'تم حذف \"$title\"';
+  }
+
+  @override
+  String get statusEmbedding => 'جارٍ تضمين الوسوم…';
+
+  @override
+  String etaLabel(int seconds) {
+    return 'الوقت المتبقي: $seconds ث';
+  }
+
+  @override
+  String downloadTileSemantics(
+    String title,
+    String artist,
+    String status,
+    String progress,
+  ) {
+    return '$title $artist $status $progress';
+  }
+
+  @override
+  String downloadActionsSemantics(String title) {
+    return 'إجراءات التنزيل لـ $title';
+  }
+
+  @override
+  String get systemEffectsTitle => 'مؤثرات الصوت للنظام (Dolby Atmos / DAP)';
+
+  @override
+  String get systemEffectsSubtitleBypassed =>
+      '✓ تم التجاوز: تم تعطيل مؤثرات النظام';
+
+  @override
+  String get systemEffectsSubtitleActive =>
+      'نشط: مؤثرات صوت النظام قيد المعالجة';
+
+  @override
+  String get systemEffectsSubtitleUnsupported =>
+      'لم يتم العثور على مؤثرات Dolby/DAP على هذا الجهاز';
+
+  @override
+  String get systemEffectsAuto => 'تلقائي';
+
+  @override
+  String get systemEffectsTryDisable => 'محاولة التعطيل';
+
+  @override
+  String get systemEffectsLeaveOn => 'إبقاء التشغيل';
+
+  @override
+  String get bluetoothLatencyTitle =>
+      'مزامنة زمن استجابة البلوتوث (AVRCP / الكلمات)';
+
+  @override
+  String bluetoothLatencySubtitle(int offset) {
+    return 'تعويض تأخير ذاكرة التخزين المؤقت للبلوتوث ($offset مللي ثانية).';
+  }
 }

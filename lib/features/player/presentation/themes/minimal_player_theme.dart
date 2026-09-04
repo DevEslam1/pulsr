@@ -72,7 +72,7 @@ class MinimalPlayerTheme extends StatelessWidget {
                     icon: Icon(Icons.more_horiz_rounded, color: p.textPrimary),
                     onPressed: () {
                       if (song != null) {
-                        showModalBottomSheet(
+                        showModalBottomSheet<void>(
                           context: context,
                           builder: (_) => SongInfoSheet(song: song),
                         );
@@ -87,15 +87,8 @@ class MinimalPlayerTheme extends StatelessWidget {
             Expanded(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final isTwoPane = (context.isLandscape ||
-                          constraints.maxWidth > constraints.maxHeight) &&
-                      constraints.maxWidth >= 640;
-
-                  final double artSize = isTwoPane
-                      ? (constraints.maxHeight * 0.72).clamp(200.0, 320.0)
-                      : (context.isTablet
-                          ? (constraints.maxHeight * 0.44).clamp(300.0, 440.0)
-                          : 320.0);
+                  final isTwoPane =
+                      context.isTwoPane || constraints.maxWidth >= 680;
 
                   final centerDisplay = Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -136,7 +129,6 @@ class MinimalPlayerTheme extends StatelessWidget {
                                       key:
                                           const ValueKey('lyrics_view_minimal'),
                                       lyrics: state.lyrics,
-                                      currentPosition: state.position,
                                       isLoading: state.isLoadingLyrics,
                                       activeColor: activeColor,
                                       source: state.lyricsSource,
@@ -152,8 +144,8 @@ class MinimalPlayerTheme extends StatelessWidget {
                                     : Center(
                                         child: ConstrainedBox(
                                           constraints: BoxConstraints(
-                                            maxHeight: artSize,
-                                            maxWidth: artSize,
+                                            maxHeight: isTwoPane ? 240 : 320,
+                                            maxWidth: isTwoPane ? 240 : 320,
                                           ),
                                           child: AspectRatio(
                                             aspectRatio: 1.0,
@@ -259,7 +251,6 @@ class MinimalPlayerTheme extends StatelessWidget {
 
                       // Seek Bar
                       PlayerSeekBar(
-                        position: state.position,
                         duration: state.duration,
                         activeColor: activeColor,
                         songId: state.currentSong?.id,
@@ -289,10 +280,8 @@ class MinimalPlayerTheme extends StatelessWidget {
                       Padding(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 20, vertical: 4),
-                        child: FittedBox(
-                          fit: BoxFit.scaleDown,
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                           children: [
                             IconButton(
                               icon: Icon(
@@ -319,7 +308,7 @@ class MinimalPlayerTheme extends StatelessWidget {
                                     : p.textSecondary,
                               ),
                               onPressed: () {
-                                showModalBottomSheet(
+                                showModalBottomSheet<void>(
                                   context: context,
                                   isScrollControlled: true,
                                   backgroundColor: Colors.transparent,
@@ -364,7 +353,7 @@ class MinimalPlayerTheme extends StatelessWidget {
                                   color: p.textSecondary),
                               onPressed: () {
                                 if (song != null) {
-                                  showModalBottomSheet(
+                                  showModalBottomSheet<void>(
                                     context: context,
                                     useRootNavigator: true,
                                     isScrollControlled: true,
@@ -387,7 +376,6 @@ class MinimalPlayerTheme extends StatelessWidget {
                           ],
                         ),
                       ),
-                    ),
                     ],
                   );
 
