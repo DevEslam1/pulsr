@@ -28,11 +28,13 @@ class SongInfoSheet extends StatelessWidget {
     if (song.path.isNotEmpty && !song.path.startsWith('ytmusic://')) {
       final exists = await File(song.path).exists();
       if (exists) {
-        Share.shareXFiles([XFile(song.path)], text: text);
+        await SharePlus.instance.share(
+          ShareParams(files: [XFile(song.path)], text: text),
+        );
         return;
       }
     }
-    Share.share(text);
+    await SharePlus.instance.share(ShareParams(text: text));
   }
 
   Future<void> _setRingtone(BuildContext context, String type) async {

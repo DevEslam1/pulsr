@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // coverage:ignore-file
-// ignore_for_file: type=lint
+// ignore_for_file: type=lint, type=warning, deprecated_member_use, deprecated_member_use_from_same_package
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
 part of 'settings_state.dart';
@@ -9,6 +9,7 @@ part of 'settings_state.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// GENERATED CODE - DO NOT MODIFY BY HAND
 // dart format off
 T _$identity<T>(T value) => value;
 
@@ -37,7 +38,7 @@ mixin _$SettingsState {
   YtmAudioQuality get downloadQuality;
   bool get wifiOnlyMode;
   bool get offlineOnlyMode;
-  bool get isScanning; // Proxy Settings
+  bool get isScanning;
   bool get proxyEnabled;
   AppProxyType get proxyType;
   String get proxyHost;
@@ -46,7 +47,7 @@ mixin _$SettingsState {
   bool get hasProxyPassword;
   String get proxyBypassHosts;
   List<ProxyEntry> get proxyList;
-  bool get isTestingAllProxies; // Extractor & Backend Settings
+  bool get isTestingAllProxies;
   ExtractorEngine get extractorEngine;
   bool get ytdlpBackendEnabled;
   String get ytdlpBackendUrl;
@@ -56,12 +57,12 @@ mixin _$SettingsState {
   String? get ytdlpBackendStatusMessage;
   String? get ytdlpBackendVersion;
   int? get ytdlpBackendProxyCount;
-  String? get ytdlpBackendCircuitState; // Audiophile & Hi-Res Output
+  String? get ytdlpBackendCircuitState;
   bool get bitPerfectOutput;
   bool get bypassDspOnBitPerfect;
   AudioOutputInfo? get currentOutputDevice;
   int? get scanResultCount;
-  String? get errorMessage; // DSP & Sound Quality
+  String? get errorMessage;
   bool get crossfeedEnabled;
   double get crossfeedDelayUs;
   double get crossfeedFeedDb;
@@ -87,175 +88,175 @@ mixin _$SettingsState {
 
   @override
   bool operator ==(Object other) {
+    final _this = this as SettingsState;
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is SettingsState &&
-            (identical(other.gaplessPlayback, gaplessPlayback) ||
-                other.gaplessPlayback == gaplessPlayback) &&
-            (identical(other.crossfadeSeconds, crossfadeSeconds) ||
-                other.crossfadeSeconds == crossfadeSeconds) &&
-            (identical(other.minDurationSec, minDurationSec) ||
-                other.minDurationSec == minDurationSec) &&
-            (identical(other.autoHideSystemMedia, autoHideSystemMedia) ||
-                other.autoHideSystemMedia == autoHideSystemMedia) &&
-            (identical(other.themeColorSource, themeColorSource) ||
-                other.themeColorSource == themeColorSource) &&
-            (identical(other.resumeAfterInterruption, resumeAfterInterruption) ||
-                other.resumeAfterInterruption == resumeAfterInterruption) &&
-            (identical(other.waveformSeekBarEnabled, waveformSeekBarEnabled) ||
-                other.waveformSeekBarEnabled == waveformSeekBarEnabled) &&
-            (identical(other.themeMode, themeMode) ||
-                other.themeMode == themeMode) &&
-            (identical(other.languageCode, languageCode) ||
-                other.languageCode == languageCode) &&
-            (identical(other.customAccentColorValue, customAccentColorValue) ||
-                other.customAccentColorValue == customAccentColorValue) &&
-            (identical(other.playerThemeMode, playerThemeMode) ||
-                other.playerThemeMode == playerThemeMode) &&
-            (identical(other.visualizerStyle, visualizerStyle) ||
-                other.visualizerStyle == visualizerStyle) &&
-            (identical(other.miniPlayerSwipeLeft, miniPlayerSwipeLeft) ||
-                other.miniPlayerSwipeLeft == miniPlayerSwipeLeft) &&
-            (identical(other.miniPlayerSwipeRight, miniPlayerSwipeRight) ||
-                other.miniPlayerSwipeRight == miniPlayerSwipeRight) &&
-            (identical(other.nowPlayingDoubleTap, nowPlayingDoubleTap) ||
-                other.nowPlayingDoubleTap == nowPlayingDoubleTap) &&
-            (identical(other.nowPlayingArtworkSwipe, nowPlayingArtworkSwipe) ||
-                other.nowPlayingArtworkSwipe == nowPlayingArtworkSwipe) &&
-            (identical(other.replayGainMode, replayGainMode) ||
-                other.replayGainMode == replayGainMode) &&
-            (identical(other.replayGainPreampWithRg, replayGainPreampWithRg) ||
-                other.replayGainPreampWithRg == replayGainPreampWithRg) &&
-            (identical(other.replayGainPreampWithoutRg, replayGainPreampWithoutRg) ||
-                other.replayGainPreampWithoutRg == replayGainPreampWithoutRg) &&
-            (identical(other.streamingQuality, streamingQuality) ||
-                other.streamingQuality == streamingQuality) &&
-            (identical(other.downloadQuality, downloadQuality) ||
-                other.downloadQuality == downloadQuality) &&
-            (identical(other.wifiOnlyMode, wifiOnlyMode) ||
-                other.wifiOnlyMode == wifiOnlyMode) &&
-            (identical(other.offlineOnlyMode, offlineOnlyMode) ||
-                other.offlineOnlyMode == offlineOnlyMode) &&
-            (identical(other.isScanning, isScanning) ||
-                other.isScanning == isScanning) &&
-            (identical(other.proxyEnabled, proxyEnabled) ||
-                other.proxyEnabled == proxyEnabled) &&
-            (identical(other.proxyType, proxyType) ||
-                other.proxyType == proxyType) &&
-            (identical(other.proxyHost, proxyHost) ||
-                other.proxyHost == proxyHost) &&
-            (identical(other.proxyPort, proxyPort) ||
-                other.proxyPort == proxyPort) &&
-            (identical(other.proxyUsername, proxyUsername) ||
-                other.proxyUsername == proxyUsername) &&
-            (identical(other.hasProxyPassword, hasProxyPassword) ||
-                other.hasProxyPassword == hasProxyPassword) &&
-            (identical(other.proxyBypassHosts, proxyBypassHosts) ||
-                other.proxyBypassHosts == proxyBypassHosts) &&
-            const DeepCollectionEquality().equals(other.proxyList, proxyList) &&
-            (identical(other.isTestingAllProxies, isTestingAllProxies) ||
-                other.isTestingAllProxies == isTestingAllProxies) &&
-            (identical(other.extractorEngine, extractorEngine) || other.extractorEngine == extractorEngine) &&
-            (identical(other.ytdlpBackendEnabled, ytdlpBackendEnabled) || other.ytdlpBackendEnabled == ytdlpBackendEnabled) &&
-            (identical(other.ytdlpBackendUrl, ytdlpBackendUrl) || other.ytdlpBackendUrl == ytdlpBackendUrl) &&
-            (identical(other.ytdlpBackendToken, ytdlpBackendToken) || other.ytdlpBackendToken == ytdlpBackendToken) &&
-            (identical(other.syncCookiesToBackend, syncCookiesToBackend) || other.syncCookiesToBackend == syncCookiesToBackend) &&
-            (identical(other.isTestingYtdlpBackend, isTestingYtdlpBackend) || other.isTestingYtdlpBackend == isTestingYtdlpBackend) &&
-            (identical(other.ytdlpBackendStatusMessage, ytdlpBackendStatusMessage) || other.ytdlpBackendStatusMessage == ytdlpBackendStatusMessage) &&
-            (identical(other.ytdlpBackendVersion, ytdlpBackendVersion) || other.ytdlpBackendVersion == ytdlpBackendVersion) &&
-            (identical(other.ytdlpBackendProxyCount, ytdlpBackendProxyCount) || other.ytdlpBackendProxyCount == ytdlpBackendProxyCount) &&
-            (identical(other.ytdlpBackendCircuitState, ytdlpBackendCircuitState) || other.ytdlpBackendCircuitState == ytdlpBackendCircuitState) &&
-            (identical(other.bitPerfectOutput, bitPerfectOutput) || other.bitPerfectOutput == bitPerfectOutput) &&
-            (identical(other.bypassDspOnBitPerfect, bypassDspOnBitPerfect) || other.bypassDspOnBitPerfect == bypassDspOnBitPerfect) &&
-            (identical(other.currentOutputDevice, currentOutputDevice) || other.currentOutputDevice == currentOutputDevice) &&
-            (identical(other.scanResultCount, scanResultCount) || other.scanResultCount == scanResultCount) &&
-            (identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage) &&
-            (identical(other.crossfeedEnabled, crossfeedEnabled) || other.crossfeedEnabled == crossfeedEnabled) &&
-            (identical(other.crossfeedDelayUs, crossfeedDelayUs) || other.crossfeedDelayUs == crossfeedDelayUs) &&
-            (identical(other.crossfeedFeedDb, crossfeedFeedDb) || other.crossfeedFeedDb == crossfeedFeedDb) &&
-            (identical(other.limiterEnabled, limiterEnabled) || other.limiterEnabled == limiterEnabled) &&
-            (identical(other.limiterLookaheadMs, limiterLookaheadMs) || other.limiterLookaheadMs == limiterLookaheadMs) &&
-            (identical(other.limiterThresholdDb, limiterThresholdDb) || other.limiterThresholdDb == limiterThresholdDb) &&
-            (identical(other.limiterReleaseMs, limiterReleaseMs) || other.limiterReleaseMs == limiterReleaseMs) &&
-            (identical(other.reverbEnabled, reverbEnabled) || other.reverbEnabled == reverbEnabled) &&
-            (identical(other.reverbPreset, reverbPreset) || other.reverbPreset == reverbPreset) &&
-            (identical(other.reverbWetDry, reverbWetDry) || other.reverbWetDry == reverbWetDry) &&
-            (identical(other.stereoBalance, stereoBalance) || other.stereoBalance == stereoBalance) &&
-            (identical(other.monoMix, monoMix) || other.monoMix == monoMix) &&
-            (identical(other.sincResamplerEnabled, sincResamplerEnabled) || other.sincResamplerEnabled == sincResamplerEnabled) &&
-            (identical(other.dspPreference, dspPreference) || other.dspPreference == dspPreference));
+            (identical(other.gaplessPlayback, _this.gaplessPlayback) ||
+                other.gaplessPlayback == _this.gaplessPlayback) &&
+            (identical(other.crossfadeSeconds, _this.crossfadeSeconds) ||
+                other.crossfadeSeconds == _this.crossfadeSeconds) &&
+            (identical(other.minDurationSec, _this.minDurationSec) ||
+                other.minDurationSec == _this.minDurationSec) &&
+            (identical(other.autoHideSystemMedia, _this.autoHideSystemMedia) ||
+                other.autoHideSystemMedia == _this.autoHideSystemMedia) &&
+            (identical(other.themeColorSource, _this.themeColorSource) ||
+                other.themeColorSource == _this.themeColorSource) &&
+            (identical(other.resumeAfterInterruption, _this.resumeAfterInterruption) ||
+                other.resumeAfterInterruption ==
+                    _this.resumeAfterInterruption) &&
+            (identical(other.waveformSeekBarEnabled, _this.waveformSeekBarEnabled) ||
+                other.waveformSeekBarEnabled == _this.waveformSeekBarEnabled) &&
+            (identical(other.themeMode, _this.themeMode) ||
+                other.themeMode == _this.themeMode) &&
+            (identical(other.languageCode, _this.languageCode) ||
+                other.languageCode == _this.languageCode) &&
+            (identical(other.customAccentColorValue, _this.customAccentColorValue) ||
+                other.customAccentColorValue == _this.customAccentColorValue) &&
+            (identical(other.playerThemeMode, _this.playerThemeMode) ||
+                other.playerThemeMode == _this.playerThemeMode) &&
+            (identical(other.visualizerStyle, _this.visualizerStyle) ||
+                other.visualizerStyle == _this.visualizerStyle) &&
+            (identical(other.miniPlayerSwipeLeft, _this.miniPlayerSwipeLeft) ||
+                other.miniPlayerSwipeLeft == _this.miniPlayerSwipeLeft) &&
+            (identical(other.miniPlayerSwipeRight, _this.miniPlayerSwipeRight) ||
+                other.miniPlayerSwipeRight == _this.miniPlayerSwipeRight) &&
+            (identical(other.nowPlayingDoubleTap, _this.nowPlayingDoubleTap) ||
+                other.nowPlayingDoubleTap == _this.nowPlayingDoubleTap) &&
+            (identical(other.nowPlayingArtworkSwipe, _this.nowPlayingArtworkSwipe) ||
+                other.nowPlayingArtworkSwipe == _this.nowPlayingArtworkSwipe) &&
+            (identical(other.replayGainMode, _this.replayGainMode) ||
+                other.replayGainMode == _this.replayGainMode) &&
+            (identical(other.replayGainPreampWithRg, _this.replayGainPreampWithRg) ||
+                other.replayGainPreampWithRg == _this.replayGainPreampWithRg) &&
+            (identical(other.replayGainPreampWithoutRg, _this.replayGainPreampWithoutRg) ||
+                other.replayGainPreampWithoutRg ==
+                    _this.replayGainPreampWithoutRg) &&
+            (identical(other.streamingQuality, _this.streamingQuality) ||
+                other.streamingQuality == _this.streamingQuality) &&
+            (identical(other.downloadQuality, _this.downloadQuality) ||
+                other.downloadQuality == _this.downloadQuality) &&
+            (identical(other.wifiOnlyMode, _this.wifiOnlyMode) ||
+                other.wifiOnlyMode == _this.wifiOnlyMode) &&
+            (identical(other.offlineOnlyMode, _this.offlineOnlyMode) ||
+                other.offlineOnlyMode == _this.offlineOnlyMode) &&
+            (identical(other.isScanning, _this.isScanning) ||
+                other.isScanning == _this.isScanning) &&
+            (identical(other.proxyEnabled, _this.proxyEnabled) ||
+                other.proxyEnabled == _this.proxyEnabled) &&
+            (identical(other.proxyType, _this.proxyType) || other.proxyType == _this.proxyType) &&
+            (identical(other.proxyHost, _this.proxyHost) || other.proxyHost == _this.proxyHost) &&
+            (identical(other.proxyPort, _this.proxyPort) || other.proxyPort == _this.proxyPort) &&
+            (identical(other.proxyUsername, _this.proxyUsername) || other.proxyUsername == _this.proxyUsername) &&
+            (identical(other.hasProxyPassword, _this.hasProxyPassword) || other.hasProxyPassword == _this.hasProxyPassword) &&
+            (identical(other.proxyBypassHosts, _this.proxyBypassHosts) || other.proxyBypassHosts == _this.proxyBypassHosts) &&
+            const DeepCollectionEquality().equals(other.proxyList, _this.proxyList) &&
+            (identical(other.isTestingAllProxies, _this.isTestingAllProxies) || other.isTestingAllProxies == _this.isTestingAllProxies) &&
+            (identical(other.extractorEngine, _this.extractorEngine) || other.extractorEngine == _this.extractorEngine) &&
+            (identical(other.ytdlpBackendEnabled, _this.ytdlpBackendEnabled) || other.ytdlpBackendEnabled == _this.ytdlpBackendEnabled) &&
+            (identical(other.ytdlpBackendUrl, _this.ytdlpBackendUrl) || other.ytdlpBackendUrl == _this.ytdlpBackendUrl) &&
+            (identical(other.ytdlpBackendToken, _this.ytdlpBackendToken) || other.ytdlpBackendToken == _this.ytdlpBackendToken) &&
+            (identical(other.syncCookiesToBackend, _this.syncCookiesToBackend) || other.syncCookiesToBackend == _this.syncCookiesToBackend) &&
+            (identical(other.isTestingYtdlpBackend, _this.isTestingYtdlpBackend) || other.isTestingYtdlpBackend == _this.isTestingYtdlpBackend) &&
+            (identical(other.ytdlpBackendStatusMessage, _this.ytdlpBackendStatusMessage) || other.ytdlpBackendStatusMessage == _this.ytdlpBackendStatusMessage) &&
+            (identical(other.ytdlpBackendVersion, _this.ytdlpBackendVersion) || other.ytdlpBackendVersion == _this.ytdlpBackendVersion) &&
+            (identical(other.ytdlpBackendProxyCount, _this.ytdlpBackendProxyCount) || other.ytdlpBackendProxyCount == _this.ytdlpBackendProxyCount) &&
+            (identical(other.ytdlpBackendCircuitState, _this.ytdlpBackendCircuitState) || other.ytdlpBackendCircuitState == _this.ytdlpBackendCircuitState) &&
+            (identical(other.bitPerfectOutput, _this.bitPerfectOutput) || other.bitPerfectOutput == _this.bitPerfectOutput) &&
+            (identical(other.bypassDspOnBitPerfect, _this.bypassDspOnBitPerfect) || other.bypassDspOnBitPerfect == _this.bypassDspOnBitPerfect) &&
+            (identical(other.currentOutputDevice, _this.currentOutputDevice) || other.currentOutputDevice == _this.currentOutputDevice) &&
+            (identical(other.scanResultCount, _this.scanResultCount) || other.scanResultCount == _this.scanResultCount) &&
+            (identical(other.errorMessage, _this.errorMessage) || other.errorMessage == _this.errorMessage) &&
+            (identical(other.crossfeedEnabled, _this.crossfeedEnabled) || other.crossfeedEnabled == _this.crossfeedEnabled) &&
+            (identical(other.crossfeedDelayUs, _this.crossfeedDelayUs) || other.crossfeedDelayUs == _this.crossfeedDelayUs) &&
+            (identical(other.crossfeedFeedDb, _this.crossfeedFeedDb) || other.crossfeedFeedDb == _this.crossfeedFeedDb) &&
+            (identical(other.limiterEnabled, _this.limiterEnabled) || other.limiterEnabled == _this.limiterEnabled) &&
+            (identical(other.limiterLookaheadMs, _this.limiterLookaheadMs) || other.limiterLookaheadMs == _this.limiterLookaheadMs) &&
+            (identical(other.limiterThresholdDb, _this.limiterThresholdDb) || other.limiterThresholdDb == _this.limiterThresholdDb) &&
+            (identical(other.limiterReleaseMs, _this.limiterReleaseMs) || other.limiterReleaseMs == _this.limiterReleaseMs) &&
+            (identical(other.reverbEnabled, _this.reverbEnabled) || other.reverbEnabled == _this.reverbEnabled) &&
+            (identical(other.reverbPreset, _this.reverbPreset) || other.reverbPreset == _this.reverbPreset) &&
+            (identical(other.reverbWetDry, _this.reverbWetDry) || other.reverbWetDry == _this.reverbWetDry) &&
+            (identical(other.stereoBalance, _this.stereoBalance) || other.stereoBalance == _this.stereoBalance) &&
+            (identical(other.monoMix, _this.monoMix) || other.monoMix == _this.monoMix) &&
+            (identical(other.sincResamplerEnabled, _this.sincResamplerEnabled) || other.sincResamplerEnabled == _this.sincResamplerEnabled) &&
+            (identical(other.dspPreference, _this.dspPreference) || other.dspPreference == _this.dspPreference));
   }
 
   @override
-  int get hashCode => Object.hashAll([
-        runtimeType,
-        gaplessPlayback,
-        crossfadeSeconds,
-        minDurationSec,
-        autoHideSystemMedia,
-        themeColorSource,
-        resumeAfterInterruption,
-        waveformSeekBarEnabled,
-        themeMode,
-        languageCode,
-        customAccentColorValue,
-        playerThemeMode,
-        visualizerStyle,
-        miniPlayerSwipeLeft,
-        miniPlayerSwipeRight,
-        nowPlayingDoubleTap,
-        nowPlayingArtworkSwipe,
-        replayGainMode,
-        replayGainPreampWithRg,
-        replayGainPreampWithoutRg,
-        streamingQuality,
-        downloadQuality,
-        wifiOnlyMode,
-        offlineOnlyMode,
-        isScanning,
-        proxyEnabled,
-        proxyType,
-        proxyHost,
-        proxyPort,
-        proxyUsername,
-        hasProxyPassword,
-        proxyBypassHosts,
-        const DeepCollectionEquality().hash(proxyList),
-        isTestingAllProxies,
-        extractorEngine,
-        ytdlpBackendEnabled,
-        ytdlpBackendUrl,
-        ytdlpBackendToken,
-        syncCookiesToBackend,
-        isTestingYtdlpBackend,
-        ytdlpBackendStatusMessage,
-        ytdlpBackendVersion,
-        ytdlpBackendProxyCount,
-        ytdlpBackendCircuitState,
-        bitPerfectOutput,
-        bypassDspOnBitPerfect,
-        currentOutputDevice,
-        scanResultCount,
-        errorMessage,
-        crossfeedEnabled,
-        crossfeedDelayUs,
-        crossfeedFeedDb,
-        limiterEnabled,
-        limiterLookaheadMs,
-        limiterThresholdDb,
-        limiterReleaseMs,
-        reverbEnabled,
-        reverbPreset,
-        reverbWetDry,
-        stereoBalance,
-        monoMix,
-        sincResamplerEnabled,
-        dspPreference
-      ]);
+  int get hashCode {
+    final _this = this as SettingsState;
+    return Object.hashAll([
+      runtimeType,
+      _this.gaplessPlayback,
+      _this.crossfadeSeconds,
+      _this.minDurationSec,
+      _this.autoHideSystemMedia,
+      _this.themeColorSource,
+      _this.resumeAfterInterruption,
+      _this.waveformSeekBarEnabled,
+      _this.themeMode,
+      _this.languageCode,
+      _this.customAccentColorValue,
+      _this.playerThemeMode,
+      _this.visualizerStyle,
+      _this.miniPlayerSwipeLeft,
+      _this.miniPlayerSwipeRight,
+      _this.nowPlayingDoubleTap,
+      _this.nowPlayingArtworkSwipe,
+      _this.replayGainMode,
+      _this.replayGainPreampWithRg,
+      _this.replayGainPreampWithoutRg,
+      _this.streamingQuality,
+      _this.downloadQuality,
+      _this.wifiOnlyMode,
+      _this.offlineOnlyMode,
+      _this.isScanning,
+      _this.proxyEnabled,
+      _this.proxyType,
+      _this.proxyHost,
+      _this.proxyPort,
+      _this.proxyUsername,
+      _this.hasProxyPassword,
+      _this.proxyBypassHosts,
+      const DeepCollectionEquality().hash(_this.proxyList),
+      _this.isTestingAllProxies,
+      _this.extractorEngine,
+      _this.ytdlpBackendEnabled,
+      _this.ytdlpBackendUrl,
+      _this.ytdlpBackendToken,
+      _this.syncCookiesToBackend,
+      _this.isTestingYtdlpBackend,
+      _this.ytdlpBackendStatusMessage,
+      _this.ytdlpBackendVersion,
+      _this.ytdlpBackendProxyCount,
+      _this.ytdlpBackendCircuitState,
+      _this.bitPerfectOutput,
+      _this.bypassDspOnBitPerfect,
+      _this.currentOutputDevice,
+      _this.scanResultCount,
+      _this.errorMessage,
+      _this.crossfeedEnabled,
+      _this.crossfeedDelayUs,
+      _this.crossfeedFeedDb,
+      _this.limiterEnabled,
+      _this.limiterLookaheadMs,
+      _this.limiterThresholdDb,
+      _this.limiterReleaseMs,
+      _this.reverbEnabled,
+      _this.reverbPreset,
+      _this.reverbWetDry,
+      _this.stereoBalance,
+      _this.monoMix,
+      _this.sincResamplerEnabled,
+      _this.dspPreference
+    ]);
+  }
 
   @override
   String toString() {
-    return 'SettingsState(gaplessPlayback: $gaplessPlayback, crossfadeSeconds: $crossfadeSeconds, minDurationSec: $minDurationSec, autoHideSystemMedia: $autoHideSystemMedia, themeColorSource: $themeColorSource, resumeAfterInterruption: $resumeAfterInterruption, waveformSeekBarEnabled: $waveformSeekBarEnabled, themeMode: $themeMode, languageCode: $languageCode, customAccentColorValue: $customAccentColorValue, playerThemeMode: $playerThemeMode, visualizerStyle: $visualizerStyle, miniPlayerSwipeLeft: $miniPlayerSwipeLeft, miniPlayerSwipeRight: $miniPlayerSwipeRight, nowPlayingDoubleTap: $nowPlayingDoubleTap, nowPlayingArtworkSwipe: $nowPlayingArtworkSwipe, replayGainMode: $replayGainMode, replayGainPreampWithRg: $replayGainPreampWithRg, replayGainPreampWithoutRg: $replayGainPreampWithoutRg, streamingQuality: $streamingQuality, downloadQuality: $downloadQuality, wifiOnlyMode: $wifiOnlyMode, offlineOnlyMode: $offlineOnlyMode, isScanning: $isScanning, proxyEnabled: $proxyEnabled, proxyType: $proxyType, proxyHost: $proxyHost, proxyPort: $proxyPort, proxyUsername: $proxyUsername, hasProxyPassword: $hasProxyPassword, proxyBypassHosts: $proxyBypassHosts, proxyList: $proxyList, isTestingAllProxies: $isTestingAllProxies, extractorEngine: $extractorEngine, ytdlpBackendEnabled: $ytdlpBackendEnabled, ytdlpBackendUrl: $ytdlpBackendUrl, ytdlpBackendToken: $ytdlpBackendToken, syncCookiesToBackend: $syncCookiesToBackend, isTestingYtdlpBackend: $isTestingYtdlpBackend, ytdlpBackendStatusMessage: $ytdlpBackendStatusMessage, ytdlpBackendVersion: $ytdlpBackendVersion, ytdlpBackendProxyCount: $ytdlpBackendProxyCount, ytdlpBackendCircuitState: $ytdlpBackendCircuitState, bitPerfectOutput: $bitPerfectOutput, bypassDspOnBitPerfect: $bypassDspOnBitPerfect, currentOutputDevice: $currentOutputDevice, scanResultCount: $scanResultCount, errorMessage: $errorMessage, crossfeedEnabled: $crossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, limiterEnabled: $limiterEnabled, limiterLookaheadMs: $limiterLookaheadMs, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, reverbEnabled: $reverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, sincResamplerEnabled: $sincResamplerEnabled, dspPreference: $dspPreference)';
+    final _this = this as SettingsState;
+    return 'SettingsState(gaplessPlayback: ${_this.gaplessPlayback}, crossfadeSeconds: ${_this.crossfadeSeconds}, minDurationSec: ${_this.minDurationSec}, autoHideSystemMedia: ${_this.autoHideSystemMedia}, themeColorSource: ${_this.themeColorSource}, resumeAfterInterruption: ${_this.resumeAfterInterruption}, waveformSeekBarEnabled: ${_this.waveformSeekBarEnabled}, themeMode: ${_this.themeMode}, languageCode: ${_this.languageCode}, customAccentColorValue: ${_this.customAccentColorValue}, playerThemeMode: ${_this.playerThemeMode}, visualizerStyle: ${_this.visualizerStyle}, miniPlayerSwipeLeft: ${_this.miniPlayerSwipeLeft}, miniPlayerSwipeRight: ${_this.miniPlayerSwipeRight}, nowPlayingDoubleTap: ${_this.nowPlayingDoubleTap}, nowPlayingArtworkSwipe: ${_this.nowPlayingArtworkSwipe}, replayGainMode: ${_this.replayGainMode}, replayGainPreampWithRg: ${_this.replayGainPreampWithRg}, replayGainPreampWithoutRg: ${_this.replayGainPreampWithoutRg}, streamingQuality: ${_this.streamingQuality}, downloadQuality: ${_this.downloadQuality}, wifiOnlyMode: ${_this.wifiOnlyMode}, offlineOnlyMode: ${_this.offlineOnlyMode}, isScanning: ${_this.isScanning}, proxyEnabled: ${_this.proxyEnabled}, proxyType: ${_this.proxyType}, proxyHost: ${_this.proxyHost}, proxyPort: ${_this.proxyPort}, proxyUsername: ${_this.proxyUsername}, hasProxyPassword: ${_this.hasProxyPassword}, proxyBypassHosts: ${_this.proxyBypassHosts}, proxyList: ${_this.proxyList}, isTestingAllProxies: ${_this.isTestingAllProxies}, extractorEngine: ${_this.extractorEngine}, ytdlpBackendEnabled: ${_this.ytdlpBackendEnabled}, ytdlpBackendUrl: ${_this.ytdlpBackendUrl}, ytdlpBackendToken: ${_this.ytdlpBackendToken}, syncCookiesToBackend: ${_this.syncCookiesToBackend}, isTestingYtdlpBackend: ${_this.isTestingYtdlpBackend}, ytdlpBackendStatusMessage: ${_this.ytdlpBackendStatusMessage}, ytdlpBackendVersion: ${_this.ytdlpBackendVersion}, ytdlpBackendProxyCount: ${_this.ytdlpBackendProxyCount}, ytdlpBackendCircuitState: ${_this.ytdlpBackendCircuitState}, bitPerfectOutput: ${_this.bitPerfectOutput}, bypassDspOnBitPerfect: ${_this.bypassDspOnBitPerfect}, currentOutputDevice: ${_this.currentOutputDevice}, scanResultCount: ${_this.scanResultCount}, errorMessage: ${_this.errorMessage}, crossfeedEnabled: ${_this.crossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, limiterEnabled: ${_this.limiterEnabled}, limiterLookaheadMs: ${_this.limiterLookaheadMs}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, reverbEnabled: ${_this.reverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, sincResamplerEnabled: ${_this.sincResamplerEnabled}, dspPreference: ${_this.dspPreference})';
   }
 }
 
@@ -406,7 +407,7 @@ class _$SettingsStateCopyWithImpl<$Res>
     Object? sincResamplerEnabled = null,
     Object? dspPreference = null,
   }) {
-    return _then(_self.copyWith(
+    return _then(SettingsState(
       gaplessPlayback: null == gaplessPlayback
           ? _self.gaplessPlayback
           : gaplessPlayback // ignore: cast_nullable_to_non_nullable
@@ -1226,7 +1227,7 @@ class _SettingsState extends SettingsState {
       this.proxyUsername = '',
       this.hasProxyPassword = false,
       this.proxyBypassHosts = 'localhost, 127.0.0.1',
-      final List<ProxyEntry> proxyList = const [],
+      List<ProxyEntry> proxyList = const [],
       this.isTestingAllProxies = false,
       this.extractorEngine = ExtractorEngine.auto,
       this.ytdlpBackendEnabled = true,
@@ -1253,7 +1254,7 @@ class _SettingsState extends SettingsState {
       this.limiterReleaseMs = 50.0,
       this.reverbEnabled = false,
       this.reverbPreset = 0,
-      this.reverbWetDry = 0.20,
+      this.reverbWetDry = 0.2,
       this.stereoBalance = 0.0,
       this.monoMix = false,
       this.sincResamplerEnabled = true,
@@ -1333,7 +1334,6 @@ class _SettingsState extends SettingsState {
   @override
   @JsonKey()
   final bool isScanning;
-// Proxy Settings
   @override
   @JsonKey()
   final bool proxyEnabled;
@@ -1367,7 +1367,6 @@ class _SettingsState extends SettingsState {
   @override
   @JsonKey()
   final bool isTestingAllProxies;
-// Extractor & Backend Settings
   @override
   @JsonKey()
   final ExtractorEngine extractorEngine;
@@ -1394,7 +1393,6 @@ class _SettingsState extends SettingsState {
   final int? ytdlpBackendProxyCount;
   @override
   final String? ytdlpBackendCircuitState;
-// Audiophile & Hi-Res Output
   @override
   @JsonKey()
   final bool bitPerfectOutput;
@@ -1407,7 +1405,6 @@ class _SettingsState extends SettingsState {
   final int? scanResultCount;
   @override
   final String? errorMessage;
-// DSP & Sound Quality
   @override
   @JsonKey()
   final bool crossfeedEnabled;
@@ -1527,7 +1524,7 @@ class _SettingsState extends SettingsState {
             (identical(other.proxyBypassHosts, proxyBypassHosts) ||
                 other.proxyBypassHosts == proxyBypassHosts) &&
             const DeepCollectionEquality()
-                .equals(other._proxyList, _proxyList) &&
+                .equals(other.proxyList, _proxyList) &&
             (identical(other.isTestingAllProxies, isTestingAllProxies) || other.isTestingAllProxies == isTestingAllProxies) &&
             (identical(other.extractorEngine, extractorEngine) || other.extractorEngine == extractorEngine) &&
             (identical(other.ytdlpBackendEnabled, ytdlpBackendEnabled) || other.ytdlpBackendEnabled == ytdlpBackendEnabled) &&
@@ -1561,71 +1558,73 @@ class _SettingsState extends SettingsState {
   }
 
   @override
-  int get hashCode => Object.hashAll([
-        runtimeType,
-        gaplessPlayback,
-        crossfadeSeconds,
-        minDurationSec,
-        autoHideSystemMedia,
-        themeColorSource,
-        resumeAfterInterruption,
-        waveformSeekBarEnabled,
-        themeMode,
-        languageCode,
-        customAccentColorValue,
-        playerThemeMode,
-        visualizerStyle,
-        miniPlayerSwipeLeft,
-        miniPlayerSwipeRight,
-        nowPlayingDoubleTap,
-        nowPlayingArtworkSwipe,
-        replayGainMode,
-        replayGainPreampWithRg,
-        replayGainPreampWithoutRg,
-        streamingQuality,
-        downloadQuality,
-        wifiOnlyMode,
-        offlineOnlyMode,
-        isScanning,
-        proxyEnabled,
-        proxyType,
-        proxyHost,
-        proxyPort,
-        proxyUsername,
-        hasProxyPassword,
-        proxyBypassHosts,
-        const DeepCollectionEquality().hash(_proxyList),
-        isTestingAllProxies,
-        extractorEngine,
-        ytdlpBackendEnabled,
-        ytdlpBackendUrl,
-        ytdlpBackendToken,
-        syncCookiesToBackend,
-        isTestingYtdlpBackend,
-        ytdlpBackendStatusMessage,
-        ytdlpBackendVersion,
-        ytdlpBackendProxyCount,
-        ytdlpBackendCircuitState,
-        bitPerfectOutput,
-        bypassDspOnBitPerfect,
-        currentOutputDevice,
-        scanResultCount,
-        errorMessage,
-        crossfeedEnabled,
-        crossfeedDelayUs,
-        crossfeedFeedDb,
-        limiterEnabled,
-        limiterLookaheadMs,
-        limiterThresholdDb,
-        limiterReleaseMs,
-        reverbEnabled,
-        reverbPreset,
-        reverbWetDry,
-        stereoBalance,
-        monoMix,
-        sincResamplerEnabled,
-        dspPreference
-      ]);
+  int get hashCode {
+    return Object.hashAll([
+      runtimeType,
+      gaplessPlayback,
+      crossfadeSeconds,
+      minDurationSec,
+      autoHideSystemMedia,
+      themeColorSource,
+      resumeAfterInterruption,
+      waveformSeekBarEnabled,
+      themeMode,
+      languageCode,
+      customAccentColorValue,
+      playerThemeMode,
+      visualizerStyle,
+      miniPlayerSwipeLeft,
+      miniPlayerSwipeRight,
+      nowPlayingDoubleTap,
+      nowPlayingArtworkSwipe,
+      replayGainMode,
+      replayGainPreampWithRg,
+      replayGainPreampWithoutRg,
+      streamingQuality,
+      downloadQuality,
+      wifiOnlyMode,
+      offlineOnlyMode,
+      isScanning,
+      proxyEnabled,
+      proxyType,
+      proxyHost,
+      proxyPort,
+      proxyUsername,
+      hasProxyPassword,
+      proxyBypassHosts,
+      const DeepCollectionEquality().hash(_proxyList),
+      isTestingAllProxies,
+      extractorEngine,
+      ytdlpBackendEnabled,
+      ytdlpBackendUrl,
+      ytdlpBackendToken,
+      syncCookiesToBackend,
+      isTestingYtdlpBackend,
+      ytdlpBackendStatusMessage,
+      ytdlpBackendVersion,
+      ytdlpBackendProxyCount,
+      ytdlpBackendCircuitState,
+      bitPerfectOutput,
+      bypassDspOnBitPerfect,
+      currentOutputDevice,
+      scanResultCount,
+      errorMessage,
+      crossfeedEnabled,
+      crossfeedDelayUs,
+      crossfeedFeedDb,
+      limiterEnabled,
+      limiterLookaheadMs,
+      limiterThresholdDb,
+      limiterReleaseMs,
+      reverbEnabled,
+      reverbPreset,
+      reverbWetDry,
+      stereoBalance,
+      monoMix,
+      sincResamplerEnabled,
+      dspPreference
+    ]);
+  }
 
   @override
   String toString() {

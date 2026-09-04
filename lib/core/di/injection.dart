@@ -35,10 +35,7 @@ abstract class NetworkModule {
 abstract class StorageModule {
   @lazySingleton
   FlutterSecureStorage get secureStorage => const FlutterSecureStorage(
-        // ignore: deprecated_member_use_from_same_package, deprecated_member_use
         aOptions: AndroidOptions(
-          // ignore: deprecated_member_use
-          encryptedSharedPreferences: true,
           resetOnError: true,
         ),
         iOptions: IOSOptions(

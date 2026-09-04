@@ -383,11 +383,11 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                   return DynamicColorBuilder(
                     builder: (lightDynamic, darkDynamic) {
                       // Resolve the accent seed per brightness.
-                      Color resolveAccent(ColorScheme? dynamicScheme) {
+                      Color resolveAccent(Color? dynamicPrimary) {
                         switch (settingsConfig.colorSource) {
                           case ThemeColorSource.system:
-                            if (dynamicScheme != null) {
-                              return dynamicScheme.primary;
+                            if (dynamicPrimary != null) {
+                              return dynamicPrimary;
                             }
                             return dynamicThemeConfig.hasCustomArtwork
                                 ? dynamicThemeConfig.primaryColor
@@ -400,12 +400,12 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
                       }
 
                       final lightTheme = AuraTheme.customTheme(
-                        resolveAccent(lightDynamic),
+                        resolveAccent(lightDynamic?.primary),
                         brightness: Brightness.light,
                       );
 
                       final darkTheme = AuraTheme.customTheme(
-                        resolveAccent(darkDynamic),
+                        resolveAccent(darkDynamic?.primary),
                         brightness: Brightness.dark,
                         isAmoled:
                             settingsConfig.themeMode == AppThemeMode.amoled,

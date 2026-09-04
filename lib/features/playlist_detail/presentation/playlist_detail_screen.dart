@@ -97,9 +97,11 @@ class PlaylistDetailScreen extends StatelessWidget {
     final exportUseCase = getIt<PlaylistExportUseCase>();
     final file = await exportUseCase.exportToFile(playlist.name, songs);
     try {
-      await Share.shareXFiles(
-        [XFile(file.path, mimeType: 'audio/x-mpegurl')],
-        text: 'Playlist: ${playlist.name}',
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path, mimeType: 'audio/x-mpegurl')],
+          text: 'Playlist: ${playlist.name}',
+        ),
       );
     } finally {
       try {

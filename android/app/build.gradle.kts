@@ -10,7 +10,7 @@ plugins {
 
 android {
     namespace = "com.pulsr.music"
-    compileSdk = 36
+    compileSdk = 37
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -26,7 +26,7 @@ android {
         // 28 (Android 9) is the floor for the true 10-band graphic EQ, which is
         // built on DynamicsProcessing postEq — added in API 28.
         minSdk = 28
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         manifestPlaceholders["appName"] = "Pulsr Music"

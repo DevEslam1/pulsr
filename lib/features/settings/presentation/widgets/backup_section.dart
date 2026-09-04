@@ -56,7 +56,7 @@ class _BackupSectionState extends State<BackupSection> {
       final fileName = 'pulsr_backup_$timestamp.json';
       final bytes = Uint8List.fromList(utf8.encode(jsonContent));
 
-      final outputFile = await FilePicker.platform.saveFile(
+      final outputUri = await FilePicker.saveFile(
         dialogTitle: 'Export Backup JSON',
         fileName: fileName,
         type: FileType.custom,
@@ -64,17 +64,12 @@ class _BackupSectionState extends State<BackupSection> {
         bytes: bytes,
       );
 
-      if (outputFile != null && outputFile.isNotEmpty) {
-        final file = File(outputFile);
-        if (!await file.exists() || (await file.length()) == 0) {
-          await file.writeAsString(jsonContent);
-        }
-
+      if (outputUri != null) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                  'Backup exported successfully to ${file.path.split(Platform.pathSeparator).last}'),
+                  'Backup exported successfully to $fileName'),
               backgroundColor: context.palette.accent,
             ),
           );
@@ -95,16 +90,16 @@ class _BackupSectionState extends State<BackupSection> {
   }
 
   Future<void> _importBackup(BuildContext context) async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: ['json'],
     );
 
-    if (result == null || result.files.single.path == null) {
+    if (result == null || result.path == null) {
       return;
     }
 
-    final filePath = result.files.single.path!;
+    final filePath = result.path!;
     final file = File(filePath);
 
     if (!await file.exists()) {

@@ -8,9 +8,8 @@ import '../utils/error_logger.dart';
 
 @singleton
 class AuthService {
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: ['email'],
-  );
+  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+  bool _googleSignInInitialized = false;
 
   bool _isFirebaseAvailable = false;
   bool get isFirebaseAvailable => _isFirebaseAvailable;
@@ -32,6 +31,16 @@ class AuthService {
       ErrorLogger.log('Firebase init skipped or unavailable',
           error: e, stackTrace: st, category: 'AuthService');
     }
+
+    if (!_googleSignInInitialized) {
+      try {
+        await _googleSignIn.initialize();
+        _googleSignInInitialized = true;
+      } catch (e, st) {
+        ErrorLogger.log('GoogleSignIn init failed',
+            error: e, stackTrace: st, category: 'AuthService');
+      }
+    }
   }
 
   Future<User?> signInWithGoogle() async {
@@ -41,16 +50,26 @@ class AuthService {
         throw Exception('Firebase is not available on this device');
       }
 
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        // User cancelled the sign-in dialog
-        return null;
+      if (!_googleSignInInitialized) {
+        await _googleSignIn.initialize();
+        _googleSignInInitialized = true;
       }
 
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+      final GoogleSignInAccount googleUser;
+      try {
+        googleUser = await _googleSignIn.authenticate(scopeHint: ['email']);
+      } on GoogleSignInException catch (e) {
+        if (e.code == GoogleSignInExceptionCode.canceled) {
+          return null;
+        }
+        rethrow;
+      }
+
+      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
+      final authz =
+          await googleUser.authorizationClient.authorizationForScopes(['email']);
       final OAuthCredential credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
+        accessToken: authz?.accessToken,
         idToken: googleAuth.idToken,
       );
 

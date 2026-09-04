@@ -121,11 +121,11 @@ class PulsrAudioHandler extends BaseAudioHandler
   late final SeamlessQueueTransition _queueTransition;
   late final StreamPreResolver _streamPreResolver;
 
-  // Gapless engine: when crossfade is off, a ConcatenatingAudioSource on the
+  // Gapless engine: when crossfade is off, AudioPlayer's built-in playlist on the
   // active player is the source of truth for track order/advance, and just_audio
-  // joins consecutive items seamlessly. Null while crossfade (duration > 0) is
+  // joins consecutive items seamlessly. False while crossfade (duration > 0) is
   // active, which keeps the manual dual-player path below.
-  ConcatenatingAudioSource? _gaplessSource;
+  bool _gaplessLoaded = false;
   // Last index reacted to from currentIndexStream, to drop duplicate emits.
   int _lastGaplessIndex = -1;
 
@@ -408,7 +408,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         await _loadGaplessQueue(
             initialPosition: resumePos, preload: wasPlaying);
       } else {
-        _gaplessSource = null;
+        _gaplessLoaded = false;
         if (wasPlaying) {
           await playSongAt(_currentIndex, initialPosition: resumePos);
         } else {
@@ -688,7 +688,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     }).catchError((_) {});
 
     _queueTransition = SeamlessQueueTransition(
-      buildConcatSource: (songs) => _buildConcat(songs),
+      buildAudioSources: (songs) => _buildAudioSources(songs),
       crossfadeToInactive: (active, inactive) async {
         final fadeId = _crossfadeManager.nextFadeId();
         await _crossfadeManager.fadeVolume(
@@ -1033,11 +1033,8 @@ class PulsrAudioHandler extends BaseAudioHandler
     return _createAudioSource(song, tag);
   }
 
-  ConcatenatingAudioSource _buildConcat(List<SongsTableData> songs) {
-    return ConcatenatingAudioSource(
-      useLazyPreparation: true,
-      children: songs.map(_buildGaplessChild).toList(),
-    );
+  List<AudioSource> _buildAudioSources(List<SongsTableData> songs) {
+    return songs.map(_buildGaplessChild).toList();
   }
 
   /// A local song plays straight off disk; a YouTube row needs a freshly
@@ -1651,7 +1648,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
   }
 
-  /// Loads the whole queue as one [ConcatenatingAudioSource] on the active
+  /// Loads the whole queue as a playlist on the active
   /// player so ExoPlayer joins consecutive tracks with no gap. With [preload]
   /// false the source is set but not prepared, so a restored YouTube track
   /// resolves lazily on the first play() instead of throwing at cold start when
@@ -1671,7 +1668,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
     mediaItem.add(_songToMediaItem(song, fastArtUri));
 
-    final concat = _buildConcat(_songs);
+    final sources = _buildAudioSources(_songs);
 
     try {
       // Cleanly stop any existing playing source to release hanging native sockets
@@ -1679,8 +1676,8 @@ class PulsrAudioHandler extends BaseAudioHandler
         await _activePlayer.stop();
       } catch (_) {}
 
-      await _activePlayer.setAudioSource(
-        concat,
+      await _activePlayer.setAudioSources(
+        sources,
         initialIndex: _currentIndex,
         initialPosition: initialPosition,
         preload: preload,
@@ -1688,7 +1685,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       try {
         _latencyTracker?.markStage(PlaybackStage.sourceSet);
       } catch (_) {}
-      _gaplessSource = concat;
+      _gaplessLoaded = true;
       if (generation != _playGeneration) return;
       await _activePlayer.setVolume(_calculateReplayGainVolume(song));
       if (preload) {
@@ -1759,8 +1756,8 @@ class PulsrAudioHandler extends BaseAudioHandler
   Future<void> _onGaplessIndexChanged(int index) async {
     if (!_gaplessMode) return;
     if (index < 0 || index >= _songs.length) return;
-    if (_gaplessSource == null) return;
-    final childCount = _gaplessSource!.length;
+    if (!_gaplessLoaded) return;
+    final childCount = _activePlayer.audioSources.length;
     if (index >= childCount) return;
 
     // Detect rapid successive transitions caused by ExoPlayer auto-advancing
@@ -2015,7 +2012,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
           restoreVolume: _volume);
     }
-    if (_gaplessMode && _gaplessSource != null) {
+    if (_gaplessMode && _gaplessLoaded) {
       if (_activePlayer.hasNext) {
         await _activePlayer.seekToNext();
       } else {
@@ -2044,7 +2041,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
           restoreVolume: _volume);
     }
-    if (_gaplessMode && _gaplessSource != null) {
+    if (_gaplessMode && _gaplessLoaded) {
       if (_activePlayer.position.inSeconds > 3) {
         await _activePlayer.seek(Duration.zero);
         _saveCurrentPosition();
@@ -2079,7 +2076,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     await _playerB.setShuffleModeEnabled(enable);
     // In gapless mode the concat's shuffle order drives playback; reshuffle so
     // enabling shuffle actually reorders upcoming tracks (current stays put).
-    if (enable && _gaplessMode && _gaplessSource != null) {
+    if (enable && _gaplessMode && _gaplessLoaded) {
       await _activePlayer.shuffle();
     }
     // The crossfade engine draws its own random order from _getNextIndex, so no
@@ -2178,8 +2175,8 @@ class PulsrAudioHandler extends BaseAudioHandler
       if (song != null) {
         _songs.add(song);
         _queueDirty = true;
-        if (_gaplessMode && _gaplessSource != null) {
-          await _gaplessSource!.add(_buildGaplessChild(song));
+        if (_gaplessMode && _gaplessLoaded) {
+          await _activePlayer.addAudioSource(_buildGaplessChild(song));
         }
         queue.add(_songs.map(_songToMediaItem).toList());
         _saveCurrentPosition();
@@ -2198,8 +2195,8 @@ class PulsrAudioHandler extends BaseAudioHandler
     _songs.insert(insertIdx, song);
     _queueDirty = true;
     // Insert sits after the current track, so the playing index never shifts.
-    if (_gaplessMode && _gaplessSource != null) {
-      await _gaplessSource!.insert(insertIdx, _buildGaplessChild(song));
+    if (_gaplessMode && _gaplessLoaded) {
+      await _activePlayer.insertAudioSource(insertIdx, _buildGaplessChild(song));
     }
     queue.add(_songs.map(_songToMediaItem).toList());
     _saveCurrentPosition();
@@ -2213,8 +2210,8 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
     _songs.add(song);
     _queueDirty = true;
-    if (_gaplessMode && _gaplessSource != null) {
-      await _gaplessSource!.add(_buildGaplessChild(song));
+    if (_gaplessMode && _gaplessLoaded) {
+      await _activePlayer.addAudioSource(_buildGaplessChild(song));
     }
     queue.add(_songs.map(_songToMediaItem).toList());
     _saveCurrentPosition();
@@ -2225,14 +2222,14 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (index < 0 || index >= _songs.length) return;
 
     final wasPlayingCurrent = index == _currentIndex;
-    final gaplessRef = _gaplessSource;
+    final wasGaplessLoaded = _gaplessLoaded;
 
     _songs.removeAt(index);
     _queueDirty = true;
 
     if (_songs.isEmpty) {
       _currentIndex = 0;
-      _gaplessSource = null;
+      _gaplessLoaded = false;
       queue.add([]);
       mediaItem.add(null);
       await stop();
@@ -2242,11 +2239,11 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (_gaplessMode) {
       if (wasPlayingCurrent) {
         // Removing the playing track changes the current song. Rebuild the
-        // concat at the clamped index so the new current starts cleanly,
+        // playlist at the clamped index so the new current starts cleanly,
         // rather than leaning on ExoPlayer's silent same-index auto-advance
         // (which would leave the notification and play history stale).
         _currentIndex = _currentIndex.clamp(0, _songs.length - 1);
-        if (gaplessRef != null && _activePlayer.audioSource != null) {
+        if (wasGaplessLoaded && _activePlayer.audioSources.isNotEmpty) {
           await _loadGaplessQueue();
         } else {
           final nextSong = _songs[_currentIndex];
@@ -2259,8 +2256,8 @@ class PulsrAudioHandler extends BaseAudioHandler
         if (index < _currentIndex) _currentIndex--;
         // Pre-set so the shift emit from currentIndexStream is a no-op.
         _lastGaplessIndex = _currentIndex;
-        if (gaplessRef != null && index < gaplessRef.length) {
-          await gaplessRef.removeAt(index);
+        if (wasGaplessLoaded && index < _activePlayer.audioSources.length) {
+          await _activePlayer.removeAudioSourceAt(index);
         }
       }
     } else {
@@ -2305,12 +2302,12 @@ class PulsrAudioHandler extends BaseAudioHandler
       _currentIndex++;
     }
 
-    // move() replays remove(oldIndex)+insert(newIndex) on the concat's still-old
+    // moveAudioSource() replays remove(oldIndex)+insert(newIndex) on the playlist's
     // layout, reaching the same order as _songs. Pre-set _lastGaplessIndex so a
     // shift emit for the (unchanged) current song is swallowed.
-    if (_gaplessMode && _gaplessSource != null) {
+    if (_gaplessMode && _gaplessLoaded) {
       _lastGaplessIndex = _currentIndex;
-      await _gaplessSource!.move(oldIndex, newIndex);
+      await _activePlayer.moveAudioSource(oldIndex, newIndex);
     }
 
     queue.add(_songs.map(_songToMediaItem).toList());

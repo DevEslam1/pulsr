@@ -32,10 +32,10 @@ class MediaScannerService {
     if (Platform.isAndroid) {
       final audio = await Permission.audio.status;
       final storage = await Permission.storage.status;
-      return audio.isGranted || storage.isGranted;
+      return audio.isGranted || audio.isLimited || storage.isGranted || storage.isLimited;
     } else if (Platform.isIOS) {
       final status = await Permission.mediaLibrary.status;
-      return status.isGranted;
+      return status.isGranted || status.isLimited;
     }
     return true;
   }
@@ -43,15 +43,15 @@ class MediaScannerService {
   Future<bool> requestPermission() async {
     if (Platform.isAndroid) {
       final audioStatus = await Permission.audio.request();
-      if (audioStatus.isGranted) return true;
+      if (audioStatus.isGranted || audioStatus.isLimited) return true;
       if (!audioStatus.isPermanentlyDenied) {
         final storageStatus = await Permission.storage.request();
-        return storageStatus.isGranted;
+        return storageStatus.isGranted || storageStatus.isLimited;
       }
       return false;
     } else if (Platform.isIOS) {
       final status = await Permission.mediaLibrary.request();
-      return status.isGranted;
+      return status.isGranted || status.isLimited;
     }
     return true;
   }

@@ -1,6 +1,6 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
 // coverage:ignore-file
-// ignore_for_file: type=lint
+// ignore_for_file: type=lint, type=warning, deprecated_member_use, deprecated_member_use_from_same_package
 // ignore_for_file: unused_element, deprecated_member_use, deprecated_member_use_from_same_package, use_function_type_syntax_for_parameters, unnecessary_const, avoid_init_to_null, invalid_override_different_default_values_named, prefer_expression_function_bodies, annotate_overrides, invalid_annotation_target, unnecessary_question_mark
 
 part of 'player_state.dart';
@@ -9,6 +9,7 @@ part of 'player_state.dart';
 // FreezedGenerator
 // **************************************************************************
 
+// GENERATED CODE - DO NOT MODIFY BY HAND
 // dart format off
 T _$identity<T>(T value) => value;
 
@@ -68,146 +69,147 @@ mixin _$PlayerState {
 
   @override
   bool operator ==(Object other) {
+    final _this = this as PlayerState;
     return identical(this, other) ||
         (other.runtimeType == runtimeType &&
             other is PlayerState &&
-            (identical(other.currentSong, currentSong) ||
-                other.currentSong == currentSong) &&
-            (identical(other.isPlaying, isPlaying) ||
-                other.isPlaying == isPlaying) &&
-            (identical(other.position, position) ||
-                other.position == position) &&
-            (identical(other.duration, duration) ||
-                other.duration == duration) &&
-            (identical(other.isShuffle, isShuffle) ||
-                other.isShuffle == isShuffle) &&
-            (identical(other.repeatMode, repeatMode) ||
-                other.repeatMode == repeatMode) &&
-            const DeepCollectionEquality().equals(other.queue, queue) &&
-            (identical(other.currentIndex, currentIndex) ||
-                other.currentIndex == currentIndex) &&
-            (identical(other.isExpanded, isExpanded) ||
-                other.isExpanded == isExpanded) &&
-            (identical(other.dominantColor, dominantColor) ||
-                other.dominantColor == dominantColor) &&
-            (identical(other.sleepTimerRemaining, sleepTimerRemaining) ||
-                other.sleepTimerRemaining == sleepTimerRemaining) &&
-            const DeepCollectionEquality().equals(other.lyrics, lyrics) &&
-            (identical(other.lyricsSource, lyricsSource) ||
-                other.lyricsSource == lyricsSource) &&
-            (identical(other.isLoadingLyrics, isLoadingLyrics) ||
-                other.isLoadingLyrics == isLoadingLyrics) &&
-            (identical(other.isLyricsVisible, isLyricsVisible) ||
-                other.isLyricsVisible == isLyricsVisible) &&
-            (identical(other.isQueueVisible, isQueueVisible) ||
-                other.isQueueVisible == isQueueVisible) &&
-            (identical(other.eqPreset, eqPreset) ||
-                other.eqPreset == eqPreset) &&
-            (identical(other.isEqEnabled, isEqEnabled) ||
-                other.isEqEnabled == isEqEnabled) &&
-            (identical(other.isVirtualizerEnabled, isVirtualizerEnabled) ||
-                other.isVirtualizerEnabled == isVirtualizerEnabled) &&
-            (identical(other.virtualizerStrength, virtualizerStrength) ||
-                other.virtualizerStrength == virtualizerStrength) &&
-            (identical(other.isDynamicsEnabled, isDynamicsEnabled) ||
-                other.isDynamicsEnabled == isDynamicsEnabled) &&
-            (identical(other.dynamicsPreset, dynamicsPreset) ||
-                other.dynamicsPreset == dynamicsPreset) &&
-            (identical(other.selectedHeadphoneProfile, selectedHeadphoneProfile) ||
-                other.selectedHeadphoneProfile == selectedHeadphoneProfile) &&
-            (identical(other.isSpatializerSupported, isSpatializerSupported) ||
-                other.isSpatializerSupported == isSpatializerSupported) &&
-            (identical(other.isSpatializerEnabled, isSpatializerEnabled) ||
-                other.isSpatializerEnabled == isSpatializerEnabled) &&
-            (identical(other.volumeBoost, volumeBoost) ||
-                other.volumeBoost == volumeBoost) &&
-            (identical(other.isCrossfeedEnabled, isCrossfeedEnabled) ||
-                other.isCrossfeedEnabled == isCrossfeedEnabled) &&
-            (identical(other.crossfeedDelayUs, crossfeedDelayUs) ||
-                other.crossfeedDelayUs == crossfeedDelayUs) &&
-            (identical(other.crossfeedFeedDb, crossfeedFeedDb) ||
-                other.crossfeedFeedDb == crossfeedFeedDb) &&
-            (identical(other.isLimiterEnabled, isLimiterEnabled) ||
-                other.isLimiterEnabled == isLimiterEnabled) &&
-            (identical(other.limiterThresholdDb, limiterThresholdDb) ||
-                other.limiterThresholdDb == limiterThresholdDb) &&
-            (identical(other.limiterReleaseMs, limiterReleaseMs) ||
-                other.limiterReleaseMs == limiterReleaseMs) &&
-            (identical(other.isReverbEnabled, isReverbEnabled) ||
-                other.isReverbEnabled == isReverbEnabled) &&
-            (identical(other.reverbPreset, reverbPreset) ||
-                other.reverbPreset == reverbPreset) &&
-            (identical(other.reverbWetDry, reverbWetDry) ||
-                other.reverbWetDry == reverbWetDry) &&
-            (identical(other.stereoBalance, stereoBalance) ||
-                other.stereoBalance == stereoBalance) &&
-            (identical(other.monoMix, monoMix) || other.monoMix == monoMix) &&
-            (identical(other.isSincResamplerEnabled, isSincResamplerEnabled) ||
-                other.isSincResamplerEnabled == isSincResamplerEnabled) &&
-            (identical(other.hasOemAudio, hasOemAudio) ||
-                other.hasOemAudio == hasOemAudio) &&
-            const DeepCollectionEquality()
-                .equals(other.detectedOemEngines, detectedOemEngines) &&
-            (identical(other.activeQueueSlot, activeQueueSlot) ||
-                other.activeQueueSlot == activeQueueSlot) &&
-            (identical(other.playbackSpeed, playbackSpeed) ||
-                other.playbackSpeed == playbackSpeed) &&
-            (identical(other.audioSessionId, audioSessionId) || other.audioSessionId == audioSessionId) &&
-            (identical(other.errorMessage, errorMessage) || other.errorMessage == errorMessage));
+            (identical(other.currentSong, _this.currentSong) ||
+                other.currentSong == _this.currentSong) &&
+            (identical(other.isPlaying, _this.isPlaying) ||
+                other.isPlaying == _this.isPlaying) &&
+            (identical(other.position, _this.position) ||
+                other.position == _this.position) &&
+            (identical(other.duration, _this.duration) ||
+                other.duration == _this.duration) &&
+            (identical(other.isShuffle, _this.isShuffle) ||
+                other.isShuffle == _this.isShuffle) &&
+            (identical(other.repeatMode, _this.repeatMode) ||
+                other.repeatMode == _this.repeatMode) &&
+            const DeepCollectionEquality().equals(other.queue, _this.queue) &&
+            (identical(other.currentIndex, _this.currentIndex) ||
+                other.currentIndex == _this.currentIndex) &&
+            (identical(other.isExpanded, _this.isExpanded) ||
+                other.isExpanded == _this.isExpanded) &&
+            (identical(other.dominantColor, _this.dominantColor) ||
+                other.dominantColor == _this.dominantColor) &&
+            (identical(other.sleepTimerRemaining, _this.sleepTimerRemaining) ||
+                other.sleepTimerRemaining == _this.sleepTimerRemaining) &&
+            const DeepCollectionEquality().equals(other.lyrics, _this.lyrics) &&
+            (identical(other.lyricsSource, _this.lyricsSource) ||
+                other.lyricsSource == _this.lyricsSource) &&
+            (identical(other.isLoadingLyrics, _this.isLoadingLyrics) ||
+                other.isLoadingLyrics == _this.isLoadingLyrics) &&
+            (identical(other.isLyricsVisible, _this.isLyricsVisible) ||
+                other.isLyricsVisible == _this.isLyricsVisible) &&
+            (identical(other.isQueueVisible, _this.isQueueVisible) ||
+                other.isQueueVisible == _this.isQueueVisible) &&
+            (identical(other.eqPreset, _this.eqPreset) ||
+                other.eqPreset == _this.eqPreset) &&
+            (identical(other.isEqEnabled, _this.isEqEnabled) ||
+                other.isEqEnabled == _this.isEqEnabled) &&
+            (identical(other.isVirtualizerEnabled, _this.isVirtualizerEnabled) ||
+                other.isVirtualizerEnabled == _this.isVirtualizerEnabled) &&
+            (identical(other.virtualizerStrength, _this.virtualizerStrength) ||
+                other.virtualizerStrength == _this.virtualizerStrength) &&
+            (identical(other.isDynamicsEnabled, _this.isDynamicsEnabled) ||
+                other.isDynamicsEnabled == _this.isDynamicsEnabled) &&
+            (identical(other.dynamicsPreset, _this.dynamicsPreset) ||
+                other.dynamicsPreset == _this.dynamicsPreset) &&
+            (identical(other.selectedHeadphoneProfile, _this.selectedHeadphoneProfile) ||
+                other.selectedHeadphoneProfile ==
+                    _this.selectedHeadphoneProfile) &&
+            (identical(other.isSpatializerSupported, _this.isSpatializerSupported) ||
+                other.isSpatializerSupported == _this.isSpatializerSupported) &&
+            (identical(other.isSpatializerEnabled, _this.isSpatializerEnabled) ||
+                other.isSpatializerEnabled == _this.isSpatializerEnabled) &&
+            (identical(other.volumeBoost, _this.volumeBoost) ||
+                other.volumeBoost == _this.volumeBoost) &&
+            (identical(other.isCrossfeedEnabled, _this.isCrossfeedEnabled) ||
+                other.isCrossfeedEnabled == _this.isCrossfeedEnabled) &&
+            (identical(other.crossfeedDelayUs, _this.crossfeedDelayUs) ||
+                other.crossfeedDelayUs == _this.crossfeedDelayUs) &&
+            (identical(other.crossfeedFeedDb, _this.crossfeedFeedDb) ||
+                other.crossfeedFeedDb == _this.crossfeedFeedDb) &&
+            (identical(other.isLimiterEnabled, _this.isLimiterEnabled) ||
+                other.isLimiterEnabled == _this.isLimiterEnabled) &&
+            (identical(other.limiterThresholdDb, _this.limiterThresholdDb) ||
+                other.limiterThresholdDb == _this.limiterThresholdDb) &&
+            (identical(other.limiterReleaseMs, _this.limiterReleaseMs) ||
+                other.limiterReleaseMs == _this.limiterReleaseMs) &&
+            (identical(other.isReverbEnabled, _this.isReverbEnabled) ||
+                other.isReverbEnabled == _this.isReverbEnabled) &&
+            (identical(other.reverbPreset, _this.reverbPreset) ||
+                other.reverbPreset == _this.reverbPreset) &&
+            (identical(other.reverbWetDry, _this.reverbWetDry) ||
+                other.reverbWetDry == _this.reverbWetDry) &&
+            (identical(other.stereoBalance, _this.stereoBalance) ||
+                other.stereoBalance == _this.stereoBalance) &&
+            (identical(other.monoMix, _this.monoMix) || other.monoMix == _this.monoMix) &&
+            (identical(other.isSincResamplerEnabled, _this.isSincResamplerEnabled) || other.isSincResamplerEnabled == _this.isSincResamplerEnabled) &&
+            (identical(other.hasOemAudio, _this.hasOemAudio) || other.hasOemAudio == _this.hasOemAudio) &&
+            const DeepCollectionEquality().equals(other.detectedOemEngines, _this.detectedOemEngines) &&
+            (identical(other.activeQueueSlot, _this.activeQueueSlot) || other.activeQueueSlot == _this.activeQueueSlot) &&
+            (identical(other.playbackSpeed, _this.playbackSpeed) || other.playbackSpeed == _this.playbackSpeed) &&
+            (identical(other.audioSessionId, _this.audioSessionId) || other.audioSessionId == _this.audioSessionId) &&
+            (identical(other.errorMessage, _this.errorMessage) || other.errorMessage == _this.errorMessage));
   }
 
   @override
-  int get hashCode => Object.hashAll([
-        runtimeType,
-        currentSong,
-        isPlaying,
-        position,
-        duration,
-        isShuffle,
-        repeatMode,
-        const DeepCollectionEquality().hash(queue),
-        currentIndex,
-        isExpanded,
-        dominantColor,
-        sleepTimerRemaining,
-        const DeepCollectionEquality().hash(lyrics),
-        lyricsSource,
-        isLoadingLyrics,
-        isLyricsVisible,
-        isQueueVisible,
-        eqPreset,
-        isEqEnabled,
-        isVirtualizerEnabled,
-        virtualizerStrength,
-        isDynamicsEnabled,
-        dynamicsPreset,
-        selectedHeadphoneProfile,
-        isSpatializerSupported,
-        isSpatializerEnabled,
-        volumeBoost,
-        isCrossfeedEnabled,
-        crossfeedDelayUs,
-        crossfeedFeedDb,
-        isLimiterEnabled,
-        limiterThresholdDb,
-        limiterReleaseMs,
-        isReverbEnabled,
-        reverbPreset,
-        reverbWetDry,
-        stereoBalance,
-        monoMix,
-        isSincResamplerEnabled,
-        hasOemAudio,
-        const DeepCollectionEquality().hash(detectedOemEngines),
-        activeQueueSlot,
-        playbackSpeed,
-        audioSessionId,
-        errorMessage
-      ]);
+  int get hashCode {
+    final _this = this as PlayerState;
+    return Object.hashAll([
+      runtimeType,
+      _this.currentSong,
+      _this.isPlaying,
+      _this.position,
+      _this.duration,
+      _this.isShuffle,
+      _this.repeatMode,
+      const DeepCollectionEquality().hash(_this.queue),
+      _this.currentIndex,
+      _this.isExpanded,
+      _this.dominantColor,
+      _this.sleepTimerRemaining,
+      const DeepCollectionEquality().hash(_this.lyrics),
+      _this.lyricsSource,
+      _this.isLoadingLyrics,
+      _this.isLyricsVisible,
+      _this.isQueueVisible,
+      _this.eqPreset,
+      _this.isEqEnabled,
+      _this.isVirtualizerEnabled,
+      _this.virtualizerStrength,
+      _this.isDynamicsEnabled,
+      _this.dynamicsPreset,
+      _this.selectedHeadphoneProfile,
+      _this.isSpatializerSupported,
+      _this.isSpatializerEnabled,
+      _this.volumeBoost,
+      _this.isCrossfeedEnabled,
+      _this.crossfeedDelayUs,
+      _this.crossfeedFeedDb,
+      _this.isLimiterEnabled,
+      _this.limiterThresholdDb,
+      _this.limiterReleaseMs,
+      _this.isReverbEnabled,
+      _this.reverbPreset,
+      _this.reverbWetDry,
+      _this.stereoBalance,
+      _this.monoMix,
+      _this.isSincResamplerEnabled,
+      _this.hasOemAudio,
+      const DeepCollectionEquality().hash(_this.detectedOemEngines),
+      _this.activeQueueSlot,
+      _this.playbackSpeed,
+      _this.audioSessionId,
+      _this.errorMessage
+    ]);
+  }
 
   @override
   String toString() {
-    return 'PlayerState(currentSong: $currentSong, isPlaying: $isPlaying, position: $position, duration: $duration, isShuffle: $isShuffle, repeatMode: $repeatMode, queue: $queue, currentIndex: $currentIndex, isExpanded: $isExpanded, dominantColor: $dominantColor, sleepTimerRemaining: $sleepTimerRemaining, lyrics: $lyrics, lyricsSource: $lyricsSource, isLoadingLyrics: $isLoadingLyrics, isLyricsVisible: $isLyricsVisible, isQueueVisible: $isQueueVisible, eqPreset: $eqPreset, isEqEnabled: $isEqEnabled, isVirtualizerEnabled: $isVirtualizerEnabled, virtualizerStrength: $virtualizerStrength, isDynamicsEnabled: $isDynamicsEnabled, dynamicsPreset: $dynamicsPreset, selectedHeadphoneProfile: $selectedHeadphoneProfile, isSpatializerSupported: $isSpatializerSupported, isSpatializerEnabled: $isSpatializerEnabled, volumeBoost: $volumeBoost, isCrossfeedEnabled: $isCrossfeedEnabled, crossfeedDelayUs: $crossfeedDelayUs, crossfeedFeedDb: $crossfeedFeedDb, isLimiterEnabled: $isLimiterEnabled, limiterThresholdDb: $limiterThresholdDb, limiterReleaseMs: $limiterReleaseMs, isReverbEnabled: $isReverbEnabled, reverbPreset: $reverbPreset, reverbWetDry: $reverbWetDry, stereoBalance: $stereoBalance, monoMix: $monoMix, isSincResamplerEnabled: $isSincResamplerEnabled, hasOemAudio: $hasOemAudio, detectedOemEngines: $detectedOemEngines, activeQueueSlot: $activeQueueSlot, playbackSpeed: $playbackSpeed, audioSessionId: $audioSessionId, errorMessage: $errorMessage)';
+    final _this = this as PlayerState;
+    return 'PlayerState(currentSong: ${_this.currentSong}, isPlaying: ${_this.isPlaying}, position: ${_this.position}, duration: ${_this.duration}, isShuffle: ${_this.isShuffle}, repeatMode: ${_this.repeatMode}, queue: ${_this.queue}, currentIndex: ${_this.currentIndex}, isExpanded: ${_this.isExpanded}, dominantColor: ${_this.dominantColor}, sleepTimerRemaining: ${_this.sleepTimerRemaining}, lyrics: ${_this.lyrics}, lyricsSource: ${_this.lyricsSource}, isLoadingLyrics: ${_this.isLoadingLyrics}, isLyricsVisible: ${_this.isLyricsVisible}, isQueueVisible: ${_this.isQueueVisible}, eqPreset: ${_this.eqPreset}, isEqEnabled: ${_this.isEqEnabled}, isVirtualizerEnabled: ${_this.isVirtualizerEnabled}, virtualizerStrength: ${_this.virtualizerStrength}, isDynamicsEnabled: ${_this.isDynamicsEnabled}, dynamicsPreset: ${_this.dynamicsPreset}, selectedHeadphoneProfile: ${_this.selectedHeadphoneProfile}, isSpatializerSupported: ${_this.isSpatializerSupported}, isSpatializerEnabled: ${_this.isSpatializerEnabled}, volumeBoost: ${_this.volumeBoost}, isCrossfeedEnabled: ${_this.isCrossfeedEnabled}, crossfeedDelayUs: ${_this.crossfeedDelayUs}, crossfeedFeedDb: ${_this.crossfeedFeedDb}, isLimiterEnabled: ${_this.isLimiterEnabled}, limiterThresholdDb: ${_this.limiterThresholdDb}, limiterReleaseMs: ${_this.limiterReleaseMs}, isReverbEnabled: ${_this.isReverbEnabled}, reverbPreset: ${_this.reverbPreset}, reverbWetDry: ${_this.reverbWetDry}, stereoBalance: ${_this.stereoBalance}, monoMix: ${_this.monoMix}, isSincResamplerEnabled: ${_this.isSincResamplerEnabled}, hasOemAudio: ${_this.hasOemAudio}, detectedOemEngines: ${_this.detectedOemEngines}, activeQueueSlot: ${_this.activeQueueSlot}, playbackSpeed: ${_this.playbackSpeed}, audioSessionId: ${_this.audioSessionId}, errorMessage: ${_this.errorMessage})';
   }
 }
 
@@ -321,7 +323,7 @@ class _$PlayerStateCopyWithImpl<$Res> implements $PlayerStateCopyWith<$Res> {
     Object? audioSessionId = freezed,
     Object? errorMessage = freezed,
   }) {
-    return _then(_self.copyWith(
+    return _then(PlayerState(
       currentSong: freezed == currentSong
           ? _self.currentSong
           : currentSong // ignore: cast_nullable_to_non_nullable
@@ -936,12 +938,12 @@ class _PlayerState extends PlayerState {
       this.duration = Duration.zero,
       this.isShuffle = false,
       this.repeatMode = PlayerRepeatMode.off,
-      final List<SongsTableData> queue = const [],
+      List<SongsTableData> queue = const [],
       this.currentIndex = 0,
       this.isExpanded = false,
       this.dominantColor,
       this.sleepTimerRemaining,
-      final List<LyricsLine> lyrics = const [],
+      List<LyricsLine> lyrics = const [],
       this.lyricsSource = LyricsSource.none,
       this.isLoadingLyrics = false,
       this.isLyricsVisible = false,
@@ -970,7 +972,7 @@ class _PlayerState extends PlayerState {
       this.monoMix = false,
       this.isSincResamplerEnabled = true,
       this.hasOemAudio = false,
-      final List<String> detectedOemEngines = const [],
+      List<String> detectedOemEngines = const [],
       this.activeQueueSlot = 0,
       this.playbackSpeed = 1.0,
       this.audioSessionId,
@@ -1151,7 +1153,7 @@ class _PlayerState extends PlayerState {
                 other.isShuffle == isShuffle) &&
             (identical(other.repeatMode, repeatMode) ||
                 other.repeatMode == repeatMode) &&
-            const DeepCollectionEquality().equals(other._queue, _queue) &&
+            const DeepCollectionEquality().equals(other.queue, _queue) &&
             (identical(other.currentIndex, currentIndex) ||
                 other.currentIndex == currentIndex) &&
             (identical(other.isExpanded, isExpanded) ||
@@ -1160,7 +1162,7 @@ class _PlayerState extends PlayerState {
                 other.dominantColor == dominantColor) &&
             (identical(other.sleepTimerRemaining, sleepTimerRemaining) ||
                 other.sleepTimerRemaining == sleepTimerRemaining) &&
-            const DeepCollectionEquality().equals(other._lyrics, _lyrics) &&
+            const DeepCollectionEquality().equals(other.lyrics, _lyrics) &&
             (identical(other.lyricsSource, lyricsSource) ||
                 other.lyricsSource == lyricsSource) &&
             (identical(other.isLoadingLyrics, isLoadingLyrics) ||
@@ -1215,7 +1217,7 @@ class _PlayerState extends PlayerState {
             (identical(other.hasOemAudio, hasOemAudio) ||
                 other.hasOemAudio == hasOemAudio) &&
             const DeepCollectionEquality()
-                .equals(other._detectedOemEngines, _detectedOemEngines) &&
+                .equals(other.detectedOemEngines, _detectedOemEngines) &&
             (identical(other.activeQueueSlot, activeQueueSlot) ||
                 other.activeQueueSlot == activeQueueSlot) &&
             (identical(other.playbackSpeed, playbackSpeed) ||
@@ -1225,53 +1227,55 @@ class _PlayerState extends PlayerState {
   }
 
   @override
-  int get hashCode => Object.hashAll([
-        runtimeType,
-        currentSong,
-        isPlaying,
-        position,
-        duration,
-        isShuffle,
-        repeatMode,
-        const DeepCollectionEquality().hash(_queue),
-        currentIndex,
-        isExpanded,
-        dominantColor,
-        sleepTimerRemaining,
-        const DeepCollectionEquality().hash(_lyrics),
-        lyricsSource,
-        isLoadingLyrics,
-        isLyricsVisible,
-        isQueueVisible,
-        eqPreset,
-        isEqEnabled,
-        isVirtualizerEnabled,
-        virtualizerStrength,
-        isDynamicsEnabled,
-        dynamicsPreset,
-        selectedHeadphoneProfile,
-        isSpatializerSupported,
-        isSpatializerEnabled,
-        volumeBoost,
-        isCrossfeedEnabled,
-        crossfeedDelayUs,
-        crossfeedFeedDb,
-        isLimiterEnabled,
-        limiterThresholdDb,
-        limiterReleaseMs,
-        isReverbEnabled,
-        reverbPreset,
-        reverbWetDry,
-        stereoBalance,
-        monoMix,
-        isSincResamplerEnabled,
-        hasOemAudio,
-        const DeepCollectionEquality().hash(_detectedOemEngines),
-        activeQueueSlot,
-        playbackSpeed,
-        audioSessionId,
-        errorMessage
-      ]);
+  int get hashCode {
+    return Object.hashAll([
+      runtimeType,
+      currentSong,
+      isPlaying,
+      position,
+      duration,
+      isShuffle,
+      repeatMode,
+      const DeepCollectionEquality().hash(_queue),
+      currentIndex,
+      isExpanded,
+      dominantColor,
+      sleepTimerRemaining,
+      const DeepCollectionEquality().hash(_lyrics),
+      lyricsSource,
+      isLoadingLyrics,
+      isLyricsVisible,
+      isQueueVisible,
+      eqPreset,
+      isEqEnabled,
+      isVirtualizerEnabled,
+      virtualizerStrength,
+      isDynamicsEnabled,
+      dynamicsPreset,
+      selectedHeadphoneProfile,
+      isSpatializerSupported,
+      isSpatializerEnabled,
+      volumeBoost,
+      isCrossfeedEnabled,
+      crossfeedDelayUs,
+      crossfeedFeedDb,
+      isLimiterEnabled,
+      limiterThresholdDb,
+      limiterReleaseMs,
+      isReverbEnabled,
+      reverbPreset,
+      reverbWetDry,
+      stereoBalance,
+      monoMix,
+      isSincResamplerEnabled,
+      hasOemAudio,
+      const DeepCollectionEquality().hash(_detectedOemEngines),
+      activeQueueSlot,
+      playbackSpeed,
+      audioSessionId,
+      errorMessage
+    ]);
+  }
 
   @override
   String toString() {

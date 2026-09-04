@@ -2621,12 +2621,18 @@ class $PlaylistEntriesTableTable extends PlaylistEntriesTable
   @override
   late final GeneratedColumn<int> playlistId = GeneratedColumn<int>(
       'playlist_id', aliasedName, false,
-      type: DriftSqlType.int, requiredDuringInsert: true);
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'REFERENCES playlists (id) ON DELETE CASCADE'));
   static const VerificationMeta _songIdMeta = const VerificationMeta('songId');
   @override
   late final GeneratedColumn<int> songId = GeneratedColumn<int>(
       'song_id', aliasedName, false,
-      type: DriftSqlType.int, requiredDuringInsert: true);
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'REFERENCES songs (id) ON DELETE CASCADE'));
   static const VerificationMeta _orderIndexMeta =
       const VerificationMeta('orderIndex');
   @override
@@ -2928,7 +2934,10 @@ class $PlayHistoryTableTable extends PlayHistoryTable
   @override
   late final GeneratedColumn<int> songId = GeneratedColumn<int>(
       'song_id', aliasedName, false,
-      type: DriftSqlType.int, requiredDuringInsert: true);
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'REFERENCES songs (id) ON DELETE CASCADE'));
   static const VerificationMeta _playedAtMeta =
       const VerificationMeta('playedAt');
   @override
@@ -3187,7 +3196,10 @@ class $QueueItemsTableTable extends QueueItemsTable
   @override
   late final GeneratedColumn<int> songId = GeneratedColumn<int>(
       'song_id', aliasedName, false,
-      type: DriftSqlType.int, requiredDuringInsert: true);
+      type: DriftSqlType.int,
+      requiredDuringInsert: true,
+      defaultConstraints: GeneratedColumn.constraintIsAlways(
+          'REFERENCES songs (id) ON DELETE CASCADE'));
   static const VerificationMeta _orderIndexMeta =
       const VerificationMeta('orderIndex');
   @override
@@ -3731,6 +3743,39 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         queueItemsTable,
         excludedFoldersTable
       ];
+  @override
+  StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules(
+        [
+          WritePropagation(
+            on: TableUpdateQuery.onTableName('playlists',
+                limitUpdateKind: UpdateKind.delete),
+            result: [
+              TableUpdate('playlist_entries', kind: UpdateKind.delete),
+            ],
+          ),
+          WritePropagation(
+            on: TableUpdateQuery.onTableName('songs',
+                limitUpdateKind: UpdateKind.delete),
+            result: [
+              TableUpdate('playlist_entries', kind: UpdateKind.delete),
+            ],
+          ),
+          WritePropagation(
+            on: TableUpdateQuery.onTableName('songs',
+                limitUpdateKind: UpdateKind.delete),
+            result: [
+              TableUpdate('play_history', kind: UpdateKind.delete),
+            ],
+          ),
+          WritePropagation(
+            on: TableUpdateQuery.onTableName('songs',
+                limitUpdateKind: UpdateKind.delete),
+            result: [
+              TableUpdate('queue_items', kind: UpdateKind.delete),
+            ],
+          ),
+        ],
+      );
 }
 
 typedef $$SongsTableTableCreateCompanionBuilder = SongsTableCompanion Function({
@@ -3807,6 +3852,61 @@ typedef $$SongsTableTableUpdateCompanionBuilder = SongsTableCompanion Function({
   Value<String?> pendingDownloadPath,
   Value<bool> isDownloaded,
 });
+
+final class $$SongsTableTableReferences
+    extends BaseReferences<_$AppDatabase, $SongsTableTable, SongsTableData> {
+  $$SongsTableTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$PlaylistEntriesTableTable,
+      List<PlaylistEntriesTableData>> _playlistEntriesTableRefsTable(
+          _$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(db.playlistEntriesTable,
+          aliasName: 'songs__id__playlist_entries__song_id');
+
+  $$PlaylistEntriesTableTableProcessedTableManager
+      get playlistEntriesTableRefs {
+    final manager =
+        $$PlaylistEntriesTableTableTableManager($_db, $_db.playlistEntriesTable)
+            .filter((f) => f.songId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache =
+        $_typedResult.readTableOrNull(_playlistEntriesTableRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+
+  static MultiTypedResultKey<$PlayHistoryTableTable, List<PlayHistoryTableData>>
+      _playHistoryTableRefsTable(_$AppDatabase db) =>
+          MultiTypedResultKey.fromTable(db.playHistoryTable,
+              aliasName: 'songs__id__play_history__song_id');
+
+  $$PlayHistoryTableTableProcessedTableManager get playHistoryTableRefs {
+    final manager =
+        $$PlayHistoryTableTableTableManager($_db, $_db.playHistoryTable)
+            .filter((f) => f.songId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache =
+        $_typedResult.readTableOrNull(_playHistoryTableRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+
+  static MultiTypedResultKey<$QueueItemsTableTable, List<QueueItemsTableData>>
+      _queueItemsTableRefsTable(_$AppDatabase db) =>
+          MultiTypedResultKey.fromTable(db.queueItemsTable,
+              aliasName: 'songs__id__queue_items__song_id');
+
+  $$QueueItemsTableTableProcessedTableManager get queueItemsTableRefs {
+    final manager =
+        $$QueueItemsTableTableTableManager($_db, $_db.queueItemsTable)
+            .filter((f) => f.songId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache =
+        $_typedResult.readTableOrNull(_queueItemsTableRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+}
 
 class $$SongsTableTableFilterComposer
     extends Composer<_$AppDatabase, $SongsTableTable> {
@@ -3928,6 +4028,70 @@ class $$SongsTableTableFilterComposer
 
   ColumnFilters<bool> get isDownloaded => $composableBuilder(
       column: $table.isDownloaded, builder: (column) => ColumnFilters(column));
+
+  Expression<bool> playlistEntriesTableRefs(
+      Expression<bool> Function($$PlaylistEntriesTableTableFilterComposer f)
+          f) {
+    final $$PlaylistEntriesTableTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.playlistEntriesTable,
+        getReferencedColumn: (t) => t.songId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$PlaylistEntriesTableTableFilterComposer(
+              $db: $db,
+              $table: $db.playlistEntriesTable,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+
+  Expression<bool> playHistoryTableRefs(
+      Expression<bool> Function($$PlayHistoryTableTableFilterComposer f) f) {
+    final $$PlayHistoryTableTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.playHistoryTable,
+        getReferencedColumn: (t) => t.songId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$PlayHistoryTableTableFilterComposer(
+              $db: $db,
+              $table: $db.playHistoryTable,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+
+  Expression<bool> queueItemsTableRefs(
+      Expression<bool> Function($$QueueItemsTableTableFilterComposer f) f) {
+    final $$QueueItemsTableTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.queueItemsTable,
+        getReferencedColumn: (t) => t.songId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$QueueItemsTableTableFilterComposer(
+              $db: $db,
+              $table: $db.queueItemsTable,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
 }
 
 class $$SongsTableTableOrderingComposer
@@ -4167,6 +4331,71 @@ class $$SongsTableTableAnnotationComposer
 
   GeneratedColumn<bool> get isDownloaded => $composableBuilder(
       column: $table.isDownloaded, builder: (column) => column);
+
+  Expression<T> playlistEntriesTableRefs<T extends Object>(
+      Expression<T> Function($$PlaylistEntriesTableTableAnnotationComposer a)
+          f) {
+    final $$PlaylistEntriesTableTableAnnotationComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.id,
+            referencedTable: $db.playlistEntriesTable,
+            getReferencedColumn: (t) => t.songId,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$PlaylistEntriesTableTableAnnotationComposer(
+                  $db: $db,
+                  $table: $db.playlistEntriesTable,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return f(composer);
+  }
+
+  Expression<T> playHistoryTableRefs<T extends Object>(
+      Expression<T> Function($$PlayHistoryTableTableAnnotationComposer a) f) {
+    final $$PlayHistoryTableTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.playHistoryTable,
+        getReferencedColumn: (t) => t.songId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$PlayHistoryTableTableAnnotationComposer(
+              $db: $db,
+              $table: $db.playHistoryTable,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
+
+  Expression<T> queueItemsTableRefs<T extends Object>(
+      Expression<T> Function($$QueueItemsTableTableAnnotationComposer a) f) {
+    final $$QueueItemsTableTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.queueItemsTable,
+        getReferencedColumn: (t) => t.songId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$QueueItemsTableTableAnnotationComposer(
+              $db: $db,
+              $table: $db.queueItemsTable,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
 }
 
 class $$SongsTableTableTableManager extends RootTableManager<
@@ -4178,12 +4407,12 @@ class $$SongsTableTableTableManager extends RootTableManager<
     $$SongsTableTableAnnotationComposer,
     $$SongsTableTableCreateCompanionBuilder,
     $$SongsTableTableUpdateCompanionBuilder,
-    (
-      SongsTableData,
-      BaseReferences<_$AppDatabase, $SongsTableTable, SongsTableData>
-    ),
+    (SongsTableData, $$SongsTableTableReferences),
     SongsTableData,
-    PrefetchHooks Function()> {
+    PrefetchHooks Function(
+        {bool playlistEntriesTableRefs,
+        bool playHistoryTableRefs,
+        bool queueItemsTableRefs})> {
   $$SongsTableTableTableManager(_$AppDatabase db, $SongsTableTable table)
       : super(TableManagerState(
           db: db,
@@ -4343,9 +4572,68 @@ class $$SongsTableTableTableManager extends RootTableManager<
             isDownloaded: isDownloaded,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$SongsTableTable, SongsTableData>(table),
+                    $$SongsTableTableReferences(db, table, e)
+                  ))
               .toList(),
-          prefetchHooksCallback: null,
+          prefetchHooksCallback: (
+              {playlistEntriesTableRefs = false,
+              playHistoryTableRefs = false,
+              queueItemsTableRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (playlistEntriesTableRefs) db.playlistEntriesTable,
+                if (playHistoryTableRefs) db.playHistoryTable,
+                if (queueItemsTableRefs) db.queueItemsTable
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (playlistEntriesTableRefs)
+                    await $_getPrefetchedData<SongsTableData, $SongsTableTable,
+                            PlaylistEntriesTableData>(
+                        currentTable: table,
+                        referencedTable: $$SongsTableTableReferences
+                            ._playlistEntriesTableRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$SongsTableTableReferences(db, table, p0)
+                                .playlistEntriesTableRefs,
+                        referencedItemsForCurrentItem: (item,
+                                referencedItems) =>
+                            referencedItems.where((e) => e.songId == item.id),
+                        typedResults: items),
+                  if (playHistoryTableRefs)
+                    await $_getPrefetchedData<SongsTableData, $SongsTableTable,
+                            PlayHistoryTableData>(
+                        currentTable: table,
+                        referencedTable: $$SongsTableTableReferences
+                            ._playHistoryTableRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$SongsTableTableReferences(db, table, p0)
+                                .playHistoryTableRefs,
+                        referencedItemsForCurrentItem: (item,
+                                referencedItems) =>
+                            referencedItems.where((e) => e.songId == item.id),
+                        typedResults: items),
+                  if (queueItemsTableRefs)
+                    await $_getPrefetchedData<SongsTableData, $SongsTableTable,
+                            QueueItemsTableData>(
+                        currentTable: table,
+                        referencedTable: $$SongsTableTableReferences
+                            ._queueItemsTableRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$SongsTableTableReferences(db, table, p0)
+                                .queueItemsTableRefs,
+                        referencedItemsForCurrentItem: (item,
+                                referencedItems) =>
+                            referencedItems.where((e) => e.songId == item.id),
+                        typedResults: items)
+                ];
+              },
+            );
+          },
         ));
 }
 
@@ -4358,12 +4646,12 @@ typedef $$SongsTableTableProcessedTableManager = ProcessedTableManager<
     $$SongsTableTableAnnotationComposer,
     $$SongsTableTableCreateCompanionBuilder,
     $$SongsTableTableUpdateCompanionBuilder,
-    (
-      SongsTableData,
-      BaseReferences<_$AppDatabase, $SongsTableTable, SongsTableData>
-    ),
+    (SongsTableData, $$SongsTableTableReferences),
     SongsTableData,
-    PrefetchHooks Function()>;
+    PrefetchHooks Function(
+        {bool playlistEntriesTableRefs,
+        bool playHistoryTableRefs,
+        bool queueItemsTableRefs})>;
 typedef $$AlbumsTableTableCreateCompanionBuilder = AlbumsTableCompanion
     Function({
   Value<int> id,
@@ -4540,7 +4828,11 @@ class $$AlbumsTableTableTableManager extends RootTableManager<
             year: year,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$AlbumsTableTable, AlbumsTableData>(table),
+                    BaseReferences<_$AppDatabase, $AlbumsTableTable,
+                        AlbumsTableData>(db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: null,
         ));
@@ -4707,7 +4999,11 @@ class $$ArtistsTableTableTableManager extends RootTableManager<
             artworkUri: artworkUri,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$ArtistsTableTable, ArtistsTableData>(table),
+                    BaseReferences<_$AppDatabase, $ArtistsTableTable,
+                        ArtistsTableData>(db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: null,
         ));
@@ -4747,6 +5043,30 @@ typedef $$PlaylistsTableTableUpdateCompanionBuilder = PlaylistsTableCompanion
   Value<String?> smartCriteria,
 });
 
+final class $$PlaylistsTableTableReferences extends BaseReferences<
+    _$AppDatabase, $PlaylistsTableTable, PlaylistsTableData> {
+  $$PlaylistsTableTableReferences(
+      super.$_db, super.$_table, super.$_typedResult);
+
+  static MultiTypedResultKey<$PlaylistEntriesTableTable,
+      List<PlaylistEntriesTableData>> _playlistEntriesTableRefsTable(
+          _$AppDatabase db) =>
+      MultiTypedResultKey.fromTable(db.playlistEntriesTable,
+          aliasName: 'playlists__id__playlist_entries__playlist_id');
+
+  $$PlaylistEntriesTableTableProcessedTableManager
+      get playlistEntriesTableRefs {
+    final manager =
+        $$PlaylistEntriesTableTableTableManager($_db, $_db.playlistEntriesTable)
+            .filter((f) => f.playlistId.id.sqlEquals($_itemColumn<int>('id')!));
+
+    final cache =
+        $_typedResult.readTableOrNull(_playlistEntriesTableRefsTable($_db));
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: cache));
+  }
+}
+
 class $$PlaylistsTableTableFilterComposer
     extends Composer<_$AppDatabase, $PlaylistsTableTable> {
   $$PlaylistsTableTableFilterComposer({
@@ -4773,6 +5093,28 @@ class $$PlaylistsTableTableFilterComposer
 
   ColumnFilters<String> get smartCriteria => $composableBuilder(
       column: $table.smartCriteria, builder: (column) => ColumnFilters(column));
+
+  Expression<bool> playlistEntriesTableRefs(
+      Expression<bool> Function($$PlaylistEntriesTableTableFilterComposer f)
+          f) {
+    final $$PlaylistEntriesTableTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.id,
+        referencedTable: $db.playlistEntriesTable,
+        getReferencedColumn: (t) => t.playlistId,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$PlaylistEntriesTableTableFilterComposer(
+              $db: $db,
+              $table: $db.playlistEntriesTable,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return f(composer);
+  }
 }
 
 class $$PlaylistsTableTableOrderingComposer
@@ -4830,6 +5172,29 @@ class $$PlaylistsTableTableAnnotationComposer
 
   GeneratedColumn<String> get smartCriteria => $composableBuilder(
       column: $table.smartCriteria, builder: (column) => column);
+
+  Expression<T> playlistEntriesTableRefs<T extends Object>(
+      Expression<T> Function($$PlaylistEntriesTableTableAnnotationComposer a)
+          f) {
+    final $$PlaylistEntriesTableTableAnnotationComposer composer =
+        $composerBuilder(
+            composer: this,
+            getCurrentColumn: (t) => t.id,
+            referencedTable: $db.playlistEntriesTable,
+            getReferencedColumn: (t) => t.playlistId,
+            builder: (joinBuilder,
+                    {$addJoinBuilderToRootComposer,
+                    $removeJoinBuilderFromRootComposer}) =>
+                $$PlaylistEntriesTableTableAnnotationComposer(
+                  $db: $db,
+                  $table: $db.playlistEntriesTable,
+                  $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                  joinBuilder: joinBuilder,
+                  $removeJoinBuilderFromRootComposer:
+                      $removeJoinBuilderFromRootComposer,
+                ));
+    return f(composer);
+  }
 }
 
 class $$PlaylistsTableTableTableManager extends RootTableManager<
@@ -4841,12 +5206,9 @@ class $$PlaylistsTableTableTableManager extends RootTableManager<
     $$PlaylistsTableTableAnnotationComposer,
     $$PlaylistsTableTableCreateCompanionBuilder,
     $$PlaylistsTableTableUpdateCompanionBuilder,
-    (
-      PlaylistsTableData,
-      BaseReferences<_$AppDatabase, $PlaylistsTableTable, PlaylistsTableData>
-    ),
+    (PlaylistsTableData, $$PlaylistsTableTableReferences),
     PlaylistsTableData,
-    PrefetchHooks Function()> {
+    PrefetchHooks Function({bool playlistEntriesTableRefs})> {
   $$PlaylistsTableTableTableManager(
       _$AppDatabase db, $PlaylistsTableTable table)
       : super(TableManagerState(
@@ -4891,9 +5253,38 @@ class $$PlaylistsTableTableTableManager extends RootTableManager<
             smartCriteria: smartCriteria,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$PlaylistsTableTable, PlaylistsTableData>(
+                        table),
+                    $$PlaylistsTableTableReferences(db, table, e)
+                  ))
               .toList(),
-          prefetchHooksCallback: null,
+          prefetchHooksCallback: ({playlistEntriesTableRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [
+                if (playlistEntriesTableRefs) db.playlistEntriesTable
+              ],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (playlistEntriesTableRefs)
+                    await $_getPrefetchedData<PlaylistsTableData,
+                            $PlaylistsTableTable, PlaylistEntriesTableData>(
+                        currentTable: table,
+                        referencedTable: $$PlaylistsTableTableReferences
+                            ._playlistEntriesTableRefsTable(db),
+                        managerFromTypedResult: (p0) =>
+                            $$PlaylistsTableTableReferences(db, table, p0)
+                                .playlistEntriesTableRefs,
+                        referencedItemsForCurrentItem:
+                            (item, referencedItems) => referencedItems
+                                .where((e) => e.playlistId == item.id),
+                        typedResults: items)
+                ];
+              },
+            );
+          },
         ));
 }
 
@@ -4906,12 +5297,9 @@ typedef $$PlaylistsTableTableProcessedTableManager = ProcessedTableManager<
     $$PlaylistsTableTableAnnotationComposer,
     $$PlaylistsTableTableCreateCompanionBuilder,
     $$PlaylistsTableTableUpdateCompanionBuilder,
-    (
-      PlaylistsTableData,
-      BaseReferences<_$AppDatabase, $PlaylistsTableTable, PlaylistsTableData>
-    ),
+    (PlaylistsTableData, $$PlaylistsTableTableReferences),
     PlaylistsTableData,
-    PrefetchHooks Function()>;
+    PrefetchHooks Function({bool playlistEntriesTableRefs})>;
 typedef $$PlaylistEntriesTableTableCreateCompanionBuilder
     = PlaylistEntriesTableCompanion Function({
   Value<int> id,
@@ -4929,6 +5317,41 @@ typedef $$PlaylistEntriesTableTableUpdateCompanionBuilder
   Value<DateTime> addedAt,
 });
 
+final class $$PlaylistEntriesTableTableReferences extends BaseReferences<
+    _$AppDatabase, $PlaylistEntriesTableTable, PlaylistEntriesTableData> {
+  $$PlaylistEntriesTableTableReferences(
+      super.$_db, super.$_table, super.$_typedResult);
+
+  static $PlaylistsTableTable _playlistIdTable(_$AppDatabase db) =>
+      db.playlistsTable
+          .createAlias('playlist_entries__playlist_id__playlists__id');
+
+  $$PlaylistsTableTableProcessedTableManager get playlistId {
+    final $_column = $_itemColumn<int>('playlist_id')!;
+
+    final manager = $$PlaylistsTableTableTableManager($_db, $_db.playlistsTable)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_playlistIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+
+  static $SongsTableTable _songIdTable(_$AppDatabase db) =>
+      db.songsTable.createAlias('playlist_entries__song_id__songs__id');
+
+  $$SongsTableTableProcessedTableManager get songId {
+    final $_column = $_itemColumn<int>('song_id')!;
+
+    final manager = $$SongsTableTableTableManager($_db, $_db.songsTable)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_songIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+}
+
 class $$PlaylistEntriesTableTableFilterComposer
     extends Composer<_$AppDatabase, $PlaylistEntriesTableTable> {
   $$PlaylistEntriesTableTableFilterComposer({
@@ -4941,17 +5364,51 @@ class $$PlaylistEntriesTableTableFilterComposer
   ColumnFilters<int> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<int> get playlistId => $composableBuilder(
-      column: $table.playlistId, builder: (column) => ColumnFilters(column));
-
-  ColumnFilters<int> get songId => $composableBuilder(
-      column: $table.songId, builder: (column) => ColumnFilters(column));
-
   ColumnFilters<int> get orderIndex => $composableBuilder(
       column: $table.orderIndex, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<DateTime> get addedAt => $composableBuilder(
       column: $table.addedAt, builder: (column) => ColumnFilters(column));
+
+  $$PlaylistsTableTableFilterComposer get playlistId {
+    final $$PlaylistsTableTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.playlistId,
+        referencedTable: $db.playlistsTable,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$PlaylistsTableTableFilterComposer(
+              $db: $db,
+              $table: $db.playlistsTable,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$SongsTableTableFilterComposer get songId {
+    final $$SongsTableTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.songId,
+        referencedTable: $db.songsTable,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$SongsTableTableFilterComposer(
+              $db: $db,
+              $table: $db.songsTable,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
 }
 
 class $$PlaylistEntriesTableTableOrderingComposer
@@ -4966,17 +5423,51 @@ class $$PlaylistEntriesTableTableOrderingComposer
   ColumnOrderings<int> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<int> get playlistId => $composableBuilder(
-      column: $table.playlistId, builder: (column) => ColumnOrderings(column));
-
-  ColumnOrderings<int> get songId => $composableBuilder(
-      column: $table.songId, builder: (column) => ColumnOrderings(column));
-
   ColumnOrderings<int> get orderIndex => $composableBuilder(
       column: $table.orderIndex, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<DateTime> get addedAt => $composableBuilder(
       column: $table.addedAt, builder: (column) => ColumnOrderings(column));
+
+  $$PlaylistsTableTableOrderingComposer get playlistId {
+    final $$PlaylistsTableTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.playlistId,
+        referencedTable: $db.playlistsTable,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$PlaylistsTableTableOrderingComposer(
+              $db: $db,
+              $table: $db.playlistsTable,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$SongsTableTableOrderingComposer get songId {
+    final $$SongsTableTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.songId,
+        referencedTable: $db.songsTable,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$SongsTableTableOrderingComposer(
+              $db: $db,
+              $table: $db.songsTable,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
 }
 
 class $$PlaylistEntriesTableTableAnnotationComposer
@@ -4991,17 +5482,51 @@ class $$PlaylistEntriesTableTableAnnotationComposer
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumn<int> get playlistId => $composableBuilder(
-      column: $table.playlistId, builder: (column) => column);
-
-  GeneratedColumn<int> get songId =>
-      $composableBuilder(column: $table.songId, builder: (column) => column);
-
   GeneratedColumn<int> get orderIndex => $composableBuilder(
       column: $table.orderIndex, builder: (column) => column);
 
   GeneratedColumn<DateTime> get addedAt =>
       $composableBuilder(column: $table.addedAt, builder: (column) => column);
+
+  $$PlaylistsTableTableAnnotationComposer get playlistId {
+    final $$PlaylistsTableTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.playlistId,
+        referencedTable: $db.playlistsTable,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$PlaylistsTableTableAnnotationComposer(
+              $db: $db,
+              $table: $db.playlistsTable,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
+
+  $$SongsTableTableAnnotationComposer get songId {
+    final $$SongsTableTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.songId,
+        referencedTable: $db.songsTable,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$SongsTableTableAnnotationComposer(
+              $db: $db,
+              $table: $db.songsTable,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
 }
 
 class $$PlaylistEntriesTableTableTableManager extends RootTableManager<
@@ -5013,13 +5538,9 @@ class $$PlaylistEntriesTableTableTableManager extends RootTableManager<
     $$PlaylistEntriesTableTableAnnotationComposer,
     $$PlaylistEntriesTableTableCreateCompanionBuilder,
     $$PlaylistEntriesTableTableUpdateCompanionBuilder,
-    (
-      PlaylistEntriesTableData,
-      BaseReferences<_$AppDatabase, $PlaylistEntriesTableTable,
-          PlaylistEntriesTableData>
-    ),
+    (PlaylistEntriesTableData, $$PlaylistEntriesTableTableReferences),
     PlaylistEntriesTableData,
-    PrefetchHooks Function()> {
+    PrefetchHooks Function({bool playlistId, bool songId})> {
   $$PlaylistEntriesTableTableTableManager(
       _$AppDatabase db, $PlaylistEntriesTableTable table)
       : super(TableManagerState(
@@ -5062,9 +5583,59 @@ class $$PlaylistEntriesTableTableTableManager extends RootTableManager<
             addedAt: addedAt,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$PlaylistEntriesTableTable,
+                        PlaylistEntriesTableData>(table),
+                    $$PlaylistEntriesTableTableReferences(db, table, e)
+                  ))
               .toList(),
-          prefetchHooksCallback: null,
+          prefetchHooksCallback: ({playlistId = false, songId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins: <
+                  T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic>>(state) {
+                if (playlistId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.playlistId,
+                    referencedTable: $$PlaylistEntriesTableTableReferences
+                        ._playlistIdTable(db),
+                    referencedColumn: $$PlaylistEntriesTableTableReferences
+                        ._playlistIdTable(db)
+                        .id,
+                  ) as T;
+                }
+                if (songId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.songId,
+                    referencedTable:
+                        $$PlaylistEntriesTableTableReferences._songIdTable(db),
+                    referencedColumn: $$PlaylistEntriesTableTableReferences
+                        ._songIdTable(db)
+                        .id,
+                  ) as T;
+                }
+
+                return state;
+              },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
         ));
 }
 
@@ -5078,13 +5649,9 @@ typedef $$PlaylistEntriesTableTableProcessedTableManager
         $$PlaylistEntriesTableTableAnnotationComposer,
         $$PlaylistEntriesTableTableCreateCompanionBuilder,
         $$PlaylistEntriesTableTableUpdateCompanionBuilder,
-        (
-          PlaylistEntriesTableData,
-          BaseReferences<_$AppDatabase, $PlaylistEntriesTableTable,
-              PlaylistEntriesTableData>
-        ),
+        (PlaylistEntriesTableData, $$PlaylistEntriesTableTableReferences),
         PlaylistEntriesTableData,
-        PrefetchHooks Function()>;
+        PrefetchHooks Function({bool playlistId, bool songId})>;
 typedef $$PlayHistoryTableTableCreateCompanionBuilder
     = PlayHistoryTableCompanion Function({
   Value<int> id,
@@ -5100,6 +5667,26 @@ typedef $$PlayHistoryTableTableUpdateCompanionBuilder
   Value<bool> completed,
 });
 
+final class $$PlayHistoryTableTableReferences extends BaseReferences<
+    _$AppDatabase, $PlayHistoryTableTable, PlayHistoryTableData> {
+  $$PlayHistoryTableTableReferences(
+      super.$_db, super.$_table, super.$_typedResult);
+
+  static $SongsTableTable _songIdTable(_$AppDatabase db) =>
+      db.songsTable.createAlias('play_history__song_id__songs__id');
+
+  $$SongsTableTableProcessedTableManager get songId {
+    final $_column = $_itemColumn<int>('song_id')!;
+
+    final manager = $$SongsTableTableTableManager($_db, $_db.songsTable)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_songIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+}
+
 class $$PlayHistoryTableTableFilterComposer
     extends Composer<_$AppDatabase, $PlayHistoryTableTable> {
   $$PlayHistoryTableTableFilterComposer({
@@ -5112,14 +5699,31 @@ class $$PlayHistoryTableTableFilterComposer
   ColumnFilters<int> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<int> get songId => $composableBuilder(
-      column: $table.songId, builder: (column) => ColumnFilters(column));
-
   ColumnFilters<DateTime> get playedAt => $composableBuilder(
       column: $table.playedAt, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<bool> get completed => $composableBuilder(
       column: $table.completed, builder: (column) => ColumnFilters(column));
+
+  $$SongsTableTableFilterComposer get songId {
+    final $$SongsTableTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.songId,
+        referencedTable: $db.songsTable,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$SongsTableTableFilterComposer(
+              $db: $db,
+              $table: $db.songsTable,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
 }
 
 class $$PlayHistoryTableTableOrderingComposer
@@ -5134,14 +5738,31 @@ class $$PlayHistoryTableTableOrderingComposer
   ColumnOrderings<int> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<int> get songId => $composableBuilder(
-      column: $table.songId, builder: (column) => ColumnOrderings(column));
-
   ColumnOrderings<DateTime> get playedAt => $composableBuilder(
       column: $table.playedAt, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<bool> get completed => $composableBuilder(
       column: $table.completed, builder: (column) => ColumnOrderings(column));
+
+  $$SongsTableTableOrderingComposer get songId {
+    final $$SongsTableTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.songId,
+        referencedTable: $db.songsTable,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$SongsTableTableOrderingComposer(
+              $db: $db,
+              $table: $db.songsTable,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
 }
 
 class $$PlayHistoryTableTableAnnotationComposer
@@ -5156,14 +5777,31 @@ class $$PlayHistoryTableTableAnnotationComposer
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumn<int> get songId =>
-      $composableBuilder(column: $table.songId, builder: (column) => column);
-
   GeneratedColumn<DateTime> get playedAt =>
       $composableBuilder(column: $table.playedAt, builder: (column) => column);
 
   GeneratedColumn<bool> get completed =>
       $composableBuilder(column: $table.completed, builder: (column) => column);
+
+  $$SongsTableTableAnnotationComposer get songId {
+    final $$SongsTableTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.songId,
+        referencedTable: $db.songsTable,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$SongsTableTableAnnotationComposer(
+              $db: $db,
+              $table: $db.songsTable,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
 }
 
 class $$PlayHistoryTableTableTableManager extends RootTableManager<
@@ -5175,13 +5813,9 @@ class $$PlayHistoryTableTableTableManager extends RootTableManager<
     $$PlayHistoryTableTableAnnotationComposer,
     $$PlayHistoryTableTableCreateCompanionBuilder,
     $$PlayHistoryTableTableUpdateCompanionBuilder,
-    (
-      PlayHistoryTableData,
-      BaseReferences<_$AppDatabase, $PlayHistoryTableTable,
-          PlayHistoryTableData>
-    ),
+    (PlayHistoryTableData, $$PlayHistoryTableTableReferences),
     PlayHistoryTableData,
-    PrefetchHooks Function()> {
+    PrefetchHooks Function({bool songId})> {
   $$PlayHistoryTableTableTableManager(
       _$AppDatabase db, $PlayHistoryTableTable table)
       : super(TableManagerState(
@@ -5218,9 +5852,47 @@ class $$PlayHistoryTableTableTableManager extends RootTableManager<
             completed: completed,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$PlayHistoryTableTable, PlayHistoryTableData>(
+                        table),
+                    $$PlayHistoryTableTableReferences(db, table, e)
+                  ))
               .toList(),
-          prefetchHooksCallback: null,
+          prefetchHooksCallback: ({songId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins: <
+                  T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic>>(state) {
+                if (songId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.songId,
+                    referencedTable:
+                        $$PlayHistoryTableTableReferences._songIdTable(db),
+                    referencedColumn:
+                        $$PlayHistoryTableTableReferences._songIdTable(db).id,
+                  ) as T;
+                }
+
+                return state;
+              },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
         ));
 }
 
@@ -5233,13 +5905,9 @@ typedef $$PlayHistoryTableTableProcessedTableManager = ProcessedTableManager<
     $$PlayHistoryTableTableAnnotationComposer,
     $$PlayHistoryTableTableCreateCompanionBuilder,
     $$PlayHistoryTableTableUpdateCompanionBuilder,
-    (
-      PlayHistoryTableData,
-      BaseReferences<_$AppDatabase, $PlayHistoryTableTable,
-          PlayHistoryTableData>
-    ),
+    (PlayHistoryTableData, $$PlayHistoryTableTableReferences),
     PlayHistoryTableData,
-    PrefetchHooks Function()>;
+    PrefetchHooks Function({bool songId})>;
 typedef $$QueueItemsTableTableCreateCompanionBuilder = QueueItemsTableCompanion
     Function({
   Value<int> id,
@@ -5257,6 +5925,26 @@ typedef $$QueueItemsTableTableUpdateCompanionBuilder = QueueItemsTableCompanion
   Value<int> positionMs,
 });
 
+final class $$QueueItemsTableTableReferences extends BaseReferences<
+    _$AppDatabase, $QueueItemsTableTable, QueueItemsTableData> {
+  $$QueueItemsTableTableReferences(
+      super.$_db, super.$_table, super.$_typedResult);
+
+  static $SongsTableTable _songIdTable(_$AppDatabase db) =>
+      db.songsTable.createAlias('queue_items__song_id__songs__id');
+
+  $$SongsTableTableProcessedTableManager get songId {
+    final $_column = $_itemColumn<int>('song_id')!;
+
+    final manager = $$SongsTableTableTableManager($_db, $_db.songsTable)
+        .filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_songIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+        manager.$state.copyWith(prefetchedData: [item]));
+  }
+}
+
 class $$QueueItemsTableTableFilterComposer
     extends Composer<_$AppDatabase, $QueueItemsTableTable> {
   $$QueueItemsTableTableFilterComposer({
@@ -5269,9 +5957,6 @@ class $$QueueItemsTableTableFilterComposer
   ColumnFilters<int> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<int> get songId => $composableBuilder(
-      column: $table.songId, builder: (column) => ColumnFilters(column));
-
   ColumnFilters<int> get orderIndex => $composableBuilder(
       column: $table.orderIndex, builder: (column) => ColumnFilters(column));
 
@@ -5280,6 +5965,26 @@ class $$QueueItemsTableTableFilterComposer
 
   ColumnFilters<int> get positionMs => $composableBuilder(
       column: $table.positionMs, builder: (column) => ColumnFilters(column));
+
+  $$SongsTableTableFilterComposer get songId {
+    final $$SongsTableTableFilterComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.songId,
+        referencedTable: $db.songsTable,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$SongsTableTableFilterComposer(
+              $db: $db,
+              $table: $db.songsTable,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
 }
 
 class $$QueueItemsTableTableOrderingComposer
@@ -5294,9 +5999,6 @@ class $$QueueItemsTableTableOrderingComposer
   ColumnOrderings<int> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<int> get songId => $composableBuilder(
-      column: $table.songId, builder: (column) => ColumnOrderings(column));
-
   ColumnOrderings<int> get orderIndex => $composableBuilder(
       column: $table.orderIndex, builder: (column) => ColumnOrderings(column));
 
@@ -5305,6 +6007,26 @@ class $$QueueItemsTableTableOrderingComposer
 
   ColumnOrderings<int> get positionMs => $composableBuilder(
       column: $table.positionMs, builder: (column) => ColumnOrderings(column));
+
+  $$SongsTableTableOrderingComposer get songId {
+    final $$SongsTableTableOrderingComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.songId,
+        referencedTable: $db.songsTable,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$SongsTableTableOrderingComposer(
+              $db: $db,
+              $table: $db.songsTable,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
 }
 
 class $$QueueItemsTableTableAnnotationComposer
@@ -5319,9 +6041,6 @@ class $$QueueItemsTableTableAnnotationComposer
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumn<int> get songId =>
-      $composableBuilder(column: $table.songId, builder: (column) => column);
-
   GeneratedColumn<int> get orderIndex => $composableBuilder(
       column: $table.orderIndex, builder: (column) => column);
 
@@ -5330,6 +6049,26 @@ class $$QueueItemsTableTableAnnotationComposer
 
   GeneratedColumn<int> get positionMs => $composableBuilder(
       column: $table.positionMs, builder: (column) => column);
+
+  $$SongsTableTableAnnotationComposer get songId {
+    final $$SongsTableTableAnnotationComposer composer = $composerBuilder(
+        composer: this,
+        getCurrentColumn: (t) => t.songId,
+        referencedTable: $db.songsTable,
+        getReferencedColumn: (t) => t.id,
+        builder: (joinBuilder,
+                {$addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer}) =>
+            $$SongsTableTableAnnotationComposer(
+              $db: $db,
+              $table: $db.songsTable,
+              $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+              joinBuilder: joinBuilder,
+              $removeJoinBuilderFromRootComposer:
+                  $removeJoinBuilderFromRootComposer,
+            ));
+    return composer;
+  }
 }
 
 class $$QueueItemsTableTableTableManager extends RootTableManager<
@@ -5341,12 +6080,9 @@ class $$QueueItemsTableTableTableManager extends RootTableManager<
     $$QueueItemsTableTableAnnotationComposer,
     $$QueueItemsTableTableCreateCompanionBuilder,
     $$QueueItemsTableTableUpdateCompanionBuilder,
-    (
-      QueueItemsTableData,
-      BaseReferences<_$AppDatabase, $QueueItemsTableTable, QueueItemsTableData>
-    ),
+    (QueueItemsTableData, $$QueueItemsTableTableReferences),
     QueueItemsTableData,
-    PrefetchHooks Function()> {
+    PrefetchHooks Function({bool songId})> {
   $$QueueItemsTableTableTableManager(
       _$AppDatabase db, $QueueItemsTableTable table)
       : super(TableManagerState(
@@ -5387,9 +6123,47 @@ class $$QueueItemsTableTableTableManager extends RootTableManager<
             positionMs: positionMs,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$QueueItemsTableTable, QueueItemsTableData>(
+                        table),
+                    $$QueueItemsTableTableReferences(db, table, e)
+                  ))
               .toList(),
-          prefetchHooksCallback: null,
+          prefetchHooksCallback: ({songId = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [],
+              addJoins: <
+                  T extends TableManagerState<
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic,
+                      dynamic>>(state) {
+                if (songId) {
+                  state = state.withJoin(
+                    currentTable: table,
+                    currentColumn: table.songId,
+                    referencedTable:
+                        $$QueueItemsTableTableReferences._songIdTable(db),
+                    referencedColumn:
+                        $$QueueItemsTableTableReferences._songIdTable(db).id,
+                  ) as T;
+                }
+
+                return state;
+              },
+              getPrefetchedDataCallback: (items) async {
+                return [];
+              },
+            );
+          },
         ));
 }
 
@@ -5402,12 +6176,9 @@ typedef $$QueueItemsTableTableProcessedTableManager = ProcessedTableManager<
     $$QueueItemsTableTableAnnotationComposer,
     $$QueueItemsTableTableCreateCompanionBuilder,
     $$QueueItemsTableTableUpdateCompanionBuilder,
-    (
-      QueueItemsTableData,
-      BaseReferences<_$AppDatabase, $QueueItemsTableTable, QueueItemsTableData>
-    ),
+    (QueueItemsTableData, $$QueueItemsTableTableReferences),
     QueueItemsTableData,
-    PrefetchHooks Function()>;
+    PrefetchHooks Function({bool songId})>;
 typedef $$ExcludedFoldersTableTableCreateCompanionBuilder
     = ExcludedFoldersTableCompanion Function({
   Value<int> id,
@@ -5528,7 +6299,12 @@ class $$ExcludedFoldersTableTableTableManager extends RootTableManager<
             addedAt: addedAt,
           ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map((e) => (
+                    e.readTable<$ExcludedFoldersTableTable,
+                        ExcludedFoldersTableData>(table),
+                    BaseReferences<_$AppDatabase, $ExcludedFoldersTableTable,
+                        ExcludedFoldersTableData>(db, table, e)
+                  ))
               .toList(),
           prefetchHooksCallback: null,
         ));

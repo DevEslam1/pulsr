@@ -137,14 +137,12 @@ class JustAudioPlayerBackend implements AudioPlayerBackend {
     Duration? initialPosition,
     ShuffleOrder? shuffleOrder,
   }) =>
-      _player.setAudioSource(
-        ConcatenatingAudioSource(
-          children: children,
-          shuffleOrder: shuffleOrder ?? DefaultShuffleOrder(),
-        ),
+      _player.setAudioSources(
+        children,
         preload: preload,
         initialIndex: initialIndex,
         initialPosition: initialPosition,
+        shuffleOrder: shuffleOrder,
       );
   @override
   Future<void> setShuffleModeEnabled(bool enabled) =>

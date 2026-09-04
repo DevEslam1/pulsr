@@ -63,14 +63,14 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
   }
 
   Future<void> _importPlaylist(BuildContext context) async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFile(
       type: FileType.custom,
       allowedExtensions: ['m3u', 'm3u8'],
     );
-    if (result == null || result.files.single.path == null) return;
+    if (result == null || result.path == null) return;
 
-    final filePath = result.files.single.path!;
-    final playlistName = result.files.single.name.replaceAll(
+    final filePath = result.path!;
+    final playlistName = result.name.replaceAll(
       RegExp(r'\.m3u8?$', caseSensitive: false),
       '',
     );

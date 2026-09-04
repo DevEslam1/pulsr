@@ -9,6 +9,7 @@
 // coverage:ignore-file
 
 // ignore_for_file: no_leading_underscores_for_library_prefixes
+
 import 'dart:io' as _i497;
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart' as _i558;
@@ -25,7 +26,7 @@ import 'package:pulsr/core/services/cloud_sync_service.dart' as _i225;
 import 'package:pulsr/core/services/duplicate_finder_service.dart' as _i1027;
 import 'package:pulsr/core/services/file_intent_handler.dart' as _i134;
 import 'package:pulsr/core/services/hires_audio_service.dart' as _i722;
-import 'package:pulsr/core/services/lrclib_service.dart' as _i621;
+import 'package:pulsr/core/services/lrclib_service.dart' as _i622;
 import 'package:pulsr/core/services/metadata_search_service.dart' as _i451;
 import 'package:pulsr/core/services/missing_artwork_service.dart' as _i417;
 import 'package:pulsr/core/services/playlist_share_service.dart' as _i118;
@@ -47,7 +48,7 @@ import 'package:pulsr/core/theme/dynamic_theme_cubit.dart' as _i401;
 import 'package:pulsr/data/audio/audio_handler.dart' as _i366;
 import 'package:pulsr/data/db/app_database.dart' as _i682;
 import 'package:pulsr/data/repositories/download_repository_impl.dart' as _i877;
-import 'package:pulsr/data/repositories/music_repository.dart' as _i626;
+import 'package:pulsr/data/repositories/music_repository.dart' as _i627;
 import 'package:pulsr/data/repositories/smart_playlist_engine.dart' as _i399;
 import 'package:pulsr/data/scanner/media_scanner_service.dart' as _i483;
 import 'package:pulsr/domain/repositories/download_repository_interface.dart'
@@ -70,7 +71,7 @@ import 'package:pulsr/domain/usecases/observe_downloads.dart' as _i47;
 import 'package:pulsr/domain/usecases/pause_download.dart' as _i308;
 import 'package:pulsr/domain/usecases/playlist_io_usecases.dart' as _i265;
 import 'package:pulsr/domain/usecases/playlist_usecases.dart' as _i792;
-import 'package:pulsr/domain/usecases/queue_download.dart' as _i633;
+import 'package:pulsr/domain/usecases/queue_download.dart' as _i634;
 import 'package:pulsr/domain/usecases/resume_download.dart' as _i902;
 import 'package:pulsr/domain/usecases/retry_download.dart' as _i19;
 import 'package:pulsr/domain/usecases/search_music_usecase.dart' as _i644;
@@ -150,11 +151,11 @@ extension GetItInjectableX on _i174.GetIt {
         ));
     gh.lazySingleton<_i621.Clock>(() => const _i621.SystemClock());
     gh.singleton<_i320.IMusicRepository>(
-        () => _i626.MusicRepository(gh<_i682.AppDatabase>()));
+        () => _i627.MusicRepository(gh<_i682.AppDatabase>()));
     gh.factory<_i171.YtmSearchCubit>(
         () => _i171.YtmSearchCubit(service: gh<_i391.YtmService>()));
-    gh.singleton<_i621.LrclibService>(
-        () => _i621.LrclibService(client: gh<_i497.HttpClient>()));
+    gh.singleton<_i622.LrclibService>(
+        () => _i622.LrclibService(client: gh<_i497.HttpClient>()));
     gh.singleton<_i483.MediaScannerService>(
         () => _i483.MediaScannerService(gh<_i320.IMusicRepository>()));
     gh.singleton<_i545.ExportBackupUseCase>(
@@ -251,8 +252,8 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i47.ObserveDownloadsUseCase(gh<_i783.IDownloadRepository>()));
     gh.singleton<_i308.PauseDownloadUseCase>(
         () => _i308.PauseDownloadUseCase(gh<_i783.IDownloadRepository>()));
-    gh.singleton<_i633.QueueDownloadUseCase>(
-        () => _i633.QueueDownloadUseCase(gh<_i783.IDownloadRepository>()));
+    gh.singleton<_i634.QueueDownloadUseCase>(
+        () => _i634.QueueDownloadUseCase(gh<_i783.IDownloadRepository>()));
     gh.singleton<_i902.ResumeDownloadUseCase>(
         () => _i902.ResumeDownloadUseCase(gh<_i783.IDownloadRepository>()));
     gh.singleton<_i19.RetryDownloadUseCase>(
@@ -272,7 +273,7 @@ extension GetItInjectableX on _i174.GetIt {
           secureStorage: gh<_i558.FlutterSecureStorage>(),
         ));
     gh.singleton<_i752.DownloadsCubit>(() => _i752.DownloadsCubit(
-          gh<_i633.QueueDownloadUseCase>(),
+          gh<_i634.QueueDownloadUseCase>(),
           gh<_i308.PauseDownloadUseCase>(),
           gh<_i902.ResumeDownloadUseCase>(),
           gh<_i19.RetryDownloadUseCase>(),

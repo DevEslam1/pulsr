@@ -72,8 +72,6 @@ class YtmAccountService {
   static const String _cookieSecureKey = 'ytm_session_cookies_secure';
   static const FlutterSecureStorage _secureStorage = FlutterSecureStorage(
     aOptions: AndroidOptions(
-      // ignore: deprecated_member_use
-      encryptedSharedPreferences: true,
       resetOnError: true,
     ),
     iOptions: IOSOptions(

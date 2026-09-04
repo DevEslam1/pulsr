@@ -31,3 +31,6 @@ target_link_libraries(pulsr_dsp
     ${android-lib}
     m
 )
+
+# 16 KB page size alignment for Android 15 & 16+ compatibility
+target_link_options(pulsr_dsp PRIVATE "-Wl,-z,max-page-size=16384")

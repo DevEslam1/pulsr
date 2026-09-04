@@ -20,8 +20,6 @@ class ScrobblerService {
         _secureStorage = secureStorage ??
             const FlutterSecureStorage(
               aOptions: AndroidOptions(
-                // ignore: deprecated_member_use
-                encryptedSharedPreferences: true,
                 resetOnError: true,
               ),
               iOptions: IOSOptions(
