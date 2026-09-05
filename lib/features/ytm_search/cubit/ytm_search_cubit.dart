@@ -100,11 +100,20 @@ class YtmSearchCubit extends Cubit<YtmSearchState> {
 
       // Auto-recovery: On bot block or recaptcha, invalidate poToken and retry with depth bound
       if (e.isBotBlocked && !isRetryAfterBotBlock && retryDepth < 2) {
-        await _service.invalidatePoToken();
-        await _service.ensurePoTokenReady();
+        var refreshed = false;
+        try {
+          await _service.invalidatePoToken();
+          await _service.ensurePoTokenReady();
+          refreshed = true;
+        } catch (_) {
+          // A failing poToken refresh must not escape this handler, or the
+          // spinner below is never cleared and the block is never reported.
+        }
         if (generation != _generation || isClosed) return;
-        return _executeSearch(query,
-            isRetryAfterBotBlock: true, retryDepth: retryDepth + 1);
+        if (refreshed) {
+          return _executeSearch(query,
+              isRetryAfterBotBlock: true, retryDepth: retryDepth + 1);
+        }
       }
 
       final errorInfo = YtmErrorClassifier.classify(e);

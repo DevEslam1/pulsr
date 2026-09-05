@@ -28,12 +28,14 @@ class DownloadsState {
     StorageStats? storageStats,
     bool? isLoading,
     String? errorMessage,
+    bool clearErrorMessage = false,
   }) {
     return DownloadsState(
       tasks: tasks ?? this.tasks,
       storageStats: storageStats ?? this.storageStats,
       isLoading: isLoading ?? this.isLoading,
-      errorMessage: errorMessage,
+      errorMessage:
+          clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
     );
   }
 

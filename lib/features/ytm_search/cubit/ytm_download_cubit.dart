@@ -70,7 +70,9 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
               : item;
           return MapEntry(k, cleanItem);
         });
-        if (!isClosed) emit(YtmDownloadState(items: restored));
+        if (!isClosed) {
+          emit(YtmDownloadState(items: {...restored, ...state.items}));
+        }
       }
     } catch (_) {}
   }
@@ -125,8 +127,9 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
           ));
     });
 
-    if (isClosed) return;
+    if (state.itemFor(videoId).status == YtDownloadStatus.canceled) return;
     if (result.isLeft()) {
+      if (isClosed) return;
       final message =
           result.getLeft().toNullable()?.message ?? 'Download failed';
       _set(videoId,
@@ -136,9 +139,7 @@ class YtmDownloadCubit extends Cubit<YtmDownloadState> {
 
     final newId = result.getOrElse((_) => song.id);
     await _playerCubit.swapReconciledSong(song.id, newId);
-    if (!isClosed) {
-      _set(videoId, const YtDownloadItem(status: YtDownloadStatus.done));
-    }
+    _set(videoId, const YtDownloadItem(status: YtDownloadStatus.done));
   }
 
   /// Queues multiple songs for download in batch.

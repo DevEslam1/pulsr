@@ -80,6 +80,10 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
         ? remoteArtworkUrl
         : 'AUDIO_$songId';
 
+    // Invalidate any in-flight extraction for the previous song: without this a
+    // slow palette landing later would overwrite the colour emitted below.
+    _currentRequestToken++;
+
     if (_cachedPalettes.containsKey(cacheKey)) {
       _debounceTimer?.cancel();
       final cached = _cachedPalettes.remove(cacheKey)!;
@@ -210,9 +214,7 @@ class DynamicThemeCubit extends Cubit<DynamicThemeState> {
       return;
     }
 
-    if (token == _currentRequestToken &&
-        !isClosed &&
-        !state.hasCustomArtworkColor) {
+    if (token == _currentRequestToken && !isClosed) {
       emit(const DynamicThemeState());
     }
   }

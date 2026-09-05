@@ -301,11 +301,14 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
       ],
       child: MultiBlocProvider(
         providers: [
-          BlocProvider<DynamicThemeCubit>(
-            create: (_) => getIt<DynamicThemeCubit>(),
+          // getIt singletons are provided by value: `create:` would make the
+          // provider close the shared instance on teardown, leaving getIt
+          // handing out a dead cubit for the rest of the process.
+          BlocProvider<DynamicThemeCubit>.value(
+            value: getIt<DynamicThemeCubit>(),
           ),
-          BlocProvider<PlayerCubit>(
-            create: (_) => getIt<PlayerCubit>(),
+          BlocProvider<PlayerCubit>.value(
+            value: getIt<PlayerCubit>(),
           ),
           BlocProvider<LibraryCubit>(
             create: (_) => getIt<LibraryCubit>(),
@@ -316,18 +319,18 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
           BlocProvider<PlaylistCubit>(
             create: (_) => getIt<PlaylistCubit>(),
           ),
-          BlocProvider<SettingsCubit>(
-            create: (_) => getIt<SettingsCubit>(),
+          BlocProvider<SettingsCubit>.value(
+            value: getIt<SettingsCubit>(),
           ),
           BlocProvider<AuthCubit>(
             create: (_) => getIt<AuthCubit>(),
           ),
-          BlocProvider<DownloadsCubit>(
-            create: (_) => getIt<DownloadsCubit>(),
+          BlocProvider<DownloadsCubit>.value(
+            value: getIt<DownloadsCubit>(),
           ),
           if (AppConfig.ytmEnabled)
-            BlocProvider<YtmDownloadCubit>(
-              create: (_) => getIt<YtmDownloadCubit>(),
+            BlocProvider<YtmDownloadCubit>.value(
+              value: getIt<YtmDownloadCubit>(),
             ),
         ],
         child: MultiBlocListener(

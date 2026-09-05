@@ -37,6 +37,7 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   StreamSubscription? _genresSub;
   StreamSubscription? _yearsSub;
   StreamSubscription? _favoritesSub;
+  int _songsToken = 0;
 
   LibraryCubit({
     required GetSongsUseCase getSongsUseCase,
@@ -103,29 +104,32 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
   }
 
   Future<void> _subscribeSongs() async {
+    final t = ++_songsToken;
     _songsSub?.cancel();
+    removeFromComposite(_songsSub);
+    _songsSub = null;
     final excludedRes = await _folderUseCases.getExcludedFolders();
-    if (isClosed) return;
+    if (isClosed || t != _songsToken) return;
     final excluded = excludedRes.fold((l) => <String>[], (r) => r);
-    _songsSub = _getSongsUseCase
-        .watchSongs(
-      sortBy: state.sortBy,
-      ascending: state.ascending,
-      excludedFolders: excluded,
-    )
-        .listen((result) {
-      if (isClosed) return;
-      result.fold(
-        (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-        (songs) => safeEmit(state.copyWith(songs: songs, errorMessage: null)),
-      );
-    });
+    _songsSub = autoSub(
+      _getSongsUseCase.watchSongs(
+        sortBy: state.sortBy,
+        ascending: state.ascending,
+        excludedFolders: excluded,
+      ),
+      (result) {
+        result.fold(
+          (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+          (songs) => safeEmit(state.copyWith(songs: songs, errorMessage: null)),
+        );
+      },
+    );
   }
 
   void _subscribeAlbums() {
     _albumsSub?.cancel();
-    _albumsSub = _getAlbumsUseCase.watchAlbums().listen((result) {
-      if (isClosed) return;
+    removeFromComposite(_albumsSub);
+    _albumsSub = autoSub(_getAlbumsUseCase.watchAlbums(), (result) {
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
         (albums) => safeEmit(state.copyWith(albums: albums, errorMessage: null)),
@@ -135,8 +139,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
 
   void _subscribeArtists() {
     _artistsSub?.cancel();
-    _artistsSub = _getArtistsUseCase.watchArtists().listen((result) {
-      if (isClosed) return;
+    removeFromComposite(_artistsSub);
+    _artistsSub = autoSub(_getArtistsUseCase.watchArtists(), (result) {
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
         (artists) => safeEmit(state.copyWith(artists: artists, errorMessage: null)),
@@ -146,8 +150,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
 
   void _subscribeGenres() {
     _genresSub?.cancel();
-    _genresSub = _getGenresUseCase.watchGenres().listen((result) {
-      if (isClosed) return;
+    removeFromComposite(_genresSub);
+    _genresSub = autoSub(_getGenresUseCase.watchGenres(), (result) {
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
         (genres) => safeEmit(state.copyWith(genres: genres, errorMessage: null)),
@@ -157,8 +161,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
 
   void _subscribeYears() {
     _yearsSub?.cancel();
-    _yearsSub = _getYearsUseCase.watchYears().listen((result) {
-      if (isClosed) return;
+    removeFromComposite(_yearsSub);
+    _yearsSub = autoSub(_getYearsUseCase.watchYears(), (result) {
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
         (years) => safeEmit(state.copyWith(years: years, errorMessage: null)),
@@ -168,8 +172,8 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
 
   void _subscribeFavorites() {
     _favoritesSub?.cancel();
-    _favoritesSub = _getFavoritesUseCase.watchFavorites().listen((result) {
-      if (isClosed) return;
+    removeFromComposite(_favoritesSub);
+    _favoritesSub = autoSub(_getFavoritesUseCase.watchFavorites(), (result) {
       result.fold(
         (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
         (favs) => safeEmit(state.copyWith(favorites: favs, errorMessage: null)),
@@ -212,11 +216,15 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
     final opToken = (_favoriteOpTokens[songId] ?? 0) + 1;
     _favoriteOpTokens[songId] = opToken;
 
+    List<SongsTableData> songsWith(bool isFavorite) => state.songs
+        .map((s) => s.id == songId ? s.copyWith(isFavorite: isFavorite) : s)
+        .toList();
+
     final currentFavs = List<SongsTableData>.from(state.favorites);
     final wasFav = currentFavs.any((s) => s.id == songId);
     if (wasFav) {
       currentFavs.removeWhere((s) => s.id == songId);
-      safeEmit(state.copyWith(favorites: currentFavs));
+      safeEmit(state.copyWith(favorites: currentFavs, songs: songsWith(false)));
     } else {
       final matchingSong = state.songs.cast<SongsTableData?>().firstWhere(
             (s) => s?.id == songId,
@@ -224,46 +232,47 @@ class LibraryCubit extends PulsrCubit<LibraryState> {
           );
       if (matchingSong != null) {
         currentFavs.add(matchingSong.copyWith(isFavorite: true));
-        safeEmit(state.copyWith(favorites: currentFavs));
+        safeEmit(state.copyWith(favorites: currentFavs, songs: songsWith(true)));
       }
     }
 
     final result = await _toggleFavoriteUseCase(songId);
     if (isClosed || _favoriteOpTokens[songId] != opToken) return;
-    result.fold(
-      (failure) {
-        final reconciled = List<SongsTableData>.from(state.favorites);
-        if (wasFav) {
-          final matchingSong = state.songs.cast<SongsTableData?>().firstWhere(
-                (s) => s?.id == songId,
-                orElse: () => null,
-              );
-          if (matchingSong != null && !reconciled.any((s) => s.id == songId)) {
-            reconciled.add(matchingSong.copyWith(isFavorite: true));
-          }
-        } else {
-          reconciled.removeWhere((s) => s.id == songId);
-        }
-        safeEmit(state.copyWith(
-          favorites: reconciled,
-          errorMessage: failure.message,
-        ));
-      },
-      (_) => null,
-    );
+    final failureMessage = result.fold<String?>((l) => l.message, (_) => null);
+    if (failureMessage == null) {
+      safeEmit(state.copyWith(errorMessage: null));
+      return;
+    }
+    final reconciled = List<SongsTableData>.from(state.favorites);
+    if (wasFav) {
+      final matchingSong = state.songs.cast<SongsTableData?>().firstWhere(
+            (s) => s?.id == songId,
+            orElse: () => null,
+          );
+      if (matchingSong != null && !reconciled.any((s) => s.id == songId)) {
+        reconciled.add(matchingSong.copyWith(isFavorite: true));
+      }
+    } else {
+      reconciled.removeWhere((s) => s.id == songId);
+    }
+    safeEmit(state.copyWith(
+      favorites: reconciled,
+      songs: songsWith(wasFav),
+      errorMessage: failureMessage,
+    ));
   }
 
   Future<void> toggleFolderExclusion(String folderPath) async {
     final result = await _folderUseCases.toggleExcludeFolder(folderPath);
     if (isClosed) return;
-    result.fold(
-      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
-      (_) async {
-        await loadFolders();
-        if (isClosed) return;
-        _subscribeSongs();
-      },
-    );
+    final failureMessage = result.fold<String?>((l) => l.message, (_) => null);
+    if (failureMessage != null) {
+      safeEmit(state.copyWith(errorMessage: failureMessage));
+      return;
+    }
+    await loadFolders();
+    if (isClosed) return;
+    await _subscribeSongs();
   }
 
   // Multi-select actions

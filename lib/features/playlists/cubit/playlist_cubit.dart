@@ -2,9 +2,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/widgets.dart';
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/bloc/base_cubit.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/di/injection.dart';
 import '../../../core/services/ytm_account_service.dart';
@@ -119,12 +119,14 @@ class YtmOnlineState {
 // ---------------------------------------------------------------------------
 
 @injectable
-class PlaylistCubit extends Cubit<PlaylistState> {
+class PlaylistCubit extends PulsrCubit<PlaylistState> {
   static const String _onlineCacheKey = 'ytm_cached_online_playlists_v1';
   final PlaylistUseCases _playlistUseCases;
   StreamSubscription? _playlistsSub;
   StreamSubscription? _playlistSongsSub;
   final Map<int, StreamSubscription> _smartSubscriptions = {};
+  final Map<int, String> _smartCriteriaJson = {};
+  Future<void> _pendingCacheSave = Future<void>.value();
   bool _isSeedingChecked = false;
 
   /// Reactive online-playlist state. Widgets use [ValueListenableBuilder]
@@ -138,13 +140,11 @@ class PlaylistCubit extends Cubit<PlaylistState> {
   }
 
   void _init() {
-    _loadOnlineCache();
-
-    _playlistsSub = _playlistUseCases.watchPlaylists().listen((result) {
+    _playlistsSub = autoSub(_playlistUseCases.watchPlaylists(), (result) {
       result.fold(
-        (failure) => emit(state.copyWith(errorMessage: failure.message)),
+        (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
         (playlists) {
-          emit(state.copyWith(playlists: playlists, errorMessage: null));
+          safeEmit(state.copyWith(playlists: playlists, errorMessage: null));
           _updateSmartCounts(playlists);
           if (!_isSeedingChecked) {
             _isSeedingChecked = true;
@@ -153,6 +153,14 @@ class PlaylistCubit extends Cubit<PlaylistState> {
         },
       );
     });
+
+    unawaited(_initOnline());
+  }
+
+  /// Restores the cached online library before any live fetch is scheduled.
+  Future<void> _initOnline() async {
+    await _loadOnlineCache();
+    if (isClosed) return;
 
     // Auto-update online playlists & liked songs in background on every restart
     if (AppConfig.ytmEnabled) {
@@ -163,11 +171,11 @@ class PlaylistCubit extends Cubit<PlaylistState> {
           .loginState
           .addListener(_onYtmLoginStateChanged);
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        Future.delayed(const Duration(seconds: 2), () {
+        autoTimer(Timer(const Duration(seconds: 2), () {
           if (!isClosed) {
             autoFetchOnlineLibrary(force: true);
           }
-        });
+        }));
       });
     }
   }
@@ -181,6 +189,7 @@ class PlaylistCubit extends Cubit<PlaylistState> {
   Future<void> _loadOnlineCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      if (isClosed) return;
       final raw = prefs.getString(_onlineCacheKey);
       if (raw != null && raw.isNotEmpty) {
         final data = jsonDecode(raw) as Map<String, dynamic>;
@@ -217,7 +226,15 @@ class PlaylistCubit extends Cubit<PlaylistState> {
     }
   }
 
-  Future<void> _saveOnlineCache() async {
+  /// Serializes cache writes so concurrent callers cannot persist a snapshot
+  /// taken before another section landed.
+  Future<void> _saveOnlineCache() {
+    final next = _pendingCacheSave.then((_) => _writeOnlineCache());
+    _pendingCacheSave = next;
+    return next;
+  }
+
+  Future<void> _writeOnlineCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final data = {
@@ -256,18 +273,24 @@ class PlaylistCubit extends Cubit<PlaylistState> {
     final currentSmartIds = <int>{};
     for (final playlist in playlists) {
       if (playlist.isSmart && playlist.smartCriteria != null) {
-        currentSmartIds.add(playlist.id);
-        if (!_smartSubscriptions.containsKey(playlist.id)) {
-          final criteria =
-              SmartCriteria.fromJsonString(playlist.smartCriteria!);
-          _smartSubscriptions[playlist.id] = _playlistUseCases
-              .watchSmartPlaylistSongs(criteria)
-              .listen((songs) {
-            if (isClosed) return;
-            final updatedCounts = Map<int, int>.from(state.smartPlaylistCounts);
-            updatedCounts[playlist.id] = songs.length;
-            emit(state.copyWith(smartPlaylistCounts: updatedCounts));
-          });
+        final int id = playlist.id;
+        final String criteriaJson = playlist.smartCriteria;
+        currentSmartIds.add(id);
+        final existing = _smartSubscriptions[id];
+        if (existing == null || _smartCriteriaJson[id] != criteriaJson) {
+          existing?.cancel();
+          removeFromComposite(existing);
+          _smartCriteriaJson[id] = criteriaJson;
+          final criteria = SmartCriteria.fromJsonString(criteriaJson);
+          _smartSubscriptions[id] = autoSub(
+            _playlistUseCases.watchSmartPlaylistSongs(criteria),
+            (songs) {
+              final updatedCounts =
+                  Map<int, int>.from(state.smartPlaylistCounts);
+              updatedCounts[id] = songs.length;
+              safeEmit(state.copyWith(smartPlaylistCounts: updatedCounts));
+            },
+          );
         }
       }
     }
@@ -276,22 +299,25 @@ class PlaylistCubit extends Cubit<PlaylistState> {
         .where((id) => !currentSmartIds.contains(id))
         .toList();
     for (final id in staleIds) {
-      _smartSubscriptions[id]?.cancel();
-      _smartSubscriptions.remove(id);
+      final sub = _smartSubscriptions.remove(id);
+      sub?.cancel();
+      removeFromComposite(sub);
+      _smartCriteriaJson.remove(id);
     }
   }
 
   void clearError() {
-    emit(state.copyWith(errorMessage: null));
+    safeEmit(state.copyWith(errorMessage: null));
   }
 
   void loadPlaylistSongs(int playlistId) {
     _playlistSongsSub?.cancel();
+    removeFromComposite(_playlistSongsSub);
     _playlistSongsSub =
-        _playlistUseCases.watchPlaylistSongs(playlistId).listen((result) {
+        autoSub(_playlistUseCases.watchPlaylistSongs(playlistId), (result) {
       result.fold(
-        (failure) => emit(state.copyWith(errorMessage: failure.message)),
-        (songs) => emit(
+        (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+        (songs) => safeEmit(
             state.copyWith(currentPlaylistSongs: songs, errorMessage: null)),
       );
     });
@@ -302,29 +328,36 @@ class PlaylistCubit extends Cubit<PlaylistState> {
     final result = await _playlistUseCases.createPlaylist(name,
         isSmart: isSmart, smartCriteria: criteria);
     result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
-      (_) => null,
+      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+      (_) => safeEmit(state.copyWith(errorMessage: null)),
     );
   }
 
   Future<void> renamePlaylist(int playlistId, String newName) async {
     final result = await _playlistUseCases.renamePlaylist(playlistId, newName);
     result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
-      (_) => null,
+      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+      (_) => safeEmit(state.copyWith(errorMessage: null)),
     );
   }
 
   Future<void> deletePlaylist(int playlistId) async {
-    _smartSubscriptions[playlistId]?.cancel();
-    _smartSubscriptions.remove(playlistId);
+    final removedSub = _smartSubscriptions.remove(playlistId);
+    removedSub?.cancel();
+    removeFromComposite(removedSub);
+    _smartCriteriaJson.remove(playlistId);
     final updatedCounts = Map<int, int>.from(state.smartPlaylistCounts)
       ..remove(playlistId);
-    emit(state.copyWith(smartPlaylistCounts: updatedCounts));
+    safeEmit(state.copyWith(smartPlaylistCounts: updatedCounts));
     final result = await _playlistUseCases.deletePlaylist(playlistId);
     result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
-      (_) => null,
+      (failure) {
+        safeEmit(state.copyWith(errorMessage: failure.message));
+        if (!isClosed) {
+          _updateSmartCounts(state.playlists);
+        }
+      },
+      (_) => safeEmit(state.copyWith(errorMessage: null)),
     );
   }
 
@@ -332,8 +365,8 @@ class PlaylistCubit extends Cubit<PlaylistState> {
     final result =
         await _playlistUseCases.addSongToPlaylist(playlistId, songId);
     result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
-      (_) => null,
+      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+      (_) => safeEmit(state.copyWith(errorMessage: null)),
     );
   }
 
@@ -341,8 +374,8 @@ class PlaylistCubit extends Cubit<PlaylistState> {
     final result =
         await _playlistUseCases.addSongsToPlaylist(playlistId, songIds);
     result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
-      (_) => null,
+      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+      (_) => safeEmit(state.copyWith(errorMessage: null)),
     );
   }
 
@@ -350,8 +383,8 @@ class PlaylistCubit extends Cubit<PlaylistState> {
     final result =
         await _playlistUseCases.removeSongFromPlaylist(playlistId, songId);
     result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
-      (_) => null,
+      (failure) => safeEmit(state.copyWith(errorMessage: failure.message)),
+      (_) => safeEmit(state.copyWith(errorMessage: null)),
     );
   }
 
@@ -406,9 +439,10 @@ class PlaylistCubit extends Cubit<PlaylistState> {
         likedError: tracks.isEmpty
             ? 'No liked songs found. Try re-logging into YouTube Music.'
             : null,
+        clearLikedError: tracks.isNotEmpty,
       );
       if (tracks.isNotEmpty) {
-        _saveOnlineCache();
+        await _saveOnlineCache();
       }
     } on YtmException catch (e) {
       ytmOnline.value = ytmOnline.value.copyWith(
@@ -450,7 +484,7 @@ class PlaylistCubit extends Cubit<PlaylistState> {
         clearAccountError: true,
       );
       if (playlists.isNotEmpty) {
-        _saveOnlineCache();
+        await _saveOnlineCache();
       }
     } on YtmException catch (e) {
       ytmOnline.value = ytmOnline.value.copyWith(
@@ -522,7 +556,7 @@ class PlaylistCubit extends Cubit<PlaylistState> {
         customPlaylists: updated,
         clearCustomError: true,
       );
-      _saveOnlineCache();
+      await _saveOnlineCache();
     } catch (e) {
       ytmOnline.value = ytmOnline.value.copyWith(
         customStatus: YtmFetchStatus.error,
@@ -536,17 +570,17 @@ class PlaylistCubit extends Cubit<PlaylistState> {
     final updated =
         ytmOnline.value.customPlaylists.where((p) => p.id != id).toList();
     ytmOnline.value = ytmOnline.value.copyWith(customPlaylists: updated);
-    _saveOnlineCache();
+    unawaited(_saveOnlineCache());
   }
 
   /// Resets all online playlist state (liked + fetched list).
   void clearOnlinePlaylists() {
     ytmOnline.value = const YtmOnlineState();
-    _saveOnlineCache();
+    unawaited(_saveOnlineCache());
   }
 
   @override
-  Future<void> close() {
+  Future<void> close() async {
     if (AppConfig.ytmEnabled) {
       try {
         getIt<YtmAccountService>()
@@ -561,6 +595,7 @@ class PlaylistCubit extends Cubit<PlaylistState> {
       sub.cancel();
     }
     _smartSubscriptions.clear();
+    _smartCriteriaJson.clear();
     return super.close();
   }
 }

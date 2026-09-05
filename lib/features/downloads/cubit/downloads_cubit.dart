@@ -1,8 +1,10 @@
 // lib/features/downloads/cubit/downloads_cubit.dart
 import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:fpdart/fpdart.dart';
 import 'package:injectable/injectable.dart';
 
+import '../../../core/errors/failures.dart';
 import '../../../domain/models/download_task.dart';
 import '../../../domain/usecases/delete_download.dart';
 import '../../../domain/usecases/get_download_storage_stats.dart';
@@ -40,10 +42,15 @@ class DownloadsCubit extends Cubit<DownloadsState> {
 
   Future<void> _init() async {
     emit(state.copyWith(isLoading: true));
-    await loadInitialTasks();
-    await refreshStorageStats();
-    _subscribeToDownloadUpdates();
-    emit(state.copyWith(isLoading: false));
+    try {
+      await loadInitialTasks();
+      _subscribeToDownloadUpdates();
+      await refreshStorageStats();
+    } finally {
+      if (!isClosed) {
+        emit(state.copyWith(isLoading: false));
+      }
+    }
   }
 
   Future<void> loadInitialTasks() async {
@@ -89,6 +96,7 @@ class DownloadsCubit extends Cubit<DownloadsState> {
 
       if (task.status == DownloadStatus.complete ||
           task.status == DownloadStatus.failed) {
+        _lastEmitTimeByVideoId.remove(task.videoId);
         refreshStorageStats();
       }
     });
@@ -108,48 +116,48 @@ class DownloadsCubit extends Cubit<DownloadsState> {
 
   Future<void> queueDownload(DownloadTask task) async {
     final result = await _queueDownloadUseCase(task);
-    result.fold(
-      (failure) {
-        emit(state.copyWith(errorMessage: failure.message));
-      },
-      (_) {},
-    );
+    _applyActionResult(result);
   }
 
   Future<void> pauseDownload(String videoId) async {
     final result = await _pauseDownloadUseCase(videoId);
-    result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
-      (_) {},
-    );
+    _applyActionResult(result);
   }
 
   Future<void> resumeDownload(String videoId) async {
     final result = await _resumeDownloadUseCase(videoId);
-    result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
-      (_) {},
-    );
+    _applyActionResult(result);
   }
 
   Future<void> retryDownload(String videoId) async {
     final result = await _retryDownloadUseCase(videoId);
-    result.fold(
-      (failure) => emit(state.copyWith(errorMessage: failure.message)),
-      (_) {},
-    );
+    _applyActionResult(result);
   }
 
   Future<void> deleteDownload(String videoId) async {
     final result = await _deleteDownloadUseCase(videoId);
+    if (isClosed) return;
     result.fold(
       (failure) => emit(state.copyWith(errorMessage: failure.message)),
       (_) {
+        _lastEmitTimeByVideoId.remove(videoId);
         final remaining = Map<String, DownloadTask>.from(state.tasks)
           ..remove(videoId);
-        emit(state.copyWith(tasks: Map<String, DownloadTask>.unmodifiable(remaining)));
+        emit(state.copyWith(
+          tasks: Map<String, DownloadTask>.unmodifiable(remaining),
+          clearErrorMessage: true,
+        ));
         refreshStorageStats();
       },
+    );
+  }
+
+  /// Surfaces a failure message, or clears a stale one once an action succeeds.
+  void _applyActionResult<R>(Either<AppFailure, R> result) {
+    if (isClosed) return;
+    result.fold(
+      (failure) => emit(state.copyWith(errorMessage: failure.message)),
+      (_) => emit(state.copyWith(clearErrorMessage: true)),
     );
   }
 

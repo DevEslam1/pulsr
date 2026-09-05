@@ -29,7 +29,7 @@ void main() {
   });
 
   group('Backup UseCases Tests', () {
-    test('Export produces valid JSON with version 1', () async {
+    test('Export produces valid JSON with version 2', () async {
       await db.into(db.songsTable).insert(
             SongsTableCompanion.insert(
               id: const Value(1),
@@ -44,7 +44,7 @@ void main() {
       expect(exported, isNotEmpty);
 
       final decoded = jsonDecode(exported) as Map<String, dynamic>;
-      expect(decoded['version'], equals(1));
+      expect(decoded['version'], equals(2));
       expect(decoded['favorites'], contains('/storage/music/song1.mp3'));
       expect(decoded['settings'], isA<Map>());
       expect(decoded['playHistory'], isA<List>());

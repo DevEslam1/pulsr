@@ -1,16 +1,16 @@
 import 'dart:async';
 import 'dart:collection';
 import 'dart:math' as math;
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../../core/bloc/base_cubit.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/folder_usecases.dart';
 import '../../../domain/usecases/search_music_usecase.dart';
 import 'search_state.dart';
 
 @injectable
-class SearchCubit extends Cubit<SearchState> {
+class SearchCubit extends PulsrCubit<SearchState> {
   final SearchMusicUseCase _searchUseCase;
   final FolderUseCases _folderUseCases;
   StreamSubscription? _searchSub;
@@ -29,27 +29,27 @@ class SearchCubit extends Cubit<SearchState> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final list = prefs.getStringList(_historyKey) ?? [];
-      if (!isClosed) emit(state.copyWith(history: list));
+      if (!isClosed) safeEmit(state.copyWith(history: list));
     } catch (_) {}
   }
 
   void _loadHistory() { unawaited(_loadHistoryAsync()); }
 
   void clearError() {
-    emit(state.copyWith(errorMessage: null));
+    safeEmit(state.copyWith(errorMessage: null));
   }
 
   void setFilter(String filter) {
-    emit(state.copyWith(selectedFilter: filter));
+    safeEmit(state.copyWith(selectedFilter: filter));
     _executeSearch(state.query, filterOverride: filter);
   }
 
   void onQueryChanged(String query) {
-    emit(state.copyWith(query: query));
+    safeEmit(state.copyWith(query: query));
     _debounceTimer?.cancel();
-    _debounceTimer = Timer(const Duration(milliseconds: 250), () {
+    _debounceTimer = autoTimer(Timer(const Duration(milliseconds: 250), () {
       _executeSearch(query);
-    });
+    }));
   }
 
   int _generation = 0;
@@ -73,7 +73,7 @@ class SearchCubit extends Cubit<SearchState> {
 
   void clearHistory() async {
     try { final p = await SharedPreferences.getInstance(); await p.remove(_historyKey); } catch (_) {}
-    if (!isClosed) emit(state.copyWith(history: []));
+    if (!isClosed) safeEmit(state.copyWith(history: []));
   }
 
   void useHistoryQuery(String q) => onQueryChanged(q);
@@ -81,10 +81,12 @@ class SearchCubit extends Cubit<SearchState> {
   Future<void> _executeSearch(String query, {String? filterOverride}) async {
     final generation = ++_generation;
     _searchSub?.cancel();
+    removeFromComposite(_searchSub);
     _searchSub = null;
     final trimmed = query.trim();
     if (trimmed.isEmpty) {
-      emit(state.copyWith(results: [], isLoading: false, errorMessage: null));
+      safeEmit(
+          state.copyWith(results: [], isLoading: false, errorMessage: null));
       return;
     }
 
@@ -92,39 +94,51 @@ class SearchCubit extends Cubit<SearchState> {
     final boundedQuery =
         trimmed.length > 64 ? trimmed.substring(0, 64) : trimmed;
 
-    emit(state.copyWith(isLoading: true));
+    safeEmit(state.copyWith(isLoading: true));
 
-    // Cache excluded folders for 5 seconds to reduce DB round-trips while typing
-    final now = DateTime.now();
-    if (_cachedExcludedFolders == null ||
-        _lastExcludedFetch == null ||
-        now.difference(_lastExcludedFetch!).inSeconds > 5) {
-      final excludedRes = await _folderUseCases.getExcludedFolders();
-      if (generation != _generation || isClosed) return;
-      _cachedExcludedFolders = excludedRes.fold((l) => <String>[], (r) => r);
-      _lastExcludedFetch = now;
-    }
+    try {
+      // Cache excluded folders for 5 seconds to reduce DB round-trips while typing
+      final now = DateTime.now();
+      if (_cachedExcludedFolders == null ||
+          _lastExcludedFetch == null ||
+          now.difference(_lastExcludedFetch!).inSeconds > 5) {
+        final excludedRes = await _folderUseCases.getExcludedFolders();
+        if (generation != _generation || isClosed) return;
+        _cachedExcludedFolders = excludedRes.fold((l) => <String>[], (r) => r);
+        _lastExcludedFetch = now;
+      }
 
-    final excluded = _cachedExcludedFolders ?? const <String>[];
+      final excluded = _cachedExcludedFolders ?? const <String>[];
 
-    _searchSub = _searchUseCase
-        .searchSongs(boundedQuery, excludedFolders: excluded)
-        .listen((result) {
-      if (generation != _generation || isClosed) return;
-      result.fold(
-        (failure) => emit(
-            state.copyWith(isLoading: false, errorMessage: failure.message)),
-        (allResults) {
-          final q = normalize(query);
-          final filter = filterOverride ?? state.selectedFilter;
-          final filtered = _filterWithFuzzy(allResults, q, filter);
+      _searchSub = autoSub(
+        _searchUseCase.searchSongs(boundedQuery, excludedFolders: excluded),
+        (result) {
+          if (generation != _generation || isClosed) return;
+          result.fold(
+            (failure) => safeEmit(state.copyWith(
+                isLoading: false, errorMessage: failure.message)),
+            (allResults) {
+              final q = normalize(query);
+              final filter = filterOverride ?? state.selectedFilter;
+              final filtered = _filterWithFuzzy(allResults, q, filter);
 
-          emit(state.copyWith(
-              results: filtered, isLoading: false, errorMessage: null));
-          if (filtered.isNotEmpty) unawaited(_persistHistory(boundedQuery));
+              safeEmit(state.copyWith(
+                  results: filtered, isLoading: false, errorMessage: null));
+              if (filtered.isNotEmpty) unawaited(_persistHistory(boundedQuery));
+            },
+          );
         },
+        onError: (error, stackTrace) => _failSearch(generation, error, stackTrace),
       );
-    });
+    } catch (e, st) {
+      _failSearch(generation, e, st);
+    }
+  }
+
+  void _failSearch(int generation, Object error, StackTrace stackTrace) {
+    addError(error, stackTrace);
+    if (generation != _generation || isClosed) return;
+    safeEmit(state.copyWith(isLoading: false, errorMessage: 'Search failed'));
   }
 
   /// Normalizes Unicode, Arabic diacritics / letter variants, and Latin accents for fuzzy search
@@ -153,8 +167,10 @@ class SearchCubit extends Cubit<SearchState> {
     return str.trim();
   }
 
-  // LRU bounded cache to prevent unbounded 10k retention (was Expando leak)
-  static final LinkedHashMap<int, ({String title, String artist, String album})> _normCache = LinkedHashMap();
+  // LRU bounded cache to prevent unbounded 10k retention (was Expando leak).
+  // Keyed by raw metadata so a retagged song is not served stale normalized
+  // text; the superseded entry ages out through LRU eviction.
+  final LinkedHashMap<String, ({String title, String artist, String album})> _normCache = LinkedHashMap();
   static const int _normCacheMax = 1000;
 
   List<SongsTableData> _filterWithFuzzy(
@@ -165,15 +181,16 @@ class SearchCubit extends Cubit<SearchState> {
     for (final song in songs) {
       if (results.length >= 100) break;
 
-      var norm = _normCache[song.id];
+      final key = '${song.id}|${song.title}|${song.artist}|${song.album}';
+      var norm = _normCache[key];
       if (norm == null) {
         norm = (title: normalize(song.title), artist: normalize(song.artist), album: normalize(song.album));
         if (_normCache.length >= _normCacheMax) _normCache.remove(_normCache.keys.first);
-        _normCache[song.id] = norm;
+        _normCache[key] = norm;
       } else {
         // Refresh LRU
-        _normCache.remove(song.id);
-        _normCache[song.id] = norm;
+        _normCache.remove(key);
+        _normCache[key] = norm;
       }
       final title = norm.title;
       final artist = norm.artist;
@@ -249,8 +266,9 @@ class SearchCubit extends Cubit<SearchState> {
     _debounceTimer?.cancel();
     _debounceTimer = null;
     _searchSub?.cancel();
+    removeFromComposite(_searchSub);
     _searchSub = null;
-    emit(state.copyWith(
+    safeEmit(state.copyWith(
         query: '', results: [], isLoading: false, errorMessage: null));
   }
 

@@ -974,8 +974,8 @@ class _OnlineCategorySection extends StatelessWidget {
 
         final tracks = snapshot.data!;
         final songs = [for (final track in tracks) track.toSongData()];
-        return BlocProvider<YtmDownloadCubit>(
-          create: (_) => getIt<YtmDownloadCubit>(),
+        return BlocProvider<YtmDownloadCubit>.value(
+          value: getIt<YtmDownloadCubit>(),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

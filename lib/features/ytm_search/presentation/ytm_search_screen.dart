@@ -19,7 +19,8 @@ class YtmSearchScreen extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider(create: (_) => getIt<YtmSearchCubit>()),
-        BlocProvider(create: (_) => getIt<YtmDownloadCubit>()),
+        BlocProvider<YtmDownloadCubit>.value(
+            value: getIt<YtmDownloadCubit>()),
       ],
       child: const _YtmSearchView(),
     );

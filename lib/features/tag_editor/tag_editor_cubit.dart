@@ -22,6 +22,10 @@ class TagEditorCubit extends Cubit<TagEditorState> {
   bool _batchGenreEdited = false;
   bool _batchYearEdited = false;
 
+  // Fields the user already edited; an in-flight [loadTags] must not
+  // overwrite them.
+  final Set<String> _userEditedFields = <String>{};
+
   TagEditorCubit({
     required SongsTableData song,
     List<SongsTableData>? batchSongs,
@@ -88,18 +92,27 @@ class TagEditorCubit extends Cubit<TagEditorState> {
         final comment = (tags['comment'] as String?)?.trim();
         final lyrics = (tags['lyrics'] as String?)?.trim();
         final artworkData = tags['artwork'] as Uint8List?;
+        bool edited(String field) => _userEditedFields.contains(field);
 
         emit(state.copyWith(
           status: TagEditorStatus.loaded,
-          title: (title != null && title.isNotEmpty) ? title : state.title,
-          artist: (artist != null && artist.isNotEmpty) ? artist : state.artist,
-          album: (album != null && album.isNotEmpty) ? album : state.album,
-          genre: genre ?? state.genre,
-          year: year ?? state.year,
-          trackNumber: trackNumber ?? state.trackNumber,
-          comment: comment ?? '',
-          lyrics: lyrics ?? '',
-          artworkBytes: artworkData,
+          title: (edited('title') || title == null || title.isEmpty)
+              ? state.title
+              : title,
+          artist: (edited('artist') || artist == null || artist.isEmpty)
+              ? state.artist
+              : artist,
+          album: (edited('album') || album == null || album.isEmpty)
+              ? state.album
+              : album,
+          genre: edited('genre') ? state.genre : (genre ?? state.genre),
+          year: edited('year') ? state.year : (year ?? state.year),
+          trackNumber: edited('trackNumber')
+              ? state.trackNumber
+              : (trackNumber ?? state.trackNumber),
+          comment: edited('comment') ? state.comment : (comment ?? ''),
+          lyrics: edited('lyrics') ? state.lyrics : (lyrics ?? ''),
+          artworkBytes: edited('artwork') ? state.artworkBytes : artworkData,
         ));
       } else {
         emit(state.copyWith(status: TagEditorStatus.loaded));
@@ -117,29 +130,34 @@ class TagEditorCubit extends Cubit<TagEditorState> {
 
   void updateTitle(String val) {
     if (isClosed) return;
+    _userEditedFields.add('title');
     emit(state.copyWith(title: val));
   }
 
   void updateArtist(String val) {
     if (isClosed) return;
+    _userEditedFields.add('artist');
     if (state.isBatchMode) _batchArtistEdited = true;
     emit(state.copyWith(artist: val));
   }
 
   void updateAlbum(String val) {
     if (isClosed) return;
+    _userEditedFields.add('album');
     if (state.isBatchMode) _batchAlbumEdited = true;
     emit(state.copyWith(album: val));
   }
 
   void updateGenre(String val) {
     if (isClosed) return;
+    _userEditedFields.add('genre');
     if (state.isBatchMode) _batchGenreEdited = true;
     emit(state.copyWith(genre: val));
   }
 
   void updateYear(String val) {
     if (isClosed) return;
+    _userEditedFields.add('year');
     if (state.isBatchMode) _batchYearEdited = true;
     emit(state.copyWith(year: val));
   }
@@ -148,18 +166,21 @@ class TagEditorCubit extends Cubit<TagEditorState> {
   bool _batchCommentEdited = false;
   void updateTrackNumber(String val) {
     if (isClosed) return;
+    _userEditedFields.add('trackNumber');
     if (state.isBatchMode) _batchTrackEdited = true;
     emit(state.copyWith(trackNumber: val));
   }
 
   void updateComment(String val) {
     if (isClosed) return;
+    _userEditedFields.add('comment');
     if (state.isBatchMode) _batchCommentEdited = true;
     emit(state.copyWith(comment: val));
   }
 
   void updateLyrics(String val) {
     if (isClosed) return;
+    _userEditedFields.add('lyrics');
     emit(state.copyWith(lyrics: val));
   }
 
@@ -174,6 +195,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
       );
       if (isClosed) return;
       if (image != null) {
+        _userEditedFields.add('artwork');
         emit(state.copyWith(
           newArtworkPath: image.path,
           removeArtwork: false,
@@ -191,6 +213,7 @@ class TagEditorCubit extends Cubit<TagEditorState> {
 
   void removeArtworkImage() {
     if (isClosed) return;
+    _userEditedFields.add('artwork');
     emit(state.copyWith(
       removeArtwork: true,
       clearNewArtworkPath: true,
@@ -358,6 +381,12 @@ class TagEditorCubit extends Cubit<TagEditorState> {
             clearBatchProgress: true,
           ));
         } else {
+          _batchArtistEdited = false;
+          _batchAlbumEdited = false;
+          _batchGenreEdited = false;
+          _batchYearEdited = false;
+          _batchTrackEdited = false;
+          _batchCommentEdited = false;
           emit(state.copyWith(
               status: TagEditorStatus.success, clearBatchProgress: true));
         }

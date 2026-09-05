@@ -321,8 +321,8 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
         track: song.title,
         album: song.album,
         durationMs: song.durationMs,
-        positionMs: position.inMilliseconds,
-        isPlaying: isPlaying,
+        positionMs: state.position.inMilliseconds,
+        isPlaying: state.isPlaying,
       );
       _scrobbleDebounce = null;
     }));
@@ -555,6 +555,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     autoSub(_audioHandler.queue, (mediaItems) async {
       if (mediaItems.isNotEmpty &&
           (state.queue.isEmpty || state.queue.length != mediaItems.length)) {
+        final gen = _mediaItemResolutionGen;
         final ids =
             mediaItems.map((m) => int.tryParse(m.id)).whereType<int>().toList();
         final songsRes = await _repository.getSongsByIds(ids);
@@ -586,7 +587,8 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
             ));
           }
         }
-        if (restoredSongs.isNotEmpty && !isClosed) {
+        if (isClosed || gen != _mediaItemResolutionGen) return;
+        if (restoredSongs.isNotEmpty) {
           safeEmit(state.copyWith(queue: restoredSongs));
         }
       }
@@ -902,8 +904,13 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       try {
         _latencyTracker?.finishWithError(e, stage: PlaybackStage.sourceSet);
       } catch (_) {}
+      safeEmit(state.copyWith(
+        isPlaying: false,
+        errorMessage: 'Failed to play ${song.title}',
+      ));
       rethrow;
     }
+    if (isClosed || _mediaItemResolutionGen != capturedGen) return;
     unawaited(_loadLyricsForSong(song));
     _updateWidgetThrottled(force: true);
   }
@@ -945,33 +952,56 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   }
 
   Future<void> reorderQueue(int oldIndex, int newIndex) async {
+    if (oldIndex < 0 ||
+        oldIndex >= state.queue.length ||
+        newIndex < 0 ||
+        newIndex > state.queue.length) {
+      return;
+    }
     await _audioHandler.reorderQueue(oldIndex, newIndex);
     final updatedQueue = List<SongsTableData>.from(state.queue);
     if (oldIndex < newIndex) newIndex -= 1;
     final song = updatedQueue.removeAt(oldIndex);
     updatedQueue.insert(newIndex, song);
+    var updatedIndex = state.currentIndex;
+    if (updatedIndex == oldIndex) {
+      updatedIndex = newIndex;
+    } else if (oldIndex < updatedIndex && newIndex >= updatedIndex) {
+      updatedIndex--;
+    } else if (oldIndex > updatedIndex && newIndex <= updatedIndex) {
+      updatedIndex++;
+    }
     _queueSlots[state.activeQueueSlot] = _QueueSlotData(
       songs: updatedQueue,
-      currentIndex: state.currentIndex,
+      currentIndex: updatedIndex,
       position: state.position,
       speed: state.playbackSpeed,
     );
     _debouncedPersistQueueSlots();
-    safeEmit(state.copyWith(queue: updatedQueue));
+    safeEmit(state.copyWith(queue: updatedQueue, currentIndex: updatedIndex));
   }
 
   Future<void> removeQueueItem(int index) async {
+    if (index < 0 || index >= state.queue.length) return;
     await _audioHandler.removeQueueItemAt(index);
     final updatedQueue = List<SongsTableData>.from(state.queue)
       ..removeAt(index);
+    var updatedIndex = state.currentIndex;
+    if (updatedQueue.isEmpty) {
+      updatedIndex = 0;
+    } else if (index < updatedIndex) {
+      updatedIndex--;
+    } else if (index == updatedIndex) {
+      updatedIndex = updatedIndex.clamp(0, updatedQueue.length - 1);
+    }
     _queueSlots[state.activeQueueSlot] = _QueueSlotData(
       songs: updatedQueue,
-      currentIndex: state.currentIndex,
+      currentIndex: updatedIndex,
       position: state.position,
       speed: state.playbackSpeed,
     );
     _debouncedPersistQueueSlots();
-    safeEmit(state.copyWith(queue: updatedQueue));
+    safeEmit(state.copyWith(queue: updatedQueue, currentIndex: updatedIndex));
   }
 
   bool _isSwitchingSlot = false;
@@ -1071,7 +1101,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   }
 
   Future<void> togglePlayPause() async {
-    if (state.isPlaying) {
+    if (_audioHandler.playbackState.value.playing) {
       await _audioHandler.pause();
     } else {
       await _audioHandler.play();
@@ -1595,7 +1625,6 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       // De-dup: the output stream also fires on format changes (sample rate,
       // bit depth) for the same device; only switch when the device changes.
       if (_lastAutoAppliedDeviceKey == key) return;
-      _lastAutoAppliedDeviceKey = key;
       if (!await service.isAutoSwitchEnabled()) return;
       final link = await service.linkForDeviceKey(key);
       if (link == null) return;
@@ -1609,6 +1638,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       }
       if (profile == null) return;
       await applyProfile(profile);
+      _lastAutoAppliedDeviceKey = key;
     } catch (e, st) {
       ErrorLogger.log('Device profile auto-switch failed',
           error: e, stackTrace: st, category: 'PlayerCubit');

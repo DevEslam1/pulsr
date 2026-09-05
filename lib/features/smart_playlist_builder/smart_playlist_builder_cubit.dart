@@ -87,9 +87,11 @@ class SmartPlaylistBuilderCubit extends Cubit<SmartPlaylistBuilderState> {
     _previewSub?.cancel();
     _previewSub = _engine.watchCriteria(state.criteria).listen(
       (songs) {
+        if (isClosed) return;
         emit(state.copyWith(previewSongs: songs));
       },
       onError: (_) {
+        if (isClosed) return;
         emit(state.copyWith(previewSongs: []));
       },
     );
@@ -104,23 +106,34 @@ class SmartPlaylistBuilderCubit extends Cubit<SmartPlaylistBuilderState> {
 
     emit(state.copyWith(isSubmitting: true, errorMessage: null));
 
-    if (state.isEditing && state.editingPlaylistId != null) {
-      final res = await _playlistUseCases.updateSmartPlaylist(
-        state.editingPlaylistId!,
-        name,
-        state.criteria.toJsonString(),
-      );
-      emit(state.copyWith(isSubmitting: false));
-      return res.isRight();
-    } else {
+    try {
+      if (state.isEditing && state.editingPlaylistId != null) {
+        final res = await _playlistUseCases.updateSmartPlaylist(
+          state.editingPlaylistId!,
+          name,
+          state.criteria.toJsonString(),
+        );
+        return _finishSave(res.isRight(), res.getLeft().toNullable()?.message);
+      }
       final res = await _playlistUseCases.createPlaylist(
         name,
         isSmart: true,
         smartCriteria: state.criteria.toJsonString(),
       );
-      emit(state.copyWith(isSubmitting: false));
-      return res.isRight();
+      return _finishSave(res.isRight(), res.getLeft().toNullable()?.message);
+    } catch (_) {
+      return _finishSave(false, 'Could not save the playlist. Please try again.');
     }
+  }
+
+  bool _finishSave(bool succeeded, String? failureMessage) {
+    if (!isClosed) {
+      emit(state.copyWith(
+        isSubmitting: false,
+        errorMessage: succeeded ? null : failureMessage,
+      ));
+    }
+    return succeeded;
   }
 
   @override

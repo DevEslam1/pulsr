@@ -11,6 +11,7 @@ class AuthCubit extends Cubit<AuthState> {
   final AuthService _authService;
   final CloudSyncService _cloudSyncService;
   StreamSubscription? _authSubscription;
+  bool _syncing = false;
 
   AuthCubit(this._authService, this._cloudSyncService)
       : super(AuthState(lastSyncedAt: _cloudSyncService.lastSyncTime)) {
@@ -19,6 +20,7 @@ class AuthCubit extends Cubit<AuthState> {
 
   void _init() {
     _authSubscription = _authService.authStateChanges.listen((user) {
+      if (isClosed) return;
       if (user != null) {
         emit(state.copyWith(
           status: AuthStatus.authenticated,
@@ -154,30 +156,39 @@ class AuthCubit extends Cubit<AuthState> {
   }
 
   Future<void> syncNow() async {
-    if (state.user == null) return;
+    if (state.user == null || _syncing) return;
+    _syncing = true;
     emit(state.copyWith(syncStatus: SyncStatus.syncing, syncError: null));
-    final success = await _cloudSyncService.syncAll();
-    if (success) {
-      emit(state.copyWith(
-        syncStatus: SyncStatus.success,
-        lastSyncedAt: _cloudSyncService.lastSyncTime,
-        syncError: null,
-      ));
-    } else {
+    try {
+      final success = await _cloudSyncService.syncAll();
+      if (isClosed) return;
+      if (success) {
+        emit(state.copyWith(
+          syncStatus: SyncStatus.success,
+          lastSyncedAt: _cloudSyncService.lastSyncTime,
+          syncError: null,
+        ));
+      } else {
+        emit(state.copyWith(
+          syncStatus: SyncStatus.failure,
+          syncError: 'Failed to sync with cloud. Check internet connection.',
+        ));
+      }
+    } catch (_) {
+      if (isClosed) return;
       emit(state.copyWith(
         syncStatus: SyncStatus.failure,
         syncError: 'Failed to sync with cloud. Check internet connection.',
       ));
+    } finally {
+      _syncing = false;
     }
   }
 
   Future<void> signOut() async {
     await _authService.signOut();
-    emit(state.copyWith(
-      status: AuthStatus.unauthenticated,
-      user: null,
-      syncStatus: SyncStatus.idle,
-    ));
+    if (isClosed) return;
+    emit(const AuthState(status: AuthStatus.unauthenticated));
   }
 
   @override

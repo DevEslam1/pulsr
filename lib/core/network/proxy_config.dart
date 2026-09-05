@@ -350,6 +350,7 @@ class ProxyEntry {
     int? latencyMs,
     bool? isWorking,
     String? lastError,
+    bool clearLastError = false,
     bool? isTesting,
   }) {
     return ProxyEntry(
@@ -362,7 +363,7 @@ class ProxyEntry {
       label: label ?? this.label,
       latencyMs: latencyMs ?? this.latencyMs,
       isWorking: isWorking ?? this.isWorking,
-      lastError: lastError ?? this.lastError,
+      lastError: clearLastError ? null : (lastError ?? this.lastError),
       isTesting: isTesting ?? this.isTesting,
     );
   }
