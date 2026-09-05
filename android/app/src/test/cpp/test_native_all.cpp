@@ -463,6 +463,7 @@ void runDspStressTest() {
         ringIdxMod = (ringIdxMod + 1) % firTaps;
     }
     auto tModEnd = std::chrono::high_resolution_clock::now();
+    auto modMicros = std::chrono::duration_cast<std::chrono::microseconds>(tModEnd - tModStart).count();
     // Warmup caches
     for (int tap = 0; tap < firTaps; ++tap) {
         sumOpt += firRing[tap + firTaps] * firIr[tap];

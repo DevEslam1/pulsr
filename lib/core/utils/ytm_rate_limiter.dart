@@ -3,6 +3,24 @@ import 'dart:async';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Simple asynchronous mutex to serialize token acquisitions.
+class AsyncMutex {
+  Future<void> _last = Future.value();
+
+  Future<T> run<T>(Future<T> Function() action) {
+    final completer = Completer<T>();
+    _last = _last.then((_) async {
+      try {
+        final res = await action();
+        completer.complete(res);
+      } catch (e, st) {
+        completer.completeError(e, st);
+      }
+    });
+    return completer.future;
+  }
+}
+
 /// Dart-side adaptive token-bucket rate limiter for YouTube Music API requests.
 ///
 /// Prevents rapid-fire HTTP requests from the Dart layer from triggering
@@ -10,6 +28,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 class YtmRateLimiter {
   YtmRateLimiter._();
   static final YtmRateLimiter shared = YtmRateLimiter._();
+
+  final AsyncMutex _nativeMutex = AsyncMutex();
+  final AsyncMutex _backendMutex = AsyncMutex();
 
   static const String _keyTokens = 'ytm_rate_limiter_tokens';
   static const String _keyLastRefill = 'ytm_rate_limiter_last_refill';
@@ -171,47 +192,45 @@ class YtmRateLimiter {
   }
 
   /// Acquires a permit before making a native YTM request.
-  Future<void> acquirePermit() async {
-    final now = DateTime.now();
-    if (now.isBefore(_backoffUntil)) {
-      await Future<void>.delayed(_backoffUntil.difference(now));
-    }
+  Future<void> acquirePermit() => _nativeMutex.run(() async {
+    while (true) {
+      final now = DateTime.now();
+      if (now.isBefore(_backoffUntil)) {
+        await Future<void>.delayed(_backoffUntil.difference(now));
+      }
 
-    _refill();
-    if (_tokens >= 1.0) {
-      _tokens -= 1.0;
-      _persist();
-      return;
-    }
+      _refill();
+      if (_tokens >= 1.0) {
+        _tokens -= 1.0;
+        _persist();
+        return;
+      }
 
-    // Wait for the next token to become available
-    final waitMs = ((1.0 - _tokens) / _refillRate * 1000).ceil();
-    await Future<void>.delayed(Duration(milliseconds: waitMs));
-    _refill();
-    _tokens = (_tokens - 1.0).clamp(0.0, _maxTokens.toDouble());
-    _persist();
-  }
+      // Wait for the next token to become available
+      final waitMs = ((1.0 - _tokens) / _refillRate * 1000).ceil().clamp(10, 5000);
+      await Future<void>.delayed(Duration(milliseconds: waitMs));
+    }
+  });
 
   /// Acquires a permit before making a backend microservice request.
-  Future<void> acquireBackendPermit() async {
-    final now = DateTime.now();
-    if (now.isBefore(_backendBackoffUntil)) {
-      await Future<void>.delayed(_backendBackoffUntil.difference(now));
-    }
+  Future<void> acquireBackendPermit() => _backendMutex.run(() async {
+    while (true) {
+      final now = DateTime.now();
+      if (now.isBefore(_backendBackoffUntil)) {
+        await Future<void>.delayed(_backendBackoffUntil.difference(now));
+      }
 
-    _refillBackend();
-    if (_backendTokens >= 1.0) {
-      _backendTokens -= 1.0;
-      _persist();
-      return;
-    }
+      _refillBackend();
+      if (_backendTokens >= 1.0) {
+        _backendTokens -= 1.0;
+        _persist();
+        return;
+      }
 
-    final waitMs = ((1.0 - _backendTokens) / _backendRefillRate * 1000).ceil();
-    await Future<void>.delayed(Duration(milliseconds: waitMs));
-    _refillBackend();
-    _backendTokens = (_backendTokens - 1.0).clamp(0.0, _backendMaxTokens.toDouble());
-    _persist();
-  }
+      final waitMs = ((1.0 - _backendTokens) / _backendRefillRate * 1000).ceil().clamp(10, 5000);
+      await Future<void>.delayed(Duration(milliseconds: waitMs));
+    }
+  });
 
   /// Called when a 429 rate-limit response is received from native YouTube.
   /// [_adaptiveMultiplier] actually scales the backoff (previously it was
@@ -221,7 +240,8 @@ class YtmRateLimiter {
     _adaptiveMultiplier = (_adaptiveMultiplier * 2).clamp(1, 16);
 
     if (retryAfterSeconds != null && retryAfterSeconds > 0) {
-      _backoffUntil = now.add(Duration(seconds: retryAfterSeconds));
+      final jitter = Duration(milliseconds: _random.nextInt(1000));
+      _backoffUntil = now.add(Duration(seconds: retryAfterSeconds) + jitter);
     } else {
       final remaining = _backoffUntil.isAfter(now)
           ? _backoffUntil.difference(now)
@@ -244,7 +264,8 @@ class YtmRateLimiter {
     final seconds = (retryAfterSeconds != null && retryAfterSeconds > 0)
         ? retryAfterSeconds
         : 60;
-    _backendBackoffUntil = now.add(Duration(seconds: seconds));
+    final jitter = Duration(milliseconds: _random.nextInt(1000));
+    _backendBackoffUntil = now.add(Duration(seconds: seconds) + jitter);
     _persist();
   }
 

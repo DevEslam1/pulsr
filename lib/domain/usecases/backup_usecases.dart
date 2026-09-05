@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:drift/drift.dart';
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/constants/prefs_keys.dart';
 import '../../core/utils/error_logger.dart';
 import '../../data/db/app_database.dart';
 import '../repositories/music_repository_interface.dart';
@@ -14,6 +15,9 @@ class ImportResult {
   final int restoredSettingsCount;
   final int restoredHistoryCount;
   final int restoredExcludedFoldersCount;
+  final int restoredEqProfilesCount;
+  final int restoredAutomationRulesCount;
+  final int restoredDownloadsCount;
   final List<String> unmatchedPaths;
 
   const ImportResult({
@@ -22,6 +26,9 @@ class ImportResult {
     this.restoredSettingsCount = 0,
     this.restoredHistoryCount = 0,
     this.restoredExcludedFoldersCount = 0,
+    this.restoredEqProfilesCount = 0,
+    this.restoredAutomationRulesCount = 0,
+    this.restoredDownloadsCount = 0,
     this.unmatchedPaths = const [],
   });
 }
@@ -122,14 +129,48 @@ class ExportBackupUseCase {
     final excludedResult = await _repository.getExcludedFolderPaths();
     final excludedFolders = excludedResult.fold((l) => <String>[], (r) => r);
 
+    // 6. Custom EQ Profiles & Presets
+    final customEqProfilesJson = prefs.getString(PrefsKeys.customEqProfiles);
+    dynamic customEqProfilesData;
+    if (customEqProfilesJson != null) {
+      try {
+        customEqProfilesData = jsonDecode(customEqProfilesJson);
+      } catch (_) {}
+    }
+
+    // 7. Automation Rules
+    final rulesJson = prefs.getString('setting_automation_rules');
+    dynamic automationRulesData;
+    if (rulesJson != null) {
+      try {
+        automationRulesData = jsonDecode(rulesJson);
+      } catch (_) {}
+    }
+
+    // 8. Downloaded Tracks Metadata
+    final downloadedTracks = allSongs
+        .where((s) => s.isDownloaded)
+        .map((s) => {
+              'title': s.title,
+              'artist': s.artist,
+              'album': s.album,
+              'path': s.path,
+              'remoteId': s.remoteId,
+              'durationMs': s.durationMs,
+            })
+        .toList();
+
     final backupPayload = {
-      'version': 1,
+      'version': 2,
       'exportedAt': DateTime.now().toIso8601String(),
       'favorites': favoritePaths,
       'playlists': playlistsData,
       'settings': settingsMap,
       'playHistory': historyData,
       'excludedFolders': excludedFolders,
+      if (customEqProfilesData != null) 'customEqProfiles': customEqProfilesData,
+      if (automationRulesData != null) 'automationRules': automationRulesData,
+      if (downloadedTracks.isNotEmpty) 'downloads': downloadedTracks,
     };
 
     return const JsonEncoder.withIndent('  ').convert(backupPayload);
@@ -488,19 +529,71 @@ class ImportBackupUseCase {
       }
     }
 
+    // 6. Restore Custom EQ Profiles
+    int restoredEqProfilesCount = 0;
+    final prefs = await SharedPreferences.getInstance();
+    if (data['customEqProfiles'] != null) {
+      try {
+        final profilesData = data['customEqProfiles'];
+        final serialized = jsonEncode(profilesData);
+        await prefs.setString(PrefsKeys.customEqProfiles, serialized);
+        restoredEqProfilesCount = (profilesData is List) ? profilesData.length : 1;
+      } catch (e, st) {
+        ErrorLogger.log('Failed restoring custom EQ profiles',
+            error: e, stackTrace: st, category: 'Backup');
+      }
+    }
+
+    // 7. Restore Automation Rules
+    int restoredAutomationRulesCount = 0;
+    if (data['automationRules'] != null && data['automationRules'] is List) {
+      try {
+        final rulesList = data['automationRules'] as List;
+        await prefs.setString('setting_automation_rules', jsonEncode(rulesList));
+        restoredAutomationRulesCount = rulesList.length;
+      } catch (e, st) {
+        ErrorLogger.log('Failed restoring automation rules',
+            error: e, stackTrace: st, category: 'Backup');
+      }
+    }
+
+    // 8. Restore Downloads Metadata
+    int restoredDownloadsCount = 0;
+    if (data['downloads'] != null && data['downloads'] is List) {
+      final dlList = data['downloads'] as List;
+      await _db.transaction(() async {
+        for (final item in dlList) {
+          if (item is Map<String, dynamic>) {
+            final path = item['path'] as String?;
+            final remoteId = item['remoteId'] as String?;
+            final matched = matchPath(path ?? '') ?? (remoteId != null ? remoteIdMap[remoteId] : null);
+            if (matched != null && !matched.isDownloaded) {
+              await (_db.update(_db.songsTable)
+                    ..where((t) => t.id.equals(matched.id)))
+                  .write(const SongsTableCompanion(isDownloaded: Value(true)));
+              restoredDownloadsCount++;
+            }
+          }
+        }
+      });
+    }
+
     return ImportResult(
       restoredFavoritesCount: restoredFavoritesCount,
       restoredPlaylistsCount: restoredPlaylistsCount,
       restoredSettingsCount: restoredSettingsCount,
       restoredHistoryCount: restoredHistoryCount,
       restoredExcludedFoldersCount: restoredExcludedCount,
+      restoredEqProfilesCount: restoredEqProfilesCount,
+      restoredAutomationRulesCount: restoredAutomationRulesCount,
+      restoredDownloadsCount: restoredDownloadsCount,
       unmatchedPaths: unmatchedPaths.toList(),
     );
   }
 
   void _validateSchema(Map<String, dynamic> data) {
     final version = data['version'];
-    if (version == null || version is! int || version < 1) {
+    if (version == null || version is! int || version < 1 || version > 2) {
       throw const FormatException('Invalid or unsupported backup version');
     }
 
@@ -536,6 +629,18 @@ class ImportBackupUseCase {
 
     if (data['excludedFolders'] != null && data['excludedFolders'] is! List) {
       throw const FormatException('excludedFolders must be a list');
+    }
+
+    if (data['customEqProfiles'] != null && data['customEqProfiles'] is! List && data['customEqProfiles'] is! Map) {
+      throw const FormatException('customEqProfiles must be a list or map');
+    }
+
+    if (data['automationRules'] != null && data['automationRules'] is! List) {
+      throw const FormatException('automationRules must be a list');
+    }
+
+    if (data['downloads'] != null && data['downloads'] is! List) {
+      throw const FormatException('downloads must be a list');
     }
   }
 }

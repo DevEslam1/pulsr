@@ -11,6 +11,7 @@ import '../../../core/widgets/empty_state_widget.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../domain/usecases/folder_usecases.dart';
+import '../../library/cubit/library_cubit.dart';
 import '../../player/cubit/player_cubit.dart';
 import '../../sheets/song_info_sheet.dart';
 
@@ -30,11 +31,13 @@ class FolderDetailScreen extends StatefulWidget {
 
 class _FolderDetailScreenState extends State<FolderDetailScreen> {
   late FolderUseCases _useCase;
+  late bool _isExcluded;
 
   @override
   void initState() {
     super.initState();
     _useCase = widget.folderUseCases ?? getIt<FolderUseCases>();
+    _isExcluded = widget.folder.isExcluded;
   }
 
   @override
@@ -48,22 +51,27 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
         actions: [
           IconButton(
             icon: Icon(
-              folder.isExcluded
+              _isExcluded
                   ? Icons.visibility_off_rounded
                   : Icons.visibility_rounded,
-              color: folder.isExcluded ? p.error : p.textSecondary,
+              color: _isExcluded ? p.error : p.textSecondary,
             ),
             tooltip:
-                folder.isExcluded ? 'Include in Scan' : 'Exclude from Scan',
+                _isExcluded ? 'Include in Scan' : 'Exclude from Scan',
             onPressed: () async {
+              final newExcluded = !_isExcluded;
+              setState(() => _isExcluded = newExcluded);
               await _useCase.toggleExcludeFolder(folder.path);
               if (context.mounted) {
+                try {
+                  context.read<LibraryCubit>().loadFolders();
+                } catch (_) {}
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      folder.isExcluded
-                          ? 'Folder included in library scan'
-                          : 'Folder excluded from library scan',
+                      newExcluded
+                          ? 'Folder excluded from library scan'
+                          : 'Folder included in library scan',
                     ),
                   ),
                 );
@@ -138,11 +146,11 @@ class _FolderDetailScreenState extends State<FolderDetailScreen> {
                         ],
                       ),
                       child: Icon(
-                        folder.isExcluded
+                        _isExcluded
                             ? Icons.folder_off_rounded
                             : Icons.folder_rounded,
                         size: 48,
-                        color: folder.isExcluded ? p.error : p.accent,
+                        color: _isExcluded ? p.error : p.accent,
                       ),
                     ),
                   ),

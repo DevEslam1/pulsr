@@ -78,6 +78,8 @@ class CloudSyncService {
     await prefs.setBool(_keySyncPlaylists, enabled);
   }
 
+  static const String _keySyncedHashes = 'cloud_sync_hashes_cache';
+
   String _stableSongId(SongsTableData song) {
     if (song.remoteId != null && song.remoteId!.isNotEmpty) {
       return 'yt_${song.remoteId}';
@@ -88,8 +90,36 @@ class CloudSyncService {
   }
 
   String _stablePlaylistId(PlaylistsTableData pl) {
-    final raw = '${pl.name.trim().toLowerCase()}|${pl.isSmart}';
-    return sha256.convert(utf8.encode(raw)).toString();
+    final prefs = _prefs;
+    final cached = prefs?.getString('sync_pl_stable_id_${pl.id}');
+    if (cached != null && cached.isNotEmpty) {
+      return cached;
+    }
+    final raw = 'pl_${pl.id}_${pl.createdAt.millisecondsSinceEpoch}_${pl.name.trim().toLowerCase()}';
+    final generated = sha256.convert(utf8.encode(raw)).toString().substring(0, 24);
+    prefs?.setString('sync_pl_stable_id_${pl.id}', generated);
+    return generated;
+  }
+
+  Future<void> _loadSyncedHashes() async {
+    final prefs = await _getPrefs();
+    final jsonStr = prefs.getString(_keySyncedHashes);
+    if (jsonStr != null) {
+      try {
+        final decoded = jsonDecode(jsonStr);
+        if (decoded is Map<String, dynamic>) {
+          _syncedDocHashes.clear();
+          decoded.forEach((k, v) => _syncedDocHashes[k] = v.toString());
+        }
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _persistSyncedHashes() async {
+    final prefs = await _getPrefs();
+    try {
+      await prefs.setString(_keySyncedHashes, jsonEncode(_syncedDocHashes));
+    } catch (_) {}
   }
 
   Future<bool> syncAll(
@@ -98,7 +128,7 @@ class CloudSyncService {
     if (user == null) return false;
 
     try {
-      _syncedDocHashes.clear();
+      await _loadSyncedHashes();
       final firestore = FirebaseFirestore.instance;
       final userDoc = firestore.collection('users').doc(user.uid);
 
@@ -111,6 +141,7 @@ class CloudSyncService {
           syncFavorites: syncFavorites, syncPlaylists: syncPlaylists);
 
       await _setLastSyncTime(DateTime.now());
+      await _persistSyncedHashes();
       return true;
     } catch (e, st) {
       ErrorLogger.log('Cloud sync failed',
@@ -120,6 +151,24 @@ class CloudSyncService {
   }
 
   final Map<String, String> _syncedDocHashes = <String, String>{};
+
+  Future<void> _commitWithRetry(WriteBatch batch) async {
+    int attempts = 0;
+    while (attempts < 3) {
+      attempts++;
+      try {
+        await batch.commit();
+        return;
+      } catch (e, st) {
+        if (attempts >= 3) {
+          ErrorLogger.log('Batch commit failed after 3 attempts',
+              error: e, stackTrace: st, category: 'CloudSync');
+        } else {
+          await Future<void>.delayed(Duration(milliseconds: 200 * attempts));
+        }
+      }
+    }
+  }
 
   Future<void> _uploadLocalData(
     DocumentReference userDoc, {
@@ -135,12 +184,7 @@ class CloudSyncService {
         final batchToCommit = currentBatch;
         currentBatch = firestore.batch();
         opCount = 0;
-        try {
-          await batchToCommit.commit();
-        } catch (e, st) {
-          ErrorLogger.log('Batch commit failed',
-              error: e, stackTrace: st, category: 'CloudSync');
-        }
+        await _commitWithRetry(batchToCommit);
       }
     }
 
@@ -209,6 +253,7 @@ class CloudSyncService {
               plDoc,
               {
                 'id': pl.id,
+                'syncId': plDocId,
                 'name': pl.name,
                 'createdAt': pl.createdAt.toIso8601String(),
                 'isSmart': pl.isSmart,
@@ -363,6 +408,7 @@ class CloudSyncService {
       final existingPlaylistsRes = await _repository.getPlaylists();
       final existingPlaylists =
           existingPlaylistsRes.fold((l) => <PlaylistsTableData>[], (r) => r);
+      final prefs = await _getPrefs();
 
       if (plSnapshot.docs.isNotEmpty) {
         for (final plDoc in plSnapshot.docs) {
@@ -370,11 +416,30 @@ class CloudSyncService {
           final name = (plData['name'] as String?) ?? '';
           if (name.isEmpty) continue;
 
+          final cloudSyncId = (plData['syncId'] as String?) ?? plDoc.id;
+          final mappedLocalId = prefs.getInt('sync_cloud_pl_$cloudSyncId');
+
           final cloudModifiedAt =
               (plData['modifiedAt'] as Timestamp?)?.toDate();
-          var pl = existingPlaylists
-              .where((p) => p.name.toLowerCase() == name.toLowerCase())
-              .firstOrNull;
+          PlaylistsTableData? pl;
+          if (mappedLocalId != null) {
+            pl = existingPlaylists.where((p) => p.id == mappedLocalId).firstOrNull;
+          }
+          if (pl == null) {
+            // Find candidates with the same name that are NOT mapped to a different cloud playlist
+            final candidates = existingPlaylists
+                .where((p) => p.name.toLowerCase() == name.toLowerCase())
+                .toList();
+            for (final cand in candidates) {
+              final mapped = prefs.getString('sync_pl_stable_id_${cand.id}');
+              if (mapped == null || mapped == cloudSyncId) {
+                pl = cand;
+                prefs.setString('sync_pl_stable_id_${cand.id}', cloudSyncId);
+                prefs.setInt('sync_cloud_pl_$cloudSyncId', cand.id);
+                break;
+              }
+            }
+          }
 
           if (pl != null && cloudModifiedAt != null) {
             final localModifiedAt = pl.createdAt;
@@ -394,6 +459,10 @@ class CloudSyncService {
               pl = await (_db.select(_db.playlistsTable)
                     ..where((t) => t.id.equals(newId)))
                   .getSingleOrNull();
+              if (pl != null) {
+                prefs.setString('sync_pl_stable_id_${pl.id}', cloudSyncId);
+                prefs.setInt('sync_cloud_pl_$cloudSyncId', pl.id);
+              }
             }
           }
 

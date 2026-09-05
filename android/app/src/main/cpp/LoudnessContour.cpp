@@ -103,10 +103,22 @@ void LoudnessContour::process(float* L, float* R, int frames) {
 
     if (std::abs(currentBassDb_ - lastComputedBassDb_) > 0.01 ||
         std::abs(currentTrebleDb_ - lastComputedTrebleDb_) > 0.01) {
-        computeLowShelf(bass_[0], kBassShelfHz, currentBassDb_, sampleRate_);
-        computeHighShelf(treble_[0], kTrebleShelfHz, currentTrebleDb_, sampleRate_);
-        computeLowShelf(bass_[1], kBassShelfHz, currentBassDb_, sampleRate_);
-        computeHighShelf(treble_[1], kTrebleShelfHz, currentTrebleDb_, sampleRate_);
+        Biquad tempBass, tempTreble;
+        computeLowShelf(tempBass, kBassShelfHz, currentBassDb_, sampleRate_);
+        computeHighShelf(tempTreble, kTrebleShelfHz, currentTrebleDb_, sampleRate_);
+        for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
+            bass_[ch].b0 = tempBass.b0;
+            bass_[ch].b1 = tempBass.b1;
+            bass_[ch].b2 = tempBass.b2;
+            bass_[ch].a1 = tempBass.a1;
+            bass_[ch].a2 = tempBass.a2;
+
+            treble_[ch].b0 = tempTreble.b0;
+            treble_[ch].b1 = tempTreble.b1;
+            treble_[ch].b2 = tempTreble.b2;
+            treble_[ch].a1 = tempTreble.a1;
+            treble_[ch].a2 = tempTreble.a2;
+        }
         lastComputedBassDb_ = currentBassDb_;
         lastComputedTrebleDb_ = currentTrebleDb_;
     }
@@ -124,16 +136,29 @@ void LoudnessContour::processInterleaved(float* buffer, int frames, int channels
 
     if (std::abs(currentBassDb_ - lastComputedBassDb_) > 0.01 ||
         std::abs(currentTrebleDb_ - lastComputedTrebleDb_) > 0.01) {
-        for (int ch = 0; ch < channels && ch < MAX_CHANNELS; ++ch) {
-            computeLowShelf(bass_[ch], kBassShelfHz, currentBassDb_, sampleRate_);
-            computeHighShelf(treble_[ch], kTrebleShelfHz, currentTrebleDb_, sampleRate_);
+        Biquad tempBass, tempTreble;
+        computeLowShelf(tempBass, kBassShelfHz, currentBassDb_, sampleRate_);
+        computeHighShelf(tempTreble, kTrebleShelfHz, currentTrebleDb_, sampleRate_);
+        for (int ch = 0; ch < MAX_CHANNELS; ++ch) {
+            bass_[ch].b0 = tempBass.b0;
+            bass_[ch].b1 = tempBass.b1;
+            bass_[ch].b2 = tempBass.b2;
+            bass_[ch].a1 = tempBass.a1;
+            bass_[ch].a2 = tempBass.a2;
+
+            treble_[ch].b0 = tempTreble.b0;
+            treble_[ch].b1 = tempTreble.b1;
+            treble_[ch].b2 = tempTreble.b2;
+            treble_[ch].a1 = tempTreble.a1;
+            treble_[ch].a2 = tempTreble.a2;
         }
         lastComputedBassDb_ = currentBassDb_;
         lastComputedTrebleDb_ = currentTrebleDb_;
     }
 
+    const int activeChannels = std::min(channels, MAX_CHANNELS);
     for (int i = 0; i < frames; ++i) {
-        for (int ch = 0; ch < channels && ch < MAX_CHANNELS; ++ch) {
+        for (int ch = 0; ch < activeChannels; ++ch) {
             buffer[i * channels + ch] = bass_[ch].process(treble_[ch].process(buffer[i * channels + ch]));
         }
     }

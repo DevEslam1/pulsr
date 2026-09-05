@@ -215,17 +215,19 @@ tasks.register("testNative") {
         val exeParity = file("${outDir.absolutePath}/test_native_parity" + if (isWindows) ".exe" else "")
         val exeDebug = file("${outDir.absolutePath}/test_native_debug" + if (isWindows) ".exe" else "")
 
-        // B24 fix: support gradle property / env var / NDK Clang on Windows
+        // Host C++ compiler discovery
         val compiler = if (project.hasProperty("hostClangPath")) {
             project.property("hostClangPath").toString()
         } else if (System.getenv("HOST_CLANG") != null) {
             System.getenv("HOST_CLANG")!!
         } else if (isWindows) {
-            val ndkDir = file("D:/Courses/work/Android/Sdk/ndk/27.1.12297006/toolchains/llvm/prebuilt/windows-x86_64/bin/clang++.exe")
-            if (ndkDir.exists()) ndkDir.absolutePath else "clang++"
+            val windhawk = file("C:/Program Files/Windhawk/Compiler/bin/clang++.exe")
+            if (windhawk.exists()) windhawk.absolutePath else "clang++"
         } else {
             "clang++"
         }
+
+        val targetFlags = if (isWindows) listOf("--target=x86_64-w64-windows-gnu") else emptyList<String>()
 
         val dspSources = listOf(
             "ParametricEQ.cpp",
@@ -245,13 +247,14 @@ tasks.register("testNative") {
 
         // 1. Build & Run (a): Parity Build with exact production flags (-O3 -std=c++20)
         println("[testNative] Compiling parity build (-O3 -std=c++20)...")
-        val parityCompileCmd = mutableListOf(
-            compiler,
-            "-std=c++20",
-            "-O3",
-            "-I", mainDir.absolutePath,
-            file("${testDir.absolutePath}/test_native_all.cpp").absolutePath
-        ).apply {
+        val parityCompileCmd = mutableListOf<String>().apply {
+            add(compiler)
+            addAll(targetFlags)
+            add("-std=c++20")
+            add("-O3")
+            add("-I")
+            add(mainDir.absolutePath)
+            add(file("${testDir.absolutePath}/test_native_all.cpp").absolutePath)
             addAll(dspSources)
             if (isWindows) add("-static")
             add("-o")
@@ -280,6 +283,7 @@ tasks.register("testNative") {
 
         val debugCompileCmd = mutableListOf<String>().apply {
             add(compiler)
+            addAll(targetFlags)
             addAll(sanitizerArgs)
             add("-I")
             add(mainDir.absolutePath)
