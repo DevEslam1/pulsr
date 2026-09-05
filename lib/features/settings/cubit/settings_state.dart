@@ -131,6 +131,17 @@ abstract class SettingsState with _$SettingsState {
   bool get dynamicThemingEnabled =>
       themeColorSource == ThemeColorSource.artwork;
 
+  /// How far the audible signal trails the position the player reports.
+  ///
+  /// Every Bluetooth sink (A2DP or LE Audio) buffers audio downstream, so the
+  /// listener hears a moment that was decoded [bluetoothLatencyOffsetMs] ago.
+  /// Anything syncing visuals to sound (lyrics, karaoke) must follow the
+  /// audible position; wired and speaker output have no comparable lag. The
+  /// amount is user-calibrated because Android exposes no sink-latency API.
+  Duration get audibleLatencyOffset => currentOutputDevice?.isBluetooth == true
+      ? Duration(milliseconds: bluetoothLatencyOffsetMs)
+      : Duration.zero;
+
   ProxyConfig get proxyConfig => ProxyConfig(
         enabled: proxyEnabled,
         type: proxyType,

@@ -247,29 +247,39 @@ class AudioConflicts {
   }) {
     if (!bitPerfectOutput || !bypassDspOnBitPerfect) return null;
     if (device?.isBluetooth == true) return null;
-    final active = device?.isBitPerfectActive == true ||
-        (device?.isUsbDac == true && bitPerfectOutput);
-    if (!active) return null;
+    if (device?.isBitPerfectActive != true) return null;
     return 'Disabled: Bit-Perfect bypass is ON — this DSP would alter the exclusive bitstream. Turn off Bit-Perfect or disable “Bypass DSP” to enable.';
   }
 
   static String? bitPerfectBlockedReason(AudioOutputInfo? device) {
     if (device == null) return null;
-    if (device.isBluetooth) return 'Cannot enable: Bluetooth transcodes (SBC/AAC/LDAC) — bit-perfect only on USB or wired direct DAC.';
-    if (device.bitPerfectFailureReason == 'requires_android_14_for_usb' || device.bitPerfectFailureReason == 'requires_android_14') {
-      return 'Requires Android 14+ for USB bit-perfect. Wired direct may still work if device advertises hi-res rates.';
+    if (device.isBluetooth) {
+      return 'Cannot enable: Bluetooth transcodes (SBC/AAC/LDAC/LC3) — bit-perfect only on a USB DAC.';
     }
-    if (device.bitPerfectFailureReason == 'wired_direct_not_supported') return 'Wired device does not advertise direct hi-res support (no FLOAT/24-bit).';
+    if (device.bitPerfectFailureReason == 'requires_android_14_for_usb' ||
+        device.bitPerfectFailureReason == 'requires_android_14') {
+      return 'Requires Android 14+ for USB bit-perfect output.';
+    }
+    if (device.bitPerfectFailureReason == 'exclusive_requires_usb_dac') {
+      return 'Cannot enable: Android exposes exclusive output only for USB DACs. Wired hi-res still plays direct when the device supports it.';
+    }
+    if (device.bitPerfectFailureReason == 'no_supported_mixer_attributes') {
+      return 'This USB DAC does not advertise an exclusive mixer configuration.';
+    }
     return null;
   }
 
   static String? gaplessBlockedByCrossfade(double crossfadeSeconds) {
-    if (crossfadeSeconds > 0.01) return 'Disabled: Crossfade is ${crossfadeSeconds.toStringAsFixed(1)} s — gapless requires 0 s. Set Crossfade to 0 to enable gapless.';
+    if (crossfadeSeconds > 0.01) {
+      return 'Disabled: Crossfade is ${crossfadeSeconds.toStringAsFixed(1)} s — gapless requires 0 s. Set Crossfade to 0 to enable gapless.';
+    }
     return null;
   }
 
   static String? crossfadeBlockedByGapless(bool gaplessEnabled) {
-    if (gaplessEnabled) return 'Disabled: Gapless is ON — crossfade needs gapless OFF. Disable Gapless to enable crossfade.';
+    if (gaplessEnabled) {
+      return 'Disabled: Gapless is ON — crossfade needs gapless OFF. Disable Gapless to enable crossfade.';
+    }
     return null;
   }
 
@@ -278,17 +288,28 @@ class AudioConflicts {
     required bool bypassDspOnBitPerfect,
     required AudioOutputInfo? device,
   }) =>
-      dspBlockedByBitPerfect(bitPerfectOutput: bitPerfectOutput, bypassDspOnBitPerfect: bypassDspOnBitPerfect, device: device);
+      dspBlockedByBitPerfect(
+          bitPerfectOutput: bitPerfectOutput,
+          bypassDspOnBitPerfect: bypassDspOnBitPerfect,
+          device: device);
 
-  static String? oemDoubleProcessingWarning({required bool hasOemAudio, required bool anyDspEnabled}) {
-    if (hasOemAudio && anyDspEnabled) return 'Warning: System Dolby/Dirac is active — running Pulsr DSP on top causes double-processing. Prefer DSP Preference = Native and disable system effects.';
+  static String? oemDoubleProcessingWarning(
+      {required bool hasOemAudio, required bool anyDspEnabled}) {
+    if (hasOemAudio && anyDspEnabled) {
+      return 'Warning: System Dolby/Dirac is active — running Pulsr DSP on top causes double-processing. Prefer DSP Preference = Native and disable system effects.';
+    }
     return null;
   }
 
-  static String? volumeBoostClippingWarning(double volumeBoost, double preampDb) {
+  static String? volumeBoostClippingWarning(
+      double volumeBoost, double preampDb) {
     final total = preampDb + volumeBoost * 10.0;
-    if (total > 6.0) return 'Clipping risk: EQ preamp (${preampDb.toStringAsFixed(1)} dB) + boost (+${(volumeBoost * 10).toStringAsFixed(1)} dB) = +${total.toStringAsFixed(1)} dB > 6 dB headroom.';
-    if (volumeBoost > 0.6) return 'High boost may cause distortion or hearing fatigue.';
+    if (total > 6.0) {
+      return 'Clipping risk: EQ preamp (${preampDb.toStringAsFixed(1)} dB) + boost (+${(volumeBoost * 10).toStringAsFixed(1)} dB) = +${total.toStringAsFixed(1)} dB > 6 dB headroom.';
+    }
+    if (volumeBoost > 0.6) {
+      return 'High boost may cause distortion or hearing fatigue.';
+    }
     return null;
   }
 }

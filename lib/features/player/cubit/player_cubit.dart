@@ -1637,8 +1637,16 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
         }
       }
       if (profile == null) return;
-      await applyProfile(profile);
+      // Claim the key before applying: applyProfile awaits a long chain, and a
+      // second stream event for the same device would otherwise pass this gate
+      // and run a concurrent apply.
       _lastAutoAppliedDeviceKey = key;
+      try {
+        await applyProfile(profile);
+      } catch (_) {
+        _lastAutoAppliedDeviceKey = null;
+        rethrow;
+      }
     } catch (e, st) {
       ErrorLogger.log('Device profile auto-switch failed',
           error: e, stackTrace: st, category: 'PlayerCubit');

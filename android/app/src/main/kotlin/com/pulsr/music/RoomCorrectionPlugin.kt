@@ -149,6 +149,13 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
         return this
     }
 
+    fun cleanup() {
+        stopRecording()
+        eventSink = null
+        if (::methodChannel.isInitialized) methodChannel.setMethodCallHandler(null)
+        if (::eventChannel.isInitialized) eventChannel.setStreamHandler(null)
+    }
+
     companion object {
         const val METHOD_CHANNEL = "com.pulsr.music/room_correction"
         const val EVENT_CHANNEL = "com.pulsr.music/room_correction_pcm"

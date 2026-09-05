@@ -67,9 +67,14 @@ class DeviceProfileService {
     required String deviceType,
     required bool isBluetooth,
   }) {
-    final type = deviceType.trim().toLowerCase();
+    // Every Bluetooth transport shares one namespace: the same earbuds report
+    // activeDeviceType 'ble' over LE Audio and 'bluetooth' over A2DP, and the
+    // user's profile has to follow them across that renegotiation.
+    final type =
+        isBluetooth ? 'bluetooth' : deviceType.trim().toLowerCase();
     if (type.isEmpty || type == 'builtin') return 'builtin:speaker';
-    final name = deviceName.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
+    final name =
+        deviceName.trim().toLowerCase().replaceAll(RegExp(r'\s+'), ' ');
     if (name.isEmpty) return '$type:unknown';
     return '$type:$name';
   }

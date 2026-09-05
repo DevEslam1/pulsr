@@ -36,16 +36,14 @@ class AudioQualitySheet extends StatelessWidget {
       isDismissible: true,
       enableDrag: true,
       barrierColor: Colors.black54,
-      builder:
-          (sheetContext) => GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => Navigator.of(sheetContext).pop(),
-            child: GestureDetector(
-              onTap:
-                  () {}, // Prevent taps on the sheet card itself from closing
-              child: AudioQualitySheet(song: song, activeColor: activeColor),
-            ),
-          ),
+      builder: (sheetContext) => GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => Navigator.of(sheetContext).pop(),
+        child: GestureDetector(
+          onTap: () {}, // Prevent taps on the sheet card itself from closing
+          child: AudioQualitySheet(song: song, activeColor: activeColor),
+        ),
+      ),
     );
   }
 
@@ -148,10 +146,10 @@ class AudioQualitySheet extends StatelessWidget {
                                     style: Theme.of(
                                       context,
                                     ).textTheme.titleMedium?.copyWith(
-                                      fontWeight: FontWeight.w900,
-                                      color: p.textPrimary,
-                                      letterSpacing: 0.2,
-                                    ),
+                                          fontWeight: FontWeight.w900,
+                                          color: p.textPrimary,
+                                          letterSpacing: 0.2,
+                                        ),
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
@@ -251,17 +249,15 @@ class AudioQualitySheet extends StatelessWidget {
                       final direct = outputDevice?.directFormats ?? const [];
                       final supported =
                           direct.where((f) => f.supported).toList();
-                      final maxRate =
-                          supported.isEmpty
-                              ? null
-                              : supported
-                                  .map((f) => f.sampleRate)
-                                  .reduce((a, b) => a > b ? a : b);
+                      final maxRate = supported.isEmpty
+                          ? null
+                          : supported
+                              .map((f) => f.sampleRate)
+                              .reduce((a, b) => a > b ? a : b);
                       final bits = supported.map((f) => f.encoding).toSet();
-                      final bitsLabel =
-                          bits.isEmpty
-                              ? '-'
-                              : bits.contains('24')
+                      final bitsLabel = bits.isEmpty
+                          ? '-'
+                          : bits.contains('24')
                               ? (bits.contains('float') || bits.contains('32')
                                   ? '32f/24'
                                   : '24')
@@ -397,10 +393,9 @@ class AudioQualitySheet extends StatelessWidget {
                           context,
                           icon: Icons.speed_rounded,
                           label: 'Source Bitrate',
-                          value:
-                              info.bitrateKbps != null
-                                  ? '${info.bitrateKbps} kbps'
-                                  : 'Variable Bitrate',
+                          value: info.bitrateKbps != null
+                              ? '${info.bitrateKbps} kbps'
+                              : 'Variable Bitrate',
                           subValue:
                               info.tier == AudioQualityTier.hiResLossless ||
                                       info.tier == AudioQualityTier.lossless
@@ -420,10 +415,9 @@ class AudioQualitySheet extends StatelessWidget {
                           context,
                           icon: Icons.folder_zip_rounded,
                           label: 'File Size & Duration',
-                          value:
-                              song.fileSize != null
-                                  ? '${(song.fileSize! / (1024 * 1024)).toStringAsFixed(2)} MB'
-                                  : 'Unknown',
+                          value: song.fileSize != null
+                              ? '${(song.fileSize! / (1024 * 1024)).toStringAsFixed(2)} MB'
+                              : 'Unknown',
                           subValue:
                               'Duration: ${Formatters.formatDuration(Duration(milliseconds: song.durationMs))}',
                           p: p,
@@ -432,10 +426,9 @@ class AudioQualitySheet extends StatelessWidget {
                           context,
                           icon: Icons.graphic_eq_rounded,
                           label: 'Dynamic Range (LRA)',
-                          value:
-                              song.loudnessRange != null
-                                  ? '${song.loudnessRange!.toStringAsFixed(1)} LU (${song.loudnessRange! >= 12 ? "DR 12+ Audiophile" : (song.loudnessRange! >= 7 ? "DR High Dynamic" : "DR Standard")})'
-                                  : 'Standard Dynamic Range',
+                          value: song.loudnessRange != null
+                              ? '${song.loudnessRange!.toStringAsFixed(1)} LU (${song.loudnessRange! >= 12 ? "DR 12+ Audiophile" : (song.loudnessRange! >= 7 ? "DR High Dynamic" : "DR Standard")})'
+                              : 'Standard Dynamic Range',
                           subValue: 'EBU R128 Loudness Range Analysis',
                           p: p,
                           isLast: true,
@@ -474,10 +467,9 @@ class AudioQualitySheet extends StatelessWidget {
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
                         backgroundColor: activeColor,
-                        foregroundColor:
-                            activeColor.computeLuminance() > 0.5
-                                ? Colors.black
-                                : Colors.white,
+                        foregroundColor: activeColor.computeLuminance() > 0.5
+                            ? Colors.black
+                            : Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(14),
@@ -563,117 +555,133 @@ class AudioQualitySheet extends StatelessWidget {
     }
 
     return Column(
-      children:
-          devices.map((dev) {
-            final isSelected = dev.isCurrent;
-            final devIcon = _getDeviceIcon(dev.type);
+      children: [
+        ...devices.map((dev) {
+          final isSelected = dev.isCurrent;
+          final devIcon = _getDeviceIcon(dev.type);
 
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                decoration: BoxDecoration(
-                  color:
-                      isSelected
-                          ? activeColor.withValues(alpha: 0.12)
-                          : p.surfaceContainer,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: isSelected ? activeColor : p.hairline,
-                    width: isSelected ? 1.5 : 1.0,
-                  ),
-                  boxShadow:
-                      isSelected
-                          ? [
-                            BoxShadow(
-                              color: activeColor.withValues(alpha: 0.12),
-                              blurRadius: 8,
-                              offset: const Offset(0, 2),
-                            ),
-                          ]
-                          : null,
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? activeColor.withValues(alpha: 0.12)
+                    : p.surfaceContainer,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: isSelected ? activeColor : p.hairline,
+                  width: isSelected ? 1.5 : 1.0,
                 ),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      cubit?.selectOutputDevice(dev.id);
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 11,
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color:
-                                  isSelected
-                                      ? activeColor.withValues(alpha: 0.2)
-                                      : p.surface,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              devIcon,
-                              size: 18,
-                              color: isSelected ? activeColor : p.textSecondary,
-                            ),
+                boxShadow: isSelected
+                    ? [
+                        BoxShadow(
+                          color: activeColor.withValues(alpha: 0.12),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
+                      ]
+                    : null,
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    cubit?.selectOutputDevice(dev.id);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 11,
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? activeColor.withValues(alpha: 0.2)
+                                : p.surface,
+                            shape: BoxShape.circle,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  dev.name,
-                                  style: TextStyle(
-                                    color: p.textPrimary,
-                                    fontSize: 13,
-                                    fontWeight:
-                                        isSelected
-                                            ? FontWeight.w800
-                                            : FontWeight.w600,
-                                  ),
+                          child: Icon(
+                            devIcon,
+                            size: 18,
+                            color: isSelected ? activeColor : p.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                dev.name,
+                                style: TextStyle(
+                                  color: p.textPrimary,
+                                  fontSize: 13,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w800
+                                      : FontWeight.w600,
                                 ),
-                                Text(
-                                  '${dev.typeName} • Up to ${dev.sampleRates.isEmpty ? "48" : (dev.sampleRates.reduce((a, b) => a > b ? a : b) ~/ 1000)} kHz / ${dev.maxBitDepth}-bit',
-                                  style: TextStyle(
-                                    color: p.textSecondary,
-                                    fontSize: 11,
-                                  ),
+                              ),
+                              Text(
+                                '${dev.typeName} • Up to ${dev.sampleRates.isEmpty ? "48" : (dev.sampleRates.reduce((a, b) => a > b ? a : b) ~/ 1000)} kHz / ${dev.maxBitDepth}-bit',
+                                style: TextStyle(
+                                  color: p.textSecondary,
+                                  fontSize: 11,
                                 ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
-                          AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 150),
-                            child:
-                                isSelected
-                                    ? Icon(
-                                      Icons.check_circle_rounded,
-                                      key: const ValueKey('checked'),
-                                      color: activeColor,
-                                      size: 20,
-                                    )
-                                    : Icon(
-                                      Icons.radio_button_unchecked_rounded,
-                                      key: const ValueKey('unchecked'),
-                                      color: p.textTertiary,
-                                      size: 20,
-                                    ),
-                          ),
-                        ],
-                      ),
+                        ),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 150),
+                          child: isSelected
+                              ? Icon(
+                                  Icons.check_circle_rounded,
+                                  key: const ValueKey('checked'),
+                                  color: activeColor,
+                                  size: 20,
+                                )
+                              : Icon(
+                                  Icons.radio_button_unchecked_rounded,
+                                  key: const ValueKey('unchecked'),
+                                  color: p.textTertiary,
+                                  size: 20,
+                                ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
-            );
-          }).toList(),
+            ),
+          );
+        }),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: () {
+              HapticFeedback.selectionClick();
+              cubit?.openOutputSwitcher();
+            },
+            icon: const Icon(Icons.open_in_new_rounded, size: 15),
+            label: const Text(
+              'Switch output in system panel',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+            ),
+            style: TextButton.styleFrom(
+              foregroundColor: p.textSecondary,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              minimumSize: const Size(0, 32),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
@@ -685,9 +693,9 @@ class AudioQualitySheet extends StatelessWidget {
     Color activeColor,
     AudioQualityInfo info,
   ) {
-    final isUsbDac = outputDevice?.isUsbDac == true;
     final isBitPerfectEnabled = cubit?.state.bitPerfectOutput == true;
-    final isBitPerfectActive = isBitPerfectEnabled && isUsbDac;
+    final isBitPerfectActive =
+        isBitPerfectEnabled && outputDevice?.isBitPerfectActive == true;
     final currentTarget =
         isBitPerfectActive ? 0 : (outputDevice?.targetSampleRate ?? 0);
 
@@ -738,25 +746,24 @@ class AudioQualitySheet extends StatelessWidget {
             physics: const BouncingScrollPhysics(),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.start,
-              children:
-                  options.map((opt) {
-                    final isSelected = (currentTarget == opt.$1);
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: _OptionPill(
-                        title: opt.$2,
-                        subtitle: opt.$3,
-                        isSelected: isSelected,
-                        isEnabled: !isBitPerfectActive,
-                        activeColor: activeColor,
-                        palette: p,
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          cubit?.setTargetOutputSampleRate(opt.$1);
-                        },
-                      ),
-                    );
-                  }).toList(),
+              children: options.map((opt) {
+                final isSelected = (currentTarget == opt.$1);
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: _OptionPill(
+                    title: opt.$2,
+                    subtitle: opt.$3,
+                    isSelected: isSelected,
+                    isEnabled: !isBitPerfectActive,
+                    activeColor: activeColor,
+                    palette: p,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      cubit?.setTargetOutputSampleRate(opt.$1);
+                    },
+                  ),
+                );
+              }).toList(),
             ),
           ),
         ),
@@ -824,25 +831,24 @@ class AudioQualitySheet extends StatelessWidget {
             physics: const BouncingScrollPhysics(),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.start,
-              children:
-                  bitDepthOptions.map((opt) {
-                    final isSelected = (currentTarget == opt.$1);
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: _OptionPill(
-                        title: opt.$2,
-                        subtitle: opt.$3,
-                        isSelected: isSelected,
-                        isEnabled: !isBitPerfectActive,
-                        activeColor: activeColor,
-                        palette: p,
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          cubit?.setTargetOutputBitDepth(opt.$1);
-                        },
-                      ),
-                    );
-                  }).toList(),
+              children: bitDepthOptions.map((opt) {
+                final isSelected = (currentTarget == opt.$1);
+                return Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: _OptionPill(
+                    title: opt.$2,
+                    subtitle: opt.$3,
+                    isSelected: isSelected,
+                    isEnabled: !isBitPerfectActive,
+                    activeColor: activeColor,
+                    palette: p,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      cubit?.setTargetOutputBitDepth(opt.$1);
+                    },
+                  ),
+                );
+              }).toList(),
             ),
           ),
         ),
@@ -851,38 +857,34 @@ class AudioQualitySheet extends StatelessWidget {
           duration: const Duration(milliseconds: 200),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           decoration: BoxDecoration(
-            color:
-                isBitPerfectEnabled
-                    ? goldAccent.withValues(alpha: 0.12)
-                    : p.surfaceContainer,
+            color: isBitPerfectEnabled
+                ? goldAccent.withValues(alpha: 0.12)
+                : p.surfaceContainer,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(
-              color:
-                  isBitPerfectEnabled
-                      ? goldAccent.withValues(alpha: 0.7)
-                      : p.hairline,
+              color: isBitPerfectEnabled
+                  ? goldAccent.withValues(alpha: 0.7)
+                  : p.hairline,
               width: isBitPerfectEnabled ? 1.5 : 1.0,
             ),
-            boxShadow:
-                isBitPerfectEnabled
-                    ? [
-                      BoxShadow(
-                        color: goldAccent.withValues(alpha: 0.15),
-                        blurRadius: 10,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
-                    : null,
+            boxShadow: isBitPerfectEnabled
+                ? [
+                    BoxShadow(
+                      color: goldAccent.withValues(alpha: 0.15),
+                      blurRadius: 10,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
           child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color:
-                      isBitPerfectEnabled
-                          ? goldAccent.withValues(alpha: 0.22)
-                          : p.surface,
+                  color: isBitPerfectEnabled
+                      ? goldAccent.withValues(alpha: 0.22)
+                      : p.surface,
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
@@ -903,10 +905,9 @@ class AudioQualitySheet extends StatelessWidget {
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 13,
-                            color:
-                                isBitPerfectEnabled
-                                    ? goldAccent
-                                    : p.textPrimary,
+                            color: isBitPerfectEnabled
+                                ? goldAccent
+                                : p.textPrimary,
                           ),
                         ),
                         const SizedBox(width: 6),
@@ -970,8 +971,8 @@ class AudioQualitySheet extends StatelessWidget {
                                       ? p.error
                                       : (isBitPerfectEnabled
                                           ? p.textPrimary.withValues(
-                                            alpha: 0.85,
-                                          )
+                                              alpha: 0.85,
+                                            )
                                           : p.textSecondary),
                               fontSize: 11,
                               height: 1.25,
@@ -989,26 +990,23 @@ class AudioQualitySheet extends StatelessWidget {
                           onPressed: () {
                             showDialog<void>(
                               context: context,
-                              builder:
-                                  (ctx) => AlertDialog(
-                                    backgroundColor: p.surface,
-                                    title: const Text('Bit-Perfect Mode'),
-                                    content: Text(
-                                      AudioFeatureRegistry
-                                          .bitPerfect
-                                          .description,
-                                      style: TextStyle(
-                                        color: p.textPrimary,
-                                        fontSize: 13,
-                                      ),
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () => Navigator.pop(ctx),
-                                        child: const Text('Got it'),
-                                      ),
-                                    ],
+                              builder: (ctx) => AlertDialog(
+                                backgroundColor: p.surface,
+                                title: const Text('Bit-Perfect Mode'),
+                                content: Text(
+                                  AudioFeatureRegistry.bitPerfect.description,
+                                  style: TextStyle(
+                                    color: p.textPrimary,
+                                    fontSize: 13,
                                   ),
+                                ),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(ctx),
+                                    child: const Text('Got it'),
+                                  ),
+                                ],
+                              ),
                             );
                           },
                         ),
@@ -1021,22 +1019,21 @@ class AudioQualitySheet extends StatelessWidget {
                 value: isBitPerfectEnabled,
                 activeTrackColor: goldAccent,
                 activeThumbColor: Colors.white,
-                onChanged:
-                    (blockedReason != null && !isBitPerfectEnabled)
-                        ? null
-                        : (val) {
-                          if (blockedReason != null && val) {
-                            ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-                              SnackBar(
-                                content: Text(blockedReason),
-                                backgroundColor: p.error,
-                              ),
-                            );
-                            return;
-                          }
-                          HapticFeedback.selectionClick();
-                          cubit?.setBitPerfectOutput(val);
-                        },
+                onChanged: (blockedReason != null && !isBitPerfectEnabled)
+                    ? null
+                    : (val) {
+                        if (blockedReason != null && val) {
+                          ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                            SnackBar(
+                              content: Text(blockedReason),
+                              backgroundColor: p.error,
+                            ),
+                          );
+                          return;
+                        }
+                        HapticFeedback.selectionClick();
+                        cubit?.setBitPerfectOutput(val);
+                      },
               ),
             ],
           ),
@@ -1057,7 +1054,10 @@ class AudioQualitySheet extends StatelessWidget {
       case 8: // TYPE_BLUETOOTH_A2DP
       case 26: // TYPE_BLE_HEADSET
       case 27: // TYPE_BLE_SPEAKER
+      case 30: // TYPE_BLE_BROADCAST
         return Icons.bluetooth_audio_rounded;
+      case 23: // TYPE_HEARING_AID
+        return Icons.hearing_rounded;
       case 9: // TYPE_HDMI
       case 10: // TYPE_HDMI_ARC
       case 29: // TYPE_HDMI_EARC
@@ -1143,33 +1143,26 @@ class AudioQualitySheet extends StatelessWidget {
     PulsrPalette p,
     Color activeColor,
   ) {
-    final bool isBitPerfect =
-        settingsState?.bitPerfectOutput == true &&
+    final bool isBitPerfect = settingsState?.bitPerfectOutput == true &&
         outputDevice?.isUsbDac == true;
-    final bool isDsd =
-        info.format.toUpperCase().contains('DSD') ||
+    final bool isDsd = info.format.toUpperCase().contains('DSD') ||
         info.codecName.toUpperCase().contains('DSD');
 
-    final String sourceLabel =
-        isDsd
-            ? 'DSD Stream (${info.format})'
-            : '${info.format} (${info.sampleRate} / ${info.bitDepth})';
-    final String dspLabel =
-        isBitPerfect
-            ? 'Bypassed (Bit-Perfect Guardrail)'
-            : 'EQ (8 RBJ) + True-Peak Limiter + BS2B';
-    final String resamplerLabel =
-        isBitPerfect
-            ? 'Direct 1:1 Stream'
-            : (outputDevice != null && outputDevice.targetSampleRate > 0
-                ? 'Polyphase Sinc FIR (${info.sampleRate} → ${outputDevice.targetSampleRate ~/ 1000} kHz)'
-                : 'Polyphase FIR Streaming Resampler');
-    final String driverLabel =
-        isBitPerfect
-            ? 'AAudio Direct / Bit-Perfect Track'
-            : 'Shared System AudioTrack';
-    final String dacLabel =
-        outputDevice?.deviceName ??
+    final String sourceLabel = isDsd
+        ? 'DSD Stream (${info.format})'
+        : '${info.format} (${info.sampleRate} / ${info.bitDepth})';
+    final String dspLabel = isBitPerfect
+        ? 'Bypassed (Bit-Perfect Guardrail)'
+        : 'EQ (8 RBJ) + True-Peak Limiter + BS2B';
+    final String resamplerLabel = isBitPerfect
+        ? 'Direct 1:1 Stream'
+        : (outputDevice != null && outputDevice.targetSampleRate > 0
+            ? 'Polyphase Sinc FIR (${info.sampleRate} → ${outputDevice.targetSampleRate ~/ 1000} kHz)'
+            : 'Polyphase FIR Streaming Resampler');
+    final String driverLabel = isBitPerfect
+        ? 'AAudio Direct / Bit-Perfect Track'
+        : 'Shared System AudioTrack';
+    final String dacLabel = outputDevice?.deviceName ??
         (outputDevice?.isUsbDac == true ? 'USB Hi-Res DAC' : 'Internal DAC');
 
     return Container(
@@ -1178,10 +1171,9 @@ class AudioQualitySheet extends StatelessWidget {
         color: p.surfaceContainer,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color:
-              isBitPerfect
-                  ? const Color(0xFFFFD700).withValues(alpha: 0.4)
-                  : p.hairline,
+          color: isBitPerfect
+              ? const Color(0xFFFFD700).withValues(alpha: 0.4)
+              : p.hairline,
         ),
       ),
       child: Column(
@@ -1233,10 +1225,9 @@ class AudioQualitySheet extends StatelessWidget {
             step: 2,
             title: 'DSP PROCESSING',
             detail: dspLabel,
-            icon:
-                isBitPerfect
-                    ? Icons.do_not_disturb_on_rounded
-                    : Icons.tune_rounded,
+            icon: isBitPerfect
+                ? Icons.do_not_disturb_on_rounded
+                : Icons.tune_rounded,
             color: isBitPerfect ? Colors.grey : activeColor,
             p: p,
             isDimmed: isBitPerfect,
@@ -1266,14 +1257,12 @@ class AudioQualitySheet extends StatelessWidget {
             title: 'HARDWARE ENDPOINT',
             detail:
                 '$dacLabel (${outputDevice != null && outputDevice.targetSampleRate > 0 ? "${outputDevice.targetSampleRate ~/ 1000} kHz" : (outputDevice != null ? "${outputDevice.sampleRate ~/ 1000} kHz" : "48 kHz")} / ${outputDevice?.bitDepth ?? 24}-bit)',
-            icon:
-                outputDevice?.isUsbDac == true
-                    ? Icons.usb_rounded
-                    : Icons.speaker_rounded,
-            color:
-                outputDevice?.isUsbDac == true
-                    ? const Color(0xFFFFD700)
-                    : activeColor,
+            icon: outputDevice?.isUsbDac == true
+                ? Icons.usb_rounded
+                : Icons.speaker_rounded,
+            color: outputDevice?.isUsbDac == true
+                ? const Color(0xFFFFD700)
+                : activeColor,
             p: p,
             isLast: true,
           ),
@@ -1322,10 +1311,9 @@ class AudioQualitySheet extends StatelessWidget {
                   fontSize: 9.5,
                   letterSpacing: 1.0,
                   fontWeight: FontWeight.w800,
-                  color:
-                      isDimmed
-                          ? p.textSecondary.withValues(alpha: 0.5)
-                          : p.textSecondary,
+                  color: isDimmed
+                      ? p.textSecondary.withValues(alpha: 0.5)
+                      : p.textSecondary,
                 ),
               ),
               const SizedBox(height: 1),
@@ -1334,10 +1322,9 @@ class AudioQualitySheet extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11.5,
                   fontWeight: FontWeight.w700,
-                  color:
-                      isDimmed
-                          ? p.textPrimary.withValues(alpha: 0.5)
-                          : p.textPrimary,
+                  color: isDimmed
+                      ? p.textPrimary.withValues(alpha: 0.5)
+                      : p.textPrimary,
                 ),
               ),
             ],
@@ -1382,25 +1369,23 @@ class _OptionPill extends StatelessWidget {
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
         decoration: BoxDecoration(
-          color:
-              isSelected
-                  ? activeColor.withValues(alpha: 0.16)
-                  : palette.surfaceContainer,
+          color: isSelected
+              ? activeColor.withValues(alpha: 0.16)
+              : palette.surfaceContainer,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isSelected ? activeColor : palette.hairline,
             width: isSelected ? 1.5 : 1.0,
           ),
-          boxShadow:
-              isSelected && isEnabled
-                  ? [
-                    BoxShadow(
-                      color: activeColor.withValues(alpha: 0.18),
-                      blurRadius: 8,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                  : null,
+          boxShadow: isSelected && isEnabled
+              ? [
+                  BoxShadow(
+                    color: activeColor.withValues(alpha: 0.18),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Material(
           color: Colors.transparent,
@@ -1430,10 +1415,9 @@ class _OptionPill extends StatelessWidget {
                       fontSize: 10,
                       fontWeight:
                           isSelected ? FontWeight.w700 : FontWeight.w500,
-                      color:
-                          isSelected
-                              ? activeColor.withValues(alpha: 0.85)
-                              : palette.textSecondary,
+                      color: isSelected
+                          ? activeColor.withValues(alpha: 0.85)
+                          : palette.textSecondary,
                     ),
                   ),
                 ],
@@ -1488,6 +1472,13 @@ extension _BluetoothCodecSection on AudioQualitySheet {
     // ── State: proxy initializing (BT stack not ready yet) ───────────────
     if (reason == 'proxy_initializing') {
       return _buildProxyLoadingBanner(context, cubit, p);
+    }
+
+    // ── State: LE Audio — LC3 is negotiated per-stream by the platform and
+    // exposes no app-facing codec/rate/depth surface, so the A2DP controls
+    // below would all be inert.
+    if (reason == 'le_audio_not_configurable') {
+      return _buildLeAudioBanner(context, cubit, p);
     }
 
     return Column(
@@ -1546,92 +1537,89 @@ extension _BluetoothCodecSection on AudioQualitySheet {
               color: _btAccent.withValues(alpha: connected ? 0.45 : 0.2),
             ),
           ),
-          child:
-              connected
-                  ? Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color:
-                              isLdac
-                                  ? _ldacAccent.withValues(alpha: 0.2)
-                                  : _btAccent.withValues(alpha: 0.2),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.high_quality_rounded,
-                          color: isLdac ? _ldacAccent : _btAccent,
-                          size: 18,
-                        ),
+          child: connected
+              ? Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: isLdac
+                            ? _ldacAccent.withValues(alpha: 0.2)
+                            : _btAccent.withValues(alpha: 0.2),
+                        shape: BoxShape.circle,
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              codecName,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w900,
-                                color: isLdac ? _ldacAccent : _btAccent,
-                                letterSpacing: 0.5,
-                              ),
-                            ),
-                            Text(
-                              '${(sampleRateHz / 1000).toStringAsFixed(sampleRateHz % 1000 == 0 ? 0 : 1)} kHz'
-                              ' · $bitDepth-bit'
-                              '${isLdac && ldacMode != null ? ' · ${ldacModes[ldacMode.clamp(0, 3)].$3}' : ''}',
-                              style: TextStyle(
-                                fontSize: 11.5,
-                                color: p.textSecondary,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
+                      child: Icon(
+                        Icons.high_quality_rounded,
+                        color: isLdac ? _ldacAccent : _btAccent,
+                        size: 18,
                       ),
-                      if (isLdac && ldacMode != null)
-                        Row(
-                          children: List.generate(
-                            4,
-                            (i) => Padding(
-                              padding: const EdgeInsets.only(left: 3),
-                              child: Container(
-                                width: 7,
-                                height: 7,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color:
-                                      i <= ldacMode ? _ldacAccent : p.hairline,
-                                ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            codecName,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w900,
+                              color: isLdac ? _ldacAccent : _btAccent,
+                              letterSpacing: 0.5,
+                            ),
+                          ),
+                          Text(
+                            '${(sampleRateHz / 1000).toStringAsFixed(sampleRateHz % 1000 == 0 ? 0 : 1)} kHz'
+                            ' · $bitDepth-bit'
+                            '${isLdac && ldacMode != null ? ' · ${ldacModes[ldacMode.clamp(0, 3)].$3}' : ''}',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              color: p.textSecondary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (isLdac && ldacMode != null)
+                      Row(
+                        children: List.generate(
+                          4,
+                          (i) => Padding(
+                            padding: const EdgeInsets.only(left: 3),
+                            child: Container(
+                              width: 7,
+                              height: 7,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: i <= ldacMode ? _ldacAccent : p.hairline,
                               ),
                             ),
                           ),
                         ),
-                    ],
-                  )
-                  : Row(
-                    children: [
-                      Icon(
-                        Icons.bluetooth_connected_rounded,
-                        color: _btAccent.withValues(alpha: 0.5),
-                        size: 20,
                       ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          'Earbuds connected. See specs below.',
-                          style: TextStyle(
-                            color: p.textSecondary,
-                            fontSize: 11.5,
-                            fontStyle: FontStyle.italic,
-                          ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    Icon(
+                      Icons.bluetooth_connected_rounded,
+                      color: _btAccent.withValues(alpha: 0.5),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Earbuds connected. See specs below.',
+                        style: TextStyle(
+                          color: p.textSecondary,
+                          fontSize: 11.5,
+                          fontStyle: FontStyle.italic,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
+                ),
         ),
 
         if (connected) ...[
@@ -1654,57 +1642,53 @@ extension _BluetoothCodecSection on AudioQualitySheet {
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
               child: Row(
-                children:
-                    visibleCodecs.map((c) {
-                      final isActive = c == codecName;
-                      final isLdacOpt = c == 'LDAC';
-                      final accent = isLdacOpt ? _ldacAccent : _btAccent;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color:
-                                isActive
-                                    ? accent.withValues(alpha: 0.18)
-                                    : p.surfaceContainer,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                              color: isActive ? accent : p.hairline,
-                              width: isActive ? 1.5 : 1.0,
+                children: visibleCodecs.map((c) {
+                  final isActive = c == codecName;
+                  final isLdacOpt = c == 'LDAC';
+                  final accent = isLdacOpt ? _ldacAccent : _btAccent;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isActive
+                            ? accent.withValues(alpha: 0.18)
+                            : p.surfaceContainer,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isActive ? accent : p.hairline,
+                          width: isActive ? 1.5 : 1.0,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          if (isActive) ...[
+                            Icon(
+                              Icons.check_rounded,
+                              color: accent,
+                              size: 11,
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          Text(
+                            c,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight:
+                                  isActive ? FontWeight.w800 : FontWeight.w500,
+                              color: isActive ? accent : p.textSecondary,
+                              letterSpacing: 0.3,
                             ),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (isActive) ...[
-                                Icon(
-                                  Icons.check_rounded,
-                                  color: accent,
-                                  size: 11,
-                                ),
-                                const SizedBox(width: 4),
-                              ],
-                              Text(
-                                c,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight:
-                                      isActive
-                                          ? FontWeight.w800
-                                          : FontWeight.w500,
-                                  color: isActive ? accent : p.textSecondary,
-                                  letterSpacing: 0.3,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    }).toList(),
+                        ],
+                      ),
+                    ),
+                  );
+                }).toList(),
               ),
             ),
           ),
@@ -1835,10 +1819,10 @@ extension _BluetoothCodecSection on AudioQualitySheet {
                     ldacModes[ldacMode.clamp(0, 3)].$1 == 0
                         ? 'Best Effort'
                         : ldacModes[ldacMode.clamp(0, 3)].$1 == 1
-                        ? 'Mobile'
-                        : ldacModes[ldacMode.clamp(0, 3)].$1 == 2
-                        ? 'Standard'
-                        : 'Maximum',
+                            ? 'Mobile'
+                            : ldacModes[ldacMode.clamp(0, 3)].$1 == 2
+                                ? 'Standard'
+                                : 'Maximum',
                     style: const TextStyle(
                       color: _ldacAccent,
                       fontSize: 13,
@@ -2030,6 +2014,93 @@ extension _BluetoothCodecSection on AudioQualitySheet {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildLeAudioBanner(
+    BuildContext context,
+    SettingsCubit? cubit,
+    PulsrPalette p,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.bluetooth_audio_rounded,
+                size: 14, color: _btAccent),
+            const SizedBox(width: 6),
+            Text(
+              'LE AUDIO',
+              style: TextStyle(
+                fontSize: 11,
+                letterSpacing: 1.4,
+                fontWeight: FontWeight.w800,
+                color: p.textSecondary,
+              ),
+            ),
+            const Spacer(),
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                cubit?.refreshOutputDevice();
+              },
+              child: Icon(Icons.refresh_rounded, size: 16, color: p.textTertiary),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: _btAccent.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: _btAccent.withValues(alpha: 0.3)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _btAccent.withValues(alpha: 0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.hearing_rounded,
+                    color: _btAccent, size: 18),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'LC3',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: _btAccent,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    Text(
+                      'Android negotiates the LC3 stream with your earbuds. '
+                      'Codec, sample rate and bit depth are not app-adjustable '
+                      'on LE Audio.',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: p.textSecondary,
+                        fontWeight: FontWeight.w600,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 

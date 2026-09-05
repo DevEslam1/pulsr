@@ -8,7 +8,7 @@ import android.media.audiofx.AudioEffect
 import android.media.audiofx.BassBoost
 import android.media.audiofx.DynamicsProcessing
 import android.media.audiofx.Equalizer
-import android.media.audiofx.PresetReverb
+import android.media.audiofx.EnvironmentalReverb
 import android.media.audiofx.LoudnessEnhancer
 import android.media.audiofx.Virtualizer
 import android.os.Build
@@ -50,6 +50,15 @@ data class DynamicsPresetConfig(
     val limiter: LimiterConfig
 )
 
+/** EnvironmentalReverb room shape for one reverb preset (Android units). */
+private data class ReverbShape(
+    val decayMs: Int,
+    val decayHFRatio: Int,
+    val density: Int,
+    val diffusion: Int,
+    val roomLevel: Int
+)
+
 class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var methodChannel: MethodChannel
     private var context: Context? = null
@@ -63,8 +72,9 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var legacyEqualizer: Equalizer? = null
     private var loudnessEnhancer: LoudnessEnhancer? = null
     private var bassBoost: BassBoost? = null
-    // HAL-bound PresetReverb — actually audible via the Android AudioEffect session
-    private var halReverb: PresetReverb? = null
+    // HAL-bound EnvironmentalReverb — audible via the AudioEffect session, and
+    // unlike PresetReverb it exposes reverbLevel so the wet/dry fader is real.
+    private var halReverb: EnvironmentalReverb? = null
 
     private var isVirtualizerEnabled = false
     private var virtualizerStrength: Short = 0
@@ -302,19 +312,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             return
         }
         var mask = 0
-        // Respect dspPreference: native=only native, oem=disable native EQ, auto=native unless OEM detected
-        val useNativeEq = when (dspPreference) {
-            "oem" -> false
-            "auto" -> {
-                val ctx = context
-                val hasOem = ctx?.let { getCachedOemInfo(it)["hasOemAudio"] as? Boolean } ?: false
-                !hasOem
-            }
-            else -> true // native
-        }
+        // The HAL chain and the native PCM chain are both audible, so every
+        // stage must have exactly one owner or it gets applied twice.
+        // EQ ownership follows dspPreference; "oem"/"auto"-with-OEM leaves it to
+        // the vendor engine, "auto" without OEM keeps the device-tuned HAL path.
+        val useNativeEq = dspPreference == "native"
         if (isEqEnabled && useNativeEq) mask = mask or STAGE_EQ
         if (isCrossfeedEnabled) mask = mask or STAGE_CROSSFEED
-        if (isReverbEnabled) mask = mask or STAGE_REVERB
+        // Reverb is owned by the HAL EnvironmentalReverb (see applyHalReverb).
         if (abs(stereoBalance) > 0.001 || monoMix) mask = mask or STAGE_PANNER
         if (isLimiterEnabled) mask = mask or STAGE_LIMITER
         // Sinc resampler only if actually needed (rate mismatch) — zero-cost zero-mask when bypassed
@@ -595,10 +600,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private fun handleAudioDeviceChange(isAdded: Boolean, devices: Array<out AudioDeviceInfo>?) {
         val deviceTypes = devices?.map { it.type } ?: emptyList()
         Log.i(TAG, "Audio device route changed (${if (isAdded) "added" else "removed"}): types=$deviceTypes")
-        val isBluetooth = deviceTypes.any {
-            it == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP || it == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
-        }
-        // BT A2DP needs 500-600ms to negotiate sink; wired/USB is fast (150ms)
+        val isBluetooth = deviceTypes.any { HiResDacPlugin.isBluetoothOutputType(it) }
+        // BT (A2DP codec handshake or LE Audio CIS setup) needs 500-600ms to
+        // negotiate the sink; wired/USB is fast (150ms). Rebinding an
+        // AudioEffect before the sink settles silently drops the effect.
         val delayMs = if (isBluetooth) 600L else 150L
 
         mainHandler.postDelayed({
@@ -623,17 +628,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         return try {
             val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
             devices.any { d ->
-                d.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
-                d.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
-                d.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
-                d.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
-                d.type == AudioDeviceInfo.TYPE_USB_HEADSET ||
-                d.type == AudioDeviceInfo.TYPE_USB_DEVICE ||
-                d.type == AudioDeviceInfo.TYPE_HEARING_AID ||
-                (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && (
-                    d.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
-                    d.type == AudioDeviceInfo.TYPE_BLE_SPEAKER
-                ))
+                HiResDacPlugin.isWiredOutputType(d.type) ||
+                HiResDacPlugin.isUsbOutputType(d.type) ||
+                HiResDacPlugin.isBluetoothOutputType(d.type) ||
+                d.type == AudioDeviceInfo.TYPE_HEARING_AID
             }
         } catch (_: Exception) {
             false
@@ -1170,7 +1168,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     }
                 }
 
-                // Stereo Balance & Mono Mix — HAL path via DynamicsProcessing per-channel inputGain
+                // Stereo Balance & Mono Mix — native SpatialPanner. Constant-power
+                // pan plus L+R downmix; no AudioEffect can sum channels.
                 "setStereoBalance" -> {
                     val balance = call.argument<Double>("balance") ?: 0.0
                     stereoBalance = balance
@@ -1182,7 +1181,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             Log.w(TAG, "nativeSetStereoBalance failed: ${e.message}")
                         }
                     }
-                    applyHalBalanceMono()
                     recalculateActiveStages()
                     result.success(true)
                 }
@@ -1198,7 +1196,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             Log.w(TAG, "nativeSetMonoMix failed: ${e.message}")
                         }
                     }
-                    applyHalBalanceMono()
                     recalculateActiveStages()
                     result.success(true)
                 }
@@ -1710,19 +1707,20 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isLimiterEnabled) "Threshold: ${limiterThresholdDb} dB, Lookahead: ${limiterLookaheadMs} ms" else "Disabled"
                     ))
 
-                    // 7. Convolution Reverb (Native C++)
-                    val revActive = isReverbEnabled && !isBitPerfectBypassActive
-                    if (revActive) activeNames.add("Convolution Reverb (Preset #$reverbPreset, Wet: ${(reverbWetDry * 100).toInt()}%)")
+                    // 7. Reverb (Android HAL EnvironmentalReverb)
+                    val revActive = isReverbEnabled && !isBitPerfectBypassActive && halAttached
+                    if (revActive) activeNames.add("Reverb (Preset #$reverbPreset, Wet: ${(reverbWetDry * 100).toInt()}%)")
                     stagesList.add(mapOf(
-                        "name" to "Convolution Reverb",
-                        "category" to "Native C++ Engine",
-                        "isSupported" to isNativeDspLoaded,
+                        "name" to "Reverb",
+                        "category" to "Android HAL (EnvironmentalReverb)",
+                        "isSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_ENV_REVERB),
                         "isEnabled" to isReverbEnabled,
                         "isBypassed" to isBitPerfectBypassActive,
-                        "isDegraded" to ((autoDegraded and STAGE_REVERB) != 0),
+                        "isDegraded" to (!halAttached && isReverbEnabled),
                         "parameters" to mapOf(
                             "preset" to reverbPreset,
-                            "wetDryRatio" to reverbWetDry.toDouble()
+                            "wetDryRatio" to reverbWetDry.toDouble(),
+                            "isAttached" to (halReverb != null)
                         ),
                         "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isReverbEnabled) "Preset #$reverbPreset (${(reverbWetDry * 100).toInt()}% Wet)" else "Disabled"
                     ))
@@ -1823,6 +1821,34 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             "intensity" to loudnessIntensity
                         ),
                         "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isLoudnessContourEnabled) "Intensity: ${(loudnessIntensity * 100).toInt()}%" else "Disabled"
+                    ))
+
+                    // 14. Spatial Panner — Stereo Balance & Mono Mix (Native C++)
+                    val panActive = (abs(stereoBalance) > 0.001 || monoMix) && !isBitPerfectBypassActive
+                    if (panActive) {
+                        activeNames.add(
+                            if (monoMix) "Mono Downmix" else "Stereo Balance (${(stereoBalance * 100).toInt()}%)"
+                        )
+                    }
+                    stagesList.add(mapOf(
+                        "name" to "Stereo Balance & Mono Downmix",
+                        "category" to "Native C++ Engine",
+                        "isSupported" to isNativeDspLoaded,
+                        "isEnabled" to (abs(stereoBalance) > 0.001 || monoMix),
+                        "isBypassed" to isBitPerfectBypassActive,
+                        "isDegraded" to ((autoDegraded and STAGE_PANNER) != 0),
+                        "parameters" to mapOf(
+                            "balance" to stereoBalance,
+                            "monoMix" to monoMix
+                        ),
+                        "statusDescription" to when {
+                            isBitPerfectBypassActive -> "Bypassed by Bit-Perfect"
+                            monoMix -> "Mono downmix (L+R)"
+                            abs(stereoBalance) > 0.001 ->
+                                if (stereoBalance < 0) "Left ${(-stereoBalance * 100).toInt()}%"
+                                else "Right ${(stereoBalance * 100).toInt()}%"
+                            else -> "Centered"
+                        }
                     ))
 
                     val nativeAppliedSampleRate = if (isNativeDspLoaded) {
@@ -2246,6 +2272,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
      */
     private fun isHalEqSuppressed(): Boolean {
         return when (dspPreference) {
+            "native" -> true // native ParametricEQ owns the band gains
             "oem" -> true
             "auto" -> {
                 val ctx = context ?: return false
@@ -2343,9 +2370,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             dp.enabled = effectiveEqEnabled || dynamicsActive || isLimiterEnabled
             dynamicsProcessing = dp
             updateLegacyEqualizer()
-            // Wire HAL limiter and balance/mono into the freshly-built DP instance
+            // Wire the HAL limiter into the freshly-built DP instance
             applyHalLimiter()
-            applyHalBalanceMono()
         } catch (e: Exception) {
             dpBuildFailures++
             if (dpBuildFailures == 1 || dpBuildFailures == dpBuildFailureLimit) {
@@ -2449,7 +2475,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         // Reattach HAL-side effects after session recreate
         applyHalReverb()
         applyHalLimiter()
-        applyHalBalanceMono()
     }
 
     /**
@@ -2503,13 +2528,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     // -------------------------------------------------------------------------
 
     /**
-     * Creates or updates the session-bound [PresetReverb] with the current
-     * preset mapping. Preset mapping:
-     *   0 = Studio Room, 1 = Concert Hall, 2 = Warm Tube (Plate), 3 = Plate, 4 = Custom IR
-     * We map to the closest Android PresetReverb preset.
-     * Note: PresetReverb does not expose a wet/dry control — reverb is on/off
-     * via enabled flag. Wet level control would require EnvironmentalReverb
-     * with manual parameter tuning per device, which is fragile.
+     * EnvironmentalReverb replaces PresetReverb here because PresetReverb is
+     * on/off only and would discard the user's wet/dry fader.
+     * Presets: 0 Studio, 1 Concert Hall, 2 Warm Tube, 3 Plate, 4 Custom IR
+     * (falls back to Studio — a real impulse response needs the PCM path).
      */
     private fun applyHalReverb() {
         if (currentAudioSessionId == 0) return
@@ -2518,20 +2540,28 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             return
         }
         try {
-            val reverb = halReverb ?: PresetReverb(0, currentAudioSessionId).also {
+            val reverb = halReverb ?: EnvironmentalReverb(0, currentAudioSessionId).also {
                 halReverb = it
             }
-            // Map our 0-4 preset index to Android's PresetReverb presets
-            val androidPreset: Short = when (reverbPreset) {
-                0 -> PresetReverb.PRESET_SMALLROOM   // Studio Room
-                1 -> PresetReverb.PRESET_LARGEHALL   // Concert Hall
-                2 -> PresetReverb.PRESET_PLATE       // Warm Tube → Plate
-                3 -> PresetReverb.PRESET_PLATE       // Plate
-                else -> PresetReverb.PRESET_SMALLROOM
+            // decayTime ms, decayHFRatio permille, density, diffusion, roomLevel mB
+            val shape = when (reverbPreset) {
+                1 -> ReverbShape(2800, 700, 1000, 1000, -900)   // Concert Hall
+                2 -> ReverbShape(1200, 400, 700, 700, -1200)    // Warm Tube
+                3 -> ReverbShape(1600, 800, 1000, 350, -1000)   // Plate
+                else -> ReverbShape(400, 900, 1000, 900, -1500) // Studio / Custom IR
             }
-            reverb.preset = androidPreset
+            reverb.decayTime = shape.decayMs
+            reverb.decayHFRatio = shape.decayHFRatio.toShort()
+            reverb.density = shape.density.toShort()
+            reverb.diffusion = shape.diffusion.toShort()
+            reverb.roomLevel = shape.roomLevel.toShort()
+            // Wet fader as a linear dB send: 1.0 -> 0 mB (full), 0.0 -> -6000 mB
+            // (inaudible). EnvironmentalReverb accepts up to +2000 mB; never
+            // boost, so the top of the range is unity.
+            reverb.reverbLevel =
+                ((reverbWetDry.coerceIn(0f, 1f) - 1f) * 6000f).toInt().toShort()
             reverb.enabled = true
-            Log.d(TAG, "HAL reverb applied: preset=$reverbPreset androidPreset=$androidPreset")
+            Log.d(TAG, "HAL reverb applied: preset=$reverbPreset wet=$reverbWetDry decay=${shape.decayMs}ms")
         } catch (e: Exception) {
             Log.w(TAG, "applyHalReverb failed: ${e.message}")
             try { halReverb?.release() } catch (_: Exception) {}
@@ -2576,46 +2606,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             Log.d(TAG, "HAL limiter applied: enabled=$isLimiterEnabled threshold=${limiterThresholdDb}dB attack=${limiterLookaheadMs}ms")
         } catch (e: Exception) {
             Log.w(TAG, "applyHalLimiter failed: ${e.message}")
-        }
-    }
-
-    /**
-     * Applies stereo balance and mono-mix via [DynamicsProcessing] per-channel
-     * inputGain. Balance -1.0 = full left, 0.0 = center, +1.0 = full right.
-     * Uses DynamicsProcessing.getChannelByChannelIndex() + setChannelTo() for
-     * real-time gain update on the live session.
-     */
-    private fun applyHalBalanceMono() {
-        val dp = dynamicsProcessing ?: run {
-            // Rebuild will call this helper after the DP is created
-            if (monoMix || kotlin.math.abs(stereoBalance) > 0.001) buildDynamicsProcessing()
-            return
-        }
-        try {
-            if (monoMix) {
-                // Both channels at 0 dB inputGain — downstream mixing creates mono
-                for (ch in 0 until CHANNEL_COUNT) {
-                    val channel = dp.getChannelByChannelIndex(ch)
-                    channel.inputGain = 0f
-                    dp.setChannelTo(ch, channel)
-                }
-            } else {
-                // Stereo balance: attenuate one channel. balance in [-1, +1]
-                // Left = ch 0, Right = ch 1
-                val bal = stereoBalance.toFloat().coerceIn(-1f, 1f)
-                // At balance=0: L=0dB, R=0dB. At balance=+1: L=-60dB (near silence), R=0dB
-                val leftGainDb = if (bal >= 0f) (-60f * bal) else 0f
-                val rightGainDb = if (bal <= 0f) (60f * bal) else 0f
-                val leftCh = dp.getChannelByChannelIndex(0)
-                leftCh.inputGain = leftGainDb
-                dp.setChannelTo(0, leftCh)
-                val rightCh = dp.getChannelByChannelIndex(1)
-                rightCh.inputGain = rightGainDb
-                dp.setChannelTo(1, rightCh)
-            }
-            Log.d(TAG, "HAL balance applied: balance=$stereoBalance mono=$monoMix")
-        } catch (e: Exception) {
-            Log.w(TAG, "applyHalBalanceMono failed: ${e.message}")
         }
     }
 

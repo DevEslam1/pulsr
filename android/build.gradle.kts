@@ -72,6 +72,15 @@ subprojects {
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+            // sentry_flutter 8.x pins languageVersion "1.6", which Kotlin 2.3
+            // refuses outright. Lift any stale plugin to the 2.0 floor.
+            val requested = languageVersion.orNull
+            if (requested != null &&
+                requested < org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0
+            ) {
+                languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
+                apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
+            }
         }
     }
 }

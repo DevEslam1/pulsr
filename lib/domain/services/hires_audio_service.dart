@@ -9,6 +9,19 @@ import '../../core/utils/error_logger.dart';
 import '../../core/utils/platform_capabilities.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+/// Outcome of a media-route change request.
+class OutputRouteResult {
+  final bool success;
+  final String? error;
+  final bool requiresSystemPicker;
+
+  const OutputRouteResult({
+    required this.success,
+    this.error,
+    this.requiresSystemPicker = false,
+  });
+}
+
 @lazySingleton
 class HiResAudioService {
   static const MethodChannel _methodChannel =
@@ -32,8 +45,9 @@ class HiResAudioService {
   void _init() {
     if (!PlatformCapabilities.isAndroid) return;
     try {
-      _eventSubscription =
-          _eventChannel.receiveBroadcastStream().handleError((Object e, StackTrace st) {
+      _eventSubscription = _eventChannel
+          .receiveBroadcastStream()
+          .handleError((Object e, StackTrace st) {
         if (e is! MissingPluginException) {
           ErrorLogger.log('HiRes DAC event stream error',
               error: e, stackTrace: st, category: 'HiResAudio');
@@ -46,7 +60,8 @@ class HiResAudioService {
             if (_cachedOutputInfo != null &&
                 _cachedOutputInfo!.deviceName == info.deviceName &&
                 _cachedOutputInfo!.sampleRate == info.sampleRate &&
-                _cachedOutputInfo!.isBitPerfectActive == info.isBitPerfectActive) {
+                _cachedOutputInfo!.isBitPerfectActive ==
+                    info.isBitPerfectActive) {
               return;
             }
             _cachedOutputInfo = info;
@@ -65,7 +80,12 @@ class HiResAudioService {
 
   Future<AudioOutputInfo> getAudioOutputInfo() async {
     if (!PlatformCapabilities.isAndroid) {
-      const fb = AudioOutputInfo(deviceName: 'Default Audio Output', isUsbDac: false, sampleRate: 44100, bitDepth: 16, isBitPerfectActive: false);
+      const fb = AudioOutputInfo(
+          deviceName: 'Default Audio Output',
+          isUsbDac: false,
+          sampleRate: 44100,
+          bitDepth: 16,
+          isBitPerfectActive: false);
       _cachedOutputInfo = fb;
       return fb;
     }
@@ -159,9 +179,9 @@ class HiResAudioService {
   Future<bool> setBitPerfectMode(bool enabled) async {
     if (!PlatformCapabilities.isAndroid) return false;
     try {
-      final bool? success = await _methodChannel
-          .invokeMethod<bool>('setBitPerfectMode', {'enabled': enabled})
-          .timeout(const Duration(seconds: 8));
+      final bool? success = await _methodChannel.invokeMethod<bool>(
+          'setBitPerfectMode',
+          {'enabled': enabled}).timeout(const Duration(seconds: 8));
       await getAudioOutputInfo();
       return success ?? false;
     } catch (e, st) {
@@ -171,18 +191,48 @@ class HiResAudioService {
     }
   }
 
-  Future<bool> selectOutputDevice(int deviceId) async {
-    if (!PlatformCapabilities.isAndroid) return false;
+  /// Asks the platform to route media to [deviceId].
+  ///
+  /// Forcing the media route needs MODIFY_AUDIO_ROUTING, which only privileged
+  /// builds hold, so `requiresSystemPicker` is the normal outcome on retail
+  /// devices — hand the user [openOutputSwitcher] instead of reporting success.
+  Future<OutputRouteResult> selectOutputDevice(int deviceId) async {
+    if (!PlatformCapabilities.isAndroid) {
+      return const OutputRouteResult(
+          success: false, error: 'unsupported_platform');
+    }
     try {
-      final dynamic res = await _methodChannel
-          .invokeMethod<dynamic>('setOutputDevice', {'deviceId': deviceId})
-          .timeout(const Duration(seconds: 8));
+      final dynamic res = await _methodChannel.invokeMethod<dynamic>(
+          'setOutputDevice',
+          {'deviceId': deviceId}).timeout(const Duration(seconds: 8));
       await getAudioOutputInfo();
-      if (res is Map) return (res['success'] as bool?) ?? false;
-      if (res is bool) return res;
-      return false;
+      if (res is Map) {
+        return OutputRouteResult(
+          success: (res['success'] as bool?) ?? false,
+          error: res['error'] as String?,
+          requiresSystemPicker: (res['requiresSystemPicker'] as bool?) ?? false,
+        );
+      }
+      if (res is bool) return OutputRouteResult(success: res);
+      return const OutputRouteResult(success: false, error: 'unknown_response');
     } catch (e, st) {
       ErrorLogger.log('Failed to selectOutputDevice($deviceId)',
+          error: e, stackTrace: st, category: 'HiResAudio');
+      return const OutputRouteResult(success: false, error: 'channel_error');
+    }
+  }
+
+  /// Opens Android's media output switcher — the sanctioned way for an
+  /// unprivileged app to move the route.
+  Future<bool> openOutputSwitcher() async {
+    if (!PlatformCapabilities.isAndroid) return false;
+    try {
+      final bool? ok = await _methodChannel
+          .invokeMethod<bool>('openOutputSwitcher')
+          .timeout(const Duration(seconds: 5));
+      return ok ?? false;
+    } catch (e, st) {
+      ErrorLogger.log('Failed to openOutputSwitcher',
           error: e, stackTrace: st, category: 'HiResAudio');
       return false;
     }
@@ -207,12 +257,13 @@ class HiResAudioService {
       {int sampleRate = 0, int bitDepth = 0}) async {
     if (!PlatformCapabilities.isAndroid) return false;
     try {
-      final bool? success = await _methodChannel
-          .invokeMethod<bool>('setTargetOutputFormat', {'sampleRate': sampleRate, 'bitDepth': bitDepth})
-          .timeout(const Duration(seconds: 8));
+      final bool? success = await _methodChannel.invokeMethod<bool>(
+          'setTargetOutputFormat', {
+        'sampleRate': sampleRate,
+        'bitDepth': bitDepth
+      }).timeout(const Duration(seconds: 8));
       await getAudioOutputInfo();
       return success ?? false;
-
     } catch (e, st) {
       ErrorLogger.log('Failed to setTargetOutputFormat($sampleRate, $bitDepth)',
           error: e, stackTrace: st, category: 'HiResAudio');
@@ -257,9 +308,9 @@ class HiResAudioService {
   Future<bool> setBluetoothCodec(String codec) async {
     if (!PlatformCapabilities.isAndroid) return false;
     try {
-      final bool? ok = await _methodChannel
-          .invokeMethod<bool>('setBluetoothCodec', {'codec': codec})
-          .timeout(const Duration(seconds: 3));
+      final bool? ok = await _methodChannel.invokeMethod<bool>(
+          'setBluetoothCodec',
+          {'codec': codec}).timeout(const Duration(seconds: 3));
       await Future<void>.delayed(const Duration(milliseconds: 700));
       await getAudioOutputInfo();
       return ok ?? false;
@@ -273,9 +324,9 @@ class HiResAudioService {
   Future<bool> setBluetoothSampleRate(int hz) async {
     if (!PlatformCapabilities.isAndroid) return false;
     try {
-      final bool? ok = await _methodChannel
-          .invokeMethod<bool>('setBluetoothSampleRate', {'sampleRate': hz})
-          .timeout(const Duration(seconds: 3));
+      final bool? ok = await _methodChannel.invokeMethod<bool>(
+          'setBluetoothSampleRate',
+          {'sampleRate': hz}).timeout(const Duration(seconds: 3));
       await Future<void>.delayed(const Duration(milliseconds: 700));
       await getAudioOutputInfo();
       return ok ?? false;
@@ -289,9 +340,9 @@ class HiResAudioService {
   Future<bool> setBluetoothBitDepth(int bits) async {
     if (!PlatformCapabilities.isAndroid) return false;
     try {
-      final bool? ok = await _methodChannel
-          .invokeMethod<bool>('setBluetoothBitDepth', {'bitDepth': bits})
-          .timeout(const Duration(seconds: 3));
+      final bool? ok = await _methodChannel.invokeMethod<bool>(
+          'setBluetoothBitDepth',
+          {'bitDepth': bits}).timeout(const Duration(seconds: 3));
       await Future<void>.delayed(const Duration(milliseconds: 700));
       await getAudioOutputInfo();
       return ok ?? false;
@@ -305,9 +356,9 @@ class HiResAudioService {
   Future<bool> setBluetoothLdacQuality(int mode) async {
     if (!PlatformCapabilities.isAndroid) return false;
     try {
-      final bool? ok = await _methodChannel
-          .invokeMethod<bool>('setBluetoothLdacQuality', {'mode': mode})
-          .timeout(const Duration(seconds: 3));
+      final bool? ok = await _methodChannel.invokeMethod<bool>(
+          'setBluetoothLdacQuality',
+          {'mode': mode}).timeout(const Duration(seconds: 3));
       await Future<void>.delayed(const Duration(milliseconds: 700));
       await getAudioOutputInfo();
       return ok ?? false;
@@ -324,4 +375,3 @@ class HiResAudioService {
     if (!_deviceController.isClosed) _deviceController.close();
   }
 }
-

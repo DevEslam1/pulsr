@@ -55,9 +55,12 @@ void main() {
         sampleRate: 48000,
         bitDepth: 24,
         isBitPerfectActive: false,
-        activeDeviceType: 'bt',
+        activeDeviceType: 'bluetooth',
         isBluetooth: true,
       );
+
+  // Derived, never hardcoded: the key format is owned by deviceKeyFor.
+  String btKey() => DeviceProfileService.deviceKeyFromInfo(btDevice());
 
   Future<PlayerCubit> buildCubit() async {
     return PlayerCubit(
@@ -85,7 +88,7 @@ void main() {
     );
     await profilesService.saveProfile(profile);
     await deviceService.rememberLink(
-        deviceKey: 'bt:sony xm5',
+        deviceKey: btKey(),
         deviceLabel: 'Sony XM5',
         profileId: 'profile_car_test');
     final cubit = await buildCubit();
@@ -117,7 +120,7 @@ void main() {
     await profilesService.saveProfile(first);
     await profilesService.saveProfile(second);
     await deviceService.rememberLink(
-        deviceKey: 'bt:sony xm5',
+        deviceKey: btKey(),
         deviceLabel: 'Sony XM5',
         profileId: 'profile_car_test');
     final cubit = await buildCubit();
@@ -130,7 +133,7 @@ void main() {
     // Re-point the link, then re-emit the SAME device (e.g. sample-rate
     // change): the device key did not change, so no re-apply may happen.
     await deviceService.rememberLink(
-        deviceKey: 'bt:sony xm5',
+        deviceKey: btKey(),
         deviceLabel: 'Sony XM5',
         profileId: 'profile_home_test');
     fakeHiRes.emitDevice(btDevice());
@@ -148,7 +151,7 @@ void main() {
     );
     await profilesService.saveProfile(profile);
     await deviceService.rememberLink(
-        deviceKey: 'bt:sony xm5',
+        deviceKey: btKey(),
         deviceLabel: 'Sony XM5',
         profileId: 'profile_car_test');
     await deviceService.setAutoSwitchEnabled(false);

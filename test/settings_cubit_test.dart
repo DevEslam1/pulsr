@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:pulsr/core/network/proxy_config.dart';
 import 'package:pulsr/data/scanner/media_scanner_service.dart';
+import 'package:pulsr/domain/models/audio_output_info.dart';
 import 'package:pulsr/features/settings/cubit/settings_cubit.dart';
 import 'package:pulsr/features/settings/cubit/settings_state.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -277,6 +280,91 @@ void main() {
       expect(cubitSession2.state.proxyUsername, 'qmyizdto');
 
       await cubitSession2.close();
+    });
+
+    test('audibleLatencyOffset only applies to Bluetooth output', () async {
+      final cubit = SettingsCubit(scannerService: mockScannerService);
+      await cubit.setBluetoothLatencyOffsetMs(200);
+
+      const wired = AudioOutputInfo(
+        deviceName: 'Wired Headset',
+        isUsbDac: false,
+        sampleRate: 48000,
+        bitDepth: 16,
+        isBitPerfectActive: false,
+      );
+      const bluetooth = AudioOutputInfo(
+        deviceName: 'WH-1000XM5',
+        isUsbDac: false,
+        sampleRate: 48000,
+        bitDepth: 16,
+        isBitPerfectActive: false,
+        isBluetooth: true,
+      );
+
+      expect(cubit.state.audibleLatencyOffset, Duration.zero);
+      expect(
+        cubit.state.copyWith(currentOutputDevice: wired).audibleLatencyOffset,
+        Duration.zero,
+      );
+      expect(
+        cubit.state
+            .copyWith(currentOutputDevice: bluetooth)
+            .audibleLatencyOffset,
+        const Duration(milliseconds: 200),
+      );
+
+      await cubit.close();
+    });
+
+    test('pool credentials stay out of SharedPreferences and survive relaunch',
+        () async {
+      final session1 = SettingsCubit(scannerService: mockScannerService);
+      await session1
+          .importProxiesFromText('31.59.20.176:6754:qmyizdto:n5fui7pyec1q');
+      await session1.close();
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('setting_proxy_list'),
+          isNot(contains('n5fui7pyec1q')));
+
+      final session2 = SettingsCubit(scannerService: mockScannerService);
+      await expectLater(
+        session2.stream,
+        emits(predicate<SettingsState>((s) => s.proxyList.length == 1)),
+      );
+      expect(session2.state.proxyList.first.password, 'n5fui7pyec1q');
+
+      await session2.close();
+    });
+
+    test('legacy plaintext pool passwords migrate into secure storage',
+        () async {
+      SharedPreferences.setMockInitialValues({
+        'setting_proxy_list': jsonEncode([
+          {
+            'id': 'legacy_1',
+            'host': '198.105.121.200',
+            'port': 6462,
+            'username': 'qmyizdto',
+            'password': 'n5fui7pyec1q',
+            'type': 'http',
+          }
+        ]),
+      });
+
+      final cubit = SettingsCubit(scannerService: mockScannerService);
+      await expectLater(
+        cubit.stream,
+        emits(predicate<SettingsState>((s) => s.proxyList.length == 1)),
+      );
+
+      expect(cubit.state.proxyList.first.password, 'n5fui7pyec1q');
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('setting_proxy_list'),
+          isNot(contains('n5fui7pyec1q')));
+
+      await cubit.close();
     });
   });
 }

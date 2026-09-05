@@ -1,6 +1,7 @@
 // lib/core/utils/ytm_rate_limiter.dart
 import 'dart:async';
 import 'dart:math';
+import 'package:clock/clock.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Simple asynchronous mutex to serialize token acquisitions.
@@ -29,8 +30,8 @@ class YtmRateLimiter {
   YtmRateLimiter._();
   static final YtmRateLimiter shared = YtmRateLimiter._();
 
-  final AsyncMutex _nativeMutex = AsyncMutex();
-  final AsyncMutex _backendMutex = AsyncMutex();
+  AsyncMutex _nativeMutex = AsyncMutex();
+  AsyncMutex _backendMutex = AsyncMutex();
 
   static const String _keyTokens = 'ytm_rate_limiter_tokens';
   static const String _keyLastRefill = 'ytm_rate_limiter_last_refill';
@@ -47,28 +48,28 @@ class YtmRateLimiter {
   static const double _refillRate = 4.0; // tokens per second
 
   double _tokens = _maxTokens.toDouble();
-  DateTime _lastRefill = DateTime.now();
+  DateTime _lastRefill = clock.now();
   final _random = Random();
 
   DateTime _backoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
   int _adaptiveMultiplier = 1;
-  DateTime _lastSuccess = DateTime.now();
+  DateTime _lastSuccess = clock.now();
 
   // Dedicated Backend bucket (higher cap, 10/s refill, no client-side pacing floors)
   static const int _backendMaxTokens = 30;
   static const double _backendRefillRate = 10.0; // tokens per second
 
   double _backendTokens = _backendMaxTokens.toDouble();
-  DateTime _backendLastRefill = DateTime.now();
+  DateTime _backendLastRefill = clock.now();
   DateTime _backendBackoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
-  DateTime _backendLastSuccess = DateTime.now();
+  DateTime _backendLastSuccess = clock.now();
 
   final Map<String, Future<dynamic>> _inFlightRequests = {};
 
   DateTime get lastBackendSuccess => _backendLastSuccess;
 
   Duration get cooldownRemaining {
-    final now = DateTime.now();
+    final now = clock.now();
     if (_backoffUntil.isAfter(now)) {
       return _backoffUntil.difference(now);
     }
@@ -78,7 +79,7 @@ class YtmRateLimiter {
   bool get isCoolingDown => cooldownRemaining > Duration.zero;
 
   Duration get backendCooldownRemaining {
-    final now = DateTime.now();
+    final now = clock.now();
     if (_backendBackoffUntil.isAfter(now)) {
       return _backendBackoffUntil.difference(now);
     }
@@ -101,7 +102,7 @@ class YtmRateLimiter {
       }
       if (savedBackoff != null) {
         final deadline = DateTime.fromMillisecondsSinceEpoch(savedBackoff);
-        if (deadline.isAfter(DateTime.now())) {
+        if (deadline.isAfter(clock.now())) {
           _backoffUntil = deadline;
         }
       }
@@ -117,7 +118,7 @@ class YtmRateLimiter {
       }
       if (savedBBackoff != null) {
         final deadline = DateTime.fromMillisecondsSinceEpoch(savedBBackoff);
-        if (deadline.isAfter(DateTime.now())) {
+        if (deadline.isAfter(clock.now())) {
           _backendBackoffUntil = deadline;
         }
       }
@@ -179,13 +180,20 @@ class YtmRateLimiter {
 
   /// Test-only: restores pristine bucket/backoff state.
   static void debugReset() {
+    // The mutexes must be replaced too: their queue tail is a future owned by
+    // whatever zone last used it, so a permit acquired under a torn-down
+    // `fakeAsync` zone would leave every later caller chained to a future that
+    // can no longer be delivered.
+    shared._nativeMutex = AsyncMutex();
+    shared._backendMutex = AsyncMutex();
+
     shared._tokens = _maxTokens.toDouble();
-    shared._lastRefill = DateTime.now();
+    shared._lastRefill = clock.now();
     shared._backoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
     shared._adaptiveMultiplier = 1;
 
     shared._backendTokens = _backendMaxTokens.toDouble();
-    shared._backendLastRefill = DateTime.now();
+    shared._backendLastRefill = clock.now();
     shared._backendBackoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
 
     shared._inFlightRequests.clear();
@@ -194,7 +202,7 @@ class YtmRateLimiter {
   /// Acquires a permit before making a native YTM request.
   Future<void> acquirePermit() => _nativeMutex.run(() async {
     while (true) {
-      final now = DateTime.now();
+      final now = clock.now();
       if (now.isBefore(_backoffUntil)) {
         await Future<void>.delayed(_backoffUntil.difference(now));
       }
@@ -215,7 +223,7 @@ class YtmRateLimiter {
   /// Acquires a permit before making a backend microservice request.
   Future<void> acquireBackendPermit() => _backendMutex.run(() async {
     while (true) {
-      final now = DateTime.now();
+      final now = clock.now();
       if (now.isBefore(_backendBackoffUntil)) {
         await Future<void>.delayed(_backendBackoffUntil.difference(now));
       }
@@ -236,7 +244,7 @@ class YtmRateLimiter {
   /// [_adaptiveMultiplier] actually scales the backoff (previously it was
   /// incremented but never read), so repeated blocks cool down longer.
   void onRateLimited([int? retryAfterSeconds]) {
-    final now = DateTime.now();
+    final now = clock.now();
     _adaptiveMultiplier = (_adaptiveMultiplier * 2).clamp(1, 16);
 
     if (retryAfterSeconds != null && retryAfterSeconds > 0) {
@@ -260,7 +268,7 @@ class YtmRateLimiter {
 
   /// Called when a 429 response is received from backend (honoring Retry-After).
   void onBackendRateLimited([int? retryAfterSeconds]) {
-    final now = DateTime.now();
+    final now = clock.now();
     final seconds = (retryAfterSeconds != null && retryAfterSeconds > 0)
         ? retryAfterSeconds
         : 60;
@@ -275,7 +283,7 @@ class YtmRateLimiter {
   /// expires naturally; success only decays the adaptive multiplier after
   /// 10 minutes of clean traffic.
   void onSuccess() {
-    final now = DateTime.now();
+    final now = clock.now();
     if (now.difference(_lastSuccess).inMinutes > 10) {
       _adaptiveMultiplier = 1;
     }
@@ -285,13 +293,13 @@ class YtmRateLimiter {
 
   /// Called on a successful backend request to reset backoff state.
   void onBackendSuccess() {
-    _backendLastSuccess = DateTime.now();
+    _backendLastSuccess = clock.now();
     _backendBackoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
     _persist();
   }
 
   void _refill() {
-    final now = DateTime.now();
+    final now = clock.now();
     final elapsed = now.difference(_lastRefill).inMilliseconds / 1000.0;
     _tokens =
         (_tokens + elapsed * _refillRate).clamp(0.0, _maxTokens.toDouble());
@@ -299,7 +307,7 @@ class YtmRateLimiter {
   }
 
   void _refillBackend() {
-    final now = DateTime.now();
+    final now = clock.now();
     final elapsed = now.difference(_backendLastRefill).inMilliseconds / 1000.0;
     _backendTokens =
         (_backendTokens + elapsed * _backendRefillRate).clamp(0.0, _backendMaxTokens.toDouble());

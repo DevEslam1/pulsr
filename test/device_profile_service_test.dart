@@ -23,21 +23,29 @@ void main() {
     test('bluetooth names are normalized (case + whitespace)', () {
       expect(
         DeviceProfileService.deviceKeyFor('  Sony   XM5 ',
-            deviceType: 'bt', isBluetooth: true),
-        'bt:sony xm5',
+            deviceType: 'bluetooth', isBluetooth: true),
+        'bluetooth:sony xm5',
       );
       expect(
         DeviceProfileService.deviceKeyFor('SONY XM5',
-            deviceType: 'BT', isBluetooth: true),
-        'bt:sony xm5',
+            deviceType: 'BLUETOOTH', isBluetooth: true),
+        'bluetooth:sony xm5',
       );
+    });
+
+    test('LE Audio and A2DP for the same headset share one key', () {
+      final a2dp = DeviceProfileService.deviceKeyFor('Sony XM5',
+          deviceType: 'bluetooth', isBluetooth: true);
+      final leAudio = DeviceProfileService.deviceKeyFor('Sony XM5',
+          deviceType: 'ble', isBluetooth: true);
+      expect(leAudio, a2dp);
     });
 
     test('same name on different transports is a different device', () {
       final usb = DeviceProfileService.deviceKeyFor('Sony XM5',
           deviceType: 'usb', isBluetooth: false);
       final bt = DeviceProfileService.deviceKeyFor('Sony XM5',
-          deviceType: 'bt', isBluetooth: true);
+          deviceType: 'bluetooth', isBluetooth: true);
       expect(usb, isNot(bt));
     });
 

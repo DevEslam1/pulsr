@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:injectable/injectable.dart';
 
 import '../../domain/models/eq_preset.dart';
+import '../../core/constants/channels.dart';
 import '../../core/utils/error_logger.dart';
 
 /// Phase 5: room-correction wizard engine (stepped-sine method).
@@ -22,9 +23,9 @@ import '../../core/utils/error_logger.dart';
 @lazySingleton
 class RoomCorrectionService {
   static const MethodChannel _method =
-      MethodChannel('com.pulsr.music/room_correction');
+      MethodChannel(PulsrChannels.roomCorrection);
   static const EventChannel _events =
-      EventChannel('com.pulsr.music/room_correction_pcm');
+      EventChannel(PulsrChannels.roomCorrectionPcm);
 
   /// Default sweep tone count and range. 24 tones x 350 ms is ~8.4 s of
   /// sweep: long enough for stable RMS per tone, short enough to record

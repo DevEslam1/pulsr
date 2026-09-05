@@ -47,6 +47,14 @@ dependencies:
   intl: ^0.20.2
   flutter_secure_storage: ^11.0.0
   rxdart: ^0.28.0
+  clock: ^1.1.2
+
+# Vendored fork: adds NativeDspAudioProcessor to the ExoPlayer audio sink so
+# libpulsr_dsp receives the decoded PCM stream. Nothing else is changed.
+dependency_overrides:
+  just_audio:
+    path: third_party/just_audio
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

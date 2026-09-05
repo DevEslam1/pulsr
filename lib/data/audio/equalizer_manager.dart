@@ -112,12 +112,6 @@ class EqualizerManager {
 
   EqualizerManager({this.loudnessEnhancerA, this.loudnessEnhancerB});
 
-  bool get supportsNativePcmEffects => true;
-
-  void _disableUnavailableNativePcmEffects() {
-    // Keep user's DSP preferences intact
-  }
-
   void _debouncedSavePreferences() {
     _saveDebounce?.cancel();
     _saveDebounce = Timer(const Duration(milliseconds: 350), () {
@@ -296,10 +290,6 @@ class EqualizerManager {
           profileId,
         );
       }
-
-      // Do not restore controls for stages that cannot receive ExoPlayer PCM.
-      // This avoids a saved \"on\" state that produces no sound.
-      _disableUnavailableNativePcmEffects();
 
       // Batch native effect enables to avoid sound-drop dropout (requires EQ off/on to fix)
       // Previously each await toggled DynamicsProcessing causing 20+ JNI hops on audio thread during playback.
@@ -1061,11 +1051,6 @@ class EqualizerManager {
     double? delayUs,
     double? feedDb,
   }) async {
-    if (!supportsNativePcmEffects) {
-      isCrossfeedEnabled = false;
-      _debouncedSavePreferences();
-      return;
-    }
     isCrossfeedEnabled = enabled;
     if (delayUs != null) crossfeedDelayUs = delayUs;
     if (feedDb != null) crossfeedFeedDb = feedDb;
@@ -1085,11 +1070,6 @@ class EqualizerManager {
     double? releaseMs,
     double? lookaheadMs,
   }) async {
-    if (!supportsNativePcmEffects) {
-      isLimiterEnabled = false;
-      _debouncedSavePreferences();
-      return;
-    }
     isLimiterEnabled = enabled;
     if (thresholdDb != null) limiterThresholdDb = thresholdDb;
     if (releaseMs != null) limiterReleaseMs = releaseMs;
@@ -1128,11 +1108,6 @@ class EqualizerManager {
   }
 
   Future<void> setReverb(bool enabled, {int? preset, double? wetDry}) async {
-    if (!supportsNativePcmEffects) {
-      isReverbEnabled = false;
-      _debouncedSavePreferences();
-      return;
-    }
     isReverbEnabled = enabled;
     if (preset != null) reverbPreset = preset;
     if (wetDry != null) reverbWetDry = wetDry;
@@ -1162,11 +1137,6 @@ class EqualizerManager {
       _effectsChannel.setBandMute(index, mute);
 
   Future<void> setStereoBalance(double balance) async {
-    if (!supportsNativePcmEffects) {
-      stereoBalance = 0.0;
-      _debouncedSavePreferences();
-      return;
-    }
     stereoBalance = balance.clamp(-1.0, 1.0);
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setStereoBalance(stereoBalance);
@@ -1175,11 +1145,6 @@ class EqualizerManager {
   }
 
   Future<void> setMonoMix(bool mono) async {
-    if (!supportsNativePcmEffects) {
-      monoMix = false;
-      _debouncedSavePreferences();
-      return;
-    }
     monoMix = mono;
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.setMonoMix(mono);
@@ -1203,11 +1168,6 @@ class EqualizerManager {
     double? mix,
     double? tilt,
   }) async {
-    if (!supportsNativePcmEffects) {
-      isSaturationEnabled = false;
-      _debouncedSavePreferences();
-      return;
-    }
     isSaturationEnabled = enabled;
     if (drive != null) saturationDrive = drive.clamp(0.0, 1.0);
     if (mix != null) saturationMix = mix.clamp(0.0, 1.0);
@@ -1224,11 +1184,6 @@ class EqualizerManager {
   }
 
   Future<void> setStereoWidth(bool enabled, {double? width}) async {
-    if (!supportsNativePcmEffects) {
-      isStereoWidthEnabled = false;
-      _debouncedSavePreferences();
-      return;
-    }
     isStereoWidthEnabled = enabled;
     if (width != null) stereoWidth = width.clamp(0.0, 2.0);
     if (PlatformCapabilities.isAndroid) {
@@ -1242,11 +1197,6 @@ class EqualizerManager {
   /// [loudnessVolumeLinear], which is kept in sync with the playback volume
   /// stage via [updateLoudnessVolume].
   Future<void> setLoudnessContour(bool enabled, {double? intensity}) async {
-    if (!supportsNativePcmEffects) {
-      isLoudnessContourEnabled = false;
-      _debouncedSavePreferences();
-      return;
-    }
     isLoudnessContourEnabled = enabled;
     if (intensity != null) loudnessContourIntensity = intensity.clamp(0.0, 1.0);
     if (PlatformCapabilities.isAndroid) {
@@ -1278,11 +1228,6 @@ class EqualizerManager {
     double? slopeDbPerOct,
     double? gain,
   }) async {
-    if (!supportsNativePcmEffects) {
-      isSubCrossoverEnabled = false;
-      _debouncedSavePreferences();
-      return;
-    }
     isSubCrossoverEnabled = enabled;
     if (cornerHz != null) subCrossoverCornerHz = cornerHz.clamp(60.0, 150.0);
     if (slopeDbPerOct != null) {
@@ -1301,11 +1246,6 @@ class EqualizerManager {
   }
 
   Future<void> setDynamicEq(bool enabled) async {
-    if (!supportsNativePcmEffects) {
-      isDynamicEqEnabled = false;
-      _debouncedSavePreferences();
-      return;
-    }
     isDynamicEqEnabled = enabled;
     if (PlatformCapabilities.isAndroid) {
       await _pushDynamicEqConfig();
@@ -1572,6 +1512,11 @@ class EqualizerManager {
 
       await _effectsChannel.setEqEnabled(isEnabled);
       await _effectsChannel.setNativeEqEnabled(isEnabled);
+      // Native eqPreampDb resets to 0 whenever the plugin is re-created, and
+      // no other push carries it, so a re-attach would silently drop the
+      // headphone profile's preamp.
+      await _effectsChannel
+          .setEqPreamp(selectedHeadphoneProfile?.preampGain ?? 0.0);
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to initialize EQ chain',

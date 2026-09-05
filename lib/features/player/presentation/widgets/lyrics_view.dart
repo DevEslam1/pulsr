@@ -6,6 +6,7 @@ import '../../../../core/constants/app_radii.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../domain/models/lyrics_line.dart';
+import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 
@@ -42,6 +43,10 @@ class _LyricsViewState extends State<LyricsView> {
   final ScrollController _scrollController = ScrollController();
   int _lastActiveIndex = -1;
 
+  /// Resolved in [build] from settings; how far behind the reported position
+  /// the listener actually is (non-zero only on Bluetooth output).
+  Duration _audibleOffset = Duration.zero;
+
   // `_isSynced` is an O(n) scan; cache it keyed by lyrics list identity.
   List<LyricsLine>? _syncedCheckSource;
   bool _syncedCache = false;
@@ -64,7 +69,7 @@ class _LyricsViewState extends State<LyricsView> {
   /// (last line whose timestamp is <= position). Returns -1 before the first
   /// line's timestamp.
   int _activeIndexOf(Duration position) {
-    final currentMs = position.inMilliseconds;
+    final currentMs = (position - _audibleOffset).inMilliseconds;
     int activeIndex = -1;
     for (int i = 0; i < widget.lyrics.length; i++) {
       if (widget.lyrics[i].timestamp.inMilliseconds <= currentMs) {
@@ -276,6 +281,8 @@ class _LyricsViewState extends State<LyricsView> {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    _audibleOffset =
+        context.select<SettingsCubit, Duration>((c) => c.state.audibleLatencyOffset);
 
     if (widget.isLoading) {
       return Center(

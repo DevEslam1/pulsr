@@ -17,7 +17,6 @@ import '../../../core/services/xdm_backend_service.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../data/audio/audio_effects_channel.dart';
 import '../../../data/scanner/media_scanner_service.dart';
-import '../../../domain/models/audio_output_info.dart';
 import '../../../core/constants/audio_feature_info.dart';
 import '../../player/presentation/widgets/audio_visualizer.dart';
 import 'settings_state.dart';
@@ -72,6 +71,8 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
   static const String _keyProxyPasswordSecure = 'proxy_password_secure';
   static const String _keyProxyBypassHosts = 'setting_proxy_bypass_hosts';
   static const String _keyProxyList = 'setting_proxy_list';
+  static const String _keyProxyListPasswordsSecure =
+      'proxy_pool_passwords_secure';
 
   final FlutterSecureStorage _secureStorage;
   String _proxyPassword = '';
@@ -99,14 +100,13 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     required MediaScannerService scannerService,
     HiResAudioService? hiResAudioService,
     FlutterSecureStorage secureStorage = const FlutterSecureStorage(),
-  }) : _scannerService = scannerService,
-       _secureStorage = secureStorage,
-       _hiResAudioService =
-           hiResAudioService ??
-           (getIt.isRegistered<HiResAudioService>()
-               ? getIt<HiResAudioService>()
-               : HiResAudioService()),
-       super(const SettingsState()) {
+  })  : _scannerService = scannerService,
+        _secureStorage = secureStorage,
+        _hiResAudioService = hiResAudioService ??
+            (getIt.isRegistered<HiResAudioService>()
+                ? getIt<HiResAudioService>()
+                : HiResAudioService()),
+        super(const SettingsState()) {
     autoSub(_hiResAudioService.outputDeviceStream, (device) {
       if (isClosed) return;
       final savedSampleRate = state.currentOutputDevice?.targetSampleRate ?? 0;
@@ -114,17 +114,12 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       safeEmit(
         state.copyWith(
           currentOutputDevice: device.copyWith(
-            targetSampleRate:
-                device.targetSampleRate != 0
-                    ? device.targetSampleRate
-                    : savedSampleRate,
-            targetBitDepth:
-                device.targetBitDepth != 0
-                    ? device.targetBitDepth
-                    : savedBitDepth,
-            isBitPerfectActive:
-                device.isBitPerfectActive ||
-                (state.bitPerfectOutput && device.isUsbDac),
+            targetSampleRate: device.targetSampleRate != 0
+                ? device.targetSampleRate
+                : savedSampleRate,
+            targetBitDepth: device.targetBitDepth != 0
+                ? device.targetBitDepth
+                : savedBitDepth,
           ),
         ),
       );
@@ -150,6 +145,19 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     } catch (e) {
       debugPrint('[SettingsCubit] Failed to sync proxy to native channel: $e');
     }
+  }
+
+  /// Reads the entry-ID-keyed proxy pool credentials out of secure storage.
+  Future<Map<String, String>> _readProxyPoolSecrets() async {
+    final secrets = <String, String>{};
+    final raw = await _safeSecureRead(_keyProxyListPasswordsSecure);
+    if (raw == null || raw.isEmpty) return secrets;
+    try {
+      (jsonDecode(raw) as Map<String, dynamic>).forEach((id, value) {
+        if (value is String && value.isNotEmpty) secrets[id] = value;
+      });
+    } catch (_) {}
+    return secrets;
   }
 
   Future<String?> _safeSecureRead(String key) async {
@@ -228,8 +236,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         orElse: () => VisualizerStyle.bar,
       );
 
-      final miniPlayerSwipeLeftStr =
-          prefs.getString(_keyMiniPlayerSwipeLeft) ??
+      final miniPlayerSwipeLeftStr = prefs.getString(_keyMiniPlayerSwipeLeft) ??
           MiniPlayerSwipeAction.next.name;
       final miniPlayerSwipeLeft = MiniPlayerSwipeAction.values.firstWhere(
         (e) => e.name == miniPlayerSwipeLeftStr,
@@ -238,14 +245,13 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
 
       final miniPlayerSwipeRightStr =
           prefs.getString(_keyMiniPlayerSwipeRight) ??
-          MiniPlayerSwipeAction.prev.name;
+              MiniPlayerSwipeAction.prev.name;
       final miniPlayerSwipeRight = MiniPlayerSwipeAction.values.firstWhere(
         (e) => e.name == miniPlayerSwipeRightStr,
         orElse: () => MiniPlayerSwipeAction.prev,
       );
 
-      final nowPlayingDoubleTapStr =
-          prefs.getString(_keyNowPlayingDoubleTap) ??
+      final nowPlayingDoubleTapStr = prefs.getString(_keyNowPlayingDoubleTap) ??
           NowPlayingDoubleTapAction.toggleFavorite.name;
       final nowPlayingDoubleTap = NowPlayingDoubleTapAction.values.firstWhere(
         (e) => e.name == nowPlayingDoubleTapStr,
@@ -254,12 +260,12 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
 
       final nowPlayingArtworkSwipeStr =
           prefs.getString(_keyNowPlayingArtworkSwipe) ??
-          NowPlayingArtworkSwipeAction.nextPrev.name;
-      final nowPlayingArtworkSwipe = NowPlayingArtworkSwipeAction.values
-          .firstWhere(
-            (e) => e.name == nowPlayingArtworkSwipeStr,
-            orElse: () => NowPlayingArtworkSwipeAction.nextPrev,
-          );
+              NowPlayingArtworkSwipeAction.nextPrev.name;
+      final nowPlayingArtworkSwipe =
+          NowPlayingArtworkSwipeAction.values.firstWhere(
+        (e) => e.name == nowPlayingArtworkSwipeStr,
+        orElse: () => NowPlayingArtworkSwipeAction.nextPrev,
+      );
 
       final replayGainModeStr =
           prefs.getString(_keyReplayGainMode) ?? ReplayGainMode.track.name;
@@ -325,11 +331,35 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
       if (proxyListRaw != null && proxyListRaw.isNotEmpty) {
         try {
           final decoded = jsonDecode(proxyListRaw) as List<dynamic>;
-          proxyList =
-              decoded
-                  .map((e) => ProxyEntry.fromMap(e as Map<String, dynamic>))
-                  .where((e) => e.isValid)
-                  .toList();
+          final maps = decoded.cast<Map<String, dynamic>>();
+          final secrets = await _readProxyPoolSecrets();
+
+          // Builds before the credential split wrote pool passwords straight
+          // into this JSON. Harvest them so the re-save below can move them
+          // into secure storage and strip them from prefs.
+          var hadPlaintext = false;
+          for (final map in maps) {
+            final legacy = map['password'] as String?;
+            final id = map['id'] as String?;
+            if (legacy != null && legacy.isNotEmpty && id != null) {
+              hadPlaintext = true;
+              secrets.putIfAbsent(id, () => legacy);
+            }
+          }
+
+          proxyList = maps
+              .map(ProxyEntry.fromMap)
+              .map(
+                (e) => secrets.containsKey(e.id)
+                    ? e.copyWith(password: secrets[e.id])
+                    : e,
+              )
+              .where((e) => e.isValid)
+              .toList();
+
+          if (hadPlaintext) {
+            await _saveProxyList(proxyList);
+          }
         } catch (_) {}
       }
 
@@ -345,10 +375,9 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
           orElse: () => ThemeColorSource.artwork,
         );
       } else if (prefs.containsKey(_keyDynamicTheme)) {
-        themeColorSource =
-            (prefs.getBool(_keyDynamicTheme) ?? true)
-                ? ThemeColorSource.artwork
-                : ThemeColorSource.custom;
+        themeColorSource = (prefs.getBool(_keyDynamicTheme) ?? true)
+            ? ThemeColorSource.artwork
+            : ThemeColorSource.custom;
       } else {
         themeColorSource = ThemeColorSource.artwork;
       }
@@ -361,8 +390,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         autoHideSystemMedia:
             prefs.getBool(_keyAutoHideSystemMedia) ?? state.autoHideSystemMedia,
         themeColorSource: themeColorSource,
-        resumeAfterInterruption:
-            prefs.getBool(_keyResumeAfterInterruption) ??
+        resumeAfterInterruption: prefs.getBool(_keyResumeAfterInterruption) ??
             state.resumeAfterInterruption,
         waveformSeekBarEnabled:
             prefs.getBool(_keyWaveformSeekBar) ?? state.waveformSeekBarEnabled,
@@ -405,51 +433,45 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
             prefs.getBool(PrefsKeys.syncCookiesToBackend) ?? false,
         bitPerfectOutput:
             prefs.getBool(PrefsKeys.bitPerfectOutput) ?? state.bitPerfectOutput,
-        bypassDspOnBitPerfect:
-            prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ??
+        bypassDspOnBitPerfect: prefs.getBool(PrefsKeys.bypassDspOnBitPerfect) ??
             state.bypassDspOnBitPerfect,
         currentOutputDevice:
             _hiResAudioService.currentOutputInfo ?? state.currentOutputDevice,
         crossfeedEnabled:
             prefs.getBool(PrefsKeys.crossfeedEnabled) ?? state.crossfeedEnabled,
-        crossfeedDelayUs:
-            prefs.getDouble(PrefsKeys.crossfeedDelayUs) ??
+        crossfeedDelayUs: prefs.getDouble(PrefsKeys.crossfeedDelayUs) ??
             state.crossfeedDelayUs,
         crossfeedFeedDb:
             prefs.getDouble(PrefsKeys.crossfeedFeedDb) ?? state.crossfeedFeedDb,
-        limiterEnabled:
-            prefs.getBool(PrefsKeys.lookaheadLimiterEnabled) ??
+        limiterEnabled: prefs.getBool(PrefsKeys.lookaheadLimiterEnabled) ??
             state.limiterEnabled,
         limiterLookaheadMs:
             prefs.getDouble('setting_lookahead_limiter_lookahead_ms') ??
-            state.limiterLookaheadMs,
+                state.limiterLookaheadMs,
         limiterThresholdDb:
             prefs.getDouble(PrefsKeys.lookaheadLimiterThresholdDb) ??
-            state.limiterThresholdDb,
+                state.limiterThresholdDb,
         limiterReleaseMs:
             prefs.getDouble(PrefsKeys.lookaheadLimiterReleaseMs) ??
-            state.limiterReleaseMs,
-        reverbEnabled:
-            prefs.getBool(PrefsKeys.convolutionReverbEnabled) ??
+                state.limiterReleaseMs,
+        reverbEnabled: prefs.getBool(PrefsKeys.convolutionReverbEnabled) ??
             state.reverbEnabled,
-        reverbPreset:
-            prefs.getInt(PrefsKeys.convolutionReverbPreset) ??
+        reverbPreset: prefs.getInt(PrefsKeys.convolutionReverbPreset) ??
             state.reverbPreset,
-        reverbWetDry:
-            prefs.getDouble(PrefsKeys.convolutionReverbWetDry) ??
+        reverbWetDry: prefs.getDouble(PrefsKeys.convolutionReverbWetDry) ??
             state.reverbWetDry,
         stereoBalance:
             prefs.getDouble(PrefsKeys.stereoBalance) ?? state.stereoBalance,
         monoMix: prefs.getBool(PrefsKeys.monoMix) ?? state.monoMix,
-        sincResamplerEnabled:
-            prefs.getBool(PrefsKeys.sincResamplerEnabled) ??
+        sincResamplerEnabled: prefs.getBool(PrefsKeys.sincResamplerEnabled) ??
             state.sincResamplerEnabled,
         dspPreference:
             prefs.getString(_keyDspPreference) ?? state.dspPreference,
-        systemEffectsPolicy:
-            prefs.getString(PrefsKeys.systemEffectsPolicy) ?? state.systemEffectsPolicy,
+        systemEffectsPolicy: prefs.getString(PrefsKeys.systemEffectsPolicy) ??
+            state.systemEffectsPolicy,
         bluetoothLatencyOffsetMs:
-            prefs.getInt(PrefsKeys.bluetoothLatencyOffsetMs) ?? state.bluetoothLatencyOffsetMs,
+            prefs.getInt(PrefsKeys.bluetoothLatencyOffsetMs) ??
+                state.bluetoothLatencyOffsetMs,
       );
 
       // A proxy edit made while this load was in flight must win over the
@@ -521,8 +543,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         state.copyWith(
           gaplessPlayback: true,
           crossfadeSeconds: 0.0,
-          errorMessage:
-              AudioConflicts.gaplessBlockedByCrossfade(
+          errorMessage: AudioConflicts.gaplessBlockedByCrossfade(
                 state.crossfadeSeconds,
               ) ??
               'Crossfade disabled: gapless requires 0 s.',
@@ -546,8 +567,7 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         state.copyWith(
           crossfadeSeconds: clamped,
           gaplessPlayback: false,
-          errorMessage:
-              AudioConflicts.crossfadeBlockedByGapless(true) ??
+          errorMessage: AudioConflicts.crossfadeBlockedByGapless(true) ??
               'Gapless disabled: crossfade requires gapless OFF.',
         ),
       );
@@ -582,8 +602,8 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
   }
 
   Future<void> setDynamicTheming(bool value) => setThemeColorSource(
-    value ? ThemeColorSource.artwork : ThemeColorSource.custom,
-  );
+        value ? ThemeColorSource.artwork : ThemeColorSource.custom,
+      );
 
   Future<void> setResumeAfterInterruption(bool value) async {
     safeEmit(state.copyWith(resumeAfterInterruption: value));
@@ -744,17 +764,26 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     _proxyDirty = true;
     final trimmedHost = host.trim();
     if (enabled) {
-      final isIPv4 = RegExp(r'^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$').hasMatch(trimmedHost);
-      final isIPv6 = RegExp(r'^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$').hasMatch(trimmedHost) ||
-          trimmedHost == '::1' || trimmedHost.startsWith('fe80:');
-      final isHostname = RegExp(r'^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$').hasMatch(trimmedHost);
-      final isLocalhost = trimmedHost == 'localhost' || trimmedHost == '127.0.0.1';
-      if (trimmedHost.isEmpty || (!isIPv4 && !isIPv6 && !isHostname && !isLocalhost)) {
+      final isIPv4 = RegExp(
+              r'^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$')
+          .hasMatch(trimmedHost);
+      final isIPv6 = RegExp(r'^([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}$')
+              .hasMatch(trimmedHost) ||
+          trimmedHost == '::1' ||
+          trimmedHost.startsWith('fe80:');
+      final isHostname = RegExp(
+              r'^([a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$')
+          .hasMatch(trimmedHost);
+      final isLocalhost =
+          trimmedHost == 'localhost' || trimmedHost == '127.0.0.1';
+      if (trimmedHost.isEmpty ||
+          (!isIPv4 && !isIPv6 && !isHostname && !isLocalhost)) {
         safeEmit(state.copyWith(errorMessage: 'Invalid proxy host format'));
         return;
       }
       if (port < 1 || port > 65535) {
-        safeEmit(state.copyWith(errorMessage: 'Proxy port must be between 1 and 65535'));
+        safeEmit(state.copyWith(
+            errorMessage: 'Proxy port must be between 1 and 65535'));
         return;
       }
     }
@@ -813,10 +842,36 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     return AppHttpOverrides.instance.testConnection(configToTest: configToTest);
   }
 
+  /// Persists the pool with credentials split out: the prefs JSON is
+  /// password-free and the secrets live in secure storage, keyed by entry ID.
   Future<void> _saveProxyList(List<ProxyEntry> list) async {
     final prefs = await SharedPreferences.getInstance();
-    final jsonList = list.map((e) => e.toMap()).toList();
+    final jsonList = list.map((e) => e.toMap()..remove('password')).toList();
     await prefs.setString(_keyProxyList, jsonEncode(jsonList));
+
+    final secrets = <String, String>{
+      for (final e in list)
+        if (e.password.isNotEmpty) e.id: e.password,
+    };
+    try {
+      if (secrets.isEmpty) {
+        await _secureStorage.delete(key: _keyProxyListPasswordsSecure);
+      } else {
+        await _secureStorage.write(
+          key: _keyProxyListPasswordsSecure,
+          value: jsonEncode(secrets),
+        );
+      }
+    } catch (e, st) {
+      // The pool itself is saved either way; only the credentials are lost, and
+      // failing loudly here beats silently writing them back out in plaintext.
+      ErrorLogger.log(
+        'Failed to persist proxy pool credentials to secure storage',
+        error: e,
+        stackTrace: st,
+        category: 'SettingsCubit',
+      );
+    }
   }
 
   /// Imports multiple proxies parsed from raw multi-line text or file content.
@@ -1125,9 +1180,6 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     safeEmit(
       state.copyWith(
         bitPerfectOutput: enabled,
-        currentOutputDevice: state.currentOutputDevice?.copyWith(
-          isBitPerfectActive: enabled,
-        ),
         errorMessage: null,
       ),
     );
@@ -1171,31 +1223,19 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     }
   }
 
-  Future<void> selectOutputDevice(int deviceId) async {
-    if (state.currentOutputDevice != null) {
-      final updatedDevices =
-          state.currentOutputDevice!.availableDevices.map((d) {
-            return AudioDeviceEntry(
-              id: d.id,
-              name: d.name,
-              type: d.type,
-              typeName: d.typeName,
-              isCurrent: d.id == deviceId,
-              sampleRates: d.sampleRates,
-              maxBitDepth: d.maxBitDepth,
-            );
-          }).toList();
-      safeEmit(
-        state.copyWith(
-          currentOutputDevice: state.currentOutputDevice!.copyWith(
-            availableDevices: updatedDevices,
-          ),
-        ),
-      );
+  /// Requests the media route move to [deviceId]. Returns true only when the
+  /// platform actually accepted it; otherwise the system output panel is opened
+  /// so the user can switch, since an unprivileged app cannot force the route.
+  Future<bool> selectOutputDevice(int deviceId) async {
+    final res = await _hiResAudioService.selectOutputDevice(deviceId);
+    if (!res.success && res.requiresSystemPicker) {
+      await _hiResAudioService.openOutputSwitcher();
     }
-    await _hiResAudioService.selectOutputDevice(deviceId);
     await refreshOutputDevice();
+    return res.success;
   }
+
+  Future<bool> openOutputSwitcher() => _hiResAudioService.openOutputSwitcher();
 
   Future<void> clearOutputDevice() async {
     await _hiResAudioService.clearOutputDevice();
@@ -1325,20 +1365,16 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
         (previous?.targetBitDepth != null && previous!.targetBitDepth > 0)
             ? previous.targetBitDepth
             : 0;
-    final isBitPerfect = state.bitPerfectOutput;
 
     if (isClosed) return;
     safeEmit(
       state.copyWith(
         currentOutputDevice: info.copyWith(
-          targetSampleRate:
-              info.targetSampleRate != 0
-                  ? info.targetSampleRate
-                  : savedSampleRate,
+          targetSampleRate: info.targetSampleRate != 0
+              ? info.targetSampleRate
+              : savedSampleRate,
           targetBitDepth:
               info.targetBitDepth != 0 ? info.targetBitDepth : savedBitDepth,
-          isBitPerfectActive:
-              info.isBitPerfectActive || (isBitPerfect && info.isUsbDac),
         ),
       ),
     );
@@ -1398,7 +1434,8 @@ class SettingsCubit extends PulsrCubit<SettingsState> {
     try {
       final result = await AudioEffectsChannel().detectSystemEffects();
       final status = result['status'] as String? ?? 'unknown';
-      final bundles = (result['detectedBundles'] as List<dynamic>?)?.cast<String>() ?? [];
+      final bundles =
+          (result['detectedBundles'] as List<dynamic>?)?.cast<String>() ?? [];
       if (!isClosed) {
         safeEmit(state.copyWith(
           systemEffectsStatus: status,

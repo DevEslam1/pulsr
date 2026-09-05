@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../../domain/models/lyrics_line.dart';
+import '../../../settings/cubit/settings_cubit.dart';
 import '../../cubit/player_cubit.dart';
 import '../../cubit/player_state.dart';
 import 'audio_visualizer.dart';
@@ -17,10 +18,13 @@ class KaraokeModeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final p = context.palette;
+    final audibleOffset = context.select<SettingsCubit, Duration>(
+      (c) => c.state.audibleLatencyOffset,
+    );
 
     return BlocBuilder<PlayerCubit, PlayerState>(
       builder: (context, state) {
-        final pos = state.position;
+        final pos = state.position - audibleOffset;
         final song = state.currentSong;
 
         // Determine current active line index
