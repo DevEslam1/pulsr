@@ -155,6 +155,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             "preWarm" -> {
                 val ctx = context?.applicationContext
                 if (ctx != null) {
+                    ensureExtractorReady()
                     ClientCapabilityMatrix.init(ctx)
                     PoTokenManager.preWarm(ctx)
                 }
@@ -712,10 +713,12 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             val stream = resolveStreamNewPipe(videoId, quality)
             return stream
         } catch (newPipeError: Throwable) {
-            if (innertubeError != null) {
-                newPipeError.addSuppressed(innertubeError)
-            }
-            throw innertubeError ?: newPipeError
+            Log.w(TAG, "NewPipeExtractor fallback also failed for $videoId: ${newPipeError.message}")
+            // Re-throw the Innertube error (carries the structured signal/traceId) with
+            // the NewPipe error suppressed for full diagnostics.
+            val primary = innertubeError ?: newPipeError
+            if (primary !== newPipeError) primary.addSuppressed(newPipeError)
+            throw primary
         }
     }
 
@@ -751,7 +754,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             "title" to info.name,
             "artist" to (info.uploaderName ?: ""),
             "artworkUrl" to bestArtwork(info.thumbnails),
-            "userAgent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
+            "userAgent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0",
         )
     }
 

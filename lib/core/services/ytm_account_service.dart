@@ -16,6 +16,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/models/lyrics_line.dart';
 import '../../domain/models/ytm_track.dart';
 import '../constants/channels.dart';
+import '../constants/embedded_browser_ua.dart';
 import '../utils/error_logger.dart';
 import '../utils/lrc_parser.dart';
 import '../utils/ytm_rate_limiter.dart';
@@ -479,8 +480,7 @@ class YtmAccountService {
   /// Builds authenticated Innertube request headers with timestamped SAPISIDHASH, SAPISID3PHASH, or SAPISID1PHASH.
   Map<String, String> _buildHeaders(
       {String userAgent = '', String origin = 'https://music.youtube.com'}) {
-    final defaultUa =
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
+    final defaultUa = EmbeddedBrowserUa.desktop;
 
     final headers = <String, String>{
       'Content-Type': 'application/json',
@@ -1219,10 +1219,10 @@ class YtmAccountService {
       {String quality = 'high'}) async {
     try {
       return await _resolvePlayerStreamInternal(videoId, quality: quality)
-          .timeout(const Duration(seconds: 25));
+          .timeout(const Duration(seconds: 15));
     } on TimeoutException {
       debugPrint(
-          '[YTM_ACCOUNT] Global stream resolution timed out after 25s for $videoId');
+          '[YTM_ACCOUNT] Global stream resolution timed out after 15s for $videoId');
       return null;
     }
   }
@@ -1293,6 +1293,11 @@ class YtmAccountService {
             'ANDROID_CREATOR',
             'ANDROID_TESTSUITE',
           ];
+
+    // Track consecutive IP-level blocks to short-circuit early (like the
+    // native InnertubeClient chain). When 2+ clients return LOGIN_REQUIRED or
+    // UNPLAYABLE the IP is flagged — every remaining client will too.
+    var consecutiveBlockSignals = 0;
 
     for (final client in clientChain) {
       try {
@@ -1382,11 +1387,20 @@ class YtmAccountService {
           (clientContext['client'] as Map)['visitorData'] = visitorData;
         }
 
+        final isEmbedClient = client == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER' ||
+            client == 'WEB_EMBEDDED_PLAYER';
         final body = jsonEncode({
           'context': clientContext,
           'videoId': videoId,
           'racyCheckOk': true,
           'contentCheckOk': true,
+          // TVHTML5 and WEB_EMBEDDED require thirdParty at the root body level
+          // (in addition to context.thirdParty set by _buildClientContext).
+          // Without this root-level field the server returns ERROR with no streamingData.
+          if (isEmbedClient)
+            'thirdParty': {
+              'embedUrl': 'https://www.youtube.com/watch?v=$videoId'
+            },
           // Web clients attest via root-level serviceIntegrityDimensions;
           // mobile clients read playbackContext.contentPlaybackContext.poToken.
           // Sending both keeps every client in the chain covered.
@@ -1400,12 +1414,14 @@ class YtmAccountService {
           },
         });
 
+
         final response = await _postWithRetry(
           Uri.parse(
               '$endpointHost/youtubei/v1/player?prettyPrint=false&key=$_apiKey'),
           headers: headers,
           body: body,
-          baseTimeoutSeconds: 10,
+          baseTimeoutSeconds: 5,
+          maxAttempts: 1,
         );
 
         if (response.statusCode == 200) {
@@ -1446,6 +1462,17 @@ class YtmAccountService {
               }
               debugPrint(
                   '[YTM_ACCOUNT] WEB_REMIX bot challenge detected, trying next client without logout');
+            }
+            // IP-block / bot-challenge short-circuit: if two consecutive
+            // clients both return LOGIN_REQUIRED or UNPLAYABLE, every
+            // remaining client will too — skip the rest of the chain.
+            if (status == 'LOGIN_REQUIRED' || status == 'UNPLAYABLE') {
+              consecutiveBlockSignals++;
+              if (consecutiveBlockSignals >= 2) {
+                debugPrint(
+                    '[YTM_ACCOUNT] Short-circuiting Dart chain: $consecutiveBlockSignals consecutive blocks for $videoId');
+                return null;
+              }
             }
             continue;
           }

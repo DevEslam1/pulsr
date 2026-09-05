@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../constants/embedded_browser_ua.dart';
 import '../utils/error_logger.dart';
 
 @singleton
@@ -64,8 +65,7 @@ class YtmClientVersionResolver {
       final response = await http.get(
         Uri.parse('https://music.youtube.com'),
         headers: {
-          'User-Agent':
-              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+          'User-Agent': EmbeddedBrowserUa.desktop,
           'Accept-Language': 'en-US,en;q=0.9',
         },
       ).timeout(const Duration(seconds: 10));

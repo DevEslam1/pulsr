@@ -17,6 +17,7 @@ import '../../data/db/app_database.dart';
 import '../../data/scanner/media_scanner_service.dart';
 import '../../domain/repositories/music_repository_interface.dart';
 import '../constants/channels.dart';
+import '../constants/embedded_browser_ua.dart';
 import '../di/injection.dart';
 import '../errors/failures.dart';
 import '../errors/ytm_error_classifier.dart';
@@ -528,8 +529,7 @@ class YtDownloadService {
     if (ua != null && ua.isNotEmpty) {
       req.headers.set(HttpHeaders.userAgentHeader, ua);
     } else {
-      req.headers.set(HttpHeaders.userAgentHeader,
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36');
+      req.headers.set(HttpHeaders.userAgentHeader, EmbeddedBrowserUa.desktop);
     }
     if (cookies != null && cookies.isNotEmpty) {
       req.headers.set(HttpHeaders.cookieHeader, cookies);

@@ -32,15 +32,15 @@ internal class ResolutionStrategy(
         // (third-party embed context). They only run after the main clients
         // fail, so the happy path is unchanged.
         val DEFAULT_STREAM_CHAIN = listOf(
-            InnertubeClient.ClientType.IOS_MUSIC,
-            InnertubeClient.ClientType.ANDROID_MUSIC,
-            InnertubeClient.ClientType.ANDROID_VR,
             InnertubeClient.ClientType.WEB_REMIX,
+            InnertubeClient.ClientType.IOS_MUSIC,
+            InnertubeClient.ClientType.ANDROID_VR,
+            InnertubeClient.ClientType.ANDROID_MUSIC,
             InnertubeClient.ClientType.ANDROID_CREATOR,
             InnertubeClient.ClientType.WEB_EMBEDDED_PLAYER,
             InnertubeClient.ClientType.MWEB,
-            InnertubeClient.ClientType.ANDROID_TESTSUITE,
-            InnertubeClient.ClientType.TVHTML5_SIMPLY_EMBEDDED_PLAYER
+            InnertubeClient.ClientType.TVHTML5_SIMPLY_EMBEDDED_PLAYER,
+            InnertubeClient.ClientType.ANDROID_TESTSUITE
         )
 
         val DEFAULT_SEARCH_CHAIN = listOf(

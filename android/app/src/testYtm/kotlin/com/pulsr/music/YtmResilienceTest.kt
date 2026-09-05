@@ -125,4 +125,26 @@ class YtmResilienceTest {
         assertTrue(webCap.requiresPoToken)
         assertTrue(webCap.requiresJsSignature)
     }
+
+    @Test
+    fun testParseIntegrityTokenDataDirectAndFallback() {
+        // Direct format: token at index 0
+        val directPayload = "[\"dGVzdFRva2Vu\", 3600]"
+        val (u8Direct, ttlDirect) = parseIntegrityTokenData(directPayload)
+        assertEquals(3600L, ttlDirect)
+        assertTrue(u8Direct.startsWith("new Uint8Array(["))
+
+        // YouTube WAA / GenerateIT format: websafe fallback at index 3, index 0 is null
+        val fallbackPayload = "[null, 43200, null, \"TWstdW9UV3BoOVRGcEtwNlFodg==\"]"
+        val (u8Fallback, ttlFallback) = parseIntegrityTokenData(fallbackPayload)
+        assertEquals(43200L, ttlFallback)
+        assertTrue(u8Fallback.startsWith("new Uint8Array(["))
+
+        // Missing TTL defaults to 12 hours (43200s)
+        val defaultTtlPayload = "[null, null, null, \"dGVzdA==\"]"
+        val (u8Default, ttlDefault) = parseIntegrityTokenData(defaultTtlPayload)
+        assertEquals(43200L, ttlDefault)
+        assertTrue(u8Default.startsWith("new Uint8Array(["))
+    }
 }
+

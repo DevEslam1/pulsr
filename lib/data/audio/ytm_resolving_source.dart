@@ -11,6 +11,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:path/path.dart' as p;
+import '../../core/constants/embedded_browser_ua.dart';
 import '../../core/di/injection.dart';
 import '../../core/errors/ytm_error_classifier.dart';
 import '../../core/services/ytm_cache_manager.dart';
@@ -245,8 +246,7 @@ class YtmResolvingSource extends StreamAudioSource {
       if (effectiveUa != null && effectiveUa.isNotEmpty)
         'User-Agent': effectiveUa
       else
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
+        'User-Agent': EmbeddedBrowserUa.desktop,
       if (effectiveCookies != null && effectiveCookies.isNotEmpty)
         'Cookie': effectiveCookies,
       'Referer': 'https://music.youtube.com/',

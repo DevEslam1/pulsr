@@ -1,5 +1,225 @@
 <!DOCTYPE html>
 <html lang="en"><head><title></title><script>
+// Anti-fingerprinting & bot detection evasion (Firefox emulation)
+(function () {
+  'use strict';
+
+  function def(obj, prop, value) {
+    try {
+      Object.defineProperty(obj, prop, {
+        get: function () { return value; },
+        configurable: true,
+        enumerable: true
+      });
+    } catch (e) {}
+  }
+
+  // 1. Suppress webdriver flag
+  try {
+    if (typeof Navigator !== 'undefined' && Navigator.prototype) {
+      Object.defineProperty(Navigator.prototype, 'webdriver', {
+        get: function () { return false; },
+        configurable: true,
+        enumerable: true
+      });
+    }
+  } catch (e) {}
+  try {
+    Object.defineProperty(navigator, 'webdriver', {
+      get: function () { return false; },
+      configurable: true,
+      enumerable: true
+    });
+  } catch (e) {}
+
+  // 2. Clean automation / bot instrumentation traces
+  try {
+    var automationKeys = [
+      '__webdriver_evaluate',
+      '__selenium_evaluate',
+      '__webdriver_script_function',
+      '__webdriver_script_func',
+      '__webdriver_script_fn',
+      '__fxdriver_evaluate',
+      '__driver_unwrapped',
+      '__webdriver_unwrapped',
+      '__driver_evaluate',
+      '__selenium_unwrapped',
+      '__fxdriver_unwrapped',
+      'calledSelenium',
+      '_Selenium_IDE_Recorder',
+      '_selenium',
+      'callSelenium',
+      '_WEBDRIVER_ELEM_CACHE',
+      'driver-evaluate',
+      'domAutomation',
+      'domAutomationController'
+    ];
+    automationKeys.forEach(function (k) {
+      try { delete window[k]; } catch (ex) {}
+      try { delete document[k]; } catch (ex) {}
+    });
+    for (var wk in window) {
+      if (wk.indexOf('cdc_') === 0 || wk.indexOf('$cdc_') === 0) {
+        try { delete window[wk]; } catch (ex) {}
+      }
+    }
+    for (var dk in document) {
+      if (dk.indexOf('cdc_') === 0 || dk.indexOf('$cdc_') === 0) {
+        try { delete document[dk]; } catch (ex) {}
+      }
+    }
+  } catch (e) {}
+
+  // 3. Firefox environment emulation
+  try {
+    delete Navigator.prototype.userAgentData;
+  } catch (e) {}
+  try {
+    delete navigator.userAgentData;
+  } catch (e) {}
+  if ('userAgentData' in navigator) {
+    try {
+      Object.defineProperty(navigator, 'userAgentData', {
+        get: function () { return undefined; },
+        configurable: true,
+        enumerable: false
+      });
+    } catch (e) {}
+  }
+
+  try {
+    delete window.chrome;
+  } catch (e) {}
+  try {
+    delete Object.getPrototypeOf(window).chrome;
+  } catch (e) {}
+  if ('chrome' in window) {
+    try {
+      Object.defineProperty(window, 'chrome', {
+        value: undefined,
+        writable: true,
+        configurable: true,
+        enumerable: false
+      });
+    } catch (e) {}
+  }
+
+  def(navigator, 'vendor', '');
+  def(navigator, 'product', 'Gecko');
+  def(navigator, 'productSub', '20100101');
+  def(navigator, 'buildID', '20181001000000');
+  def(navigator, 'platform', 'Win32');
+  def(navigator, 'oscpu', 'Windows NT 10.0; Win64; x64');
+  def(navigator, 'appVersion', '5.0 (Windows)');
+  def(navigator, 'maxTouchPoints', 0);
+  def(navigator, 'doNotTrack', 'unspecified');
+
+  if (!window.external || typeof window.external.AddSearchProvider === 'undefined') {
+    try {
+      window.external = window.external || {};
+      window.external.AddSearchProvider = function () {};
+      window.external.IsSearchProviderInstalled = function () {};
+    } catch (e) {}
+  }
+
+  // 4. Standard PDF plugins for desktop Firefox
+  try {
+    var ffPlugins = (function () {
+      var names = [
+        'PDF Viewer',
+        'Chrome PDF Viewer',
+        'Chromium PDF Viewer',
+        'Microsoft Edge PDF Viewer',
+        'WebKit built-in PDF',
+      ];
+      var mimeType = { type: 'application/pdf', suffixes: 'pdf', description: '' };
+      var plugins = [];
+      for (var i = 0; i < names.length; i++) {
+        var p = {
+          name: names[i],
+          description: '',
+          filename: 'internal-pdf-viewer',
+          length: 1,
+          0: mimeType,
+          namedItem: function () { return null; },
+          item: function (n) { return n === 0 ? mimeType : null; },
+        };
+        plugins.push(p);
+      }
+      plugins.namedItem = function (n) {
+        for (var j = 0; j < plugins.length; j++) {
+          if (plugins[j].name === n) return plugins[j];
+        }
+        return null;
+      };
+      plugins.item = function (n) { return plugins[n] || null; };
+      plugins.refresh = function () {};
+      plugins.length = names.length;
+      return plugins;
+    })();
+    Object.defineProperty(navigator, 'plugins', {
+      get: function () { return ffPlugins; },
+      configurable: true,
+      enumerable: true,
+    });
+    Object.defineProperty(navigator, 'mimeTypes', {
+      get: function () {
+        return [{
+          type: 'application/pdf',
+          suffixes: 'pdf',
+          description: '',
+          enabledPlugin: ffPlugins[0],
+        }];
+      },
+      configurable: true,
+      enumerable: true,
+    });
+  } catch (e) {}
+
+  // 5. Languages
+  try {
+    Object.defineProperty(navigator, 'languages', {
+      get: function () { return ['en-US', 'en']; },
+      configurable: true,
+      enumerable: true,
+    });
+    Object.defineProperty(navigator, 'language', {
+      get: function () { return 'en-US'; },
+      configurable: true,
+      enumerable: true,
+    });
+  } catch (e) {}
+
+  // 6. Mask emulator / headless WebGL renderer
+  try {
+    var patchWebGL = function (proto) {
+      if (!proto || !proto.getParameter) return;
+      var origGetParam = proto.getParameter;
+      proto.getParameter = function (param) {
+        if (param === 37445) { // UNMASKED_VENDOR_WEBGL
+          var origV = origGetParam.apply(this, arguments);
+          if (origV && (origV.indexOf('Google') !== -1 || origV.indexOf('Mesa') !== -1)) {
+            return 'Google Inc. (NVIDIA)';
+          }
+          return origV;
+        }
+        if (param === 37446) { // UNMASKED_RENDERER_WEBGL
+          var origR = origGetParam.apply(this, arguments);
+          if (origR && (origR.indexOf('SwiftShader') !== -1 || origR.indexOf('llvmpipe') !== -1 || origR.indexOf('Emulator') !== -1)) {
+            return 'ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 Direct3D11 vs_5_0 ps_5_0, D3D11)';
+          }
+          return origR;
+        }
+        return origGetParam.apply(this, arguments);
+      };
+    };
+    if (typeof WebGLRenderingContext !== 'undefined') patchWebGL(WebGLRenderingContext.prototype);
+    if (typeof WebGL2RenderingContext !== 'undefined') patchWebGL(WebGL2RenderingContext.prototype);
+  } catch (e) {}
+
+})();
+
 /**
  * Factory method to create and load a BotGuardClient instance.
  * @param options - Configuration options for the BotGuardClient.
@@ -17,13 +237,14 @@ function loadBotGuard(challengeData) {
   if (!this.vm.a)
     throw new Error('[BotGuardClient]: Could not load program');
 
+  const self = this;
   const vmFunctionsCallback = function (
     asyncSnapshotFunction,
     shutdownFunction,
     passEventFunction,
     checkCameraFunction
   ) {
-    this.vmFunctions = {
+    self.vmFunctions = {
       asyncSnapshotFunction: asyncSnapshotFunction,
       shutdownFunction: shutdownFunction,
       passEventFunction: passEventFunction,
@@ -31,28 +252,28 @@ function loadBotGuard(challengeData) {
     };
   };
 
-  this.syncSnapshotFunction = this.vm.a(this.program, vmFunctionsCallback, true, this.userInteractionElement, function () {/** no-op */ }, [ [], [] ])[0]
+  this.syncSnapshotFunction = this.vm.a(this.program, vmFunctionsCallback, true, this.userInteractionElement, function () {/** no-op */ }, [ [], [] ])[0];
 
-  // an asynchronous function runs in the background and it will eventually call
-  // `vmFunctionsCallback`, however we need to manually tell JavaScript to pass
-  // control to the things running in the background by interrupting this async
-  // function in any way, e.g. with a delay of 1ms. The loop is most probably not
-  // needed but is there just because.
+  // If the VM functions callback was completed synchronously by vm.a(), resolve immediately
+  if (self.vmFunctions && self.vmFunctions.asyncSnapshotFunction) {
+    return Promise.resolve(self);
+  }
+
+  // Otherwise poll with lexical scoping and bounded interval
   return new Promise(function (resolve, reject) {
-    i = 0
-    refreshIntervalId = setInterval(function () {
-      if (!!this.vmFunctions.asyncSnapshotFunction) {
-        resolve(this)
+    let count = 0;
+    const refreshIntervalId = setInterval(function () {
+      if (self.vmFunctions && self.vmFunctions.asyncSnapshotFunction) {
         clearInterval(refreshIntervalId);
-      }
-      if (i >= 10000) {
-        reject("asyncSnapshotFunction is null even after 10 seconds")
+        resolve(self);
+      } else if (++count >= 200) { // 10s (200 * 50ms)
         clearInterval(refreshIntervalId);
+        reject(new Error("asyncSnapshotFunction is null even after 10 seconds"));
       }
-      i += 1;
-    }, 1);
-  })
+    }, 50);
+  });
 }
+
 
 /**
  * Takes a snapshot asynchronously.

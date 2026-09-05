@@ -175,7 +175,7 @@ internal object YtmHttpClient {
                 val req = Request.Builder()
                     .url(url)
                     .head()
-                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/138.0.0.0 Safari/537.36")
+                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0")
                     .build()
 
                 okHttpClient.newCall(req).execute().use { response ->

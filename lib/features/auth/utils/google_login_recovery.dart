@@ -10,7 +10,7 @@
 //   block #3 → null (exhausted; the sheet shows the manual recovery card)
 
 /// Which browser identity the embedded WebView currently presents.
-enum BrowserIdentity { desktop, mobile }
+enum BrowserIdentity { desktop, mobile, chromeDesktop, safariMobile }
 
 /// One rung of the recovery ladder: the identity to switch to before
 /// reloading (cookies/cache clearing is implied and performed by the caller).
@@ -25,9 +25,20 @@ class GoogleBlockRecovery {
   BrowserIdentity _identity;
   int _attempt = 0;
 
+  // Ladder sequence tried on successive blocks.
+  // Chrome is the initial default UA (best TLS match), so the ladder
+  // starts with Firefox Mobile → Safari Mobile → Firefox Desktop.
+  // Chrome Desktop is included as a fallback at the end (manual retry resets).
+  static const List<BrowserIdentity> _ladder = [
+    BrowserIdentity.mobile,
+    BrowserIdentity.safariMobile,
+    BrowserIdentity.desktop,
+    BrowserIdentity.chromeDesktop,
+  ];
+
   GoogleBlockRecovery({
     this.maxAttempts = 2,
-    BrowserIdentity initialIdentity = BrowserIdentity.desktop,
+    BrowserIdentity initialIdentity = BrowserIdentity.mobile,
   }) : _identity = initialIdentity;
 
   BrowserIdentity get identity => _identity;
@@ -38,10 +49,13 @@ class GoogleBlockRecovery {
   /// step, or null when automatic retries are exhausted (stop — never loop).
   BlockRecoveryStep? onBlocked() {
     if (exhausted) return null;
+    // Pick the next identity from the ladder (skip current identity)
+    final next = _ladder.firstWhere(
+      (id) => id != _identity,
+      orElse: () => _ladder[_attempt % _ladder.length],
+    );
     _attempt++;
-    _identity = _identity == BrowserIdentity.desktop
-        ? BrowserIdentity.mobile
-        : BrowserIdentity.desktop;
+    _identity = next;
     return BlockRecoveryStep(_identity);
   }
 

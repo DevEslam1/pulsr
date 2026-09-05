@@ -82,7 +82,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       ).hasMatch(u);
 
   static bool _isAuthInProgressUrl(String u) => RegExp(
-        r'accounts\.google\.com/v3/signin|accounts\.google\.com/ServiceLogin|/checkpoint/|consent\.google',
+        r'accounts\.google\.com/(v3/)?signin|accounts\.google\.com/ServiceLogin|/checkpoint/|/challenge/|challenge|consent\.google',
         caseSensitive: false,
       ).hasMatch(u);
 
@@ -104,8 +104,10 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
   // --- Google "This browser or app may not be secure" block recovery ---
   // UAs live in EmbeddedBrowserUa (single source; keep bumped — see file).
-  static String get mobileUserAgent => EmbeddedBrowserUa.mobile;
-  static String get desktopUserAgent => EmbeddedBrowserUa.desktop;
+  // Chrome Desktop is the default: its TLS fingerprint matches the Chromium
+  // WebView engine, giving the most consistent signal to Google's risk check.
+  static String get mobileUserAgent => EmbeddedBrowserUa.chromeMobile;
+  static String get desktopUserAgent => EmbeddedBrowserUa.chromeDesktop;
 
   /// Returns the [UserScript] list to inject at AT_DOCUMENT_START.
   ///
@@ -126,7 +128,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   ];
 
   final GoogleBlockRecovery _blockRecovery =
-      GoogleBlockRecovery(initialIdentity: BrowserIdentity.mobile);
+      GoogleBlockRecovery(initialIdentity: BrowserIdentity.chromeDesktop);
 
   /// Non-null while the automatic recovery ladder is running (drives the
   /// inline status banner); prevents re-entry so the ladder never loops.
@@ -142,9 +144,24 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   /// Throttle for the block-page JS text scan (once per 2.5 s per page).
   DateTime _lastBlockScanAt = DateTime.fromMillisecondsSinceEpoch(0);
 
-  String _uaFor(BrowserIdentity identity) => identity == BrowserIdentity.desktop
-      ? EmbeddedBrowserUa.desktop
-      : EmbeddedBrowserUa.mobile;
+  /// Suppresses block re-detection for 8 s after each recovery step so the
+  /// new page has time to fully load before we scan again. Without this,
+  /// the poll fires while the reloaded page is still the block page and
+  /// triggers another recovery step immediately, looping forever.
+  DateTime _blockCooldownUntil = DateTime.fromMillisecondsSinceEpoch(0);
+
+  String _uaFor(BrowserIdentity identity) {
+    switch (identity) {
+      case BrowserIdentity.chromeDesktop:
+        return EmbeddedBrowserUa.chromeDesktop;
+      case BrowserIdentity.safariMobile:
+        return EmbeddedBrowserUa.safariMobile;
+      case BrowserIdentity.desktop:
+        return EmbeddedBrowserUa.desktop;
+      case BrowserIdentity.mobile:
+        return EmbeddedBrowserUa.mobile;
+    }
+  }
 
   @override
   void initState() {
@@ -220,7 +237,10 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
         // Check for Google block during polling (detects SPA client-side rejections after tapping Next)
         if (!widget.isBrowseMode && !_blockExhausted && _blockStatus == null) {
-          final isBlocked = _shouldScanForBlockPage()
+          // Skip block scan during post-recovery cooldown to prevent re-detection
+          // of the same block page before the new page has finished loading.
+          final inCooldown = DateTime.now().isBefore(_blockCooldownUntil);
+          final isBlocked = (!inCooldown && _shouldScanForBlockPage())
               ? await _scanPageForBlockText(_webViewController!)
               : false;
           if (isBlocked) {
@@ -377,29 +397,51 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   /// phrases in the document title/body text (first 4 KB, lowercased).
   Future<bool> _scanPageForBlockText(InAppWebViewController controller) async {
     try {
+      final currentUrl =
+          (await controller.getUrl())?.toString().toLowerCase() ?? '';
+      if (currentUrl.contains('/challenge/') ||
+          currentUrl.contains('signin/challenge') ||
+          currentUrl.contains('/checkpoint/')) {
+        return false;
+      }
+
       final raw = await controller.evaluateJavascript(source: '''
 (() => {
   try {
-    if (window.__googleBlockDetected) return "couldn't sign you in";
-    if (!window.__blockObserverInstalled) {
-      window.__blockObserverInstalled = true;
-      const observer = new MutationObserver(() => {
-        if (document.body && (document.body.innerText || document.body.textContent || '').includes("couldn't sign you in")) {
-          window.__googleBlockDetected = true;
-          observer.disconnect();
-        }
-      });
-      if (document.body) {
-        observer.observe(document.body, { childList: true, subtree: true });
-      }
-    }
     var t = (document.title || '');
     var b = '';
     try { b = (document.body && (document.body.innerText || document.body.textContent)) || ''; } catch (e) {}
-    return (t + '|' + b).slice(0, 8000).toLowerCase();
+    var full = (t + '|' + b).slice(0, 8000).toLowerCase();
+
+    // 2-Step Verification / phone prompt is active authentication, NOT a block
+    if (full.includes('2-step') ||
+        full.includes('check your phone') ||
+        full.includes('tap yes') ||
+        full.includes('google sent a notification') ||
+        full.includes('verification code') ||
+        full.includes('security key') ||
+        full.includes('authenticator') ||
+        full.includes('enter the code')) {
+      window.__googleBlockDetected = false;
+      return '';
+    }
+
+    if (window.__googleBlockDetected) return "couldn't sign you in";
+    return full;
   } catch (e) { return ''; }
 })()''');
       final text = raw?.toString().toLowerCase() ?? '';
+      if (text.isEmpty) return false;
+      if (text.contains('2-step') ||
+          text.contains('check your phone') ||
+          text.contains('tap yes') ||
+          text.contains('google sent a notification') ||
+          text.contains('verification code') ||
+          text.contains('security key') ||
+          text.contains('authenticator') ||
+          text.contains('enter the code')) {
+        return false;
+      }
       for (final phrase in _blockPhrases) {
         if (text.contains(phrase)) return true;
       }
@@ -452,6 +494,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           widget.isBrowseMode ? 'https://music.youtube.com' : googleSignInUrl;
       await _webViewController?.loadUrl(
           urlRequest: URLRequest(url: WebUri(target)));
+      // Set cooldown AFTER the load is initiated so the poll doesn't
+      // re-scan the still-loading block page.
+      _blockCooldownUntil = DateTime.now().add(const Duration(seconds: 8));
     } catch (e) {
       debugPrint('[YtmWebLogin] Block recovery step failed: $e');
     } finally {
@@ -1375,10 +1420,35 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   /// Shown in place of the WebView once both automatic retries against
   /// Google's embedded-browser block were exhausted.
   Widget _buildBlockRecoveryCard(PulsrPalette p) {
-    final currentIdentity = _uaIdentityOverride ?? BrowserIdentity.desktop;
-    final otherIdentity = currentIdentity == BrowserIdentity.desktop
-        ? BrowserIdentity.mobile
-        : BrowserIdentity.desktop;
+    final currentIdentity = _uaIdentityOverride ?? BrowserIdentity.mobile;
+    // Cycle to the next identity in the ladder order
+    const ladder = [
+      BrowserIdentity.chromeDesktop,
+      BrowserIdentity.mobile,
+      BrowserIdentity.safariMobile,
+      BrowserIdentity.desktop,
+    ];
+    final currentIdx = ladder.indexOf(currentIdentity);
+    final otherIdentity = ladder[(currentIdx + 1) % ladder.length];
+
+    String identityLabel(BrowserIdentity id) {
+      switch (id) {
+        case BrowserIdentity.chromeDesktop: return 'Chrome Desktop';
+        case BrowserIdentity.mobile: return 'Firefox Mobile';
+        case BrowserIdentity.safariMobile: return 'Safari Mobile';
+        case BrowserIdentity.desktop: return 'Firefox Desktop';
+      }
+    }
+
+    IconData identityIcon(BrowserIdentity id) {
+      switch (id) {
+        case BrowserIdentity.chromeDesktop: return Icons.desktop_windows_rounded;
+        case BrowserIdentity.mobile: return Icons.smartphone_rounded;
+        case BrowserIdentity.safariMobile: return Icons.phone_iphone_rounded;
+        case BrowserIdentity.desktop: return Icons.laptop_windows_rounded;
+      }
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Column(
@@ -1423,7 +1493,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Current browser identity: ${currentIdentity.name} Chrome',
+                  'Current identity: ${identityLabel(currentIdentity)}',
                   style: TextStyle(
                       color: p.textTertiary,
                       fontSize: 11,
@@ -1449,15 +1519,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: () => _switchIdentityManually(otherIdentity),
-            icon: Icon(
-                otherIdentity == BrowserIdentity.mobile
-                    ? Icons.smartphone_rounded
-                    : Icons.desktop_windows_rounded,
-                size: 18),
+            icon: Icon(identityIcon(otherIdentity), size: 18),
             label: Text(
-                otherIdentity == BrowserIdentity.mobile
-                    ? 'Use Mobile browser identity'
-                    : 'Use Desktop browser identity',
+                'Try ${identityLabel(otherIdentity)}',
                 style: const TextStyle(fontWeight: FontWeight.w700)),
             style: OutlinedButton.styleFrom(
               foregroundColor: p.textPrimary,

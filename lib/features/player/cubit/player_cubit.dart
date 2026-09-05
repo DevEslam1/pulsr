@@ -691,48 +691,50 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
     LyricsResult? lyricsResult;
 
-    // 1. For local files, check embedded metadata and sidecar .lrc files
-    if (song.source == SongSource.local &&
-        !song.path.startsWith('http') &&
-        !song.path.startsWith('ytmusic://')) {
-      lyricsResult = await LrcParser.resolveLyrics(song.path, songId: song.id);
-    }
+    try {
+      // 1. For local files, check embedded metadata and sidecar .lrc files
+      if (song.source == SongSource.local &&
+          !song.path.startsWith('http') &&
+          !song.path.startsWith('ytmusic://')) {
+        lyricsResult = await LrcParser.resolveLyrics(song.path, songId: song.id);
+      }
 
-    if (isClosed ||
-        gen != _lyricsLoadGen ||
-        state.currentSong?.id != song.id) {
-      return;
-    }
+      if (isClosed ||
+          gen != _lyricsLoadGen ||
+          state.currentSong?.id != song.id) {
+        return;
+      }
 
-    // 2. Query LRCLIB for synchronized karaoke lyrics (works for local and online tracks)
-    if (lyricsResult == null || lyricsResult.lines.isEmpty) {
-      try {
-        final lrclib = getIt<LrclibService>();
-        lyricsResult = await lrclib.fetchLyrics(
-          trackName: song.title,
-          artistName: song.artist,
-          albumName: song.album,
-          durationSeconds: song.durationMs > 0 ? song.durationMs ~/ 1000 : null,
-        );
-      } catch (_) {}
-    }
+      // 2. Query LRCLIB for synchronized karaoke lyrics (works for local and online tracks)
+      if (lyricsResult == null || lyricsResult.lines.isEmpty) {
+        try {
+          final lrclib = getIt<LrclibService>();
+          lyricsResult = await lrclib.fetchLyrics(
+            trackName: song.title,
+            artistName: song.artist,
+            albumName: song.album,
+            durationSeconds: song.durationMs > 0 ? song.durationMs ~/ 1000 : null,
+          );
+        } catch (_) {}
+      }
 
-    if (isClosed ||
-        gen != _lyricsLoadGen ||
-        state.currentSong?.id != song.id) {
-      return;
-    }
+      if (isClosed ||
+          gen != _lyricsLoadGen ||
+          state.currentSong?.id != song.id) {
+        return;
+      }
 
-    // 3. For YouTube Music tracks without LRCLIB matches, fetch native YTM lyrics
-    final videoId = song.remoteId;
-    if ((lyricsResult == null || lyricsResult.lines.isEmpty) &&
-        videoId != null &&
-        videoId.isNotEmpty) {
-      try {
-        final ytmAccount = getIt<YtmAccountService>();
-        lyricsResult = await ytmAccount.fetchYtmLyrics(videoId);
-      } catch (_) {}
-    }
+      // 3. For YouTube Music tracks without LRCLIB matches, fetch native YTM lyrics
+      final videoId = song.remoteId;
+      if ((lyricsResult == null || lyricsResult.lines.isEmpty) &&
+          videoId != null &&
+          videoId.isNotEmpty) {
+        try {
+          final ytmAccount = getIt<YtmAccountService>();
+          lyricsResult = await ytmAccount.fetchYtmLyrics(videoId);
+        } catch (_) {}
+      }
+    } catch (_) {}
 
     if (isClosed ||
         gen != _lyricsLoadGen ||
@@ -758,36 +760,13 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     final capturedGen = _mediaItemResolutionGen;
     // Mark restoration as done: any in-flight _restoreQueueSlots must abort
     _queueRestorationDone = true;
-    // If playing an online song that has already been downloaded to the device, swap to local song
-    SongsTableData targetSong = song;
-    if (song.source == SongSource.youtube) {
-      try {
-        final match = await _repository.findMatchingLocalSong(
-          remoteId: song.remoteId,
-          title: song.title,
-          artist: song.artist,
-        );
-        // Abort if a newer playSong call arrived while we were awaiting
-        if (_mediaItemResolutionGen != capturedGen) return;
-        final local = match.fold((_) => null, (s) => s);
-        if (local != null &&
-            (local.path.startsWith('content:') ||
-                await File(local.path).exists())) {
-          targetSong = local;
-        }
-      } catch (_) {}
-    }
-
     var rawQueue =
-        queue != null ? List<SongsTableData>.from(queue) : [targetSong];
-    if (targetSong.id != song.id) {
-      rawQueue = rawQueue.map((s) => s.id == song.id ? targetSong : s).toList();
-    }
+        queue != null ? List<SongsTableData>.from(queue) : [song];
 
-    var targetIndex = rawQueue.indexWhere((s) => s.id == targetSong.id);
+    var targetIndex = rawQueue.indexWhere((s) => s.id == song.id);
     if (targetIndex == -1) {
       targetIndex = 0;
-      rawQueue.insert(0, targetSong);
+      rawQueue.insert(0, song);
     }
 
     List<SongsTableData> effectiveQueue;
@@ -819,14 +798,46 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     );
     _debouncedPersistQueueSlots();
 
+    // Immediate emission so tap feels instant: song row highlights,
+    // play/pause updates to playing, and miniplayer shows the track.
     safeEmit(state.copyWith(
       queue: effectiveQueue,
       currentIndex: effectiveIndex,
-      currentSong: targetSong,
+      currentSong: song,
+      isPlaying: true,
       position: startPos,
-      duration: Duration(milliseconds: targetSong.durationMs),
+      duration: Duration(milliseconds: song.durationMs),
       errorMessage: queueTruncationWarning,
     ));
+
+    // If playing an online song that has already been downloaded to the device, swap to local song
+    SongsTableData targetSong = song;
+    if (song.source == SongSource.youtube) {
+      try {
+        final match = await _repository.findMatchingLocalSong(
+          remoteId: song.remoteId,
+          title: song.title,
+          artist: song.artist,
+        );
+        if (_mediaItemResolutionGen != capturedGen) return;
+        final local = match.fold((_) => null, (s) => s);
+        if (local != null &&
+            (local.path.startsWith('content:') ||
+                await File(local.path).exists())) {
+          targetSong = local;
+          if (targetSong.id != song.id) {
+            effectiveQueue = effectiveQueue
+                .map((s) => s.id == song.id ? targetSong : s)
+                .toList();
+            safeEmit(state.copyWith(
+              queue: effectiveQueue,
+              currentSong: targetSong,
+            ));
+          }
+        }
+      } catch (_) {}
+    }
+
     try {
       _latencyTracker?.markStage(PlaybackStage.resolutionRequested);
     } catch (_) {}

@@ -21,7 +21,23 @@ class AudioEffectsChannel {
 
   static final AudioEffectsChannel _instance = AudioEffectsChannel._internal();
   factory AudioEffectsChannel() => _instance;
-  AudioEffectsChannel._internal();
+  AudioEffectsChannel._internal() {
+    _channel.setMethodCallHandler(_handleNativeCall);
+  }
+
+  final StreamController<void> _routeChangedController =
+      StreamController<void>.broadcast();
+
+  /// Stream emitting whenever the native audio route changes (earpods/headphones connected/disconnected).
+  Stream<void> get onRouteChanged => _routeChangedController.stream;
+
+  Future<dynamic> _handleNativeCall(MethodCall call) async {
+    if (call.method == 'onRouteChanged') {
+      if (!_routeChangedController.isClosed) {
+        _routeChangedController.add(null);
+      }
+    }
+  }
 
   bool get _isAndroid => PlatformCapabilities.isAndroid;
 
@@ -29,6 +45,9 @@ class AudioEffectsChannel {
   void dispose() {
     if (!_autoDegradeStreamController.isClosed) {
       _autoDegradeStreamController.close();
+    }
+    if (!_routeChangedController.isClosed) {
+      _routeChangedController.close();
     }
   }
 
@@ -76,7 +95,7 @@ class AudioEffectsChannel {
     try {
       final caps = await _channel
           .invokeMapMethod<String, dynamic>('getCapabilities')
-          .timeout(const Duration(seconds: 2));
+          .timeout(const Duration(seconds: 8));
       if (caps != null) {
         _isVirtualizerSupported =
             (caps['isVirtualizerSupported'] == true ||
@@ -108,7 +127,7 @@ class AudioEffectsChannel {
     try {
       final pipeline = await _channel
           .invokeMapMethod<String, dynamic>('getProcessingCapabilities')
-          .timeout(const Duration(seconds: 2));
+          .timeout(const Duration(seconds: 8));
       _isPcmDspAttached = pipeline?['isPcmDspAttached'] == true;
       _hasPcmDspPath = pipeline?['hasPcmDspPath'] == true;
     } catch (e, st) {
@@ -122,7 +141,7 @@ class AudioEffectsChannel {
     try {
       final spatialMap = await _channel
           .invokeMapMethod<String, dynamic>('getSpatializerState')
-          .timeout(const Duration(seconds: 2));
+          .timeout(const Duration(seconds: 8));
       if (spatialMap != null) {
         _isSpatializerSupported = (spatialMap['isSupported'] == true);
         _isHeadTrackerAvailable =
@@ -158,8 +177,9 @@ class AudioEffectsChannel {
     try {
       final result = await _channel
           .invokeMapMethod<String, dynamic>('detectOemAudio')
-          .timeout(const Duration(seconds: 2));
+          .timeout(const Duration(seconds: 8));
       return result ?? {'hasOemAudio': false, 'detectedEngines': <String>[]};
+
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to detect OEM audio engines',

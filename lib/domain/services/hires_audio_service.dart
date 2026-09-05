@@ -161,7 +161,7 @@ class HiResAudioService {
     try {
       final bool? success = await _methodChannel
           .invokeMethod<bool>('setBitPerfectMode', {'enabled': enabled})
-          .timeout(const Duration(seconds: 3));
+          .timeout(const Duration(seconds: 8));
       await getAudioOutputInfo();
       return success ?? false;
     } catch (e, st) {
@@ -176,7 +176,7 @@ class HiResAudioService {
     try {
       final dynamic res = await _methodChannel
           .invokeMethod<dynamic>('setOutputDevice', {'deviceId': deviceId})
-          .timeout(const Duration(seconds: 3));
+          .timeout(const Duration(seconds: 8));
       await getAudioOutputInfo();
       if (res is Map) return (res['success'] as bool?) ?? false;
       if (res is bool) return res;
@@ -193,7 +193,7 @@ class HiResAudioService {
     try {
       final bool? success = await _methodChannel
           .invokeMethod<bool>('clearOutputDevice')
-          .timeout(const Duration(seconds: 2));
+          .timeout(const Duration(seconds: 8));
       await getAudioOutputInfo();
       return success ?? false;
     } catch (e, st) {
@@ -209,9 +209,10 @@ class HiResAudioService {
     try {
       final bool? success = await _methodChannel
           .invokeMethod<bool>('setTargetOutputFormat', {'sampleRate': sampleRate, 'bitDepth': bitDepth})
-          .timeout(const Duration(seconds: 2));
+          .timeout(const Duration(seconds: 8));
       await getAudioOutputInfo();
       return success ?? false;
+
     } catch (e, st) {
       ErrorLogger.log('Failed to setTargetOutputFormat($sampleRate, $bitDepth)',
           error: e, stackTrace: st, category: 'HiResAudio');

@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'package:injectable/injectable.dart';
 
 import '../constants/channels.dart';
+import '../constants/embedded_browser_ua.dart';
 import '../di/injection.dart';
 import 'xdm_backend_service.dart';
 import 'ytm_account_service.dart';
@@ -98,7 +99,7 @@ class YtmException implements Exception {
 class YtmService {
   static const String channelName = PulsrChannels.ytm;
   static const Duration _defaultSearchTimeout = Duration(seconds: 25);
-  static const Duration _defaultResolveTimeout = Duration(seconds: 25);
+  static const Duration _defaultResolveTimeout = Duration(seconds: 15);
 
   final MethodChannel _channel = const MethodChannel(channelName);
   final StreamController<void> _authExpiredController =
@@ -118,6 +119,8 @@ class YtmService {
   /// remote backend instead of piling up doomed chains (which also starves
   /// the native thread pool into cascading YTM_TIMEOUTs).
   static const _botCooldown = Duration(seconds: 90);
+  /// Extended cooldown for IP-level blocks (every client fails instantly).
+  static const _ipBlockCooldown = Duration(seconds: 180);
   DateTime _botChallengeUntil = DateTime.fromMillisecondsSinceEpoch(0);
   YtmException? _lastBotChallenge;
 
@@ -125,7 +128,12 @@ class YtmService {
 
   void _noteBotChallenge(YtmException e) {
     _lastBotChallenge = e;
-    _botChallengeUntil = DateTime.now().add(_botCooldown);
+    // Use extended cooldown for IP-level blocks: these don't resolve by
+    // just waiting a minute, and retrying only deepens the block.
+    final cooldown = (e.isNetwork || e.code == 'IP_BLOCKED')
+        ? _ipBlockCooldown
+        : _botCooldown;
+    _botChallengeUntil = DateTime.now().add(cooldown);
   }
 
   /// Test-only: clears bot-cooldown state.
@@ -350,8 +358,7 @@ class YtmService {
 
       final headers = <String, String>{
         'Content-Type': 'application/json',
-        'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+        'User-Agent': EmbeddedBrowserUa.desktop,
         'Origin': 'https://music.youtube.com',
         'Referer': 'https://music.youtube.com/',
         'x-origin': 'https://music.youtube.com',
@@ -613,6 +620,11 @@ class YtmService {
       // they are deliberately NOT recorded in firstError.)
       if (e is YtmException && e.isAuth) rethrow;
       debugPrint('[YTM_SERVICE] Direct account stream resolution fallback: $e');
+      // If the account tier hit an IP-level block, activate cooldown so the
+      // native tier doesn't burn through 9 more clients for the same result.
+      if (!inBotCooldown && e is YtmException && (e.isBotBlocked || e.isNetwork)) {
+        _noteBotChallenge(e);
+      }
     }
 
     // 2. Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
@@ -710,7 +722,7 @@ class YtmService {
   Future<T?> _guard<T>(
     Future<T?> Function() call, {
     required Duration timeout,
-    int maxRetries = 2,
+    int maxRetries = 1,
   }) async {
     for (var attempt = 0; attempt <= maxRetries; attempt++) {
       try {

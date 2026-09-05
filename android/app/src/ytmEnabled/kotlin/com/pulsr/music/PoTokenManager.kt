@@ -358,22 +358,43 @@ object PoTokenManager {
         generator = null
         oldGen?.let { Handler(Looper.getMainLooper()).post { it.close() } }
 
-        // 1. Fetch visitorData from Innertube if missing or expired
-        val clientRequestInfo = InnertubeClientRequestInfo.ofWebClient()
-        clientRequestInfo.clientInfo.clientVersion = YoutubeParsingHelper.getClientVersion()
+        // 1. Fetch visitorData from Innertube — skip network fetch if we already have
+        //    a non-expired visitorData (avoids broken HTML scrape in PulsrDownloader).
+        val newVisitorData: String
+        if (visitorData.isNotEmpty() && !isExpired()) {
+            Log.d(TAG, "Reusing cached visitorData (not expired), skipping Innertube fetch")
+            newVisitorData = visitorData
+        } else {
+            val clientRequestInfo = InnertubeClientRequestInfo.ofWebClient()
+            // getClientVersion() does an HTML page scrape; if it fails (e.g. ERR_FAILED on
+            // flagged IPs) fall back to a pinned version so the PoToken chain can still run.
+            val resolvedVersion = try {
+                YoutubeParsingHelper.getClientVersion()
+            } catch (e: Exception) {
+                Log.w(TAG, "getClientVersion() failed (${e.message}), using pinned fallback version")
+                "2.20260905.00.00"
+            }
+            clientRequestInfo.clientInfo.clientVersion = resolvedVersion
 
-        val newVisitorData = try {
-            YoutubeParsingHelper.getVisitorDataFromInnertube(
-                clientRequestInfo,
-                NewPipe.getPreferredLocalization(),
-                NewPipe.getPreferredContentCountry(),
-                YoutubeParsingHelper.getYouTubeHeaders(),
-                YoutubeParsingHelper.YOUTUBEI_V1_URL,
-                null,
-                false,
-            )
-        } catch (e: Exception) {
-            if (visitorData.isNotEmpty()) visitorData else throw e
+            newVisitorData = try {
+                YoutubeParsingHelper.getVisitorDataFromInnertube(
+                    clientRequestInfo,
+                    NewPipe.getPreferredLocalization(),
+                    NewPipe.getPreferredContentCountry(),
+                    YoutubeParsingHelper.getYouTubeHeaders(),
+                    YoutubeParsingHelper.YOUTUBEI_V1_URL,
+                    null,
+                    false,
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "getVisitorDataFromInnertube() failed: ${e.message}")
+                if (visitorData.isNotEmpty()) {
+                    Log.i(TAG, "Falling back to stale cached visitorData")
+                    visitorData
+                } else {
+                    throw e
+                }
+            }
         }
 
         // 2. Instantiate offscreen BotGuard generator

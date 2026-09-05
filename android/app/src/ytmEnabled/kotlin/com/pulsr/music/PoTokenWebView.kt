@@ -8,7 +8,10 @@ import android.util.Log
 import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
+import android.webkit.WebResourceRequest
 import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.annotation.MainThread
 import androidx.annotation.WorkerThread
 import org.json.JSONObject
@@ -50,10 +53,24 @@ internal class PoTokenWebView private constructor(
 
     //region Initialization
     init {
+        Log.d(TAG, "Initializing PoTokenWebView instance")
         configureWebView()
+
+        webView.webViewClient = object : WebViewClient() {
+            override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
+                super.onReceivedError(view, request, error)
+                Log.w(TAG, "WebView onReceivedError: ${error?.description} (code=${error?.errorCode}) for ${request?.url}")
+            }
+
+            override fun onPageFinished(view: WebView?, url: String?) {
+                super.onPageFinished(view, url)
+                Log.d(TAG, "WebView onPageFinished: $url")
+            }
+        }
 
         webView.webChromeClient = object : WebChromeClient() {
             override fun onConsoleMessage(m: ConsoleMessage): Boolean {
+                Log.d(TAG, "WebView console [${m.messageLevel()}]: ${m.message()} (${m.sourceId()}:${m.lineNumber()})")
                 if (m.message().contains("Uncaught")) {
                     // Everything that can legitimately fail is wrapped in try/catch and
                     // reported through the JS interface, so an uncaught error means the
@@ -68,6 +85,7 @@ internal class PoTokenWebView private constructor(
             }
         }
     }
+
 
     @SuppressLint("SetJavaScriptEnabled") // BotGuard *is* JavaScript
     @Suppress("DEPRECATION") // setSafeBrowsingEnabled, still the only pre-manifest switch
@@ -91,8 +109,10 @@ internal class PoTokenWebView private constructor(
     private fun loadHtmlAndObtainBotguard(context: Context) {
         executor.execute {
             try {
+                Log.d(TAG, "loadHtmlAndObtainBotguard: loading asset $HTML_ASSET")
                 val html = context.assets.open(HTML_ASSET).bufferedReader().use { it.readText() }
                 runOnMainThread(generatorFuture) {
+                    Log.d(TAG, "loadHtmlAndObtainBotguard: injecting downloadAndRunBotguard into WebView")
                     webView.loadDataWithBaseURL(
                         "https://www.youtube.com",
                         // Calls downloadAndRunBotguard() once the page has loaded.
@@ -106,6 +126,7 @@ internal class PoTokenWebView private constructor(
                     )
                 }
             } catch (t: Throwable) {
+                Log.e(TAG, "loadHtmlAndObtainBotguard failed: ${t.message}", t)
                 closeAndCancelInitialization(t)
             }
         }
@@ -114,10 +135,12 @@ internal class PoTokenWebView private constructor(
     /** Called from the snippet appended to the page in [loadHtmlAndObtainBotguard]. */
     @JavascriptInterface
     fun downloadAndRunBotguard() {
+        Log.d(TAG, "downloadAndRunBotguard: invoked from WebView JS interface")
         makeBotguardServiceRequest(
             "https://www.youtube.com/api/jnn/v1/Create",
             "[ \"$REQUEST_KEY\" ]",
         ) { responseBody ->
+            Log.d(TAG, "downloadAndRunBotguard: parsing challenge response (${responseBody.length} bytes)")
             val challengeData = parseChallengeData(responseBody)
             webView.evaluateJavascript(
                 """try {
@@ -146,15 +169,18 @@ internal class PoTokenWebView private constructor(
     /** Called from the JS snippet in [downloadAndRunBotguard] with BotGuard's output. */
     @JavascriptInterface
     fun onRunBotguardResult(botguardResponse: String) {
+        Log.d(TAG, "onRunBotguardResult: botguardResponse received (len=${botguardResponse.length})")
         makeBotguardServiceRequest(
             "https://www.youtube.com/api/jnn/v1/GenerateIT",
             "[ \"$REQUEST_KEY\", \"$botguardResponse\" ]",
         ) { responseBody ->
+            Log.d(TAG, "onRunBotguardResult: parsing GenerateIT response")
             val (integrityToken, expirationTimeInSeconds) = parseIntegrityTokenData(responseBody)
             // 10 minutes of margin, so a token cannot expire mid-request.
             expirationInstant = Instant.now().plusSeconds(expirationTimeInSeconds - 600)
 
             webView.evaluateJavascript("this.integrityToken = $integrityToken") {
+                Log.i(TAG, "BotGuard generator successfully initialized! Valid until epoch: $expirationInstant")
                 generatorFuture.complete(this)
             }
         }
@@ -259,6 +285,7 @@ internal class PoTokenWebView private constructor(
     ) {
         executor.execute {
             try {
+                Log.d(TAG, "makeBotguardServiceRequest: POST $url")
                 val response = NewPipe.getDownloader().post(
                     url,
                     mapOf(
@@ -271,18 +298,21 @@ internal class PoTokenWebView private constructor(
                     ),
                     data.toByteArray(),
                 )
+                Log.d(TAG, "makeBotguardServiceRequest: responseCode=${response.responseCode()} for $url")
                 if (response.responseCode() != 200) {
-                    throw PoTokenException("Invalid response code: ${response.responseCode()}")
+                    throw PoTokenException("Invalid response code: ${response.responseCode()} from $url")
                 }
                 val body = response.responseBody()
                 runOnMainThread(generatorFuture) {
                     try {
                         handleResponseBody(body)
                     } catch (t: Throwable) {
+                        Log.e(TAG, "handleResponseBody failed for $url: ${t.message}", t)
                         closeAndCancelInitialization(t)
                     }
                 }
             } catch (t: Throwable) {
+                Log.e(TAG, "makeBotguardServiceRequest failed for $url: ${t.message}", t)
                 closeAndCancelInitialization(t)
             }
         }
@@ -290,6 +320,7 @@ internal class PoTokenWebView private constructor(
 
     /** Fails [generatorFuture] with [error] and releases resources. */
     private fun closeAndCancelInitialization(error: Throwable) {
+        Log.e(TAG, "closeAndCancelInitialization: ${error.message}", error)
         // Failed first so the waiting extractor thread is released without depending
         // on the main thread ever getting around to the cleanup below.
         generatorFuture.completeExceptionally(error)
@@ -336,8 +367,8 @@ internal class PoTokenWebView private constructor(
         // Public API key and request key used by BotGuard, taken from its own requests.
         var GOOGLE_API_KEY: String = System.getProperty("GOOGLE_API_KEY") ?: "AIzaSyDyT5W0Jh49F30Pqqtyfdf7pDLFKLJoAnw"
         private const val REQUEST_KEY = "O43z0dpjhgX20SCx4KAo"
-        private const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " +
-            "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36"
+        private const val USER_AGENT =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0"
         private const val JS_INTERFACE = "PoTokenWebView"
 
         // Initialization is two network round-trips plus a JS handshake that upstream

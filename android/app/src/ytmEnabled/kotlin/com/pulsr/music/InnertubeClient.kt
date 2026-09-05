@@ -174,6 +174,11 @@ internal class InnertubeClient(
         var lastSignal: YtmBlockSignal = YtmBlockSignal.RateLimited
         val traceId = UUID.randomUUID().toString()
 
+        // Track consecutive IP-level blocks to short-circuit early.
+        // When 2+ clients independently return IpBlocked/BotChallenge the
+        // entire chain is doomed — burning 7 more clients just wastes 10-20s.
+        var consecutiveBlockSignals = 0
+
         fun attemptClient(client: ClientType): Map<String, Any?>? {
             if (Thread.currentThread().isInterrupted) return null
             try {
@@ -200,6 +205,21 @@ internal class InnertubeClient(
                             lastBotRefreshTriggerMs = now
                             PoTokenManager.evictMintedTokens()
                             PoTokenManager.triggerBackgroundRefresh()
+                        }
+                    }
+                    // IP-block / bot-challenge short-circuit: if two consecutive
+                    // clients both signal IpBlocked or BotChallenge, every
+                    // remaining client will too — skip the rest of the chain.
+                    if (parsedSignal == YtmBlockSignal.IpBlocked ||
+                        parsedSignal == YtmBlockSignal.BotChallenge) {
+                        consecutiveBlockSignals++
+                        if (consecutiveBlockSignals >= 2) {
+                            Log.w(TAG, "[$traceId] Short-circuiting chain: $consecutiveBlockSignals consecutive IP-level blocks")
+                            throw InnertubeException(
+                                signal = parsedSignal,
+                                message = "IP/bot blocked after $consecutiveBlockSignals clients for video $videoId",
+                                traceId = traceId
+                            )
                         }
                     }
                     return null
@@ -329,7 +349,7 @@ internal class InnertubeClient(
         }
 
         // Poll for either candidate 1 or candidate 2 to complete
-        val hedgeRaceDeadline = android.os.SystemClock.elapsedRealtime() + 6000L
+        val hedgeRaceDeadline = android.os.SystemClock.elapsedRealtime() + 3000L
         while (android.os.SystemClock.elapsedRealtime() < hedgeRaceDeadline && activeFutures.isNotEmpty()) {
             val doneList = activeFutures.filter { it.isDone }
             for (done in doneList) {
@@ -419,7 +439,7 @@ internal class InnertubeClient(
     fun requestPlayer(videoId: String, clientType: ClientType): JSONObject {
         val endpoint = "${clientType.endpointHost}/youtubei/v1/player?prettyPrint=false&key=$API_KEY"
         val payload = buildPlayerBody(videoId, clientType)
-        return postWithRetry(endpoint, payload, clientType, RateLimiter.Bucket.PLAYER)
+        return postWithRetry(endpoint, payload, clientType, RateLimiter.Bucket.PLAYER, maxRetries = 1)
     }
 
     fun requestBrowse(browseId: String, clientType: ClientType = ClientType.WEB_REMIX): JSONObject {
@@ -524,6 +544,16 @@ internal class InnertubeClient(
                             val hash = sha1Hex(toHash)
                             reqBuilder.header("Authorization", "$authType ${timestamp}_$hash")
                         }
+                    }
+                }
+
+                // Mobile clients (ANDROID_MUSIC, IOS_MUSIC) also need cookies
+                // when the user is logged in — YouTube requires session cookies
+                // on these endpoints for authenticated content.
+                if (!clientType.isWeb && cookieStore.isSessionValid()) {
+                    val cookieHeader = cookieStore.getMergedCookieHeader()
+                    if (!cookieHeader.isNullOrEmpty()) {
+                        reqBuilder.header("Cookie", cookieHeader)
                     }
                 }
 
@@ -649,16 +679,6 @@ internal class InnertubeClient(
         val playbackContext = JSONObject()
         val contentPlaybackContext = JSONObject().apply {
             put("html5Preference", "HTML5_PREF_WANTS")
-            // ANDROID_TESTSUITE is a bare no-auth client: a web-minted BotGuard
-            // token attached to its context is at best useless, at worst a
-            // mismatch signal, so it always goes out clean.
-            if (!clientType.isWeb && hasPo && clientType != ClientType.ANDROID_TESTSUITE) {
-                val tokenTarget = PoTokenManager.visitorData.ifEmpty { videoId }
-                val poToken = PoTokenManager.poTokenForSync(tokenTarget)
-                if (poToken.isNotEmpty()) {
-                    put("poToken", poToken)
-                }
-            }
         }
         playbackContext.put("contentPlaybackContext", contentPlaybackContext)
         root.put("playbackContext", playbackContext)
@@ -752,7 +772,15 @@ internal class InnertubeClient(
 
         if (clientType == ClientType.WEB_EMBEDDED_PLAYER || clientType == ClientType.TVHTML5_SIMPLY_EMBEDDED_PLAYER) {
             val thirdParty = JSONObject()
-            thirdParty.put("embedUrl", "https://www.youtube.com")
+            // Must be the full video URL (not just the domain) — YouTube validates
+            // this against the videoId being requested. A bare domain returns ERROR
+            // with no streamingData.
+            val embedVideoUrl = if (!videoId.isNullOrEmpty()) {
+                "https://www.youtube.com/watch?v=$videoId"
+            } else {
+                "https://www.youtube.com"
+            }
+            thirdParty.put("embedUrl", embedVideoUrl)
             contextJson.put("thirdParty", thirdParty)
         }
 

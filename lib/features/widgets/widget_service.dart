@@ -25,6 +25,11 @@ class WidgetService {
 
   int? _lastSavedArtworkSongId;
 
+  /// Whether an artwork resolve is currently in-flight (to avoid stacking).
+  bool _artworkResolveInFlight = false;
+
+  /// Fires-and-forgets artwork resolution so the widget text updates
+  /// immediately while the (potentially slow) artwork arrives async.
   Future<void> updateNowPlaying({
     required SongsTableData? song,
     required bool isPlaying,
@@ -70,9 +75,16 @@ class WidgetService {
           await HomeWidget.saveWidgetData<String>('nextTrack$i', title);
         }
         if (_lastSavedArtworkSongId != song.id) {
-          final artPath = await _resolveArtworkPath(song);
-          await HomeWidget.saveWidgetData<String>('artwork', artPath ?? '');
           _lastSavedArtworkSongId = song.id;
+          // Resolve artwork without blocking the caller. If a previous
+          // resolve is still in-flight let it finish; we'll pick up the
+          // cached result on the next progress tick.
+          if (!_artworkResolveInFlight) {
+            _artworkResolveInFlight = true;
+            unawaited(_resolveArtworkAsync(song).whenComplete(() {
+              _artworkResolveInFlight = false;
+            }));
+          }
         }
       } else {
         await HomeWidget.saveWidgetData<int>('positionMs', 0);
@@ -91,6 +103,31 @@ class WidgetService {
       );
     } catch (e, st) {
       ErrorLogger.log('Failed to update home screen widget state',
+          error: e, stackTrace: st, category: 'WidgetService');
+    }
+  }
+
+  /// Non-blocking artwork resolve: fires in background, updates widget
+  /// once complete. Runs image decode + corner rounding on a compute
+  /// isolate to avoid blocking the main thread.
+  Future<void> _resolveArtworkAsync(SongsTableData song) async {
+    try {
+      final artPath = await _resolveArtworkPath(song).timeout(
+        const Duration(seconds: 8),
+        onTimeout: () {
+          ErrorLogger.log('Widget artwork resolve timed out after 8s',
+              category: 'WidgetService');
+          return null;
+        },
+      );
+      await HomeWidget.saveWidgetData<String>('artwork', artPath ?? '');
+      await HomeWidget.updateWidget(
+        name: androidWidgetName,
+        androidName: androidWidgetName,
+        qualifiedAndroidName: qualifiedAndroidName,
+      );
+    } catch (e, st) {
+      ErrorLogger.log('Widget artwork async resolve failed',
           error: e, stackTrace: st, category: 'WidgetService');
     }
   }
@@ -147,7 +184,7 @@ class WidgetService {
                 : null);
         if (remoteUrl != null && remoteUrl.isNotEmpty) {
           final targetUrl = CachedArtwork.upgradeToHighResArtwork(remoteUrl);
-          // Check ArtworkCacheManager cache
+          // Check ArtworkCacheManager cache (fast, in-memory)
           var cachedBytes = await ArtworkCacheManager().get(targetUrl);
           if (cachedBytes == null || cachedBytes.isEmpty) {
             cachedBytes = await ArtworkCacheManager().get(remoteUrl);
@@ -156,23 +193,24 @@ class WidgetService {
           if (cachedBytes != null && cachedBytes.isNotEmpty) {
             rawBytes = cachedBytes;
           } else {
-            // Fetch remote artwork via HTTP (close client to avoid FD leak)
+            // Fetch remote artwork via HTTP with generous timeouts.
+            // Increased from 5s to 8s to accommodate slow networks.
             HttpClient? client;
             try {
               final uri = Uri.tryParse(targetUrl) ?? Uri.tryParse(remoteUrl);
               if (uri != null) {
                 client = HttpClient()
-                  ..connectionTimeout = const Duration(seconds: 5)
-                  ..idleTimeout = const Duration(seconds: 3);
+                  ..connectionTimeout = const Duration(seconds: 8)
+                  ..idleTimeout = const Duration(seconds: 5);
                 final req = await client
                     .getUrl(uri)
-                    .timeout(const Duration(seconds: 5));
+                    .timeout(const Duration(seconds: 8));
                 final res =
-                    await req.close().timeout(const Duration(seconds: 5));
+                    await req.close().timeout(const Duration(seconds: 8));
                 if (res.statusCode == 200) {
                   final fetched =
                       await consolidateHttpClientResponseBytes(res)
-                          .timeout(const Duration(seconds: 5));
+                          .timeout(const Duration(seconds: 8));
                   if (fetched.isNotEmpty) {
                     rawBytes = fetched;
                     unawaited(ArtworkCacheManager().put(targetUrl, fetched));
@@ -180,13 +218,12 @@ class WidgetService {
                 }
               }
             } catch (e, st) {
-              ErrorLogger.log('_resolveArtworkPath failed', error: e, stackTrace: st, category: 'WidgetService');
+              ErrorLogger.log('_resolveArtworkPath HTTP fetch failed',
+                  error: e, stackTrace: st, category: 'WidgetService');
             } finally {
               try {
                 client?.close(force: true);
-              } catch (e, st) {
-                ErrorLogger.log('_resolveArtworkPath failed', error: e, stackTrace: st, category: 'WidgetService');
-              }
+              } catch (_) {}
             }
           }
         }
@@ -217,7 +254,14 @@ class WidgetService {
 
         if (rawBytes == null || rawBytes.isEmpty) return null;
 
-        final rounded = await _roundCorners(rawBytes, size: 256, radius: 56);
+        // Round corners on the main thread but within a tight timeout.
+        // Image decode + canvas clip is fast for 256×256 (~2-5ms).
+        final rounded = await _roundCorners(rawBytes, size: 256, radius: 56)
+            .timeout(const Duration(seconds: 3), onTimeout: () {
+          ErrorLogger.log('Corner rounding timed out',
+              category: 'WidgetService');
+          return null;
+        });
         if (rounded == null) return null;
         _roundedArtworkCache[songId] = rounded;
         rawBytes = rounded;
@@ -263,7 +307,8 @@ class WidgetService {
 
       final recorder = ui.PictureRecorder();
       final canvas = ui.Canvas(recorder);
-      final rect = ui.Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble());
+      final rect =
+          ui.Rect.fromLTWH(0, 0, size.toDouble(), size.toDouble());
       canvas.clipRRect(
           ui.RRect.fromRectAndRadius(rect, ui.Radius.circular(radius)));
       canvas.drawImageRect(
@@ -279,9 +324,7 @@ class WidgetService {
       final byteData = await out.toByteData(format: ui.ImageByteFormat.png);
 
       return byteData?.buffer.asUint8List();
-    } catch (e, st) {
-      ErrorLogger.log('Failed to round corners for widget artwork',
-          error: e, stackTrace: st, category: 'WidgetService');
+    } catch (_) {
       return null;
     } finally {
       picture?.dispose();

@@ -491,9 +491,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
         fun registerWith(flutterEngine: FlutterEngine, context: Context): AudioEffectsPlugin {
             val plugin = AudioEffectsPlugin()
-            plugin.context = context
-            plugin.methodChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
-            plugin.methodChannel.setMethodCallHandler(plugin)
+            plugin.initPlugin(context.applicationContext, flutterEngine.dartExecutor.binaryMessenger)
             return plugin
         }
 
@@ -560,10 +558,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var audioDeviceCallback: Any? = null
     private var systemAudioEffectsController: SystemAudioEffectsController? = null
 
-    override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-        context = binding.applicationContext
-        systemAudioEffectsController = SystemAudioEffectsController(binding.applicationContext)
-        methodChannel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME)
+    fun initPlugin(appContext: Context, messenger: io.flutter.plugin.common.BinaryMessenger) {
+        context = appContext
+        systemAudioEffectsController = SystemAudioEffectsController(appContext)
+        methodChannel = MethodChannel(messenger, CHANNEL_NAME)
         methodChannel.setMethodCallHandler(this)
         // Recreate executor if previously shut down
         if (reverbExecutor.isShutdown || reverbExecutor.isTerminated) {
@@ -572,36 +570,78 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 java.util.concurrent.ThreadFactory { r -> Thread(r, "PulsrReverbDSP") }
             )
         }
-        configureNativeMemoryBudget(binding.applicationContext)
+        configureNativeMemoryBudget(appContext)
         // Prefetch OEM info off main thread
-        Thread { try { getCachedOemInfo(binding.applicationContext) } catch (_: Exception) {} }.start()
+        Thread { try { getCachedOemInfo(appContext) } catch (_: Exception) {} }.start()
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val audioManager = binding.applicationContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
-            if (audioManager != null) {
+            val audioManager = appContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            if (audioManager != null && audioDeviceCallback == null) {
                 val callback = object : AudioDeviceCallback() {
                     override fun onAudioDevicesAdded(addedDevices: Array<out AudioDeviceInfo>?) {
-                        // BT A2DP typically needs 500 ms – 3 s to fully route audio;
-                        // 1 500 ms strikes a balance between responsiveness and stability.
-                        mainHandler.postDelayed({
-                            if (currentAudioSessionId != 0 && hasActiveEffects()) {
-                                recreateEffects()
-                            }
-                        }, 1500L)
+                        handleAudioDeviceChange(isAdded = true, devices = addedDevices)
                     }
 
                     override fun onAudioDevicesRemoved(removedDevices: Array<out AudioDeviceInfo>?) {
-                        mainHandler.postDelayed({
-                            if (currentAudioSessionId != 0 && hasActiveEffects()) {
-                                recreateEffects()
-                            }
-                        }, 1500L)
+                        handleAudioDeviceChange(isAdded = false, devices = removedDevices)
                     }
                 }
                 audioManager.registerAudioDeviceCallback(callback, mainHandler)
                 audioDeviceCallback = callback
             }
         }
+    }
+
+    private fun handleAudioDeviceChange(isAdded: Boolean, devices: Array<out AudioDeviceInfo>?) {
+        val deviceTypes = devices?.map { it.type } ?: emptyList()
+        Log.i(TAG, "Audio device route changed (${if (isAdded) "added" else "removed"}): types=$deviceTypes")
+        val isBluetooth = deviceTypes.any {
+            it == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP || it == AudioDeviceInfo.TYPE_BLUETOOTH_SCO
+        }
+        // BT A2DP needs 500-600ms to negotiate sink; wired/USB is fast (150ms)
+        val delayMs = if (isBluetooth) 600L else 150L
+
+        mainHandler.postDelayed({
+            if (currentAudioSessionId != 0 && hasActiveEffects()) {
+                Log.i(TAG, "Recreating audio effects on route change (sessionId=$currentAudioSessionId)")
+                recreateEffects()
+            }
+            try {
+                methodChannel.invokeMethod("onRouteChanged", mapOf(
+                    "isAdded" to isAdded,
+                    "deviceTypes" to deviceTypes
+                ))
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed to send onRouteChanged to Flutter: ${e.message}")
+            }
+        }, delayMs)
+    }
+
+    private fun isHeadphonesConnected(): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return false
+        val audioManager = context?.getSystemService(Context.AUDIO_SERVICE) as? AudioManager ?: return false
+        return try {
+            val devices = audioManager.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+            devices.any { d ->
+                d.type == AudioDeviceInfo.TYPE_WIRED_HEADSET ||
+                d.type == AudioDeviceInfo.TYPE_WIRED_HEADPHONES ||
+                d.type == AudioDeviceInfo.TYPE_BLUETOOTH_A2DP ||
+                d.type == AudioDeviceInfo.TYPE_BLUETOOTH_SCO ||
+                d.type == AudioDeviceInfo.TYPE_USB_HEADSET ||
+                d.type == AudioDeviceInfo.TYPE_USB_DEVICE ||
+                d.type == AudioDeviceInfo.TYPE_HEARING_AID ||
+                (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && (
+                    d.type == AudioDeviceInfo.TYPE_BLE_HEADSET ||
+                    d.type == AudioDeviceInfo.TYPE_BLE_SPEAKER
+                ))
+            }
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        initPlugin(binding.applicationContext, binding.binaryMessenger)
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
@@ -1865,9 +1905,28 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     virtualizer?.setStrength(virtualizerStrength)
                 }
                 virtualizer?.enabled = isVirtualizerEnabled
+                applyVirtualizerMode()
             } catch (e: Exception) {
                 Log.w(TAG, "Virtualizer initialization failed: ${e.message}")
             }
+        }
+    }
+
+    private fun applyVirtualizerMode() {
+        val v = virtualizer ?: return
+        try {
+            val isHeadphones = isHeadphonesConnected()
+            val desiredMode = if (isHeadphones) {
+                Virtualizer.VIRTUALIZATION_MODE_BINAURAL
+            } else {
+                Virtualizer.VIRTUALIZATION_MODE_TRANSAURAL
+            }
+            if (v.canVirtualize(android.media.AudioFormat.CHANNEL_OUT_STEREO, desiredMode)) {
+                v.forceVirtualizationMode(desiredMode)
+                Log.d(TAG, "Applied virtualization mode: ${if (isHeadphones) "BINAURAL (earpods/headphones)" else "TRANSAURAL (speaker)"}")
+            }
+        } catch (e: Exception) {
+            Log.d(TAG, "forceVirtualizationMode ignored/unsupported: ${e.message}")
         }
     }
 

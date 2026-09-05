@@ -634,6 +634,13 @@ class EqualizerManager {
       if (!enabled) {
         await _effectsChannel.setEqBands(targetFreqs);
         await _effectsChannel.setEqBandGains(currentPreset.gains);
+      } else {
+        final tenBandGains = EqPreset.interpolateGains(
+          currentPreset.gains,
+          targetFrequencies: customFrequencies,
+        );
+        await _effectsChannel.setEqBands(customFrequencies);
+        await _effectsChannel.setEqBandGains(tenBandGains);
       }
     }
     _debouncedSavePreferences();
@@ -697,6 +704,11 @@ class EqualizerManager {
           newGains[index],
           1.414,
         );
+        final tenBandGains = EqPreset.interpolateGains(
+          newGains,
+          targetFrequencies: customFrequencies,
+        );
+        await _effectsChannel.setEqBandGains(tenBandGains);
       } else {
         await _effectsChannel.setEqBandGain(index, newGains[index]);
         await _effectsChannel.setNativeEqBand(
@@ -731,6 +743,15 @@ class EqualizerManager {
           // Keep legacy 10-band DynamicsProcessing in sync only for 10-band mode
           await _effectsChannel.setEqBands(targetFreqs);
           await _effectsChannel.setEqBandGains(currentPreset.gains);
+        } else {
+          // In 32-band mode, interpolate to 10 bands so the audible DynamicsProcessing postEq
+          // reflects the EQ curve instead of remaining silent/flat!
+          final tenBandGains = EqPreset.interpolateGains(
+            currentPreset.gains,
+            targetFrequencies: customFrequencies,
+          );
+          await _effectsChannel.setEqBands(customFrequencies);
+          await _effectsChannel.setEqBandGains(tenBandGains);
         }
         return;
       } catch (_) {}

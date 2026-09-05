@@ -46,6 +46,7 @@ enum class YtmBlockSignal(val code: String) {
         private val GONE_SUBSTRINGS = listOf(
             "video unavailable",
             "removed by the user",
+            "removed by user",
             "private video",
             "video has been removed",
             "deleted",
@@ -153,6 +154,11 @@ enum class YtmBlockSignal(val code: String) {
                 403 -> IpBlocked
                 400 -> ClientDeprecated
                 404 -> VideoGone
+                200 -> {
+                    // A 200 response with UNPLAYABLE and no other matched signal
+                    // (e.g. ANDROID_TESTSUITE on flagged IPs) indicates IP/access block.
+                    if (status == "UNPLAYABLE") IpBlocked else RateLimited
+                }
                 else -> RateLimited
             }
         }
