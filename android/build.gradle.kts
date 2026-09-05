@@ -24,8 +24,10 @@ val newBuildDir: Directory =
 rootProject.layout.buildDirectory.value(newBuildDir)
 
 subprojects {
-    val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
-    project.layout.buildDirectory.value(newSubprojectBuildDir)
+    if (project.projectDir.toPath().root == rootProject.projectDir.toPath().root) {
+        val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
+        project.layout.buildDirectory.value(newSubprojectBuildDir)
+    }
 }
 
 subprojects {
@@ -38,7 +40,7 @@ subprojects {
 // We force 17 via android DSL + toolchain so Java and Kotlin match (AGP 9 + Kotlin 2.3 + JDK 17).
 subprojects {
     plugins.withId("com.android.library") {
-        val android = extensions.findByType(com.android.build.gradle.LibraryExtension::class.java)
+        val android = extensions.findByType(com.android.build.api.dsl.LibraryExtension::class.java)
         if (android != null) {
             if (android.namespace.isNullOrEmpty()) {
                 android.namespace = when (project.name) {
@@ -55,7 +57,7 @@ subprojects {
 // when subprojects have already been configured.
 gradle.afterProject {
     val android = extensions.findByName("android")
-    if (android is com.android.build.gradle.BaseExtension) {
+    if (android is com.android.build.api.dsl.CommonExtension) {
         android.compileOptions.sourceCompatibility = JavaVersion.VERSION_17
         android.compileOptions.targetCompatibility = JavaVersion.VERSION_17
     }
@@ -70,8 +72,6 @@ subprojects {
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
-            languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
-            apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_0)
         }
     }
 }

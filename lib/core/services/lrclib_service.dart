@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:injectable/injectable.dart';
 import '../../domain/models/lyrics_line.dart';
-import '../config/app_config.dart';
 import '../utils/error_logger.dart';
 import '../utils/lrc_parser.dart';
 

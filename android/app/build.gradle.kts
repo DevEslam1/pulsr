@@ -51,6 +51,7 @@ android {
             dimension = "default"
             applicationIdSuffix = ".plus"
             manifestPlaceholders["appName"] = "Pulsr Plus"
+            proguardFile(file("src/dev/proguard-rules.pro"))
         }
         create("prod") {
             dimension = "default"
@@ -62,6 +63,7 @@ android {
             dimension = "default"
             applicationIdSuffix = ".ytm"
             manifestPlaceholders["appName"] = "Pulsr Music"
+            proguardFile(file("src/ytm/proguard-rules.pro"))
         }
     }
 
@@ -114,27 +116,26 @@ android {
         release {
             val releaseConfig = signingConfigs.getByName("release")
             val hasKeystore = releaseConfig.storeFile != null && releaseConfig.storeFile!!.exists()
-            val isCI = System.getenv("CI") == "true"
-            val isProdOrYtmBuild = gradle.startParameter.taskNames.any {
-                (it.contains("Prod", ignoreCase = true) || it.contains("Ytm", ignoreCase = true)) &&
-                it.contains("Release", ignoreCase = true)
+            val isReleaseBuild = gradle.startParameter.taskNames.any {
+                it.contains("Release", ignoreCase = true) || it.contains("bundle", ignoreCase = true)
             }
-            if (!hasKeystore) {
-                if (isCI && isProdOrYtmBuild) {
-                    throw GradleException("Release keystore file missing in key.properties for release build on CI!")
+            val allowDebugSigning = project.hasProperty("allowDebugSigning") && project.property("allowDebugSigning").toString().toBoolean()
+            if (isReleaseBuild && !hasKeystore) {
+                if (!allowDebugSigning) {
+                    throw GradleException(
+                        "Release keystore file missing in key.properties! " +
+                        "To permit debug signing fallback for local testing, pass -PallowDebugSigning=true."
+                    )
                 }
-                logger.warn("WARNING: Release keystore file not found in key.properties. Falling back to debug signing config for local dev release build.")
+                logger.warn("WARNING: Release keystore file not found in key.properties. Using debug signing config because allowDebugSigning=true was passed.")
             }
             signingConfig = if (hasKeystore) releaseConfig else signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
-            // Include flavor-specific ProGuard rules so dev/ytm keep NewPipe/Rhino (B-02).
-            // Both flavor files contain identical keep rules; including both is idempotent and harmless for prod.
+            // Flavor-specific ProGuard rules are scoped per-flavor via androidComponents (B-11b)
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
-                "src/dev/proguard-rules.pro",
-                "src/ytm/proguard-rules.pro"
+                "proguard-rules.pro"
             )
         }
     }
@@ -214,9 +215,14 @@ tasks.register("testNative") {
         val exeParity = file("${outDir.absolutePath}/test_native_parity" + if (isWindows) ".exe" else "")
         val exeDebug = file("${outDir.absolutePath}/test_native_debug" + if (isWindows) ".exe" else "")
 
-        val compiler = if (isWindows) {
-            val windhawkClang = file("C:/Program Files/Windhawk/Compiler/bin/clang++.exe")
-            if (windhawkClang.exists()) windhawkClang.absolutePath else "clang++"
+        // B24 fix: support gradle property / env var / NDK Clang on Windows
+        val compiler = if (project.hasProperty("hostClangPath")) {
+            project.property("hostClangPath").toString()
+        } else if (System.getenv("HOST_CLANG") != null) {
+            System.getenv("HOST_CLANG")!!
+        } else if (isWindows) {
+            val ndkDir = file("D:/Courses/work/Android/Sdk/ndk/27.1.12297006/toolchains/llvm/prebuilt/windows-x86_64/bin/clang++.exe")
+            if (ndkDir.exists()) ndkDir.absolutePath else "clang++"
         } else {
             "clang++"
         }
@@ -229,16 +235,20 @@ tasks.register("testNative") {
             "SincResampler.cpp",
             "DsdDecoder.cpp",
             "SpatialPanner.cpp",
+            "HarmonicSaturation.cpp",
+            "StereoWidth.cpp",
+            "LoudnessContour.cpp",
+            "SubCrossover.cpp",
+            "DynamicEQ.cpp",
             "AudioDspEngine.cpp"
         ).map { file("${mainDir.absolutePath}/$it").absolutePath }
 
-        // 1. Build & Run (a): Parity Build with exact production flags (-O3 -ffast-math -std=c++20)
-        println("[testNative] Compiling parity build (-O3 -ffast-math -std=c++20)...")
+        // 1. Build & Run (a): Parity Build with exact production flags (-O3 -std=c++20)
+        println("[testNative] Compiling parity build (-O3 -std=c++20)...")
         val parityCompileCmd = mutableListOf(
             compiler,
             "-std=c++20",
             "-O3",
-            "-ffast-math",
             "-I", mainDir.absolutePath,
             file("${testDir.absolutePath}/test_native_all.cpp").absolutePath
         ).apply {
@@ -276,7 +286,7 @@ tasks.register("testNative") {
             add(file("${testDir.absolutePath}/test_native_all.cpp").absolutePath)
             addAll(dspSources)
             if (isWindows) add("-static")
-            if (!isWindows) add("-fsanitize=address,undefined")
+            // B1 fix: deduplicated sanitizer flag
             add("-o")
             add(exeDebug.absolutePath)
         }
@@ -306,6 +316,20 @@ tasks.register("validateProdIsolation") {
         }
         val forbiddenTerms = listOf("music.youtube.com", "NewPipeExtractor", "org.schabi.newpipe", "po_token")
 
+        // B2/B3 fix: byte-level ASCII scanning helper for binary files (.png, .so)
+        fun fileContainsAsciiBytes(targetFile: File, term: String): Boolean {
+            val termBytes = term.toByteArray(Charsets.US_ASCII)
+            val bytes = targetFile.readBytes()
+            if (bytes.size < termBytes.size) return false
+            outer@ for (i in 0..(bytes.size - termBytes.size)) {
+                for (j in termBytes.indices) {
+                    if (bytes[i + j] != termBytes[j]) continue@outer
+                }
+                return true
+            }
+            return false
+        }
+
         // 1. Check main Manifest
         val mainManifest = file("src/main/AndroidManifest.xml")
         if (mainManifest.exists()) {
@@ -330,14 +354,19 @@ tasks.register("validateProdIsolation") {
             }
         }
 
-        // 3. Check main res
+        // 3. Check main res (B2/B3 fix: byte-level scan on images, text scan on xml)
         val mainResDir = file("src/main/res")
         if (mainResDir.exists()) {
             mainResDir.walkTopDown().filter { it.isFile && (it.extension == "xml" || it.extension == "png") }.forEach { file ->
-                val text = file.readText()
                 for (term in forbiddenTerms) {
-                    if (text.contains(term)) {
-                        throw GradleException("Forbidden GPL/YouTube term '$term' found in src/main/res file: ${file.path}")
+                    if (file.extension == "png") {
+                        if (fileContainsAsciiBytes(file, term)) {
+                            throw GradleException("Forbidden GPL/YouTube term '$term' found in src/main/res file: ${file.path}")
+                        }
+                    } else {
+                        if (file.readText().contains(term)) {
+                            throw GradleException("Forbidden GPL/YouTube term '$term' found in src/main/res file: ${file.path}")
+                        }
                     }
                 }
             }
@@ -380,25 +409,19 @@ tasks.register("validateProdIsolation") {
             }
         }
 
-        // 7. Check jniLibs (prebuilt .so that could hide extractor)
+        // 7. Check jniLibs (prebuilt .so that could hide extractor) - B2/B3 fix
         val jniLibsDir = file("src/main/jniLibs")
         if (jniLibsDir.exists()) {
             jniLibsDir.walkTopDown().filter { it.isFile }.forEach { file ->
-                // Binary scan as text fallback — look for forbidden strings in file name and text-readable content
                 val name = file.name
                 for (term in forbiddenTerms) {
                     if (name.contains(term)) {
                         throw GradleException("Forbidden GPL/YouTube term '$term' found in jniLibs file name: ${file.path}")
                     }
-                }
-                try {
-                    val text = file.readText(Charsets.UTF_8)
-                    for (term in forbiddenTerms) {
-                        if (text.contains(term)) {
-                            throw GradleException("Forbidden GPL/YouTube term '$term' found in jniLibs file: ${file.path}")
-                        }
+                    if (fileContainsAsciiBytes(file, term)) {
+                        throw GradleException("Forbidden GPL/YouTube term '$term' found in jniLibs binary: ${file.path}")
                     }
-                } catch (_: Exception) {}
+                }
             }
         }
 

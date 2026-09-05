@@ -37,7 +37,7 @@ add_library(pulsr_dsp SHARED
 
 target_compile_options(pulsr_dsp PRIVATE
     $<$<CONFIG:Debug>:-O0 -g>
-    $<$<CONFIG:RelWithDebInfo>:-O2 -g>
+    $<$<CONFIG:RelWithDebInfo>:-O3 -g>
     $<$<CONFIG:Release>:-O3>
 )
 
