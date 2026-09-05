@@ -84,7 +84,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             val appContext = context?.applicationContext
             val locale = resolveLocale()
             val countryCode = (pendingCountry?.takeIf { it.isNotBlank() }
-                ?: locale.country).ifBlank { "US" }
+                ?: locale.country).ifBlank { "EG" }
 
             NewPipe.init(
                 PulsrDownloader(appContext),

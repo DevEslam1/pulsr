@@ -26,57 +26,112 @@ class LrclibService {
     int? durationSeconds,
   }) async {
     // 1. Clean track & artist name (strip (Official Video), [MV], (feat. ...), etc.)
-    final cleanTrack = _cleanTitle(trackName);
+    final cleanTrack = _cleanTitle(trackName, artistName: artistName);
     final cleanArtist = _cleanArtist(artistName);
 
-    // Try exact get first
+    final effectiveTrack = cleanTrack.isNotEmpty ? cleanTrack : trackName;
+    final effectiveArtist = cleanArtist.isNotEmpty ? cleanArtist : artistName;
+
+    // 1. Try exact get with all metadata (album, duration)
     var result = await _tryGetLyrics(
-      trackName: cleanTrack.isNotEmpty ? cleanTrack : trackName,
-      artistName: cleanArtist.isNotEmpty ? cleanArtist : artistName,
+      trackName: effectiveTrack,
+      artistName: effectiveArtist,
       albumName: albumName,
       durationSeconds: durationSeconds,
     );
 
     if (result != null && result.lines.isNotEmpty) return result;
 
-    // Fallback to fuzzy search on LRCLIB
-    result = await _trySearchLyrics(
-      query:
-          '${cleanTrack.isNotEmpty ? cleanTrack : trackName} ${cleanArtist.isNotEmpty ? cleanArtist : artistName}',
-    );
+    // 2. If exact get with album/duration failed, try without strict album/duration
+    if (albumName != null || durationSeconds != null) {
+      result = await _tryGetLyrics(
+        trackName: effectiveTrack,
+        artistName: effectiveArtist,
+      );
+      if (result != null && result.lines.isNotEmpty) return result;
+    }
 
-    return result;
+    // 3. Fallback to fuzzy search on LRCLIB with clean query
+    final searchTerms = <String>[effectiveTrack];
+    if (effectiveArtist.isNotEmpty &&
+        !effectiveTrack.toLowerCase().contains(effectiveArtist.toLowerCase())) {
+      searchTerms.add(effectiveArtist);
+    }
+    result = await _trySearchLyrics(query: searchTerms.join(' '));
+    if (result != null && result.lines.isNotEmpty) return result;
+
+    // 4. If cleanTrack differed from raw trackName, try raw search as last resort
+    if (effectiveTrack != trackName) {
+      result = await _trySearchLyrics(query: '$trackName $effectiveArtist');
+      if (result != null && result.lines.isNotEmpty) return result;
+    }
+
+    return null;
   }
 
-  String _cleanTitle(String title) {
+  String _cleanTitle(String title, {String? artistName}) {
     var cleaned = title;
-    if (cleaned.contains('|')) {
-      cleaned = cleaned.split('|').first;
+
+    // Split on common dividers like |, /, •, ~
+    if (cleaned.contains(RegExp(r'\s*[|/•~]\s*'))) {
+      cleaned = cleaned.split(RegExp(r'\s*[|/•~]\s*')).first;
     }
-    cleaned = cleaned
-        .replaceAll(
-            RegExp(
-                r'\s*[\(\[\{].*?(official|video|audio|mv|lyrics|feat|ft\.|remix|version|hq|hd|حفل|كليب|فيديو|موسيقى|جلسة|لايف|بث).*?[\)\]\}]',
-                caseSensitive: false),
-            '')
-        .replaceAll(
-            RegExp(r'\s*-\s*(official|video|audio|mv|lyrics|فيديو|كليب|حفل).*',
-                caseSensitive: false),
-            '')
-        .replaceAll(
-            RegExp(r'\s*(حفل|مهرجان|جلسة|فيديو كليب).*', caseSensitive: false),
-            '')
-        .trim();
-    return cleaned;
+
+    // Strip common YouTube / release clutter inside brackets/parentheses
+    cleaned = cleaned.replaceAll(
+      RegExp(
+        r'\s*[\(\[\{].*?(official|video|audio|mv|lyrics|lyric|remix|version|hq|hd|explicit|clean|visualizer|clip|حفل|كليب|فيديو|موسيقى|جلسة|لايف|بث|مهرجان).*?[\)\]\}]',
+        caseSensitive: false,
+      ),
+      '',
+    );
+
+    // Strip trailing "- Official Video", etc.
+    cleaned = cleaned.replaceAll(
+      RegExp(
+        r'\s*-\s*(official|video|audio|mv|lyrics|lyric|remix|version|visualizer|clip|فيديو|كليب|حفل).*',
+        caseSensitive: false,
+      ),
+      '',
+    );
+
+    // Strip leading "Artist - " or "Artist – " if artist is provided or title contains " - "
+    if (artistName != null && artistName.trim().isNotEmpty) {
+      final escapedArtist = RegExp.escape(artistName.trim());
+      cleaned = cleaned.replaceAll(
+        RegExp('^\\s*$escapedArtist\\s*[-–—:]\\s*', caseSensitive: false),
+        '',
+      );
+      // Also check if artist is at the end: "Title - Artist"
+      cleaned = cleaned.replaceAll(
+        RegExp('\\s*[-–—:]\\s*$escapedArtist\\s*\$', caseSensitive: false),
+        '',
+      );
+    }
+
+    // Strip common YouTube "feat." or "ft." in brackets or standalone
+    cleaned = cleaned.replaceAll(
+      RegExp(r'\s*[\(\[\{]?\s*(feat\.|ft\.|with)\s+.*?[\)\]\}]?', caseSensitive: false),
+      '',
+    );
+
+    // Strip remaining generic Arabic video labels
+    cleaned = cleaned.replaceAll(
+      RegExp(r'\s*(فيديو كليب|حفل|مهرجان|جلسة|سهرة).*', caseSensitive: false),
+      '',
+    );
+
+    return cleaned.trim();
   }
 
   String _cleanArtist(String artist) {
     return artist
         .replaceAll(
-            RegExp(r'\s*[\(\[\{].*?(topic|vevo).*?[\)\]\}]',
-                caseSensitive: false),
-            '')
+          RegExp(r'\s*[\(\[\{].*?(topic|vevo).*?[\)\]\}]', caseSensitive: false),
+          '',
+        )
         .replaceAll(RegExp(r'\s*-\s*Topic', caseSensitive: false), '')
+        .replaceAll(RegExp(r'\s*Vevo', caseSensitive: false), '')
         .trim();
   }
 
@@ -129,6 +184,17 @@ class LrclibService {
         final responseBody = await response.transform(utf8.decoder).join();
         final list = jsonDecode(responseBody);
         if (list is List && list.isNotEmpty) {
+          // Pass 1: Prioritize synced lyrics
+          for (final item in list) {
+            if (item is Map<String, dynamic>) {
+              final synced = item['syncedLyrics'] as String?;
+              if (synced != null && synced.trim().isNotEmpty) {
+                final res = _extractLyricsFromJson(item);
+                if (res != null && res.lines.isNotEmpty) return res;
+              }
+            }
+          }
+          // Pass 2: Fallback to plain lyrics
           for (final item in list) {
             if (item is Map<String, dynamic>) {
               final res = _extractLyricsFromJson(item);

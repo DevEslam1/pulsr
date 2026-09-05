@@ -102,72 +102,75 @@ class NowPlayingQueueView extends StatelessWidget {
                           final song = queue[index];
                           final isCurrent = index == state.currentIndex;
 
-                          return ListTile(
+                          return Material(
                             key: ValueKey('queue_${song.id}_$index'),
-                            leading: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                CachedArtwork(
-                                  id: song.id,
-                                  remoteUrl: song.remoteArtworkUrl,
-                                  type: ArtworkType.AUDIO,
-                                  size: 42,
-                                  borderRadius: 10,
+                            color: Colors.transparent,
+                            child: ListTile(
+                              leading: Stack(
+                                alignment: Alignment.center,
+                                children: [
+                                  CachedArtwork(
+                                    id: song.id,
+                                    remoteUrl: song.remoteArtworkUrl,
+                                    type: ArtworkType.AUDIO,
+                                    size: 42,
+                                    borderRadius: 10,
+                                  ),
+                                  if (isCurrent)
+                                    Container(
+                                      width: 42,
+                                      height: 42,
+                                      decoration: BoxDecoration(
+                                        color:
+                                            Colors.black.withValues(alpha: 0.5),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                      child: Center(
+                                        child:
+                                            NowPlayingIndicator(color: p.accent),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              title: Text(
+                                song.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontWeight: isCurrent
+                                      ? FontWeight.w800
+                                      : FontWeight.w600,
+                                  color: isCurrent ? p.accent : p.textPrimary,
+                                  fontSize: 13.5,
                                 ),
-                                if (isCurrent)
-                                  Container(
-                                    width: 42,
-                                    height: 42,
-                                    decoration: BoxDecoration(
-                                      color:
-                                          Colors.black.withValues(alpha: 0.5),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Center(
-                                      child:
-                                          NowPlayingIndicator(color: p.accent),
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            title: Text(
-                              song.title,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontWeight: isCurrent
-                                    ? FontWeight.w800
-                                    : FontWeight.w600,
-                                color: isCurrent ? p.accent : p.textPrimary,
-                                fontSize: 13.5,
                               ),
-                            ),
-                            subtitle: Text(
-                              song.artist,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: p.textSecondary,
-                                fontSize: 11.5,
+                              subtitle: Text(
+                                song.artist,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: p.textSecondary,
+                                  fontSize: 11.5,
+                                ),
                               ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (!isCurrent)
+                                    IconButton(
+                                      icon: Icon(Icons.close_rounded,
+                                          size: 18, color: p.textTertiary),
+                                      onPressed: () =>
+                                          cubit.removeQueueItem(index),
+                                    ),
+                                  Icon(Icons.drag_handle_rounded,
+                                      color: p.textTertiary, size: 20),
+                                ],
+                              ),
+                              onTap: () {
+                                cubit.playSong(song, queue: queue);
+                              },
                             ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (!isCurrent)
-                                  IconButton(
-                                    icon: Icon(Icons.close_rounded,
-                                        size: 18, color: p.textTertiary),
-                                    onPressed: () =>
-                                        cubit.removeQueueItem(index),
-                                  ),
-                                Icon(Icons.drag_handle_rounded,
-                                    color: p.textTertiary, size: 20),
-                              ],
-                            ),
-                            onTap: () {
-                              cubit.playSong(song, queue: queue);
-                            },
                           );
                         },
                       ),

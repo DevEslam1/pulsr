@@ -201,9 +201,9 @@ internal class InnertubeClient(
                         // this branch; the refresh itself is a no-op while the
                         // token is fresh, so once a minute is plenty.
                         val now = android.os.SystemClock.elapsedRealtime()
-                        if (now - lastBotRefreshTriggerMs > 60_000L) {
+                        if (now - lastBotRefreshTriggerMs > 30_000L) {
                             lastBotRefreshTriggerMs = now
-                            PoTokenManager.evictMintedTokens()
+                            PoTokenManager.invalidate()
                             PoTokenManager.triggerBackgroundRefresh()
                         }
                     }
@@ -547,15 +547,11 @@ internal class InnertubeClient(
                     }
                 }
 
-                // Mobile clients (ANDROID_MUSIC, IOS_MUSIC) also need cookies
-                // when the user is logged in — YouTube requires session cookies
-                // on these endpoints for authenticated content.
-                if (!clientType.isWeb && cookieStore.isSessionValid()) {
-                    val cookieHeader = cookieStore.getMergedCookieHeader()
-                    if (!cookieHeader.isNullOrEmpty()) {
-                        reqBuilder.header("Cookie", cookieHeader)
-                    }
-                }
+                // Keep mobile clients guest-only: attaching WEB session cookies
+                // to ANDROID_MUSIC/IOS_MUSIC poisons the fallback that works
+                // logged-out (YouTube returns LOGIN_REQUIRED for mismatched
+                // auth on these endpoints). Authenticated playback is covered
+                // by WEB_REMIX with cookies + SAPISIDHASH above.
 
                 val response = YtmHttpClient.okHttpClient.newCall(reqBuilder.build()).execute()
                 val code = response.code

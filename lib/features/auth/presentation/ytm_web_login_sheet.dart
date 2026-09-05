@@ -109,16 +109,147 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   static String get mobileUserAgent => EmbeddedBrowserUa.chromeMobile;
   static String get desktopUserAgent => EmbeddedBrowserUa.chromeDesktop;
 
-  /// Returns the [UserScript] list to inject at AT_DOCUMENT_START.
+  static const String _ytmBrowseGuardJs = r'''
+(function () {
+  'use strict';
+  try {
+    var isPlayUrl = function(url) {
+      if (!url) return false;
+      var s = String(url).toLowerCase();
+      return s.indexOf('play.google.com') !== -1 ||
+             s.indexOf('market://') !== -1 ||
+             s.indexOf('intent://') !== -1;
+    };
+
+    // Override location assign/replace to suppress Google Play redirection
+    var origAssign = window.location.assign;
+    window.location.assign = function(url) {
+      if (isPlayUrl(url)) {
+        return;
+      }
+      return origAssign.apply(this, arguments);
+    };
+
+    var origReplace = window.location.replace;
+    window.location.replace = function(url) {
+      if (isPlayUrl(url)) {
+        return;
+      }
+      return origReplace.apply(this, arguments);
+    };
+
+    // Emulate desktop screen metrics so YouTube Music desktop player renders
+    if (window.screen && (window.screen.width < 1024 || window.screen.availWidth < 1024)) {
+      try {
+        Object.defineProperty(window.screen, 'width', { get: function() { return 1366; }, configurable: true });
+        Object.defineProperty(window.screen, 'availWidth', { get: function() { return 1366; }, configurable: true });
+        Object.defineProperty(window.screen, 'height', { get: function() { return 768; }, configurable: true });
+        Object.defineProperty(window.screen, 'availHeight', { get: function() { return 728; }, configurable: true });
+      } catch (e) {}
+    }
+
+    // Intercept clicks on links pointing to Google Play
+    document.addEventListener('click', function(e) {
+      var target = e.target;
+      while (target && target !== document) {
+        if (target.tagName === 'A' && target.href && isPlayUrl(target.href)) {
+          e.preventDefault();
+          e.stopPropagation();
+          return false;
+        }
+        target = target.parentElement;
+      }
+    }, true);
+
+    // Set Egypt region preference cookie on .youtube.com
+    try {
+      document.cookie = "PREF=f1=50000000&gl=EG&hl=en; domain=.youtube.com; path=/";
+    } catch(e) {}
+
+    // Hook ytcfg to enforce Egypt region and disable unavailable state
+    try {
+      var patchData = function(data) {
+        if (!data || typeof data !== 'object') return data;
+        data.GL = 'EG';
+        data.HL = 'en';
+        data.IS_UNAVAILABLE = false;
+        data.IS_UNAVAILABLE_IN_REGION = false;
+        data.UNAVAILABLE_IN_REGION = false;
+        if (data.INNERTUBE_CONTEXT && data.INNERTUBE_CONTEXT.client) {
+          data.INNERTUBE_CONTEXT.client.gl = 'EG';
+          data.INNERTUBE_CONTEXT.client.hl = 'en';
+        }
+        return data;
+      };
+
+      var origYtcfg = window.ytcfg;
+      if (origYtcfg) {
+        if (origYtcfg.d) {
+          var origD = origYtcfg.d;
+          origYtcfg.d = function() {
+            return patchData(origD.apply(this, arguments));
+          };
+        }
+        if (origYtcfg.set) {
+          var origSet = origYtcfg.set;
+          origYtcfg.set = function(k, v) {
+            if (typeof k === 'object') patchData(k);
+            return origSet.apply(this, arguments);
+          };
+        }
+      }
+    } catch(e) {}
+  } catch (e) {}
+})();
+''';
+
+  static const String _ytmViewportEnforceJs = r'''
+(function () {
+  'use strict';
+  try {
+    // Hide mobile app promotional banners and overlays
+    var style = document.createElement('style');
+    style.textContent = `
+      ytmusic-app-promo,
+      .ytmusic-app-promo,
+      #app-promo,
+      [class*="app-promo"],
+      ytmusic-banner-promo-renderer,
+      ytmusic-mobile-topbar-renderer {
+        display: none !important;
+      }
+    `;
+    (document.head || document.documentElement).appendChild(style);
+
+    // Ensure desktop viewport width on phones so YouTube Music renders full desktop player
+    var meta = document.querySelector('meta[name="viewport"]');
+    if (meta) {
+      meta.setAttribute('content', 'width=1024, initial-scale=0.85, maximum-scale=3.0, user-scalable=yes');
+    }
+  } catch (e) {}
+})();
+''';
+
+  /// Returns the [UserScript] list to inject into the WebView.
   ///
   /// The script deletes navigator.userAgentData (Chromium-only, absent in
   /// Safari) and aligns platform/vendor so Google's sign-in cannot fingerprint
   /// the embedded WebView even after the UA string has been spoofed.
+  /// Also injects browse guard & viewport scripts to ensure the full YouTube
+  /// Music web player renders instead of Google Play redirects.
   static UnmodifiableListView<UserScript> get _antiFingerPrintScripts =>
       UnmodifiableListView([
         UserScript(
           source: EmbeddedBrowserUa.antiFingerprint,
           injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+        ),
+        UserScript(
+          source: _ytmBrowseGuardJs,
+          injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+        ),
+        UserScript(
+          source: _ytmViewportEnforceJs,
+          injectionTime: UserScriptInjectionTime.AT_DOCUMENT_END,
         ),
       ]);
 
@@ -163,11 +294,77 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     }
   }
 
+  bool _isGeoBlocked = false;
+
+  /// Ensures that any YouTube Music URL carries explicit gl=EG&hl=en parameters.
+  static String _withGeoParams(String url) {
+    if (!url.contains('music.youtube.com')) return url;
+    final uri = Uri.tryParse(url);
+    if (uri == null) return url;
+    if (uri.queryParameters.containsKey('gl')) return url;
+    final newParams = Map<String, String>.from(uri.queryParameters);
+    newParams['gl'] = 'EG';
+    newParams['hl'] = 'en';
+    return uri.replace(queryParameters: newParams).toString();
+  }
+
+  Future<bool> _scanPageForGeoBlock(InAppWebViewController controller) async {
+    try {
+      final raw = await controller.evaluateJavascript(source: '''
+(() => {
+  try {
+    var text = (document.body && (document.body.innerText || document.body.textContent)) || '';
+    var lower = text.toLowerCase();
+    return lower.includes('not available in your area') ||
+           lower.includes('not available in your country') ||
+           lower.includes("isn't available in your country") ||
+           lower.includes("isn't available in your region") ||
+           lower.includes('not available in your region') ||
+           lower.includes('غير متوفر في منطقتك') ||
+           lower.includes('غير متاح في منطقتك');
+  } catch (e) { return false; }
+})()''');
+      return raw == true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _forceEgRegionReload() async {
+    if (mounted) setState(() => _isGeoBlocked = false);
+    try {
+      final cookieManager = CookieManager.instance();
+      await cookieManager.setCookie(
+        url: WebUri('https://music.youtube.com'),
+        name: 'PREF',
+        value: 'f1=50000000&gl=EG&hl=en',
+        domain: '.youtube.com',
+        path: '/',
+      );
+    } catch (_) {}
+    await _navigateTo('https://music.youtube.com/?gl=EG&hl=en');
+  }
+
   @override
   void initState() {
     super.initState();
-    _currentUrl = widget.initialUrl ??
-        (widget.isBrowseMode ? 'https://music.youtube.com' : googleSignInUrl);
+    _currentUrl = widget.initialUrl != null
+        ? _withGeoParams(widget.initialUrl!)
+        : (widget.isBrowseMode
+            ? 'https://music.youtube.com/?gl=EG&hl=en'
+            : googleSignInUrl);
+
+    // Pre-seed Egypt region preference cookie for YouTube domains
+    try {
+      final cookieManager = CookieManager.instance();
+      cookieManager.setCookie(
+        url: WebUri('https://music.youtube.com'),
+        name: 'PREF',
+        value: 'f1=50000000&gl=EG&hl=en',
+        domain: '.youtube.com',
+        path: '/',
+      );
+    } catch (_) {}
 
     final accountService = getIt<YtmAccountService>();
     if (accountService.isLoggedIn) {
@@ -180,12 +377,17 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       });
     }
 
+    final isYtm =
+        widget.isBrowseMode || _currentUrl.contains('music.youtube.com');
     final initialUa = _uaIdentityOverride != null
         ? _uaFor(_uaIdentityOverride!)
-        : (widget.isBrowseMode ? desktopUserAgent : mobileUserAgent);
+        : (isYtm ? desktopUserAgent : mobileUserAgent);
 
     _settings = InAppWebViewSettings(
       userAgent: initialUa,
+      preferredContentMode: isYtm
+          ? UserPreferredContentMode.DESKTOP
+          : UserPreferredContentMode.RECOMMENDED,
       useHybridComposition: true,
       javaScriptEnabled: true,
       javaScriptCanOpenWindowsAutomatically: true,
@@ -203,6 +405,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       allowContentAccess: true,
       useWideViewPort: true,
       loadWithOverviewMode: true,
+      supportZoom: true,
+      builtInZoomControls: true,
+      displayZoomControls: false,
       allowsInlineMediaPlayback: true,
       useShouldOverrideUrlLoading: true,
       // Empty set suppresses the X-Requested-With header that Android WebView
@@ -539,20 +744,28 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   }
 
   Future<void> _navigateTo(String url) async {
+    final effectiveUrl = _withGeoParams(url);
     _pollIntervalSeconds = 2;
     _scheduleNextAuthPoll();
+    final isYtm =
+        widget.isBrowseMode || effectiveUrl.contains('music.youtube.com');
     final targetUa = _uaIdentityOverride != null
         ? _uaFor(_uaIdentityOverride!)
-        : (widget.isBrowseMode ? desktopUserAgent : mobileUserAgent);
+        : (isYtm ? desktopUserAgent : mobileUserAgent);
     try {
       await _webViewController?.setSettings(
-        settings: InAppWebViewSettings(userAgent: targetUa),
+        settings: InAppWebViewSettings(
+          userAgent: targetUa,
+          preferredContentMode: isYtm
+              ? UserPreferredContentMode.DESKTOP
+              : UserPreferredContentMode.RECOMMENDED,
+        ),
       );
     } catch (e, st) {
       ErrorLogger.log('_navigateTo failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
     }
     final loadUrlFuture = _webViewController?.loadUrl(
-        urlRequest: URLRequest(url: WebUri(url)));
+        urlRequest: URLRequest(url: WebUri(effectiveUrl)));
     if (loadUrlFuture != null) unawaited(loadUrlFuture);
   }
 
@@ -914,21 +1127,21 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                 _navChip(
                                   label: 'Home',
                                   icon: Icons.home_rounded,
-                                  url: 'https://music.youtube.com',
+                                  url: 'https://music.youtube.com/?gl=EG&hl=en',
                                   p: p,
                                 ),
                                 const SizedBox(width: 6),
                                 _navChip(
-                                  label: 'Explore / Charts',
+                                  label: 'Explore',
                                   icon: Icons.explore_rounded,
-                                  url: 'https://music.youtube.com/explore',
+                                  url: 'https://music.youtube.com/explore?gl=EG&hl=en',
                                   p: p,
                                 ),
                                 const SizedBox(width: 6),
                                 _navChip(
                                   label: 'Library',
                                   icon: Icons.library_music_rounded,
-                                  url: 'https://music.youtube.com/library',
+                                  url: 'https://music.youtube.com/library?gl=EG&hl=en',
                                   p: p,
                                 ),
                                 const SizedBox(width: 6),
@@ -936,21 +1149,35 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                   label: 'Liked Music',
                                   icon: Icons.favorite_rounded,
                                   url:
-                                      'https://music.youtube.com/playlist?list=LM',
+                                      'https://music.youtube.com/playlist?list=LM&gl=EG&hl=en',
                                   p: p,
                                 ),
                                 const SizedBox(width: 6),
                                 _navChip(
                                   label: 'New Releases',
                                   icon: Icons.fiber_new_rounded,
-                                  url: 'https://music.youtube.com/new_releases',
+                                  url: 'https://music.youtube.com/new_releases?gl=EG&hl=en',
                                   p: p,
                                 ),
                                 const SizedBox(width: 6),
                                 _navChip(
                                   label: 'History',
                                   icon: Icons.history_rounded,
-                                  url: 'https://music.youtube.com/history',
+                                  url: 'https://music.youtube.com/history?gl=EG&hl=en',
+                                  p: p,
+                                ),
+                                const SizedBox(width: 6),
+                                _navChip(
+                                  label: 'YouTube Web',
+                                  icon: Icons.video_library_rounded,
+                                  url: 'https://www.youtube.com',
+                                  p: p,
+                                ),
+                                const SizedBox(width: 6),
+                                _navChip(
+                                  label: 'Egypt Mode',
+                                  icon: Icons.public_rounded,
+                                  url: 'https://music.youtube.com/?gl=EG&hl=en',
                                   p: p,
                                 ),
                               ],
@@ -1241,6 +1468,87 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                       ),
                     ),
 
+                  // Geo-block alert banner with one-tap bypass & YouTube fallback
+                  if (_isGeoBlocked)
+                    Container(
+                      margin: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 4),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Colors.amber.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: Colors.amber.withValues(alpha: 0.4)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.public_off_rounded,
+                                  color: Colors.amber, size: 17),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'YouTube Music is restricted in your region',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: p.textPrimary,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Your network IP is outside YouTube Music Web support. Force Egypt mode or switch to YouTube Web (never geo-blocked).',
+                            style: TextStyle(
+                                fontSize: 11, color: p.textSecondary),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              FilledButton.icon(
+                                onPressed: _forceEgRegionReload,
+                                icon: const Text('🇪🇬',
+                                    style: TextStyle(fontSize: 12)),
+                                label: const Text('Force Egypt Mode',
+                                    style: TextStyle(fontSize: 11)),
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: p.accent,
+                                  foregroundColor: p.onAccent,
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              OutlinedButton.icon(
+                                onPressed: () =>
+                                    _navigateTo('https://www.youtube.com'),
+                                icon: const Icon(Icons.video_library_rounded,
+                                    size: 13),
+                                label: const Text('Open YouTube Web',
+                                    style: TextStyle(fontSize: 11)),
+                                style: OutlinedButton.styleFrom(
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 10, vertical: 4),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+
                   if (_isLoading || _progressNotifier.value < 1.0)
                     ValueListenableBuilder<double>(
                       valueListenable: _progressNotifier,
@@ -1282,10 +1590,10 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                         onCreateWindow: (controller, createWindowAction) async {
                           final url = createWindowAction.request.url;
                           if (url != null) {
-                            final urlStr = url.toString();
+                            final urlStr = url.toString().toLowerCase();
                             if (urlStr.startsWith('market://') ||
                                 urlStr.startsWith('intent://') ||
-                                urlStr.contains('play.google.com/store/apps/details')) {
+                                urlStr.contains('play.google.com')) {
                               return false;
                             }
                             await controller.loadUrl(
@@ -1298,14 +1606,15 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                           final uri = navigationAction.request.url;
                           if (uri == null) return NavigationActionPolicy.ALLOW;
                           final urlStr = uri.toString();
+                          final urlLower = urlStr.toLowerCase();
 
                           // Prevent Google Play Store / market / intent deep links from opening
-                          if (urlStr.startsWith('market://') ||
-                              urlStr.startsWith('intent://') ||
-                              urlStr.contains('play.google.com/store/apps/details') ||
-                              (urlStr.contains('google.com/url') &&
-                                  urlStr.contains('play.google.com'))) {
-                            if (!widget.isBrowseMode) {
+                          if (urlLower.startsWith('market://') ||
+                              urlLower.startsWith('intent://') ||
+                              urlLower.contains('play.google.com') ||
+                              (urlLower.contains('google.com/url') &&
+                                  urlLower.contains('play.google.com'))) {
+                            if (!widget.isBrowseMode && !urlLower.contains('music')) {
                               unawaited(_navigateTo(googleSignInUrl));
                             } else {
                               unawaited(_navigateTo('https://music.youtube.com'));
@@ -1322,13 +1631,36 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                         },
                         onLoadStart: (controller, url) async {
                           if (mounted) setState(() => _isLoading = true);
+                          final urlStr = url?.toString() ?? '';
+                          final urlLower = urlStr.toLowerCase();
+
+                          // Fail-safe: if WebView started navigating to Google Play, stop and bounce to YTM
+                          if (urlLower.contains('play.google.com') ||
+                              urlLower.startsWith('market://') ||
+                              urlLower.startsWith('intent://')) {
+                            debugPrint(
+                                '[YtmWebLogin] onLoadStart caught Google Play link, returning to music.youtube.com');
+                            unawaited(controller.stopLoading());
+                            final fallback = widget.isBrowseMode
+                                ? 'https://music.youtube.com'
+                                : googleSignInUrl;
+                            unawaited(_navigateTo(fallback));
+                            return;
+                          }
+
+                          final isYtm = widget.isBrowseMode ||
+                              urlLower.contains('music.youtube.com');
                           final targetUa = _uaIdentityOverride != null
                               ? _uaFor(_uaIdentityOverride!)
-                              : (widget.isBrowseMode ? desktopUserAgent : mobileUserAgent);
+                              : (isYtm ? desktopUserAgent : mobileUserAgent);
                           try {
                             await controller.setSettings(
-                              settings:
-                                  InAppWebViewSettings(userAgent: targetUa),
+                              settings: InAppWebViewSettings(
+                                userAgent: targetUa,
+                                preferredContentMode: isYtm
+                                    ? UserPreferredContentMode.DESKTOP
+                                    : UserPreferredContentMode.RECOMMENDED,
+                              ),
                             );
                           } catch (e, st) {
                             ErrorLogger.log('startsWith failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
@@ -1343,8 +1675,34 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                           if (mounted) setState(() => _isLoading = false);
                           await _updateNavState();
                           final urlStr = url?.toString() ?? '';
+                          final urlLower = urlStr.toLowerCase();
+
+                          // Fail-safe: if loaded page landed on Google Play, bounce back to YouTube Music
+                          if (urlLower.contains('play.google.com')) {
+                            debugPrint(
+                                '[YtmWebLogin] onLoadStop landed on play.google.com, bouncing to music.youtube.com');
+                            final fallback = widget.isBrowseMode
+                                ? 'https://music.youtube.com'
+                                : googleSignInUrl;
+                            unawaited(_navigateTo(fallback));
+                            return;
+                          }
+
                           final parsedUrl = Uri.tryParse(urlStr);
                           final host = parsedUrl?.host ?? '';
+
+                          // Check for Geo-block ("not available in your area" / "not available in your country")
+                          if (urlLower.contains('music.youtube.com')) {
+                            final isGeoBlocked =
+                                await _scanPageForGeoBlock(controller);
+                            if (mounted && _isGeoBlocked != isGeoBlocked) {
+                              setState(() => _isGeoBlocked = isGeoBlocked);
+                            }
+                          } else {
+                            if (mounted && _isGeoBlocked) {
+                              setState(() => _isGeoBlocked = false);
+                            }
+                          }
 
                           // --- Google block detection ("This browser or app
                           // may not be secure") ---

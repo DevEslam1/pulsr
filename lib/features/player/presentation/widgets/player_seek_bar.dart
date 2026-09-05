@@ -130,13 +130,17 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
       final double progressPercent = maxDuration > 0
           ? (effectiveValue / maxDuration).clamp(0.0, 1.0)
           : 0.0;
+      final isDragging = _dragValue != null;
+      final trackHeight = isDragging ? 7.0 : 4.5;
+      final thumbSize = isDragging ? 16.0 : 13.0;
 
       return Directionality(
         textDirection: TextDirection.ltr,
         child: RepaintBoundary(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 // Custom Gesture-driven scrubber track
                 LayoutBuilder(
@@ -184,41 +188,42 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                         }
                       },
                       child: SizedBox(
-                        height: 28,
+                        height: 32,
                         child: Stack(
                           alignment: Alignment.centerLeft,
                           children: [
                             // Inactive Track
-                            Container(
-                              height: 5,
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 150),
+                              height: trackHeight,
                               decoration: BoxDecoration(
                                 color: Theme.of(context).brightness ==
                                         Brightness.dark
-                                    ? Colors.white.withValues(alpha: 0.18)
+                                    ? Colors.white.withValues(alpha: 0.14)
                                     : context.palette.hairline
-                                        .withValues(alpha: 0.9),
-                                borderRadius: BorderRadius.circular(4),
+                                        .withValues(alpha: 0.8),
+                                borderRadius: BorderRadius.circular(trackHeight),
                               ),
                             ),
                             // Active Progress Track
                             FractionallySizedBox(
                               widthFactor: progressPercent,
-                              child: Container(
-                                height: 5,
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                height: trackHeight,
                                 decoration: BoxDecoration(
                                   gradient: LinearGradient(
                                     colors: [
-                                      widget.activeColor
-                                          .withValues(alpha: 0.8),
+                                      widget.activeColor.withValues(alpha: 0.85),
                                       widget.activeColor,
                                     ],
                                   ),
-                                  borderRadius: BorderRadius.circular(4),
+                                  borderRadius: BorderRadius.circular(trackHeight),
                                   boxShadow: [
                                     BoxShadow(
                                       color: widget.activeColor
-                                          .withValues(alpha: 0.4),
-                                      blurRadius: 8,
+                                          .withValues(alpha: isDragging ? 0.65 : 0.35),
+                                      blurRadius: isDragging ? 12 : 8,
                                       offset: const Offset(0, 1),
                                     ),
                                   ],
@@ -227,22 +232,32 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                             ),
                             // Scrubber Thumb
                             Positioned(
-                              left: (progressPercent * trackWidth - 7).clamp(
+                              left: (progressPercent * trackWidth - (thumbSize / 2)).clamp(
                                   0.0,
-                                  (trackWidth - 14).clamp(0.0, trackWidth)),
-                              child: Container(
-                                width: 14,
-                                height: 14,
+                                  (trackWidth - thumbSize).clamp(0.0, trackWidth)),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 120),
+                                width: thumbSize,
+                                height: thumbSize,
                                 decoration: BoxDecoration(
                                   color: Colors.white,
                                   shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: widget.activeColor.withValues(alpha: 0.35),
+                                    width: isDragging ? 2.5 : 1.5,
+                                  ),
                                   boxShadow: [
                                     BoxShadow(
-                                      color:
-                                          Colors.black.withValues(alpha: 0.4),
+                                      color: Colors.black.withValues(alpha: 0.35),
                                       blurRadius: 6,
                                       offset: const Offset(0, 2),
                                     ),
+                                    if (isDragging)
+                                      BoxShadow(
+                                        color: widget.activeColor.withValues(alpha: 0.5),
+                                        blurRadius: 10,
+                                        spreadRadius: 1,
+                                      ),
                                   ],
                                 ),
                               ),
@@ -268,6 +283,8 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                         color: context.palette.textSecondary,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                        letterSpacing: 0.3,
                       ),
                     ),
                     Text(
@@ -276,6 +293,8 @@ class _PlayerSeekBarState extends State<PlayerSeekBar> {
                         color: context.palette.textSecondary,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                        letterSpacing: 0.3,
                       ),
                     ),
                   ],

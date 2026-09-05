@@ -2419,7 +2419,16 @@ class SettingsScreen extends StatelessWidget {
                         title: 'Home Page',
                         subtitle:
                             'Personalized recommendations, mixes & quick picks',
-                        url: 'https://music.youtube.com',
+                        url: 'https://music.youtube.com/?gl=EG&hl=en',
+                        p: p,
+                      ),
+                      _ytmWebOptionTile(
+                        ctx,
+                        icon: Icons.video_library_rounded,
+                        title: 'YouTube Web',
+                        subtitle:
+                            'Browse all music videos & playlists (no geo-restrictions)',
+                        url: 'https://www.youtube.com',
                         p: p,
                       ),
                       _ytmWebOptionTile(
@@ -2428,7 +2437,7 @@ class SettingsScreen extends StatelessWidget {
                         title: 'Explore & Charts',
                         subtitle:
                             'Trending songs, top global charts & music videos',
-                        url: 'https://music.youtube.com/explore',
+                        url: 'https://music.youtube.com/explore?gl=EG&hl=en',
                         p: p,
                       ),
                       _ytmWebOptionTile(
@@ -2437,7 +2446,7 @@ class SettingsScreen extends StatelessWidget {
                         title: 'Your Library',
                         subtitle:
                             'Saved playlists, albums, songs & subscribed artists',
-                        url: 'https://music.youtube.com/library',
+                        url: 'https://music.youtube.com/library?gl=EG&hl=en',
                         p: p,
                       ),
                       _ytmWebOptionTile(
@@ -2446,7 +2455,7 @@ class SettingsScreen extends StatelessWidget {
                         title: 'Liked Music',
                         subtitle:
                             'Thumbed-up songs synced with your Google account',
-                        url: 'https://music.youtube.com/playlist?list=LM',
+                        url: 'https://music.youtube.com/playlist?list=LM&gl=EG&hl=en',
                         p: p,
                       ),
                       _ytmWebOptionTile(
@@ -2455,7 +2464,7 @@ class SettingsScreen extends StatelessWidget {
                         title: 'New Releases',
                         subtitle:
                             'Latest album drops, EPs and trending single releases',
-                        url: 'https://music.youtube.com/new_releases',
+                        url: 'https://music.youtube.com/new_releases?gl=EG&hl=en',
                         p: p,
                       ),
                       _ytmWebOptionTile(
@@ -2464,7 +2473,7 @@ class SettingsScreen extends StatelessWidget {
                         title: 'Listening History',
                         subtitle:
                             'Recently played tracks and stations on your account',
-                        url: 'https://music.youtube.com/history',
+                        url: 'https://music.youtube.com/history?gl=EG&hl=en',
                         p: p,
                       ),
                     ],

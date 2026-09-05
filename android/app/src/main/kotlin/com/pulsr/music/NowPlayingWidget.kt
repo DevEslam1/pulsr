@@ -596,18 +596,22 @@ class NowPlayingWidget : AppWidgetProvider() {
                                     BitmapFactory.decodeFile(artworkPath, boundsOptions)
                                     var sampleSize = 1
                                     while ((boundsOptions.outWidth / sampleSize) > targetPx * 2 || (boundsOptions.outHeight / sampleSize) > targetPx * 2) sampleSize *= 2
-                                    val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize; inPreferredConfig = Bitmap.Config.RGB_565 }
+                                    val decodeOptions = BitmapFactory.Options().apply { inSampleSize = sampleSize; inPreferredConfig = Bitmap.Config.ARGB_8888 }
                                     val rawBitmap = BitmapFactory.decodeFile(artworkPath, decodeOptions) ?: return@execute
                                     if (rawBitmap.isRecycled) return@execute
-                                    val scaledBitmap = if (rawBitmap.width > targetPx || rawBitmap.height > targetPx) Bitmap.createScaledBitmap(rawBitmap, targetPx, targetPx, true) else rawBitmap
+                                    val scaledBitmap = if (rawBitmap.width > targetPx || rawBitmap.height > targetPx) {
+                                        val sb = Bitmap.createScaledBitmap(rawBitmap, targetPx, targetPx, true)
+                                        if (sb !== rawBitmap) rawBitmap.recycle()
+                                        sb
+                                    } else rawBitmap
                                     val cornerRadiusPx = (if (targetArtDp >= 90) 18f else 14f) * density
                                     val roundedBitmap = getRoundedCornerBitmap(scaledBitmap, cornerRadiusPx)
+                                    if (roundedBitmap !== scaledBitmap) scaledBitmap.recycle()
                                     if (roundedBitmap.isRecycled) return@execute
                                     cachedArtworkBitmap = roundedBitmap
                                     cachedArtworkPath = artworkPath
                                     cachedArtworkMtime = mtime
                                     cachedArtworkTargetPx = targetPx
-                                    // Refresh all widgets with now-cached bitmap
                                     Handler(Looper.getMainLooper()).post {
                                         try {
                                             val mgr = AppWidgetManager.getInstance(appCtx)
@@ -634,18 +638,21 @@ class NowPlayingWidget : AppWidgetProvider() {
 
                             val decodeOptions = BitmapFactory.Options().apply {
                                 inSampleSize = sampleSize
-                                inPreferredConfig = Bitmap.Config.RGB_565
+                                inPreferredConfig = Bitmap.Config.ARGB_8888
                             }
 
                             val rawBitmap = BitmapFactory.decodeFile(artworkPath, decodeOptions)
                             if (rawBitmap != null && !rawBitmap.isRecycled) {
                                 val scaledBitmap = if (rawBitmap.width > targetPx || rawBitmap.height > targetPx) {
-                                    Bitmap.createScaledBitmap(rawBitmap, targetPx, targetPx, true)
+                                    val sb = Bitmap.createScaledBitmap(rawBitmap, targetPx, targetPx, true)
+                                    if (sb !== rawBitmap) rawBitmap.recycle()
+                                    sb
                                 } else {
                                     rawBitmap
                                 }
                                 val cornerRadiusPx = (if (targetArtDp >= 90) 18f else 14f) * density
                                 val roundedBitmap = getRoundedCornerBitmap(scaledBitmap, cornerRadiusPx)
+                                if (roundedBitmap !== scaledBitmap) scaledBitmap.recycle()
 
                                 if (!roundedBitmap.isRecycled) {
                                     cachedArtworkBitmap = roundedBitmap

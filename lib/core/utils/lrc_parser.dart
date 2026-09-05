@@ -230,16 +230,19 @@ class LrcParser {
     }
 
     // Cache the result (including null to avoid repeated failing lookups, with TTL)
-    if (_lyricsCache.length >= _maxCacheSize) {
-      final evictedKey = _lyricsCache.keys.first;
-      _lyricsCache.remove(evictedKey);
-      _negativeCacheTimes.remove(evictedKey);
-    }
-    _lyricsCache[cacheKey] = resolved;
-    if (resolved == null) {
-      _negativeCacheTimes[cacheKey] = DateTime.now();
-    } else {
-      _negativeCacheTimes.remove(cacheKey);
+    // Only cache negative null if online resolution was attempted (trackTitle != null)
+    if (resolved != null || (trackTitle != null && trackTitle.isNotEmpty)) {
+      if (_lyricsCache.length >= _maxCacheSize) {
+        final evictedKey = _lyricsCache.keys.first;
+        _lyricsCache.remove(evictedKey);
+        _negativeCacheTimes.remove(evictedKey);
+      }
+      _lyricsCache[cacheKey] = resolved;
+      if (resolved == null) {
+        _negativeCacheTimes[cacheKey] = DateTime.now();
+      } else {
+        _negativeCacheTimes.remove(cacheKey);
+      }
     }
 
     return resolved;

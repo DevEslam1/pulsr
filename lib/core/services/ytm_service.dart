@@ -350,7 +350,7 @@ class YtmService {
             'clientName': 'WEB_REMIX',
             'clientVersion': clientVersion,
             'hl': 'en',
-            'gl': 'US',
+            'gl': 'EG',
           },
         },
         'query': query,
@@ -592,34 +592,49 @@ class YtmService {
       if (!inBotCooldown && getIt.isRegistered<YtmAccountService>()) {
         final account = getIt<YtmAccountService>();
         if (account.isLoggedIn) {
-          try {
-            _tracker?.markStage(PlaybackStage.clientRequestSent);
-            _tracker?.markStage(PlaybackStage.poTokenNeeded);
-          } catch (_) {}
-          final directStream =
-              await account.resolvePlayerStream(videoId, quality: quality);
-          if (directStream != null) {
+          // Guard: skip Tier-1 if dataSyncId is not yet available. Without a
+          // valid dataSyncId we cannot mint an account-bound poToken, so the
+          // chain would use a guest token paired with auth cookies — a mismatch
+          // YouTube rejects with LOGIN_REQUIRED / UNPLAYABLE on every client.
+          // Tier-2 (native extractor) handles unauthenticated resolution cleanly.
+          if (account.dataSyncId == null || account.dataSyncId!.isEmpty) {
+            debugPrint('[YTM_SERVICE] Skipping Tier-1 for $videoId: dataSyncId '
+                'not yet ready (session warming in progress). Tier-2 will handle.');
+          } else {
             try {
-              _tracker?.markStage(PlaybackStage.urlObtained);
+              _tracker?.markStage(PlaybackStage.clientRequestSent);
+              _tracker?.markStage(PlaybackStage.poTokenNeeded);
             } catch (_) {}
-            urlCache?.put(
-              videoId,
-              directStream.url,
-              quality: quality,
-              userAgent: directStream.userAgent,
-              cookies: directStream.cookies,
-            );
-            return directStream;
+            final directStream =
+                await account.resolvePlayerStream(videoId, quality: quality);
+            if (directStream != null) {
+              try {
+                _tracker?.markStage(PlaybackStage.urlObtained);
+              } catch (_) {}
+              urlCache?.put(
+                videoId,
+                directStream.url,
+                quality: quality,
+                userAgent: directStream.userAgent,
+                cookies: directStream.cookies,
+              );
+              return directStream;
+            }
           }
         }
       }
     } catch (e) {
-      // A definitive session-expired verdict must surface to callers/UI,
-      // never silently downgrade to guest playback.
-      // (Tier-1 account misses are routine fallback, not the final error, so
-      // they are deliberately NOT recorded in firstError.)
-      if (e is YtmException && e.isAuth) rethrow;
-      debugPrint('[YTM_SERVICE] Direct account stream resolution fallback: $e');
+      // Never abort the whole chain on a Tier-1 auth failure: an expired or
+      // mismatched (guest-poToken + auth-cookies) WEB_REMIX request must fall
+      // back to guest native/remote playback, otherwise login breaks public
+      // streams that work logged-out. Auth is only surfaced if every tier fails
+      // (see final rethrow below).
+      if (e is YtmException && e.isAuth) {
+        debugPrint('[YTM_SERVICE] Direct account stream auth failure, falling back to guest engines: $e');
+        firstError ??= e;
+      } else {
+        debugPrint('[YTM_SERVICE] Direct account stream resolution fallback: $e');
+      }
       // If the account tier hit an IP-level block, activate cooldown so the
       // native tier doesn't burn through 9 more clients for the same result.
       if (!inBotCooldown && e is YtmException && (e.isBotBlocked || e.isNetwork)) {
@@ -659,7 +674,9 @@ class YtmService {
       }
     } catch (e) {
       debugPrint('[YTM_SERVICE] Native stream resolution failed: $e');
-      if (e is YtmException && e.isAuth) rethrow;
+      // Same guest-fallback rule as Tier-1: a native LOGIN_REQUIRED (often
+      // caused by stale synced cookies) must still try the remote backend
+      // before surfacing auth to the UI.
       firstError ??= e;
       // The cooldown short-circuit itself must not extend the window, or a
       // retry loop would hold it open forever (fixed window from first hit).

@@ -325,6 +325,7 @@ class EmbeddedBrowserUa {
 
     def(navigator, 'vendor', 'Google Inc.');
     def(navigator, 'platform', isMobile ? 'Linux armv8l' : 'Win32');
+    def(navigator, 'maxTouchPoints', isMobile ? 5 : 0);
 
     // Ensure window.chrome stub is present for Chrome
     if (!window.chrome || typeof window.chrome.runtime === 'undefined') {
@@ -416,6 +417,41 @@ class EmbeddedBrowserUa {
       configurable: true,
       enumerable: true,
     });
+  } catch (e) {}
+
+  // ── 5.1 Geo & Timezone normalization (Egypt Region) ────────────────────────
+  try {
+    if (typeof Intl !== 'undefined' && Intl.DateTimeFormat && Intl.DateTimeFormat.prototype.resolvedOptions) {
+      var origResolved = Intl.DateTimeFormat.prototype.resolvedOptions;
+      Intl.DateTimeFormat.prototype.resolvedOptions = function () {
+        var res = origResolved.apply(this, arguments);
+        res.timeZone = 'Africa/Cairo';
+        return res;
+      };
+    }
+  } catch (e) {}
+  try {
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      var fakePos = {
+        coords: {
+          latitude: 30.0444,
+          longitude: 31.2357,
+          accuracy: 10,
+          altitude: null,
+          altitudeAccuracy: null,
+          heading: null,
+          speed: null
+        },
+        timestamp: Date.now()
+      };
+      navigator.geolocation.getCurrentPosition = function (success) {
+        if (success) success(fakePos);
+      };
+      navigator.geolocation.watchPosition = function (success) {
+        if (success) success(fakePos);
+        return 1;
+      };
+    }
   } catch (e) {}
 
   // ── 6. Mask emulator / headless WebGL renderer ────────────────────────────

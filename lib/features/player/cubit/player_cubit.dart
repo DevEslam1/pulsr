@@ -424,14 +424,29 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     );
   }
 
+  bool _isSameTrack(SongsTableData? a, SongsTableData? b) {
+    if (identical(a, b)) return true;
+    if (a == null || b == null) return false;
+    if (a.id == b.id) return true;
+    if (a.remoteId != null &&
+        b.remoteId != null &&
+        a.remoteId!.isNotEmpty &&
+        a.remoteId == b.remoteId) {
+      return true;
+    }
+    if (a.path.isNotEmpty && a.path == b.path) return true;
+    return false;
+  }
+
   void _listenToAudioService() {
     autoSub(_audioHandler.onTrackChanged, (song) {
       if (isClosed) return;
       final gen = ++_mediaItemResolutionGen;
-      final songQueueIndex = state.queue.indexWhere((s) => s.id == song.id);
+      final songQueueIndex =
+          state.queue.indexWhere((s) => _isSameTrack(s, song));
       final effectiveIndex =
           songQueueIndex != -1 ? songQueueIndex : state.currentIndex;
-      final isSameSong = state.currentSong?.id == song.id;
+      final isSameSong = _isSameTrack(state.currentSong, song);
 
       final duration = song.durationMs > 0
           ? Duration(milliseconds: song.durationMs)
@@ -500,9 +515,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
                     : (resolvedSong!.durationMs > 0
                         ? Duration(milliseconds: resolvedSong!.durationMs)
                         : state.duration);
-            final isSameSong = state.currentSong?.id == resolvedSong!.id;
-            final songQueueIndex =
-                state.queue.indexWhere((s) => s.id == resolvedSong!.id);
+            final isSameSong = _isSameTrack(state.currentSong, resolvedSong);
+            final songQueueIndex = state.queue
+                .indexWhere((s) => _isSameTrack(s, resolvedSong));
             final effectiveIndex =
                 songQueueIndex != -1 ? songQueueIndex : state.currentIndex;
 
@@ -604,6 +619,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
         } catch (_) {}
       }
       final effectivePos = isCompleted ? Duration.zero : playbackState.position;
+      final wasPlaying = state.isPlaying;
 
       safeEmit(
         state.copyWith(
@@ -615,7 +631,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
           playbackSpeed: playbackState.speed,
         ),
       );
-      if (isPlaying != state.isPlaying || repeat != state.repeatMode) {
+      if (isPlaying != wasPlaying || repeat != state.repeatMode) {
         _updateWidgetThrottled(force: true);
       } else {
         _updateWidgetProgressThrottled();
@@ -669,7 +685,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       if (updated != null &&
           !isClosed &&
           gen == _mediaItemResolutionGen &&
-          state.currentSong?.id == updated.id) {
+          _isSameTrack(state.currentSong, updated)) {
         safeEmit(state.copyWith(currentSong: updated));
       }
     } catch (_) {}
@@ -696,12 +712,15 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       if (song.source == SongSource.local &&
           !song.path.startsWith('http') &&
           !song.path.startsWith('ytmusic://')) {
-        lyricsResult = await LrcParser.resolveLyrics(song.path, songId: song.id);
+        lyricsResult = await LrcParser.resolveLyrics(
+          song.path,
+          songId: song.id,
+        );
       }
 
       if (isClosed ||
           gen != _lyricsLoadGen ||
-          state.currentSong?.id != song.id) {
+          !_isSameTrack(state.currentSong, song)) {
         return;
       }
 
@@ -713,14 +732,18 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
             trackName: song.title,
             artistName: song.artist,
             albumName: song.album,
-            durationSeconds: song.durationMs > 0 ? song.durationMs ~/ 1000 : null,
+            durationSeconds:
+                song.durationMs > 0 ? song.durationMs ~/ 1000 : null,
           );
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('LRCLIB fetch error for ${song.title}',
+              error: e, stackTrace: st, category: 'Lyrics');
+        }
       }
 
       if (isClosed ||
           gen != _lyricsLoadGen ||
-          state.currentSong?.id != song.id) {
+          !_isSameTrack(state.currentSong, song)) {
         return;
       }
 
@@ -732,20 +755,36 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
         try {
           final ytmAccount = getIt<YtmAccountService>();
           lyricsResult = await ytmAccount.fetchYtmLyrics(videoId);
-        } catch (_) {}
+        } catch (e, st) {
+          ErrorLogger.log('YTM lyrics fetch error for $videoId',
+              error: e, stackTrace: st, category: 'Lyrics');
+        }
       }
-    } catch (_) {}
-
-    if (isClosed ||
-        gen != _lyricsLoadGen ||
-        state.currentSong?.id != song.id) {
-      return;
+    } catch (e, st) {
+      ErrorLogger.log('Lyrics load error for ${song.title}',
+          error: e, stackTrace: st, category: 'Lyrics');
+    } finally {
+      if (!isClosed && gen == _lyricsLoadGen) {
+        if (_isSameTrack(state.currentSong, song)) {
+          safeEmit(state.copyWith(
+            isLoadingLyrics: false,
+            lyrics: lyricsResult?.lines ?? [],
+            lyricsSource: lyricsResult?.source ?? LyricsSource.none,
+          ));
+        } else {
+          safeEmit(state.copyWith(
+            isLoadingLyrics: false,
+          ));
+        }
+      }
     }
-    safeEmit(state.copyWith(
-      isLoadingLyrics: false,
-      lyrics: lyricsResult?.lines ?? [],
-      lyricsSource: lyricsResult?.source ?? LyricsSource.none,
-    ));
+  }
+
+  Future<void> refreshLyrics() async {
+    final song = state.currentSong;
+    if (song != null) {
+      await _loadLyricsForSong(song);
+    }
   }
 
   Future<void> playSong(SongsTableData song,

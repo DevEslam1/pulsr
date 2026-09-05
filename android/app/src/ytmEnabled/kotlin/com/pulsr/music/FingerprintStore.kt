@@ -28,18 +28,18 @@ internal object FingerprintStore {
         val osVersion: String,
         val sdkInt: Int,
         val hl: String = "en",
-        val gl: String = "US"
+        val gl: String = "EG"
     ) {
         fun buildUserAgent(clientType: InnertubeClient.ClientType): String {
             return when (clientType) {
                 InnertubeClient.ClientType.ANDROID_MUSIC ->
                     "com.google.android.apps.youtube.music/8.32.50 (Linux; U; Android $osVersion; ${hl}_${gl}; $deviceModel) gzip"
                 InnertubeClient.ClientType.ANDROID_VR ->
-                    "com.google.android.apps.youtube.vr.oculus/1.63.27 (Linux; U; Android 12; en_US; Quest 2) gzip"
+                    "com.google.android.apps.youtube.vr.oculus/1.63.27 (Linux; U; Android 12; ${hl}_${gl}; Quest 2) gzip"
                 InnertubeClient.ClientType.ANDROID_CREATOR ->
-                    "com.google.android.apps.youtube.creator/24.45.100 (Linux; U; Android 13; en_US) gzip"
+                    "com.google.android.apps.youtube.creator/24.45.100 (Linux; U; Android 13; ${hl}_${gl}) gzip"
                 InnertubeClient.ClientType.IOS_MUSIC ->
-                    "com.google.ios.youtubemusic/8.32.1 (iPhone15,3; U; CPU iOS 18_0 like Mac OS X; en_US)"
+                    "com.google.ios.youtubemusic/8.32.1 (iPhone15,3; U; CPU iOS 18_0 like Mac OS X; ${hl}_${gl})"
                 InnertubeClient.ClientType.TVHTML5_SIMPLY_EMBEDDED_PLAYER ->
                     "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/4.0 Chrome/76.0.3809.146 TV Safari/537.36"
                 InnertubeClient.ClientType.MWEB ->
@@ -78,7 +78,7 @@ internal object FingerprintStore {
                     .putString(KEY_OS_VERSION, osVer)
                     .putInt(KEY_SDK_INT, sdk)
                     .putString(KEY_HL, "en")
-                    .putString(KEY_GL, "US")
+                    .putString(KEY_GL, "EG")
                     .apply()
 
                 val fp = DeviceFingerprint(
@@ -88,11 +88,16 @@ internal object FingerprintStore {
                     osVersion = osVer,
                     sdkInt = sdk,
                     hl = "en",
-                    gl = "US"
+                    gl = "EG"
                 )
                 cachedFingerprint = fp
                 return fp
             } else {
+                var storedGl = prefs.getString(KEY_GL, "EG") ?: "EG"
+                if (storedGl == "US") {
+                    storedGl = "EG"
+                    prefs.edit().putString(KEY_GL, "EG").apply()
+                }
                 val fp = DeviceFingerprint(
                     installUuid = uuid,
                     deviceMake = prefs.getString(KEY_DEVICE_MAKE, "Google") ?: "Google",
@@ -100,7 +105,7 @@ internal object FingerprintStore {
                     osVersion = prefs.getString(KEY_OS_VERSION, "14") ?: "14",
                     sdkInt = prefs.getInt(KEY_SDK_INT, 34),
                     hl = prefs.getString(KEY_HL, "en") ?: "en",
-                    gl = prefs.getString(KEY_GL, "US") ?: "US"
+                    gl = storedGl
                 )
                 cachedFingerprint = fp
                 return fp

@@ -1072,6 +1072,22 @@ class PulsrAudioHandler extends BaseAudioHandler
             error: e, stackTrace: st, category: 'AudioHandler');
       });
     }
+    // CRITICAL GUARD: If the error occurred on a pre-fetched background track or queued item
+    // while another song is actively playing, NEVER pause playback or skip!
+    // Pausing here causes the active playing song to stop automatically because a future
+    // track in the playlist failed to preload.
+    final activeSong = currentSong;
+    final isCurrentTrack = activeSong != null &&
+        (activeSong.id == song.id ||
+            (song.remoteId != null &&
+                song.remoteId!.isNotEmpty &&
+                activeSong.remoteId == song.remoteId));
+
+    if (!isCurrentTrack && _activePlayer.playing) {
+      debugPrint(
+          '[AudioHandler] Background pre-fetch failed for "${song.title}", keeping active playback alive.');
+      return;
+    }
 
     if (info.recoveryAction == YtmRecoveryAction.skipToNextTrack) {
       debugPrint('[AudioHandler] Track blocked/unavailable. Skipping to next.');
@@ -1336,6 +1352,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// Matching fade-in after a switch: starting at 0 and ramping to the
   /// ReplayGain target avoids the cold-start click. Skipped while ducked
   /// (navigation/call) so the ramp never fights the duck level.
+  // ignore: unused_element
   void _fadeInAfterSwitch(AudioPlayer player, double targetVolume) {
     if (_duckActive) return;
     unawaited(_crossfadeManager.fadeVolume(

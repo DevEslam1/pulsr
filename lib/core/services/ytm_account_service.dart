@@ -126,6 +126,9 @@ class YtmAccountService {
   String? get cookies => _cookies;
   String? get accountName => _accountName;
   String? get accountAvatar => _accountAvatar;
+  /// Raw datasyncId of the authenticated account — null until the first authenticated
+  /// Innertube response is harvested. Used externally to gate account-bound poToken minting.
+  String? get dataSyncId => _dataSyncId;
 
   String get _clientVersion => _versionResolver.clientVersion;
   String get _apiKey => _versionResolver.apiKey;
@@ -269,10 +272,33 @@ class YtmAccountService {
 
     loginState.value = true;
 
-    // Warm session in background & harvest any Set-Cookie headers
-    unawaited(_warmSession().catchError((e) {
-      debugPrint('[YTM_ACCOUNT] Session warming failed (non-fatal): $e');
-    }));
+    // Eagerly bootstrap session state in the background so dataSyncId is ready
+    // before the first playSong call. Without this, the first playback attempt
+    // fires before _warmSession finishes, _dataSyncId is null, and the code
+    // falls back to a guest poToken + auth cookies — a combination YouTube
+    // rejects for every client in the chain (the LOGIN_REQUIRED / UNPLAYABLE
+    // cascade seen after login). Awaiting _warmSession here (still unawaited
+    // from the caller's perspective via the outer unawaited) lets us chain a
+    // _bootstrapDataSyncId call so the ID is populated in a single background
+    // trip rather than waiting until the first resolvePlayerStream call.
+    unawaited(() async {
+      try {
+        await _warmSession();
+      } catch (e) {
+        debugPrint('[YTM_ACCOUNT] Session warming failed (non-fatal): $e');
+      }
+      // If _warmSession didn't harvest a dataSyncId (e.g. home browse returned
+      // an unexpected shape), do an explicit lightweight bootstrap fetch.
+      if (_dataSyncId == null || _dataSyncId!.isEmpty) {
+        debugPrint('[YTM_ACCOUNT] dataSyncId not yet available after warm, bootstrapping...');
+        await _bootstrapDataSyncId();
+      }
+      if (_dataSyncId != null && _dataSyncId!.isNotEmpty) {
+        debugPrint('[YTM_ACCOUNT] dataSyncId ready after login: $_dataSyncId');
+      } else {
+        debugPrint('[YTM_ACCOUNT] dataSyncId still null after bootstrap — Tier-1 will be skipped until populated');
+      }
+    }());
     return true;
   }
 
@@ -585,7 +611,7 @@ class YtmAccountService {
                   ? '8.32.1'
                   : _clientVersion,
       'hl': 'en',
-      'gl': 'US',
+      'gl': 'EG',
     };
 
     if (clientType == 'ANDROID_MUSIC') {
@@ -1173,6 +1199,38 @@ class YtmAccountService {
       final List<LyricsLine> lines = [];
       void parseLyrics(dynamic node) {
         if (node is Map<String, dynamic>) {
+          if (node.containsKey('musicTimedLyricsRenderer')) {
+            final timedShelf =
+                node['musicTimedLyricsRenderer'] as Map<String, dynamic>;
+            final dataList =
+                timedShelf['timedLyricsData'] as List<dynamic>?;
+            if (dataList != null && dataList.isNotEmpty) {
+              for (final item in dataList) {
+                if (item is Map<String, dynamic>) {
+                  String text = '';
+                  final lyricLine = item['lyricLine'];
+                  if (lyricLine is String) {
+                    text = lyricLine;
+                  } else if (lyricLine is Map && lyricLine.containsKey('runs')) {
+                    final runs = lyricLine['runs'] as List<dynamic>;
+                    text = runs.map((r) => r['text'] as String? ?? '').join();
+                  }
+                  final cueRange = item['cueRange'] as Map<String, dynamic>?;
+                  final startMs = int.tryParse(
+                          cueRange?['startTimeMilliseconds']?.toString() ??
+                              '0') ??
+                      0;
+                  lines.add(LyricsLine(
+                    timestamp: Duration(milliseconds: startMs),
+                    text: text.trim(),
+                    source: LyricsSource.ytmusic,
+                  ));
+                }
+              }
+              if (lines.isNotEmpty) return;
+            }
+          }
+
           if (node.containsKey('musicDescriptionShelfRenderer')) {
             final shelf =
                 node['musicDescriptionShelfRenderer'] as Map<String, dynamic>;
@@ -1241,21 +1299,39 @@ class YtmAccountService {
     } catch (_) {}
     String? poToken;
     String? visitorData;
+    bool hadAccountPoToken = false; // true only when account-bound token minted successfully
     if (isAuthenticated) {
+      // dataSyncId guard: if we still don't have a dataSyncId (e.g. first play
+      // immediately after login before _warmSession completed), skip Tier-1
+      // entirely rather than falling back to a guest poToken + auth cookies.
+      // A guest poToken paired with session cookies is a poisoned combination
+      // that YouTube rejects for every client, causing the full LOGIN_REQUIRED
+      // cascade. Tier-2 (native extractor) works cleanly without this mismatch.
       if (_dataSyncId == null || _dataSyncId!.isEmpty) {
-        await _bootstrapDataSyncId();
+        debugPrint('[YTM_ACCOUNT] dataSyncId not yet available for $videoId — '
+            'skipping Tier-1 to avoid guest-poToken+cookie mismatch. '
+            'Tier-2 native extractor will handle this request.');
+        return null;
       }
-      final dsid = _dataSyncId;
-      if (dsid != null && dsid.isNotEmpty) {
-        try {
-          final account = await getIt<YtmService>().getAccountPoToken(dsid);
-          poToken = account?['poToken'] as String?;
-          final vd = account?['visitorData'] as String?;
-          visitorData =
-              _sessionVisitorData ?? (vd != null && vd.isNotEmpty ? vd : null);
-        } catch (e) {
-          debugPrint('[YTM_ACCOUNT] Account poToken minting failed: $e');
+      final dsid = _dataSyncId!;
+      try {
+        final account = await getIt<YtmService>().getAccountPoToken(dsid);
+        poToken = account?['poToken'] as String?;
+        final vd = account?['visitorData'] as String?;
+        visitorData =
+            _sessionVisitorData ?? (vd != null && vd.isNotEmpty ? vd : null);
+        if (poToken != null && poToken.isNotEmpty) {
+          hadAccountPoToken = true;
         }
+      } catch (e) {
+        debugPrint('[YTM_ACCOUNT] Account poToken minting failed: $e');
+      }
+      // If account-bound poToken minting failed (e.g. BotGuard not ready yet),
+      // skip Tier-1 to avoid the guest-token+cookie mismatch. Tier-2 handles it.
+      if (!hadAccountPoToken) {
+        debugPrint('[YTM_ACCOUNT] Account-bound poToken unavailable for $videoId — '
+            'skipping Tier-1 to avoid mismatch. Tier-2 will handle this.');
+        return null;
       }
     }
     if (poToken == null || poToken.isEmpty) {
@@ -1372,11 +1448,11 @@ class YtmAccountService {
           }
         } else {
           headers['X-Origin'] = endpointHost;
-          if ((client == 'ANDROID_MUSIC' || client == 'IOS_MUSIC') &&
-              _cookies != null &&
-              _cookies!.isNotEmpty) {
-            headers['Cookie'] = _cookies!;
-          }
+          // Keep mobile clients guest-only: attaching WEB session cookies to
+          // ANDROID_MUSIC/IOS_MUSIC poisons the fallback that works logged-out
+          // (YouTube returns LOGIN_REQUIRED for mismatched auth on these
+          // endpoints). Authenticated playback is covered by WEB_REMIX above;
+          // mobile clients stay as the guest fallback when login breaks it.
         }
 
         final clientContext = _buildClientContext(client, videoId);
@@ -1438,39 +1514,32 @@ class YtmAccountService {
             debugPrint(
                 '[YTM_ACCOUNT] Client $client returned playability $status ($statusReason, poTokenAttached: $hadPoToken), falling back to next');
 
-            // If WEB_REMIX (the client using auth cookies) returns LOGIN_REQUIRED,
-            // check whether it's a genuine session expiry or just a bot challenge.
-            // Bot challenges say "Sign in to confirm you're not a bot" — don't logout for those.
+            // WEB_REMIX LOGIN_REQUIRED must never logout/throw mid-chain:
+            // a single client can report LOGIN_REQUIRED for a bot challenge,
+            // a guest-poToken/auth-cookie mismatch, or age-gating while the
+            // session itself is still valid. Fall through to the remaining
+            // (guest mobile/embed) clients; session expiry is decided by
+            // validateSessionDetailed(), not by one player response.
             if (client == 'WEB_REMIX' &&
                 status == 'LOGIN_REQUIRED' &&
                 _cookies != null &&
                 _cookies!.isNotEmpty) {
-              final reason =
-                  (playability?['reason'] as String? ?? '').toLowerCase();
-              final isBotChallenge =
-                  reason.contains('bot') || reason.contains('confirm');
-              if (!isBotChallenge) {
-                debugPrint(
-                    '[YTM_ACCOUNT] Session expired detected on WEB_REMIX. Clearing cookies and notifying UI.');
-                unawaited(logout());
-                try {
-                  getIt<YtmService>().notifyAuthExpired();
-                } catch (_) {}
-
-                throw const YtmException('YTM_AUTH',
-                    'YouTube Music session expired. Please sign in again.');
-              }
               debugPrint(
-                  '[YTM_ACCOUNT] WEB_REMIX bot challenge detected, trying next client without logout');
+                  '[YTM_ACCOUNT] WEB_REMIX returned LOGIN_REQUIRED, trying next client without logout');
             }
             // IP-block / bot-challenge short-circuit: if two consecutive
-            // clients both return LOGIN_REQUIRED or UNPLAYABLE, every
+            // clients both return genuine bot challenges, every
             // remaining client will too — skip the rest of the chain.
-            if (status == 'LOGIN_REQUIRED' || status == 'UNPLAYABLE') {
+            // Note: UNPLAYABLE indicates per-client catalog restriction, NOT a bot block.
+            final isBotBlock = status.contains('BOT') ||
+                statusReason.toLowerCase().contains('not a bot') ||
+                statusReason.toLowerCase().contains('automated queries') ||
+                statusReason.toLowerCase().contains('unusual traffic');
+            if (isBotBlock) {
               consecutiveBlockSignals++;
               if (consecutiveBlockSignals >= 2) {
                 debugPrint(
-                    '[YTM_ACCOUNT] Short-circuiting Dart chain: $consecutiveBlockSignals consecutive blocks for $videoId');
+                    '[YTM_ACCOUNT] Short-circuiting Dart chain: $consecutiveBlockSignals consecutive bot blocks for $videoId');
                 return null;
               }
             }
@@ -1538,10 +1607,7 @@ class YtmAccountService {
               artist: details?['author'] as String? ?? '',
               artworkUrl: null,
               userAgent: headers['User-Agent'],
-              cookies:
-                  (isWeb || client == 'ANDROID_MUSIC' || client == 'IOS_MUSIC')
-                      ? _cookies
-                      : null,
+              cookies: isWeb ? _cookies : null,
             );
           } else {
             debugPrint(

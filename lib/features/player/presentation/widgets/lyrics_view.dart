@@ -89,7 +89,10 @@ class _LyricsViewState extends State<LyricsView> {
   void _handleActiveLine(int activeIndex) {
     if (activeIndex != -1 && activeIndex != _lastActiveIndex) {
       _lastActiveIndex = activeIndex;
-      _scrollToActive(activeIndex);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _scrollToActive(activeIndex);
+      });
     }
   }
 
@@ -303,6 +306,26 @@ class _LyricsViewState extends State<LyricsView> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                     color: p.textSecondary, fontSize: 13, height: 1.4),
+              ),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(
+                onPressed: () {
+                  try {
+                    context.read<PlayerCubit>().refreshLyrics();
+                  } catch (_) {}
+                },
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('Search Lyrics',
+                    style: TextStyle(fontSize: 12)),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: widget.activeColor,
+                  side: BorderSide(
+                      color: widget.activeColor.withValues(alpha: 0.4)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                ),
               ),
             ],
           ),

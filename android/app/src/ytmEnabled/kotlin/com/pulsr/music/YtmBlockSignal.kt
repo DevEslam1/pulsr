@@ -40,7 +40,11 @@ enum class YtmBlockSignal(val code: String) {
             "uploader has not made this video available in your country",
             "not made this video available in your country",
             "unavailable in your country",
-            "unavailable in your location"
+            "unavailable in your location",
+            "غير متوفر في منطقتك",
+            "غير متوفر في بلدك",
+            "غير متاح في منطقتك",
+            "غير متاح في بلدك"
         )
 
         private val GONE_SUBSTRINGS = listOf(
