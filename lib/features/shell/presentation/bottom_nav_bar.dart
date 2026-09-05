@@ -52,8 +52,8 @@ class PulsrBottomNavBar extends StatelessWidget {
     final items = _getItems(context);
 
     final double maxBarWidth = isTablet ? 620.0 : 540.0;
-    final double barHeight = isTablet ? 68.0 : 62.0;
-    final navRadius = BorderRadius.circular(isTablet ? 32 : 24);
+    final double barHeight = isTablet ? 68.0 : 64.0;
+    final navRadius = BorderRadius.circular(isTablet ? 34 : 28);
 
     return SafeArea(
       top: false,
@@ -62,10 +62,10 @@ class PulsrBottomNavBar extends StatelessWidget {
       bottom: true,
       child: Padding(
         padding: EdgeInsets.fromLTRB(
-          isTablet ? 24 : 12,
-          4,
-          isTablet ? 24 : 12,
-          isTablet ? 10 : 6,
+          isTablet ? 24 : 14,
+          2,
+          isTablet ? 24 : 14,
+          isTablet ? 12 : 8,
         ),
         child: Align(
           alignment: Alignment.bottomCenter,
@@ -80,13 +80,13 @@ class PulsrBottomNavBar extends StatelessWidget {
                   borderRadius: navRadius,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: p.isDark ? 0.45 : 0.12),
+                      color: Colors.black.withValues(alpha: p.isDark ? 0.40 : 0.12),
                       blurRadius: 24,
                       spreadRadius: 0,
                       offset: const Offset(0, 8),
                     ),
                     BoxShadow(
-                      color: p.accent.withValues(alpha: p.isDark ? 0.12 : 0.06),
+                      color: p.accent.withValues(alpha: p.isDark ? 0.10 : 0.05),
                       blurRadius: 18,
                       spreadRadius: -2,
                       offset: const Offset(0, 2),
@@ -96,7 +96,7 @@ class PulsrBottomNavBar extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: navRadius,
                   child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+                    filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
                     child: Container(
                       decoration: BoxDecoration(
                         borderRadius: navRadius,
@@ -104,9 +104,9 @@ class PulsrBottomNavBar extends StatelessWidget {
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                           colors: [
-                            p.surface.withValues(alpha: p.isDark ? 0.88 : 0.94),
+                            p.surface.withValues(alpha: p.isDark ? 0.78 : 0.88),
                             p.surfaceContainer
-                                .withValues(alpha: p.isDark ? 0.82 : 0.90),
+                                .withValues(alpha: p.isDark ? 0.72 : 0.84),
                           ],
                         ),
                         border: Border.all(

@@ -241,6 +241,40 @@ class TestPulsrAudioHandler extends BaseAudioHandler
 
   @override
   Stream<String> get errorStream => const Stream.empty();
+  final StreamController<SongsTableData> _trackChangedController =
+      StreamController<SongsTableData>.broadcast();
+  @override
+  Stream<SongsTableData> get onTrackChanged => _trackChangedController.stream;
+  @override
+  Future<void> get effectsReady => Future<void>.value();
+  @override
+  bool get isSaturationEnabled => false;
+  @override
+  double get saturationDrive => 0.3;
+  @override
+  double get saturationMix => 0.5;
+  @override
+  double get saturationTilt => 0.3;
+  @override
+  bool get isStereoWidthEnabled => false;
+  @override
+  double get stereoWidth => 1.0;
+  @override
+  bool get isLoudnessContourEnabled => false;
+  @override
+  double get loudnessContourIntensity => 0.0;
+  @override
+  bool get isSubCrossoverEnabled => false;
+  @override
+  double get subCrossoverCornerHz => 80.0;
+  @override
+  double get subCrossoverSlopeDbPerOct => 24.0;
+  @override
+  double get subCrossoverGain => 0.8;
+  @override
+  bool get isDynamicEqEnabled => false;
+  @override
+  List<DynamicEqBandConfig> get dynamicEqBands => const [DynamicEqBandConfig()];
 
   @override
   void dispose() {

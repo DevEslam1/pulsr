@@ -46,6 +46,12 @@ class AudioEffectsChannel {
   // (EQ, dynamics, reverb via EnvironmentalReverb, limiter, etc.) is fully
   // audible — its status is reported via getProcessingCapabilities.
   bool _isPcmDspAttached = false;
+
+  /// True only when a PCM source actually feeds the C++ DSP engine. The
+  /// Phase-1 stages configured into that engine (crossfeed, saturation,
+  /// stereo width, sub crossover, dynamic EQ, loudness contour) are not
+  /// audible until this is true.
+  bool _hasPcmDspPath = false;
   bool _hasOemAudio = false;
   List<String> _detectedOemEngines = [];
 
@@ -58,6 +64,9 @@ class AudioEffectsChannel {
   bool get isFloatOutputSupported => _isFloatOutputSupported;
   bool get isHardwareOffloadSupported => _isHardwareOffloadSupported;
   bool get isPcmDspAttached => _isPcmDspAttached;
+
+  /// Whether the C++ DSP engine has a live PCM source (audible stages).
+  bool get hasPcmDspPath => _hasPcmDspPath;
   bool get hasOemAudio => _hasOemAudio;
   List<String> get detectedOemEngines => List.unmodifiable(_detectedOemEngines);
 
@@ -101,6 +110,7 @@ class AudioEffectsChannel {
           .invokeMapMethod<String, dynamic>('getProcessingCapabilities')
           .timeout(const Duration(seconds: 2));
       _isPcmDspAttached = pipeline?['isPcmDspAttached'] == true;
+      _hasPcmDspPath = pipeline?['hasPcmDspPath'] == true;
     } catch (e, st) {
       ErrorLogger.log(
         'Failed to get DSP processing capabilities',

@@ -90,6 +90,14 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
     // Native DSP Engine states
     private var isNativeDspLoaded = false
+
+    /// True only once a real PCM buffer has been pushed through
+    /// nativeProcessPcmAudio. The C++ stages (crossfeed, saturation, stereo
+    /// width, sub crossover, dynamic EQ, loudness contour) are configured but
+    /// NOT audible until then: ExoPlayer provides no PCM callback, so nothing
+    /// feeds this engine. Reported to Flutter as hasPcmDspPath.
+    @Volatile
+    private var isPcmSourceConnected = false
     private var isCrossfeedEnabled = false
     private var crossfeedDelayUs = 350.0
     private var crossfeedFeedDb = -9.0
@@ -748,6 +756,7 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val frameCount = call.argument<Int>("frameCount") ?: 0
                     val channels = call.argument<Int>("channels") ?: 2
                     if (buffer != null && isNativeDspLoaded) {
+                        isPcmSourceConnected = true
                         try {
                             val processed = nativeProcessPcmAudio(buffer, frameCount, channels)
                             result.success(processed)
@@ -1440,16 +1449,16 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         "hasEqualizer" to (dynamicsSupported || isNativeDspLoaded),
                         "hasNativeDsp" to isNativeDspLoaded,
                         "hasNativeParametricEq" to isNativeDspLoaded,
-                        "hasCrossfeed" to isNativeDspLoaded,
+                        "hasCrossfeed" to (isNativeDspLoaded && isPcmSourceConnected),
                         "hasLookaheadLimiter" to isNativeDspLoaded,
                         "hasConvolutionReverb" to isNativeDspLoaded,
                         "hasSincResampler" to isNativeDspLoaded,
                         "hasDsdDecoder" to isNativeDspLoaded,
-                        "hasHarmonicSaturation" to isNativeDspLoaded,
-                        "hasStereoWidth" to isNativeDspLoaded,
-                        "hasLoudnessContour" to isNativeDspLoaded,
-                        "hasSubCrossover" to isNativeDspLoaded,
-                        "hasDynamicEq" to isNativeDspLoaded,
+                        "hasHarmonicSaturation" to (isNativeDspLoaded && isPcmSourceConnected),
+                        "hasStereoWidth" to (isNativeDspLoaded && isPcmSourceConnected),
+                        "hasLoudnessContour" to (isNativeDspLoaded && isPcmSourceConnected),
+                        "hasSubCrossover" to (isNativeDspLoaded && isPcmSourceConnected),
+                        "hasDynamicEq" to (isNativeDspLoaded && isPcmSourceConnected),
                         "eqBandCount" to if (isNativeDspLoaded) 32 else (if (dynamicsSupported) eqBandCount else 0),
                         "eqCenterFrequencies" to eqCenterFreqs.toList(),
                         "hasAudioEffects" to true,
@@ -1523,7 +1532,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(
                         mapOf(
                             "isPcmDspAttached" to isEffectPipelineAttached(),
-                            "isSessionAttached" to (currentAudioSessionId != 0)
+                            "isSessionAttached" to (currentAudioSessionId != 0),
+                            "hasPcmDspPath" to isPcmSourceConnected
                         )
                     )
                 }

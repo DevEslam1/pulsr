@@ -1,4 +1,4 @@
-﻿// lib/core/services/hires_audio_service.dart
+// lib/core/services/hires_audio_service.dart
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -7,6 +7,7 @@ import '../../domain/models/audio_output_info.dart';
 import '../../core/constants/channels.dart';
 import '../../core/utils/error_logger.dart';
 import '../../core/utils/platform_capabilities.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 @lazySingleton
 class HiResAudioService {
@@ -221,6 +222,14 @@ class HiResAudioService {
   Future<void> requestBluetoothPermission() async {
     if (!PlatformCapabilities.isAndroid) return;
     try {
+      // Android 12+: BLUETOOTH_CONNECT is a runtime permission. Try the
+      // standard system dialog first; fall back to the native handler
+      // (opens App Settings) when denied or permanently denied.
+      var status = await Permission.bluetoothConnect.status;
+      if (!status.isGranted) {
+        status = await Permission.bluetoothConnect.request();
+      }
+      if (status.isGranted) return;
       await _methodChannel
           .invokeMethod<void>('requestBluetoothPermission')
           .timeout(const Duration(seconds: 5));

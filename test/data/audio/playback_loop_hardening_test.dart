@@ -92,6 +92,34 @@ class StubPulsrAudioHandler extends BaseAudioHandler
   @override
   List<String> get detectedOemEngines => const [];
   @override
+  bool get isSaturationEnabled => false;
+  @override
+  double get saturationDrive => 0.3;
+  @override
+  double get saturationMix => 0.5;
+  @override
+  double get saturationTilt => 0.3;
+  @override
+  bool get isStereoWidthEnabled => false;
+  @override
+  double get stereoWidth => 1.0;
+  @override
+  bool get isLoudnessContourEnabled => false;
+  @override
+  double get loudnessContourIntensity => 0.0;
+  @override
+  bool get isSubCrossoverEnabled => false;
+  @override
+  double get subCrossoverCornerHz => 80.0;
+  @override
+  double get subCrossoverSlopeDbPerOct => 24.0;
+  @override
+  double get subCrossoverGain => 0.8;
+  @override
+  bool get isDynamicEqEnabled => false;
+  @override
+  List<DynamicEqBandConfig> get dynamicEqBands => const [DynamicEqBandConfig()];
+  @override
   Duration get crossfadeDuration => Duration.zero;
   @override
   Stream<Duration> get positionStream => _positionController.stream;
@@ -101,6 +129,12 @@ class StubPulsrAudioHandler extends BaseAudioHandler
       StreamController<String>.broadcast();
   @override
   Stream<String> get errorStream => _errorController.stream;
+  final StreamController<SongsTableData> _trackChangedController =
+      StreamController<SongsTableData>.broadcast();
+  @override
+  Stream<SongsTableData> get onTrackChanged => _trackChangedController.stream;
+  @override
+  Future<void> get effectsReady => Future<void>.value();
 
   @override
   void setCrossfadeDuration(Duration d) {}

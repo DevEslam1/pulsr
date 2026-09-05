@@ -630,7 +630,6 @@ class PulsrAudioHandler extends BaseAudioHandler
       },
     );
 
-
     _memoryManager = AudioMemoryManager(
       onEvictOldestCacheRequested: () {
         AudioMemoryManager.trimStreamCache(_streamCache);
@@ -898,8 +897,7 @@ class PulsrAudioHandler extends BaseAudioHandler
                 }
                 _wasPlayingBeforeInterruption = false;
                 if (_crossfadeManager.isCrossfading) {
-                  await _crossfadeManager.cancel(
-                      _inactivePlayer, _activePlayer,
+                  await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
                       restoreVolume: _preCrossfadeVolume ?? _volume);
                 }
                 await _activePlayer.pause();
@@ -1191,8 +1189,7 @@ class PulsrAudioHandler extends BaseAudioHandler
 
     // Hot path: reuse the cached prefs (loaded once in _init) instead of an
     // async disk read per resolve — saves ~5-20ms on every tap/prefetch.
-    final prefs =
-        _cachedPrefs ?? await SharedPreferences.getInstance();
+    final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
     final offlineOnly = prefs.getBool('setting_offline_only_mode') ?? false;
     if (offlineOnly) {
       throw const YtmException(
@@ -1304,8 +1301,38 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// (navigation/call) so the ramp never fights the duck level.
   void _fadeInAfterSwitch(AudioPlayer player, double targetVolume) {
     if (_duckActive) return;
-    unawaited(_crossfadeManager.fadeVolume(player, 0.0,
-        targetVolume.clamp(0.0, 1.0), const Duration(milliseconds: 90), _crossfadeManager.nextFadeId()));
+    unawaited(_crossfadeManager.fadeVolume(
+        player,
+        0.0,
+        targetVolume.clamp(0.0, 1.0),
+        const Duration(milliseconds: 90),
+        _crossfadeManager.nextFadeId()));
+  }
+
+  /// Safety net for the cold-start fade-in: the 90ms ramp is unawaited and can
+  /// be orphaned by a racing fade-id bump, a cancelled crossfade, or a play()
+  /// interrupted mid-load, leaving the player audibly running at volume 0
+  /// until the user pauses and resumes. A short convergence check restores the
+  /// ReplayGain target when the player is ready and playing but still muted.
+  void _scheduleFadeInConvergenceGuard(AudioPlayer player, int generation) {
+    if (_duckActive) return;
+    Timer(const Duration(milliseconds: 350), () async {
+      try {
+        if (generation != _playGeneration) return;
+        if (!identical(player, _activePlayer)) return;
+        if (_duckActive || _crossfadeManager.isCrossfading) return;
+        if (!player.playing) return;
+        if (player.processingState != ProcessingState.ready) return;
+        if (player.volume > 0.01) return;
+        final target =
+            _calculateReplayGainVolume(currentSong).clamp(0.0, 1.0);
+        if (target <= 0.05) return;
+        ErrorLogger.log(
+            'Cold-start fade-in did not converge; restoring target volume',
+            category: 'AudioHandler');
+        await player.setVolume(target);
+      } catch (_) {}
+    });
   }
 
   void cancelPrefetches() {
@@ -1789,8 +1816,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     if (song.source == SongSource.youtube &&
         (song.path.startsWith('ytmusic://') ||
             song.path.isEmpty ||
-            (!song.path.startsWith('content:') &&
-                song.isDownloaded != true)) &&
+            (!song.path.startsWith('content:') && song.isDownloaded != true)) &&
         (song.remoteId?.isNotEmpty ?? false)) {
       try {
         await _resolveStreamUrl(song).timeout(const Duration(seconds: 20));
@@ -1798,8 +1824,10 @@ class PulsrAudioHandler extends BaseAudioHandler
         if (generation != _playGeneration) return;
         final info = YtmErrorClassifier.classify(e);
         _errorSubject.add(info.message);
-        ErrorLogger.log('Pre-resolve failed for ${song.title}, keeping current playback',
-            error: e, category: 'AudioHandler');
+        ErrorLogger.log(
+            'Pre-resolve failed for ${song.title}, keeping current playback',
+            error: e,
+            category: 'AudioHandler');
         return;
       }
       if (generation != _playGeneration) return;
@@ -1840,6 +1868,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         await _activePlayer.setVolume(0.0);
         await _activePlayer.play();
         _fadeInAfterSwitch(_activePlayer, targetVolume);
+        _scheduleFadeInConvergenceGuard(_activePlayer, generation);
       }
       if (preload) {
         try {
@@ -1988,16 +2017,17 @@ class PulsrAudioHandler extends BaseAudioHandler
         (song.remoteId?.isNotEmpty ?? false) &&
         (song.path.startsWith('ytmusic://') ||
             song.path.isEmpty ||
-            (!song.path.startsWith('content:') &&
-                song.isDownloaded != true))) {
+            (!song.path.startsWith('content:') && song.isDownloaded != true))) {
       try {
         await _resolveStreamUrl(song).timeout(const Duration(seconds: 20));
       } catch (e) {
         if (generation != _playGeneration) return;
         final info = YtmErrorClassifier.classify(e);
         _errorSubject.add(info.message);
-        ErrorLogger.log('Pre-resolve failed for ${song.title}, keeping current playback',
-            error: e, category: 'AudioHandler');
+        ErrorLogger.log(
+            'Pre-resolve failed for ${song.title}, keeping current playback',
+            error: e,
+            category: 'AudioHandler');
         return;
       }
       if (generation != _playGeneration) return;
@@ -2086,6 +2116,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       }
       await _activePlayer.play();
       if (!_duckActive) _fadeInAfterSwitch(_activePlayer, targetVolume);
+      _scheduleFadeInConvergenceGuard(_activePlayer, generation);
       _consecutiveFailures = 0;
       _repository.recordPlayHistory(song.id);
       _saveCurrentPosition();
@@ -2168,7 +2199,11 @@ class PulsrAudioHandler extends BaseAudioHandler
       _pendingLazyPosition = null;
       return playSongAt(_currentIndex, initialPosition: pending);
     }
-    return _activePlayer.play();
+    final generation = _playGeneration;
+    final player = _activePlayer;
+    final playFuture = player.play();
+    _scheduleFadeInConvergenceGuard(player, generation);
+    return playFuture;
   }
 
   @override
@@ -2385,7 +2420,8 @@ class PulsrAudioHandler extends BaseAudioHandler
     _queueDirty = true;
     // Insert sits after the current track, so the playing index never shifts.
     if (_gaplessMode && _gaplessLoaded) {
-      await _activePlayer.insertAudioSource(insertIdx, _buildGaplessChild(song));
+      await _activePlayer.insertAudioSource(
+          insertIdx, _buildGaplessChild(song));
     }
     queue.add(_songs.map(_songToMediaItem).toList());
     _saveCurrentPosition();
@@ -2951,12 +2987,13 @@ class PulsrAudioHandler extends BaseAudioHandler
     double? drive,
     double? mix,
     double? tilt,
-  }) => _equalizerManager.setSaturation(
-    enabled,
-    drive: drive,
-    mix: mix,
-    tilt: tilt,
-  );
+  }) =>
+      _equalizerManager.setSaturation(
+        enabled,
+        drive: drive,
+        mix: mix,
+        tilt: tilt,
+      );
   bool get isStereoWidthEnabled => _equalizerManager.isStereoWidthEnabled;
   double get stereoWidth => _equalizerManager.stereoWidth;
   Future<void> setStereoWidth(bool enabled, {double? width}) =>
@@ -2977,12 +3014,13 @@ class PulsrAudioHandler extends BaseAudioHandler
     double? cornerHz,
     double? slopeDbPerOct,
     double? gain,
-  }) => _equalizerManager.setSubCrossover(
-    enabled,
-    cornerHz: cornerHz,
-    slopeDbPerOct: slopeDbPerOct,
-    gain: gain,
-  );
+  }) =>
+      _equalizerManager.setSubCrossover(
+        enabled,
+        cornerHz: cornerHz,
+        slopeDbPerOct: slopeDbPerOct,
+        gain: gain,
+      );
   bool get isDynamicEqEnabled => _equalizerManager.isDynamicEqEnabled;
   List<DynamicEqBandConfig> get dynamicEqBands =>
       _equalizerManager.dynamicEqBands;

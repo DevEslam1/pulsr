@@ -160,7 +160,11 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     }
   }
 
-  bool get _nativePcmEffectsAvailable => true;
+  /// The C++ stages (crossfeed, saturation, stereo width, sub crossover,
+  /// dynamic EQ) are only audible when a PCM source feeds the native engine.
+  /// HAL-backed stages (limiter, mono/balance, reverb, EQ, bass, virtualizer,
+  /// volume boost) ignore this and stay available.
+  bool get _nativePcmEffectsAvailable => AudioEffectsChannel().hasPcmDspPath;
 
   void _showFeatureInfo(BuildContext context, AudioFeatureInfo info, {String? conflictReason}) {
     final p = context.palette;
@@ -2288,10 +2292,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         ],
                       ),
                     ),
-                    IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Crossfeed', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.crossfeed, conflictReason: dspBlocked)),
+                    IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Crossfeed', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.crossfeed, conflictReason: dspBlocked ?? (_nativePcmEffectsAvailable ? null : 'Requires PCM DSP path - not audible yet'))),
                     const SizedBox(width: 4),
                     Switch.adaptive(
-                      value: dspBlocked == null && state.isCrossfeedEnabled,
+                      value: dspBlocked == null && _nativePcmEffectsAvailable && state.isCrossfeedEnabled,
                       activeTrackColor: p.accent,
                       activeThumbColor: p.onAccent,
                       onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
@@ -2301,7 +2305,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   ],
                 ),
                 if (dspBlocked != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Blocked by Bit-Perfect', style: TextStyle(color: p.error, fontSize: 10, fontWeight: FontWeight.w600))),
-                if (dspBlocked == null && state.isCrossfeedEnabled) ...[
+                if (dspBlocked == null && _nativePcmEffectsAvailable && state.isCrossfeedEnabled) ...[
                   const SizedBox(height: 14),
                   // Delay slider
                   Row(
@@ -2439,7 +2443,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       value: dspBlocked == null && state.isLimiterEnabled,
                       activeTrackColor: p.accent,
                       activeThumbColor: p.onAccent,
-                      onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                      onChanged: dspBlocked != null
                           ? null
                           : (val) => cubit.setLookaheadLimiter(val),
                     ),
@@ -2599,7 +2603,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           value: dspBlocked == null && state.monoMix,
                           activeTrackColor: p.accent,
                           activeThumbColor: p.onAccent,
-                          onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                          onChanged: dspBlocked != null
                               ? null
                               : (val) => cubit.setMonoMix(val),
                         ),
@@ -2716,7 +2720,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                       value: dspBlocked == null && state.isReverbEnabled,
                       activeTrackColor: p.accent,
                       activeThumbColor: p.onAccent,
-                      onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                      onChanged: dspBlocked != null
                           ? null
                           : (val) => cubit.setReverb(val),
                     ),
@@ -2930,10 +2934,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   tooltip: l10n.dspSaturationTitle,
                   onPressed: () => _showFeatureInfo(
                       context, AudioFeatureRegistry.saturation,
-                      conflictReason: dspBlocked)),
+                      conflictReason: dspBlocked ??
+                          (_nativePcmEffectsAvailable
+                              ? null
+                              : 'Requires PCM DSP path - not audible yet'))),
               const SizedBox(width: 4),
               Switch.adaptive(
-                value: dspBlocked == null && state.isSaturationEnabled,
+                value: dspBlocked == null && _nativePcmEffectsAvailable && state.isSaturationEnabled,
                 activeTrackColor: p.accent,
                 activeThumbColor: p.onAccent,
                 onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
@@ -2950,7 +2957,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         color: p.error,
                         fontSize: 10,
                         fontWeight: FontWeight.w600))),
-          if (dspBlocked == null && state.isSaturationEnabled) ...[
+          if (dspBlocked == null && _nativePcmEffectsAvailable && state.isSaturationEnabled) ...[
             const SizedBox(height: 14),
             _buildDspSliderRow(
               context: context,
@@ -3049,10 +3056,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   tooltip: l10n.dspStereoWidthTitle,
                   onPressed: () => _showFeatureInfo(
                       context, AudioFeatureRegistry.stereoWidth,
-                      conflictReason: dspBlocked)),
+                      conflictReason: dspBlocked ??
+                          (_nativePcmEffectsAvailable
+                              ? null
+                              : 'Requires PCM DSP path - not audible yet'))),
               const SizedBox(width: 4),
               Switch.adaptive(
-                value: dspBlocked == null && state.isStereoWidthEnabled,
+                value: dspBlocked == null && _nativePcmEffectsAvailable && state.isStereoWidthEnabled,
                 activeTrackColor: p.accent,
                 activeThumbColor: p.onAccent,
                 onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
@@ -3069,7 +3079,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         color: p.error,
                         fontSize: 10,
                         fontWeight: FontWeight.w600))),
-          if (dspBlocked == null && state.isStereoWidthEnabled) ...[
+          if (dspBlocked == null && _nativePcmEffectsAvailable && state.isStereoWidthEnabled) ...[
             const SizedBox(height: 14),
             _buildDspSliderRow(
               context: context,
@@ -3145,10 +3155,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   tooltip: l10n.dspSubCrossoverTitle,
                   onPressed: () => _showFeatureInfo(
                       context, AudioFeatureRegistry.subCrossover,
-                      conflictReason: dspBlocked)),
+                      conflictReason: dspBlocked ??
+                          (_nativePcmEffectsAvailable
+                              ? null
+                              : 'Requires PCM DSP path - not audible yet'))),
               const SizedBox(width: 4),
               Switch.adaptive(
-                value: dspBlocked == null && state.isSubCrossoverEnabled,
+                value: dspBlocked == null && _nativePcmEffectsAvailable && state.isSubCrossoverEnabled,
                 activeTrackColor: p.accent,
                 activeThumbColor: p.onAccent,
                 onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
@@ -3165,7 +3178,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         color: p.error,
                         fontSize: 10,
                         fontWeight: FontWeight.w600))),
-          if (dspBlocked == null && state.isSubCrossoverEnabled) ...[
+          if (dspBlocked == null && _nativePcmEffectsAvailable && state.isSubCrossoverEnabled) ...[
             const SizedBox(height: 14),
             // Honest copy: this is bass redirection, not multichannel LFE.
             Text(l10n.dspSubCrossoverNote,
@@ -3260,10 +3273,13 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                   tooltip: l10n.dspDynamicEqTitle,
                   onPressed: () => _showFeatureInfo(
                       context, AudioFeatureRegistry.dynamicEq,
-                      conflictReason: dspBlocked)),
+                      conflictReason: dspBlocked ??
+                          (_nativePcmEffectsAvailable
+                              ? null
+                              : 'Requires PCM DSP path - not audible yet'))),
               const SizedBox(width: 4),
               Switch.adaptive(
-                value: dspBlocked == null && state.isDynamicEqEnabled,
+                value: dspBlocked == null && _nativePcmEffectsAvailable && state.isDynamicEqEnabled,
                 activeTrackColor: p.accent,
                 activeThumbColor: p.onAccent,
                 onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
@@ -3280,7 +3296,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         color: p.error,
                         fontSize: 10,
                         fontWeight: FontWeight.w600))),
-          if (dspBlocked == null && state.isDynamicEqEnabled) ...[
+          if (dspBlocked == null && _nativePcmEffectsAvailable && state.isDynamicEqEnabled) ...[
             const SizedBox(height: 14),
             _buildDspSliderRow(
               context: context,

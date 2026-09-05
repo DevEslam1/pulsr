@@ -14,6 +14,12 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
     <!-- Required solely for the audio visualizer; requested at runtime only when the user enables it -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- Bluetooth (Android 12+): A2DP codec info/switching and connected device
+         names via HiResDacPlugin. Runtime "Nearby devices" permission, requested
+         from HiResAudioService.requestBluetoothPermission(). -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+    <!-- Legacy Bluetooth access on Android 11 and below -->
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30"/>
 
     <!-- Custom signature permission to protect internal widget & playback broadcasts -->
     <permission android:name="com.pulsr.music.permission.WIDGET_CONTROL"

@@ -675,8 +675,14 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     } catch (_) {}
   }
 
+  /// Monotonic loader generation: only the most recently started lyrics load
+  /// may emit, so a slow fetch for a superseded song can never overwrite the
+  /// current track's lyrics.
+  int _lyricsLoadGen = 0;
+
   Future<void> _loadLyricsForSong(SongsTableData song) async {
     if (isClosed) return;
+    final gen = ++_lyricsLoadGen;
     safeEmit(state.copyWith(
       isLoadingLyrics: true,
       lyrics: [],
@@ -692,7 +698,11 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       lyricsResult = await LrcParser.resolveLyrics(song.path, songId: song.id);
     }
 
-    if (isClosed || state.currentSong?.id != song.id) return;
+    if (isClosed ||
+        gen != _lyricsLoadGen ||
+        state.currentSong?.id != song.id) {
+      return;
+    }
 
     // 2. Query LRCLIB for synchronized karaoke lyrics (works for local and online tracks)
     if (lyricsResult == null || lyricsResult.lines.isEmpty) {
@@ -707,7 +717,11 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       } catch (_) {}
     }
 
-    if (isClosed || state.currentSong?.id != song.id) return;
+    if (isClosed ||
+        gen != _lyricsLoadGen ||
+        state.currentSong?.id != song.id) {
+      return;
+    }
 
     // 3. For YouTube Music tracks without LRCLIB matches, fetch native YTM lyrics
     final videoId = song.remoteId;
@@ -720,7 +734,11 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       } catch (_) {}
     }
 
-    if (isClosed || state.currentSong?.id != song.id) return;
+    if (isClosed ||
+        gen != _lyricsLoadGen ||
+        state.currentSong?.id != song.id) {
+      return;
+    }
     safeEmit(state.copyWith(
       isLoadingLyrics: false,
       lyrics: lyricsResult?.lines ?? [],

@@ -7,6 +7,7 @@ import '../../../../core/theme/aura_theme.dart';
 import '../../../../core/utils/l10n_extensions.dart';
 import '../../../../data/db/app_database.dart';
 import '../../../../core/utils/platform_capabilities.dart';
+import '../../../../data/audio/audio_effects_channel.dart';
 import '../../../player/cubit/player_cubit.dart';
 import '../../../player/presentation/widgets/audio_quality_sheet.dart';
 import '../../../player/presentation/widgets/equalizer_sheet.dart';
@@ -443,13 +444,15 @@ class AudioSoundSection extends StatelessWidget {
                       value: playerState.isLoudnessContourEnabled,
                       activeTrackColor: p.accent,
                       activeThumbColor: p.onAccent,
-                      onChanged: lcBlocked != null
+                      onChanged: lcBlocked != null || !AudioEffectsChannel().hasPcmDspPath
                           ? null
                           : (val) => playerCubit.setLoudnessContour(val),
                     ),
                   ],
                 ),
-                if (lcBlocked == null && playerState.isLoudnessContourEnabled) ...[
+                if (lcBlocked == null &&
+                    AudioEffectsChannel().hasPcmDspPath &&
+                    playerState.isLoudnessContourEnabled) ...[
                   const SizedBox(height: 4),
                   SettingSliderRow(
                     label: l10n.dspLoudnessIntensity,

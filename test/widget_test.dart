@@ -1,4 +1,6 @@
 // test/widget_test.dart
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
@@ -83,6 +85,40 @@ class MockPulsrAudioHandler extends BaseAudioHandler
   Duration get crossfadeDuration => Duration.zero;
   @override
   Stream<Duration> get positionStream => const Stream.empty();
+  final StreamController<SongsTableData> _trackChangedController =
+      StreamController<SongsTableData>.broadcast();
+  @override
+  Stream<SongsTableData> get onTrackChanged => _trackChangedController.stream;
+  @override
+  Future<void> get effectsReady => Future<void>.value();
+  @override
+  bool get isSaturationEnabled => false;
+  @override
+  double get saturationDrive => 0.3;
+  @override
+  double get saturationMix => 0.5;
+  @override
+  double get saturationTilt => 0.3;
+  @override
+  bool get isStereoWidthEnabled => false;
+  @override
+  double get stereoWidth => 1.0;
+  @override
+  bool get isLoudnessContourEnabled => false;
+  @override
+  double get loudnessContourIntensity => 0.0;
+  @override
+  bool get isSubCrossoverEnabled => false;
+  @override
+  double get subCrossoverCornerHz => 80.0;
+  @override
+  double get subCrossoverSlopeDbPerOct => 24.0;
+  @override
+  double get subCrossoverGain => 0.8;
+  @override
+  bool get isDynamicEqEnabled => false;
+  @override
+  List<DynamicEqBandConfig> get dynamicEqBands => const [DynamicEqBandConfig()];
   @override
   void setCrossfadeDuration(Duration d) {}
   @override
@@ -338,6 +374,9 @@ void main() {
       expect(find.text('Pulsr Music'), findsOneWidget);
       await Future.delayed(const Duration(milliseconds: 100));
       await tester.pump();
+      // Flush one-shot app timers (debounces) so the fake-async invariant
+      // does not trip on pending timers after the tree is disposed.
+      await tester.pump(const Duration(seconds: 5));
       await tester.pumpWidget(const SizedBox());
       await tester.pump();
       await audioHandler.stop();

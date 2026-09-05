@@ -392,7 +392,7 @@ class AuraTheme {
             const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
       ),
       bottomNavigationBarTheme: BottomNavigationBarThemeData(
-        backgroundColor: p.surface,
+        backgroundColor: Colors.transparent,
         selectedItemColor: p.accent,
         unselectedItemColor: p.textTertiary,
         type: BottomNavigationBarType.fixed,
