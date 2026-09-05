@@ -119,6 +119,10 @@ class PulsrAudioHandler extends BaseAudioHandler
   final LinkedHashMap<String,
           ({String url, DateTime expires, String? userAgent, String? cookies})>
       _streamCache = LinkedHashMap();
+  // Active stream URL resolutions, keyed by videoId-quality. Deduplicates concurrent
+  // requests (e.g. background pre-warm and YtmResolvingSource.request()).
+  final Map<String, Future<({String url, String? userAgent, String? cookies})>>
+      _inFlightResolves = {};
   // Video ids with an in-flight prefetch, so we resolve each at most once.
   final Set<String> _prefetching = {};
 
@@ -244,9 +248,9 @@ class PulsrAudioHandler extends BaseAudioHandler
         androidLoadControl: AndroidLoadControl(
           minBufferDuration: const Duration(seconds: 30),
           maxBufferDuration: const Duration(seconds: 60),
-          bufferForPlaybackDuration: const Duration(milliseconds: 800),
+          bufferForPlaybackDuration: const Duration(milliseconds: 250),
           bufferForPlaybackAfterRebufferDuration:
-              const Duration(milliseconds: 1500),
+              const Duration(milliseconds: 800),
           prioritizeTimeOverSizeThresholds: false,
         ),
       );
@@ -1234,7 +1238,7 @@ class PulsrAudioHandler extends BaseAudioHandler
 
     // Hot path: reuse the cached prefs (loaded once in _init) instead of an
     // async disk read per resolve — saves ~5-20ms on every tap/prefetch.
-    final prefs = _cachedPrefs ?? await SharedPreferences.getInstance();
+    final prefs = _cachedPrefs ??= await SharedPreferences.getInstance();
     final offlineOnly = prefs.getBool('setting_offline_only_mode') ?? false;
     if (offlineOnly) {
       throw const YtmException(
@@ -1263,49 +1267,63 @@ class PulsrAudioHandler extends BaseAudioHandler
           cookies: cached.cookies
         );
       }
+      final inFlight = _inFlightResolves[cacheKey];
+      if (inFlight != null) {
+        return await inFlight;
+      }
     }
-    try {
-      _latencyTracker?.markStage(PlaybackStage.pluginEntered);
-      _latencyTracker?.markStage(PlaybackStage.clientRequestSent);
-    } catch (_) {}
-    final stream = await _ytmService.resolveStream(videoId,
-        quality: quality, forceRefresh: forceRefresh);
-    if (stream.url.trim().isEmpty) {
-      throw const YtmException(
-          'YTM_UNAVAILABLE', 'Resolved stream URL is empty');
-    }
-    final expireParam = Uri.tryParse(stream.url)?.queryParameters['expire'];
-    DateTime expireAt;
-    if (expireParam != null) {
-      final rawExpire = int.tryParse(expireParam) ?? 0;
-      if (rawExpire > 9999999999) {
-        expireAt = DateTime.fromMillisecondsSinceEpoch(rawExpire);
-      } else if (rawExpire > 0) {
-        expireAt = DateTime.fromMillisecondsSinceEpoch(rawExpire * 1000);
+
+    final future = () async {
+      try {
+        _latencyTracker?.markStage(PlaybackStage.pluginEntered);
+        _latencyTracker?.markStage(PlaybackStage.clientRequestSent);
+      } catch (_) {}
+      final stream = await _ytmService.resolveStream(videoId,
+          quality: quality, forceRefresh: forceRefresh);
+      if (stream.url.trim().isEmpty) {
+        throw const YtmException(
+            'YTM_UNAVAILABLE', 'Resolved stream URL is empty');
+      }
+      final expireParam = Uri.tryParse(stream.url)?.queryParameters['expire'];
+      DateTime expireAt;
+      if (expireParam != null) {
+        final rawExpire = int.tryParse(expireParam) ?? 0;
+        if (rawExpire > 9999999999) {
+          expireAt = DateTime.fromMillisecondsSinceEpoch(rawExpire);
+        } else if (rawExpire > 0) {
+          expireAt = DateTime.fromMillisecondsSinceEpoch(rawExpire * 1000);
+        } else {
+          expireAt = DateTime.now().add(const Duration(hours: 5));
+        }
       } else {
         expireAt = DateTime.now().add(const Duration(hours: 5));
       }
-    } else {
-      expireAt = DateTime.now().add(const Duration(hours: 5));
-    }
-    final safeExpiry = expireAt.subtract(const Duration(minutes: 5));
-    if (safeExpiry.isAfter(DateTime.now())) {
-      _addToStreamCache(cacheKey, (
+      final safeExpiry = expireAt.subtract(const Duration(minutes: 5));
+      if (safeExpiry.isAfter(DateTime.now())) {
+        _addToStreamCache(cacheKey, (
+          url: stream.url,
+          expires: safeExpiry,
+          userAgent: stream.userAgent,
+          cookies: stream.cookies
+        ));
+      }
+      AudioMemoryManager.trimStreamCache(_streamCache);
+      try {
+        _latencyTracker?.markStage(PlaybackStage.urlObtained);
+      } catch (_) {}
+      return (
         url: stream.url,
-        expires: safeExpiry,
         userAgent: stream.userAgent,
         cookies: stream.cookies
-      ));
-    }
-    AudioMemoryManager.trimStreamCache(_streamCache);
+      );
+    }();
+
+    _inFlightResolves[cacheKey] = future;
     try {
-      _latencyTracker?.markStage(PlaybackStage.urlObtained);
-    } catch (_) {}
-    return (
-      url: stream.url,
-      userAgent: stream.userAgent,
-      cookies: stream.cookies
-    );
+      return await future;
+    } finally {
+      _inFlightResolves.remove(cacheKey);
+    }
   }
 
   /// Non-blocking background cache warm for [song]. Populates the stream URL
@@ -1814,6 +1832,22 @@ class PulsrAudioHandler extends BaseAudioHandler
   // --- QUEUE & PLAYBACK COMMANDS ---
   Future<void> loadQueue(List<SongsTableData> songs,
       {int initialIndex = 0, Duration? initialPosition}) async {
+    // Immediately warm the target song so network resolution overlaps
+    // with crossfade cancellation, queue assembly, and player teardown.
+    final targetIdx =
+        initialIndex.clamp(0, songs.isEmpty ? 0 : songs.length - 1);
+    if (songs.isNotEmpty) {
+      final initialSong = songs[targetIdx];
+      if (initialSong.source == SongSource.youtube &&
+          (initialSong.remoteId?.isNotEmpty ?? false) &&
+          (initialSong.path.startsWith('ytmusic://') ||
+              initialSong.path.isEmpty ||
+              (!initialSong.path.startsWith('content:') &&
+                  initialSong.isDownloaded != true))) {
+        unawaited(_warmStreamCache(initialSong));
+      }
+    }
+
     _sleepTimerManager.cancelSleepTimer();
     await _crossfadeManager.cancel(_inactivePlayer, _activePlayer,
         restoreVolume: _volume);

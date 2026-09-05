@@ -1295,7 +1295,9 @@ class YtmAccountService {
     // Warm the native BotGuard attestation once so both the account-bound and
     // guest minting below have a live generator instead of a cold WebView.
     try {
-      await getIt<YtmService>().ensurePoTokenReady();
+      await getIt<YtmService>()
+          .ensurePoTokenReady()
+          .timeout(const Duration(seconds: 2));
     } catch (_) {}
     String? poToken;
     String? visitorData;
@@ -1315,7 +1317,9 @@ class YtmAccountService {
       }
       final dsid = _dataSyncId!;
       try {
-        final account = await getIt<YtmService>().getAccountPoToken(dsid);
+        final account = await getIt<YtmService>()
+            .getAccountPoToken(dsid)
+            .timeout(const Duration(seconds: 2));
         poToken = account?['poToken'] as String?;
         final vd = account?['visitorData'] as String?;
         visitorData =
@@ -1336,7 +1340,9 @@ class YtmAccountService {
     }
     if (poToken == null || poToken.isEmpty) {
       try {
-        final poState = await getIt<YtmService>().getPoTokenState();
+        final poState = await getIt<YtmService>()
+            .getPoTokenState()
+            .timeout(const Duration(seconds: 2));
         poToken = poState?['streamingPoToken'] as String?;
         visitorData ??= poState?['visitorData'] as String?;
       } catch (_) {}
@@ -1612,6 +1618,15 @@ class YtmAccountService {
           } else {
             debugPrint(
                 '[YTM_ACCOUNT] Client $client returned status $status but no audio formats (adaptiveFormats: ${adaptive.length} total, streamingData: ${streamingData != null})');
+          }
+        } else if (response.statusCode == 429 || response.statusCode == 403) {
+          debugPrint(
+              '[YTM_ACCOUNT] Client $client returned HTTP ${response.statusCode}');
+          consecutiveBlockSignals++;
+          if (consecutiveBlockSignals >= 2) {
+            debugPrint(
+                '[YTM_ACCOUNT] Short-circuiting Dart chain: $consecutiveBlockSignals consecutive block/rate-limit signals for $videoId');
+            return null;
           }
         }
       } catch (e) {

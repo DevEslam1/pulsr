@@ -177,7 +177,9 @@ class YtmService {
   /// Calls native PoTokenManager to ensure attestation tokens are ready.
   Future<bool> ensurePoTokenReady() async {
     try {
-      final ready = await _channel.invokeMethod<bool>('ensurePoTokenReady');
+      final ready = await _channel
+          .invokeMethod<bool>('ensurePoTokenReady')
+          .timeout(const Duration(seconds: 2));
       return ready ?? false;
     } catch (_) {
       return false;
@@ -187,15 +189,18 @@ class YtmService {
   /// Invalidates BotGuard poToken state on bot-detection block or session logout.
   Future<void> invalidatePoToken() async {
     try {
-      await _channel.invokeMethod<bool>('invalidatePoToken');
+      await _channel
+          .invokeMethod<bool>('invalidatePoToken')
+          .timeout(const Duration(seconds: 2));
     } catch (_) {}
   }
 
   /// Retrieves state of PoTokenManager.
   Future<Map<String, dynamic>?> getPoTokenState() async {
     try {
-      final state =
-          await _channel.invokeMethod<Map<Object?, Object?>>('getPoTokenState');
+      final state = await _channel
+          .invokeMethod<Map<Object?, Object?>>('getPoTokenState')
+          .timeout(const Duration(seconds: 2));
       if (state == null) return null;
       return state.map((k, v) => MapEntry(k.toString(), v));
     } catch (_) {
@@ -211,7 +216,7 @@ class YtmService {
       final state = await _channel.invokeMethod<Map<Object?, Object?>>(
         'getAccountPoToken',
         {'dataSyncId': dataSyncId},
-      );
+      ).timeout(const Duration(seconds: 2));
       if (state == null) return null;
       return state.map((k, v) => MapEntry(k.toString(), v));
     } catch (_) {

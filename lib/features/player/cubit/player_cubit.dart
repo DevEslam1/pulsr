@@ -728,13 +728,15 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       if (lyricsResult == null || lyricsResult.lines.isEmpty) {
         try {
           final lrclib = getIt<LrclibService>();
-          lyricsResult = await lrclib.fetchLyrics(
-            trackName: song.title,
-            artistName: song.artist,
-            albumName: song.album,
-            durationSeconds:
-                song.durationMs > 0 ? song.durationMs ~/ 1000 : null,
-          );
+          lyricsResult = await lrclib
+              .fetchLyrics(
+                trackName: song.title,
+                artistName: song.artist,
+                albumName: song.album,
+                durationSeconds:
+                    song.durationMs > 0 ? song.durationMs ~/ 1000 : null,
+              )
+              .timeout(const Duration(seconds: 4), onTimeout: () => null);
         } catch (e, st) {
           ErrorLogger.log('LRCLIB fetch error for ${song.title}',
               error: e, stackTrace: st, category: 'Lyrics');
@@ -754,7 +756,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
           videoId.isNotEmpty) {
         try {
           final ytmAccount = getIt<YtmAccountService>();
-          lyricsResult = await ytmAccount.fetchYtmLyrics(videoId);
+          lyricsResult = await ytmAccount
+              .fetchYtmLyrics(videoId)
+              .timeout(const Duration(seconds: 4), onTimeout: () => null);
         } catch (e, st) {
           ErrorLogger.log('YTM lyrics fetch error for $videoId',
               error: e, stackTrace: st, category: 'Lyrics');
@@ -849,37 +853,42 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       errorMessage: queueTruncationWarning,
     ));
 
-    // If playing an online song that has already been downloaded to the device, swap to local song
-    SongsTableData targetSong = song;
-    if (song.source == SongSource.youtube) {
-      try {
-        final match = await _repository.findMatchingLocalSong(
-          remoteId: song.remoteId,
-          title: song.title,
-          artist: song.artist,
-        );
-        if (_mediaItemResolutionGen != capturedGen) return;
-        final local = match.fold((_) => null, (s) => s);
-        if (local != null &&
-            (local.path.startsWith('content:') ||
-                await File(local.path).exists())) {
-          targetSong = local;
-          if (targetSong.id != song.id) {
-            effectiveQueue = effectiveQueue
-                .map((s) => s.id == song.id ? targetSong : s)
-                .toList();
-            safeEmit(state.copyWith(
-              queue: effectiveQueue,
-              currentSong: targetSong,
-            ));
-          }
-        }
-      } catch (_) {}
-    }
-
+    // Start loadQueue immediately — don't block on local-match DB query.
+    // The local-match check runs in parallel and swaps the source if found.
     try {
       _latencyTracker?.markStage(PlaybackStage.resolutionRequested);
     } catch (_) {}
+
+    // Fire-and-forget: check if a downloaded local copy exists and swap it in
+    if (song.source == SongSource.youtube) {
+      unawaited(() async {
+        try {
+          final match = await _repository.findMatchingLocalSong(
+            remoteId: song.remoteId,
+            title: song.title,
+            artist: song.artist,
+          );
+          if (_mediaItemResolutionGen != capturedGen) return;
+          final local = match.fold((_) => null, (s) => s);
+          if (local != null &&
+              (local.path.startsWith('content:') ||
+                  await File(local.path).exists())) {
+            if (_mediaItemResolutionGen != capturedGen) return;
+            if (local.id != song.id) {
+              _audioHandler.swapReconciledSong(song.id, local);
+              final swappedQueue = effectiveQueue
+                  .map((s) => s.id == song.id ? local : s)
+                  .toList();
+              safeEmit(state.copyWith(
+                queue: swappedQueue,
+                currentSong: local,
+              ));
+            }
+          }
+        } catch (_) {}
+      }());
+    }
+
     try {
       await _audioHandler.loadQueue(
         effectiveQueue,
@@ -895,7 +904,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       } catch (_) {}
       rethrow;
     }
-    unawaited(_loadLyricsForSong(targetSong));
+    unawaited(_loadLyricsForSong(song));
     _updateWidgetThrottled(force: true);
   }
 

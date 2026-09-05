@@ -27,6 +27,11 @@ class _TabletSideInspectorState extends State<TabletSideInspector> {
     final p = context.palette;
 
     return BlocBuilder<PlayerCubit, PlayerState>(
+      buildWhen: (prev, curr) =>
+          prev.queue.length != curr.queue.length ||
+          prev.lyrics != curr.lyrics ||
+          prev.isLoadingLyrics != curr.isLoadingLyrics ||
+          prev.lyricsSource != curr.lyricsSource,
       builder: (context, state) {
         final activeColor = p.accent;
 
@@ -169,7 +174,6 @@ class _TabletSideInspectorState extends State<TabletSideInspector> {
                         padding: const EdgeInsets.all(8.0),
                         child: LyricsView(
                           lyrics: state.lyrics,
-                          currentPosition: state.position,
                           isLoading: state.isLoadingLyrics,
                           activeColor: activeColor,
                           source: state.lyricsSource,
