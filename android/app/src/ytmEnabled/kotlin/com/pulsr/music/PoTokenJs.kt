@@ -71,11 +71,19 @@ internal fun stringToU8(identifier: String): String = newUint8Array(identifier.t
  * by commas, e.g. "97,98,99" for "abc" — into the base64 flavour poTokens use.
  */
 internal fun u8ToBase64(poToken: String): String {
-    val bytes = poToken.split(",").map { it.trim().toUByte().toByte() }.toByteArray()
+    val trimmed = poToken.trim()
+    if (trimmed.isEmpty()) throw PoTokenException("Empty poToken U8 array")
+    val parts = trimmed.split(",")
+    val bytes = ByteArray(parts.size)
+    for (i in parts.indices) {
+        val u = parts[i].trim().toUByteOrNull()
+            ?: throw PoTokenException("Invalid poToken U8 value: '${parts[i]}'")
+        bytes[i] = u.toByte()
+    }
     return try {
         java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(bytes)
     } catch (_: Throwable) {
-        Base64.encodeToString(bytes, Base64.NO_WRAP or Base64.URL_SAFE)
+        Base64.encodeToString(bytes, Base64.NO_WRAP or Base64.URL_SAFE).trimEnd('=')
     }
 }
 
@@ -94,14 +102,23 @@ private fun newUint8Array(contents: ByteArray): String =
     }
 
 private fun base64ToBytes(base64: String): ByteArray {
-    val normalized = base64.replace('-', '+').replace('_', '/').replace('.', '=')
+    val unpadded = base64.trim()
+    val padded = when (unpadded.length % 4) {
+        2 -> "$unpadded=="
+        3 -> "$unpadded="
+        else -> unpadded
+    }
     return try {
-        java.util.Base64.getDecoder().decode(normalized)
+        java.util.Base64.getUrlDecoder().decode(padded)
     } catch (_: Throwable) {
         try {
-            Base64.decode(normalized, Base64.DEFAULT)
-        } catch (e: IllegalArgumentException) {
-            throw PoTokenException("Cannot base64 decode: ${e.message}")
+            java.util.Base64.getDecoder().decode(padded.replace('-', '+').replace('_', '/'))
+        } catch (_: Throwable) {
+            try {
+                Base64.decode(padded, Base64.URL_SAFE or Base64.NO_WRAP)
+            } catch (e: Exception) {
+                throw PoTokenException("Cannot base64 decode: ${e.message}")
+            }
         }
     }
 }

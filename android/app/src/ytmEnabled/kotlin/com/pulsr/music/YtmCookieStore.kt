@@ -110,6 +110,8 @@ internal class YtmCookieStore private constructor(context: Context) {
                 val c = cm.getCookie(domain) ?: continue
                 parseInto(googleOnly, c)
             }
+            // Clear existing cookies before refresh so stale/expired session entries don't linger (Y-H11)
+            cookies.clear()
             for (domain in YOUTUBE_DOMAINS) {
                 val c = cm.getCookie(domain) ?: continue
                 parseAndPut(c)
@@ -230,11 +232,29 @@ internal class YtmCookieStore private constructor(context: Context) {
     fun getMergedCookieHeader(targetHost: String? = null): String? {
         synchronized(lock) {
             if (cookies.isEmpty()) return null
+
+            // Refuse non-YouTube / non-Google hosts explicitly to avoid credential leakage (Y-C5)
+            if (targetHost != null && !isYouTubeOrGoogleHost(targetHost)) {
+                return null
+            }
+
             val youtubeTarget = isYouTubeHost(targetHost)
-            val entries = cookies.entries.filter { youtubeTarget.not() || isSendableToYouTube(it.key) }
+            val entries = cookies.entries.filter {
+                if (youtubeTarget) isSendableToYouTube(it.key) else true
+            }
             if (entries.isEmpty()) return null
             return entries.joinToString("; ") { "${it.key}=${it.value}" }
         }
+    }
+
+    private fun isYouTubeOrGoogleHost(targetHost: String?): Boolean {
+        if (targetHost == null) return true
+        val host = runCatching { java.net.URI(targetHost).host }.getOrNull()
+            ?: targetHost.substringAfter("//").substringBefore("/").substringBefore(":")
+        val lower = host.lowercase().removePrefix(".")
+        return lower == "youtube.com" || lower.endsWith(".youtube.com") ||
+               lower == "google.com" || lower.endsWith(".google.com") ||
+               lower == "googleusercontent.com" || lower.endsWith(".googleusercontent.com")
     }
 
     private fun isYouTubeHost(targetHost: String?): Boolean {
@@ -300,14 +320,21 @@ internal class YtmCookieStore private constructor(context: Context) {
             markSignedOut(true)
             runCatching {
                 val cm = CookieManager.getInstance()
+                val explicitDomains = listOf(
+                    ".youtube.com",
+                    ".music.youtube.com",
+                    "music.youtube.com",
+                    "www.youtube.com",
+                    "youtube.com",
+                    ".google.com",
+                    "accounts.google.com"
+                )
                 for (domain in DOMAINS) {
-                    val host = runCatching { java.net.URI(domain).host }.getOrNull() ?: continue
                     for (name in trackedNames) {
-                        // Expire on both the exact host and the registrable
-                        // domain: YouTube sets some names on `.youtube.com`.
                         cm.setCookie(domain, "$name=; Max-Age=0; Path=/")
-                        val dotted = host.substringAfter("www.").substringAfter("music.")
-                        cm.setCookie(domain, "$name=; Max-Age=0; Path=/; Domain=.$dotted")
+                        for (d in explicitDomains) {
+                            cm.setCookie(domain, "$name=; Max-Age=0; Path=/; Domain=$d")
+                        }
                     }
                 }
                 cm.flush()

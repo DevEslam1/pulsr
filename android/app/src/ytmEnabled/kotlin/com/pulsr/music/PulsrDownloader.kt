@@ -10,6 +10,9 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.zip.GZIPInputStream
 
+/** Thrown when YouTube responds with HTTP 429 Too Many Requests. Extends IOException for NewPipe compatibility. */
+class RateLimitedException(message: String, val retryAfterMs: Long? = null) : IOException(message)
+
 /**
  * Hardened HTTP Downloader for NewPipeExtractor.
  *
@@ -53,10 +56,10 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
             }
 
             // Attach cookies from YtmCookieStore or native CookieManager.
-            // Skip the /youtubei/v1/player endpoint: NewPipe resolves streams as a guest (guest
-            // poToken + guest visitorData), so attaching account cookies there produces a
-            // cookie/token mismatch YouTube rejects. Cookies still flow to browse/search/next.
-            if (!isPlayerRequest(request.url())) {
+            // When user is signed in with a valid session, allow attaching cookies
+            // to player requests as well so age-restricted/member streams can resolve.
+            val allowCookiesForPlayer = context?.let { YtmCookieStore.getInstance(it).isSessionValid() } == true
+            if (!isPlayerRequest(request.url()) || allowCookiesForPlayer) {
                 val rawCookieHeader = resolveCookies(request.url())
                 if (!rawCookieHeader.isNullOrEmpty()) {
                     val cookieHeader = sanitizeCookieHeader(rawCookieHeader)
@@ -92,12 +95,13 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
                 val retryAfter = connection.getHeaderField("Retry-After")?.trim()?.toLongOrNull()
                 RateLimiter.shared.onRateLimited(retryAfter)
                 ProxyManager.onPathFailed(request.url())
-                throw ReCaptchaException("HTTP 429 Too Many Requests: Rate limited by YouTube", request.url())
+                throw RateLimitedException("HTTP 429 Too Many Requests: Rate limited by YouTube", retryAfter)
             }
 
             val stream = if (code >= 400) connection.errorStream else connection.inputStream
             val body = stream?.let { raw ->
-                val decoded = if (connection.contentEncoding.equals("gzip", ignoreCase = true)) {
+                val isGzip = connection.contentEncoding?.equals("gzip", ignoreCase = true) == true
+                val decoded = if (isGzip) {
                     GZIPInputStream(raw)
                 } else {
                     raw

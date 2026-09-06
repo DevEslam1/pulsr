@@ -95,22 +95,13 @@ class RateLimiter(
      * in which case no permit is held and the caller must not release one.
      */
     fun acquirePermit(bucket: Bucket = Bucket.PLAYER): Boolean {
-        // 1. Global in-flight concurrency limiter
-        try {
-            globalSemaphore.acquire()
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
-            return false
-        }
-
         while (true) {
+            // 1. Backoff check: sleep outside the global concurrency permit to prevent
+            // starvations of unrelated calls or pools.
             val now = clock.elapsedRealtime()
             val backoffUntil = backoffUntilTimestamp.get()
 
             if (now < backoffUntil) {
-                // Per-waiter jitter: without it every parked caller wakes in the
-                // same millisecond against a freshly refilled bucket, firing a
-                // burst the instant a long ban lifts.
                 val sleepTime = backoffUntil - now + Random.nextLong(0L, 2000L)
                 if (sleepTime > 0) {
                     lock.lock()
@@ -118,12 +109,26 @@ class RateLimiter(
                         condition.await(sleepTime, TimeUnit.MILLISECONDS)
                     } catch (_: InterruptedException) {
                         Thread.currentThread().interrupt()
-                        globalSemaphore.release()
                         return false
                     } finally {
                         lock.unlock()
                     }
                 }
+                continue
+            }
+
+            // 2. Global in-flight concurrency limiter
+            try {
+                globalSemaphore.acquire()
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return false
+            }
+
+            // Check if backoff arrived while waiting on the semaphore
+            val postAcquireNow = clock.elapsedRealtime()
+            if (postAcquireNow < backoffUntilTimestamp.get()) {
+                globalSemaphore.release()
                 continue
             }
 
@@ -133,32 +138,32 @@ class RateLimiter(
                 // this off "no success for 10 minutes" would reset the backoff
                 // in the middle of a block, which is when it is needed most.
                 val cleanSince = cleanSinceTimestamp.get()
-                if (cleanSince > 0 && consecutiveThrottles.get() == 0 && (now - cleanSince) > CLEAN_DECAY_MS) {
+                if (cleanSince > 0 && consecutiveThrottles.get() == 0 && (postAcquireNow - cleanSince) > CLEAN_DECAY_MS) {
                     adaptiveMultiplier.set(1)
-                    cleanSinceTimestamp.set(now)
+                    cleanSinceTimestamp.set(postAcquireNow)
                 }
 
-                val state = bucketStates[bucket] ?: BucketState(bucket, bucket.maxTokens.toDouble(), now).also {
+                val state = bucketStates[bucket] ?: BucketState(bucket, bucket.maxTokens.toDouble(), postAcquireNow).also {
                     bucketStates[bucket] = it
                 }
 
                 // Refill bucket tokens
-                val elapsedSec = (now - state.lastRefill) / 1000.0
+                val elapsedSec = (postAcquireNow - state.lastRefill) / 1000.0
                 if (elapsedSec > 0) {
                     state.availableTokens = min(bucket.maxTokens.toDouble(), state.availableTokens + (elapsedSec * bucket.refillPerSecond))
-                    state.lastRefill = now
+                    state.lastRefill = postAcquireNow
                 }
 
                 // Check respectful human pacing gap
                 if (respectfulMode && bucket.minGapMs > 0 && state.lastRequest > 0) {
-                    val gapElapsed = now - state.lastRequest
+                    val gapElapsed = postAcquireNow - state.lastRequest
                     if (gapElapsed < bucket.minGapMs) {
                         val waitGap = bucket.minGapMs - gapElapsed + (0..150).random()
+                        globalSemaphore.release()
                         try {
                             condition.await(waitGap, TimeUnit.MILLISECONDS)
                         } catch (_: InterruptedException) {
                             Thread.currentThread().interrupt()
-                            globalSemaphore.release()
                             return false
                         }
                         continue
@@ -167,16 +172,16 @@ class RateLimiter(
 
                 if (state.availableTokens >= 1.0) {
                     state.availableTokens -= 1.0
-                    state.lastRequest = now
+                    state.lastRequest = postAcquireNow
                     return true
                 }
 
                 val waitTimeMs = ((1.0 - state.availableTokens) / bucket.refillPerSecond * 1000.0).toLong().coerceIn(50L, 500L)
+                globalSemaphore.release()
                 try {
                     condition.await(waitTimeMs, TimeUnit.MILLISECONDS)
                 } catch (_: InterruptedException) {
                     Thread.currentThread().interrupt()
-                    globalSemaphore.release()
                     return false
                 }
             } finally {
@@ -271,6 +276,7 @@ class RateLimiter(
                 it.availableTokens = it.bucket.maxTokens.toDouble()
                 it.lastRefill = now
             }
+            condition.signalAll()
         } finally {
             lock.unlock()
         }

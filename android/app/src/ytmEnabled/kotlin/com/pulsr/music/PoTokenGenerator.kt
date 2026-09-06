@@ -1,6 +1,7 @@
 package com.pulsr.music
 
 import java.io.Closeable
+import java.time.Instant
 
 /**
  * Mints the proof-of-origin tokens YouTube requires before it will hand out stream
@@ -19,4 +20,7 @@ internal interface PoTokenGenerator : Closeable {
 
     /** Once expired, every token this generator produced is rejected by YouTube. */
     fun isExpired(): Boolean
+
+    /** The exact instant when this generator expires, or null if unknown. */
+    fun expirationInstant(): Instant? = null
 }

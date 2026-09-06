@@ -138,26 +138,50 @@ internal object ClientCapabilityMatrix {
         )
     )
 
+    enum class CapabilityLoadState {
+        NOT_LOADED,
+        LOADED_FROM_ASSETS,
+        FALLBACK_DEFAULTS,
+        PARSE_ERROR
+    }
+
+    @Volatile
+    var loadState: CapabilityLoadState = CapabilityLoadState.NOT_LOADED
+        private set
+
+    @Volatile
+    private var isInitialized = false
+
     @Volatile
     private var capabilities: Map<InnertubeClient.ClientType, ClientCapability> = defaultCapabilities
 
     fun init(context: Context) {
-        try {
-            val jsonString = context.assets.open(ASSET_FILE).bufferedReader().use { it.readText() }
-            loadFromJson(jsonString)
-        } catch (e: Exception) {
-            Log.w(TAG, "Failed loading $ASSET_FILE from assets, using built-in matrix defaults: ${e.message}")
-            capabilities = defaultCapabilities
+        if (isInitialized) return
+        synchronized(this) {
+            if (isInitialized) return
+            try {
+                val jsonString = context.assets.open(ASSET_FILE).bufferedReader().use { it.readText() }
+                loadFromJson(jsonString)
+                loadState = CapabilityLoadState.LOADED_FROM_ASSETS
+            } catch (e: Exception) {
+                Log.w(TAG, "Failed loading $ASSET_FILE from assets, using built-in matrix defaults: ${e.message}")
+                capabilities = defaultCapabilities
+                loadState = CapabilityLoadState.FALLBACK_DEFAULTS
+            }
+            isInitialized = true
         }
     }
 
     fun loadFromJson(jsonString: String) {
         try {
             val root = JSONObject(jsonString)
-            val clientsJson = root.optJSONObject("clients") ?: return
+            val clientsJson = root.optJSONObject("clients") ?: run {
+                loadState = CapabilityLoadState.PARSE_ERROR
+                return
+            }
             val mutable = mutableMapOf<InnertubeClient.ClientType, ClientCapability>()
 
-            for (type in InnertubeClient.ClientType.values()) {
+            for (type in InnertubeClient.ClientType.entries) {
                 val clientObj = clientsJson.optJSONObject(type.name)
                 if (clientObj != null) {
                     // Each field falls back to the built-in capability, not to a blanket
@@ -182,10 +206,12 @@ internal object ClientCapabilityMatrix {
                 }
             }
             capabilities = mutable
+            loadState = CapabilityLoadState.LOADED_FROM_ASSETS
             Log.i(TAG, "Successfully loaded client capabilities matrix (${mutable.size} clients)")
         } catch (e: Exception) {
             Log.w(TAG, "Error parsing client capability JSON, falling back to defaults", e)
             capabilities = defaultCapabilities
+            loadState = CapabilityLoadState.PARSE_ERROR
         }
     }
 

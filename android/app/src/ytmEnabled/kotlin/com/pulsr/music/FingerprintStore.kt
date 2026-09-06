@@ -26,8 +26,10 @@ internal object FingerprintStore {
     // the Dart Innertube contexts send the same pair. A native fingerprint that
     // disagrees with those is a stronger bot signal than a "wrong" but coherent
     // one, so this is the single source of truth rather than four literals.
-    const val DEFAULT_HL = "en"
-    const val DEFAULT_GL = "EG"
+    val DEFAULT_HL: String
+        get() = java.util.Locale.getDefault().language.ifBlank { "en" }.lowercase()
+    val DEFAULT_GL: String
+        get() = java.util.Locale.getDefault().country.ifBlank { "US" }.uppercase()
 
     internal data class DeviceFingerprint(
         val installUuid: String,
@@ -39,15 +41,16 @@ internal object FingerprintStore {
         val gl: String = DEFAULT_GL
     ) {
         fun buildUserAgent(clientType: InnertubeClient.ClientType): String {
+            val ver = clientType.effectiveClientVersion
             return when (clientType) {
                 InnertubeClient.ClientType.ANDROID_MUSIC ->
-                    "com.google.android.apps.youtube.music/8.32.50 (Linux; U; Android $osVersion; ${hl}_${gl}; $deviceModel) gzip"
+                    "com.google.android.apps.youtube.music/$ver (Linux; U; Android $osVersion; ${hl}_${gl}; $deviceModel) gzip"
                 InnertubeClient.ClientType.ANDROID_VR ->
-                    "com.google.android.apps.youtube.vr.oculus/1.63.27 (Linux; U; Android 12; ${hl}_${gl}; Quest 2) gzip"
+                    "com.google.android.apps.youtube.vr.oculus/$ver (Linux; U; Android 12; ${hl}_${gl}; Quest 2) gzip"
                 InnertubeClient.ClientType.ANDROID_CREATOR ->
-                    "com.google.android.apps.youtube.creator/24.45.100 (Linux; U; Android 13; ${hl}_${gl}) gzip"
+                    "com.google.android.apps.youtube.creator/$ver (Linux; U; Android 13; ${hl}_${gl}) gzip"
                 InnertubeClient.ClientType.IOS_MUSIC ->
-                    "com.google.ios.youtubemusic/8.32.1 (iPhone15,3; U; CPU iOS 18_0 like Mac OS X; ${hl}_${gl})"
+                    "com.google.ios.youtubemusic/$ver (iPhone15,3; U; CPU iOS 18_0 like Mac OS X; ${hl}_${gl})"
                 InnertubeClient.ClientType.TVHTML5_SIMPLY_EMBEDDED_PLAYER ->
                     "Mozilla/5.0 (SMART-TV; Linux; Tizen 6.0) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/4.0 Chrome/76.0.3809.146 TV Safari/537.36"
                 InnertubeClient.ClientType.MWEB ->
@@ -55,7 +58,7 @@ internal object FingerprintStore {
                 InnertubeClient.ClientType.WEB_REMIX, InnertubeClient.ClientType.WEB_EMBEDDED_PLAYER ->
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"
                 InnertubeClient.ClientType.ANDROID_TESTSUITE ->
-                    "com.google.android.youtube/1.9 (Linux; U; Android 9; gzip)"
+                    "com.google.android.youtube/$ver (Linux; U; Android 9; gzip)"
             }
         }
     }
@@ -120,6 +123,17 @@ internal object FingerprintStore {
             prefs.edit().clear().apply()
             cachedFingerprint = null
             return getFingerprint(context)
+        }
+    }
+
+    fun updateLocale(context: Context, hl: String?, gl: String?) {
+        synchronized(this) {
+            val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            val editor = prefs.edit()
+            if (!hl.isNullOrBlank()) editor.putString(KEY_HL, hl)
+            if (!gl.isNullOrBlank()) editor.putString(KEY_GL, gl)
+            editor.apply()
+            cachedFingerprint = null
         }
     }
 }

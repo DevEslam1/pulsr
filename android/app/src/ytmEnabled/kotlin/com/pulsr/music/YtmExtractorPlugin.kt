@@ -127,9 +127,32 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
     }
 
     private fun captureLocale(call: MethodCall) {
-        if (extractorReady) return
-        call.argument<String>("country")?.let { pendingCountry = it }
-        call.argument<String>("lang")?.let { pendingLang = it }
+        val country = call.argument<String>("country")?.takeIf { it.isNotBlank() }
+        val lang = call.argument<String>("lang")?.takeIf { it.isNotBlank() }
+        var changed = false
+        if (country != null && country != pendingCountry) {
+            pendingCountry = country
+            changed = true
+        }
+        if (lang != null && lang != pendingLang) {
+            pendingLang = lang
+            changed = true
+        }
+        if (changed && extractorReady) {
+            val ctx = context?.applicationContext
+            if (ctx != null) {
+                FingerprintStore.updateLocale(ctx, pendingLang, pendingCountry)
+                runCatching {
+                    val locale = resolveLocale()
+                    val countryCode = (pendingCountry ?: locale.country).ifBlank { "US" }
+                    NewPipe.init(
+                        PulsrDownloader(ctx),
+                        Localization.fromLocale(locale),
+                        ContentCountry(countryCode),
+                    )
+                }
+            }
+        }
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -331,21 +354,29 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
     }
 
     private fun runOffMainThread(result: MethodChannel.Result, work: () -> Any?) {
-        executor.execute {
-            try {
-                ensureExtractorReady()
-                val value = work()
-                mainHandler.post { runCatching { result.success(value) } }
-            } catch (e: Throwable) {
-                Log.w(TAG, "YTM native request failed: ${e.message}")
-                val code = errorCodeFor(e)
-                val details = if (e is InnertubeClient.InnertubeException) {
-                    mapOf("signal" to e.signal.code, "traceId" to e.traceId)
-                } else {
-                    null
+        if (executor.isShutdown || executor.isTerminated) {
+            result.error("YTM_SHUTDOWN", "YTM extractor is shutting down", null)
+            return
+        }
+        try {
+            executor.execute {
+                try {
+                    ensureExtractorReady()
+                    val value = work()
+                    mainHandler.post { runCatching { result.success(value) } }
+                } catch (e: Throwable) {
+                    Log.w(TAG, "YTM native request failed: ${e.message}")
+                    val code = errorCodeFor(e)
+                    val details = if (e is InnertubeClient.InnertubeException) {
+                        mapOf("signal" to e.signal.code, "traceId" to e.traceId)
+                    } else {
+                        null
+                    }
+                    mainHandler.post { runCatching { result.error(code, e.message, details) } }
                 }
-                mainHandler.post { runCatching { result.error(code, e.message, details) } }
             }
+        } catch (e: java.util.concurrent.RejectedExecutionException) {
+            result.error("YTM_SHUTDOWN", "YTM extractor is shutting down", null)
         }
     }
 
@@ -397,6 +428,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
     private fun search(query: String, limit: Int): List<Map<String, Any?>> {
         val results = mutableListOf<Map<String, Any?>>()
         val seenVideoIds = mutableSetOf<String>()
+        var primaryError: Throwable? = null
 
         // 1. Primary: MUSIC_SONGS
         try {
@@ -415,10 +447,14 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             }
         } catch (e: Exception) {
             Log.w(TAG, "Primary songs search failed: ${e.message}")
+            primaryError = e
         }
 
-        // 2. Fallback if empty: General search
+        // 2. Fallback if empty: General search only if not throttled/blocked
         if (results.isEmpty()) {
+            if (primaryError is ReCaptchaException || primaryError is RateLimitedException) {
+                throw primaryError
+            }
             try {
                 val generalExtractor = ServiceList.YouTube.getSearchExtractor(query)
                 generalExtractor.fetchPage()
@@ -431,6 +467,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "General search fallback failed: ${e.message}")
+                if (primaryError != null && results.isEmpty()) throw primaryError
             }
         }
 
@@ -438,18 +475,14 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
     }
 
     private fun trending(limit: Int): List<Map<String, Any?>> {
-        return try {
-            val kioskList = ServiceList.YouTube.kioskList
-            val kioskExtractor = kioskList.getExtractorById(kioskList.defaultKioskId, null)
-            kioskExtractor.fetchPage()
-            val kioskInfo = org.schabi.newpipe.extractor.kiosk.KioskInfo.getInfo(kioskExtractor)
-            streamItemsToMaps(
-                kioskInfo.relatedItems.asSequence().filterIsInstance<StreamInfoItem>(),
-                limit,
-            )
-        } catch (_: Throwable) {
-            emptyList()
-        }
+        val kioskList = ServiceList.YouTube.kioskList
+        val kioskExtractor = kioskList.getExtractorById(kioskList.defaultKioskId, null)
+        kioskExtractor.fetchPage()
+        val kioskInfo = org.schabi.newpipe.extractor.kiosk.KioskInfo.getInfo(kioskExtractor)
+        return streamItemsToMaps(
+            kioskInfo.relatedItems.asSequence().filterIsInstance<StreamInfoItem>(),
+            limit,
+        )
     }
 
     /**
@@ -510,11 +543,13 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         }
 
         val tracks = streamItemsToMaps(allItems.asSequence(), limit)
+        val isTruncated = (nextPage != null && allItems.size >= limit) || pageCount >= 10
         return mapOf(
             "title" to playlistInfo.name,
             "uploader" to (playlistInfo.uploaderName ?: ""),
             "thumbnailUrl" to bestArtwork(playlistInfo.thumbnails),
             "tracks" to tracks,
+            "isTruncated" to isTruncated,
         )
     }
 
@@ -548,6 +583,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
 
                     // Follow continuation pages
                     val allTracks = tracks.toMutableList()
+                    val seenIds = tracks.mapNotNull { it["videoId"] as? String }.toMutableSet()
                     var currentJson = json
                     var pageCount = 0
                     while (allTracks.size < limit && pageCount < 10) {
@@ -556,7 +592,12 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                             val contJson = client.requestContinuation(token)
                             val contTracks = parseInnertubeTracksFromJson(contJson, limit - allTracks.size)
                             if (contTracks.isEmpty()) break
-                            allTracks.addAll(contTracks)
+                            for (t in contTracks) {
+                                val vid = t["videoId"] as? String
+                                if (vid == null || seenIds.add(vid)) {
+                                    allTracks.add(t)
+                                }
+                            }
                             currentJson = contJson
                             pageCount++
                         } catch (e: Exception) {
@@ -570,6 +611,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                         "uploader" to "",
                         "thumbnailUrl" to null,
                         "tracks" to allTracks.take(limit),
+                        "isTruncated" to (allTracks.size >= limit || pageCount >= 10),
                     )
                 }
             } catch (e: Throwable) {
@@ -594,6 +636,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         limit: Int,
     ): List<Map<String, Any?>> {
         val results = mutableListOf<Map<String, Any?>>()
+        val seenVideoIds = mutableSetOf<String>()
 
         fun parseRenderer(renderer: org.json.JSONObject) {
             val videoId = renderer.optString("videoId").takeIf { it.length == 11 } ?: run {
@@ -603,6 +646,8 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                     ?.optString("videoId")
                     ?.takeIf { it.length == 11 }
             } ?: return
+
+            if (!seenVideoIds.add(videoId)) return
 
             // Title from flexColumns[0]
             var title = "Unknown Title"
@@ -850,11 +895,13 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         return runCatching { Uri.parse(url).getQueryParameter("expire")?.toLongOrNull() }.getOrNull()
     }
 
-    private fun streamItemsToMaps(items: Sequence<StreamInfoItem>, limit: Int): List<Map<String, Any?>> =
-        items
+    private fun streamItemsToMaps(items: Sequence<StreamInfoItem>, limit: Int): List<Map<String, Any?>> {
+        val seen = mutableSetOf<String>()
+        return items
             .filterNot { it.streamType == StreamType.LIVE_STREAM || it.streamType == StreamType.AUDIO_LIVE_STREAM }
             .mapNotNull { item ->
                 val videoId = videoIdOf(item.url) ?: return@mapNotNull null
+                if (!seen.add(videoId)) return@mapNotNull null
                 mapOf(
                     "videoId" to videoId,
                     "title" to item.name,
@@ -865,6 +912,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             }
             .take(limit)
             .toList()
+    }
 
     private fun videoIdOf(url: String?): String? {
         if (url == null) return null
@@ -896,7 +944,10 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
     fun cleanup() {
         channel?.setMethodCallHandler(null)
         channel = null
-        executor.shutdownNow()
-        InnertubeClient.shutdown()
+        try {
+            executor.shutdownNow()
+        } catch (_: Exception) {}
+        runCatching { PoTokenManager.invalidate() }
+        runCatching { InnertubeClient.shutdown() }
     }
 }

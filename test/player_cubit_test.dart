@@ -969,14 +969,13 @@ void main() {
         await cubit.swapReconciledSong(301, 303);
         expect(cubit.state.currentSong?.id, equals(303));
 
-        // Queue slot operations
+        // Queue slot operations: empty slot switch is rejected to protect live queue
         when(
           () => mockRepository.getSongsByIds([303]),
         ).thenAnswer((_) async => Right([songC]));
         await cubit.switchQueueSlot(1);
-        expect(cubit.state.activeQueueSlot, equals(1));
-        await cubit.switchQueueSlot(0);
         expect(cubit.state.activeQueueSlot, equals(0));
+        expect(cubit.state.errorMessage, equals('Queue slot is empty'));
 
         await cubit.close();
       },

@@ -20,7 +20,8 @@ enum class YtmBlockSignal(val code: String) {
     GeoBlocked("GEO_BLOCKED"),
     SignInRequired("SIGN_IN_REQUIRED"),
     VideoGone("VIDEO_GONE"),
-    NetworkUnavailable("YTM_NETWORK");
+    NetworkUnavailable("YTM_NETWORK"),
+    SignatureDecipherFailed("SIGNATURE_DECIPHER_FAILED");
 
     companion object {
         private val BOT_SUBSTRINGS = listOf(
@@ -139,14 +140,7 @@ enum class YtmBlockSignal(val code: String) {
                 return RateLimited
             }
 
-            // 3. Client Deprecated (HTTP 400 or API key / version errors)
-            if (httpCode == 400 ||
-                topLevelError?.optInt("code") == 400 ||
-                DEPRECATED_SUBSTRINGS.any { combinedReasons.contains(it) }) {
-                return ClientDeprecated
-            }
-
-            // 4. PoToken Invalid (403 on stream URL / empty adaptiveFormats with 200)
+            // 3. PoToken Invalid (403 on stream URL / empty adaptiveFormats with 200)
             if (combinedReasons.contains("potoken") ||
                 combinedReasons.contains("po_token_invalid") ||
                 combinedReasons.contains("integrity token") ||
@@ -155,12 +149,20 @@ enum class YtmBlockSignal(val code: String) {
                 return PoTokenInvalid
             }
 
-            // 5. Geo Blocked
+            // 4. Geo Blocked
             if (status == "UNPLAYABLE" && GEO_SUBSTRINGS.any { combinedReasons.contains(it) }) {
                 return GeoBlocked
             }
             if (GEO_SUBSTRINGS.any { combinedReasons.contains(it) }) {
                 return GeoBlocked
+            }
+
+            // 5. Sign In Required (legitimate auth requirement without bot flags)
+            if (status == "LOGIN_REQUIRED" ||
+                combinedReasons.contains("login_required") ||
+                combinedReasons.contains("sign in to access") ||
+                combinedReasons.contains("authentication required")) {
+                return SignInRequired
             }
 
             // 6. Video Gone / Removed / Private.
@@ -178,20 +180,19 @@ enum class YtmBlockSignal(val code: String) {
                 return VideoGone
             }
 
-            // 7. Sign In Required (legitimate auth requirement without bot flags)
-            if (status == "LOGIN_REQUIRED" ||
-                combinedReasons.contains("login_required") ||
-                combinedReasons.contains("sign in to access") ||
-                combinedReasons.contains("authentication required")) {
-                return SignInRequired
-            }
-
-            // 8. IP Blocked (403 without bot wording, or general access denied)
+            // 7. IP Blocked (403 without bot wording, or general access denied)
             if (httpCode == 403 ||
                 combinedReasons.contains("forbidden") ||
                 combinedReasons.contains("access denied") ||
                 combinedReasons.contains("ip blocked")) {
                 return IpBlocked
+            }
+
+            // 8. Client Deprecated (HTTP 400 or API key / version errors)
+            if (httpCode == 400 ||
+                topLevelError?.optInt("code") == 400 ||
+                DEPRECATED_SUBSTRINGS.any { combinedReasons.contains(it) }) {
+                return ClientDeprecated
             }
 
             // Fallback categorization based on HTTP codes

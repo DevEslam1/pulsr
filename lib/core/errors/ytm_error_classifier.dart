@@ -17,7 +17,8 @@ enum YtmBlockSignal {
   geoBlocked,
   signInRequired,
   videoGone,
-  networkUnavailable;
+  networkUnavailable,
+  signatureDecipherFailed;
 
   static YtmBlockSignal? fromCode(String code) {
     switch (code.toUpperCase()) {
@@ -58,6 +59,8 @@ enum YtmBlockSignal {
       case 'YTM_UNAVAILABLE':
       case 'YTM_404':
         return YtmBlockSignal.videoGone;
+      case 'SIGNATURE_DECIPHER_FAILED':
+        return YtmBlockSignal.signatureDecipherFailed;
       default:
         return null;
     }
@@ -503,6 +506,13 @@ class YtmErrorClassifier {
         );
       case YtmBlockSignal.networkUnavailable:
         return _networkInfo(traceId);
+      case YtmBlockSignal.signatureDecipherFailed:
+        return YtmErrorInfo(
+          message: 'Signature deciphering unavailable for this format.',
+          recoveryAction: YtmRecoveryAction.rotateIdentity,
+          signal: signal,
+          traceId: traceId,
+        );
     }
   }
 }

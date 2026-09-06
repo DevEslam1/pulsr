@@ -133,23 +133,25 @@ internal class InnertubeClient(
          * new build — before this the matrix was loaded, logged and then ignored.
          */
         val effectiveClientVersion: String
-            get() = when (this) {
-                WEB_REMIX, WEB_EMBEDDED_PLAYER -> {
-                    val dateStr = SimpleDateFormat("yyyyMMdd", Locale.US).apply {
-                        timeZone = TimeZone.getTimeZone("UTC")
-                    }.format(Date())
-                    "1.$dateStr.01.00"
+            get() = ClientCapabilityMatrix.getCapability(this)
+                .defaultClientVersion
+                .ifBlank {
+                    when (this) {
+                        WEB_REMIX, WEB_EMBEDDED_PLAYER -> {
+                            val dateStr = SimpleDateFormat("yyyyMMdd", Locale.US).apply {
+                                timeZone = TimeZone.getTimeZone("UTC")
+                            }.format(Date())
+                            "1.$dateStr.01.00"
+                        }
+                        MWEB -> {
+                            val dateStr = SimpleDateFormat("yyyyMMdd", Locale.US).apply {
+                                timeZone = TimeZone.getTimeZone("UTC")
+                            }.format(Date())
+                            "2.$dateStr.01.00"
+                        }
+                        else -> clientVersion
+                    }
                 }
-                MWEB -> {
-                    val dateStr = SimpleDateFormat("yyyyMMdd", Locale.US).apply {
-                        timeZone = TimeZone.getTimeZone("UTC")
-                    }.format(Date())
-                    "2.$dateStr.01.00"
-                }
-                else -> ClientCapabilityMatrix.getCapability(this)
-                    .defaultClientVersion
-                    .ifBlank { clientVersion }
-            }
 
         /** `x-youtube-client-name`, overridable through the capability matrix. */
         val effectiveClientNameId: String
@@ -245,8 +247,7 @@ internal class InnertubeClient(
                             PoTokenManager.triggerBackgroundRefresh()
                         }
                     }
-                    if (parsedSignal == YtmBlockSignal.IpBlocked ||
-                        parsedSignal == YtmBlockSignal.BotChallenge) {
+                    if (parsedSignal == YtmBlockSignal.IpBlocked) {
                         blockClients.add(client.name)
                         val count = blockSignalCount.incrementAndGet()
                         if (count >= 5) {
@@ -255,7 +256,7 @@ internal class InnertubeClient(
                                 null,
                                 InnertubeException(
                                     signal = parsedSignal,
-                                    message = "IP/bot blocked by $count clients (${blockClients.joinToString()}) for video $videoId",
+                                    message = "IP blocked by $count clients (${blockClients.joinToString()}) for video $videoId",
                                     traceId = traceId
                                 )
                             )
@@ -283,15 +284,21 @@ internal class InnertubeClient(
                 }
 
                 if (audioFormats.isEmpty()) {
-                    // An empty format list normally means the poToken was
-                    // rejected, but a genuinely unavailable track reports the
-                    // same shape — only claim PoTokenInvalid when a token was
-                    // actually attached.
                     val hadFormatArrays = formatArrays.any { it.length() > 0 }
+                    val hadCiphered = formatArrays.any { arr ->
+                        (0 until arr.length()).any { idx ->
+                            val f = arr.optJSONObject(idx)
+                            f?.optString("signatureCipher")?.isNotEmpty() == true || f?.optString("cipher")?.isNotEmpty() == true
+                        }
+                    }
                     lastSignalRef.set(
-                        if (hadFormatArrays) YtmBlockSignal.VideoGone else YtmBlockSignal.PoTokenInvalid
+                        when {
+                            hadCiphered -> YtmBlockSignal.SignatureDecipherFailed
+                            hadFormatArrays -> YtmBlockSignal.VideoGone
+                            else -> YtmBlockSignal.PoTokenInvalid
+                        }
                     )
-                    Log.w(TAG, "[$traceId] Client ${client.name} returned no usable audio formats")
+                    Log.w(TAG, "[$traceId] Client ${client.name} returned no usable audio formats (hadCiphered=$hadCiphered)")
                     return null
                 }
 
@@ -381,13 +388,18 @@ internal class InnertubeClient(
 
         val activeFutures = java.util.concurrent.CopyOnWriteArrayList<java.util.concurrent.Future<Pair<ClientType, Map<String, Any?>?>>>()
 
-        fun submitCandidate(client: ClientType): java.util.concurrent.Future<Pair<ClientType, Map<String, Any?>?>> {
-            val future = streamResolverPool.submit(java.util.concurrent.Callable {
-                val res = attemptClient(client)
-                client to res
-            })
-            activeFutures.add(future)
-            return future
+        fun submitCandidate(client: ClientType): java.util.concurrent.Future<Pair<ClientType, Map<String, Any?>?>>? {
+            return try {
+                val future = streamResolverPool.submit(java.util.concurrent.Callable {
+                    val res = attemptClient(client)
+                    client to res
+                })
+                activeFutures.add(future)
+                future
+            } catch (e: java.util.concurrent.RejectedExecutionException) {
+                Log.w(TAG, "Stream resolver pool rejected candidate ${client.name}", e)
+                null
+            }
         }
 
         fun cancelAll(except: java.util.concurrent.Future<*>? = null) {
@@ -411,7 +423,9 @@ internal class InnertubeClient(
                         winnerStore.recordWinningClient(trackType, client)
                         return res
                     } else {
-                        winnerStore.recordFailure(trackType, client)
+                        if (!done.isCancelled && !Thread.currentThread().isInterrupted) {
+                            winnerStore.recordFailure(trackType, client)
+                        }
                         activeFutures.remove(done)
                         break
                     }
@@ -446,7 +460,9 @@ internal class InnertubeClient(
                         winnerStore.recordWinningClient(trackType, client)
                         return res
                     } else {
-                        winnerStore.recordFailure(trackType, client)
+                        if (!done.isCancelled && !Thread.currentThread().isInterrupted) {
+                            winnerStore.recordFailure(trackType, client)
+                        }
                         activeFutures.remove(done)
                     }
                 } catch (_: Throwable) {
@@ -546,7 +562,7 @@ internal class InnertubeClient(
     fun requestPlayer(videoId: String, clientType: ClientType): JSONObject {
         val endpoint = "${clientType.endpointHost}/youtubei/v1/player?prettyPrint=false&key=$API_KEY"
         val payload = buildPlayerBody(videoId, clientType)
-        return postWithRetry(endpoint, payload, clientType, RateLimiter.Bucket.PLAYER, maxRetries = 1)
+        return postWithRetry(endpoint, payload, clientType, RateLimiter.Bucket.PLAYER, maxRetries = 2)
     }
 
     fun requestBrowse(browseId: String, clientType: ClientType = ClientType.WEB_REMIX): JSONObject {
@@ -588,18 +604,25 @@ internal class InnertubeClient(
     ): JSONObject {
         var lastError: Exception? = null
         val traceId = UUID.randomUUID().toString()
+        var sleepAfterAttemptMs = 0L
 
         for (attempt in 0 until maxRetries) {
+            if (sleepAfterAttemptMs > 0) {
+                try {
+                    Thread.sleep(sleepAfterAttemptMs)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    lastError = IOException("Sleep interrupted between attempts for ${clientType.name}")
+                    break
+                }
+                sleepAfterAttemptMs = 0L
+            }
+
             if (!rateLimiter.acquirePermit(bucket)) {
                 Thread.currentThread().interrupt()
                 lastError = IOException("Rate limiter wait interrupted for ${clientType.name}")
                 break
             }
-            // The limiter now owns exactly one permit on our behalf; track it so
-            // the 429/5xx paths that deliberately drop it mid-iteration do not
-            // let `finally` over-release (Semaphore.release has no upper bound,
-            // so an over-release permanently widens the concurrency cap).
-            var permitHeld = true
 
             try {
                 val fp = FingerprintStore.getFingerprint(context)
@@ -670,13 +693,6 @@ internal class InnertubeClient(
                     }
                 }
 
-                // Every other client stays guest-only: attaching WEB session
-                // cookies to ANDROID_MUSIC/IOS_MUSIC — or to the embed/TV/MWEB
-                // web clients — poisons the fallback that works logged-out
-                // (YouTube returns LOGIN_REQUIRED for mismatched auth on those
-                // endpoints). Authenticated playback is covered by WEB_REMIX
-                // with cookies + SAPISIDHASH above.
-
                 val response = YtmHttpClient.okHttpClient.newCall(reqBuilder.build()).execute()
                 val code = response.code
 
@@ -697,17 +713,7 @@ internal class InnertubeClient(
                     ProxyManager.onPathFailed(urlStr)
                     Log.w(TAG, "[$traceId] Rate limited (429) on attempt $attempt. Backing off for ${backoff}ms")
                     response.close()
-                    // Sleep outside the global permit: holding it across a
-                    // (potentially 15m) backoff starves all other buckets.
-                    rateLimiter.releasePermit()
-                    permitHeld = false
-                    Thread.sleep(backoff)
-                    permitHeld = rateLimiter.acquirePermit(bucket)
-                    if (!permitHeld) {
-                        Thread.currentThread().interrupt()
-                        lastError = IOException("Rate limiter wait interrupted after 429")
-                        break
-                    }
+                    sleepAfterAttemptMs = backoff
                     continue
                 }
 
@@ -719,15 +725,7 @@ internal class InnertubeClient(
                     Log.w(TAG, "[$traceId] Server error ($code) on attempt $attempt. Retrying...")
                     response.close()
                     val sleepMs = (1000L shl attempt) + (0..500).random()
-                    rateLimiter.releasePermit()
-                    permitHeld = false
-                    Thread.sleep(sleepMs)
-                    permitHeld = rateLimiter.acquirePermit(bucket)
-                    if (!permitHeld) {
-                        Thread.currentThread().interrupt()
-                        lastError = IOException("Rate limiter wait interrupted after $code")
-                        break
-                    }
+                    sleepAfterAttemptMs = sleepMs
                     continue
                 }
 
@@ -772,7 +770,7 @@ internal class InnertubeClient(
                 lastError = e
                 Log.e(TAG, "[$traceId] Unexpected error in Innertube post: ${e.message}", e)
             } finally {
-                if (permitHeld) rateLimiter.releasePermit()
+                rateLimiter.releasePermit()
             }
         }
 
@@ -978,7 +976,7 @@ internal class InnertubeClient(
         private var lastBotRefreshTriggerMs = 0L
         @Volatile
         private var lastDataSyncBootstrapMs = 0L
-        var API_KEY: String = System.getProperty("YTM_API_KEY") ?: "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30"
+        var API_KEY: String = YtmConfig.getYtmApiKey()
         @Volatile
         private var _streamResolverPool: java.util.concurrent.ExecutorService? = null
         val streamResolverPool: java.util.concurrent.ExecutorService

@@ -82,6 +82,7 @@ object PoTokenManager {
         get() = generator?.isExpired() == false
 
     private var appContext: Context? = null
+    private val managerScope = CoroutineScope(kotlinx.coroutines.SupervisorJob() + Dispatchers.IO)
     private val stateMutex = Mutex()
     private var refreshInFlight: kotlinx.coroutines.Deferred<Boolean>? = null
     private val lastBackgroundRefreshMs = java.util.concurrent.atomic.AtomicLong(0L)
@@ -138,7 +139,7 @@ object PoTokenManager {
      */
     fun preWarm(context: Context) {
         init(context)
-        CoroutineScope(Dispatchers.IO).launch {
+        managerScope.launch {
             try {
                 if (isExpired() || isExpiringSoon() || !hasWarmGenerator) {
                     ensureReady()
@@ -154,7 +155,7 @@ object PoTokenManager {
      */
     fun checkAndRefreshVisibleScreen() {
         if (isTtlCritical() && !webViewBroken) {
-            CoroutineScope(Dispatchers.IO).launch {
+            managerScope.launch {
                 runCatching { ensureReady() }
             }
         }
@@ -176,7 +177,7 @@ object PoTokenManager {
         if (last != 0L && (now - last) < BACKGROUND_REFRESH_INTERVAL_MS) return
         if (!lastBackgroundRefreshMs.compareAndSet(last, now)) return
         Log.i(TAG, "Triggering non-blocking background PoToken regeneration")
-        CoroutineScope(Dispatchers.IO).launch {
+        managerScope.launch {
             try {
                 ensureReady()
             } catch (t: Throwable) {
@@ -210,7 +211,7 @@ object PoTokenManager {
                 }
             }
 
-            val deferred = CoroutineScope(Dispatchers.IO).async {
+            val deferred = managerScope.async {
                 try {
                     refreshInternal()
                     true
@@ -233,6 +234,10 @@ object PoTokenManager {
     }
 
     fun ensureReadySync(): Boolean {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            Log.w(TAG, "ensureReadySync called on main thread; refusing to block")
+            return isReady || visitorData.isNotEmpty()
+        }
         if (webViewBroken) return visitorData.isNotEmpty()
         if (isReady && !isExpiringSoon() && hasWarmGenerator) return true
 
@@ -468,10 +473,12 @@ object PoTokenManager {
             throw t
         }
 
-        // 4. Default 12 hour expiry with 30 min margin
+        // 4. Calculate actual expiry from generator and store ceiling
         val now = Instant.now().epochSecond
-        val ttlSeconds = PoTokenStore.DEFAULT_TTL_SECONDS
-        val newExpiry = now + ttlSeconds
+        val generatorExpiry = newGenerator.expirationInstant()?.epochSecond ?: Long.MAX_VALUE
+        val storeExpiry = now + PoTokenStore.DEFAULT_TTL_SECONDS
+        val newExpiry = minOf(generatorExpiry, storeExpiry)
+        val effectiveTtlSeconds = (newExpiry - now).coerceAtLeast(60L)
 
         visitorData = newVisitorData
         streamingPoToken = newStreamingToken
@@ -489,7 +496,7 @@ object PoTokenManager {
             visitorData = newVisitorData,
             integrityToken = integrityToken,
             dataSyncId = dataSyncId,
-            ttlSeconds = ttlSeconds,
+            ttlSeconds = effectiveTtlSeconds,
             generatedAt = now
         )
 

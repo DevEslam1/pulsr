@@ -66,7 +66,7 @@ internal class ResolutionStrategy(
     fun buildChain(
         op: Operation,
         limitedMode: Boolean = false,
-        hasJsEngine: Boolean = true,
+        hasJsEngine: Boolean = false,
         trackType: String = ClientWinnerStore.TRACK_TYPE_MUSIC
     ): List<InnertubeClient.ClientType> {
         val baseChain = when (op) {
@@ -120,10 +120,15 @@ internal class ResolutionStrategy(
             cap.requiresPoToken && !hasPoToken
         }
 
-        val chain = primary + secondary
+        val chain = if (limitedMode) primary else primary + secondary
         return chain.ifEmpty {
-            // Absolute fallback to IOS_MUSIC / ANDROID_VR if all filtered out
-            listOf(InnertubeClient.ClientType.IOS_MUSIC, InnertubeClient.ClientType.ANDROID_VR)
+            // Absolute fallback filtered through capabilities
+            listOf(InnertubeClient.ClientType.IOS_MUSIC, InnertubeClient.ClientType.ANDROID_VR).filter {
+                val cap = ClientCapabilityMatrix.getCapability(it)
+                (!cap.requiresJsSignature || hasJsEngine) && (!limitedMode || !cap.requiresPoToken)
+            }.ifEmpty {
+                listOf(InnertubeClient.ClientType.IOS_MUSIC)
+            }
         }
     }
 }

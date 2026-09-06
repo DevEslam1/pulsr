@@ -40,8 +40,11 @@ internal object YtmHttpClient {
 
     companion object {
         val instance = TtlDnsCache()
+        private const val MAX_STALE_MS = 60 * 60 * 1000L // 1 hour max disaster recovery
         private val IPV4_REGEX =
             Regex("^((25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)$")
+        private val IPV6_REGEX =
+            Regex("^[0-9a-fA-F:]+$")
         private val DOH_ENDPOINTS = listOf(
             "https://8.8.8.8/resolve",
             "https://1.1.1.1/dns-query",
@@ -70,9 +73,9 @@ internal object YtmHttpClient {
                     cache[hostname] = dohResult to now
                     dohResult
                 } else {
-                    // If cached entry exists even if stale, use it as disaster recovery
-                    if (cached != null && cached.first.isNotEmpty()) {
-                        Log.w(TAG, "System DNS failed for $hostname, using stale cached IP")
+                    // If cached entry exists even if stale, use it as disaster recovery (bounded to MAX_STALE_MS)
+                    if (cached != null && cached.first.isNotEmpty() && (now - cached.second) < MAX_STALE_MS) {
+                        Log.w(TAG, "System DNS failed for $hostname, using bounded stale cached IP")
                         cached.first
                     } else {
                         throw e
@@ -111,14 +114,12 @@ internal object YtmHttpClient {
                 val addresses = mutableListOf<InetAddress>()
                 for (i in 0 until answers.length()) {
                     val answer = answers.getJSONObject(i)
-                    // Only A records (type 1): CNAME hostnames would bounce
-                    // back to system DNS, and AAAA breaks IPv4-only networks.
-                    if (answer.optInt("type", -1) != 1) continue
+                    val type = answer.optInt("type", -1)
                     val data = answer.optString("data")
-                    if (data.isNotEmpty() && IPV4_REGEX.matches(data)) {
-                        runCatching {
-                            addresses.add(InetAddress.getByName(data))
-                        }
+                    if (type == 1 && data.isNotEmpty() && IPV4_REGEX.matches(data)) {
+                        runCatching { addresses.add(InetAddress.getByName(data)) }
+                    } else if (type == 28 && data.isNotEmpty() && IPV6_REGEX.matches(data)) {
+                        runCatching { addresses.add(InetAddress.getByName(data)) }
                     }
                 }
                 addresses

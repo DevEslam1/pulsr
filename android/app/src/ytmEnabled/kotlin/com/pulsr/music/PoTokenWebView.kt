@@ -111,6 +111,12 @@ internal class PoTokenWebView private constructor(
             try {
                 Log.d(TAG, "loadHtmlAndObtainBotguard: loading asset $HTML_ASSET")
                 val html = context.assets.open(HTML_ASSET).bufferedReader().use { it.readText() }
+                if (!html.contains("</script>")) {
+                    closeAndCancelInitialization(
+                        PoTokenException("po_token.html is invalid: missing </script>")
+                    )
+                    return@execute
+                }
                 runOnMainThread(generatorFuture) {
                     Log.d(TAG, "loadHtmlAndObtainBotguard: injecting downloadAndRunBotguard into WebView")
                     webView.loadDataWithBaseURL(
@@ -244,6 +250,8 @@ internal class PoTokenWebView private constructor(
     /** An uninitialized generator counts as expired, so callers recreate it. */
     override fun isExpired(): Boolean =
         expirationInstant?.let { Instant.now().isAfter(it) } ?: true
+
+    override fun expirationInstant(): Instant? = expirationInstant
     //endregion
 
     //region Handling multiple pending tokens
@@ -365,7 +373,7 @@ internal class PoTokenWebView private constructor(
         private const val HTML_ASSET = "po_token.html"
 
         // Public API key and request key used by BotGuard, taken from its own requests.
-        var GOOGLE_API_KEY: String = System.getProperty("GOOGLE_API_KEY") ?: "AIzaSyDyT5W0Jh49F30Pqqtyfdf7pDLFKLJoAnw"
+        var GOOGLE_API_KEY: String = YtmConfig.getGoogleApiKey()
         private const val REQUEST_KEY = "O43z0dpjhgX20SCx4KAo"
         private const val USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0"

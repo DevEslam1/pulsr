@@ -439,6 +439,15 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     return false;
   }
 
+  bool _isSameQueue(List<SongsTableData> a, List<SongsTableData> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (!_isSameTrack(a[i], b[i])) return false;
+    }
+    return true;
+  }
+
   void _listenToAudioService() {
     autoSub(_audioHandler.onTrackChanged, (song) {
       if (isClosed) return;
@@ -460,6 +469,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
           duration: duration,
           position: isSameSong ? state.position : Duration.zero,
           errorMessage: null,
+          lyrics: isSameSong ? state.lyrics : [],
+          lyricsSource: isSameSong ? state.lyricsSource : LyricsSource.none,
+          isLoadingLyrics: !isSameSong,
         ),
       );
 
@@ -529,6 +541,10 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
                 duration: duration,
                 position: isSameSong ? state.position : Duration.zero,
                 errorMessage: null,
+                lyrics: isSameSong ? state.lyrics : [],
+                lyricsSource:
+                    isSameSong ? state.lyricsSource : LyricsSource.none,
+                isLoadingLyrics: !isSameSong,
               ),
             );
 
@@ -554,44 +570,47 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     });
 
     autoSub(_audioHandler.queue, (mediaItems) async {
-      if (mediaItems.isNotEmpty &&
-          (state.queue.isEmpty || state.queue.length != mediaItems.length)) {
-        final gen = _mediaItemResolutionGen;
-        final ids =
-            mediaItems.map((m) => int.tryParse(m.id)).whereType<int>().toList();
-        final songsRes = await _repository.getSongsByIds(ids);
-        final songsMap = {
-          for (final s in songsRes.fold((_) => <SongsTableData>[], (r) => r))
-            s.id: s
-        };
-        final restoredSongs = <SongsTableData>[];
-        for (final m in mediaItems) {
-          final mid = int.tryParse(m.id);
-          if (mid != null && songsMap.containsKey(mid)) {
-            restoredSongs.add(songsMap[mid]!);
-          } else if (mid != null) {
-            restoredSongs.add(SongsTableData(
-              id: mid,
-              title: m.title,
-              artist: m.artist ?? 'Unknown',
-              album: m.album ?? '',
-              durationMs: m.duration?.inMilliseconds ?? 0,
-              path: (m.extras?['path'] as String?) ?? '',
-              source: SongSource.youtube,
-              remoteId: m.extras?['remoteId'] as String?,
-              remoteArtworkUrl: m.artUri?.toString(),
-              isFavorite: false,
-              isMissing: false,
-              isDownloaded: false,
-              playCount: 0,
-              lastPositionMs: 0,
-            ));
-          }
+      if (mediaItems.isEmpty) return;
+      final gen = _mediaItemResolutionGen;
+      final ids =
+          mediaItems.map((m) => int.tryParse(m.id)).whereType<int>().toList();
+      if (ids.isEmpty) return;
+
+      final songsRes = await _repository.getSongsByIds(ids);
+      if (isClosed || gen != _mediaItemResolutionGen) return;
+
+      final songsMap = {
+        for (final s in songsRes.fold((_) => <SongsTableData>[], (r) => r))
+          s.id: s
+      };
+      final restoredSongs = <SongsTableData>[];
+      for (final m in mediaItems) {
+        final mid = int.tryParse(m.id);
+        if (mid != null && songsMap.containsKey(mid)) {
+          restoredSongs.add(songsMap[mid]!);
+        } else if (mid != null) {
+          restoredSongs.add(SongsTableData(
+            id: mid,
+            title: m.title,
+            artist: m.artist ?? 'Unknown',
+            album: m.album ?? '',
+            durationMs: m.duration?.inMilliseconds ?? 0,
+            path: (m.extras?['path'] as String?) ?? '',
+            source: SongSource.youtube,
+            remoteId: m.extras?['remoteId'] as String?,
+            remoteArtworkUrl: m.artUri?.toString(),
+            isFavorite: false,
+            isMissing: false,
+            isDownloaded: false,
+            playCount: 0,
+            lastPositionMs: 0,
+          ));
         }
-        if (isClosed || gen != _mediaItemResolutionGen) return;
-        if (restoredSongs.isNotEmpty) {
-          safeEmit(state.copyWith(queue: restoredSongs));
-        }
+      }
+      if (isClosed || gen != _mediaItemResolutionGen) return;
+      if (restoredSongs.isNotEmpty &&
+          !_isSameQueue(state.queue, restoredSongs)) {
+        safeEmit(state.copyWith(queue: restoredSongs));
       }
     });
 
@@ -739,7 +758,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
                 durationSeconds:
                     song.durationMs > 0 ? song.durationMs ~/ 1000 : null,
               )
-              .timeout(const Duration(seconds: 4), onTimeout: () => null);
+              .timeout(const Duration(seconds: 5), onTimeout: () => null);
         } catch (e, st) {
           ErrorLogger.log('LRCLIB fetch error for ${song.title}',
               error: e, stackTrace: st, category: 'Lyrics');
@@ -761,7 +780,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
           final ytmAccount = getIt<YtmAccountService>();
           lyricsResult = await ytmAccount
               .fetchYtmLyrics(videoId)
-              .timeout(const Duration(seconds: 4), onTimeout: () => null);
+              .timeout(const Duration(seconds: 5), onTimeout: () => null);
         } catch (e, st) {
           ErrorLogger.log('YTM lyrics fetch error for $videoId',
               error: e, stackTrace: st, category: 'Lyrics');
@@ -846,6 +865,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
     // Immediate emission so tap feels instant: song row highlights,
     // play/pause updates to playing, and miniplayer shows the track.
+    final isSameSong = _isSameTrack(state.currentSong, song);
     safeEmit(state.copyWith(
       queue: effectiveQueue,
       currentIndex: effectiveIndex,
@@ -854,6 +874,9 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       position: startPos,
       duration: Duration(milliseconds: song.durationMs),
       errorMessage: queueTruncationWarning,
+      lyrics: isSameSong ? state.lyrics : [],
+      lyricsSource: isSameSong ? state.lyricsSource : LyricsSource.none,
+      isLoadingLyrics: !isSameSong,
     ));
 
     // Start loadQueue immediately — don't block on local-match DB query.
@@ -1036,8 +1059,6 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
       if (validSongs.isEmpty) {
         safeEmit(state.copyWith(
-          activeQueueSlot: slot,
-          queue: [],
           errorMessage: 'Queue slot is empty',
         ));
         return;

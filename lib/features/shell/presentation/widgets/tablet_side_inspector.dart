@@ -28,7 +28,8 @@ class _TabletSideInspectorState extends State<TabletSideInspector> {
 
     return BlocBuilder<PlayerCubit, PlayerState>(
       buildWhen: (prev, curr) =>
-          prev.queue.length != curr.queue.length ||
+          prev.queue != curr.queue ||
+          prev.currentSong != curr.currentSong ||
           prev.lyrics != curr.lyrics ||
           prev.isLoadingLyrics != curr.isLoadingLyrics ||
           prev.lyricsSource != curr.lyricsSource,
