@@ -19,19 +19,29 @@ class LrcParser {
     final lines = lrcContent.split(RegExp(r'\r?\n'));
     final List<LyricsLine> result = [];
 
+    // Check for [offset:+/-ms] tag
+    int offsetMs = 0;
+    final RegExp offsetExp =
+        RegExp(r'\[offset:\s*([+-]?\d+)\s*\]', caseSensitive: false);
+    for (final line in lines) {
+      final offsetMatch = offsetExp.firstMatch(line);
+      if (offsetMatch != null) {
+        offsetMs = int.tryParse(offsetMatch.group(1) ?? '0') ?? 0;
+        break;
+      }
+    }
+
     // Match tags like [01:23.45] or [01:23.456] or [01:23.4] or [01:23] or [120:00.00]
     final RegExp timeExp = RegExp(r'\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]');
+    final RegExp wordTagExp = RegExp(r'<(?:\d{1,3}:)?\d{2}(?:\.\d{1,3})?>');
 
     for (final line in lines) {
       final matches = timeExp.allMatches(line).toList();
       if (matches.isEmpty) continue;
 
-      // The lyric text is everything after the last timestamp tag
+      // The lyric text is everything after the last timestamp tag, stripped of karaoke tags
       final lastMatch = matches.last;
-      final text = line.substring(lastMatch.end).trim();
-      if (text.isEmpty && matches.length == 1) {
-        continue;
-      }
+      final text = line.substring(lastMatch.end).replaceAll(wordTagExp, '').trim();
 
       for (final match in matches) {
         final minutes = int.parse(match.group(1)!);
@@ -40,11 +50,9 @@ class LrcParser {
         final milliseconds =
             int.parse(fractionStr.padRight(3, '0').substring(0, 3));
 
-        final totalDuration = Duration(
-          minutes: minutes,
-          seconds: seconds,
-          milliseconds: milliseconds,
-        );
+        var totalMs = minutes * 60000 + seconds * 1000 + milliseconds + offsetMs;
+        if (totalMs < 0) totalMs = 0;
+        final totalDuration = Duration(milliseconds: totalMs);
 
         result.add(
             LyricsLine(timestamp: totalDuration, text: text, source: source));
@@ -53,6 +61,20 @@ class LrcParser {
 
     result.sort((a, b) => a.timestamp.compareTo(b.timestamp));
     return result;
+  }
+
+  /// Formats a list of [LyricsLine] into a valid LRC formatted string.
+  static String formatToLrc(List<LyricsLine> lines) {
+    final sb = StringBuffer();
+    for (final line in lines) {
+      final totalMs = line.timestamp.inMilliseconds;
+      final minutes = (totalMs ~/ 60000).toString().padLeft(2, '0');
+      final seconds = ((totalMs % 60000) ~/ 1000).toString().padLeft(2, '0');
+      final centis = ((totalMs % 1000) ~/ 10).toString().padLeft(2, '0');
+      final text = line.text.isNotEmpty ? line.text : '•••';
+      sb.writeln('[$minutes:$seconds.$centis]$text');
+    }
+    return sb.toString();
   }
 
   /// Parses plain text non-synced lyrics into a list of `LyricsLine`.

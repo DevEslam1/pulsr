@@ -305,6 +305,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
 
     @Override
     public void onTimelineChanged(Timeline timeline, int reason) {
+        if (processingState == ProcessingState.loading) {
+            return;
+        }
         if (updateCurrentIndex()) {
             broadcastImmediatePlaybackEvent();
         }
@@ -329,6 +332,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
     }
 
     private boolean updateCurrentIndex() {
+        if (processingState == ProcessingState.loading) {
+            return false;
+        }
         Integer newIndex = player.getCurrentMediaItemIndex();
         // newIndex is never null.
         // currentIndex is sometimes null.
@@ -754,7 +760,9 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
 
     private void load(final List<MediaSource> mediaSources, ShuffleOrder shuffleOrder, final long initialPosition, final Integer initialIndex, final Result result) {
         currentIndex = initialIndex != null ? initialIndex : 0;
-        switch (processingState) {
+        final ProcessingState oldState = processingState;
+        processingState = ProcessingState.loading;
+        switch (oldState) {
         case idle:
             break;
         case loading:
@@ -767,7 +775,6 @@ public class AudioPlayer implements MethodCallHandler, Player.Listener, Metadata
         }
         prepareResult = result;
         updatePosition();
-        processingState = ProcessingState.loading;
         errorCode = null;
         errorMessage = null;
         enqueuePlaybackEvent();

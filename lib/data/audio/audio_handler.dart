@@ -155,6 +155,13 @@ class PulsrAudioHandler extends BaseAudioHandler
   // Last index reacted to from currentIndexStream, to drop duplicate emits.
   int _lastGaplessIndex = -1;
 
+  // Guard against session restoration stomping over user-initiated playback on cold start
+  bool _userPlaybackInitiated = false;
+  // Target index for current gapless load; used to filter transient ExoPlayer index 0 emits
+  int? _gaplessTargetIndex;
+  DateTime? _gaplessLoadTime;
+  bool _gaplessTargetReached = false;
+
   /// Gapless is the default engine. Enabling crossfade (duration > 0) switches
   /// to the overlapping dual-player engine, which cannot also produce a seamless
   /// join, so the two are mutually exclusive by construction.
@@ -1534,8 +1541,13 @@ class PulsrAudioHandler extends BaseAudioHandler
 
   Future<void> restoreLastPlaybackSession() async {
     try {
+      if (_userPlaybackInitiated || _songs.isNotEmpty) return;
+      final restoreGen = _playGeneration;
+
       // Restore shuffle and repeat preferences from storage (Issue #12)
       final prefs = await SharedPreferences.getInstance();
+      if (_userPlaybackInitiated || _songs.isNotEmpty || _playGeneration != restoreGen) return;
+
       final shufflePref = prefs.getBool(PrefsKeys.playbackShuffle) ?? false;
       final repeatModePref =
           prefs.getString(PrefsKeys.playbackRepeatMode) ?? 'off';
@@ -1547,9 +1559,14 @@ class PulsrAudioHandler extends BaseAudioHandler
       await setShuffleMode(shufflePref
           ? AudioServiceShuffleMode.all
           : AudioServiceShuffleMode.none);
+      if (_userPlaybackInitiated || _songs.isNotEmpty || _playGeneration != restoreGen) return;
+
       await setRepeatMode(repeatMode);
+      if (_userPlaybackInitiated || _songs.isNotEmpty || _playGeneration != restoreGen) return;
 
       final queueRes = await _repository.getSavedQueue();
+      if (_userPlaybackInitiated || _songs.isNotEmpty || _playGeneration != restoreGen) return;
+
       final queueItems =
           queueRes.fold((l) => <QueueItemsTableData>[], (r) => r);
       if (queueItems.isEmpty) return;
@@ -1557,6 +1574,8 @@ class PulsrAudioHandler extends BaseAudioHandler
       // Batch query songs instead of N+1 synchronous disk checks (Issue #18)
       final songIds = queueItems.map((q) => q.songId).toList();
       final songsRes = await _repository.getSongsByIds(songIds);
+      if (_userPlaybackInitiated || _songs.isNotEmpty || _playGeneration != restoreGen) return;
+
       final songsMap = {
         for (final s in songsRes.fold((l) => <SongsTableData>[], (r) => r))
           s.id: s
@@ -1579,10 +1598,12 @@ class PulsrAudioHandler extends BaseAudioHandler
       }
 
       if (songs.isNotEmpty) {
+        if (_userPlaybackInitiated || _songs.isNotEmpty || _playGeneration != restoreGen) return;
         _songs = songs;
         _currentIndex = targetIndex.clamp(0, songs.length - 1);
         final currentSong = _songs[_currentIndex];
         final artUri = await ArtworkUriResolver.resolveArtworkUri(currentSong);
+        if (_userPlaybackInitiated || _playGeneration != restoreGen) return;
         final item = _songToMediaItem(currentSong, artUri);
         mediaItem.add(item);
         queue.add(_songs.map(_songToMediaItem).toList());
@@ -1607,6 +1628,7 @@ class PulsrAudioHandler extends BaseAudioHandler
             );
           }
         }
+        if (_userPlaybackInitiated || _playGeneration != restoreGen) return;
         _broadcastState(_activePlayer.playbackEvent);
         _positionSubject.add(pos);
       }
@@ -1861,6 +1883,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   // --- QUEUE & PLAYBACK COMMANDS ---
   Future<void> loadQueue(List<SongsTableData> songs,
       {int initialIndex = 0, Duration? initialPosition}) async {
+    _userPlaybackInitiated = true;
     // Immediately warm the target song so network resolution overlaps
     // with crossfade cancellation, queue assembly, and player teardown.
     final targetIdx =
@@ -1893,6 +1916,9 @@ class PulsrAudioHandler extends BaseAudioHandler
           initialIndex.clamp(0, _songs.isEmpty ? 0 : _songs.length - 1);
       _currentIndex = targetIndex;
       _lastGaplessIndex = targetIndex;
+      _gaplessTargetIndex = targetIndex;
+      _gaplessTargetReached = true;
+      _gaplessLoadTime = DateTime.now();
       final song = _songs[targetIndex];
       final fastArtUri =
           song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
@@ -1993,6 +2019,9 @@ class PulsrAudioHandler extends BaseAudioHandler
     // Snapshot: no interleaved stream event may change the load target.
     final targetIndex = _currentIndex;
     _lastGaplessIndex = targetIndex;
+    _gaplessTargetIndex = targetIndex;
+    _gaplessTargetReached = false;
+    _gaplessLoadTime = DateTime.now();
 
     final song = _songs[targetIndex];
     final fastArtUri =
@@ -2044,6 +2073,11 @@ class PulsrAudioHandler extends BaseAudioHandler
       } catch (_) {}
       _gaplessLoaded = true;
       _lastGaplessIndex = targetIndex;
+      _gaplessLoadTime = DateTime.now();
+      if (_activePlayer.currentIndex == targetIndex) {
+        _gaplessTargetReached = true;
+        _gaplessTargetIndex = null;
+      }
       if (generation != _playGeneration) return;
       final targetVolume = _calculateReplayGainVolume(song);
       if (!preload) {
@@ -2125,6 +2159,25 @@ class PulsrAudioHandler extends BaseAudioHandler
     final childCount = _activePlayer.audioSources.length;
     if (index >= childCount) return;
 
+    // Transient index 0 / spurious emit filter:
+    // When loading a playlist, ExoPlayer may emit an initial index 0 before settling on the
+    // requested target index. If target index hasn't been reached yet, ignore any unexpected index.
+    if (_gaplessTargetIndex != null) {
+      if (index == _gaplessTargetIndex) {
+        _gaplessTargetReached = true;
+        _gaplessTargetIndex = null;
+      } else if (!_gaplessTargetReached) {
+        final elapsed = _gaplessLoadTime != null
+            ? DateTime.now().difference(_gaplessLoadTime!).inMilliseconds
+            : 99999;
+        if (elapsed < 1500) {
+          debugPrint(
+              '[AudioHandler] Ignoring spurious gapless index event: $index (target was $_gaplessTargetIndex)');
+          return;
+        }
+      }
+    }
+
     // Detect rapid successive transitions caused by ExoPlayer auto-advancing
     // past failing tracks in a loop.
     final now = DateTime.now();
@@ -2196,6 +2249,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   }
 
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {
+    _userPlaybackInitiated = true;
     if (index < 0 || index >= _songs.length) return;
     cancelPrefetches();
     // A YouTube resolve below can await for seconds; a second skip during that
@@ -2374,6 +2428,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   // --- PLAYBACK ACTIONS ---
   @override
   Future<void> play() {
+    _userPlaybackInitiated = true;
     ErrorLogger.addBreadcrumb('Playback started', category: 'player');
     // A restored YouTube session in the crossfade engine is left with no source
     // loaded (see restoreLastPlaybackSession); resolve and start it on the first

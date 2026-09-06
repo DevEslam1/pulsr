@@ -195,7 +195,8 @@ class _CirclePlayerThemeState extends State<CirclePlayerTheme>
                       duration: const Duration(milliseconds: 300),
                       child: state.isLyricsVisible
                           ? LyricsView(
-                              key: const ValueKey('lyrics_view'),
+                              key: ValueKey(
+                                  'lyrics_${song?.id}_${song?.remoteId}'),
                               lyrics: state.lyrics,
                               isLoading: state.isLoadingLyrics,
                               activeColor: activeColor,

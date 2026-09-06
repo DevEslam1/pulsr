@@ -72,6 +72,39 @@ Third line of plain lyric
       expect(lines[1].source, LyricsSource.embedded);
     });
 
+    test('applies [offset:+500] and [offset:-200] header tags', () {
+      const lrcPositive = '''
+[offset:+500]
+[00:05.00]Positive offset lyric
+''';
+      final linesPos = LrcParser.parse(lrcPositive);
+      expect(linesPos[0].timestamp, const Duration(seconds: 5, milliseconds: 500));
+
+      const lrcNegative = '''
+[offset:-500]
+[00:05.00]Negative offset lyric
+''';
+      final linesNeg = LrcParser.parse(lrcNegative);
+      expect(linesNeg[0].timestamp, const Duration(seconds: 4, milliseconds: 500));
+    });
+
+    test('strips word-level karaoke tags from enhanced LRC', () {
+      const lrc = '[00:10.00]<00:10.00>Hello <00:10.50>world <00:11.00>!';
+      final lines = LrcParser.parse(lrc);
+      expect(lines.length, 1);
+      expect(lines[0].text, 'Hello world !');
+    });
+
+    test('formatToLrc formats lyrics back into standard LRC syntax', () {
+      final input = [
+        LyricsLine(timestamp: const Duration(seconds: 5, milliseconds: 200), text: 'Line 1'),
+        LyricsLine(timestamp: const Duration(minutes: 1, seconds: 12, milliseconds: 450), text: 'Line 2'),
+      ];
+      final lrc = LrcParser.formatToLrc(input);
+      expect(lrc, contains('[00:05.20]Line 1'));
+      expect(lrc, contains('[01:12.45]Line 2'));
+    });
+
     test(
         'resolveLyrics returns null for non-existent audio path when no embedded or external lrc',
         () async {

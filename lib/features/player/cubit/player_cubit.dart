@@ -809,7 +809,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
     var rawQueue =
         queue != null ? List<SongsTableData>.from(queue) : [song];
 
-    var targetIndex = rawQueue.indexWhere((s) => s.id == song.id);
+    var targetIndex = rawQueue.indexWhere((s) => _isSameTrack(s, song));
     if (targetIndex == -1) {
       targetIndex = 0;
       rawQueue.insert(0, song);
@@ -880,7 +880,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
             if (local.id != song.id) {
               _audioHandler.swapReconciledSong(song.id, local);
               final swappedQueue = effectiveQueue
-                  .map((s) => s.id == song.id ? local : s)
+                  .map((s) => _isSameTrack(s, song) ? local : s)
                   .toList();
               safeEmit(state.copyWith(
                 queue: swappedQueue,

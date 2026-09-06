@@ -173,6 +173,8 @@ class _TabletSideInspectorState extends State<TabletSideInspector> {
                     : Padding(
                         padding: const EdgeInsets.all(8.0),
                         child: LyricsView(
+                          key: ValueKey(
+                              'lyrics_${state.currentSong?.id}_${state.currentSong?.remoteId}'),
                           lyrics: state.lyrics,
                           isLoading: state.isLoadingLyrics,
                           activeColor: activeColor,

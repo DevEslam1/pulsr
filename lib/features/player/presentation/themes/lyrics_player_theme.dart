@@ -34,9 +34,11 @@ class LyricsPlayerTheme extends StatelessWidget {
           ),
           clipBehavior: Clip.antiAlias,
           child: LyricsView(
+            key: ValueKey('lyrics_${song?.id}_${song?.remoteId}'),
             lyrics: state.lyrics,
             isLoading: state.isLoadingLyrics,
             activeColor: props.activeColor,
+            source: state.lyricsSource,
           ),
         );
 

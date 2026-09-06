@@ -126,8 +126,8 @@ class MinimalPlayerTheme extends StatelessWidget {
                                 ? SizedBox(
                                     height: isTwoPane ? 220 : 280,
                                     child: LyricsView(
-                                      key:
-                                          const ValueKey('lyrics_view_minimal'),
+                                      key: ValueKey(
+                                          'lyrics_${song?.id}_${song?.remoteId}'),
                                       lyrics: state.lyrics,
                                       isLoading: state.isLoadingLyrics,
                                       activeColor: activeColor,
