@@ -255,6 +255,29 @@ class RateLimiter(
         return (until - now).coerceAtLeast(0L)
     }
 
+    /**
+     * Drops throttle state after a network-path change (VPN up/down, Wi-Fi <->
+     * mobile). Backoff/throttle verdicts belong to the previous egress IP;
+     * carrying them onto the new route needlessly silences resolves there.
+     */
+    fun resetAfterNetworkChange() {
+        consecutiveThrottles.set(0)
+        adaptiveMultiplier.set(1)
+        backoffUntilTimestamp.set(0L)
+        val now = clock.elapsedRealtime()
+        lock.lock()
+        try {
+            bucketStates.values.forEach {
+                it.availableTokens = it.bucket.maxTokens.toDouble()
+                it.lastRefill = now
+            }
+        } finally {
+            lock.unlock()
+        }
+        cleanSinceTimestamp.set(now)
+        prefs?.edit()?.remove(KEY_BACKOFF_UNTIL)?.apply()
+    }
+
     companion object {
         private const val PREFS_NAME = "ytm_ratelimiter_prefs"
         private const val KEY_BACKOFF_UNTIL = "key_backoff_until"

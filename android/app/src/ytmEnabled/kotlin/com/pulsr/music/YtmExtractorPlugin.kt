@@ -158,6 +158,16 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 val isVpn = if (ctx != null) CellularFailoverHelper.isVpnActive(ctx) else false
                 result.success(isVpn)
             }
+            "clearNetworkCaches" -> {
+                // VPN up/down (or Wi-Fi <-> mobile) moves the egress IP, which
+                // invalidates cached googlevideo edges and any throttle verdict
+                // tied to the old IP. Dart already drops its URL caches.
+                runOffMainThread(result) {
+                    YtmHttpClient.TtlDnsCache.instance.clear()
+                    RateLimiter.shared.resetAfterNetworkChange()
+                    true
+                }
+            }
             "preWarm" -> {
                 val ctx = context?.applicationContext
                 if (ctx == null) {

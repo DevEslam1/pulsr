@@ -320,6 +320,22 @@ class _HiddenFoldersScreenState extends State<HiddenFoldersScreen> {
                                       ),
                                     ),
                                   ),
+                                  const SizedBox(width: 4),
+                                  IconButton(
+                                    icon: Icon(Icons.settings_backup_restore,
+                                        size: 18,
+                                        color: state.minDurationSec == 30
+                                            ? p.textTertiary.withValues(alpha: 0.4)
+                                            : p.accent),
+                                    tooltip: 'Reset to default (30s)',
+                                    visualDensity: VisualDensity.compact,
+                                    padding: EdgeInsets.zero,
+                                    constraints: const BoxConstraints(
+                                        minWidth: 28, minHeight: 28),
+                                    onPressed: state.minDurationSec == 30
+                                        ? null
+                                        : () => cubit.setMinDuration(30),
+                                  ),
                                 ],
                               ),
                               const SizedBox(height: 8),

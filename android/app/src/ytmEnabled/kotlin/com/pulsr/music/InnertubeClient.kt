@@ -201,10 +201,14 @@ internal class InnertubeClient(
         val lastSignalRef = java.util.concurrent.atomic.AtomicReference(YtmBlockSignal.RateLimited)
         val lastExceptionRef = java.util.concurrent.atomic.AtomicReference<Throwable?>(null)
 
-        // Track IP-level blocks to short-circuit early. When 2+ clients
-        // independently return IpBlocked/BotChallenge the entire chain is
-        // doomed — burning 7 more clients just wastes 10-20s.
+        // Track IP-level blocks to short-circuit early. The hedged race runs 2
+        // candidates up front, so a threshold of 2 fires before the sequential
+        // tail ever starts — the 7 remaining clients never get tried. 5 lets
+        // the tail prove itself (last-resort clients like ANDROID_TESTSUITE
+        // often survive a flagged IP) while still bailing out of a doomed
+        // sweep instead of burning ~10-20s per track.
         val blockSignalCount = java.util.concurrent.atomic.AtomicInteger(0)
+        val blockClients = java.util.concurrent.CopyOnWriteArrayList<String>()
         // attemptClient cannot throw the short-circuit itself: its own
         // `catch (t: Throwable)` would swallow it. It parks the exception here
         // and the race / sequential loops rethrow it.
@@ -241,14 +245,15 @@ internal class InnertubeClient(
                     }
                     if (parsedSignal == YtmBlockSignal.IpBlocked ||
                         parsedSignal == YtmBlockSignal.BotChallenge) {
+                        blockClients.add(client.name)
                         val count = blockSignalCount.incrementAndGet()
-                        if (count >= 2) {
-                            Log.w(TAG, "[$traceId] Short-circuiting chain: $count IP-level blocks")
+                        if (count >= 5) {
+                            Log.w(TAG, "[$traceId] Short-circuiting chain: $count IP-level blocks (${blockClients.joinToString()})")
                             shortCircuit.compareAndSet(
                                 null,
                                 InnertubeException(
                                     signal = parsedSignal,
-                                    message = "IP/bot blocked after $count clients for video $videoId",
+                                    message = "IP/bot blocked by $count clients (${blockClients.joinToString()}) for video $videoId",
                                     traceId = traceId
                                 )
                             )

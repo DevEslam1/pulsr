@@ -18,7 +18,7 @@ void main() {
   late MockPlayerCubit playerCubit;
   late MockSettingsCubit settingsCubit;
 
-  final testSong = SongsTableData(
+  final testSong = const SongsTableData(
     id: 1,
     title: 'Test Track',
     artist: 'Test Artist',
@@ -30,6 +30,8 @@ void main() {
     lastPositionMs: 0,
     isFavorite: false,
     isMissing: false,
+    source: 'local',
+    isDownloaded: true,
   );
 
   setUp(() {
@@ -141,23 +143,60 @@ void main() {
     expect(currentMode, equals(DockStackMode.defaultLayout));
 
     // 1. Swipe down -> should transition to miniPlayerOnTop
-    await tester.drag(find.text('Test Track'), const Offset(0, 300));
+    await tester.fling(find.text('Test Track'), const Offset(0, 300), 1000.0);
     await tester.pumpAndSettle();
     expect(currentMode, equals(DockStackMode.miniPlayerOnTop));
 
     // 2. Swipe down again -> should transition to navBarOnTop (replaces stack order)
-    await tester.drag(find.byType(PulsrBottomNavBar), const Offset(0, 300));
+    await tester.fling(
+      find.byType(PulsrBottomNavBar),
+      const Offset(0, 300),
+      1000.0,
+      warnIfMissed: false,
+    );
     await tester.pumpAndSettle();
     expect(currentMode, equals(DockStackMode.navBarOnTop));
 
     // 3. Swipe down again -> should swap back to miniPlayerOnTop
-    await tester.drag(find.byType(PulsrBottomNavBar), const Offset(0, 300));
+    await tester.fling(
+      find.byType(PulsrBottomNavBar),
+      const Offset(0, 300),
+      1000.0,
+      warnIfMissed: false,
+    );
     await tester.pumpAndSettle();
     expect(currentMode, equals(DockStackMode.miniPlayerOnTop));
 
     // 4. Swipe up -> should restore defaultLayout
-    await tester.drag(find.text('Test Track'), const Offset(0, -300));
+    await tester.fling(find.text('Test Track'), const Offset(0, -300), 1000.0);
     await tester.pumpAndSettle();
     expect(currentMode, equals(DockStackMode.defaultLayout));
+  });
+
+  testWidgets('Tapping peeking card behind brings it to the front',
+      (tester) async {
+    DockStackMode currentMode = DockStackMode.miniPlayerOnTop;
+
+    await tester.pumpWidget(
+      StatefulBuilder(
+        builder: (context, setState) {
+          return buildTestWidget(
+            mode: currentMode,
+            onModeChanged: (newMode) {
+              setState(() => currentMode = newMode);
+            },
+            hasSong: true,
+          );
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // In miniPlayerOnTop, the nav bar is behind and peeking at top.
+    // Tapping the peeking region of the nav bar brings it to the front (navBarOnTop).
+    final navBarRect = tester.getRect(find.byType(PulsrBottomNavBar));
+    await tester.tapAt(Offset(navBarRect.center.dx, navBarRect.top + 4));
+    await tester.pumpAndSettle();
+    expect(currentMode, equals(DockStackMode.navBarOnTop));
   });
 }

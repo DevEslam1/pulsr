@@ -1352,6 +1352,7 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// Non-blocking background cache warm for [song]. Populates the stream URL
   /// cache so a subsequent lazy resolve completes near-instantly.
   Future<void> _warmStreamCache(SongsTableData song) async {
+    if (_ytmService.isBotCoolingDown) return;
     try {
       await _resolveStreamUrl(song).timeout(const Duration(seconds: 15));
     } catch (_) {}
@@ -1464,6 +1465,12 @@ class PulsrAudioHandler extends BaseAudioHandler
     }
     // Avoid launching background prefetch storms if playback failures are occurring
     if (_consecutiveFailures > 0) {
+      return;
+    }
+    // While the IP is cooling down every resolve fails instantly with the same
+    // BOT_CHALLENGE, so prefetching only burns log lines and thread-pool slots.
+    // The foreground resolve retries once the window lapses.
+    if (_ytmService.isBotCoolingDown) {
       return;
     }
     if (!_prefetching.add(videoId)) {

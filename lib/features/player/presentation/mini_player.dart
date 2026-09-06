@@ -57,33 +57,63 @@ class MiniPlayer extends StatelessWidget {
         final cubit = context.read<PlayerCubit>();
         final activeAccent = p.accent;
 
+        double dragDx = 0;
+        double dragDy = 0;
+
         return Semantics(
           label: 'Now playing: ${song.title} by ${song.artist}',
           button: true,
           child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
             onTap: onTap,
-            onVerticalDragEnd: (d) {
-              final v = d.primaryVelocity ?? 0;
-              if (v > 180) {
-                onSwipeDown?.call();
-              } else if (v < -180) {
-                if (onSwipeUp != null) {
-                  onSwipeUp!();
-                } else {
-                  onTap();
+            onPanStart: (_) {
+              dragDx = 0;
+              dragDy = 0;
+            },
+            onPanUpdate: (d) {
+              dragDx += d.delta.dx;
+              dragDy += d.delta.dy;
+            },
+            onPanEnd: (d) {
+              final vx = d.velocity.pixelsPerSecond.dx;
+              final vy = d.velocity.pixelsPerSecond.dy;
+              final absX = dragDx.abs();
+              final absY = dragDy.abs();
+
+              // If drag was very small, treat as tap
+              if (absX < 15 && absY < 15 && vx.abs() < 50 && vy.abs() < 50) {
+                onTap();
+                return;
+              }
+
+              // Check if swipe was predominantly vertical or horizontal
+              if (absY >= absX) {
+                // Vertical swipe:
+                if (dragDy > 20 || vy > 80) {
+                  onSwipeDown?.call();
+                } else if (dragDy < -20 || vy < -80) {
+                  if (onSwipeUp != null) {
+                    onSwipeUp!();
+                  } else {
+                    onTap();
+                  }
+                }
+              } else {
+                // Horizontal swipe:
+                if (dragDx < -20 || vx < -80) {
+                  _handleSwipe(cubit, settingsState.miniPlayerSwipeLeft,
+                      isLeft: true);
+                } else if (dragDx > 20 || vx > 80) {
+                  _handleSwipe(cubit, settingsState.miniPlayerSwipeRight,
+                      isLeft: false);
                 }
               }
+              dragDx = 0;
+              dragDy = 0;
             },
-            onHorizontalDragEnd: (d) {
-              final v = d.primaryVelocity ?? 0;
-              if (v < -200) {
-                _handleSwipe(cubit, settingsState.miniPlayerSwipeLeft,
-                    isLeft: true);
-              }
-              if (v > 200) {
-                _handleSwipe(cubit, settingsState.miniPlayerSwipeRight,
-                    isLeft: false);
-              }
+            onPanCancel: () {
+              dragDx = 0;
+              dragDy = 0;
             },
             child: Padding(
               padding: const EdgeInsetsDirectional.fromSTEB(12, 4, 12, 8),

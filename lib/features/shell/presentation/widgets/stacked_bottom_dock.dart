@@ -175,11 +175,31 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
           );
         }
 
-        if (isMiniBehind) {
-          miniPlayerWidget = GestureDetector(
+        Widget wrapBehindCard(Widget child, DockStackMode targetMode) {
+          double behindDragDy = 0;
+          return GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: () => _setMode(DockStackMode.miniPlayerOnTop),
-            child: AbsorbPointer(child: miniPlayerWidget),
+            onTap: () => _setMode(targetMode),
+            onVerticalDragStart: (_) => behindDragDy = 0,
+            onVerticalDragUpdate: (d) => behindDragDy += d.delta.dy,
+            onVerticalDragEnd: (d) {
+              final v = d.primaryVelocity ?? 0;
+              if (behindDragDy > 20 || v > 80) {
+                _handleSwipeDown();
+              } else if (behindDragDy < -20 || v < -80) {
+                _handleSwipeUp();
+              }
+              behindDragDy = 0;
+            },
+            onVerticalDragCancel: () => behindDragDy = 0,
+            child: AbsorbPointer(child: child),
+          );
+        }
+
+        if (isMiniBehind) {
+          miniPlayerWidget = wrapBehindCard(
+            miniPlayerWidget,
+            DockStackMode.miniPlayerOnTop,
           );
         }
 
@@ -230,10 +250,9 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
         }
 
         if (isBarBehind) {
-          navBarWidget = GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => _setMode(DockStackMode.navBarOnTop),
-            child: AbsorbPointer(child: navBarWidget),
+          navBarWidget = wrapBehindCard(
+            navBarWidget,
+            DockStackMode.navBarOnTop,
           );
         }
 
@@ -268,6 +287,7 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
             ? [miniPlayerCard, navBarCard]
             : [navBarCard, miniPlayerCard];
 
+        double dockDragDy = 0;
         return SafeArea(
           top: false,
           left: false,
@@ -275,14 +295,18 @@ class _StackedBottomDockState extends State<StackedBottomDock> {
           bottom: true,
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
+            onVerticalDragStart: (_) => dockDragDy = 0,
+            onVerticalDragUpdate: (d) => dockDragDy += d.delta.dy,
             onVerticalDragEnd: (d) {
               final v = d.primaryVelocity ?? 0;
-              if (v > 180) {
+              if (dockDragDy > 20 || v > 80) {
                 _handleSwipeDown();
-              } else if (v < -180) {
+              } else if (dockDragDy < -20 || v < -80) {
                 _handleSwipeUp();
               }
+              dockDragDy = 0;
             },
+            onVerticalDragCancel: () => dockDragDy = 0,
             child: AnimatedContainer(
               duration: _animDuration,
               curve: _animCurve,

@@ -301,6 +301,28 @@ class YtmService {
     }
   }
 
+  /// Drops every piece of state that is pinned to the previous egress IP.
+  ///
+  /// Call when the network path changes (VPN up/down, Wi-Fi <-> mobile):
+  /// googlevideo URLs carry an IP-bound signature, so any cached URL resolved
+  /// before the switch gets a 403 on the new path. The bot/IP cooldown is
+  /// also cleared — a block verdict from the old IP must not silence the
+  /// native tiers on the new one — and the native DNS TTL cache is dropped so
+  /// the next resolve re-resolves the edge for the new route.
+  Future<void> handleNetworkChange() async {
+    debugClearBotCooldown();
+    try {
+      if (getIt.isRegistered<YtmUrlCache>()) {
+        getIt<YtmUrlCache>().clear();
+      }
+    } catch (_) {}
+    try {
+      await _channel
+          .invokeMethod<bool>('clearNetworkCaches')
+          .timeout(const Duration(seconds: 3));
+    } catch (_) {}
+  }
+
   Future<bool> isAvailable() async {
     final cached = _available;
     if (cached != null) return cached;
@@ -691,7 +713,14 @@ class YtmService {
 
     // 2. Native Multi-Client Extractor (NewPipe -> WEB_REMIX -> ANDROID -> IOS -> TV)
     try {
-      if (inBotCooldown) throw _lastBotChallenge ?? const YtmException('BOT_CHALLENGE', 'Cooling down after YouTube verification challenge');
+      // Fail fast with a FRESH per-video exception: rethrowing _lastBotChallenge
+      // pastes another video's id + trace id into this video's logs and makes a
+      // stale verdict look like a new native failure. The stored challenge is
+      // only kept for the cooldown window timing.
+      if (inBotCooldown) {
+        throw YtmException('BOT_CHALLENGE',
+            'Cooling down after YouTube verification challenge ($videoId)');
+      }
       try {
         _tracker?.markStage(PlaybackStage.clientRequestSent);
         // Check poToken state heuristically: if we have a cached token, this is warm

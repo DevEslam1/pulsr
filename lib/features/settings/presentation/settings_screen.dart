@@ -31,6 +31,7 @@ import '../cubit/settings_state.dart';
 import 'hidden_folders_screen.dart';
 import 'widgets/backup_section.dart';
 import 'widgets/battery_optimization_card.dart';
+import 'widgets/settings_slider_row.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -124,42 +125,15 @@ class SettingsScreen extends StatelessWidget {
                         value: state.waveformSeekBarEnabled,
                         onChanged: cubit.setWaveformSeekBar),
                     _divider(p),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(context.l10n.crossfade,
-                                  style: TextStyle(
-                                      color: p.textPrimary,
-                                      fontWeight: FontWeight.w700,
-                                      fontSize: 14)),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 3),
-                                decoration: BoxDecoration(
-                                    color: p.accentContainer,
-                                    borderRadius: BorderRadius.circular(8)),
-                                child: Text(
-                                    '${state.crossfadeSeconds.toStringAsFixed(1)}s',
-                                    style: TextStyle(
-                                        color: p.accent,
-                                        fontWeight: FontWeight.w800,
-                                        fontSize: 12)),
-                              ),
-                            ],
-                          ),
-                          Slider(
-                              value: state.crossfadeSeconds,
-                              min: 0,
-                              max: 12,
-                              divisions: 24,
-                              onChanged: cubit.setCrossfade),
-                        ],
-                      ),
+                    SettingSliderRow(
+                      label: context.l10n.crossfade,
+                      value: state.crossfadeSeconds,
+                      min: 0,
+                      max: 12,
+                      divisions: 24,
+                      defaultValue: 0.0,
+                      formatValue: (v) => '${v.toStringAsFixed(1)}s',
+                      onChanged: cubit.setCrossfade,
                     ),
                     _divider(p),
                     // Audiophile & Hi-Res Output Card & Controls
@@ -383,57 +357,26 @@ class SettingsScreen extends StatelessWidget {
                             ),
                           ),
                           if (state.replayGainMode != ReplayGainMode.off) ...[
-                            const SizedBox(height: 14),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Preamp (With RG tag)',
-                                  style: TextStyle(
-                                      color: p.textPrimary,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600),
-                                ),
-                                Text(
-                                  '${state.replayGainPreampWithRg >= 0 ? '+' : ''}${state.replayGainPreampWithRg.toStringAsFixed(1)} dB',
-                                  style: TextStyle(
-                                      color: p.accent,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w800),
-                                ),
-                              ],
-                            ),
-                            Slider(
+                            SettingSliderRow(
+                              label: 'Preamp (With RG tag)',
                               value: state.replayGainPreampWithRg,
                               min: -12.0,
                               max: 12.0,
                               divisions: 48,
+                              defaultValue: 0.0,
+                              formatValue: (v) =>
+                                  '${v >= 0 ? '+' : ''}${v.toStringAsFixed(1)} dB',
                               onChanged: cubit.setReplayGainPreampWithRg,
                             ),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Preamp (Without RG tag fallback)',
-                                  style: TextStyle(
-                                      color: p.textPrimary,
-                                      fontSize: 13,
-                                      fontWeight: FontWeight.w600),
-                                ),
-                                Text(
-                                  '${state.replayGainPreampWithoutRg >= 0 ? '+' : ''}${state.replayGainPreampWithoutRg.toStringAsFixed(1)} dB',
-                                  style: TextStyle(
-                                      color: p.accent,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w800),
-                                ),
-                              ],
-                            ),
-                            Slider(
+                            SettingSliderRow(
+                              label: 'Preamp (Without RG tag fallback)',
                               value: state.replayGainPreampWithoutRg,
                               min: -12.0,
                               max: 12.0,
                               divisions: 48,
+                              defaultValue: -3.0,
+                              formatValue: (v) =>
+                                  '${v >= 0 ? '+' : ''}${v.toStringAsFixed(1)} dB',
                               onChanged: cubit.setReplayGainPreampWithoutRg,
                             ),
                           ],
@@ -995,8 +938,30 @@ class SettingsScreen extends StatelessWidget {
           builder: (context, setDialogState) => Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                  'Exclude tracks under $selected seconds (filters voice notes):'),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'Exclude tracks under $selected seconds (filters voice notes):',
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.settings_backup_restore,
+                        size: 20,
+                        color: selected == 30
+                            ? Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withValues(alpha: 0.38)
+                            : primaryColor),
+                    tooltip: 'Reset to default (30s)',
+                    visualDensity: VisualDensity.compact,
+                    onPressed: selected == 30
+                        ? null
+                        : () => setDialogState(() => selected = 30),
+                  ),
+                ],
+              ),
               const SizedBox(height: 12),
               Slider(
                 value: selected.toDouble(),

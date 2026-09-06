@@ -65,6 +65,8 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 result.success(merged)
             }
             "setCookies" -> result.success(true)
+            "isVpnConnected" -> result.success(false)
+            "clearNetworkCaches" -> result.success(true)
             else -> result.error("YTM_DISABLED", "YouTube Music is not available in this build", null)
         }
     }

@@ -214,6 +214,32 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     );
   }
 
+  Future<void> _resetAllDspDefaults(
+      BuildContext context, PlayerCubit cubit) async {
+    await cubit.resetToFlat();
+    await cubit.setBassBoost(0.0);
+    await cubit.setVolumeBoost(0.0);
+    await cubit.setVirtualizerEnabled(false);
+    await cubit.setVirtualizerStrength(0.0);
+    await cubit.setDynamicsPreset(DynamicsPreset.off);
+    await cubit.setCrossfeed(false, delayUs: 350.0, feedDb: -9.0);
+    await cubit.setLookaheadLimiter(false, thresholdDb: -0.2, releaseMs: 50.0);
+    await cubit.setStereoBalance(0.0);
+    await cubit.setReverb(false, preset: 0, wetDry: 0.20);
+    await cubit.setSaturation(false, drive: 0.3, mix: 0.5, tilt: 0.3);
+    await cubit.setStereoWidth(false, width: 1.0);
+    await cubit.setSubCrossover(false, cornerHz: 80.0, gain: 0.8);
+    await cubit.setDynamicEq(false);
+    await cubit.setLoudnessContour(false, intensity: 0.0);
+    if (!context.mounted) return;
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      const SnackBar(
+        content: Text('All Equalizer & DSP settings restored to defaults'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   Future<void> _showSaveCustomPresetDialog(
       PlayerCubit cubit, PlayerState state) async {
     final textController = TextEditingController(text: 'My Custom EQ');
@@ -372,7 +398,21 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
                         child: Row(
                           children: [
-                            const SizedBox(width: 32),
+                            IconButton(
+                              tooltip: 'Reset all DSP & EQ to defaults',
+                              icon: Icon(Icons.restart_alt_rounded,
+                                  color: dspBlockedGlobal != null
+                                      ? p.textTertiary.withValues(alpha: 0.4)
+                                      : p.accent,
+                                  size: 20),
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(
+                                  minWidth: 32, minHeight: 32),
+                              onPressed: dspBlockedGlobal != null
+                                  ? null
+                                  : () => _resetAllDspDefaults(context, cubit),
+                            ),
                             const Spacer(),
                             Container(
                               width: 40,
@@ -1195,9 +1235,29 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                           IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Bass Boost', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.bassBoost, conflictReason: dspBlocked)),
                         ],
                       ),
-                      Text(
-                        '${(preset.bassBoost * 100).round()}% punch',
-                        style: TextStyle(fontSize: 11, color: p.textTertiary),
+                      Row(
+                        children: [
+                          Text(
+                            '${(preset.bassBoost * 100).round()}% punch',
+                            style: TextStyle(fontSize: 11, color: p.textTertiary),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: Icon(Icons.settings_backup_restore,
+                                size: 14,
+                                color: preset.bassBoost <= 0.001 || dspBlocked != null
+                                    ? p.textTertiary.withValues(alpha: 0.35)
+                                    : p.accent),
+                            tooltip: 'Reset Bass Enhancer (0%)',
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints:
+                                const BoxConstraints(minWidth: 18, minHeight: 18),
+                            onPressed: preset.bassBoost <= 0.001 || dspBlocked != null
+                                ? null
+                                : () => cubit.setBassBoost(0.0),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -1289,39 +1349,60 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         ],
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: (isOverSafe
-                                ? p.error
-                                : (state.volumeBoost > 0
-                                    ? p.accent
-                                    : p.surface))
-                            .withValues(alpha: 0.15),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(
-                          color: isOverSafe
-                              ? p.error.withValues(alpha: 0.4)
-                              : (state.volumeBoost > 0
-                                  ? p.accent.withValues(alpha: 0.3)
-                                  : p.hairline),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: (isOverSafe
+                                    ? p.error
+                                    : (state.volumeBoost > 0
+                                        ? p.accent
+                                        : p.surface))
+                                .withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: isOverSafe
+                                  ? p.error.withValues(alpha: 0.4)
+                                  : (state.volumeBoost > 0
+                                      ? p.accent.withValues(alpha: 0.3)
+                                      : p.hairline),
+                            ),
+                          ),
+                          child: Text(
+                            state.volumeBoost > 0
+                                ? '+${(state.volumeBoost * 10).toStringAsFixed(1)} dB'
+                                : 'Off',
+                            style: TextStyle(
+                              color: isOverSafe
+                                  ? p.error
+                                  : (state.volumeBoost > 0
+                                      ? p.accent
+                                      : p.textSecondary),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                         ),
-                      ),
-                      child: Text(
-                        state.volumeBoost > 0
-                            ? '+${(state.volumeBoost * 10).toStringAsFixed(1)} dB'
-                            : 'Off',
-                        style: TextStyle(
-                          color: isOverSafe
-                              ? p.error
-                              : (state.volumeBoost > 0
-                                  ? p.accent
-                                  : p.textSecondary),
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
+                        const SizedBox(width: 4),
+                        IconButton(
+                          icon: Icon(Icons.settings_backup_restore,
+                              size: 16,
+                              color: state.volumeBoost <= 0.001 || dspBlocked != null
+                                  ? p.textTertiary.withValues(alpha: 0.35)
+                                  : p.accent),
+                          tooltip: 'Reset Volume Boost (Off)',
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints:
+                              const BoxConstraints(minWidth: 24, minHeight: 24),
+                          onPressed: state.volumeBoost <= 0.001 || dspBlocked != null
+                              ? null
+                              : () => cubit.setVolumeBoost(0.0),
                         ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
@@ -2052,12 +2133,35 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                   fontSize: 12,
                                   color: p.textSecondary,
                                   fontWeight: FontWeight.w600)),
-                          Text(
-                            '${(state.virtualizerStrength * 100).round()}%',
-                            style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: p.accent),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '${(state.virtualizerStrength * 100).round()}%',
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: p.accent),
+                              ),
+                              const SizedBox(width: 4),
+                              IconButton(
+                                icon: Icon(Icons.settings_backup_restore,
+                                    size: 15,
+                                    color: !state.isVirtualizerEnabled ||
+                                            state.virtualizerStrength <= 0.001
+                                        ? p.textTertiary.withValues(alpha: 0.35)
+                                        : p.accent),
+                                tooltip: 'Reset to default (0%)',
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(
+                                    minWidth: 20, minHeight: 20),
+                                onPressed: !state.isVirtualizerEnabled ||
+                                        state.virtualizerStrength <= 0.001
+                                    ? null
+                                    : () => cubit.setVirtualizerStrength(0.0),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -2318,12 +2422,33 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               fontSize: 12,
                               color: p.textSecondary,
                               fontWeight: FontWeight.w600)),
-                      Text(
-                        '${state.crossfeedDelayUs.round()} Ã‚Âµs',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: p.accent),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${state.crossfeedDelayUs.round()} µs',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: p.accent),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: Icon(Icons.settings_backup_restore,
+                                size: 15,
+                                color: (state.crossfeedDelayUs - 350.0).abs() < 1.0
+                                    ? p.textTertiary.withValues(alpha: 0.35)
+                                    : p.accent),
+                            tooltip: 'Reset to default (350 µs)',
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                                minWidth: 20, minHeight: 20),
+                            onPressed: (state.crossfeedDelayUs - 350.0).abs() < 1.0
+                                ? null
+                                : () => cubit.setCrossfeed(true, delayUs: 350.0),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -2354,12 +2479,33 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               fontSize: 12,
                               color: p.textSecondary,
                               fontWeight: FontWeight.w600)),
-                      Text(
-                        '${state.crossfeedFeedDb.toStringAsFixed(1)} dB',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: p.accent),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${state.crossfeedFeedDb.toStringAsFixed(1)} dB',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: p.accent),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: Icon(Icons.settings_backup_restore,
+                                size: 15,
+                                color: (state.crossfeedFeedDb - (-9.0)).abs() < 0.05
+                                    ? p.textTertiary.withValues(alpha: 0.35)
+                                    : p.accent),
+                            tooltip: 'Reset to default (-9.0 dB)',
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                                minWidth: 20, minHeight: 20),
+                            onPressed: (state.crossfeedFeedDb - (-9.0)).abs() < 0.05
+                                ? null
+                                : () => cubit.setCrossfeed(true, feedDb: -9.0),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -2462,12 +2608,33 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               fontSize: 12,
                               color: p.textSecondary,
                               fontWeight: FontWeight.w600)),
-                      Text(
-                        '${state.limiterThresholdDb.toStringAsFixed(1)} dBFS',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: p.accent),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${state.limiterThresholdDb.toStringAsFixed(1)} dBFS',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: p.accent),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: Icon(Icons.settings_backup_restore,
+                                size: 15,
+                                color: (state.limiterThresholdDb - (-0.2)).abs() < 0.05
+                                    ? p.textTertiary.withValues(alpha: 0.35)
+                                    : p.accent),
+                            tooltip: 'Reset to default (-0.2 dBFS)',
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                                minWidth: 20, minHeight: 20),
+                            onPressed: (state.limiterThresholdDb - (-0.2)).abs() < 0.05
+                                ? null
+                                : () => cubit.setLookaheadLimiter(true, thresholdDb: -0.2),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -2497,12 +2664,33 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               fontSize: 12,
                               color: p.textSecondary,
                               fontWeight: FontWeight.w600)),
-                      Text(
-                        '${state.limiterReleaseMs.round()} ms',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: p.accent),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${state.limiterReleaseMs.round()} ms',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: p.accent),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: Icon(Icons.settings_backup_restore,
+                                size: 15,
+                                color: (state.limiterReleaseMs - 50.0).abs() < 0.5
+                                    ? p.textTertiary.withValues(alpha: 0.35)
+                                    : p.accent),
+                            tooltip: 'Reset to default (50 ms)',
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                                minWidth: 20, minHeight: 20),
+                            onPressed: (state.limiterReleaseMs - 50.0).abs() < 0.5
+                                ? null
+                                : () => cubit.setLookaheadLimiter(true, releaseMs: 50.0),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -2627,16 +2815,41 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                             fontSize: 12,
                             fontWeight: FontWeight.w800,
                             color: dspBlocked != null ? p.textTertiary : (state.stereoBalance < -0.05 ? p.accent : p.textSecondary))),
-                    Text(
-                      dspBlocked != null ? 'Blocked' : (state.stereoBalance.abs() < 0.05
-                          ? 'Center'
-                          : (state.stereoBalance < 0
-                              ? 'Left ${(-state.stereoBalance * 100).round()}%'
-                              : 'Right ${(state.stereoBalance * 100).round()}%')),
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: dspBlocked != null ? p.error : p.accent),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          dspBlocked != null ? 'Blocked' : (state.stereoBalance.abs() < 0.05
+                              ? 'Center'
+                              : (state.stereoBalance < 0
+                                  ? 'Left ${(-state.stereoBalance * 100).round()}%'
+                                  : 'Right ${(state.stereoBalance * 100).round()}%')),
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: dspBlocked != null ? p.error : p.accent),
+                        ),
+                        const SizedBox(width: 4),
+                        IconButton(
+                          icon: Icon(Icons.settings_backup_restore,
+                              size: 15,
+                              color: dspBlocked != null ||
+                                      !_nativePcmEffectsAvailable ||
+                                      state.stereoBalance.abs() < 0.01
+                                  ? p.textTertiary.withValues(alpha: 0.35)
+                                  : p.accent),
+                          tooltip: 'Reset Balance to Center',
+                          visualDensity: VisualDensity.compact,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(
+                              minWidth: 20, minHeight: 20),
+                          onPressed: dspBlocked != null ||
+                                  !_nativePcmEffectsAvailable ||
+                                  state.stereoBalance.abs() < 0.01
+                              ? null
+                              : () => cubit.setStereoBalance(0.0),
+                        ),
+                      ],
                     ),
                     Text('R',
                         style: TextStyle(
@@ -2762,12 +2975,33 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                               fontSize: 12,
                               color: p.textSecondary,
                               fontWeight: FontWeight.w600)),
-                      Text(
-                        '${(state.reverbWetDry * 100).round()}% Wet',
-                        style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                            color: p.accent),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            '${(state.reverbWetDry * 100).round()}% Wet',
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: p.accent),
+                          ),
+                          const SizedBox(width: 4),
+                          IconButton(
+                            icon: Icon(Icons.settings_backup_restore,
+                                size: 15,
+                                color: (state.reverbWetDry - 0.20).abs() < 0.01
+                                    ? p.textTertiary.withValues(alpha: 0.35)
+                                    : p.accent),
+                            tooltip: 'Reset to default (20% Wet)',
+                            visualDensity: VisualDensity.compact,
+                            padding: EdgeInsets.zero,
+                            constraints: const BoxConstraints(
+                                minWidth: 20, minHeight: 20),
+                            onPressed: (state.reverbWetDry - 0.20).abs() < 0.01
+                                ? null
+                                : () => cubit.setReverb(true, wetDry: 0.20),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -2851,9 +3085,12 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     required double value,
     required double min,
     required double max,
+    double? defaultValue,
     int? divisions,
     required ValueChanged<double> onChanged,
   }) {
+    final isDefault =
+        defaultValue != null && (value - defaultValue).abs() < 0.001;
     return Column(
       children: [
         Row(
@@ -2864,11 +3101,32 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     fontSize: 12,
                     color: p.textSecondary,
                     fontWeight: FontWeight.w600)),
-            Text(valueText,
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: p.accent)),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(valueText,
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: p.accent)),
+                if (defaultValue != null) ...[
+                  const SizedBox(width: 4),
+                  IconButton(
+                    icon: Icon(Icons.settings_backup_restore,
+                        size: 15,
+                        color: isDefault
+                            ? p.textTertiary.withValues(alpha: 0.35)
+                            : p.accent),
+                    tooltip: 'Reset to default',
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints:
+                        const BoxConstraints(minWidth: 20, minHeight: 20),
+                    onPressed: isDefault ? null : () => onChanged(defaultValue),
+                  ),
+                ],
+              ],
+            ),
           ],
         ),
         SliderTheme(
@@ -2981,6 +3239,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               value: state.saturationDrive,
               min: 0.0,
               max: 1.0,
+              defaultValue: 0.3,
               divisions: 20,
               onChanged: (val) => cubit.setSaturation(true, drive: val),
             ),
@@ -2992,6 +3251,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               value: state.saturationMix,
               min: 0.0,
               max: 1.0,
+              defaultValue: 0.5,
               divisions: 20,
               onChanged: (val) => cubit.setSaturation(true, mix: val),
             ),
@@ -3003,6 +3263,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               value: state.saturationTilt,
               min: 0.0,
               max: 1.0,
+              defaultValue: 0.3,
               divisions: 20,
               onChanged: (val) => cubit.setSaturation(true, tilt: val),
             ),
@@ -3103,6 +3364,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               value: state.stereoWidth,
               min: 0.0,
               max: 2.0,
+              defaultValue: 1.0,
               divisions: 40,
               onChanged: (val) => cubit.setStereoWidth(true, width: val),
             ),
@@ -3206,6 +3468,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               value: state.subCrossoverCornerHz,
               min: 60.0,
               max: 150.0,
+              defaultValue: 80.0,
               divisions: 18,
               onChanged: (val) => cubit.setSubCrossover(true, cornerHz: val),
             ),
@@ -3217,6 +3480,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               value: state.subCrossoverGain,
               min: 0.0,
               max: 1.0,
+              defaultValue: 0.8,
               divisions: 20,
               onChanged: (val) => cubit.setSubCrossover(true, gain: val),
             ),
@@ -3321,6 +3585,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               value: band.frequency,
               min: 60.0,
               max: 12000.0,
+              defaultValue: 1000.0,
               divisions: 64,
               onChanged: (val) =>
                   cubit.setDynamicEqBand(0, band.copyWith(frequency: val)),
@@ -3333,6 +3598,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               value: band.thresholdDb,
               min: -60.0,
               max: 0.0,
+              defaultValue: -30.0,
               divisions: 60,
               onChanged: (val) =>
                   cubit.setDynamicEqBand(0, band.copyWith(thresholdDb: val)),
@@ -3345,6 +3611,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               value: band.ratio,
               min: 1.0,
               max: 8.0,
+              defaultValue: 3.0,
               divisions: 35,
               onChanged: (val) =>
                   cubit.setDynamicEqBand(0, band.copyWith(ratio: val)),
@@ -3357,6 +3624,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               value: band.attackMs,
               min: 0.1,
               max: 50.0,
+              defaultValue: 5.0,
               divisions: 50,
               onChanged: (val) =>
                   cubit.setDynamicEqBand(0, band.copyWith(attackMs: val)),
@@ -3369,6 +3637,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               value: band.releaseMs,
               min: 20.0,
               max: 1000.0,
+              defaultValue: 120.0,
               divisions: 49,
               onChanged: (val) =>
                   cubit.setDynamicEqBand(0, band.copyWith(releaseMs: val)),
@@ -3381,6 +3650,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
               value: band.maxCutDb,
               min: -24.0,
               max: 0.0,
+              defaultValue: -12.0,
               divisions: 24,
               onChanged: (val) =>
                   cubit.setDynamicEqBand(0, band.copyWith(maxCutDb: val)),

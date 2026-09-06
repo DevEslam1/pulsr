@@ -108,6 +108,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               value: _thresholdDb,
               min: -30.0,
               max: 0.0,
+              defaultValue: -0.2,
               onChanged: (val) {
                 setState(() => _thresholdDb = val);
                 _applyParams();
@@ -121,6 +122,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               value: _ratio,
               min: 1.0,
               max: 20.0,
+              defaultValue: 3.0,
               onChanged: (val) {
                 setState(() => _ratio = val);
                 _applyParams();
@@ -134,6 +136,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               value: _attackMs,
               min: 1.0,
               max: 100.0,
+              defaultValue: 15.0,
               onChanged: (val) {
                 setState(() => _attackMs = val);
                 _applyParams();
@@ -147,6 +150,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               value: _releaseMs,
               min: 10.0,
               max: 500.0,
+              defaultValue: 50.0,
               onChanged: (val) {
                 setState(() => _releaseMs = val);
                 _applyParams();
@@ -160,6 +164,7 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
               value: _makeupGainDb,
               min: 0.0,
               max: 12.0,
+              defaultValue: 0.0,
               onChanged: (val) {
                 setState(() => _makeupGainDb = val);
                 _applyParams();
@@ -202,9 +207,12 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
     required double value,
     required double min,
     required double max,
+    double? defaultValue,
     required ValueChanged<double> onChanged,
   }) {
     final p = context.palette;
+    final isDefault =
+        defaultValue != null && (value - defaultValue).abs() < 0.001;
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
@@ -220,13 +228,36 @@ class _CompressorLimiterSheetState extends State<CompressorLimiterSheet> {
                   fontWeight: FontWeight.w500,
                 ),
               ),
-              Text(
-                valueDisplay,
-                style: TextStyle(
-                  color: p.primary,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    valueDisplay,
+                    style: TextStyle(
+                      color: p.primary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (defaultValue != null) ...[
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: Icon(Icons.settings_backup_restore,
+                          size: 16,
+                          color: isDefault || !_limiterEnabled
+                              ? p.textSecondary.withValues(alpha: 0.35)
+                              : p.primary),
+                      tooltip: 'Reset to default',
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints:
+                          const BoxConstraints(minWidth: 24, minHeight: 24),
+                      onPressed: isDefault || !_limiterEnabled
+                          ? null
+                          : () => onChanged(defaultValue),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
