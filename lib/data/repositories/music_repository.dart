@@ -256,9 +256,9 @@ class MusicRepository implements IMusicRepository {
       return (_db.select(_db.songsTable)
             ..where((t) =>
                 t.isFavorite.equals(true) &
-                t.isMissing.equals(false) &
-                t.source.equals(SongSource.local) &
-                t.path.like('ytmusic://%').not())
+                (t.isMissing.equals(false) |
+                    t.source.equals(SongSource.youtube) |
+                    t.remoteId.isNotNull()))
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .watch()
           .map((songs) => Right<AppFailure, List<SongsTableData>>(songs))
@@ -276,9 +276,9 @@ class MusicRepository implements IMusicRepository {
       final songs = await (_db.select(_db.songsTable)
             ..where((t) =>
                 t.isFavorite.equals(true) &
-                t.isMissing.equals(false) &
-                t.source.equals(SongSource.local) &
-                t.path.like('ytmusic://%').not())
+                (t.isMissing.equals(false) |
+                    t.source.equals(SongSource.youtube) |
+                    t.remoteId.isNotNull()))
             ..orderBy([(t) => OrderingTerm(expression: t.title)]))
           .get();
       return Right(songs);
@@ -302,7 +302,10 @@ class MusicRepository implements IMusicRepository {
         if (existing != null) {
           await (_db.update(_db.songsTable)
                 ..where((t) => t.id.equals(existing.id)))
-              .write(const SongsTableCompanion(isFavorite: Value(true)));
+              .write(const SongsTableCompanion(
+                isFavorite: Value(true),
+                isMissing: Value(false),
+              ));
           count++;
         } else {
           await _db.into(_db.songsTable).insert(
@@ -317,6 +320,7 @@ class MusicRepository implements IMusicRepository {
                   remoteId: Value(track.videoId),
                   remoteArtworkUrl: Value(track.artworkUrl),
                   isFavorite: const Value(true),
+                  isMissing: const Value(false),
                   dateAdded: Value(DateTime.now().millisecondsSinceEpoch),
                 ),
                 mode: InsertMode.insertOrReplace,

@@ -10,6 +10,7 @@ import '../../../core/utils/adaptive.dart';
 import '../../../core/utils/l10n_extensions.dart';
 import '../../../core/widgets/empty_state_widget.dart';
 import '../../../domain/models/ytm_track.dart';
+import '../../../domain/usecases/get_favorites_usecase.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../../domain/usecases/playlist_io_usecases.dart';
 import '../../../data/db/app_database.dart';
@@ -307,10 +308,9 @@ class _PlaylistsScreenState extends State<PlaylistsScreen> {
               icon: Icons.favorite_rounded,
               colors: [p.favorite, const Color(0xFFB0316B)],
               onTap: () async {
-                final songs = await getSongsUseCase.getAllSongs();
-                songs.fold((l) => null, (list) {
-                  final favs =
-                      list.where((s) => s.isFavorite).toList();
+                final favoritesRes =
+                    await getIt<GetFavoritesUseCase>().getFavorites();
+                favoritesRes.fold((l) => null, (favs) {
                   if (favs.isNotEmpty) {
                     playerCubit.playSong(favs.first, queue: favs);
                   }

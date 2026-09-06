@@ -1098,7 +1098,9 @@ class _LibraryScreenState extends State<LibraryScreen>
     final isGrid = state.viewMode == LibraryViewMode.grid;
 
     return RefreshIndicator(
-      onRefresh: () => _handleRefresh(context),
+      onRefresh: () => _favTabFilter == 1 && AppConfig.ytmEnabled
+          ? _syncYtmLikes(context)
+          : _handleRefresh(context),
       child: Column(
         children: [
           // ---------- Sub Tabs Switcher (Local / Online) ----------
@@ -1485,6 +1487,9 @@ class _LibraryScreenState extends State<LibraryScreen>
     try {
       final count = await libraryCubit.syncYtmAccountLikes();
       if (context.mounted) {
+        if (_favTabFilter != 1) {
+          setState(() => _favTabFilter = 1);
+        }
         messenger.hideCurrentSnackBar();
         messenger.showSnackBar(
           SnackBar(
@@ -1691,6 +1696,9 @@ class _LibraryScreenState extends State<LibraryScreen>
                               Navigator.of(ctx).pop();
                             }
                             if (context.mounted) {
+                              if (_favTabFilter != 1) {
+                                setState(() => _favTabFilter = 1);
+                              }
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(

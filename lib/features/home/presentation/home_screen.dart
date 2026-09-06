@@ -11,6 +11,7 @@ import '../../../core/widgets/section_header.dart';
 import '../../../core/widgets/song_tile.dart';
 import '../../../data/db/app_database.dart';
 import '../../../data/scanner/media_scanner_service.dart';
+import '../../../domain/usecases/get_favorites_usecase.dart';
 import '../../../domain/usecases/get_songs_usecase.dart';
 import '../../../core/errors/failures.dart';
 import '../../player/cubit/player_cubit.dart';
@@ -463,9 +464,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 icon: Icons.favorite_rounded,
                 color: p.favorite,
                 onTap: () async {
-                  final songs = await getSongsUseCase.getAllSongs();
-                  songs.fold((l) => null, (list) {
-                    final favs = list.where((s) => s.isFavorite).toList();
+                  final favoritesRes =
+                      await getIt<GetFavoritesUseCase>().getFavorites();
+                  favoritesRes.fold((l) => null, (favs) {
                     if (favs.isNotEmpty) {
                       playerCubit.playSong(favs.first, queue: favs);
                     }

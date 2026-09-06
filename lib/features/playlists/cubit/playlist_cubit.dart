@@ -12,6 +12,7 @@ import '../../../core/services/ytm_service.dart';
 import '../../../core/utils/error_logger.dart';
 import '../../../domain/models/smart_playlist_criteria.dart';
 import '../../../domain/models/ytm_track.dart';
+import '../../../domain/repositories/music_repository_interface.dart';
 import '../../../domain/usecases/playlist_usecases.dart';
 import 'playlist_state.dart';
 
@@ -443,6 +444,12 @@ class PlaylistCubit extends PulsrCubit<PlaylistState> {
       );
       if (tracks.isNotEmpty) {
         await _saveOnlineCache();
+        try {
+          final repo = getIt.isRegistered<IMusicRepository>()
+              ? getIt<IMusicRepository>()
+              : null;
+          await repo?.importOnlineTracksAsFavorites(tracks);
+        } catch (_) {}
       }
     } on YtmException catch (e) {
       ytmOnline.value = ytmOnline.value.copyWith(

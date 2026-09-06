@@ -4,6 +4,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:pulsr/data/db/app_database.dart';
 import 'package:pulsr/data/repositories/music_repository.dart';
+import 'package:pulsr/domain/models/ytm_track.dart';
 
 void main() {
   late AppDatabase db;
@@ -136,6 +137,69 @@ void main() {
       final favResult = await repository.getFavorites();
       final favorites = favResult.getOrElse((_) => []);
       expect(favorites.any((s) => s.id == 2), isTrue);
+    });
+
+    test('Online tracks imported as favorites appear in getFavorites and watchFavorites',
+        () async {
+      // 1. Insert a local favorite song
+      await db.into(db.songsTable).insert(
+            SongsTableCompanion.insert(
+              id: const Value(101),
+              title: 'Local Favorite',
+              path: '/storage/music/local_fav.mp3',
+              isFavorite: const Value(true),
+            ),
+          );
+
+      // 2. Import online YouTube Music tracks as favorites
+      final onlineTracks = [
+        const YtmTrack(
+          videoId: 'yt_vid_1',
+          title: 'Online Hit 1',
+          artist: 'YTM Artist 1',
+          duration: Duration(minutes: 3, seconds: 30),
+          artworkUrl: 'https://lh3.googleusercontent.com/art1',
+        ),
+        const YtmTrack(
+          videoId: 'yt_vid_2',
+          title: 'Online Hit 2',
+          artist: 'YTM Artist 2',
+          duration: Duration(minutes: 4, seconds: 15),
+          artworkUrl: 'https://lh3.googleusercontent.com/art2',
+        ),
+      ];
+
+      final importRes =
+          await repository.importOnlineTracksAsFavorites(onlineTracks);
+      expect(importRes.isRight(), isTrue);
+      expect(importRes.getOrElse((_) => 0), equals(2));
+
+      // 3. Verify getFavorites returns BOTH local and online favorites
+      final favsRes = await repository.getFavorites();
+      final favs = favsRes.getOrElse((_) => []);
+      expect(favs.length, equals(3));
+      expect(favs.any((s) => s.remoteId == 'yt_vid_1'), isTrue);
+      expect(favs.any((s) => s.remoteId == 'yt_vid_2'), isTrue);
+      expect(favs.any((s) => s.id == 101), isTrue);
+
+      // 4. Verify watchFavorites stream emits the online favorites
+      final streamResult = await repository.watchFavorites().first;
+      final streamFavs = streamResult.getOrElse((_) => []);
+      expect(streamFavs.length, equals(3));
+      expect(streamFavs.any((s) => s.source == SongSource.youtube), isTrue);
+
+      // 5. Test re-importing when an existing row was previously marked isMissing: true
+      await (db.update(db.songsTable)..where((t) => t.remoteId.equals('yt_vid_1')))
+          .write(const SongsTableCompanion(isMissing: Value(true)));
+
+      final reimportRes =
+          await repository.importOnlineTracksAsFavorites(onlineTracks);
+      expect(reimportRes.isRight(), isTrue);
+
+      final postReimport = await repository.getFavorites();
+      final postFavs = postReimport.getOrElse((_) => []);
+      final vid1 = postFavs.firstWhere((s) => s.remoteId == 'yt_vid_1');
+      expect(vid1.isMissing, isFalse);
     });
 
     test('Record play history updates song count and lastPlayed', () async {

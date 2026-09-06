@@ -13,4 +13,8 @@ class GetFavoritesUseCase {
   Stream<Result<List<SongsTableData>>> watchFavorites() {
     return _repository.watchFavorites();
   }
+
+  Future<Result<List<SongsTableData>>> getFavorites() {
+    return _repository.getFavorites();
+  }
 }
