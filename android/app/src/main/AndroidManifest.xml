@@ -184,5 +184,13 @@
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
         </intent>
+        <intent>
+            <action android:name="com.android.music.metachanged" />
+        </intent>
+        <package android:name="com.adam.aslfms" />
+        <package android:name="fm.last.android" />
+        <package android:name="com.simplecity.amp_scrobbler" />
+        <package android:name="net.jjc1138.android.scrobbler" />
+        <package android:name="com.softartstudio.scrobble" />
     </queries>
 </manifest>

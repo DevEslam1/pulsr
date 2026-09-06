@@ -41,12 +41,30 @@ class ScrobblerPlugin(private val context: Context) : MethodChannel.MethodCallHa
     private var isScrobblerChecked = false
     private var isScrobblerPresent = false
 
+    private val knownScrobblerPackages = arrayOf(
+        "com.adam.aslfms",
+        "fm.last.android",
+        "com.simplecity.amp_scrobbler",
+        "net.jjc1138.android.scrobbler",
+        "com.softartstudio.scrobble"
+    )
+
     private fun isScrobblerAvailable(): Boolean {
         if (isScrobblerChecked) return isScrobblerPresent
         try {
             val intent = Intent("com.android.music.metachanged")
             val receivers = context.packageManager.queryBroadcastReceivers(intent, 0)
-            isScrobblerPresent = receivers.isNotEmpty()
+            if (receivers.isNotEmpty()) {
+                isScrobblerPresent = true
+            } else {
+                for (pkg in knownScrobblerPackages) {
+                    val pkgIntent = Intent("com.android.music.metachanged").setPackage(pkg)
+                    if (context.packageManager.queryBroadcastReceivers(pkgIntent, 0).isNotEmpty()) {
+                        isScrobblerPresent = true
+                        break
+                    }
+                }
+            }
         } catch (_: Throwable) {
             isScrobblerPresent = false
         }
@@ -74,7 +92,7 @@ class ScrobblerPlugin(private val context: Context) : MethodChannel.MethodCallHa
             )
 
             for (action in actions) {
-                val intent = Intent(action).apply {
+                val baseIntent = Intent(action).apply {
                     putExtra("id", id)
                     putExtra("artist", artist)
                     putExtra("track", track)
@@ -86,7 +104,15 @@ class ScrobblerPlugin(private val context: Context) : MethodChannel.MethodCallHa
                     putExtra("package", context.packageName)
                     putExtra("app-name", "Pulsr")
                 }
-                context.sendBroadcast(intent)
+                try { context.sendBroadcast(baseIntent) } catch (_: Throwable) {}
+
+                // Send explicit broadcasts to known scrobbler packages on Android 8+
+                for (pkg in knownScrobblerPackages) {
+                    try {
+                        val explicitIntent = Intent(baseIntent).setPackage(pkg)
+                        context.sendBroadcast(explicitIntent)
+                    } catch (_: Throwable) {}
+                }
             }
         } catch (_: Throwable) {
             // Ignore broadcast failures in restricted environments

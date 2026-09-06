@@ -46,6 +46,8 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
         }
     }
 
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
     @SuppressLint("MissingPermission")
     private fun startRecording(sampleRate: Int, result: MethodChannel.Result) {
         if (capturing.get()) {
@@ -88,22 +90,25 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
             record.startRecording()
             captureThread = Thread {
                 val buf = ByteArray(4096)
-                while (capturing.get()) {
+                while (capturing.get() && !Thread.currentThread().isInterrupted) {
                     val n = try {
                         record.read(buf, 0, buf.size)
                     } catch (_: Throwable) {
                         break
                     }
-                    if (n > 0) {
-                        val sink = eventSink ?: break
-                        try {
-                            sink.success(mapOf("pcm" to buf.copyOf(n), "frames" to n / 2))
-                        } catch (_: Exception) {
-                            break
+                    if (n > 0 && capturing.get()) {
+                        val payload = mapOf("pcm" to buf.copyOf(n), "frames" to n / 2)
+                        mainHandler.post {
+                            if (capturing.get()) {
+                                try {
+                                    eventSink?.success(payload)
+                                } catch (_: Exception) {}
+                            }
                         }
                     }
                 }
             }.apply {
+                name = "PulsrRoomCapture"
                 priority = Thread.NORM_PRIORITY + 1
                 start()
             }
@@ -116,8 +121,11 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
 
     private fun stopRecording() {
         capturing.set(false)
+        val thread = captureThread
+        captureThread = null
         try {
-            captureThread?.join(600)
+            thread?.interrupt()
+            thread?.join(1500)
         } catch (_: Throwable) {}
         try {
             audioRecord?.stop()
@@ -126,7 +134,6 @@ class RoomCorrectionPlugin private constructor(private val appContext: Context) 
             audioRecord?.release()
         } catch (_: Throwable) {}
         audioRecord = null
-        captureThread = null
     }
 
     override fun onListen(arguments: Any?, sink: EventChannel.EventSink?) {

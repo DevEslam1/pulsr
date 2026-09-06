@@ -106,7 +106,13 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
 
     // Bluetooth A2DP codec control
     private var bluetoothA2dp: BluetoothA2dp? = null
-    private val bluetoothAdapter: BluetoothAdapter? = BluetoothAdapter.getDefaultAdapter()
+    private val bluetoothAdapter: BluetoothAdapter? =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            (context.getSystemService(Context.BLUETOOTH_SERVICE) as? android.bluetooth.BluetoothManager)?.adapter
+        } else {
+            @Suppress("DEPRECATION")
+            BluetoothAdapter.getDefaultAdapter()
+        }
     private var a2dpServiceListener: BluetoothProfile.ServiceListener? = null
 
     init {
@@ -520,7 +526,9 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 BluetoothCodecConfig.SAMPLE_RATE_44100,
                 BluetoothCodecConfig.SAMPLE_RATE_48000,
                 BluetoothCodecConfig.SAMPLE_RATE_88200,
-                BluetoothCodecConfig.SAMPLE_RATE_96000
+                BluetoothCodecConfig.SAMPLE_RATE_96000,
+                BluetoothCodecConfig.SAMPLE_RATE_176400,
+                BluetoothCodecConfig.SAMPLE_RATE_192000
             )
             val bitDepthFlags = listOf(
                 BluetoothCodecConfig.BITS_PER_SAMPLE_16,
@@ -590,6 +598,34 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
             val targetBits = if (bitDepth != null && bitDepth > 0)
                 depthToCodecBits(bitDepth)
                 else current.bitsPerSample
+
+            @Suppress("UNCHECKED_CAST")
+            val selectableCaps: List<BluetoothCodecConfig> =
+                (status.javaClass.getMethod("getCodecsSelectableCapabilities").invoke(status) as? List<*>)
+                    ?.filterIsInstance<BluetoothCodecConfig>() ?: emptyList()
+
+            // Validate against device selectable capabilities
+            if (selectableCaps.isNotEmpty()) {
+                val matchingCodecCaps = selectableCaps.filter { it.codecType == targetCodecType }
+                if (matchingCodecCaps.isEmpty()) {
+                    Log.w(TAG, "Target codec ${codecTypeName(targetCodecType)} not supported by connected device")
+                    return false
+                }
+                if (targetSampleRate != BluetoothCodecConfig.SAMPLE_RATE_NONE && targetSampleRate != current.sampleRate) {
+                    val rateSupported = matchingCodecCaps.any { (it.sampleRate and targetSampleRate) != 0 }
+                    if (!rateSupported) {
+                        Log.w(TAG, "Sample rate $sampleRateHz not supported for codec ${codecTypeName(targetCodecType)}")
+                        return false
+                    }
+                }
+                if (targetBits != BluetoothCodecConfig.BITS_PER_SAMPLE_NONE && targetBits != current.bitsPerSample) {
+                    val bitsSupported = matchingCodecCaps.any { (it.bitsPerSample and targetBits) != 0 }
+                    if (!bitsSupported) {
+                        Log.w(TAG, "Bit depth $bitDepth not supported for codec ${codecTypeName(targetCodecType)}")
+                        return false
+                    }
+                }
+            }
 
             // LDAC quality encodes in codecSpecific1 (Long)
             val ldacSpecific1: Long = if (targetCodecType == BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC
@@ -826,16 +862,19 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
      * rate/depth the user asked for when the DAC offers it, so the sample-rate
      * picker is not decoration on the one path where it can be obeyed.
      */
-    private fun selectMixerAttributes(supported: List<*>): Any? {
+    private fun selectMixerAttributes(supported: List<*>, strictTargetFormat: Boolean = false): Any? {
         val exclusive = supported.filterNotNull().filter { getMixerBehaviorCached(it) == 1 }
         val pool = exclusive.ifEmpty { supported.filterNotNull() }
         if (pool.isEmpty()) return null
         if (targetSampleRate > 0 || targetBitDepth > 0) {
-            pool.firstOrNull { attr ->
+            val match = pool.firstOrNull { attr ->
                 val fmt = mixerAttrFormat(attr) ?: return@firstOrNull false
                 (targetSampleRate <= 0 || fmt.sampleRate == targetSampleRate) &&
                     (targetBitDepth <= 0 || encodingBitDepth(fmt.encoding) == targetBitDepth)
-            }?.let { return it }
+            }
+            if (match != null) return match
+            lastBitPerfectReason = "target_format_unavailable"
+            if (strictTargetFormat) return null
         }
         return pool.maxByOrNull { attr ->
             val fmt = mixerAttrFormat(attr)
@@ -880,7 +919,9 @@ class HiResDacPlugin(private val context: Context, messenger: BinaryMessenger) :
                 if (enabled) {
                     val selectedAttr = selectMixerAttributes(supportedAttributes)
                     if (selectedAttr == null) {
-                        lastBitPerfectReason = "no_supported_mixer_attributes"
+                        if (lastBitPerfectReason == null) {
+                            lastBitPerfectReason = "no_supported_mixer_attributes"
+                        }
                         return false
                     }
                     val mixerAttrClass = Class.forName("android.media.AudioMixerAttributes")

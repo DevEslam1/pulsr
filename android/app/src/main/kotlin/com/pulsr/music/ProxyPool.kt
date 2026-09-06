@@ -126,6 +126,8 @@ object ProxyPool {
                     return null
                 }
             })
+        } else {
+            Authenticator.setDefault(null)
         }
 
         return selected.toJavaProxy()

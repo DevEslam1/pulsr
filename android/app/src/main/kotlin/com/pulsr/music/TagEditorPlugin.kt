@@ -71,9 +71,20 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                     return
                 }
                 backgroundExecutor.execute {
+                    var tempFile: java.io.File? = null
                     try {
-                        val file = File(path)
-                        if (!file.exists()) {
+                        val file = if (path.startsWith("content:")) {
+                            val uri = android.net.Uri.parse(path)
+                            tempFile = java.io.File.createTempFile("tag_read_", ".tmp", context?.cacheDir)
+                            context?.contentResolver?.openInputStream(uri)?.use { input ->
+                                tempFile.outputStream().use { output -> input.copyTo(output) }
+                            }
+                            tempFile
+                        } else {
+                            File(path)
+                        }
+
+                        if (file == null || !file.exists()) {
                             android.os.Handler(android.os.Looper.getMainLooper()).post {
                                 result.error("FILE_NOT_FOUND", "File does not exist at $path", null)
                             }
@@ -131,6 +142,8 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                         android.os.Handler(android.os.Looper.getMainLooper()).post {
                             result.error("READ_TAGS_ERROR", e.message, e.stackTraceToString())
                         }
+                    } finally {
+                        tempFile?.let { runCatching { it.delete() } }
                     }
                 }
             }
@@ -145,9 +158,21 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                 }
 
                 backgroundExecutor.execute {
+                    var tempFile: java.io.File? = null
                     try {
-                        val file = File(path)
-                        if (!file.exists()) {
+                        val isContentUri = path.startsWith("content:")
+                        val file = if (isContentUri) {
+                            val uri = android.net.Uri.parse(path)
+                            tempFile = java.io.File.createTempFile("tag_write_", ".tmp", context?.cacheDir)
+                            context?.contentResolver?.openInputStream(uri)?.use { input ->
+                                tempFile.outputStream().use { output -> input.copyTo(output) }
+                            }
+                            tempFile
+                        } else {
+                            File(path)
+                        }
+
+                        if (file == null || !file.exists()) {
                             android.os.Handler(android.os.Looper.getMainLooper()).post {
                                 result.error("FILE_NOT_FOUND", "File does not exist at $path", null)
                             }
@@ -184,9 +209,6 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                         if (effectiveArtworkBytes != null && effectiveArtworkBytes.size > 1024 * 1024) {
                             val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                             BitmapFactory.decodeByteArray(effectiveArtworkBytes, 0, effectiveArtworkBytes.size, options)
-                            // Scale down whenever the file exceeds 1 MB — regardless of pixel count.
-                            // Previously the condition was `<= 10000000L` which was inverted: it scaled
-                            // moderate images (< 10 MP) but let extremely large images through unscaled.
                             if (options.outWidth > 0 && options.outHeight > 0) {
                                 try {
                                     val bmp = BitmapFactory.decodeByteArray(effectiveArtworkBytes, 0, effectiveArtworkBytes.size)
@@ -237,6 +259,13 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
 
                         AudioFileIO.write(audioFile)
 
+                        if (isContentUri) {
+                            val uri = android.net.Uri.parse(path)
+                            context?.contentResolver?.openOutputStream(uri, "rwt")?.use { out ->
+                                file.inputStream().use { input -> input.copyTo(out) }
+                            }
+                        }
+
                         // Trigger Android system MediaStore scan so changes are indexed immediately
                         context?.let { ctx ->
                             try {
@@ -251,6 +280,8 @@ class TagEditorPlugin : FlutterPlugin, MethodCallHandler {
                         android.os.Handler(android.os.Looper.getMainLooper()).post {
                             result.error("WRITE_TAGS_ERROR", e.message, e.stackTraceToString())
                         }
+                    } finally {
+                        tempFile?.let { runCatching { it.delete() } }
                     }
                 }
             }

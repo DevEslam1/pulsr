@@ -60,21 +60,8 @@ class VisualizerPlugin : FlutterPlugin, MethodCallHandler, EventChannel.StreamHa
         when (call.method) {
             "start", "setAudioSessionId" -> {
                 val audioSessionId = call.argument<Int>("audioSessionId") ?: 0
-                stopVisualizer()
                 val success = startVisualizer(audioSessionId)
-                if (success) {
-                    result.success(true)
-                } else {
-                    // Try global audio session 0 fallback if specific session failed
-                    if (audioSessionId != 0) {
-                        val fallbackSuccess = startVisualizer(0)
-                        if (fallbackSuccess) {
-                            result.success(true)
-                            return
-                        }
-                    }
-                    result.success(false)
-                }
+                result.success(success)
             }
             "stop", "releaseVisualizer" -> {
                 stopVisualizer()

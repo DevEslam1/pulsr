@@ -41,6 +41,8 @@ class DownloadService : Service() {
         private const val REQUEST_CODE_OPEN = 1001
         private const val REQUEST_CODE_CANCEL = 1002
 
+        var onDownloadCancelledListener: ((String) -> Unit)? = null
+
         fun start(context: Context, videoId: String, title: String) {
             val intent = Intent(context, DownloadService::class.java).apply {
                 action = ACTION_START
@@ -56,9 +58,7 @@ class DownloadService : Service() {
                 } else {
                     context.startService(intent)
                 }
-            } catch (_: IllegalStateException) {
-                try { context.startService(intent) } catch (_: Exception) {}
-            } catch (_: SecurityException) {
+            } catch (e: Exception) {
                 try { context.startService(intent) } catch (_: Exception) {}
             }
         }
@@ -89,6 +89,7 @@ class DownloadService : Service() {
     }
 
     private var activeDownloads = mutableMapOf<String, Int>() // videoId -> progress 0..100
+    private var downloadTitles = mutableMapOf<String, String>() // videoId -> title
     private var foregroundStarted = false
 
     override fun onCreate() {
@@ -102,55 +103,70 @@ class DownloadService : Service() {
                 val vid = intent.getStringExtra(EXTRA_VIDEO_ID) ?: return START_NOT_STICKY
                 val title = intent.getStringExtra(EXTRA_TITLE) ?: "Downloading"
                 activeDownloads[vid] = 0
-                ensureForeground(title, 0)
+                downloadTitles[vid] = title
+                ensureForeground(title, 0, vid)
             }
             ACTION_UPDATE -> {
                 val vid = intent.getStringExtra(EXTRA_VIDEO_ID) ?: return START_NOT_STICKY
                 val title = intent.getStringExtra(EXTRA_TITLE) ?: "Downloading"
                 val progress = intent.getIntExtra(EXTRA_PROGRESS, 0).coerceIn(0, 100)
                 activeDownloads[vid] = progress
+                downloadTitles[vid] = title
                 // Remove completed ones
-                if (progress >= 100) activeDownloads.remove(vid)
+                if (progress >= 100) {
+                    activeDownloads.remove(vid)
+                    downloadTitles.remove(vid)
+                }
                 if (activeDownloads.isEmpty()) {
                     stopForegroundAndSelf()
                 } else {
                     val display = if (activeDownloads.size == 1) title else "${activeDownloads.size} downloads"
                     val avg = if (activeDownloads.isNotEmpty()) activeDownloads.values.average().toInt() else 0
-                    ensureForeground(display, avg)
+                    ensureForeground(display, avg, vid)
                 }
             }
             ACTION_CANCEL -> {
                 val vid = intent.getStringExtra(EXTRA_VIDEO_ID)
-                if (vid != null) activeDownloads.remove(vid)
+                if (vid != null) {
+                    activeDownloads.remove(vid)
+                    downloadTitles.remove(vid)
+                    try { onDownloadCancelledListener?.invoke(vid) } catch (_: Exception) {}
+                }
                 if (activeDownloads.isEmpty()) stopForegroundAndSelf() else {
-                    val n = notificationFor(activeDownloads.keys.firstOrNull() ?: "Downloads",
-                        activeDownloads.values.firstOrNull() ?: 0)
+                    val firstVid = activeDownloads.keys.firstOrNull()
+                    val title = downloadTitles[firstVid] ?: "Downloads"
+                    val n = notificationFor(title, activeDownloads[firstVid] ?: 0, firstVid)
                     (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
                         .notify(NOTIFICATION_ID, n)
                 }
             }
             ACTION_STOP -> {
                 activeDownloads.clear()
+                downloadTitles.clear()
                 stopForegroundAndSelf()
             }
         }
         return START_NOT_STICKY
     }
 
-    private fun ensureForeground(title: String, progress: Int) {
-        val n = notificationFor(title, progress)
-        if (!foregroundStarted) {
-            // FOREGROUND_SERVICE_TYPE_DATA_SYNC exists only on API 34+. Passing
-            // it on API 29-33 throws IllegalArgumentException -> crash.
-            if (Build.VERSION.SDK_INT >= 34) {
-                startForeground(NOTIFICATION_ID, n, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+    private fun ensureForeground(title: String, progress: Int, targetVideoId: String?) {
+        val n = notificationFor(title, progress, targetVideoId)
+        try {
+            if (!foregroundStarted) {
+                // FOREGROUND_SERVICE_TYPE_DATA_SYNC exists only on API 34+. Passing
+                // it on API 29-33 throws IllegalArgumentException -> crash.
+                if (Build.VERSION.SDK_INT >= 34) {
+                    startForeground(NOTIFICATION_ID, n, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+                } else {
+                    startForeground(NOTIFICATION_ID, n)
+                }
+                foregroundStarted = true
             } else {
-                startForeground(NOTIFICATION_ID, n)
+                (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                    .notify(NOTIFICATION_ID, n)
             }
-            foregroundStarted = true
-        } else {
-            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
-                .notify(NOTIFICATION_ID, n)
+        } catch (e: Exception) {
+            android.util.Log.w("DownloadService", "Failed to transition to foreground: ${e.message}")
         }
     }
 
@@ -159,16 +175,18 @@ class DownloadService : Service() {
         stopSelf()
         foregroundStarted = false
         activeDownloads.clear()
+        downloadTitles.clear()
     }
 
-    private fun notificationFor(title: String, progress: Int): Notification {
+    private fun notificationFor(title: String, progress: Int, targetVideoId: String?): Notification {
         val openIntent = packageManager.getLaunchIntentForPackage(packageName)?.let { base ->
             PendingIntent.getActivity(this, REQUEST_CODE_OPEN, base,
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         }
         val cancelIntent = Intent(this, DownloadService::class.java).apply {
             action = ACTION_CANCEL
-            putExtra(EXTRA_VIDEO_ID, activeDownloads.keys.firstOrNull())
+            putExtra(EXTRA_VIDEO_ID, targetVideoId)
+            `package` = packageName
         }
         val cancelPending = PendingIntent.getService(this, REQUEST_CODE_CANCEL, cancelIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)

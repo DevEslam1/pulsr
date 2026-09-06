@@ -29,11 +29,22 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
     companion object {
         const val CHANNEL_NAME = "com.pulsr.music/yt_download"
 
+        private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
         fun registerWith(flutterEngine: FlutterEngine, context: Context): YtDownloadPlugin {
             val plugin = YtDownloadPlugin()
             plugin.context = context
             plugin.channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
             plugin.channel.setMethodCallHandler(plugin)
+            DownloadService.onDownloadCancelledListener = { videoId ->
+                mainHandler.post {
+                    if (plugin.context != null) {
+                        try {
+                            plugin.channel.invokeMethod("onDownloadCancelled", mapOf("videoId" to videoId))
+                        } catch (_: Exception) {}
+                    }
+                }
+            }
             return plugin
         }
     }
@@ -42,6 +53,15 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
         context = binding.applicationContext
         channel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME)
         channel.setMethodCallHandler(this)
+        DownloadService.onDownloadCancelledListener = { videoId ->
+            mainHandler.post {
+                if (context != null) {
+                    try {
+                        channel.invokeMethod("onDownloadCancelled", mapOf("videoId" to videoId))
+                    } catch (_: Exception) {}
+                }
+            }
+        }
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
@@ -49,6 +69,7 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     fun cleanup() {
+        DownloadService.onDownloadCancelledListener = null
         if (::channel.isInitialized) {
             channel.setMethodCallHandler(null)
         }
@@ -169,8 +190,10 @@ class YtDownloadPlugin : FlutterPlugin, MethodCallHandler {
                     return null
                 }
 
-                resolver.update(uri, ContentValues().apply { put(MediaStore.Audio.Media.IS_PENDING, 0) }, null, null)
-                success = true
+                val updateCount = resolver.update(uri, ContentValues().apply { put(MediaStore.Audio.Media.IS_PENDING, 0) }, null, null)
+                if (updateCount > 0) {
+                    success = true
+                }
 
                 var path: String? = null
                 resolver.query(uri, arrayOf(MediaStore.Audio.Media.DATA), null, null, null)?.use { c ->

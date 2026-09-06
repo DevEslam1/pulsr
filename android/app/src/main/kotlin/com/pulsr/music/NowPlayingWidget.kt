@@ -47,8 +47,8 @@ class NowPlayingWidget : AppWidgetProvider() {
                 if (check != android.content.pm.PackageManager.PERMISSION_GRANTED) {
                     // For non-signature callers, verify intent came from our package explicitly
                     val caller = intent.`package`
-                    if (caller != null && caller != context.packageName) {
-                        android.util.Log.w("NowPlayingWidget", "Rejected widget action from $caller without permission")
+                    if (caller == null || caller != context.packageName) {
+                        android.util.Log.w("NowPlayingWidget", "Rejected widget action from ${caller ?: "unknown"} without permission")
                         return
                     }
                 }
@@ -742,6 +742,7 @@ class NowPlayingWidget : AppWidgetProvider() {
         private fun createBroadcastPendingIntent(context: Context, actionName: String, requestCode: Int): PendingIntent {
             val intent = Intent(context, NowPlayingWidget::class.java).apply {
                 action = actionName
+                `package` = context.packageName
             }
             val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
@@ -755,6 +756,7 @@ class NowPlayingWidget : AppWidgetProvider() {
             val intent = Intent(context, NowPlayingWidget::class.java).apply {
                 action = ACTION_SEEK_RATIO
                 putExtra(EXTRA_RATIO, ratio)
+                `package` = context.packageName
             }
             val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE

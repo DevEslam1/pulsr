@@ -12,6 +12,9 @@ import android.util.Log
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import org.jaudiotagger.audio.AudioFileIO
+import org.jaudiotagger.tag.FieldKey
+import java.io.File
  
 class MainActivity : AudioServiceActivity() {
     private val LYRICS_CHANNEL = "com.pulsr.music/lyrics"
@@ -128,9 +131,7 @@ class MainActivity : AudioServiceActivity() {
         }
     }
  
-    companion object {
-        private const val METADATA_KEY_LYRICS = 1000
-    }
+
  
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -169,24 +170,32 @@ class MainActivity : AudioServiceActivity() {
                     return@setMethodCallHandler
                 }
                 lyricsExecutor.execute {
-                    val retriever = MediaMetadataRetriever()
+                    var lyrics: String? = null
+                    var tempFile: File? = null
                     try {
-                        if (filePath.startsWith("content:")) {
-                            retriever.setDataSource(this, Uri.parse(filePath))
+                        val file = if (filePath.startsWith("content:")) {
+                            val uri = Uri.parse(filePath)
+                            tempFile = File.createTempFile("lyrics_", ".tmp", cacheDir)
+                            contentResolver.openInputStream(uri)?.use { input ->
+                                tempFile.outputStream().use { output -> input.copyTo(output) }
+                            }
+                            tempFile
                         } else {
-                            retriever.setDataSource(filePath)
+                            File(filePath)
                         }
-                        val lyrics = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                            retriever.extractMetadata(METADATA_KEY_LYRICS)
-                        } else {
-                            null
+
+                        if (file != null && file.exists()) {
+                            try {
+                                val audioFile = AudioFileIO.read(file)
+                                lyrics = audioFile.tag?.getFirst(FieldKey.LYRICS)
+                            } catch (_: Exception) {}
                         }
                         runOnUiThread { runCatching { result.success(lyrics) } }
                     } catch (e: Exception) {
                         Log.w("MainActivity", "Embedded lyrics extraction failed for $filePath: ${e.message}")
                         runOnUiThread { runCatching { result.success(null) } }
                     } finally {
-                        runCatching { retriever.release() }
+                        tempFile?.let { runCatching { it.delete() } }
                     }
                 }
             } else {
@@ -244,7 +253,7 @@ class MainActivity : AudioServiceActivity() {
     }
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
-        audioEffectsPlugin?.releaseEffects()
+        audioEffectsPlugin?.cleanup()
         audioEffectsPlugin = null
         tagEditorPlugin?.cleanup()
         tagEditorPlugin = null

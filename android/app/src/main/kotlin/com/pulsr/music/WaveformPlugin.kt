@@ -256,16 +256,13 @@ class WaveformPlugin : FlutterPlugin, MethodCallHandler {
     }
 
     private fun setDataSource(extractor: MediaExtractor, path: String) {
+        val ctx = context
         when {
             path.startsWith("content:") -> {
-                val ctx = context ?: throw IllegalStateException("No context for content URI")
-                val uri = Uri.parse(path)
-                val pfd = ctx.contentResolver.openFileDescriptor(uri, "r")
-                    ?: throw IllegalStateException("Could not open file descriptor for $path")
-                try {
-                    extractor.setDataSource(pfd.fileDescriptor)
-                } finally {
-                    try { pfd.close() } catch (_: Exception) {}
+                if (ctx != null) {
+                    extractor.setDataSource(ctx, Uri.parse(path), null)
+                } else {
+                    throw IllegalStateException("No context for content URI")
                 }
             }
             path.startsWith("file://") -> extractor.setDataSource(Uri.parse(path).path ?: path)

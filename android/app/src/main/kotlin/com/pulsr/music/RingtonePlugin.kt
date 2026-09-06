@@ -96,8 +96,24 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
                     return
                 }
 
-                val file = File(filePath)
-                if (!file.exists()) {
+                var tempFile: File? = null
+                val file: File? = if (filePath.startsWith("content:")) {
+                    val uri = Uri.parse(filePath)
+                    tempFile = File.createTempFile("ringtone_", ".tmp", currentContext.cacheDir)
+                    try {
+                        currentContext.contentResolver.openInputStream(uri)?.use { input ->
+                            tempFile.outputStream().use { output -> input.copyTo(output) }
+                        }
+                        tempFile
+                    } catch (_: Exception) {
+                        null
+                    }
+                } else {
+                    File(filePath)
+                }
+
+                if (file == null || !file.exists()) {
+                    tempFile?.let { runCatching { it.delete() } }
                     result.error("FILE_NOT_FOUND", "Audio file not found at $filePath", null)
                     return
                 }
@@ -118,6 +134,8 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
                     }
                 } catch (e: Exception) {
                     result.error("SET_RINGTONE_FAILED", e.localizedMessage ?: "Unknown error", e.stackTraceToString())
+                } finally {
+                    tempFile?.let { runCatching { it.delete() } }
                 }
             }
             else -> result.notImplemented()
@@ -176,7 +194,23 @@ class RingtonePlugin : FlutterPlugin, MethodCallHandler {
                 put(MediaStore.Audio.Media.IS_PENDING, 1)
             } else {
                 @Suppress("DEPRECATION")
-                put(MediaStore.Audio.Media.DATA, file.absolutePath)
+                val publicDir = Environment.getExternalStoragePublicDirectory(
+                    when (ringtoneType) {
+                        RingtoneManager.TYPE_NOTIFICATION -> Environment.DIRECTORY_NOTIFICATIONS
+                        RingtoneManager.TYPE_ALARM -> Environment.DIRECTORY_ALARMS
+                        else -> Environment.DIRECTORY_RINGTONES
+                    }
+                )
+                if (!publicDir.exists()) publicDir.mkdirs()
+                val target = File(publicDir, fileName)
+                try {
+                    file.inputStream().use { input -> target.outputStream().use { out -> input.copyTo(out) } }
+                    @Suppress("DEPRECATION")
+                    put(MediaStore.Audio.Media.DATA, target.absolutePath)
+                } catch (_: Exception) {
+                    @Suppress("DEPRECATION")
+                    put(MediaStore.Audio.Media.DATA, file.absolutePath)
+                }
             }
         }
 
