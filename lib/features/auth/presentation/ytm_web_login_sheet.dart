@@ -726,7 +726,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         if (text.contains(phrase)) return true;
       }
     } catch (e, st) {
-      ErrorLogger.log('_scanPageForBlockText failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+      _handleWebViewError('_scanPageForBlockText failed', e, st);
     }
     return false;
   }
@@ -845,12 +845,17 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
             : UserPreferredContentMode.MOBILE,
       );
     } catch (e, st) {
-      ErrorLogger.log('_navigateTo failed',
-          error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+      _handleWebViewError('_navigateTo setSettings failed', e, st);
     }
     final loadUrlFuture = _webViewController?.loadUrl(
         urlRequest: URLRequest(url: WebUri(effectiveUrl)));
-    if (loadUrlFuture != null) unawaited(loadUrlFuture);
+    // `loadUrl` on a dead handle throws asynchronously; unawaited, that became an
+    // unhandled rejection rather than reaching _handleWebViewError.
+    if (loadUrlFuture != null) {
+      unawaited(loadUrlFuture.catchError(
+          (Object e, StackTrace st) => _handleWebViewError(
+              '_navigateTo loadUrl failed', e, st)));
+    }
   }
 
   Future<bool> _checkIfLoggedIn([String? url]) {
@@ -922,7 +927,11 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         return true;
       }
     } catch (e, st) {
-      ErrorLogger.log('_detectLoginState failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+      // Not routed through _handleWebViewError: CookieManager is a static plugin
+      // channel that outlives any one webview, so a failure here says nothing
+      // about whether _webViewController is still alive.
+      ErrorLogger.log('_detectLoginState cookie read failed',
+          error: e, stackTrace: st, category: 'YtmWebLoginSheet');
     }
 
     // 2. Try native platform cookie manager
