@@ -133,6 +133,9 @@ class PulsrAudioHandler extends BaseAudioHandler
   // Video ids with an in-flight prefetch, so we resolve each at most once.
   final Set<String> _prefetching = {};
 
+  String _currentStreamingQuality() =>
+      _cachedPrefs?.getString('setting_streaming_quality') ?? 'high';
+
   final AdaptiveBufferEngine _adaptiveBufferEngine = AdaptiveBufferEngine();
   final OptimizedDspPipeline _dspPipeline = OptimizedDspPipeline();
   late final PlaybackAnalytics _playbackAnalytics;
@@ -679,6 +682,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       urlCache: getIt.isRegistered<YtmUrlCache>()
           ? getIt<YtmUrlCache>()
           : YtmUrlCache(),
+      qualityProvider: _currentStreamingQuality,
     );
 
     _formatDecoder = FormatAwareDecoder(
@@ -1146,6 +1150,7 @@ class PulsrAudioHandler extends BaseAudioHandler
       late final YtmResolvingSource source;
       source = YtmResolvingSource.withRefresh(
         videoId: song.remoteId ?? '',
+        quality: _currentStreamingQuality(),
         resolve: ({bool forceRefresh = false}) async {
           final resolved =
               await _resolveStreamUrl(song, forceRefresh: forceRefresh);
@@ -1220,6 +1225,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     late final YtmResolvingSource source;
     source = YtmResolvingSource.withRefresh(
       videoId: song.remoteId ?? '',
+      quality: _currentStreamingQuality(),
       resolve: ({bool forceRefresh = false}) async {
         final resolved =
             await _resolveStreamUrl(song, forceRefresh: forceRefresh);
@@ -1423,8 +1429,7 @@ class PulsrAudioHandler extends BaseAudioHandler
           return;
         }
         // Player is playing but volume is still muted
-        final target =
-            _calculateReplayGainVolume(currentSong).clamp(0.0, 1.0);
+        final target = _calculateReplayGainVolume(currentSong).clamp(0.0, 1.0);
         if (target > 0.05) {
           ErrorLogger.log(
               'Cold-start fade-in did not converge (attempt $attempts); restoring target volume',
@@ -1635,8 +1640,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         // Synchronize speed on inactive player before loading & playback
         await _inactivePlayer.setSpeed(_activePlayer.speed);
         final crossfadeLazy = source is YtmResolvingSource;
-        await _inactivePlayer.setAudioSource(source,
-            preload: !crossfadeLazy);
+        await _inactivePlayer.setAudioSource(source, preload: !crossfadeLazy);
 
         if (_crossfadeManager.currentFadeId != currentFadeId) {
           try {
@@ -1695,6 +1699,7 @@ class PulsrAudioHandler extends BaseAudioHandler
 
         mediaItem.add(_songToMediaItem(nextSong, artUri));
         _onTrackChangedSubject.add(nextSong);
+        _planNextStreamResolution();
         _repository.recordPlayHistory(nextSong.id);
         _broadcastState(_activePlayer.playbackEvent);
 
@@ -1886,15 +1891,18 @@ class PulsrAudioHandler extends BaseAudioHandler
           song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
       mediaItem.add(_songToMediaItem(song, fastArtUri));
       _onTrackChangedSubject.add(song);
+      _planNextStreamResolution();
 
       if (song.source == SongSource.youtube &&
           (song.remoteId?.isNotEmpty ?? false) &&
           (song.path.startsWith('ytmusic://') ||
               song.path.isEmpty ||
-              (!song.path.startsWith('content:') && song.isDownloaded != true))) {
+              (!song.path.startsWith('content:') &&
+                  song.isDownloaded != true))) {
         unawaited(_warmStreamCache(song).catchError((e) {
           if (generation != _playGeneration) return;
-          debugPrint('[AudioHandler] Background warm failed for ${song.title}: $e');
+          debugPrint(
+              '[AudioHandler] Background warm failed for ${song.title}: $e');
         }));
       }
 
@@ -1984,6 +1992,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
     mediaItem.add(_songToMediaItem(song, fastArtUri));
     _onTrackChangedSubject.add(song);
+    _planNextStreamResolution();
 
     final sources = _buildAudioSources(_songs);
 
@@ -2003,7 +2012,8 @@ class PulsrAudioHandler extends BaseAudioHandler
         (song.remoteId?.isNotEmpty ?? false)) {
       unawaited(_warmStreamCache(song).catchError((e) {
         if (generation != _playGeneration) return;
-        debugPrint('[AudioHandler] Gapless pre-warm failed for ${song.title}: $e');
+        debugPrint(
+            '[AudioHandler] Gapless pre-warm failed for ${song.title}: $e');
       }));
     }
 
@@ -2141,6 +2151,7 @@ class PulsrAudioHandler extends BaseAudioHandler
         song.artworkUri != null ? Uri.tryParse(song.artworkUri!) : null;
     mediaItem.add(_songToMediaItem(song, fastArtUri));
     _onTrackChangedSubject.add(song);
+    _planNextStreamResolution();
     await _activePlayer.setVolume(_calculateReplayGainVolume(song));
     _repository.recordPlayHistory(song.id);
     _broadcastState(_activePlayer.playbackEvent);
@@ -2168,6 +2179,15 @@ class PulsrAudioHandler extends BaseAudioHandler
     unawaited(_sleepTimerManager.onTrackCompleted());
   }
 
+  void _planNextStreamResolution() {
+    if (_songs.isEmpty) return;
+    _streamPreResolver.onTrackStarted(
+      queue: _songs,
+      currentIndex: _currentIndex,
+      isShuffle: _activePlayer.shuffleModeEnabled,
+    );
+  }
+
   Future<void> playSongAt(int index, {Duration? initialPosition}) async {
     if (index < 0 || index >= _songs.length) return;
     cancelPrefetches();
@@ -2188,7 +2208,8 @@ class PulsrAudioHandler extends BaseAudioHandler
             (!song.path.startsWith('content:') && song.isDownloaded != true))) {
       unawaited(_warmStreamCache(song).catchError((e) {
         if (generation != _playGeneration) return;
-        debugPrint('[AudioHandler] Background warm failed for ${song.title}: $e');
+        debugPrint(
+            '[AudioHandler] Background warm failed for ${song.title}: $e');
       }));
     }
 
@@ -3223,6 +3244,7 @@ class PulsrAudioHandler extends BaseAudioHandler
     _subscriptions.clear();
     // Dispose sleep timer before closing its subject to avoid add-after-close race
     _sleepTimerManager.dispose();
+    _streamPreResolver.dispose();
     if (!_positionSubject.isClosed) _positionSubject.close();
     if (!_audioSessionIdSubject.isClosed) _audioSessionIdSubject.close();
     if (!_errorSubject.isClosed) _errorSubject.close();

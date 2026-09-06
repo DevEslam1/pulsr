@@ -23,7 +23,10 @@ internal class YtmCookieStore private constructor(context: Context) {
     private val legacyPrefs: SharedPreferences =
         context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-    private val prefs: SharedPreferences = try {
+    // Never fall back to plaintext SharedPreferences for Google session
+    // credentials. If the keystore is unavailable we keep the current process
+    // session in memory and ask the user to sign in again after a restart.
+    private val prefs: SharedPreferences? = try {
         val masterKey = MasterKey.Builder(context)
             .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
             .build()
@@ -34,9 +37,7 @@ internal class YtmCookieStore private constructor(context: Context) {
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
-    } catch (_: Throwable) {
-        legacyPrefs
-    }
+    } catch (_: Throwable) { null }
 
     // Keyed by cookie name -> cookie value
     private val cookies = ConcurrentHashMap<String, String>()
@@ -48,9 +49,9 @@ internal class YtmCookieStore private constructor(context: Context) {
 
     private fun loadFromPrefs() {
         synchronized(lock) {
-            var saved = prefs.getString(KEY_COOKIES, null)
+            var saved = prefs?.getString(KEY_COOKIES, null)
             // One-time migration: check legacy plaintext prefs
-            if (saved.isNullOrEmpty() && prefs !== legacyPrefs) {
+            if (saved.isNullOrEmpty() && prefs != null) {
                 val legacySaved = legacyPrefs.getString(KEY_COOKIES, null)
                 if (!legacySaved.isNullOrEmpty()) {
                     try {
@@ -263,10 +264,10 @@ internal class YtmCookieStore private constructor(context: Context) {
 
     private fun clearStoredCookies() {
         cookies.clear()
-        prefs.edit().remove(KEY_COOKIES).apply()
-        if (prefs !== legacyPrefs) {
-            legacyPrefs.edit().remove(KEY_COOKIES).apply()
-        }
+        prefs?.edit()?.remove(KEY_COOKIES)?.apply()
+        // Remove historic plaintext storage during logout/migration; it is
+        // never used as a fallback for a new session.
+        legacyPrefs.edit().remove(KEY_COOKIES).apply()
     }
 
     fun clearCookies() = clear()
@@ -298,10 +299,10 @@ internal class YtmCookieStore private constructor(context: Context) {
             for ((k, v) in cookies) {
                 json.put(k, v)
             }
-            prefs.edit().putString(KEY_COOKIES, json.toString()).apply()
+            prefs?.edit()?.putString(KEY_COOKIES, json.toString())?.apply()
         } catch (_: Throwable) {
             val merged = getMergedCookieHeader() ?: ""
-            prefs.edit().putString(KEY_COOKIES, merged).apply()
+            prefs?.edit()?.putString(KEY_COOKIES, merged)?.apply()
         }
     }
 

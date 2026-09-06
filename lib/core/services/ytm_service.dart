@@ -199,8 +199,9 @@ class YtmService {
     };
   }
 
-  /// Synchronizes cookies into the native CookieManager so the extractor
-  /// makes authenticated requests on all YouTube endpoints.
+  /// Synchronizes cookies into the native extractor's encrypted session store.
+  /// The login WebView owns its CookieManager jar; importing a raw header must
+  /// not blindly replay domain-less credentials into browser origins.
   Future<void> syncCookies(String cookies) async {
     try {
       await _channel.invokeMethod<bool>('setCookies', {'cookies': cookies});

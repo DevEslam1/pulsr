@@ -36,8 +36,9 @@ class EmbeddedBrowserUa {
   static const String chromeMobile =
       'Mozilla/5.0 (Linux; Android 15; Pixel 9 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.7204.93 Mobile Safari/537.36';
 
-  /// Default mobile sign-in UA: Firefox Mobile on Android (bypasses Google's Chromium WebView checks).
-  static const String mobile = firefoxMobile;
+  /// Default mobile sign-in UA: Authentic Chrome Mobile on Android.
+  /// Matches the underlying Chromium WebView engine and avoids BotGuard Gecko/Blink mismatches.
+  static const String mobile = chromeMobile;
 
   /// Default desktop browsing UA: Firefox Desktop on Windows.
   static const String desktop = firefoxDesktop;
@@ -59,6 +60,18 @@ class EmbeddedBrowserUa {
   static const String antiFingerprint = r'''
 (function () {
   'use strict';
+
+  // CRITICAL: Do NOT tamper with native prototypes on Google or YouTube authentication domains.
+  // Google BotGuard actively tests Function.prototype.toString on Intl, WebGL, and Navigator APIs.
+  // Any non-native wrapper immediately trips Google's "This browser or app may not be secure" interstitial.
+  try {
+    var host = (window.location && window.location.hostname) || '';
+    if (host.indexOf('google.com') !== -1 ||
+        host.indexOf('youtube.com') !== -1 ||
+        host.indexOf('gstatic.com') !== -1) {
+      return;
+    }
+  } catch (e) {}
 
   function def(obj, prop, value) {
     try {
@@ -146,6 +159,15 @@ class EmbeddedBrowserUa {
     if ('userAgentData' in navigator) {
       try {
         Object.defineProperty(navigator, 'userAgentData', {
+          get: function () { return undefined; },
+          configurable: true,
+          enumerable: false
+        });
+      } catch (e) {}
+    }
+    if (typeof Navigator !== 'undefined' && Navigator.prototype) {
+      try {
+        Object.defineProperty(Navigator.prototype, 'userAgentData', {
           get: function () { return undefined; },
           configurable: true,
           enumerable: false
@@ -261,13 +283,29 @@ class EmbeddedBrowserUa {
     }
   } else if (isSafari) {
     try {
+      delete Navigator.prototype.userAgentData;
+    } catch (e) {}
+    try {
+      delete navigator.userAgentData;
+    } catch (e) {}
+    try {
       Object.defineProperty(navigator, 'userAgentData', {
         get: function () { return undefined; },
         configurable: true,
         enumerable: false
       });
     } catch (e) {}
+    if (typeof Navigator !== 'undefined' && Navigator.prototype) {
+      try {
+        Object.defineProperty(Navigator.prototype, 'userAgentData', {
+          get: function () { return undefined; },
+          configurable: true,
+          enumerable: false
+        });
+      } catch (e) {}
+    }
     try { delete window.chrome; } catch (e) {}
+    try { delete Object.getPrototypeOf(window).chrome; } catch (e) {}
     def(navigator, 'vendor', 'Apple Computer, Inc.');
     def(navigator, 'platform', isMobile ? 'iPhone' : 'MacIntel');
     def(navigator, 'maxTouchPoints', isMobile ? 5 : 0);
@@ -316,6 +354,16 @@ class EmbeddedBrowserUa {
     };
 
     try {
+      if (typeof Navigator !== 'undefined' && Navigator.prototype) {
+        Object.defineProperty(Navigator.prototype, 'userAgentData', {
+          get: function () { return uadStub; },
+          configurable: true,
+          enumerable: true
+        });
+      }
+    } catch (e) {}
+
+    try {
       Object.defineProperty(navigator, 'userAgentData', {
         get: function () { return uadStub; },
         configurable: true,
@@ -329,6 +377,13 @@ class EmbeddedBrowserUa {
 
     // Ensure window.chrome stub is present for Chrome
     if (!window.chrome || typeof window.chrome.runtime === 'undefined') {
+      try {
+        Object.defineProperty(window.chrome || {}, 'webview', {
+          value: undefined,
+          configurable: true,
+          writable: true,
+        });
+      } catch (e) {}
       try {
         Object.defineProperty(window, 'chrome', {
           value: {
@@ -348,6 +403,12 @@ class EmbeddedBrowserUa {
           writable: true,
           enumerable: true,
         });
+      } catch (e) {}
+    } else {
+      try {
+        if (window.chrome.webview) {
+          delete window.chrome.webview;
+        }
       } catch (e) {}
     }
 

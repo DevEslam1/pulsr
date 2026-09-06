@@ -5,7 +5,8 @@ import '../db/app_database.dart';
 import '../../core/services/ytm_url_cache.dart';
 import '../../domain/models/ytm_track.dart';
 
-typedef StreamUrlResolver = Future<YtmStream> Function(String videoId, {String quality});
+typedef StreamUrlResolver = Future<YtmStream> Function(String videoId,
+    {String quality});
 
 /// Task 3 — Next-Track Pre-Resolver for YouTube Music streams.
 ///
@@ -18,6 +19,7 @@ typedef StreamUrlResolver = Future<YtmStream> Function(String videoId, {String q
 class StreamPreResolver {
   final StreamUrlResolver resolveUrl;
   final YtmUrlCache urlCache;
+  final String Function() qualityProvider;
   final Duration debounceDuration;
 
   Timer? _debounceTimer;
@@ -28,8 +30,11 @@ class StreamPreResolver {
   StreamPreResolver({
     required this.resolveUrl,
     required this.urlCache,
+    this.qualityProvider = _defaultQuality,
     this.debounceDuration = const Duration(milliseconds: 300),
   });
+
+  static String _defaultQuality() => 'high';
 
   /// Current video ID actively resolving in background, if any.
   String? get inFlightVideoId => _inFlightVideoId;
@@ -90,10 +95,16 @@ class StreamPreResolver {
 
     // Only YouTube tracks require network URL pre-resolution
     final videoId = nextSong.remoteId;
-    if (videoId == null || videoId.isEmpty) return;
+    if (nextSong.source != SongSource.youtube ||
+        videoId == null ||
+        videoId.isEmpty) {
+      return;
+    }
+
+    final quality = qualityProvider();
 
     // Idempotent: skip if already valid in URL cache
-    if (urlCache.contains(videoId)) {
+    if (urlCache.contains(videoId, quality: quality)) {
       return;
     }
 
@@ -108,13 +119,15 @@ class StreamPreResolver {
     final completer = Completer<void>();
     _activeResolution = completer;
 
-    resolveUrl(videoId).then((stream) {
+    resolveUrl(videoId, quality: quality).then((stream) {
       if (_disposed || !identical(_activeResolution, completer)) return;
-      urlCache.putStream(stream);
-      debugPrint('[StreamPreResolver] Successfully pre-resolved next track ($videoId)');
+      urlCache.putStream(stream, quality: quality);
+      debugPrint(
+          '[StreamPreResolver] Successfully pre-resolved next track ($videoId)');
     }).catchError((e) {
       if (_disposed || !identical(_activeResolution, completer)) return;
-      debugPrint('[StreamPreResolver] Pre-resolution failed for $videoId non-fatally: $e');
+      debugPrint(
+          '[StreamPreResolver] Pre-resolution failed for $videoId non-fatally: $e');
     }).whenComplete(() {
       if (identical(_activeResolution, completer)) {
         _inFlightVideoId = null;
@@ -133,7 +146,8 @@ class StreamPreResolver {
 
     if (isShuffle && shuffleIndices != null && shuffleIndices.isNotEmpty) {
       final currentPosInShuffle = shuffleIndices.indexOf(currentIndex);
-      if (currentPosInShuffle >= 0 && currentPosInShuffle + 1 < shuffleIndices.length) {
+      if (currentPosInShuffle >= 0 &&
+          currentPosInShuffle + 1 < shuffleIndices.length) {
         final nextOriginalIndex = shuffleIndices[currentPosInShuffle + 1];
         if (nextOriginalIndex >= 0 && nextOriginalIndex < queue.length) {
           return queue[nextOriginalIndex];

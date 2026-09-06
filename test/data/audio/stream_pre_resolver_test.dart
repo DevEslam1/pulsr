@@ -10,15 +10,19 @@ import 'package:pulsr/domain/models/ytm_track.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  SongsTableData createSong(int id, String title, {String? remoteId}) {
+  SongsTableData createSong(int id, String title,
+      {String? remoteId, String? source}) {
     return SongsTableData(
       id: id,
       title: title,
       artist: 'Test Artist',
       album: 'Test Album',
       durationMs: 200000,
-      path: remoteId != null ? 'ytmusic://$remoteId' : '/storage/emulated/0/Music/test.mp3',
-      source: remoteId != null ? SongSource.youtube : SongSource.local,
+      path: remoteId != null
+          ? 'ytmusic://$remoteId'
+          : '/storage/emulated/0/Music/test.mp3',
+      source:
+          source ?? (remoteId != null ? SongSource.youtube : SongSource.local),
       remoteId: remoteId,
       isFavorite: false,
       isMissing: false,
@@ -62,7 +66,8 @@ void main() {
       preResolver.dispose();
     });
 
-    test('fires on track start and pre-resolves next queue item into URL cache', () async {
+    test('fires on track start and pre-resolves next queue item into URL cache',
+        () async {
       final queue = [
         createSong(1, 'Current Track', remoteId: 'vid1'),
         createSong(2, 'Next Track', remoteId: 'vid2'),
@@ -82,10 +87,13 @@ void main() {
 
       expect(resolvedVideoIds, contains('vid2'));
       expect(urlCache.contains('vid2'), isTrue);
-      expect(urlCache.getUrl('vid2'), equals('https://googlevideo.com/stream_vid2.m4a'));
+      expect(urlCache.getUrl('vid2'),
+          equals('https://googlevideo.com/stream_vid2.m4a'));
     });
 
-    test('shuffle-aware: pre-resolves head of upcoming queue according to shuffleIndices', () async {
+    test(
+        'shuffle-aware: pre-resolves head of upcoming queue according to shuffleIndices',
+        () async {
       final queue = [
         createSong(1, 'Track 1', remoteId: 'vid1'),
         createSong(2, 'Track 2', remoteId: 'vid2'),
@@ -110,14 +118,16 @@ void main() {
       expect(urlCache.contains('vid2'), isFalse);
     });
 
-    test('debounced re-plan on queue mutation (add/remove/reorder/shuffle)', () async {
+    test('debounced re-plan on queue mutation (add/remove/reorder/shuffle)',
+        () async {
       final queue = [
         createSong(1, 'Track 1', remoteId: 'vid1'),
         createSong(2, 'Track 2', remoteId: 'vid2'),
       ];
 
       // Rapidly mutate queue 3 times before debounce duration (50ms)
-      preResolver.onQueueMutated(queue: queue, currentIndex: 0, isShuffle: false);
+      preResolver.onQueueMutated(
+          queue: queue, currentIndex: 0, isShuffle: false);
       await Future<void>.delayed(const Duration(milliseconds: 10));
 
       final updatedQueue = [
@@ -125,7 +135,8 @@ void main() {
         createSong(3, 'New Track 3', remoteId: 'vid3'),
         createSong(2, 'Track 2', remoteId: 'vid2'),
       ];
-      preResolver.onQueueMutated(queue: updatedQueue, currentIndex: 0, isShuffle: false);
+      preResolver.onQueueMutated(
+          queue: updatedQueue, currentIndex: 0, isShuffle: false);
 
       // Wait for debounce timer (50ms) to fire
       await Future<void>.delayed(const Duration(milliseconds: 80));
@@ -135,7 +146,9 @@ void main() {
       expect(urlCache.contains('vid3'), isTrue);
     });
 
-    test('idempotent: does not re-resolve if next track is already in URL cache', () async {
+    test(
+        'idempotent: does not re-resolve if next track is already in URL cache',
+        () async {
       urlCache.put('vid2', 'https://googlevideo.com/already_cached.m4a');
 
       final queue = [
@@ -151,16 +164,70 @@ void main() {
 
       await Future<void>.delayed(const Duration(milliseconds: 20));
 
-      expect(resolvedVideoIds, isEmpty, reason: 'Must skip network resolution on cache hit');
+      expect(resolvedVideoIds, isEmpty,
+          reason: 'Must skip network resolution on cache hit');
     });
 
-    test('cancelled on dispose: pending resolutions and timers do not write after dispose', () async {
+    test(
+        'uses the selected quality bucket instead of a high-quality cache entry',
+        () async {
+      urlCache.put('vid2', 'https://googlevideo.com/high.m4a', quality: 'high');
+      preResolver = StreamPreResolver(
+        resolveUrl: (videoId, {quality = 'high'}) async {
+          resolvedVideoIds.add('$videoId:$quality');
+          return YtmStream(
+            videoId: videoId,
+            url: 'https://googlevideo.com/$quality.m4a',
+            mimeType: 'audio/mp4',
+            container: 'm4a',
+            bitrateKbps: 128,
+            duration: const Duration(seconds: 200),
+            title: 'Track $videoId',
+            artist: 'Artist',
+          );
+        },
+        urlCache: urlCache,
+        qualityProvider: () => 'low',
+      );
+
+      preResolver.onTrackStarted(
+        queue: [
+          createSong(1, 'Current', remoteId: 'vid1'),
+          createSong(2, 'Next', remoteId: 'vid2'),
+        ],
+        currentIndex: 0,
+        isShuffle: false,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(resolvedVideoIds, contains('vid2:low'));
+      expect(urlCache.contains('vid2', quality: 'low'), isTrue);
+    });
+
+    test('does not pre-resolve a local track merely because it has a remote id',
+        () async {
+      final localWithRemoteId = createSong(2, 'Local copy',
+          remoteId: 'vid2', source: SongSource.local);
+      preResolver.onTrackStarted(
+        queue: [createSong(1, 'Current', remoteId: 'vid1'), localWithRemoteId],
+        currentIndex: 0,
+        isShuffle: false,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+
+      expect(resolvedVideoIds, isEmpty);
+    });
+
+    test(
+        'cancelled on dispose: pending resolutions and timers do not write after dispose',
+        () async {
       final queue = [
         createSong(1, 'Track 1', remoteId: 'vid1'),
         createSong(2, 'Track 2', remoteId: 'vid2'),
       ];
 
-      preResolver.onQueueMutated(queue: queue, currentIndex: 0, isShuffle: false);
+      preResolver.onQueueMutated(
+          queue: queue, currentIndex: 0, isShuffle: false);
       preResolver.dispose();
 
       await Future<void>.delayed(const Duration(milliseconds: 80));
@@ -168,7 +235,9 @@ void main() {
       expect(resolvedVideoIds, isEmpty);
     });
 
-    test('integration: pre-resolved track plays with zero resolver plugin calls', () async {
+    test(
+        'integration: pre-resolved track plays with zero resolver plugin calls',
+        () async {
       final queue = [
         createSong(1, 'Song 1', remoteId: 'v1'),
         createSong(2, 'Song 2', remoteId: 'v2'),
@@ -197,7 +266,8 @@ void main() {
 
       expect(source.videoId, equals('v2'));
       // Constructing and streaming from pre-resolved source uses cache directly
-      expect(resolverClosureInvoked, isFalse, reason: 'Cache hit skips plugin call');
+      expect(resolverClosureInvoked, isFalse,
+          reason: 'Cache hit skips plugin call');
     });
   });
 }

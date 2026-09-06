@@ -4,6 +4,7 @@ import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import '../../../core/constants/embedded_browser_ua.dart';
 import '../../../core/di/injection.dart';
@@ -62,9 +63,46 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   InAppWebViewSettings? _settings;
   bool _isLoading = true;
 
-  // F-17: WebView progress ticks arrive many times per page load; they feed
-  // this notifier and rebuild only the small progress bar, not the whole
-  // ~1000-line sheet.
+  /// Set once the native WebView behind [_webViewController] has been torn down.
+  ///
+  /// The controller is a Dart handle onto a per-instance platform channel
+  /// (`com.pichillilorenzo/flutter_inappwebview_<id>`). When the platform view
+  /// goes away — a hot restart, the engine reclaiming the view while the sheet is
+  /// still mounted — the handle stays non-null and every call on it throws
+  /// `MissingPluginException`. The auth poll calls `getUrl()` every few seconds,
+  /// so it threw on each tick, filed a crash report for each throw and then
+  /// rescheduled itself, forever: an endless stream of
+  /// `MissingPluginException(No implementation found for method getUrl …)` in the
+  /// log and a poll loop that could never recover. Recording it once lets the
+  /// loop stop and lets `onWebViewCreated` restart it against the new instance.
+  bool _webViewGone = false;
+
+  /// Whether [error] means the native WebView is gone rather than that the call
+  /// itself failed. Nothing is recoverable from it, and it is not worth a crash
+  /// report — it is the expected shape of "you are holding a dead handle".
+  bool _isWebViewGoneError(Object error) =>
+      error is MissingPluginException ||
+      (error is PlatformException &&
+          (error.code == 'invalid_instance_id' ||
+              (error.message ?? '').toLowerCase().contains('not found')));
+
+  /// Funnels a caught WebView error: drops the dead-handle case (recording it so
+  /// callers stop retrying) and crash-reports everything else as before.
+  void _handleWebViewError(String context, Object error, StackTrace stack) {
+    if (_isWebViewGoneError(error)) {
+      if (!_webViewGone) {
+        _webViewGone = true;
+        _webViewController = null;
+        _authPollTimer?.cancel();
+        debugPrint(
+            '[YtmWebLogin] native WebView is gone ($context) — pausing auth poll');
+      }
+      return;
+    }
+    ErrorLogger.log(context,
+        error: error, stackTrace: stack, category: 'YtmWebLoginSheet');
+  }
+
   final ValueNotifier<double> _progressNotifier = ValueNotifier<double>(0.0);
 
   bool _isLoggedIn = false;
@@ -86,6 +124,26 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         caseSensitive: false,
       ).hasMatch(u);
 
+  static bool _isTrustedGoogleNavigation(Uri uri) {
+    if (uri.scheme == 'about') return true;
+    if (uri.scheme != 'https') return false;
+    final host = uri.host.toLowerCase();
+    return host == 'google.com' ||
+        host.endsWith('.google.com') ||
+        host == 'youtube.com' ||
+        host.endsWith('.youtube.com') ||
+        host == 'youtu.be' ||
+        host.endsWith('.youtu.be') ||
+        host == 'googleusercontent.com' ||
+        host.endsWith('.googleusercontent.com') ||
+        host == 'gstatic.com' ||
+        host.endsWith('.gstatic.com') ||
+        host == 'googleapis.com' ||
+        host.endsWith('.googleapis.com') ||
+        host.contains('.google.') ||
+        host.contains('.youtube.');
+  }
+
   bool _canGoBack = false;
   bool _canGoForward = false;
   late String _currentUrl;
@@ -104,15 +162,20 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
   // --- Google "This browser or app may not be secure" block recovery ---
   // UAs live in EmbeddedBrowserUa (single source; keep bumped — see file).
-  // Chrome Desktop is the default: its TLS fingerprint matches the Chromium
-  // WebView engine, giving the most consistent signal to Google's risk check.
-  static String get mobileUserAgent => EmbeddedBrowserUa.chromeMobile;
-  static String get desktopUserAgent => EmbeddedBrowserUa.chromeDesktop;
+  // Default to Firefox Mobile (bypasses Google's Chromium WebView checks on Android).
+  static String get mobileUserAgent => EmbeddedBrowserUa.mobile;
 
   static const String _ytmBrowseGuardJs = r'''
 (function () {
   'use strict';
   try {
+    var host = (window.location && window.location.hostname) || '';
+    // Only run browse guard on YouTube / YouTube Music.
+    // NEVER tamper with window.location on accounts.google.com or google.com!
+    if (host.indexOf('youtube.com') === -1) {
+      return;
+    }
+
     var isPlayUrl = function(url) {
       if (!url) return false;
       var s = String(url).toLowerCase();
@@ -137,16 +200,6 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       }
       return origReplace.apply(this, arguments);
     };
-
-    // Emulate desktop screen metrics so YouTube Music desktop player renders
-    if (window.screen && (window.screen.width < 1024 || window.screen.availWidth < 1024)) {
-      try {
-        Object.defineProperty(window.screen, 'width', { get: function() { return 1366; }, configurable: true });
-        Object.defineProperty(window.screen, 'availWidth', { get: function() { return 1366; }, configurable: true });
-        Object.defineProperty(window.screen, 'height', { get: function() { return 768; }, configurable: true });
-        Object.defineProperty(window.screen, 'availHeight', { get: function() { return 728; }, configurable: true });
-      } catch (e) {}
-    }
 
     // Intercept clicks on links pointing to Google Play
     document.addEventListener('click', function(e) {
@@ -207,6 +260,13 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 (function () {
   'use strict';
   try {
+    var host = (window.location && window.location.hostname) || '';
+    // Only enforce viewport & promo hiding on YouTube Music.
+    // NEVER alter styles or viewport on Google Sign-In (accounts.google.com).
+    if (host.indexOf('music.youtube.com') === -1) {
+      return;
+    }
+
     // Hide mobile app promotional banners and overlays
     var style = document.createElement('style');
     style.textContent = `
@@ -221,11 +281,14 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     `;
     (document.head || document.documentElement).appendChild(style);
 
-    // Ensure desktop viewport width on phones so YouTube Music renders full desktop player
+    // Enforce mobile responsive viewport for natural phone layout
     var meta = document.querySelector('meta[name="viewport"]');
-    if (meta) {
-      meta.setAttribute('content', 'width=1024, initial-scale=0.85, maximum-scale=3.0, user-scalable=yes');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.name = 'viewport';
+      (document.head || document.documentElement).appendChild(meta);
     }
+    meta.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes');
   } catch (e) {}
 })();
 ''';
@@ -259,7 +322,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   ];
 
   final GoogleBlockRecovery _blockRecovery =
-      GoogleBlockRecovery(initialIdentity: BrowserIdentity.chromeDesktop);
+      GoogleBlockRecovery(initialIdentity: BrowserIdentity.mobile);
 
   /// Non-null while the automatic recovery ladder is running (drives the
   /// inline status banner); prevents re-entry so the ladder never loops.
@@ -383,17 +446,13 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       });
     }
 
-    final isYtm =
-        widget.isBrowseMode || _currentUrl.contains('music.youtube.com');
     final initialUa = _uaIdentityOverride != null
         ? _uaFor(_uaIdentityOverride!)
-        : (isYtm ? desktopUserAgent : mobileUserAgent);
+        : mobileUserAgent;
 
     _settings = InAppWebViewSettings(
       userAgent: initialUa,
-      preferredContentMode: isYtm
-          ? UserPreferredContentMode.DESKTOP
-          : UserPreferredContentMode.RECOMMENDED,
+      preferredContentMode: UserPreferredContentMode.MOBILE,
       useHybridComposition: true,
       javaScriptEnabled: true,
       javaScriptCanOpenWindowsAutomatically: true,
@@ -401,18 +460,18 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       mediaPlaybackRequiresUserGesture: false,
       isInspectable: kDebugMode,
       transparentBackground: false,
-      mixedContentMode: MixedContentMode.MIXED_CONTENT_ALWAYS_ALLOW,
+      mixedContentMode: MixedContentMode.MIXED_CONTENT_NEVER_ALLOW,
       cacheEnabled: true,
       databaseEnabled: true,
       domStorageEnabled: true,
       thirdPartyCookiesEnabled: true,
       sharedCookiesEnabled: true,
-      allowFileAccess: true,
-      allowContentAccess: true,
+      allowFileAccess: false,
+      allowContentAccess: false,
       useWideViewPort: true,
       loadWithOverviewMode: true,
       supportZoom: true,
-      builtInZoomControls: true,
+      builtInZoomControls: false,
       displayZoomControls: false,
       allowsInlineMediaPlayback: true,
       useShouldOverrideUrlLoading: true,
@@ -439,12 +498,17 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   void _scheduleNextAuthPoll() {
     _authPollTimer?.cancel();
     if (!mounted || _isLoggedIn) return;
+    // Nothing to poll: every call would throw MissingPluginException on the dead
+    // handle. `onWebViewCreated` restarts the loop when a live one arrives.
+    if (_webViewGone) return;
 
     _authPollTimer = Timer(Duration(seconds: _pollIntervalSeconds), () async {
-      if (!mounted || _isLoggedIn) return;
+      if (!mounted || _isLoggedIn || _webViewGone) return;
       if (_webViewController != null && !_isLoading) {
         final loggedIn = await _checkIfLoggedIn();
         if (loggedIn) return;
+        // _checkIfLoggedIn may have discovered the handle is dead.
+        if (_webViewGone || _webViewController == null) return;
 
         // Check for Google block during polling (detects SPA client-side rejections after tapping Next)
         if (!widget.isBrowseMode && !_blockExhausted && _blockStatus == null) {
@@ -498,7 +562,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         });
       }
     } catch (e, st) {
-      ErrorLogger.log('_updateNavState failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+      _handleWebViewError('_updateNavState failed', e, st);
     }
   }
 
@@ -596,6 +660,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
   bool _shouldScanForBlockPage() {
     final now = DateTime.now();
+    if (now.isBefore(_blockCooldownUntil)) return false;
     if (now.difference(_lastBlockScanAt) <
         const Duration(milliseconds: 2500)) {
       return false;
@@ -624,7 +689,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     try { b = (document.body && (document.body.innerText || document.body.textContent)) || ''; } catch (e) {}
     var full = (t + '|' + b).slice(0, 8000).toLowerCase();
 
-    // 2-Step Verification / phone prompt is active authentication, NOT a block
+    // 2-Step Verification / CAPTCHA challenge is active authentication, NOT a block
     if (full.includes('2-step') ||
         full.includes('check your phone') ||
         full.includes('tap yes') ||
@@ -632,7 +697,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         full.includes('verification code') ||
         full.includes('security key') ||
         full.includes('authenticator') ||
-        full.includes('enter the code')) {
+        full.includes('enter the code') ||
+        full.includes('type the text') ||
+        full.includes('captcha')) {
       window.__googleBlockDetected = false;
       return '';
     }
@@ -650,7 +717,9 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           text.contains('verification code') ||
           text.contains('security key') ||
           text.contains('authenticator') ||
-          text.contains('enter the code')) {
+          text.contains('enter the code') ||
+          text.contains('type the text') ||
+          text.contains('captcha')) {
         return false;
       }
       for (final phrase in _blockPhrases) {
@@ -662,30 +731,19 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     return false;
   }
 
-  /// Entry point of the automatic recovery ladder (max 2 retries, then the
-  /// manual recovery card — never loops).
+  /// Entry point when Google blocks the embedded browser.
+  /// Shows the manual recovery card directly so the user is in control and
+  /// never trapped in an automatic reload/wipe loop.
   void _handleGoogleBlock() {
     if (!mounted || widget.isBrowseMode) return;
-    // Already recovering, or exhausted → stop; the card handles it manually.
+    // Already recovering or showing recovery options.
     if (_blockStatus != null || _blockExhausted) return;
 
-    final step = _blockRecovery.onBlocked();
-    if (step == null) {
-      debugPrint('[YtmWebLogin] Google block: retries exhausted.');
-      setState(() {
-        _blockExhausted = true;
-        _blockStatus = null;
-      });
-      return;
-    }
-    debugPrint('[YtmWebLogin] Google block detected → ladder attempt '
-        '${_blockRecovery.attempt}/${_blockRecovery.maxAttempts} '
-        '→ identity ${step.nextIdentity.name}');
+    debugPrint('[YtmWebLogin] Google block detected — presenting recovery options.');
     setState(() {
-      _blockStatus =
-          'Google blocked the embedded browser — retrying with different browser identity (${_blockRecovery.attempt}/${_blockRecovery.maxAttempts})…';
+      _blockExhausted = true;
+      _blockStatus = null;
     });
-    unawaited(_runBlockRecoveryStep(step));
   }
 
   /// Pushes a user-agent (and optionally a content mode) onto the live WebView
@@ -717,32 +775,6 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     await controller.setSettings(settings: base);
   }
 
-  Future<void> _runBlockRecoveryStep(BlockRecoveryStep step) async {
-    try {
-      // 1. Clear cookies + cache, 2. switch browser identity, 3. reload.
-      await _clearWebViewCookiesAndCache();
-      _uaIdentityOverride = step.nextIdentity;
-      try {
-        await _applyWebViewIdentity(
-          _webViewController,
-          userAgent: _uaFor(step.nextIdentity),
-        );
-      } catch (e, st) {
-        ErrorLogger.log('_runBlockRecoveryStep failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
-      }
-      final target =
-          widget.isBrowseMode ? 'https://music.youtube.com' : googleSignInUrl;
-      await _webViewController?.loadUrl(
-          urlRequest: URLRequest(url: WebUri(target)));
-      // Set cooldown AFTER the load is initiated so the poll doesn't
-      // re-scan the still-loading block page.
-      _blockCooldownUntil = DateTime.now().add(const Duration(seconds: 8));
-    } catch (e) {
-      debugPrint('[YtmWebLogin] Block recovery step failed: $e');
-    } finally {
-      if (mounted) setState(() => _blockStatus = null);
-    }
-  }
 
   /// Recovery card "Retry": manual full ladder — reset attempts, clean
   /// session, default identity selection, reload.
@@ -758,6 +790,12 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       });
     }
     await _clearWebViewCookiesAndCache();
+    await _applyWebViewIdentity(
+      _webViewController,
+      userAgent: mobileUserAgent,
+      contentMode: UserPreferredContentMode.MOBILE,
+    );
+    _blockCooldownUntil = DateTime.now().add(const Duration(seconds: 8));
     await _navigateTo(
         widget.isBrowseMode ? 'https://music.youtube.com' : googleSignInUrl);
     if (mounted) setState(() => _blockStatus = null);
@@ -766,6 +804,8 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
   /// Recovery card identity toggle: switch UA mode and reload in place.
   Future<void> _switchIdentityManually(BrowserIdentity identity) async {
     _uaIdentityOverride = identity;
+    final isDesktop = identity == BrowserIdentity.desktop ||
+        identity == BrowserIdentity.chromeDesktop;
     if (mounted) {
       setState(() {
         _blockExhausted = false;
@@ -773,6 +813,15 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
             'Reloading with ${identity.name} browser identity…';
       });
     }
+    await _clearWebViewCookiesAndCache();
+    await _applyWebViewIdentity(
+      _webViewController,
+      userAgent: _uaFor(identity),
+      contentMode: isDesktop
+          ? UserPreferredContentMode.DESKTOP
+          : UserPreferredContentMode.MOBILE,
+    );
+    _blockCooldownUntil = DateTime.now().add(const Duration(seconds: 8));
     await _navigateTo(
         widget.isBrowseMode ? 'https://music.youtube.com' : googleSignInUrl);
     if (mounted) setState(() => _blockStatus = null);
@@ -782,21 +831,22 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     final effectiveUrl = _withGeoParams(url);
     _pollIntervalSeconds = 2;
     _scheduleNextAuthPoll();
-    final isYtm =
-        widget.isBrowseMode || effectiveUrl.contains('music.youtube.com');
     final targetUa = _uaIdentityOverride != null
         ? _uaFor(_uaIdentityOverride!)
-        : (isYtm ? desktopUserAgent : mobileUserAgent);
+        : mobileUserAgent;
+    final isDesktop = _uaIdentityOverride == BrowserIdentity.desktop ||
+        _uaIdentityOverride == BrowserIdentity.chromeDesktop;
     try {
       await _applyWebViewIdentity(
         _webViewController,
         userAgent: targetUa,
-        contentMode: isYtm
+        contentMode: isDesktop
             ? UserPreferredContentMode.DESKTOP
-            : UserPreferredContentMode.RECOMMENDED,
+            : UserPreferredContentMode.MOBILE,
       );
     } catch (e, st) {
-      ErrorLogger.log('_navigateTo failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+      ErrorLogger.log('_navigateTo failed',
+          error: e, stackTrace: st, category: 'YtmWebLoginSheet');
     }
     final loadUrlFuture = _webViewController?.loadUrl(
         urlRequest: URLRequest(url: WebUri(effectiveUrl)));
@@ -817,7 +867,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
       final webUri = await _webViewController?.getUrl();
       currentUrl ??= webUri?.toString();
     } catch (e, st) {
-      ErrorLogger.log('_detectLoginState failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+      _handleWebViewError('_detectLoginState getUrl failed', e, st);
     }
 
     if (currentUrl != null) {
@@ -1620,6 +1670,13 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                         },
                         onWebViewCreated: (controller) {
                           _webViewController = controller;
+                          // A fresh native instance: the previous handle may have
+                          // died and paused the auth poll, so bring it back.
+                          if (_webViewGone) {
+                            _webViewGone = false;
+                            _pollIntervalSeconds = 2;
+                            _scheduleNextAuthPoll();
+                          }
                         },
                         onCreateWindow: (controller, createWindowAction) async {
                           final url = createWindowAction.request.url;
@@ -1656,9 +1713,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                             return NavigationActionPolicy.CANCEL;
                           }
 
-                          if (!urlStr.startsWith('http://') &&
-                              !urlStr.startsWith('https://') &&
-                              !urlStr.startsWith('about:')) {
+                          if (!_isTrustedGoogleNavigation(uri)) {
                             return NavigationActionPolicy.CANCEL;
                           }
                           return NavigationActionPolicy.ALLOW;
@@ -1680,26 +1735,6 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                                 : googleSignInUrl;
                             unawaited(_navigateTo(fallback));
                             return;
-                          }
-
-                          final isYtm = widget.isBrowseMode ||
-                              urlLower.contains('music.youtube.com');
-                          final targetUa = _uaIdentityOverride != null
-                              ? _uaFor(_uaIdentityOverride!)
-                              : (isYtm ? desktopUserAgent : mobileUserAgent);
-                          try {
-                            await _applyWebViewIdentity(
-                              controller,
-                              userAgent: targetUa,
-                              contentMode: isYtm
-                                  ? UserPreferredContentMode.DESKTOP
-                                  : UserPreferredContentMode.RECOMMENDED,
-                            );
-                          } catch (e, st) {
-                            ErrorLogger.log('onLoadStart setSettings failed',
-                                error: e,
-                                stackTrace: st,
-                                category: 'YtmWebLoginSheet');
                           }
                         },
                         onProgressChanged: (controller, progress) {
@@ -1828,7 +1863,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     String identityLabel(BrowserIdentity id) {
       switch (id) {
         case BrowserIdentity.chromeDesktop: return 'Chrome Desktop';
-        case BrowserIdentity.mobile: return 'Firefox Mobile';
+        case BrowserIdentity.mobile: return 'Chrome Mobile';
         case BrowserIdentity.safariMobile: return 'Safari Mobile';
         case BrowserIdentity.desktop: return 'Firefox Desktop';
       }
