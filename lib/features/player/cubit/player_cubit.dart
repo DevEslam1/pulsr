@@ -22,6 +22,7 @@ import '../../../data/scanner/media_scanner_service.dart';
 import '../../../domain/models/audio_effects_config.dart';
 import '../../../domain/models/eq_preset.dart';
 import '../../../domain/models/headphone_profile.dart';
+import '../../../domain/models/reverb_preset.dart';
 import '../../../data/audio/headphone_profiles_repository.dart';
 import '../../../domain/models/lyrics_line.dart';
 import '../../../domain/repositories/music_repository_interface.dart';
@@ -1510,7 +1511,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   Future<void> loadCustomImpulseResponse(List<double> irSamples) async {
     safeEmit(state.copyWith(
       isReverbEnabled: true,
-      reverbPreset: 4, // Custom
+      reverbPreset: ReverbPreset.custom.wireValue,
     ));
     await _audioHandler.loadCustomImpulseResponse(irSamples);
   }

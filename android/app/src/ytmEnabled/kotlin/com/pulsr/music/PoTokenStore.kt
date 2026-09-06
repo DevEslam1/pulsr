@@ -162,6 +162,25 @@ internal object PoTokenStore {
     }
 
     /**
+     * Clears attestation state while keeping the dataSyncId, which identifies the
+     * signed-in account rather than the token.
+     */
+    fun clearAttestation(context: Context) {
+        try {
+            getPrefs(context).edit()
+                .remove(KEY_STREAMING_TOKEN)
+                .remove(KEY_VISITOR_DATA)
+                .remove(KEY_INTEGRITY_TOKEN)
+                .remove(KEY_GENERATED_AT)
+                .remove(KEY_TTL_SECONDS)
+                .remove(KEY_EXPIRY_INSTANT)
+                .apply()
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to clear attestation state: ${t.message}", t)
+        }
+    }
+
+    /**
      * Clears all persisted poToken state (e.g. on invalidation or corruption).
      */
     fun clear(context: Context) {

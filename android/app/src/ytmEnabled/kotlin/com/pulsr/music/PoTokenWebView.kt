@@ -385,11 +385,22 @@ internal class PoTokenWebView private constructor(
          */
         fun newPoTokenGenerator(context: Context): PoTokenGenerator {
             val future = CompletableFuture<PoTokenGenerator>()
+            val instance = java.util.concurrent.atomic.AtomicReference<PoTokenWebView?>(null)
             val posted = mainHandler.post {
-                PoTokenWebView(context, future).loadHtmlAndObtainBotguard(context)
+                PoTokenWebView(context, future).also {
+                    instance.set(it)
+                    it.loadHtmlAndObtainBotguard(context)
+                }
             }
             if (!posted) throw PoTokenException("Could not run on main thread")
-            return future.await(INIT_TIMEOUT_SECONDS, "initializing BotGuard")
+            return future.await(INIT_TIMEOUT_SECONDS, "initializing BotGuard") {
+                // On timeout the WebView never called back, so nothing else will
+                // ever release it: each failed attempt otherwise strands a WebView
+                // and a single-thread executor for the life of the process. The
+                // handler is FIFO, so the construction above has already run by
+                // the time this close is dispatched.
+                mainHandler.post { instance.get()?.close() }
+            }
         }
 
         /**

@@ -1,14 +1,10 @@
 package com.pulsr.music
 
-import android.content.Context
 import android.util.Log
 import okhttp3.ConnectionPool
 import okhttp3.Dns
-import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
 import org.json.JSONObject
 import java.io.IOException
 import java.net.InetAddress
@@ -46,6 +42,11 @@ internal object YtmHttpClient {
         val instance = TtlDnsCache()
         private val IPV4_REGEX =
             Regex("^((25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)\\.){3}(25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)$")
+        private val DOH_ENDPOINTS = listOf(
+            "https://8.8.8.8/resolve",
+            "https://1.1.1.1/dns-query",
+            "https://dns.google/resolve"
+        )
     }
 
         @Throws(UnknownHostException::class)
@@ -81,11 +82,24 @@ internal object YtmHttpClient {
         }
 
         /**
-         * Resolves hostname via Google Public DNS over HTTPS (DoH).
+         * Resolves hostname via public DNS over HTTPS.
+         *
+         * The endpoints are IP literals on purpose: `https://dns.google/...`
+         * would itself need a system DNS lookup, which is the exact thing that
+         * just failed. Both providers list their resolver IPs as SANs on the
+         * serving certificate, so TLS verification still succeeds.
          */
         private fun resolveDoH(hostname: String): List<InetAddress> {
+            for (endpoint in DOH_ENDPOINTS) {
+                val result = queryDoH(endpoint, hostname)
+                if (result.isNotEmpty()) return result
+            }
+            return emptyList()
+        }
+
+        private fun queryDoH(endpoint: String, hostname: String): List<InetAddress> {
             return try {
-                val dohUrl = "https://dns.google/resolve?name=$hostname&type=A"
+                val dohUrl = "$endpoint?name=$hostname&type=A"
                 val conn = (java.net.URL(dohUrl).openConnection() as java.net.HttpURLConnection).apply {
                     connectTimeout = 3000
                     readTimeout = 3000
@@ -109,7 +123,7 @@ internal object YtmHttpClient {
                 }
                 addresses
             } catch (t: Throwable) {
-                Log.w(TAG, "DoH lookup failed for $hostname: ${t.message}")
+                Log.w(TAG, "DoH lookup failed for $hostname via $endpoint: ${t.message}")
                 emptyList()
             }
         }
@@ -161,7 +175,14 @@ internal object YtmHttpClient {
     }
 
     /**
-     * Asynchronously pre-connects and warms the TLS socket to [url] in the shared connection pool.
+     * Asynchronously warms DNS for [url]'s host.
+     *
+     * This used to fire a real HEAD request to the googlevideo URL. That never
+     * paid off: playback goes through ExoPlayer's own HTTP stack and connection
+     * pool, so the warmed socket was never reused — it just spent an extra
+     * request against YouTube (with a User-Agent that did not even match the
+     * client the URL was minted for). Populating the resolver cache is the part
+     * that actually carries over.
      */
     fun preConnect(url: String) {
         preConnectExecutor.execute {
@@ -169,21 +190,12 @@ internal object YtmHttpClient {
                 val httpUrl = url.toHttpUrlOrNull() ?: return@execute
                 val host = httpUrl.host
                 if (!host.contains("googlevideo.com") && !host.contains("youtube.com")) return@execute
+                if (TtlDnsCache.instance.getCached(host) != null) return@execute
 
-                Log.d(TAG, "Pre-connecting TLS socket to $host...")
-                // Perform lightweight HEAD request or DNS/Socket warm-up
-                val req = Request.Builder()
-                    .url(url)
-                    .head()
-                    .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0")
-                    .build()
-
-                okHttpClient.newCall(req).execute().use { response ->
-                    Log.d(TAG, "Pre-connect to $host finished with code ${response.code} (socket placed in pool)")
-                }
+                TtlDnsCache.instance.lookup(host)
+                Log.d(TAG, "Pre-resolved DNS for $host")
             } catch (t: Throwable) {
-                // Non-fatal preconnect failure
-                Log.d(TAG, "Pre-connect failed non-fatally: ${t.message}")
+                Log.d(TAG, "DNS pre-warm failed non-fatally: ${t.message}")
             }
         }
     }

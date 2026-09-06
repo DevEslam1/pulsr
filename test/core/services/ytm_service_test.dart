@@ -39,6 +39,10 @@ void main() {
       expect(const YtmException('YTM_NETWORK').isNetwork, isTrue);
       expect(const YtmException('YTM_TIMEOUT').isNetwork, isTrue);
       expect(const YtmException('YTM_FAILED').isNetwork, isFalse);
+      // A 403 is an answer from YouTube, so the route works and only this
+      // identity is refused. Counting it as "no network" made every IP block
+      // take the offline path, and every offline blip take the 180s IP cooldown.
+      expect(const YtmException('IP_BLOCKED').isNetwork, isFalse);
     });
 
     test('isBotBlocked flags bot keywords and recaptcha', () {
@@ -49,9 +53,25 @@ void main() {
                   'YTM_FAILED', 'Sign in to confirm you are not a bot')
               .isBotBlocked,
           isTrue);
-      expect(const YtmException('YTM_FAILED', 'LOGIN_REQUIRED').isBotBlocked,
-          isTrue);
       expect(const YtmException('YTM_NETWORK').isBotBlocked, isFalse);
+      // A bare LOGIN_REQUIRED is the normal playabilityStatus of a private or
+      // members-only track. Reading it as a bot block put the whole service in
+      // a 90s cooldown — and invalidated a perfectly good poToken — every time
+      // one turned up in a queue. It routes to auth recovery instead.
+      expect(const YtmException('YTM_FAILED', 'LOGIN_REQUIRED').isBotBlocked,
+          isFalse);
+      expect(
+          const YtmException('YTM_FAILED', 'LOGIN_REQUIRED').isAuth, isTrue);
+      // Throttling is its own verdict: minting a fresh token and retrying at
+      // once is the worst possible response to a 429.
+      expect(const YtmException('RATE_LIMITED').isBotBlocked, isFalse);
+      expect(const YtmException('RATE_LIMITED').isThrottled, isTrue);
+      // …but it still stops the queue rather than failing every track in turn.
+      expect(const YtmException('RATE_LIMITED').isFatal, isTrue);
+      // 'bot' has to be a word: a message about a bottleneck is not a block.
+      expect(
+          const YtmException('YTM_FAILED', 'decoder bottleneck').isBotBlocked,
+          isFalse);
     });
 
     test('isAuth flags auth codes and unauthenticated details', () {

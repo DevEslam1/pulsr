@@ -23,8 +23,9 @@ void testRateConversion(double inRate, double outRate, const std::string& testNa
             inInterleaved[i * 2 + 1] = std::cos(2.0f * static_cast<float>(M_PI) * 440.0f * t);
         }
 
-        int produced = resampler.processInterleaved(
-            inInterleaved.data(), blockSize, outInterleaved.data(), blockSize);
+        // processInterleaved is in-place and holds the N-in/N-out contract.
+        outInterleaved = inInterleaved;
+        int produced = resampler.processInterleaved(outInterleaved.data(), blockSize, 2);
 
         if (produced != blockSize) {
             std::cerr << "FAIL: " << testName << " block " << b 

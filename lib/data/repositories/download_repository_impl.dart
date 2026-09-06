@@ -103,14 +103,12 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       _queue.add(videoId);
     }
 
-    // Start foreground service for background guarantee (B-07)
-    try {
-      await _downloadChannel.invokeMethod('startDownloadForeground', {
-        'videoId': videoId,
-        'title': task.title,
-      });
-    } catch (_) {}
-
+    // The notification is started by YtDownloadService when it accepts the job
+    // and torn down only once its own queue and active set are both empty. This
+    // layer used to raise it here as well and stop it from three places of its
+    // own, none of which could see the service's work — so finishing one of
+    // three concurrent downloads killed the notification for the other two, and
+    // with it the foreground guarantee that keeps them running.
     _processQueue();
     return Right(task.id);
   }
@@ -155,14 +153,8 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       _queue.add(videoId);
     }
 
-    // Stream URL may be expired (~6h); YtDownloadService re-resolves on retry inside _downloadAudioWithRetry
-    try {
-      await _downloadChannel.invokeMethod('startDownloadForeground', {
-        'videoId': videoId,
-        'title': task.title,
-      });
-    } catch (_) {}
-
+    // Stream URL may be expired (~6h); YtDownloadService re-resolves on retry
+    // inside _downloadAudioWithRetry, and raises the notification itself.
     _processQueue();
     return const Right(unit);
   }
@@ -203,12 +195,19 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       _activeCompleters.remove(videoId);
     }
 
-    // Also remove any .part files
+    _tasks.remove(videoId);
+
+    // Scratch files: the service owns the cache directory and the naming, so it
+    // does the targeted delete. The orphan sweep is a second pass for genuine
+    // leftovers, and every task still on the books is named so that a paused
+    // download's partial survives it — the old call passed `activePartNames: {}`,
+    // protecting nothing.
     try {
-      // Clean possible temp .part leftover via service helper
+      await _ytDownloadService.deleteArtifactsFor(videoId);
       await _ytDownloadService.cleanOrphanPartFiles(
-          activePartNames: {}); // will sweep all ytdl_ parts older than 10min; for immediate delete, also delete ytdl_videoId.*
+          protectedVideoIds: _tasks.keys.toSet());
     } catch (_) {}
+
     if (task?.filePath != null) {
       try {
         final f = File(task!.filePath!);
@@ -222,40 +221,14 @@ class DownloadRepositoryImpl implements IDownloadRepository {
         if (await part.exists()) await part.delete();
       } catch (_) {}
     }
-    // Delete temp dir variant ytdl_videoId.*
-    try {
-      final dir = await _getTempDir();
-      if (dir != null) {
-        final prefix = 'ytdl_$videoId';
-        await for (final e in dir.list()) {
-          if (e is File && e.path.contains(prefix)) {
-            try {
-              await e.delete();
-            } catch (_) {}
-          }
-        }
-      }
-    } catch (_) {}
 
-    _tasks.remove(videoId);
     _cachedStorageStats = null; // Invalidate storage cache
-    try {
-      await _downloadChannel.invokeMethod('stopDownloadForeground');
-    } catch (_) {}
+    // No stopDownloadForeground here: deleting one entry says nothing about the
+    // other two that may still be transferring, and this used to stop the
+    // service unconditionally.
     _schedulePersist();
     _processQueue();
     return const Right(unit);
-  }
-
-  Future<Directory?> _getTempDir() async {
-    try {
-      // path_provider getTemporaryDirectory equivalent via dart:io? Use Directory.systemTemp? Fallback to manual.
-      // We delegate to native plugin would be better; but try path_provider channel indirectly via File.
-      // For now, try to locate via File('${Directory.systemTemp.path}').exists
-      return Directory.systemTemp;
-    } catch (_) {
-      return null;
-    }
   }
 
   @override
@@ -344,74 +317,81 @@ class DownloadRepositoryImpl implements IDownloadRepository {
           }
         }
       }
-      // Collect active part names to not delete paused downloads' partials
-      final activeNames = _tasks.values.where((t) => t.status == DownloadStatus.paused).map((t) => 'ytdl_${t.videoId}.part').toSet();
-      await _ytDownloadService.cleanOrphanPartFiles(activePartNames: activeNames.isNotEmpty ? activeNames : null);
+      // Keep the partials of everything we still track, so a download paused
+      // across a restart can resume from its bytes instead of from zero. Named
+      // by video id: the on-disk names carry the container extension
+      // (`ytdl_<id>.m4a.part`, `.part0..3`, `.parts`), which this layer never
+      // learns, so the old exact-name guess of `ytdl_<id>.part` matched nothing.
+      final protected = _tasks.values
+          .where((t) => t.status != DownloadStatus.complete)
+          .map((t) => t.videoId)
+          .toSet();
+      await _ytDownloadService.cleanOrphanPartFiles(
+          protectedVideoIds: protected.isNotEmpty ? protected : null);
       // Enqueue paused tasks for resumption? Keep paused state; user taps resume re-resolves URL (expiry handled)
     } catch (e) {
       ErrorLogger.log('DownloadRepository reconcileOnBoot failed', error: e);
     }
   }
 
-  // Throttle coalescing ~100ms (was 250) — per-tile ValueNotifier would be ideal, but this prevents rebuild storms from 1000/s chunk callbacks
-  Timer? _throttleFlushTimer;
-  DownloadTask? _pendingThrottledTask;
+  // Throttle coalescing ~100ms (was 250) — per-tile ValueNotifier would be
+  // ideal, but this prevents rebuild storms from 1000/s chunk callbacks.
+  //
+  // Keyed by videoId: three downloads run at once and they shared one pending
+  // slot and one timer, so B's update overwrote A's and cancelled A's timer,
+  // then the `videoId ==` guard threw the loser away. A's tile sat frozen at
+  // whatever percentage it happened to be on until it finished.
+  final Map<String, Timer> _throttleFlushTimers = {};
+  final Map<String, DownloadTask> _pendingThrottledTasks = {};
   static const _throttleMs = 100;
 
   void _updateTask(DownloadTask task) {
     _tasks[task.videoId] = task;
 
+    final videoId = task.videoId;
     final now = DateTime.now().millisecondsSinceEpoch;
-    final lastEmit = _lastProgressEmitMs[task.videoId] ?? 0;
+    final lastEmit = _lastProgressEmitMs[videoId] ?? 0;
     final isIntermediateProgress = task.status == DownloadStatus.downloading &&
         task.progress > 0.0 &&
         task.progress < 1.0;
-    final isTerminal = task.status == DownloadStatus.complete || task.status == DownloadStatus.failed || task.status == DownloadStatus.paused;
+    final isTerminal = task.status == DownloadStatus.complete ||
+        task.status == DownloadStatus.failed ||
+        task.status == DownloadStatus.paused;
 
     if (isIntermediateProgress && (now - lastEmit < _throttleMs) && !isTerminal) {
-      _pendingThrottledTask = task;
-      _throttleFlushTimer?.cancel();
-      _throttleFlushTimer = Timer(const Duration(milliseconds: _throttleMs), () {
-        if (_pendingThrottledTask != null && _pendingThrottledTask!.videoId == task.videoId) {
-          _lastProgressEmitMs[task.videoId] = DateTime.now().millisecondsSinceEpoch;
-          if (!_streamController.isClosed) _streamController.add(_pendingThrottledTask!);
-          // FGS progress update throttled same interval
-          _pushFgsProgress(_pendingThrottledTask!);
-          _pendingThrottledTask = null;
-        }
+      _pendingThrottledTasks[videoId] = task;
+      _throttleFlushTimers[videoId]?.cancel();
+      _throttleFlushTimers[videoId] =
+          Timer(const Duration(milliseconds: _throttleMs), () {
+        _throttleFlushTimers.remove(videoId);
+        final pending = _pendingThrottledTasks.remove(videoId);
+        if (pending == null) return;
+        _lastProgressEmitMs[videoId] = DateTime.now().millisecondsSinceEpoch;
+        if (!_streamController.isClosed) _streamController.add(pending);
       });
       _schedulePersist();
       return;
     }
-    _throttleFlushTimer?.cancel();
-    _pendingThrottledTask = null;
+    _throttleFlushTimers.remove(videoId)?.cancel();
+    _pendingThrottledTasks.remove(videoId);
 
-    _lastProgressEmitMs[task.videoId] = now;
+    _lastProgressEmitMs[videoId] = now;
     if (!_streamController.isClosed) {
       _streamController.add(task);
     }
-    _pushFgsProgress(task);
-    _schedulePersist();
-  }
-
-  void _pushFgsProgress(DownloadTask task) {
-    if (task.status == DownloadStatus.downloading) {
-      final pct = (task.progress * 100).round().clamp(0, 100);
-      _downloadChannel.invokeMethod('updateDownloadProgress', {
-        'videoId': task.videoId,
-        'title': task.title,
-        'progress': pct,
-      }).catchError((_) {});
-    } else if (task.status == DownloadStatus.complete || task.status == DownloadStatus.failed) {
-      if (_activeVideoIds.length <= 1) {
-        _downloadChannel.invokeMethod('stopDownloadForeground').catchError((_) {});
-      }
+    if (isTerminal) {
+      _lastProgressEmitMs.remove(videoId);
     }
+    _schedulePersist();
   }
 
   void dispose() {
     _saveDebounce?.cancel();
-    _throttleFlushTimer?.cancel();
+    for (final timer in _throttleFlushTimers.values) {
+      timer.cancel();
+    }
+    _throttleFlushTimers.clear();
+    _pendingThrottledTasks.clear();
     if (!_streamController.isClosed) _streamController.close();
   }
 
@@ -442,11 +422,10 @@ class DownloadRepositoryImpl implements IDownloadRepository {
       _activeVideoIds.add(videoId);
       _executeTask(task);
     }
-    if (_activeVideoIds.isEmpty && _queue.isEmpty) {
-      try {
-        _downloadChannel.invokeMethod('stopDownloadForeground');
-      } catch (_) {}
-    }
+    // The notification's lifetime belongs to YtDownloadService: its queue is the
+    // one that actually has jobs in it, and it drains after this one does. This
+    // used to stop the service the moment the repository's own sets emptied,
+    // which is true while the service is still finishing the last transfer.
   }
 
   Future<void> _executeTask(DownloadTask task) async {

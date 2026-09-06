@@ -79,4 +79,81 @@ void main() {
           infoCode.recoveryAction, equals(YtmRecoveryAction.rotatePath));
     });
   });
+
+  // The playback path and the download path both have to answer "resolve a new
+  // URL, or retry this one?", and they need opposite remedies: a dropped
+  // connection treated as a burned URL throws away a working URL, deletes the
+  // bytes already on disk and pays for a fresh multi-client resolve, while a
+  // burned URL treated as a blip retries a dead URL until the attempts run out.
+  group('isUrlBurned', () {
+    test('is true for the statuses that spend a URL', () {
+      expect(YtmErrorClassifier.isUrlBurned(Exception('HTTP Status Error: 403')),
+          isTrue);
+      expect(YtmErrorClassifier.isUrlBurned(Exception('HTTP 404 on resume')),
+          isTrue);
+      expect(
+          YtmErrorClassifier.isUrlBurned(
+              const YtmException('YTM_429', 'HTTP 429 Retry-After: 30')),
+          isTrue);
+      expect(YtmErrorClassifier.isUrlBurned(Exception('HTTP 410 Gone')), isTrue);
+      expect(
+          YtmErrorClassifier.isUrlBurned(
+              Exception('response code 416 Range Not Satisfiable')),
+          isTrue);
+    });
+
+    test('is false for a 5xx, which is YouTube\'s own hiccup', () {
+      expect(YtmErrorClassifier.isUrlBurned(Exception('HTTP 500')), isFalse);
+      expect(YtmErrorClassifier.isUrlBurned(Exception('HTTP 503')), isFalse);
+    });
+
+    test('is false for transport failures', () {
+      expect(
+          YtmErrorClassifier.isUrlBurned(
+              Exception('SocketException: Connection reset by peer')),
+          isFalse);
+      expect(
+          YtmErrorClassifier.isUrlBurned(
+              Exception('TimeoutException after 0:00:45.000000')),
+          isFalse);
+      expect(
+          YtmErrorClassifier.isUrlBurned(
+              const YtmException('YTM_NETWORK', 'Failed host lookup')),
+          isFalse);
+    });
+
+    test('is not fooled by digits that are not a status', () {
+      // A byte count, a bitrate or an itag in the message used to be read as an
+      // HTTP verdict by a bare `contains('403')`.
+      expect(
+          YtmErrorClassifier.isUrlBurned(
+              Exception('Connection closed before full body clen=4030099 itag=251')),
+          isFalse);
+      expect(
+          YtmErrorClassifier.isUrlBurned(
+              const DownloadFailureLike('Incomplete download: 100/200 bytes')),
+          isFalse);
+    });
+
+    test('is true for a bot interstitial and a rate-limit phrase', () {
+      expect(
+          YtmErrorClassifier.isUrlBurned(Exception(
+              'Sign in to confirm you’re not a bot')),
+          isTrue);
+      expect(
+          YtmErrorClassifier.isUrlBurned(Exception('Too many requests')),
+          isTrue);
+    });
+  });
+}
+
+/// Stands in for `DownloadFailure`, which lives behind an fpdart import the
+/// classifier does not need: what matters here is a plain object whose
+/// `toString()` carries byte counts.
+class DownloadFailureLike {
+  final String message;
+  const DownloadFailureLike(this.message);
+
+  @override
+  String toString() => 'DownloadFailure: $message';
 }

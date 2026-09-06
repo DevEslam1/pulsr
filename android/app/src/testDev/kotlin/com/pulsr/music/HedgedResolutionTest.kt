@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger
 class HedgedResolutionTest {
 
     @Test
-    fun testDefaultStreamChainExcludesTvAndOrdersFastAudioClients() {
+    fun testDefaultStreamChainKeepsLastResortClientsOffTheFastPath() {
         val chain = ResolutionStrategy.DEFAULT_STREAM_CHAIN
 
         // Fast audio clients present
@@ -23,9 +23,23 @@ class HedgedResolutionTest {
         assertTrue("ANDROID_VR should be in default stream chain", chain.contains(InnertubeClient.ClientType.ANDROID_VR))
         assertTrue("WEB_REMIX should be in default stream chain", chain.contains(InnertubeClient.ClientType.WEB_REMIX))
 
-        // TV client removed from fast path
-        assertFalse("TV HTML5 client must be stripped from default stream chain",
-            chain.contains(InnertubeClient.ClientType.TVHTML5_SIMPLY_EMBEDDED_PLAYER))
+        // The TV embed and bare test client exist only as no-login last resorts for
+        // IP-flagged waves, so they must sit strictly behind every audio client
+        // rather than being raced on the hedged fast path.
+        val lastResorts = listOf(
+            InnertubeClient.ClientType.TVHTML5_SIMPLY_EMBEDDED_PLAYER,
+            InnertubeClient.ClientType.ANDROID_TESTSUITE
+        )
+        val firstLastResortIndex = chain.indexOfFirst { it in lastResorts }
+        assertTrue("Chain must still offer a no-login last resort", firstLastResortIndex >= 0)
+        assertTrue(
+            "Last-resort clients must come after every audio client",
+            chain.drop(firstLastResortIndex).all { it in lastResorts }
+        )
+        assertTrue(
+            "Hedged race covers the first two candidates, which must both be audio clients",
+            firstLastResortIndex >= 2
+        )
     }
 
     @Test

@@ -10,6 +10,7 @@ import '../../../../data/audio/headphone_profiles_repository.dart';
 import '../../../../domain/models/audio_effects_config.dart';
 import '../../../../domain/models/eq_preset.dart';
 import '../../../../domain/models/headphone_profile.dart';
+import '../../../../domain/models/reverb_preset.dart';
 import '../../cubit/player_cubit.dart';
 import '../../../../core/utils/list_content_diff.dart';
 import '../../cubit/player_state.dart';
@@ -161,9 +162,10 @@ class _EqualizerSheetState extends State<EqualizerSheet>
   }
 
   /// The C++ stages (crossfeed, saturation, stereo width, sub crossover,
-  /// dynamic EQ) are only audible when a PCM source feeds the native engine.
-  /// HAL-backed stages (limiter, mono/balance, reverb, EQ, bass, virtualizer,
-  /// volume boost) ignore this and stay available.
+  /// dynamic EQ, convolution reverb, mono/balance) exist only in libpulsr_dsp,
+  /// so they need the native chain spliced into ExoPlayer's audio sink.
+  /// HAL-backed stages (limiter, EQ, bass, virtualizer, volume boost) ignore
+  /// this and stay available.
   bool get _nativePcmEffectsAvailable => AudioEffectsChannel().hasPcmDspPath;
 
   void _showFeatureInfo(BuildContext context, AudioFeatureInfo info, {String? conflictReason}) {
@@ -2572,7 +2574,7 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
-                                    IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Stereo Balance', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.panner, conflictReason: dspBlocked)),
+                                    IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Stereo Balance', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.panner, conflictReason: dspBlocked ?? (_nativePcmEffectsAvailable ? null : 'Requires PCM DSP path - not audible yet'))),
                                   ],
                                 ),
                                 Text(
@@ -2600,18 +2602,22 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                                     : p.textSecondary)),
                         const SizedBox(width: 4),
                         Switch.adaptive(
-                          value: dspBlocked == null && state.monoMix,
+                          value: dspBlocked == null &&
+                              _nativePcmEffectsAvailable &&
+                              state.monoMix,
                           activeTrackColor: p.accent,
                           activeThumbColor: p.onAccent,
-                          onChanged: dspBlocked != null
-                              ? null
-                              : (val) => cubit.setMonoMix(val),
+                          onChanged:
+                              dspBlocked != null || !_nativePcmEffectsAvailable
+                                  ? null
+                                  : (val) => cubit.setMonoMix(val),
                         ),
                       ],
                     ),
                   ],
                 ),
-                if (dspBlocked != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Blocked by Bit-Perfect', style: TextStyle(color: p.error, fontSize: 10, fontWeight: FontWeight.w600))),
+                if (dspBlocked != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Blocked by Bit-Perfect', style: TextStyle(color: p.error, fontSize: 10, fontWeight: FontWeight.w600)))
+                else if (!_nativePcmEffectsAvailable) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Native DSP unavailable on this device', style: TextStyle(color: p.textTertiary, fontSize: 10, fontWeight: FontWeight.w600))),
                 const SizedBox(height: 14),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -2653,7 +2659,9 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                     min: -1.0,
                     max: 1.0,
                     divisions: 40,
-                    onChanged: dspBlocked != null ? null : (val) => cubit.setStereoBalance(val),
+                    onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
+                        ? null
+                        : (val) => cubit.setStereoBalance(val),
                   ),
                 ),
               ],
@@ -2714,36 +2722,35 @@ class _EqualizerSheetState extends State<EqualizerSheet>
                         ],
                       ),
                     ),
-                    IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Reverb', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.reverb, conflictReason: dspBlocked)),
+                    IconButton(icon: Icon(Icons.info_outline_rounded, size: 16, color: p.textTertiary), visualDensity: VisualDensity.compact, tooltip: 'About Reverb', onPressed: () => _showFeatureInfo(context, AudioFeatureRegistry.reverb, conflictReason: dspBlocked ?? (_nativePcmEffectsAvailable ? null : 'Requires PCM DSP path - not audible yet'))),
                     const SizedBox(width: 4),
                     Switch.adaptive(
-                      value: dspBlocked == null && state.isReverbEnabled,
+                      value: dspBlocked == null &&
+                          _nativePcmEffectsAvailable &&
+                          state.isReverbEnabled,
                       activeTrackColor: p.accent,
                       activeThumbColor: p.onAccent,
-                      onChanged: dspBlocked != null
+                      onChanged: dspBlocked != null || !_nativePcmEffectsAvailable
                           ? null
                           : (val) => cubit.setReverb(val),
                     ),
                   ],
                 ),
-                if (dspBlocked != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Blocked by Bit-Perfect', style: TextStyle(color: p.error, fontSize: 10, fontWeight: FontWeight.w600))),
-                if (dspBlocked == null && state.isReverbEnabled) ...[
+                if (dspBlocked != null) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Blocked by Bit-Perfect', style: TextStyle(color: p.error, fontSize: 10, fontWeight: FontWeight.w600)))
+                else if (!_nativePcmEffectsAvailable) Padding(padding: const EdgeInsets.only(top: 6), child: Text('Native DSP unavailable on this device', style: TextStyle(color: p.textTertiary, fontSize: 10, fontWeight: FontWeight.w600))),
+                if (dspBlocked == null &&
+                    _nativePcmEffectsAvailable &&
+                    state.isReverbEnabled) ...[
                   const SizedBox(height: 14),
-                  // Room presets chips
+                  // Room presets chips. Ordinals are the C++ ReverbPreset
+                  // enum, so the synthesized IR always matches the label.
                   Wrap(
                     spacing: 8,
                     runSpacing: 6,
                     children: [
-                      _buildReverbChip(
-                          'Studio Room', 0, state.reverbPreset, cubit, p),
-                      _buildReverbChip(
-                          'Concert Hall', 1, state.reverbPreset, cubit, p),
-                      _buildReverbChip(
-                          'Warm Tube', 2, state.reverbPreset, cubit, p),
-                      _buildReverbChip(
-                          'Plate Reverb', 3, state.reverbPreset, cubit, p),
-                      _buildReverbChip(
-                          'Custom', 4, state.reverbPreset, cubit, p),
+                      for (final preset in ReverbPreset.values)
+                        _buildReverbChip(
+                            preset, state.reverbPreset, cubit, p),
                     ],
                   ),
                   const SizedBox(height: 12),
@@ -2805,11 +2812,14 @@ class _EqualizerSheetState extends State<EqualizerSheet>
     );
   }
 
-  Widget _buildReverbChip(String label, int presetIdx, int currentPreset,
+  Widget _buildReverbChip(ReverbPreset preset, int currentPreset,
       PlayerCubit cubit, PulsrPalette p) {
-    final isSelected = presetIdx == currentPreset;
+    final isSelected = preset.wireValue == currentPreset;
+    // Custom IR is only meaningful once one is loaded; selecting it would
+    // otherwise leave the reverb with whatever IR happened to be prepared.
+    final isSelectable = preset != ReverbPreset.custom || isSelected;
     return ChoiceChip(
-      label: Text(label),
+      label: Text(preset.label),
       selected: isSelected,
       selectedColor: p.accent.withValues(alpha: 0.22),
       backgroundColor: p.surface,
@@ -2817,11 +2827,15 @@ class _EqualizerSheetState extends State<EqualizerSheet>
         color: isSelected ? p.accent : p.hairline,
       ),
       labelStyle: TextStyle(
-        color: isSelected ? p.accent : p.textSecondary,
+        color: isSelected
+            ? p.accent
+            : (isSelectable ? p.textSecondary : p.textSecondary.withValues(alpha: 0.4)),
         fontWeight: FontWeight.w700,
         fontSize: 11,
       ),
-      onSelected: (_) => cubit.setReverb(true, preset: presetIdx),
+      onSelected: isSelectable
+          ? (_) => cubit.setReverb(true, preset: preset.wireValue)
+          : null,
     );
   }
 

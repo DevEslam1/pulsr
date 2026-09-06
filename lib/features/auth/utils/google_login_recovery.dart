@@ -4,10 +4,13 @@
 // ytm_web_login_sheet.dart. Kept free of Flutter/webview dependencies so the
 // ladder can be unit-tested in isolation.
 //
-// Ladder (max [maxAttempts] automatic retries, never loops):
-//   block #1 → clear cookies+cache, switch identity desktop → mobile, reload
-//   block #2 → clear cookies+cache, switch identity mobile → desktop, reload
-//   block #3 → null (exhausted; the sheet shows the manual recovery card)
+// Ladder (max [maxAttempts] automatic retries, never loops): each block clears
+// cookies+cache and advances one rung from the identity currently presented —
+//   mobile → safariMobile → desktop → chromeDesktop → (wraps)
+// Once [maxAttempts] rungs have been spent [onBlocked] returns null and the
+// sheet shows the manual recovery card; a manual retry ([reset]) re-arms the
+// counter and continues forward from where it stopped rather than re-presenting
+// the identities Google just refused.
 
 /// Which browser identity the embedded WebView currently presents.
 enum BrowserIdentity { desktop, mobile, chromeDesktop, safariMobile }
@@ -49,13 +52,16 @@ class GoogleBlockRecovery {
   /// step, or null when automatic retries are exhausted (stop — never loop).
   BlockRecoveryStep? onBlocked() {
     if (exhausted) return null;
-    // Pick the next identity from the ladder (skip current identity)
-    final next = _ladder.firstWhere(
-      (id) => id != _identity,
-      orElse: () => _ladder[_attempt % _ladder.length],
-    );
+    // Walk forward through the ladder from wherever the current identity sits.
+    // `firstWhere((id) => id != _identity)` returned the first entry that merely
+    // *differed*, so from `mobile` it picked `safariMobile`, then from
+    // `safariMobile` it picked `mobile` again — the ladder oscillated between
+    // its first two rungs and no desktop identity was ever tried, which is the
+    // half of it most likely to get past a mobile-flagged block.
+    final current = _ladder.indexOf(_identity);
+    final nextIndex = (current >= 0 ? current + 1 : _attempt) % _ladder.length;
     _attempt++;
-    _identity = next;
+    _identity = _ladder[nextIndex];
     return BlockRecoveryStep(_identity);
   }
 

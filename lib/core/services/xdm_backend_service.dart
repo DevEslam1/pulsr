@@ -346,8 +346,12 @@ class XdmBackendService {
     if (response.statusCode == 429 || errorCode == 'RATE_LIMITED' || errorCode == 'BOT_CHECK') {
       final retryHeader = response.headers['retry-after'];
       final retryAfter = int.tryParse(retryHeader ?? '') ?? 60;
+      // Only the backend bucket. The backend's quota — and its cookie pool's
+      // BOT_CHECK — say nothing about how YouTube sees *this device*: it is a
+      // different IP entirely. Freezing the native path here made the fallback
+      // take the primary down with it, which is what "everything is blocked"
+      // looked like, and an uncapped `Retry-After` froze it for hours.
       YtmRateLimiter.shared.onBackendRateLimited(retryAfter);
-      YtmRateLimiter.shared.onRateLimited(retryAfter);
       throw YtmException(errorCode, message);
     }
 
@@ -427,7 +431,11 @@ class XdmBackendService {
       artist: artist,
       artworkUrl: 'https://i.ytimg.com/vi/$videoId/hqdefault.jpg',
       expiresAt: expiresAt,
-    );
+      // The backend may omit `expiresAt` entirely, and when it does send one the
+      // unit is not guaranteed to be millis. Left as-is, an absent stamp made
+      // every consumer treat the URL as immortal, and a seconds-valued one made
+      // it born expired — which the URL cache answers by refusing to store it.
+    ).withResolvedExpiry();
   }
 
   /// Extracts playlist tracks from [playlistUrl] via the yt-dlp backend.

@@ -248,8 +248,13 @@ class YtmRateLimiter {
     _adaptiveMultiplier = (_adaptiveMultiplier * 2).clamp(1, 16);
 
     if (retryAfterSeconds != null && retryAfterSeconds > 0) {
+      // Capped: a `Retry-After` is a hint from a remote party, and this window
+      // is persisted, so an outsized value (or a header from a proxy that is not
+      // YouTube) used to freeze every native request for hours — across app
+      // restarts — with no way to clear it.
+      final seconds = retryAfterSeconds.clamp(1, _maxRetryAfterSeconds);
       final jitter = Duration(milliseconds: _random.nextInt(1000));
-      _backoffUntil = now.add(Duration(seconds: retryAfterSeconds) + jitter);
+      _backoffUntil = now.add(Duration(seconds: seconds) + jitter);
     } else {
       final remaining = _backoffUntil.isAfter(now)
           ? _backoffUntil.difference(now)
@@ -266,11 +271,15 @@ class YtmRateLimiter {
     _persist();
   }
 
+  /// Upper bound on any `Retry-After` we honour, for the same reason a browser
+  /// bounds it: the value arrives from the network.
+  static const int _maxRetryAfterSeconds = 300;
+
   /// Called when a 429 response is received from backend (honoring Retry-After).
   void onBackendRateLimited([int? retryAfterSeconds]) {
     final now = clock.now();
     final seconds = (retryAfterSeconds != null && retryAfterSeconds > 0)
-        ? retryAfterSeconds
+        ? retryAfterSeconds.clamp(1, _maxRetryAfterSeconds)
         : 60;
     final jitter = Duration(milliseconds: _random.nextInt(1000));
     _backendBackoffUntil = now.add(Duration(seconds: seconds) + jitter);
@@ -291,10 +300,15 @@ class YtmRateLimiter {
     _persist();
   }
 
-  /// Called on a successful backend request to reset backoff state.
+  /// Called on a successful backend request.
+  ///
+  /// Like [onSuccess], it does not clear an active cooling window. Permits are
+  /// taken before a request is sent, so several can be in flight when a 429
+  /// arrives; whichever of them succeeds afterwards used to wipe the whole
+  /// `Retry-After` window and let the app resume hammering a backend that had
+  /// just asked it to stop.
   void onBackendSuccess() {
     _backendLastSuccess = clock.now();
-    _backendBackoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
     _persist();
   }
 

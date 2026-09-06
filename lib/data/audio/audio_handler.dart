@@ -121,8 +121,15 @@ class PulsrAudioHandler extends BaseAudioHandler
       _streamCache = LinkedHashMap();
   // Active stream URL resolutions, keyed by videoId-quality. Deduplicates concurrent
   // requests (e.g. background pre-warm and YtmResolvingSource.request()).
-  final Map<String, Future<({String url, String? userAgent, String? cookies})>>
-      _inFlightResolves = {};
+  final Map<
+      String,
+      Future<
+          ({
+            String url,
+            String? userAgent,
+            String? cookies,
+            String quality
+          })>> _inFlightResolves = {};
   // Video ids with an in-flight prefetch, so we resolve each at most once.
   final Set<String> _prefetching = {};
 
@@ -1066,11 +1073,14 @@ class PulsrAudioHandler extends BaseAudioHandler
     );
     _errorSubject.add(info.message);
 
-    // Invalidate poToken on 403 / bot block so the next track attempts a fresh attestation
-    final errStr = error.toString().toLowerCase();
-    if (errStr.contains('403') ||
-        errStr.contains('bot') ||
-        (error is YtmException && error.isBotBlocked)) {
+    // Invalidate poToken only on a verdict that a fresh attestation can fix.
+    // `contains('403')` matched the digits anywhere in the message — including
+    // inside a video id, an itag or a byte count — and bare `bot` matched
+    // "bottleneck", so ordinary failures kept throwing away a working token and
+    // paying for a new BotGuard round on the next track.
+    final signal = info.signal;
+    if (signal == YtmBlockSignal.botChallenge ||
+        signal == YtmBlockSignal.poTokenInvalid) {
       _ytmService.invalidatePoToken().catchError((e, st) {
         ErrorLogger.log('poToken invalidation failed',
             error: e, stackTrace: st, category: 'AudioHandler');
@@ -1141,6 +1151,7 @@ class PulsrAudioHandler extends BaseAudioHandler
               await _resolveStreamUrl(song, forceRefresh: forceRefresh);
           source.userAgent = resolved.userAgent;
           source.cookies = resolved.cookies;
+          source.quality = resolved.quality;
           return resolved.url;
         },
         onError: (error) => _handleStreamResolutionError(song, error),
@@ -1214,6 +1225,7 @@ class PulsrAudioHandler extends BaseAudioHandler
             await _resolveStreamUrl(song, forceRefresh: forceRefresh);
         source.userAgent = resolved.userAgent;
         source.cookies = resolved.cookies;
+        source.quality = resolved.quality;
         return resolved.url;
       },
       onError: (error) => _handleStreamResolutionError(song, error),
@@ -1225,9 +1237,12 @@ class PulsrAudioHandler extends BaseAudioHandler
   /// Returns a currently-valid stream URL for a YouTube row, reusing a memoized
   /// one until it nears expiry. Throws [YtmException] when nothing usable comes
   /// back, so the caller can tell "network down" from "skip this track".
-  Future<({String url, String? userAgent, String? cookies})> _resolveStreamUrl(
-      SongsTableData song,
-      {bool forceRefresh = false}) async {
+  ///
+  /// [quality] is reported back because it is part of every downstream cache key
+  /// ([YtmUrlCache], the disk cache slot); the caller cannot assume `high`.
+  Future<({String url, String? userAgent, String? cookies, String quality})>
+      _resolveStreamUrl(SongsTableData song,
+          {bool forceRefresh = false}) async {
     try {
       _latencyTracker?.markStage(PlaybackStage.resolutionRequested);
     } catch (_) {}
@@ -1264,7 +1279,8 @@ class PulsrAudioHandler extends BaseAudioHandler
         return (
           url: cached.url,
           userAgent: cached.userAgent,
-          cookies: cached.cookies
+          cookies: cached.cookies,
+          quality: quality
         );
       }
       final inFlight = _inFlightResolves[cacheKey];
@@ -1314,7 +1330,8 @@ class PulsrAudioHandler extends BaseAudioHandler
       return (
         url: stream.url,
         userAgent: stream.userAgent,
-        cookies: stream.cookies
+        cookies: stream.cookies,
+        quality: quality
       );
     }();
 

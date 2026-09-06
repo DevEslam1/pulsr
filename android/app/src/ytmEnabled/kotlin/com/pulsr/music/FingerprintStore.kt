@@ -21,14 +21,22 @@ internal object FingerprintStore {
     private const val KEY_HL = "ytm_hl"
     private const val KEY_GL = "ytm_gl"
 
+    // The whole YTM surface pins one region: the sign-in WebView's
+    // anti-fingerprint script hardcodes Africa/Cairo and Cairo coordinates, and
+    // the Dart Innertube contexts send the same pair. A native fingerprint that
+    // disagrees with those is a stronger bot signal than a "wrong" but coherent
+    // one, so this is the single source of truth rather than four literals.
+    const val DEFAULT_HL = "en"
+    const val DEFAULT_GL = "EG"
+
     internal data class DeviceFingerprint(
         val installUuid: String,
         val deviceMake: String,
         val deviceModel: String,
         val osVersion: String,
         val sdkInt: Int,
-        val hl: String = "en",
-        val gl: String = "EG"
+        val hl: String = DEFAULT_HL,
+        val gl: String = DEFAULT_GL
     ) {
         fun buildUserAgent(clientType: InnertubeClient.ClientType): String {
             return when (clientType) {
@@ -77,8 +85,8 @@ internal object FingerprintStore {
                     .putString(KEY_DEVICE_MODEL, model)
                     .putString(KEY_OS_VERSION, osVer)
                     .putInt(KEY_SDK_INT, sdk)
-                    .putString(KEY_HL, "en")
-                    .putString(KEY_GL, "EG")
+                    .putString(KEY_HL, DEFAULT_HL)
+                    .putString(KEY_GL, DEFAULT_GL)
                     .apply()
 
                 val fp = DeviceFingerprint(
@@ -86,26 +94,19 @@ internal object FingerprintStore {
                     deviceMake = make,
                     deviceModel = model,
                     osVersion = osVer,
-                    sdkInt = sdk,
-                    hl = "en",
-                    gl = "EG"
+                    sdkInt = sdk
                 )
                 cachedFingerprint = fp
                 return fp
             } else {
-                var storedGl = prefs.getString(KEY_GL, "EG") ?: "EG"
-                if (storedGl == "US") {
-                    storedGl = "EG"
-                    prefs.edit().putString(KEY_GL, "EG").apply()
-                }
                 val fp = DeviceFingerprint(
                     installUuid = uuid,
                     deviceMake = prefs.getString(KEY_DEVICE_MAKE, "Google") ?: "Google",
                     deviceModel = prefs.getString(KEY_DEVICE_MODEL, "Pixel 8") ?: "Pixel 8",
                     osVersion = prefs.getString(KEY_OS_VERSION, "14") ?: "14",
                     sdkInt = prefs.getInt(KEY_SDK_INT, 34),
-                    hl = prefs.getString(KEY_HL, "en") ?: "en",
-                    gl = storedGl
+                    hl = prefs.getString(KEY_HL, DEFAULT_HL) ?: DEFAULT_HL,
+                    gl = prefs.getString(KEY_GL, DEFAULT_GL) ?: DEFAULT_GL
                 )
                 cachedFingerprint = fp
                 return fp

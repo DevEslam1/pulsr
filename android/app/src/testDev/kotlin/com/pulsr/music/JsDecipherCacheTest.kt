@@ -2,6 +2,7 @@ package com.pulsr.music
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -74,5 +75,19 @@ class JsDecipherCacheTest {
 
         val outOfBoundsSwap = cache.applyTransforms("abc", listOf("swap:10"))
         assertEquals("abc", outOfBoundsSwap)
+    }
+
+    @Test
+    fun testDecipherFailsWhenNoRulesCached() {
+        val cache = JsDecipherCache()
+
+        assertThrows(UndecipherableSignatureException::class.java) {
+            cache.decipherSignature("abc", "unknown_player")
+        }
+
+        cache.putRules("empty_player", emptyList())
+        assertThrows(UndecipherableSignatureException::class.java) {
+            cache.decipherSignature("abc", "empty_player")
+        }
     }
 }

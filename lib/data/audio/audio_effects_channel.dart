@@ -1,6 +1,5 @@
 // lib/data/audio/audio_effects_channel.dart
 import 'dart:async';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:flutter/services.dart';
 import '../../core/constants/channels.dart';
@@ -59,17 +58,13 @@ class AudioEffectsChannel {
   bool _isBassBoostSupported = false;
   bool _isFloatOutputSupported = true;
   bool _isHardwareOffloadSupported = true;
-  // The native C++ stages need a PCM callback from the playback engine. The
-  // current just_audio/ExoPlayer integration does not provide one, so these
-  // must never be advertised as audible effects. The HAL AudioEffect path
-  // (EQ, dynamics, reverb via EnvironmentalReverb, limiter, etc.) is fully
-  // audible — its status is reported via getProcessingCapabilities.
+  // Health of the session-bound AudioEffect (HAL) chain: EQ, dynamics,
+  // virtualizer, bass boost, loudness enhancer.
   bool _isPcmDspAttached = false;
 
-  /// True only when a PCM source actually feeds the C++ DSP engine. The
-  /// Phase-1 stages configured into that engine (crossfeed, saturation,
-  /// stereo width, sub crossover, dynamic EQ, loudness contour) are not
-  /// audible until this is true.
+  /// Whether the native C++ chain is in the audible path. The vendored
+  /// just_audio fork splices NativeDspAudioProcessor into ExoPlayer's audio
+  /// sink, so this is true whenever libpulsr_dsp loaded.
   bool _hasPcmDspPath = false;
   bool _hasOemAudio = false;
   List<String> _detectedOemEngines = [];
@@ -84,7 +79,7 @@ class AudioEffectsChannel {
   bool get isHardwareOffloadSupported => _isHardwareOffloadSupported;
   bool get isPcmDspAttached => _isPcmDspAttached;
 
-  /// Whether the C++ DSP engine has a live PCM source (audible stages).
+  /// Whether the native C++ DSP chain is in ExoPlayer's audible path.
   bool get hasPcmDspPath => _hasPcmDspPath;
   bool get hasOemAudio => _hasOemAudio;
   List<String> get detectedOemEngines => List.unmodifiable(_detectedOemEngines);
@@ -1282,40 +1277,6 @@ class AudioEffectsChannel {
         category: 'AudioEffectsChannel',
       );
       return null;
-    }
-  }
-
-  /// Processes a PCM audio frame through the native DSP engine.
-  ///
-  /// This method bridges the per-frame PCM callbacks from just_audio's
-  /// playback engine into Pulsr's C++ DSP pipeline. The native engine will
-  /// apply all active DSP stages (EQ, limiter, reverb, saturation, etc.)
-  /// and return the processed PCM data.
-  ///
-  /// Returns the number of frames processed, or 0 on error/Android mismatch.
-  Future<int> nativeProcessPcmAudio(
-    Float32List buffer,
-    int frameCount,
-    int channels,
-  ) async {
-    if (!_isAndroid) return 0;
-    try {
-      final result = await _channel
-          .invokeMethod<int>('nativeProcessPcmAudio', {
-            'buffer': buffer,
-            'frameCount': frameCount,
-            'channels': channels,
-          })
-          .timeout(const Duration(milliseconds: 10));
-      return result ?? 0;
-    } catch (e, st) {
-      ErrorLogger.log(
-        'nativeProcessPcmAudio failed: frame processing interrupted',
-        error: e,
-        stackTrace: st,
-        category: 'AudioEffectsChannel',
-      );
-      return 0;
     }
   }
 }

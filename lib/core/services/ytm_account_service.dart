@@ -137,7 +137,13 @@ class YtmAccountService {
     if (_isInitialized) return;
     try {
       await _versionResolver.init();
-      final nativeCookies = await getNativeCookiesFromDomains();
+      final rawNative = await getNativeCookiesFromDomains();
+      // The native store answers for several domains at once, so the same
+      // `SAPISID` can appear twice with different values. Un-deduplicated, the
+      // header carries both while buildAuthorizationHeader hashes only the first
+      // — the signature then belongs to an account the request is not making.
+      final nativeCookies =
+          rawNative == null ? null : normalizeCookieHeader(rawNative);
       if (nativeCookies != null &&
           nativeCookies.isNotEmpty &&
           looksLikeSignedInCookies(nativeCookies)) {
@@ -167,7 +173,12 @@ class YtmAccountService {
       final prefs = await SharedPreferences.getInstance();
       _accountName = prefs.getString(_accountNamePrefKey);
       _accountAvatar = prefs.getString(_accountAvatarPrefKey);
-      _dataSyncId = prefs.getString(_dataSyncIdPrefKey);
+      // `??=`, not `=`: the validateSession() above harvests the datasyncId off
+      // the live response and has already handed it to YtmService, so a plain
+      // assignment here overwrote a fresh id with the stored one — or with null
+      // on a first run — leaving Dart and native disagreeing about which account
+      // the poToken is bound to.
+      _dataSyncId ??= prefs.getString(_dataSyncIdPrefKey);
       _isInitialized = true;
       loginState.value = isLoggedIn;
     } catch (e, st) {
@@ -189,7 +200,26 @@ class YtmAccountService {
         }),
         baseTimeoutSeconds: 8,
       );
+      // A 401 is Innertube rejecting the credential itself, which is as
+      // definitive as a logged-out body; answering `unknown` for it kept a dead
+      // session installed so every later request failed with no way back to the
+      // login sheet. A 403 is the opposite case — far more often an IP or bot
+      // block than a bad cookie — and init() wipes the jar on any `false`, so it
+      // only counts as invalid when the body itself agrees.
+      if (res.statusCode == 401) {
+        return SessionValidationResult.invalid;
+      }
       if (res.statusCode != 200) {
+        if (res.statusCode == 403) {
+          try {
+            final body = jsonDecode(res.body) as Map<String, dynamic>;
+            if (_isUnauthenticatedResponse(body)) {
+              return SessionValidationResult.invalid;
+            }
+          } catch (_) {
+            // Not JSON (an HTML interstitial): a block, not a verdict.
+          }
+        }
         return SessionValidationResult.unknown; // transient, don't kill session
       }
       final json = jsonDecode(res.body) as Map<String, dynamic>;
@@ -253,14 +283,65 @@ class YtmAccountService {
     } catch (_) {}
   }
 
+  /// Folds a pasted or scraped cookie blob into one well-formed `Cookie` header
+  /// value: `name=value` pairs, `; `-joined, last writer wins, no CR/LF and no
+  /// leftover cookie attributes.
+  ///
+  /// The login sheet lets people paste a header by hand and a DevTools copy
+  /// brings along newlines, a `Cookie:` prefix and per-cookie attributes such as
+  /// `Path=/` or `Expires=Wed, 21 Oct 2026 ...`. Stored verbatim those either
+  /// make the http client reject the request outright or reach the native cookie
+  /// store as extra header lines, and a duplicated `SAPISID` silently decides
+  /// which account gets signed in.
+  static String normalizeCookieHeader(String raw) {
+    const attributeNames = {
+      'path',
+      'domain',
+      'expires',
+      'max-age',
+      'samesite',
+      'priority',
+      'partitioned',
+      'secure',
+      'httponly',
+    };
+    final ordered = <String, String>{};
+    for (final segment in raw.split(RegExp(r'[;\r\n]'))) {
+      var pair = segment.trim();
+      if (pair.isEmpty) continue;
+      if (pair.toLowerCase().startsWith('cookie:')) {
+        pair = pair.substring('cookie:'.length).trim();
+      }
+      final eq = pair.indexOf('=');
+      if (eq <= 0) continue; // `Secure`, `HttpOnly`, or a stray value
+      final name = pair.substring(0, eq).trim();
+      final value = pair.substring(eq + 1).trim();
+      if (name.isEmpty || attributeNames.contains(name.toLowerCase())) continue;
+      if (name.contains(RegExp(r'[\s,;]'))) continue; // not a cookie name
+      ordered[name] = value;
+    }
+    return ordered.entries.map((e) => '${e.key}=${e.value}').join('; ');
+  }
+
   /// Saves extracted web cookies, warms the session, and triggers fresh attestation.
   Future<bool> saveSession(String rawCookies) async {
-    _cookies = rawCookies;
-    await _persistCookies(rawCookies);
+    final jar = normalizeCookieHeader(rawCookies);
+    // A blob with no SAPISID-family cookie and no PSID is not a session. Saving
+    // one flipped `loginState` to true, pushed it into the native cookie store
+    // and invalidated a working poToken, leaving the UI showing a signed-in
+    // account whose every request comes back unauthenticated — and since no
+    // caller reads this return value, the only visible symptom was breakage.
+    if (!looksLikeSignedInCookies(jar)) {
+      debugPrint(
+          '[YTM_ACCOUNT] Refusing to save a cookie jar with no session cookies');
+      return false;
+    }
+    _cookies = jar;
+    await _persistCookies(jar);
 
     // Sync to native CookieManager and invalidate stale poTokens
     final ytmService = getIt<YtmService>();
-    await ytmService.syncCookies(rawCookies);
+    await ytmService.syncCookies(jar);
     await ytmService.invalidatePoToken();
 
     // ACCOUNT_CHOOSER / LOGIN_INFO hold opaque base64 blobs, not human names.
@@ -294,7 +375,9 @@ class YtmAccountService {
         await _bootstrapDataSyncId();
       }
       if (_dataSyncId != null && _dataSyncId!.isNotEmpty) {
-        debugPrint('[YTM_ACCOUNT] dataSyncId ready after login: $_dataSyncId');
+        // The id itself is an account identifier and the poToken binding — log
+        // that it arrived, never its value.
+        debugPrint('[YTM_ACCOUNT] dataSyncId ready after login');
       } else {
         debugPrint('[YTM_ACCOUNT] dataSyncId still null after bootstrap — Tier-1 will be skipped until populated');
       }
@@ -388,10 +471,8 @@ class YtmAccountService {
         try {
           _harvestSessionState(json);
         } catch (_) {}
-        final setCookie = res.headers['set-cookie'];
-        if (setCookie != null && setCookie.isNotEmpty) {
-          _ingestSetCookies(setCookie);
-        }
+        // Set-Cookie is now ingested for every 2xx in _postWithRetry, so this
+        // path no longer needs its own copy.
         debugPrint('[YTM_ACCOUNT] Session warmed successfully');
       }
     } catch (e) {
@@ -528,7 +609,48 @@ class YtmAccountService {
       }
     }
 
+    // Innertube hands back a `visitorData` on the first response and expects it
+    // echoed on the rest of the session. Without it every call looks like a
+    // brand-new visitor, which is one of the cheapest bot signals to trip — and
+    // it is the same id the poToken is minted against, so omitting it here can
+    // leave the token bound to a visitor the request never claims to be.
+    final visitorId = _sessionVisitorData;
+    if (visitorId != null && visitorId.isNotEmpty) {
+      headers['X-Goog-Visitor-Id'] = visitorId;
+    }
+
     return headers;
+  }
+
+  /// Re-derives the credential-bearing headers from the live cookie jar just
+  /// before a request goes out, leaving every other header the caller set alone.
+  ///
+  /// Callers build headers once and reuse them across a browse loop, up to 20
+  /// continuation pages and three backoff attempts. Two things go stale in that
+  /// window: SAPISIDHASH embeds the second it was computed, so a paging walk
+  /// signs its later pages with a minutes-old timestamp, and the jar itself now
+  /// rotates underneath them as [_ingestSetCookies] takes in `Set-Cookie` — a
+  /// stale `Cookie` header would keep presenting the superseded values. Doing it
+  /// here rather than at each call site means no request can forget.
+  Map<String, String>? _resignHeaders(Map<String, String>? headers) {
+    if (headers == null) return null;
+    // Only requests we signed in the first place: an anonymous call must stay
+    // anonymous no matter what happens to be in the jar.
+    if (!headers.containsKey('Authorization')) return headers;
+    final jar = _cookies;
+    if (jar == null || jar.isEmpty) return headers;
+    final origin =
+        headers['x-origin'] ?? headers['Origin'] ?? 'https://music.youtube.com';
+    final fresh = buildAuthorizationHeader(jar, origin: origin);
+    if (fresh == null) return headers;
+    final visitorId = _sessionVisitorData;
+    return {
+      ...headers,
+      'Cookie': jar,
+      'Authorization': fresh,
+      if (visitorId != null && visitorId.isNotEmpty)
+        'X-Goog-Visitor-Id': visitorId,
+    };
   }
 
   /// Builds the proper Authorization header for YouTube / Google InnerTube requests.
@@ -698,7 +820,7 @@ class YtmAccountService {
         await YtmRateLimiter.shared.acquirePermit();
         final timeout = Duration(seconds: baseTimeoutSeconds + attempt * 5);
         final res = await _innertubeClient
-            .post(uri, headers: headers, body: body)
+            .post(uri, headers: _resignHeaders(headers), body: body)
             .timeout(timeout);
         if (res.statusCode == 429 || res.statusCode >= 500) {
           if (res.statusCode == 429) {
@@ -717,6 +839,22 @@ class YtmAccountService {
         // an active cooling window back to "all clear".
         if (res.statusCode >= 200 && res.statusCode < 300) {
           YtmRateLimiter.shared.onSuccess();
+          // Google rotates the session cookies (notably the `__Secure-*PSID*`
+          // family and `SIDCC`) on ordinary authenticated traffic, and drops the
+          // old values when the rotation is never acknowledged. Ingesting only
+          // inside _warmSession() meant every rotation on a library fetch, a
+          // continuation page or a playlist edit was thrown away, so a jar that
+          // was valid at login quietly aged out. Gated on `isLoggedIn` so a
+          // response to an anonymous call cannot conjure a session out of
+          // whatever cookies the edge server happened to set.
+          if (isLoggedIn) {
+            final setCookie = res.headers['set-cookie'];
+            if (setCookie != null && setCookie.isNotEmpty) {
+              try {
+                _ingestSetCookies(setCookie);
+              } catch (_) {}
+            }
+          }
         }
         return res;
       } on TimeoutException {
@@ -763,8 +901,19 @@ class YtmAccountService {
           if (_isUnauthenticatedResponse(json)) {
             debugPrint(
                 '[YTM_ACCOUNT] Unauthenticated response detected on $bId');
-            await logout();
-            throw const YtmException('YTM_AUTH', 'Session expired');
+            // `_isUnauthenticatedResponse` is a shape heuristic — a library
+            // browse that legitimately answers with a bare shell trips it too —
+            // and logout() wipes the cookie jar and the WebView. Signing people
+            // out on one odd response is the wrong trade, so get a second,
+            // independent verdict from the canonical home browse and only tear
+            // the session down when that agrees.
+            final verdict = await validateSessionDetailed();
+            if (verdict == SessionValidationResult.invalid) {
+              await logout();
+              throw const YtmException('YTM_AUTH', 'Session expired');
+            }
+            getIt<YtmService>().notifyAuthExpired();
+            continue;
           }
 
           _harvestSessionState(json);
@@ -789,7 +938,9 @@ class YtmAccountService {
     }
 
     // Refresh cookies from native CookieManager if needed
-    final nativeCookies = await getNativeCookiesFromDomains();
+    final rawNative = await getNativeCookiesFromDomains();
+    final nativeCookies =
+        rawNative == null ? null : normalizeCookieHeader(rawNative);
     if (nativeCookies != null &&
         nativeCookies.isNotEmpty &&
         looksLikeSignedInCookies(nativeCookies)) {
@@ -839,7 +990,8 @@ class YtmAccountService {
 
           if (tracks.isEmpty) {
             debugPrint(
-                '[YTM_ACCOUNT] Liked songs query $bId returned 0 tracks. RAW BODY:\n${response.body}');
+                '[YTM_ACCOUNT] Liked songs query $bId returned 0 tracks '
+                '(${response.body.length} B, keys: ${json.keys.take(8).join(', ')})');
             // YouTube Music frequently delivers the liked-songs list only via
             // continuation — the initial browse response is a header shell.
             final initToken = _extractContinuationToken(json);
@@ -865,7 +1017,8 @@ class YtmAccountService {
                   tracks.addAll(contTracks);
                 } else {
                   debugPrint(
-                      '[YTM_ACCOUNT] Continuation body returned 0 tracks. RAW:\n${contRes.body}');
+                      '[YTM_ACCOUNT] Continuation body returned 0 tracks '
+                      '(${contRes.body.length} B, keys: ${contJson.keys.take(8).join(', ')})');
                 }
               }
             }
@@ -959,7 +1112,8 @@ class YtmAccountService {
             return tracks.take(maxTracks).toList();
           } else {
             debugPrint(
-                '[YTM_ACCOUNT] Next endpoint $pId raw body:\n${response.body}');
+                '[YTM_ACCOUNT] Next endpoint $pId parsed nothing '
+                '(${response.body.length} B, keys: ${json.keys.take(8).join(', ')})');
           }
         }
       } catch (e) {
@@ -1614,7 +1768,12 @@ class YtmAccountService {
               artworkUrl: null,
               userAgent: headers['User-Agent'],
               cookies: isWeb ? _cookies : null,
-            );
+              // The player response never states an expiry of its own, but the
+              // URL it hands back always carries one. Left null, `isExpired` and
+              // `isExpiringSoon` answer false for the whole ~6-hour life of the
+              // URL and then keep answering false after it dies, so nothing
+              // re-resolves and the URL cache stores it with the wrong lifetime.
+            ).withResolvedExpiry();
           } else {
             debugPrint(
                 '[YTM_ACCOUNT] Client $client returned status $status but no audio formats (adaptiveFormats: ${adaptive.length} total, streamingData: ${streamingData != null})');

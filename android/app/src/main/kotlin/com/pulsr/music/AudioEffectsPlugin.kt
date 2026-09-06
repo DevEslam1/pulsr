@@ -8,7 +8,6 @@ import android.media.audiofx.AudioEffect
 import android.media.audiofx.BassBoost
 import android.media.audiofx.DynamicsProcessing
 import android.media.audiofx.Equalizer
-import android.media.audiofx.EnvironmentalReverb
 import android.media.audiofx.LoudnessEnhancer
 import android.media.audiofx.Virtualizer
 import android.os.Build
@@ -50,15 +49,6 @@ data class DynamicsPresetConfig(
     val limiter: LimiterConfig
 )
 
-/** EnvironmentalReverb room shape for one reverb preset (Android units). */
-private data class ReverbShape(
-    val decayMs: Int,
-    val decayHFRatio: Int,
-    val density: Int,
-    val diffusion: Int,
-    val roomLevel: Int
-)
-
 class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private lateinit var methodChannel: MethodChannel
     private var context: Context? = null
@@ -72,9 +62,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var legacyEqualizer: Equalizer? = null
     private var loudnessEnhancer: LoudnessEnhancer? = null
     private var bassBoost: BassBoost? = null
-    // HAL-bound EnvironmentalReverb — audible via the AudioEffect session, and
-    // unlike PresetReverb it exposes reverbLevel so the wet/dry fader is real.
-    private var halReverb: EnvironmentalReverb? = null
 
     private var isVirtualizerEnabled = false
     private var virtualizerStrength: Short = 0
@@ -98,16 +85,11 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
     private var eqBandGains = DoubleArray(DEFAULT_EQ_FREQS.size)
     private var eqPreampDb = 0.0
 
-    // Native DSP Engine states
+    // Native DSP Engine states. The vendored just_audio fork installs
+    // NativeDspAudioProcessor into ExoPlayer's audio sink unconditionally, so
+    // the C++ chain is in the audible path whenever libpulsr_dsp loaded.
     private var isNativeDspLoaded = false
 
-    /// True only once a real PCM buffer has been pushed through
-    /// nativeProcessPcmAudio. The C++ stages (crossfeed, saturation, stereo
-    /// width, sub crossover, dynamic EQ, loudness contour) are configured but
-    /// NOT audible until then: ExoPlayer provides no PCM callback, so nothing
-    /// feeds this engine. Reported to Flutter as hasPcmDspPath.
-    @Volatile
-    private var isPcmSourceConnected = false
     private var isCrossfeedEnabled = false
     private var crossfeedDelayUs = 350.0
     private var crossfeedFeedDb = -9.0
@@ -270,8 +252,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         index: Int, freq: Double, q: Double, thresholdDb: Double, ratio: Double,
         attackMs: Double, releaseMs: Double, maxCutDb: Double, enabled: Boolean
     )
-    private external fun nativeProcessAudio(buffer: FloatArray, frames: Int, channels: Int): Int
-    private external fun nativeProcessPcmAudio(buffer: FloatArray, frames: Int, channels: Int): Int
     private external fun nativeDecodeDsd(dsdL: ByteArray, dsdR: ByteArray, byteCount: Int, dsdRate: Int, targetPcmSampleRate: Int, bitOrder: Int): FloatArray?
     private external fun nativeSetActiveStages(bitmask: Int)
     private external fun nativeSetCacheBudgetBytes(budgetBytes: Long)
@@ -319,7 +299,10 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         val useNativeEq = dspPreference == "native"
         if (isEqEnabled && useNativeEq) mask = mask or STAGE_EQ
         if (isCrossfeedEnabled) mask = mask or STAGE_CROSSFEED
-        // Reverb is owned by the HAL EnvironmentalReverb (see applyHalReverb).
+        // Convolution reverb is owned by the native chain: it is the only path
+        // that can convolve a user-loaded impulse response, which is what the
+        // feature claims to do. The HAL EnvironmentalReverb is not attached.
+        if (isReverbEnabled) mask = mask or STAGE_REVERB
         if (abs(stereoBalance) > 0.001 || monoMix) mask = mask or STAGE_PANNER
         if (isLimiterEnabled) mask = mask or STAGE_LIMITER
         // Sinc resampler only if actually needed (rate mismatch) — zero-cost zero-mask when bypassed
@@ -369,6 +352,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         const val STAGE_LOUDNESS = 1 shl 8
         const val STAGE_CROSSOVER = 1 shl 9
         const val STAGE_DYNEQ = 1 shl 10
+
+        /**
+         * Ordinal of `ReverbPreset::Custom` in ConvolutionReverb.h — the one
+         * value the native side will not synthesize an IR for.
+         */
+        private const val REVERB_PRESET_CUSTOM = 8
 
         const val TAG = "AudioEffectsPlugin"
         const val CHANNEL_NAME = "com.pulsr.music/audio_effects"
@@ -789,23 +778,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(true)
                 }
 
-                "nativeProcessPcmAudio", "nativeProcessAudio" -> {
-                    val buffer = call.argument<FloatArray>("buffer")
-                    val frameCount = call.argument<Int>("frameCount") ?: 0
-                    val channels = call.argument<Int>("channels") ?: 2
-                    if (buffer != null && isNativeDspLoaded) {
-                        isPcmSourceConnected = true
-                        try {
-                            val processed = nativeProcessPcmAudio(buffer, frameCount, channels)
-                            result.success(processed)
-                        } catch (e: Exception) {
-                            result.success(0)
-                        }
-                    } else {
-                        result.success(0)
-                    }
-                }
-
                 // NOTE: the rich DSP debug report lives further down in this
                 // when-block (search for the second "getDspDebugStatus"). It
                 // used to be shadowed by a native-only branch here, which made
@@ -1048,7 +1020,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     result.success(true)
                 }
 
-                // Convolution Reverb — HAL path via EnvironmentalReverb + native C++ (for when PCM path lands)
+                // Convolution Reverb — native C++ ConvolutionReverb in the
+                // ExoPlayer audio sink (see NativeDspAudioProcessor).
                 "setReverbEnabled" -> {
                     val enabled = call.argument<Boolean>("enabled") ?: false
                     isReverbEnabled = enabled
@@ -1060,7 +1033,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             Log.w(TAG, "nativeSetReverbEnabled failed: ${e.message}")
                         }
                     }
-                    applyHalReverb()
                     recalculateActiveStages()
                     result.success(true)
                 }
@@ -1079,8 +1051,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             }
                         }
                     }
-                    // HAL path: update EnvironmentalReverb preset
-                    applyHalReverb()
                     result.success(true)
                 }
 
@@ -1095,8 +1065,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                             Log.w(TAG, "nativeSetReverbWetDry failed: ${e.message}")
                         }
                     }
-                    // HAL path: update EnvironmentalReverb wet level
-                    applyHalReverb()
                     result.success(true)
                 }
 
@@ -1127,6 +1095,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     if (irList != null && isNativeDspLoaded) {
                         // Large IR offloaded to avoid blocking MethodChannel (up to 1M taps)
                         val copy = irList.toList() // detach from Dart memory
+                        // The loaded IR replaces whatever preset was prepared, so
+                        // record Custom. Without this the memo in setReverbPreset
+                        // would skip a later re-select of the same ordinal and
+                        // leave the custom IR playing under a room's label.
+                        reverbPreset = REVERB_PRESET_CUSTOM
+                        lastNativeReverbPreset = REVERB_PRESET_CUSTOM
                         safeReverbExecute {
                             try {
                                 val floatArray = FloatArray(copy.size) { copy[it].toFloat() }
@@ -1486,16 +1460,16 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         "hasEqualizer" to (dynamicsSupported || isNativeDspLoaded),
                         "hasNativeDsp" to isNativeDspLoaded,
                         "hasNativeParametricEq" to isNativeDspLoaded,
-                        "hasCrossfeed" to (isNativeDspLoaded && isPcmSourceConnected),
+                        "hasCrossfeed" to isNativeDspLoaded,
                         "hasLookaheadLimiter" to isNativeDspLoaded,
                         "hasConvolutionReverb" to isNativeDspLoaded,
                         "hasSincResampler" to isNativeDspLoaded,
                         "hasDsdDecoder" to isNativeDspLoaded,
-                        "hasHarmonicSaturation" to (isNativeDspLoaded && isPcmSourceConnected),
-                        "hasStereoWidth" to (isNativeDspLoaded && isPcmSourceConnected),
-                        "hasLoudnessContour" to (isNativeDspLoaded && isPcmSourceConnected),
-                        "hasSubCrossover" to (isNativeDspLoaded && isPcmSourceConnected),
-                        "hasDynamicEq" to (isNativeDspLoaded && isPcmSourceConnected),
+                        "hasHarmonicSaturation" to isNativeDspLoaded,
+                        "hasStereoWidth" to isNativeDspLoaded,
+                        "hasLoudnessContour" to isNativeDspLoaded,
+                        "hasSubCrossover" to isNativeDspLoaded,
+                        "hasDynamicEq" to isNativeDspLoaded,
                         "eqBandCount" to if (isNativeDspLoaded) 32 else (if (dynamicsSupported) eqBandCount else 0),
                         "eqCenterFrequencies" to eqCenterFreqs.toList(),
                         "hasAudioEffects" to true,
@@ -1549,28 +1523,27 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                     val preference = call.argument<String>("preference") ?: "native"
                     dspPreference = preference
                     recalculateActiveStages()
-                    // Do not tear down the Android session EQ here. The native
-                    // engine is used by explicit PCM clients, while ExoPlayer's
-                    // output reaches the earbuds through this AudioEffect
-                    // session. Releasing it made the default "native" setting
-                    // silently turn the audible EQ off.
+                    // Do not tear down the Android session EQ here. Both DSP
+                    // paths are audible: the native chain runs inside
+                    // ExoPlayer's audio sink, and the HAL chain runs on the
+                    // output session. Releasing the session EQ made the default
+                    // "native" setting silently turn the audible EQ off.
                     if (isEqEnabled || (isDynamicsEnabled && currentDynamicsPreset != "off")) {
                         buildDynamicsProcessing()
                     }
                     result.success(true)
                 }
 
-                // Truthful pipeline attachment state. The native C++ engine is
-                // configured by this plugin but is not called from
-                // just_audio/ExoPlayer's PCM callback; the AUDIBLE path is the
-                // session-bound AudioEffect chain, so report its health so
-                // Flutter can surface genuine detachment.
+                // Two independent audible paths: the session-bound AudioEffect
+                // chain (isPcmDspAttached) and the native C++ chain that the
+                // vendored just_audio fork splices into ExoPlayer's audio sink
+                // (hasPcmDspPath). Report each one's real health.
                 "getProcessingCapabilities" -> {
                     result.success(
                         mapOf(
                             "isPcmDspAttached" to isEffectPipelineAttached(),
                             "isSessionAttached" to (currentAudioSessionId != 0),
-                            "hasPcmDspPath" to isPcmSourceConnected
+                            "hasPcmDspPath" to isNativeDspLoaded
                         )
                     )
                 }
@@ -1707,20 +1680,20 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                         "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isLimiterEnabled) "Threshold: ${limiterThresholdDb} dB, Lookahead: ${limiterLookaheadMs} ms" else "Disabled"
                     ))
 
-                    // 7. Reverb (Android HAL EnvironmentalReverb)
-                    val revActive = isReverbEnabled && !isBitPerfectBypassActive && halAttached
-                    if (revActive) activeNames.add("Reverb (Preset #$reverbPreset, Wet: ${(reverbWetDry * 100).toInt()}%)")
+                    // 7. Convolution Reverb (Native C++)
+                    val revActive = isReverbEnabled && !isBitPerfectBypassActive && isNativeDspLoaded
+                    if (revActive) activeNames.add("Convolution Reverb (Preset #$reverbPreset, Wet: ${(reverbWetDry * 100).toInt()}%)")
                     stagesList.add(mapOf(
-                        "name" to "Reverb",
-                        "category" to "Android HAL (EnvironmentalReverb)",
-                        "isSupported" to isEffectTypeSupported(AudioEffect.EFFECT_TYPE_ENV_REVERB),
+                        "name" to "Convolution Reverb",
+                        "category" to "Native C++ Engine",
+                        "isSupported" to isNativeDspLoaded,
                         "isEnabled" to isReverbEnabled,
                         "isBypassed" to isBitPerfectBypassActive,
-                        "isDegraded" to (!halAttached && isReverbEnabled),
+                        "isDegraded" to ((autoDegraded and STAGE_REVERB) != 0),
                         "parameters" to mapOf(
                             "preset" to reverbPreset,
                             "wetDryRatio" to reverbWetDry.toDouble(),
-                            "isAttached" to (halReverb != null)
+                            "isCustomIr" to (reverbPreset == REVERB_PRESET_CUSTOM)
                         ),
                         "statusDescription" to if (isBitPerfectBypassActive) "Bypassed by Bit-Perfect" else if (isReverbEnabled) "Preset #$reverbPreset (${(reverbWetDry * 100).toInt()}% Wet)" else "Disabled"
                     ))
@@ -2448,14 +2421,12 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
         try { bassBoost?.release() } catch (_: Exception) {}
         try { dynamicsProcessing?.release() } catch (_: Exception) {}
         try { legacyEqualizer?.release() } catch (_: Exception) {}
-        try { halReverb?.release() } catch (_: Exception) {}
 
         virtualizer = null
         loudnessEnhancer = null
         bassBoost = null
         dynamicsProcessing = null
         legacyEqualizer = null
-        halReverb = null
         cachedSupportedEffects = runCatching { AudioEffect.queryEffects() }.getOrNull()
 
         if (isVirtualizerEnabled || virtualizerStrength > 0) {
@@ -2473,7 +2444,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
 
         buildDynamicsProcessing()
         // Reattach HAL-side effects after session recreate
-        applyHalReverb()
         applyHalLimiter()
     }
 
@@ -2495,7 +2465,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 virtualizerStrength > 0 ||
                 volumeBoostMilliBels > 0 ||
                 bassBoostStrength > 0 ||
-                isReverbEnabled ||
                 isLimiterEnabled
         if (!wantsAnyHalStage) return true
 
@@ -2517,57 +2486,15 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
                 healthy(legacyEqualizer) ||
                 healthy(virtualizer) ||
                 healthy(loudnessEnhancer) ||
-                healthy(bassBoost) ||
-                (halReverb?.let { try { it.id; true } catch (_: Exception) { false } } ?: false)
+                healthy(bassBoost)
     }
 
     // -------------------------------------------------------------------------
     // HAL-bound effect helpers — these create/update Android AudioEffect objects
-    // that ARE in the audio session path (audible, unlike the native C++ engine
-    // which requires a PCM callback that ExoPlayer does not currently provide).
+    // on the ExoPlayer audio session, in parallel with the native C++ chain that
+    // NativeDspAudioProcessor runs inside the sink. Both are audible, so every
+    // stage has exactly one owner (see recalculateActiveStages).
     // -------------------------------------------------------------------------
-
-    /**
-     * EnvironmentalReverb replaces PresetReverb here because PresetReverb is
-     * on/off only and would discard the user's wet/dry fader.
-     * Presets: 0 Studio, 1 Concert Hall, 2 Warm Tube, 3 Plate, 4 Custom IR
-     * (falls back to Studio — a real impulse response needs the PCM path).
-     */
-    private fun applyHalReverb() {
-        if (currentAudioSessionId == 0) return
-        if (!isReverbEnabled) {
-            try { halReverb?.enabled = false } catch (_: Exception) {}
-            return
-        }
-        try {
-            val reverb = halReverb ?: EnvironmentalReverb(0, currentAudioSessionId).also {
-                halReverb = it
-            }
-            // decayTime ms, decayHFRatio permille, density, diffusion, roomLevel mB
-            val shape = when (reverbPreset) {
-                1 -> ReverbShape(2800, 700, 1000, 1000, -900)   // Concert Hall
-                2 -> ReverbShape(1200, 400, 700, 700, -1200)    // Warm Tube
-                3 -> ReverbShape(1600, 800, 1000, 350, -1000)   // Plate
-                else -> ReverbShape(400, 900, 1000, 900, -1500) // Studio / Custom IR
-            }
-            reverb.decayTime = shape.decayMs
-            reverb.decayHFRatio = shape.decayHFRatio.toShort()
-            reverb.density = shape.density.toShort()
-            reverb.diffusion = shape.diffusion.toShort()
-            reverb.roomLevel = shape.roomLevel.toShort()
-            // Wet fader as a linear dB send: 1.0 -> 0 mB (full), 0.0 -> -6000 mB
-            // (inaudible). EnvironmentalReverb accepts up to +2000 mB; never
-            // boost, so the top of the range is unity.
-            reverb.reverbLevel =
-                ((reverbWetDry.coerceIn(0f, 1f) - 1f) * 6000f).toInt().toShort()
-            reverb.enabled = true
-            Log.d(TAG, "HAL reverb applied: preset=$reverbPreset wet=$reverbWetDry decay=${shape.decayMs}ms")
-        } catch (e: Exception) {
-            Log.w(TAG, "applyHalReverb failed: ${e.message}")
-            try { halReverb?.release() } catch (_: Exception) {}
-            halReverb = null
-        }
-    }
 
     /**
      * Wires the user's limiter threshold/release/attack into the
@@ -2590,8 +2517,8 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             for (ch in 0 until CHANNEL_COUNT) {
                 val limiter = dp.getLimiterByChannelIndex(ch)
                 if (isLimiterEnabled) {
-                    // Map lookahead (ms) → attack time (ms). EnvironmentalReverb
-                    // has no lookahead; DynamicsProcessing.Limiter uses attackTime.
+                    // Map lookahead (ms) → attack time (ms): DynamicsProcessing
+                    // has no lookahead, only Limiter.attackTime.
                     limiter.attackTime = limiterLookaheadMs.toFloat().coerceIn(0.1f, 50f)
                     limiter.releaseTime = limiterReleaseMs.toFloat().coerceIn(10f, 2000f)
                     limiter.ratio = 20f           // Effectively brickwall
@@ -2655,14 +2582,6 @@ class AudioEffectsPlugin : FlutterPlugin, MethodCallHandler {
             Log.w(TAG, "Equalizer fallback cleanup error: ${e.message}")
         }
         legacyEqualizer = null
-
-        try {
-            halReverb?.enabled = false
-            halReverb?.release()
-        } catch (e: Exception) {
-            Log.w(TAG, "HAL EnvironmentalReverb cleanup error: ${e.message}")
-        }
-        halReverb = null
 
         cachedSupportedEffects = null
         // Full reset: clear the parameter dedup caches so a subsequent

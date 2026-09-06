@@ -7,6 +7,9 @@ import java.net.URLDecoder
 import java.net.URLEncoder
 import java.util.concurrent.ConcurrentHashMap
 
+internal class UndecipherableSignatureException(playerHash: String) :
+    IllegalStateException("No cached decipher rules for player hash $playerHash")
+
 /**
  * Task 5 — JS Player Decipher & N-Sig Transform Cache.
  *
@@ -57,14 +60,19 @@ internal class JsDecipherCache(
     }
 
     /**
-     * Resolves signature using cached transform rules or basic transform ladder.
+     * Resolves signature using cached transform rules.
+     *
+     * Throws [UndecipherableSignatureException] when no usable rules are cached.
+     * Returning the input untransformed produced a URL that googlevideo answers
+     * with 403, which the block classifier then read as an IP block; failing lets
+     * the caller discard the format and try the next client instead.
      */
     fun decipherSignature(signature: String, playerHash: String = "default"): String {
         val rules = getRules(playerHash)
-        if (rules != null && !rules.isExpired && rules.transformSteps.isNotEmpty()) {
-            return applyTransforms(signature, rules.transformSteps)
+        if (rules == null || rules.isExpired || rules.transformSteps.isEmpty()) {
+            throw UndecipherableSignatureException(playerHash)
         }
-        return signature
+        return applyTransforms(signature, rules.transformSteps)
     }
 
     /**

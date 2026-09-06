@@ -81,9 +81,9 @@ class AudioFeatureRegistry {
   static const reverb = AudioFeatureInfo(
     id: 'reverb',
     title: 'Convolution Reverb',
-    subtitle: 'Studio / Hall / Plate / Custom IR',
+    subtitle: '8 rooms (RT60 0.35–5 s) or custom IR',
     description:
-        'Partitioned convolution (512-frames) with synthetic IRs (RT60 0.35–5 s) or custom impulse. Largest latency (~10 ms). IR synthesis runs off main thread. Disabled during Bit-Perfect.',
+        'Partitioned convolution (512-frame blocks) against a synthesized room impulse — Studio, Room, Chamber, Hall, Concert Hall, Cathedral, Plate, Spring — or an impulse response you load. Largest latency (~10 ms). IR synthesis runs off the main thread. Needs the native DSP path; disabled during Bit-Perfect.',
     conflictsWith: 'Bit-Perfect bypass',
   );
 

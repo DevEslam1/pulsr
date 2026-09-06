@@ -21,7 +21,22 @@ internal class ClientWinnerStore(context: Context) {
         private const val PREFS_NAME = "pulsr_ytm_client_winners"
         private const val KEY_PREFIX_WINNER = "winner_"
         private const val KEY_PREFIX_FAILURES = "failures_"
+        private const val KEY_PREFIX_RECORDED_AT = "recorded_at_"
         private const val MAX_CONSECUTIVE_FAILURES = 2
+
+        // A winner is evidence about the *current* conditions — which client YouTube
+        // was serving during one IP-flagged wave. Without an expiry the store pinned
+        // that client to the front of the chain indefinitely, long after the regular
+        // clients had recovered.
+        private const val WINNER_TTL_MS = 6 * 60 * 60 * 1000L
+
+        // Never worth promoting: these only exist as no-login last resorts and they
+        // hand back low-bitrate or restricted streams, so pinning one to the front
+        // permanently degrades quality for every later track.
+        private val NON_PROMOTABLE = setOf(
+            InnertubeClient.ClientType.ANDROID_TESTSUITE,
+            InnertubeClient.ClientType.TVHTML5_SIMPLY_EMBEDDED_PLAYER,
+        )
 
         const val TRACK_TYPE_MUSIC = "music"
         const val TRACK_TYPE_LONGFORM = "longform"
@@ -37,7 +52,8 @@ internal class ClientWinnerStore(context: Context) {
     }
 
     /**
-     * Returns the cached winning client for [trackType], or null if none is recorded or if it failed too many times.
+     * Returns the cached winning client for [trackType], or null if none is recorded,
+     * it has expired, or it failed too many times.
      */
     @Synchronized
     fun getWinningClient(trackType: String = TRACK_TYPE_MUSIC): InnertubeClient.ClientType? {
@@ -45,6 +61,13 @@ internal class ClientWinnerStore(context: Context) {
         val failures = prefs.getInt(KEY_PREFIX_FAILURES + trackType, 0)
         if (failures >= MAX_CONSECUTIVE_FAILURES) {
             Log.d(TAG, "Evicting winner $clientName for $trackType due to $failures consecutive failures")
+            clearWinner(trackType)
+            return null
+        }
+        val recordedAt = prefs.getLong(KEY_PREFIX_RECORDED_AT + trackType, 0L)
+        val age = System.currentTimeMillis() - recordedAt
+        if (recordedAt <= 0L || age > WINNER_TTL_MS || age < 0L) {
+            Log.d(TAG, "Evicting stale winner $clientName for $trackType (age ${age}ms)")
             clearWinner(trackType)
             return null
         }
@@ -60,9 +83,14 @@ internal class ClientWinnerStore(context: Context) {
      */
     @Synchronized
     fun recordWinningClient(trackType: String = TRACK_TYPE_MUSIC, client: InnertubeClient.ClientType) {
+        if (client in NON_PROMOTABLE) {
+            Log.d(TAG, "Not promoting last-resort client ${client.name} for $trackType")
+            return
+        }
         prefs.edit()
             .putString(KEY_PREFIX_WINNER + trackType, client.name)
             .putInt(KEY_PREFIX_FAILURES + trackType, 0)
+            .putLong(KEY_PREFIX_RECORDED_AT + trackType, System.currentTimeMillis())
             .apply()
         Log.d(TAG, "Recorded winning client ${client.name} for $trackType")
     }
@@ -91,6 +119,7 @@ internal class ClientWinnerStore(context: Context) {
         prefs.edit()
             .remove(KEY_PREFIX_WINNER + trackType)
             .remove(KEY_PREFIX_FAILURES + trackType)
+            .remove(KEY_PREFIX_RECORDED_AT + trackType)
             .apply()
     }
 

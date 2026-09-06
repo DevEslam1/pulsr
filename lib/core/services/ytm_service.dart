@@ -31,6 +31,9 @@ class YtmException implements Exception {
 
   const YtmException(this.code, [this.details, this.traceId]);
 
+  /// A bare `bot` substring also matches "bottleneck", "sabotage" and "robots".
+  static final RegExp _botWord = RegExp(r'\bbots?\b', caseSensitive: false);
+
   YtmBlockSignal? get signal {
     // Prefer the explicit machine code (e.g. native BOT_CHALLENGE with a
     // human message like "All clients LOGIN_REQUIRED"): classifying the free
@@ -38,35 +41,51 @@ class YtmException implements Exception {
     // instead of bot-recovery.
     final explicit = YtmBlockSignal.fromCode(code);
     if (explicit != null) return explicit;
-    return YtmErrorClassifier.classify(
-      details ?? code,
-      traceId,
-    ).signal;
+    return YtmErrorClassifier.classifyCode(code, details, traceId).signal;
   }
 
-  /// Retrying later may work; retrying the rest of the queue now will not.
+  /// The device could not reach YouTube at all. Retrying later may work;
+  /// retrying the rest of the queue now will not.
+  ///
+  /// Deliberately excludes [YtmBlockSignal.ipBlocked]: a 403 is a *response*,
+  /// so the route works and only the identity is refused. Folding the two
+  /// together made every offline blip take the 180s IP-block cooldown.
   bool get isNetwork =>
+      signal == YtmBlockSignal.networkUnavailable ||
       code == 'YTM_NETWORK' ||
       code == 'YTM_TIMEOUT' ||
-      code == 'YTM_OFFLINE' ||
-      signal == YtmBlockSignal.ipBlocked;
+      code == 'YTM_OFFLINE';
 
-  /// YouTube has flagged the IP / client as automated/bot and requires authentication.
+  /// YouTube has flagged the IP / client as automated and wants attestation.
+  ///
+  /// Throttling ([isThrottled]) is not included: callers respond to a bot block
+  /// by minting a fresh poToken and retrying at once, which is the worst
+  /// possible reaction to a 429. A bare `LOGIN_REQUIRED` is not included
+  /// either — that is the normal playabilityStatus of a private or
+  /// members-only track, and treating it as a bot block imposed a 90s global
+  /// cooldown every time one appeared in a queue.
   bool get isBotBlocked =>
       signal == YtmBlockSignal.botChallenge ||
       signal == YtmBlockSignal.poTokenInvalid ||
-      signal == YtmBlockSignal.rateLimited ||
       code == 'BOT_CHALLENGE' ||
       code == 'PO_TOKEN_INVALID' ||
-      code == 'RATE_LIMITED' ||
+      code == 'YTM_PO_TOKEN_INVALID' ||
       code == 'YTM_BOT_BLOCKED' ||
-      code == 'YTM_429' ||
       code == 'YTM_RECAPTCHA' ||
       code == 'RECAPTCHA_REQUIRED' ||
       (details != null &&
-          (details!.contains('bot') ||
-              details!.contains('LOGIN_REQUIRED') ||
+          (_botWord.hasMatch(details!) ||
               details!.contains('Sign in to confirm')));
+
+  /// YouTube is rate-limiting this IP. Waiting helps; rotating identity does not.
+  bool get isThrottled =>
+      signal == YtmBlockSignal.rateLimited ||
+      code == 'RATE_LIMITED' ||
+      code == 'YTM_429';
+
+  /// YouTube answered, but refused this IP / route.
+  bool get isIpBlocked =>
+      signal == YtmBlockSignal.ipBlocked || code == 'IP_BLOCKED';
 
   /// Session has expired or authentication is invalid.
   bool get isAuth =>
@@ -77,7 +96,8 @@ class YtmException implements Exception {
       (details != null && details!.toLowerCase().contains('unauthenticated'));
 
   /// Fatal error where looping / skipping the queue will only worsen the block.
-  bool get isFatal => isNetwork || isDisabled || isBotBlocked || isAuth;
+  bool get isFatal =>
+      isNetwork || isDisabled || isBotBlocked || isThrottled || isAuth;
 
   /// This one video cannot be played, but others still can.
   bool get isUnavailable =>
@@ -129,11 +149,24 @@ class YtmService {
   void _noteBotChallenge(YtmException e) {
     _lastBotChallenge = e;
     // Use extended cooldown for IP-level blocks: these don't resolve by
-    // just waiting a minute, and retrying only deepens the block.
-    final cooldown = (e.isNetwork || e.code == 'IP_BLOCKED')
-        ? _ipBlockCooldown
-        : _botCooldown;
+    // just waiting a minute, and retrying only deepens the block. Keyed off
+    // the parsed signal, not off `isNetwork`, so an offline blip no longer
+    // buys a 3-minute cooldown that outlives the outage.
+    final cooldown = e.isIpBlocked ? _ipBlockCooldown : _botCooldown;
     _botChallengeUntil = DateTime.now().add(cooldown);
+  }
+
+  /// Any successful resolve proves the IP is not blocked, so an active cooldown
+  /// must end: a fixed window kept skipping the native tiers (the only ones
+  /// that produce high-bitrate streams) for minutes after YouTube let us back
+  /// in, and every retry inside the window rethrew the stale challenge.
+  void _noteResolveSuccess() {
+    if (_lastBotChallenge == null &&
+        _botChallengeUntil.millisecondsSinceEpoch == 0) {
+      return;
+    }
+    _botChallengeUntil = DateTime.fromMillisecondsSinceEpoch(0);
+    _lastBotChallenge = null;
   }
 
   /// Test-only: clears bot-cooldown state.
@@ -276,8 +309,13 @@ class YtmService {
         timeout: const Duration(seconds: 5),
       );
       return _available = value ?? false;
-    } on YtmException {
-      return _available = false;
+    } on YtmException catch (e) {
+      // Only a real answer is permanent. A 5s timeout or a transport blip used
+      // to be cached as "no extractor in this build", which disabled the whole
+      // YouTube Music surface for the rest of the process — while the plugin
+      // was there all along and just busy warming up.
+      if (e.isDisabled) return _available = false;
+      return false;
     }
   }
 
@@ -616,13 +654,11 @@ class YtmService {
               try {
                 _tracker?.markStage(PlaybackStage.urlObtained);
               } catch (_) {}
-              urlCache?.put(
-                videoId,
-                directStream.url,
-                quality: quality,
-                userAgent: directStream.userAgent,
-                cookies: directStream.cookies,
-              );
+              // putStream, not put: the entry keeps the real container, MIME and
+              // bitrate. put() alone let a later cache hit rebuild the stream by
+              // guessing them from the URL, which wrote Opus bytes into a .m4a.
+              urlCache?.putStream(directStream, quality: quality);
+              _noteResolveSuccess();
               return directStream;
             }
           }
@@ -640,9 +676,14 @@ class YtmService {
       } else {
         debugPrint('[YTM_SERVICE] Direct account stream resolution fallback: $e');
       }
-      // If the account tier hit an IP-level block, activate cooldown so the
-      // native tier doesn't burn through 9 more clients for the same result.
-      if (!inBotCooldown && e is YtmException && (e.isBotBlocked || e.isNetwork)) {
+      // If the account tier hit an IP-level block or a bot challenge, activate
+      // cooldown so the native tier doesn't burn through 9 more clients for the
+      // same result. A transport failure is excluded on purpose: the next tier
+      // may well have a route (remote backend), and cooling down on an offline
+      // blip is what made a one-second signal drop look like an IP block.
+      if (!inBotCooldown &&
+          e is YtmException &&
+          (e.isBotBlocked || e.isThrottled || e.isIpBlocked)) {
         _noteBotChallenge(e);
       }
     }
@@ -668,13 +709,8 @@ class YtmService {
         try {
           _tracker?.markStage(PlaybackStage.urlObtained);
         } catch (_) {}
-        urlCache?.put(
-          videoId,
-          stream.url,
-          quality: quality,
-          userAgent: stream.userAgent,
-          cookies: stream.cookies,
-        );
+        urlCache?.putStream(stream, quality: quality);
+        _noteResolveSuccess();
         return stream;
       }
     } catch (e) {
@@ -687,7 +723,7 @@ class YtmService {
       // retry loop would hold it open forever (fixed window from first hit).
       if (!inBotCooldown &&
           e is YtmException &&
-          (e.isBotBlocked || e.code == 'PO_TOKEN_INVALID')) {
+          (e.isBotBlocked || e.isThrottled || e.isIpBlocked)) {
         _noteBotChallenge(e);
       }
     }
@@ -712,13 +748,9 @@ class YtmService {
             try {
               _tracker?.markStage(PlaybackStage.urlObtained);
             } catch (_) {}
-            urlCache?.put(
-              videoId,
-              remoteStream.url,
-              quality: quality,
-              userAgent: remoteStream.userAgent,
-              cookies: remoteStream.cookies,
-            );
+            urlCache?.putStream(remoteStream, quality: quality);
+            // The remote backend resolving does not clear a YouTube-side
+            // cooldown: it proves the *backend's* IP is fine, not this device's.
             return remoteStream;
           }
         }
@@ -726,7 +758,7 @@ class YtmService {
     } catch (e) {
       debugPrint(
           '[YTM_SERVICE] Remote yt-dlp backend stream resolution fallback: $e');
-      if (e is YtmException && (e.isBotBlocked || e.code == 'RATE_LIMITED')) {
+      if (e is YtmException && (e.isBotBlocked || e.isThrottled)) {
         rethrow;
       }
       firstError ??= e;
@@ -767,7 +799,21 @@ class YtmService {
         }
         await Future.delayed(Duration(milliseconds: 800 * (1 << attempt)));
       } on PlatformException catch (e) {
-        final codeUpper = e.code.toUpperCase();
+        // The native side packages `{signal, traceId}` in `details` for every
+        // InnertubeException. Both used to be dropped on the floor, so a
+        // structured verdict degraded into a substring guess at the message and
+        // the trace id never reached the log line that was meant to carry it.
+        final detailsMap = e.details is Map ? e.details as Map : null;
+        final signalCode = detailsMap?['signal'] as String?;
+        final traceId = detailsMap?['traceId'] as String?;
+        // Prefer whichever of the two the Dart enum actually recognises: the
+        // plugin sets code = signal.code for Innertube failures, but a wrapper
+        // higher up can replace the code with a generic one.
+        final resolvedCode = YtmBlockSignal.fromCode(e.code) != null
+            ? e.code
+            : (signalCode ?? e.code);
+
+        final codeUpper = resolvedCode.toUpperCase();
         // Feed 429s into the shared Dart limiter so search/resolve/download
         // all cool down together instead of each retrying against the same IP.
         if (codeUpper.contains('429') ||
@@ -778,23 +824,24 @@ class YtmService {
         // A full native chain already tried every client: blindly replaying
         // the whole chain 2x more triples thread-pool load and turns one
         // IP-flag into cascading timeouts. Fail fast to the next engine.
-        final isFatalCode = e.code == 'YTM_DISABLED' ||
-            e.code == 'YTM_UNSUPPORTED' ||
-            e.code == 'BOT_CHALLENGE' ||
-            e.code == 'YTM_BOT_BLOCKED' ||
-            e.code == 'YTM_RECAPTCHA' ||
-            e.code == 'PO_TOKEN_INVALID' ||
-            e.code == 'YTM_PO_TOKEN_INVALID' ||
-            e.code == 'LOGIN_REQUIRED' ||
-            e.code == 'YTM_AUTH';
+        final failure = YtmException(resolvedCode, e.message, traceId);
+        final isFatalCode = failure.isDisabled ||
+            failure.isBotBlocked ||
+            failure.isThrottled ||
+            failure.isAuth;
 
         if (attempt == maxRetries || isFatalCode) {
-          ErrorLogger.log('YTM call failed: ${e.code} ${e.message}',
+          ErrorLogger.log(
+              'YTM call failed: ${failure.code}'
+              '${traceId == null ? '' : ' [trace=$traceId]'} ${e.message}',
               category: 'YTM');
-          if (e.code == 'LOGIN_REQUIRED' || e.code == 'YTM_AUTH') {
+          // Only an unambiguous auth verdict pings the UI: SIGN_IN_REQUIRED is
+          // also what a private or members-only track returns, and prompting a
+          // re-login for one of those trains the user to ignore the prompt.
+          if (resolvedCode == 'LOGIN_REQUIRED' || resolvedCode == 'YTM_AUTH') {
             notifyAuthExpired();
           }
-          throw YtmException(e.code, e.message);
+          throw failure;
         }
         await Future.delayed(Duration(milliseconds: 500 * (1 << attempt)));
       }

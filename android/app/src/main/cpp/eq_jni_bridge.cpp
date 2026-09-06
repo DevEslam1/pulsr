@@ -330,47 +330,6 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetSincResamplerRates(
     });
 }
 
-static inline jint processPcmAudioInternal(JNIEnv* env, jfloatArray jBuffer, jint frameCount, jint channels) {
-    if (!jBuffer || frameCount <= 0 || channels <= 0 || channels > 8) {
-        return 0;
-    }
-    jsize arrayLen = env->GetArrayLength(jBuffer);
-    jsize requiredLen = static_cast<jsize>(frameCount) * channels;
-    if (arrayLen < requiredLen) {
-        frameCount = static_cast<jint>(arrayLen / channels);
-        if (frameCount <= 0) return 0;
-    }
-
-    jfloat* javaBuffer = env->GetFloatArrayElements(jBuffer, nullptr);
-    if (!javaBuffer) {
-        return 0;
-    }
-
-    try {
-        int processedFrames = AudioDspEngine::instance().processInterleaved(
-            javaBuffer,
-            frameCount,
-            channels
-        );
-        env->ReleaseFloatArrayElements(jBuffer, javaBuffer, 0);
-        return static_cast<jint>(processedFrames);
-    } catch (const std::exception& e) {
-        LOGE("processPcmAudio: exception - %s", e.what());
-        env->ReleaseFloatArrayElements(jBuffer, javaBuffer, JNI_ABORT);
-        return 0;
-    } catch (...) {
-        LOGE("processPcmAudio: unknown exception");
-        env->ReleaseFloatArrayElements(jBuffer, javaBuffer, JNI_ABORT);
-        return 0;
-    }
-}
-
-JNIEXPORT jint JNICALL
-Java_com_pulsr_music_AudioEffectsPlugin_nativeProcessAudio(
-        JNIEnv* env, jobject /* thiz */, jfloatArray buffer, jint frames, jint channels) {
-    return processPcmAudioInternal(env, buffer, frames, channels);
-}
-
 JNIEXPORT jfloatArray JNICALL
 Java_com_pulsr_music_AudioEffectsPlugin_nativeDecodeDsd(
         JNIEnv* env, jobject /* thiz */,
@@ -561,15 +520,6 @@ Java_com_pulsr_music_AudioEffectsPlugin_nativeSetDynamicEqBand(
         band.maxCutDb = maxCutDb;
         band.enabled = enabled;
     });
-}
-
-// ---- PCM Audio Processing for per-frame DSP ----
-
-JNIEXPORT jint JNICALL
-Java_com_pulsr_music_AudioEffectsPlugin_nativeProcessPcmAudio(
-        JNIEnv* env, jobject /* thiz */,
-        jfloatArray jBuffer, jint frameCount, jint channels) {
-    return processPcmAudioInternal(env, jBuffer, frameCount, channels);
 }
 
 // ---- ExoPlayer Media3 NativeDspAudioProcessor In-Stream Direct Buffer Bridge ----

@@ -81,5 +81,56 @@ void main() {
         expect(waited, greaterThan(const Duration(seconds: 8)));
       });
     });
+
+    test('an outsized Retry-After is capped, not honoured verbatim', () {
+      fakeAsync((async) {
+        YtmRateLimiter.debugReset();
+        final limiter = YtmRateLimiter.shared;
+
+        // The window is persisted, so honouring an hour-long hint from the
+        // network froze every native request for an hour across restarts.
+        limiter.onRateLimited(3600);
+
+        expect(limiter.cooldownRemaining,
+            lessThan(const Duration(seconds: 302)));
+        expect(limiter.cooldownRemaining, greaterThan(const Duration(minutes: 4)));
+        async.flushTimers();
+      });
+    });
+  });
+
+  group('YtmRateLimiter backend bucket', () {
+    test('a backend 429 does not freeze the native YouTube path', () {
+      fakeAsync((async) {
+        YtmRateLimiter.debugReset();
+        final limiter = YtmRateLimiter.shared;
+
+        limiter.onBackendRateLimited(60);
+
+        expect(limiter.isBackendCoolingDown, isTrue);
+        // The backend is a different IP; its quota says nothing about how
+        // YouTube sees this device. Freezing both made the fallback take the
+        // primary down with it.
+        expect(limiter.isCoolingDown, isFalse);
+        async.flushTimers();
+      });
+    });
+
+    test('onBackendSuccess does not cancel an active backend window', () {
+      fakeAsync((async) {
+        YtmRateLimiter.debugReset();
+        final limiter = YtmRateLimiter.shared;
+
+        limiter.onBackendRateLimited(60);
+        // A request already in flight when the 429 landed completes after it,
+        // and used to wipe the whole Retry-After window.
+        limiter.onBackendSuccess();
+
+        expect(limiter.isBackendCoolingDown, isTrue);
+        expect(limiter.backendCooldownRemaining,
+            greaterThan(const Duration(seconds: 30)));
+        async.flushTimers();
+      });
+    });
   });
 }

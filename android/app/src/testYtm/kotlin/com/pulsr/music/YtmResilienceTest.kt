@@ -11,7 +11,7 @@ import java.net.Proxy
 class YtmResilienceTest {
 
     @Test
-    fun testAll8BlockSignals() {
+    fun testAllBlockSignals() {
         // 1. RateLimited
         val sig1 = YtmBlockSignal.parse(429, "Too Many Requests")
         assertEquals(YtmBlockSignal.RateLimited, sig1)
@@ -59,6 +59,17 @@ class YtmResilienceTest {
         }
         val sig8 = YtmBlockSignal.parse(200, "error", playabilityGone)
         assertEquals(YtmBlockSignal.VideoGone, sig8)
+
+        // 9. NetworkUnavailable is a transport verdict, not a parsed response:
+        // parse() only ever sees a body that actually arrived, so an offline blip
+        // must reach Dart through the exception classifier instead of being
+        // laundered into RateLimited/IpBlocked here.
+        assertEquals("YTM_NETWORK", YtmBlockSignal.NetworkUnavailable.code)
+
+        // Every signal needs a distinct code: Dart keys its recovery strategy off
+        // the string, so a collision silently merges two failure modes.
+        val codes = YtmBlockSignal.values().map { it.code }
+        assertEquals("Block signal codes must be unique", codes.size, codes.toSet().size)
     }
 
     @Test

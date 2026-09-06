@@ -157,6 +157,63 @@ class YtmStream {
     return DateTime.now().add(threshold).isAfter(deadline);
   }
 
+  /// Epoch millis stamped on a googlevideo URL, or null if it carries no stamp.
+  ///
+  /// Every playable URL carries one, as `?expire=<epoch-seconds>` or as an
+  /// `/expire/<epoch-seconds>/` path segment. Not every producer of a
+  /// [YtmStream] fills [expiresAt] though — the NewPipe fallback path and the
+  /// remote backend both omit it — and with it null `isExpired` and
+  /// `isExpiringSoon` answer false forever, so a dead URL is served as fresh.
+  static int? expiryFromUrl(String url) {
+    try {
+      final uri = Uri.parse(url);
+      var raw = uri.queryParameters['expire'];
+      if (raw == null) {
+        final segments = uri.pathSegments;
+        final index = segments.indexOf('expire');
+        if (index >= 0 && index + 1 < segments.length) {
+          raw = segments[index + 1];
+        }
+      }
+      final epochSeconds = int.tryParse(raw ?? '');
+      if (epochSeconds != null && epochSeconds > 0) {
+        return epochSeconds * 1000;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  /// This stream with a trustworthy [expiresAt].
+  ///
+  /// Not every producer fills it — the NewPipe fallback and the remote backend
+  /// both omit it — and with it null, [isExpired] and [isExpiringSoon] answer
+  /// false forever, so a dead URL is handed out as fresh and the download's
+  /// proactive re-resolve never fires. A value that is plainly epoch *seconds*
+  /// (anything before 1973 in millis) is scaled up rather than believed, since
+  /// read as millis it would instead mark every stream permanently expired.
+  YtmStream withResolvedExpiry() {
+    var stamp = expiresAt;
+    if (stamp != null && stamp > 0 && stamp < 100000000000) {
+      stamp *= 1000;
+    }
+    stamp ??= expiryFromUrl(url);
+    if (stamp == expiresAt) return this;
+    return YtmStream(
+      videoId: videoId,
+      url: url,
+      mimeType: mimeType,
+      container: container,
+      bitrateKbps: bitrateKbps,
+      duration: duration,
+      title: title,
+      artist: artist,
+      artworkUrl: artworkUrl,
+      userAgent: userAgent,
+      cookies: cookies,
+      expiresAt: stamp,
+    );
+  }
+
   static YtmStream? fromChannel(Map<Object?, Object?> map) {
     final videoId = map['videoId'] as String?;
     final url = map['url'] as String?;
@@ -176,8 +233,12 @@ class YtmStream {
           : null,
       userAgent: map['userAgent'] as String?,
       cookies: map['cookies'] as String?,
-      expiresAt: (map['expiresAt'] as num?)?.toInt(),
-    );
+      expiresAt: (map['expiresAt'] as num?)?.toInt() ?? expiryFromUrl(url),
+      // The native side is free to send its stamp in either unit — NewPipe reads
+      // `expire` straight off the URL, which is epoch *seconds*. Read as millis
+      // that is January 1971, so every stream would be born expired and the URL
+      // cache would refuse to store it.
+    ).withResolvedExpiry();
   }
 
   @override

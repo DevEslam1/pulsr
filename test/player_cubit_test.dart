@@ -12,6 +12,7 @@ import 'package:pulsr/data/scanner/media_scanner_service.dart';
 import 'package:pulsr/domain/models/audio_effects_config.dart';
 import 'package:pulsr/domain/models/eq_preset.dart';
 import 'package:pulsr/domain/models/headphone_profile.dart';
+import 'package:pulsr/domain/models/reverb_preset.dart';
 import 'package:pulsr/domain/usecases/toggle_favorite_usecase.dart';
 import 'package:pulsr/features/player/cubit/player_cubit.dart';
 import 'package:pulsr/features/player/cubit/player_state.dart';
@@ -849,7 +850,9 @@ void main() {
         await cubit.setReverb(true, preset: 2, wetDry: 0.35);
         expect(cubit.state.isReverbEnabled, isTrue);
         await cubit.loadCustomImpulseResponse([0.1, 0.2, 0.3]);
-        expect(cubit.state.reverbPreset, equals(4));
+        // ReverbPreset.custom — the one ordinal the native side will not
+        // overwrite with a synthesized IR.
+        expect(cubit.state.reverbPreset, equals(ReverbPreset.custom.wireValue));
         await cubit.setStereoBalance(0.2);
         expect(cubit.state.stereoBalance, equals(0.2));
         await cubit.setMonoMix(true);

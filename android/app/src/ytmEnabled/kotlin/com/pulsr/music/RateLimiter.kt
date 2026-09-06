@@ -62,6 +62,11 @@ class RateLimiter(
     private val lastSuccessTimestamp = AtomicLong(0L)
     private val consecutiveThrottles = AtomicInteger(0)
 
+    // Start of the current uninterrupted run of successful requests. Zeroed by
+    // [onRateLimited] so the multiplier only decays after genuinely clean
+    // traffic, not after ten minutes of being blocked.
+    private val cleanSinceTimestamp = AtomicLong(0L)
+
     private val lock = ReentrantLock()
     private val condition = lock.newCondition()
 
@@ -84,28 +89,37 @@ class RateLimiter(
 
     /**
      * Acquires permit for [bucket], honoring concurrency cap and pacing floors.
+     *
+     * Returns true when a global permit is held by the caller — the caller must
+     * then release it exactly once. Returns false when the wait was interrupted,
+     * in which case no permit is held and the caller must not release one.
      */
-    fun acquirePermit(bucket: Bucket = Bucket.PLAYER) {
+    fun acquirePermit(bucket: Bucket = Bucket.PLAYER): Boolean {
         // 1. Global in-flight concurrency limiter
-        globalSemaphore.acquire()
+        try {
+            globalSemaphore.acquire()
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+            return false
+        }
 
         while (true) {
             val now = clock.elapsedRealtime()
             val backoffUntil = backoffUntilTimestamp.get()
 
             if (now < backoffUntil) {
-                val sleepTime = backoffUntil - now
+                // Per-waiter jitter: without it every parked caller wakes in the
+                // same millisecond against a freshly refilled bucket, firing a
+                // burst the instant a long ban lifts.
+                val sleepTime = backoffUntil - now + Random.nextLong(0L, 2000L)
                 if (sleepTime > 0) {
                     lock.lock()
                     try {
                         condition.await(sleepTime, TimeUnit.MILLISECONDS)
                     } catch (_: InterruptedException) {
-                        // Release the global permit: without this, 8
-                        // interrupted acquires (e.g. cancelled hedges) stall
-                        // the limiter permanently.
                         Thread.currentThread().interrupt()
                         globalSemaphore.release()
-                        return
+                        return false
                     } finally {
                         lock.unlock()
                     }
@@ -115,10 +129,13 @@ class RateLimiter(
 
             lock.lock()
             try {
-                // Check clean traffic decay (10 minutes clean decays multiplier)
-                val lastSuccess = lastSuccessTimestamp.get()
-                if (lastSuccess > 0 && (now - lastSuccess) > 600_000L) {
+                // Decay the multiplier only after a sustained clean run. Keying
+                // this off "no success for 10 minutes" would reset the backoff
+                // in the middle of a block, which is when it is needed most.
+                val cleanSince = cleanSinceTimestamp.get()
+                if (cleanSince > 0 && consecutiveThrottles.get() == 0 && (now - cleanSince) > CLEAN_DECAY_MS) {
                     adaptiveMultiplier.set(1)
+                    cleanSinceTimestamp.set(now)
                 }
 
                 val state = bucketStates[bucket] ?: BucketState(bucket, bucket.maxTokens.toDouble(), now).also {
@@ -142,7 +159,7 @@ class RateLimiter(
                         } catch (_: InterruptedException) {
                             Thread.currentThread().interrupt()
                             globalSemaphore.release()
-                            return
+                            return false
                         }
                         continue
                     }
@@ -151,7 +168,7 @@ class RateLimiter(
                 if (state.availableTokens >= 1.0) {
                     state.availableTokens -= 1.0
                     state.lastRequest = now
-                    return
+                    return true
                 }
 
                 val waitTimeMs = ((1.0 - state.availableTokens) / bucket.refillPerSecond * 1000.0).toLong().coerceIn(50L, 500L)
@@ -160,7 +177,7 @@ class RateLimiter(
                 } catch (_: InterruptedException) {
                     Thread.currentThread().interrupt()
                     globalSemaphore.release()
-                    return
+                    return false
                 }
             } finally {
                 lock.unlock()
@@ -192,16 +209,33 @@ class RateLimiter(
         }
 
         val nowRealtime = clock.elapsedRealtime()
-        val backoffUntil = nowRealtime + delayMs
-        backoffUntilTimestamp.set(backoffUntil)
+        val candidateBackoff = nowRealtime + delayMs
+        // Never shorten an active window: a `Retry-After: 3` arriving mid-ban
+        // must not cut a 15 minute cooldown down to 3 seconds.
+        val backoffUntil = backoffUntilTimestamp.updateAndGet { existing ->
+            if (existing > candidateBackoff) existing else candidateBackoff
+        }
+        val effectiveDelayMs = (backoffUntil - nowRealtime).coerceAtLeast(delayMs)
 
         // Persist to prefs
-        val wallBackoffUntil = clock.currentTimeMillis() + delayMs
+        val wallBackoffUntil = clock.currentTimeMillis() + effectiveDelayMs
         prefs?.edit()?.putLong(KEY_BACKOFF_UNTIL, wallBackoffUntil)?.apply()
 
-        // Drain tokens
-        bucketStates.values.forEach { it.availableTokens = 0.0 }
-        return delayMs
+        // Drain tokens. `lastRefill` must move with them, otherwise refill is
+        // purely time-based and the next acquire immediately credits the whole
+        // backoff window back as tokens, making the drain a no-op.
+        lock.lock()
+        try {
+            val drainAt = nowRealtime
+            bucketStates.values.forEach {
+                it.availableTokens = 0.0
+                it.lastRefill = drainAt
+            }
+        } finally {
+            lock.unlock()
+        }
+        cleanSinceTimestamp.set(0L)
+        return effectiveDelayMs
     }
 
     /**
@@ -209,7 +243,9 @@ class RateLimiter(
      */
     fun onSuccess() {
         consecutiveThrottles.set(0)
-        lastSuccessTimestamp.set(clock.elapsedRealtime())
+        val now = clock.elapsedRealtime()
+        lastSuccessTimestamp.set(now)
+        cleanSinceTimestamp.compareAndSet(0L, now)
         prefs?.edit()?.remove(KEY_BACKOFF_UNTIL)?.apply()
     }
 
@@ -222,6 +258,7 @@ class RateLimiter(
     companion object {
         private const val PREFS_NAME = "ytm_ratelimiter_prefs"
         private const val KEY_BACKOFF_UNTIL = "key_backoff_until"
+        private const val CLEAN_DECAY_MS = 600_000L
 
         val shared: RateLimiter by lazy { RateLimiter() }
     }

@@ -9,6 +9,7 @@ import '../../core/utils/platform_capabilities.dart';
 import '../../domain/models/audio_effects_config.dart';
 import '../../domain/models/eq_preset.dart';
 import '../../domain/models/headphone_profile.dart';
+import '../../domain/models/reverb_preset.dart';
 import 'audio_effects_channel.dart';
 import 'headphone_profiles_repository.dart';
 
@@ -67,8 +68,10 @@ class EqualizerManager {
   double compressorMakeupGainDb = 0.0;
 
   bool isReverbEnabled = false;
-  int reverbPreset =
-      0; // 0=Studio, 1=Concert Hall, 2=Warm Tube, 3=Plate, 4=Custom IR
+
+  /// Wire value of a [ReverbPreset] — the ordinal the native convolution
+  /// reverb synthesizes an impulse response for.
+  int reverbPreset = ReverbPreset.studio.wireValue;
   double reverbWetDry = 0.20;
 
   double stereoBalance = 0.0; // -1.0 to +1.0
@@ -232,7 +235,15 @@ class EqualizerManager {
 
       isReverbEnabled =
           prefs.getBool(PrefsKeys.convolutionReverbEnabled) ?? false;
-      reverbPreset = prefs.getInt(PrefsKeys.convolutionReverbPreset) ?? 0;
+      // The impulse response itself is not persisted, so a stored `custom`
+      // would restore reverb with no IR at all. Fall back to the default room.
+      final storedReverb = ReverbPreset.fromWireValue(
+          prefs.getInt(PrefsKeys.convolutionReverbPreset) ??
+              ReverbPreset.studio.wireValue);
+      reverbPreset = (storedReverb == ReverbPreset.custom
+              ? ReverbPreset.studio
+              : storedReverb)
+          .wireValue;
       reverbWetDry = prefs.getDouble(PrefsKeys.convolutionReverbWetDry) ?? 0.20;
 
       stereoBalance = prefs.getDouble(PrefsKeys.stereoBalance) ?? 0.0;
@@ -1123,7 +1134,9 @@ class EqualizerManager {
     if (PlatformCapabilities.isAndroid) {
       await _effectsChannel.loadImpulseResponse(irSamples);
       isReverbEnabled = true;
-      reverbPreset = 4; // Custom
+      // Must be `custom`: any synthesizable ordinal makes the native side
+      // build its own IR on the next re-apply and discard the loaded one.
+      reverbPreset = ReverbPreset.custom.wireValue;
       await _effectsChannel.setReverbEnabled(true);
     }
     _debouncedSavePreferences();

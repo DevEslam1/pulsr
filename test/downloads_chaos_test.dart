@@ -67,22 +67,54 @@ void main() {
   });
 
   test('orphan .part reclaimer does not delete active paused parts', () {
-    // Simulates cleanOrphanPartFiles filter: paused task's ytdl_vid.part must be preserved
-    final activeNames = {'ytdl_vid_1.part', 'ytdl_vid_2.part'};
+    // Mirrors the cleanOrphanPartFiles filter, which protects by *video id*, not
+    // by exact file name. The names on disk carry the container extension, so the
+    // caller cannot spell them: a paused `vid_1` leaves `ytdl_vid_1.m4a.part`,
+    // its `.partN` chunk siblings and a `.parts` stamp behind, and the artwork
+    // fetch leaves `ytdl_art_vid_1.jpg`. The old whitelist named
+    // `ytdl_vid_1.part`, matched nothing, and the resume restarted from zero.
+    final protectedIds = {'vid_1', 'vid_2'};
     final allFiles = [
-      'ytdl_vid_1.part',
-      'ytdl_vid_2.part',
-      'ytdl_vid_3.part',
-      'ytdl_vid_3.part0',
-      'other.tmp'
+      'ytdl_vid_1.m4a.part',
+      'ytdl_vid_1.m4a.part0',
+      'ytdl_vid_1.parts',
+      'ytdl_art_vid_1.jpg',
+      'ytdl_vid_2.webm.part',
+      'ytdl_vid_3.m4a.part',
+      'ytdl_vid_3.m4a.part0',
+      'other.tmp',
     ];
     final orphanDeletion = allFiles
         .where((f) =>
-            (f.startsWith('ytdl_') || f.contains('.part')) &&
-            !activeNames.contains(f))
+            f.startsWith('ytdl_') &&
+            !protectedIds.any((id) =>
+                f.startsWith('ytdl_$id.') || f.startsWith('ytdl_art_$id.')))
         .toList();
-    expect(orphanDeletion, contains('ytdl_vid_3.part'));
-    expect(orphanDeletion, isNot(contains('ytdl_vid_1.part')));
+    expect(orphanDeletion, ['ytdl_vid_3.m4a.part', 'ytdl_vid_3.m4a.part0']);
+  });
+
+  test('a targeted delete is scoped to the id, not to a prefix of it', () {
+    // `path.contains('ytdl_$videoId')` had no name boundary, so removing the
+    // download `abc` also removed everything belonging to `abcdef`.
+    const videoId = 'abc';
+    final files = [
+      'ytdl_abc.m4a',
+      'ytdl_abc.m4a.part',
+      'ytdl_art_abc.jpg',
+      'ytdl_abcdef.m4a',
+      'ytdl_art_abcdef.jpg',
+    ];
+    final deleted = files
+        .where((f) =>
+            f.startsWith('ytdl_$videoId.') || f.startsWith('ytdl_art_$videoId.'))
+        .toList();
+    expect(deleted, ['ytdl_abc.m4a', 'ytdl_abc.m4a.part', 'ytdl_art_abc.jpg']);
+    // What the old boundary-less predicate did instead: reached into another
+    // download's files and still missed this one's artwork.
+    final oldSweep =
+        files.where((f) => f.contains('ytdl_$videoId')).toList();
+    expect(oldSweep, contains('ytdl_abcdef.m4a'));
+    expect(oldSweep, isNot(contains('ytdl_art_abc.jpg')));
   });
 
   test('resume must verify 206 not 200 append corruption', () {

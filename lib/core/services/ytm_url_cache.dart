@@ -137,12 +137,26 @@ class YtmUrlCache {
     final key = _buildKey(videoId, quality);
     final now = _clock.now();
 
-    // Determine expiration timestamp
-    DateTime computedExpiry = explicitExpiry ?? _parseUrlExpiry(url, now) ?? now.add(_ttl);
-    // Cap at now + ttl
-    final maxAllowedExpiry = now.add(_ttl);
-    if (computedExpiry.isAfter(maxAllowedExpiry)) {
-      computedExpiry = maxAllowedExpiry;
+    // Earliest known death wins, capped at now + ttl. The URL's own `expire`
+    // stamp used to be ignored whenever an explicitExpiry was supplied, and a
+    // stamp that had already passed was reported as "no stamp at all" — so a
+    // dead URL was handed the full 4-hour default TTL and every later read
+    // served it happily until googlevideo answered 403.
+    final stampExpiry = _parseUrlExpiryStamp(url)?.subtract(expirySafetyMargin);
+    final candidates = <DateTime>[
+      now.add(_ttl),
+      if (explicitExpiry != null) explicitExpiry,
+      if (stampExpiry != null) stampExpiry,
+    ];
+    final computedExpiry =
+        candidates.reduce((a, b) => a.isBefore(b) ? a : b);
+
+    if (!computedExpiry.isAfter(now)) {
+      // Already expired, or inside the safety margin: caching it would only
+      // re-arm a stale entry. Drop whatever was stored under this key so the
+      // next read misses and re-resolves instead of reusing a dead URL.
+      _cache.remove(key);
+      return;
     }
 
     final entry = YtmUrlCacheEntry(
@@ -203,19 +217,29 @@ class YtmUrlCache {
   /// Current number of entries in the cache.
   int get length => _cache.length;
 
-  /// Parses YouTube stream URL `expire` query parameter if present.
-  DateTime? _parseUrlExpiry(String url, DateTime now) {
+  /// Absolute expiry stamped on a googlevideo URL, or null when it carries none.
+  ///
+  /// The stamp is served either as a query parameter (`?expire=1712345678`) or
+  /// as a path segment (`/expire/1712345678/`); reading only the query form let
+  /// path-form URLs look stamp-less and take the full default TTL.
+  ///
+  /// A stamp in the past is returned as-is rather than as null: "no stamp" and
+  /// "already dead" must not collapse into the same answer, or the caller
+  /// cannot tell a fresh URL from an expired one.
+  DateTime? _parseUrlExpiryStamp(String url) {
     try {
       final uri = Uri.parse(url);
-      final expireParam = uri.queryParameters['expire'];
-      if (expireParam != null) {
-        final epochSeconds = int.tryParse(expireParam);
-        if (epochSeconds != null && epochSeconds > 0) {
-          final expiresAt = DateTime.fromMillisecondsSinceEpoch(epochSeconds * 1000);
-          // Subtract safety margin (5 min) to prevent near-expiry stalls
-          final safeExpiry = expiresAt.subtract(expirySafetyMargin);
-          return safeExpiry.isAfter(now) ? safeExpiry : null;
+      var expireParam = uri.queryParameters['expire'];
+      if (expireParam == null) {
+        final segments = uri.pathSegments;
+        final index = segments.indexOf('expire');
+        if (index >= 0 && index + 1 < segments.length) {
+          expireParam = segments[index + 1];
         }
+      }
+      final epochSeconds = int.tryParse(expireParam ?? '');
+      if (epochSeconds != null && epochSeconds > 0) {
+        return DateTime.fromMillisecondsSinceEpoch(epochSeconds * 1000);
       }
     } catch (_) {}
     return null;

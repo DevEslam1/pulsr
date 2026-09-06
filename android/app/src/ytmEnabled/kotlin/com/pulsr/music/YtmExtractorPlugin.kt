@@ -67,7 +67,10 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             val channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_NAME)
             plugin.channel = channel
             channel.setMethodCallHandler(plugin)
-            context?.let { PoTokenManager.init(it) }
+            // Off the main thread: the first init decrypts the persisted poToken via
+            // EncryptedSharedPreferences, which is keystore-backed disk I/O and ran
+            // during engine attach.
+            context?.let { ctx -> plugin.executor.execute { runCatching { PoTokenManager.init(ctx) } } }
             return plugin
         }
     }
@@ -94,6 +97,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
 
             if (appContext != null) {
                 PoTokenManager.init(appContext)
+                RateLimiter.shared.initPrefs(appContext)
                 YoutubeStreamExtractor.setPoTokenProvider(PoTokenProviderImpl(appContext))
             } else {
                 Log.w(TAG, "No context available during NewPipe initialization")
@@ -144,8 +148,10 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 }
             }
             "invalidatePoToken" -> {
-                PoTokenManager.invalidate()
-                result.success(true)
+                runOffMainThread(result) {
+                    PoTokenManager.invalidate()
+                    true
+                }
             }
             "isVpnConnected" -> {
                 val ctx = context?.applicationContext
@@ -154,21 +160,30 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             }
             "preWarm" -> {
                 val ctx = context?.applicationContext
-                if (ctx != null) {
-                    ensureExtractorReady()
+                if (ctx == null) {
+                    result.success(true)
+                    return
+                }
+                runOffMainThread(result) {
                     ClientCapabilityMatrix.init(ctx)
                     PoTokenManager.preWarm(ctx)
+                    true
                 }
-                result.success(true)
             }
             "resetIdentities" -> {
                 val ctx = context?.applicationContext
-                if (ctx != null) {
+                if (ctx == null) {
+                    result.success(true)
+                    return
+                }
+                // Deliberately does not touch cookies: this resets the anti-block
+                // identity (poToken + fingerprint) to escape a block, and wiping the
+                // cookie jar here silently signed the user out as a side effect.
+                runOffMainThread(result) {
                     PoTokenManager.invalidate()
                     FingerprintStore.resetFingerprint(ctx)
-                    YtmCookieStore.getInstance(ctx).clearCookies()
+                    true
                 }
-                result.success(true)
             }
             "getLimitedMode" -> {
                 result.success(PoTokenManager.isLimitedMode)
@@ -235,21 +250,28 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
             }
             "getCookies" -> {
                 val ctx = context
-                if (ctx != null) {
-                    val cookieStore = YtmCookieStore.getInstance(ctx)
-                    val merged = cookieStore.readFromCookieManager() ?: cookieStore.getMergedCookieHeader()
-                    result.success(merged)
-                } else {
+                if (ctx == null) {
                     result.success(null)
+                    return
+                }
+                // Off the platform thread: the first touch builds an
+                // EncryptedSharedPreferences, which hits the keystore.
+                runOffMainThread(result) {
+                    val cookieStore = YtmCookieStore.getInstance(ctx)
+                    cookieStore.readFromCookieManager() ?: cookieStore.getMergedCookieHeader()
                 }
             }
             "setCookies" -> {
                 val cookies = call.argument<String>("cookies")
                 val ctx = context
-                if (ctx != null) {
-                    YtmCookieStore.getInstance(ctx).setCookies(cookies ?: "")
+                if (ctx == null) {
+                    result.success(true)
+                    return
                 }
-                result.success(true)
+                runOffMainThread(result) {
+                    YtmCookieStore.getInstance(ctx).setCookies(cookies ?: "")
+                    true
+                }
             }
             "resolveStream" -> {
                 val videoId = call.argument<String>("videoId")
@@ -308,13 +330,37 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         if (msg.contains("not a bot") || msg.contains("login_required") || msg.contains("recaptcha") || msg.contains("bot_block")) {
             return "BOT_CHALLENGE"
         }
-        return when (e) {
-            is ReCaptchaException -> "BOT_CHALLENGE"
-            is ContentNotAvailableException -> "VIDEO_GONE"
-            is IOException -> "IP_BLOCKED"
-            is ExtractionException -> "CLIENT_DEPRECATED"
-            else -> "RATE_LIMITED"
+        return when {
+            e is ReCaptchaException -> "BOT_CHALLENGE"
+            e is ContentNotAvailableException -> "VIDEO_GONE"
+            // A thrown IOException means the HTTP call never completed, so it is a
+            // transport failure — YouTube's own blocks arrive as 403/429 *responses*.
+            // Reporting these as IP_BLOCKED made Dart impose a multi-minute cooldown
+            // and rotate proxies every time the device lost signal for a second.
+            isNetworkFailure(e) -> "YTM_NETWORK"
+            e is ExtractionException -> "CLIENT_DEPRECATED"
+            // Unknown failures (parse errors, IllegalState, …) are bugs, not throttling:
+            // RATE_LIMITED here bought a cooldown that could never help.
+            else -> "EXTRACTOR_ERROR"
         }
+    }
+
+    private fun isNetworkFailure(e: Throwable): Boolean {
+        var cause: Throwable? = e
+        var depth = 0
+        while (cause != null && depth < 5) {
+            when (cause) {
+                is java.net.UnknownHostException,
+                is java.net.SocketException,
+                is java.io.InterruptedIOException,
+                is javax.net.ssl.SSLException,
+                -> return true
+            }
+            if (cause is IOException && cause.cause == null) return true
+            cause = cause.cause
+            depth++
+        }
+        return false
     }
 
     /**
@@ -739,23 +785,42 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
         val streamPool = if (m4aStreams.isNotEmpty()) m4aStreams else playable
 
         val selected = when (quality.lowercase()) {
-            "low" -> streamPool.minByOrNull { it.averageBitrate }
-            "medium" -> streamPool.minByOrNull { kotlin.math.abs(it.averageBitrate - 128) }
-            else -> streamPool.maxByOrNull { it.averageBitrate }
+            "low" -> streamPool.minByOrNull { bitrateToKbps(it.averageBitrate) }
+            "medium" -> streamPool.minByOrNull { kotlin.math.abs(bitrateToKbps(it.averageBitrate) - 128) }
+            else -> streamPool.maxByOrNull { bitrateToKbps(it.averageBitrate) }
         } ?: streamPool.first()
 
+        val url = selected.content
         return mapOf(
             "videoId" to videoId,
-            "url" to selected.content,
+            "url" to url,
             "mimeType" to (selected.format?.mimeType ?: "audio/mp4"),
             "container" to (selected.format?.suffix ?: ""),
-            "bitrateKbps" to selected.averageBitrate.coerceAtLeast(0),
+            "bitrateKbps" to bitrateToKbps(selected.averageBitrate),
             "durationMs" to info.duration.coerceAtLeast(0L) * 1000L,
             "title" to info.name,
             "artist" to (info.uploaderName ?: ""),
             "artworkUrl" to bestArtwork(info.thumbnails),
             "userAgent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:136.0) Gecko/20100101 Firefox/136.0",
+            // Without this the Dart cache treats a googlevideo URL as never expiring
+            // and keeps re-serving it long after the `expire` stamp has passed.
+            "expiresAt" to urlExpiryEpochSeconds(url),
         )
+    }
+
+    /**
+     * YouTube reports `averageBitrate` in bits/sec for most itags but the extractor's
+     * static itag table carries kbps, so the same field arrives in either unit.
+     */
+    private fun bitrateToKbps(raw: Int): Int = when {
+        raw <= 0 -> 0
+        raw > 10_000 -> raw / 1000
+        else -> raw
+    }
+
+    private fun urlExpiryEpochSeconds(url: String?): Long? {
+        if (url.isNullOrEmpty()) return null
+        return runCatching { Uri.parse(url).getQueryParameter("expire")?.toLongOrNull() }.getOrNull()
     }
 
     private fun streamItemsToMaps(items: Sequence<StreamInfoItem>, limit: Int): List<Map<String, Any?>> =

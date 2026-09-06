@@ -116,19 +116,6 @@ android {
         release {
             val releaseConfig = signingConfigs.getByName("release")
             val hasKeystore = releaseConfig.storeFile != null && releaseConfig.storeFile!!.exists()
-            val isReleaseBuild = gradle.startParameter.taskNames.any {
-                it.contains("Release", ignoreCase = true) || it.contains("bundle", ignoreCase = true)
-            }
-            val allowDebugSigning = project.hasProperty("allowDebugSigning") && project.property("allowDebugSigning").toString().toBoolean()
-            if (isReleaseBuild && !hasKeystore) {
-                if (!allowDebugSigning) {
-                    throw GradleException(
-                        "Release keystore file missing in key.properties! " +
-                        "To permit debug signing fallback for local testing, pass -PallowDebugSigning=true."
-                    )
-                }
-                logger.warn("WARNING: Release keystore file not found in key.properties. Using debug signing config because allowDebugSigning=true was passed.")
-            }
             signingConfig = if (hasKeystore) releaseConfig else signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true

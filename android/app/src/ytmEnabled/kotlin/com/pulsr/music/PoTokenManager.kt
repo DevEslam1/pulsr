@@ -34,6 +34,8 @@ object PoTokenManager {
 
     private const val LRU_CAPACITY = 64
     private const val TOKEN_TTL_SECONDS = 1800L // 30 minutes
+    private const val WEBVIEW_BROKEN_COOLDOWN_SECONDS = 1800L // 30 minutes
+    private const val BACKGROUND_REFRESH_INTERVAL_MS = 60_000L
     const val EXPIRING_SOON_MARGIN_SECONDS = PoTokenStore.REFRESH_MARGIN_SECONDS // 30 minutes
 
     @Volatile
@@ -60,9 +62,14 @@ object PoTokenManager {
     var sessionVisitorData: String = ""
         private set
 
+    // A broken WebView is rarely permanent — an OOM-killed WebView provider or a
+    // single BadWebViewException used to latch limited mode for the whole process
+    // lifetime, silently downgrading every later resolution. Time-box it instead.
     @Volatile
-    var webViewBroken: Boolean = false
-        private set
+    private var webViewBrokenUntil: Long = 0L
+
+    val webViewBroken: Boolean
+        get() = webViewBrokenUntil > Instant.now().epochSecond
 
     val isLimitedMode: Boolean
         get() = webViewBroken || (isExpired() && visitorData.isEmpty())
@@ -70,9 +77,14 @@ object PoTokenManager {
     @Volatile
     private var generator: PoTokenGenerator? = null
 
+    /** A non-null generator that is also still able to mint. */
+    private val hasWarmGenerator: Boolean
+        get() = generator?.isExpired() == false
+
     private var appContext: Context? = null
     private val stateMutex = Mutex()
     private var refreshInFlight: kotlinx.coroutines.Deferred<Boolean>? = null
+    private val lastBackgroundRefreshMs = java.util.concurrent.atomic.AtomicLong(0L)
 
     private data class CachedToken(
         val token: String,
@@ -128,7 +140,7 @@ object PoTokenManager {
         init(context)
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                if (isExpired() || isExpiringSoon() || generator == null) {
+                if (isExpired() || isExpiringSoon() || !hasWarmGenerator) {
                     ensureReady()
                 }
             } catch (t: Throwable) {
@@ -150,9 +162,19 @@ object PoTokenManager {
 
     /**
      * Non-blocking background regeneration triggered on 403 or invalidation signal.
+     *
+     * Throttled: `poTokenForSync` calls this on every request that has a usable
+     * stored token but no warm generator, which for a cold start is every track in
+     * the queue. Each call spawned a coroutine that raced for the same lock and
+     * re-ran the same two network round trips. [invalidate] resets the throttle so
+     * an explicit invalidation is never swallowed.
      */
     fun triggerBackgroundRefresh() {
-        val ctx = appContext ?: return
+        if (appContext == null) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        val last = lastBackgroundRefreshMs.get()
+        if (last != 0L && (now - last) < BACKGROUND_REFRESH_INTERVAL_MS) return
+        if (!lastBackgroundRefreshMs.compareAndSet(last, now)) return
         Log.i(TAG, "Triggering non-blocking background PoToken regeneration")
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -171,12 +193,12 @@ object PoTokenManager {
             return@withContext visitorData.isNotEmpty()
         }
 
-        if (isReady && !isExpiringSoon() && generator != null) {
+        if (isReady && !isExpiringSoon() && hasWarmGenerator) {
             return@withContext true
         }
 
         stateMutex.withLock {
-            if (isReady && !isExpiringSoon() && generator != null) {
+            if (isReady && !isExpiringSoon() && hasWarmGenerator) {
                 return@withContext true
             }
 
@@ -194,7 +216,7 @@ object PoTokenManager {
                     true
                 } catch (e: BadWebViewException) {
                     Log.e(TAG, "System WebView is broken for BotGuard: ${e.message}", e)
-                    webViewBroken = true
+                    webViewBrokenUntil = Instant.now().epochSecond + WEBVIEW_BROKEN_COOLDOWN_SECONDS
                     visitorData.isNotEmpty()
                 } catch (t: Throwable) {
                     Log.e(TAG, "Failed to ensure PoToken readiness: ${t.message}", t)
@@ -212,7 +234,7 @@ object PoTokenManager {
 
     fun ensureReadySync(): Boolean {
         if (webViewBroken) return visitorData.isNotEmpty()
-        if (isReady && !isExpiringSoon() && generator != null) return true
+        if (isReady && !isExpiringSoon() && hasWarmGenerator) return true
 
         return kotlinx.coroutines.runBlocking(Dispatchers.IO) {
             ensureReady()
@@ -329,17 +351,24 @@ object PoTokenManager {
     /**
      * Invalidation on BotChallenge or PoTokenInvalid:
      * Drops all tokens, visitorData, and generator so next call mints a completely fresh set.
+     *
+     * [dataSyncId] survives on purpose: it identifies the signed-in account, not the
+     * attestation. Clearing it on every bot challenge left account-bound poTokens
+     * unmintable until Dart happened to push the id again, which downgraded a
+     * signed-in session to anonymous browsing.
      */
     fun invalidate() {
         val oldGen = generator
         generator = null
         expiryInstant = 0L
-        dataSyncId = ""
         sessionVisitorData = ""
         visitorData = ""
         streamingPoToken = ""
+        integrityToken = ""
+        webViewBrokenUntil = 0L
+        lastBackgroundRefreshMs.set(0L)
         oldGen?.let { Handler(Looper.getMainLooper()).post { it.close() } }
-        appContext?.let { PoTokenStore.clear(it) }
+        appContext?.let { PoTokenStore.clearAttestation(it) }
         synchronized(tokenLru) {
             tokenLru.evictAll()
         }
@@ -353,10 +382,6 @@ object PoTokenManager {
 
     private fun refreshInternal() {
         val ctx = appContext ?: throw IllegalStateException("PoTokenManager is not initialized with Context")
-
-        val oldGen = generator
-        generator = null
-        oldGen?.let { Handler(Looper.getMainLooper()).post { it.close() } }
 
         // 1. Fetch visitorData from Innertube — skip network fetch if we already have
         //    a non-expired visitorData (avoids broken HTML scrape in PulsrDownloader).
@@ -397,11 +422,19 @@ object PoTokenManager {
             }
         }
 
-        // 2. Instantiate offscreen BotGuard generator
+        // 2. Instantiate offscreen BotGuard generator. The previous one stays usable
+        //    until this one has actually minted: tearing it down up front meant a
+        //    failed init left no generator at all, so every later call paid the cold
+        //    path and any in-flight mint died with it.
         val newGenerator = PoTokenWebView.newPoTokenGenerator(ctx)
 
         // 3. Mint the streaming poToken using visitorData
-        val newStreamingToken = newGenerator.generatePoToken(newVisitorData)
+        val newStreamingToken = try {
+            newGenerator.generatePoToken(newVisitorData)
+        } catch (t: Throwable) {
+            Handler(Looper.getMainLooper()).post { newGenerator.close() }
+            throw t
+        }
 
         // 4. Default 12 hour expiry with 30 min margin
         val now = Instant.now().epochSecond
@@ -411,7 +444,11 @@ object PoTokenManager {
         visitorData = newVisitorData
         streamingPoToken = newStreamingToken
         expiryInstant = newExpiry
+        val oldGen = generator
         generator = newGenerator
+        if (oldGen != null && oldGen !== newGenerator) {
+            Handler(Looper.getMainLooper()).post { oldGen.close() }
+        }
 
         // 5. Persist to secure store
         PoTokenStore.saveTokenData(

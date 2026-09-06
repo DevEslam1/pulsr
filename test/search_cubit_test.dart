@@ -21,6 +21,25 @@ class MockSearchMusicUseCase implements SearchMusicUseCase {
 
 class MockFolderUseCases extends Mock implements FolderUseCases {}
 
+/// Waits until [predicate] holds, instead of sleeping for a fixed margin over
+/// the cubit's 250 ms debounce.
+///
+/// A flat `Future.delayed(300ms)` left 50 ms of slack, which is enough on an idle
+/// machine and not enough when the whole suite runs its files concurrently — the
+/// debounce timer fires late and the assertion reads a state that has not been
+/// emitted yet. These tests then failed only in a full run and passed on their
+/// own, which reads like a real intermittent bug in search.
+Future<void> pumpUntil(
+  bool Function() predicate, {
+  Duration timeout = const Duration(seconds: 5),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (!predicate()) {
+    if (DateTime.now().isAfter(deadline)) return; // let the expect() report it
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+}
+
 void main() {
   late MockFolderUseCases mockFolderUseCases;
 
@@ -65,7 +84,7 @@ void main() {
       );
 
       cubit.onQueryChanged('Beat');
-      await Future.delayed(const Duration(milliseconds: 300));
+      await pumpUntil(() => cubit.state.results.isNotEmpty);
 
       expect(cubit.state.query, equals('Beat'));
       expect(cubit.state.results.length, equals(1));
@@ -97,7 +116,7 @@ void main() {
       );
 
       cubit.onQueryChanged('Beat');
-      await Future.delayed(const Duration(milliseconds: 300));
+      await pumpUntil(() => cubit.state.results.isNotEmpty);
 
       cubit.clearQuery();
       expect(cubit.state.query, isEmpty);
@@ -143,14 +162,14 @@ void main() {
       );
 
       cubit.onQueryChanged('Beat');
-      await Future.delayed(const Duration(milliseconds: 400));
+      await pumpUntil(() => cubit.state.results.length == 2);
 
       // Both songs match "beat" somewhere
       expect(cubit.state.results.length, equals(2));
 
       // Filter by Artists only: only "Beat Maker" matches
       cubit.setFilter('Artists');
-      await Future.delayed(const Duration(milliseconds: 400));
+      await pumpUntil(() => cubit.state.results.length == 1);
       expect(cubit.state.selectedFilter, equals('Artists'));
       expect(cubit.state.results.length, equals(1));
       expect(cubit.state.results.first.artist, equals('Beat Maker'));
@@ -180,7 +199,9 @@ void main() {
       );
 
       cubit.onQueryChanged('   ');
-      await Future.delayed(const Duration(milliseconds: 300));
+      // Asserting an absence, so there is nothing to poll for: give the debounce
+      // room to fire and prove it produced nothing.
+      await Future.delayed(const Duration(seconds: 1));
 
       expect(cubit.state.query, equals('   '));
       expect(cubit.state.results, isEmpty);

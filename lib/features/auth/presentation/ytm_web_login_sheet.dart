@@ -368,10 +368,16 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
 
     final accountService = getIt<YtmAccountService>();
     if (accountService.isLoggedIn) {
-      accountService.validateSession().then((ok) {
+      // Only a definite `invalid` may tear the jar down. `validateSession()`
+      // flattens the three-way verdict into a bool, so a timeout, a captive
+      // portal or an IP-level 403 read as "signed out": the sheet dropped to the
+      // sign-in prompt and `_clearCookiesAndReset()` wiped a session that was
+      // perfectly good, forcing a real re-login over something transient.
+      accountService.validateSessionDetailed().then((verdict) {
         if (!mounted) return;
-        setState(() => _isLoggedIn = ok);
-        if (!ok) {
+        setState(() =>
+            _isLoggedIn = verdict != SessionValidationResult.invalid);
+        if (verdict == SessionValidationResult.invalid) {
           _clearCookiesAndReset(); // start the re-login with a CLEAN jar (fixes B6)
         }
       });
@@ -682,15 +688,44 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     unawaited(_runBlockRecoveryStep(step));
   }
 
+  /// Pushes a user-agent (and optionally a content mode) onto the live WebView
+  /// without discarding everything else it was configured with.
+  ///
+  /// `setSettings` replaces the whole settings object, so handing it a freshly
+  /// constructed `InAppWebViewSettings(userAgent: …)` reset every other field to
+  /// its default. That silently undid the configuration this sheet depends on to
+  /// look like a real browser to Google — `requestedWithHeaderOriginAllowList`
+  /// (the empty set that suppresses `X-Requested-With: com.pulsr.music`, the
+  /// header Google uses to spot an embedded WebView and refuse sign-in),
+  /// `thirdPartyCookiesEnabled`/`sharedCookiesEnabled` (without which the login
+  /// never lands in the jar we read), `domStorageEnabled`, and
+  /// `useShouldOverrideUrlLoading` (which the OAuth redirect chain runs through).
+  /// So the block-recovery path, whose entire job is to look *less* like a bot,
+  /// was making the next attempt look more like one.
+  Future<void> _applyWebViewIdentity(
+    InAppWebViewController? controller, {
+    required String userAgent,
+    UserPreferredContentMode? contentMode,
+  }) async {
+    if (controller == null) return;
+    final base = _settings?.copy() ?? InAppWebViewSettings();
+    base.userAgent = userAgent;
+    if (contentMode != null) base.preferredContentMode = contentMode;
+    // Keep the field in step with the WebView, so the next call copies from what
+    // is actually installed rather than from the initial value.
+    _settings = base;
+    await controller.setSettings(settings: base);
+  }
+
   Future<void> _runBlockRecoveryStep(BlockRecoveryStep step) async {
     try {
       // 1. Clear cookies + cache, 2. switch browser identity, 3. reload.
       await _clearWebViewCookiesAndCache();
       _uaIdentityOverride = step.nextIdentity;
       try {
-        await _webViewController?.setSettings(
-          settings: InAppWebViewSettings(
-              userAgent: _uaFor(step.nextIdentity)),
+        await _applyWebViewIdentity(
+          _webViewController,
+          userAgent: _uaFor(step.nextIdentity),
         );
       } catch (e, st) {
         ErrorLogger.log('_runBlockRecoveryStep failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
@@ -753,13 +788,12 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
         ? _uaFor(_uaIdentityOverride!)
         : (isYtm ? desktopUserAgent : mobileUserAgent);
     try {
-      await _webViewController?.setSettings(
-        settings: InAppWebViewSettings(
-          userAgent: targetUa,
-          preferredContentMode: isYtm
-              ? UserPreferredContentMode.DESKTOP
-              : UserPreferredContentMode.RECOMMENDED,
-        ),
+      await _applyWebViewIdentity(
+        _webViewController,
+        userAgent: targetUa,
+        contentMode: isYtm
+            ? UserPreferredContentMode.DESKTOP
+            : UserPreferredContentMode.RECOMMENDED,
       );
     } catch (e, st) {
       ErrorLogger.log('_navigateTo failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
@@ -1654,16 +1688,18 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                               ? _uaFor(_uaIdentityOverride!)
                               : (isYtm ? desktopUserAgent : mobileUserAgent);
                           try {
-                            await controller.setSettings(
-                              settings: InAppWebViewSettings(
-                                userAgent: targetUa,
-                                preferredContentMode: isYtm
-                                    ? UserPreferredContentMode.DESKTOP
-                                    : UserPreferredContentMode.RECOMMENDED,
-                              ),
+                            await _applyWebViewIdentity(
+                              controller,
+                              userAgent: targetUa,
+                              contentMode: isYtm
+                                  ? UserPreferredContentMode.DESKTOP
+                                  : UserPreferredContentMode.RECOMMENDED,
                             );
                           } catch (e, st) {
-                            ErrorLogger.log('startsWith failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');
+                            ErrorLogger.log('onLoadStart setSettings failed',
+                                error: e,
+                                stackTrace: st,
+                                category: 'YtmWebLoginSheet');
                           }
                         },
                         onProgressChanged: (controller, progress) {
@@ -1974,6 +2010,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
     final p = context.palette;
     final textController = TextEditingController();
     String? errorText;
+    var busy = false;
 
     await showDialog<void>(
       context: context,
@@ -2012,6 +2049,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                 TextField(
                   controller: textController,
                   maxLines: 4,
+                  enabled: !busy,
                   style: TextStyle(color: p.textPrimary, fontSize: 12, fontFamily: 'monospace'),
                   decoration: InputDecoration(
                     hintText: 'SAPISID=...; __Secure-3PSID=...; SID=...',
@@ -2030,7 +2068,7 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(ctx),
+              onPressed: busy ? null : () => Navigator.pop(ctx),
               child: const Text('Cancel'),
             ),
             FilledButton(
@@ -2038,38 +2076,79 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
                 backgroundColor: p.accent,
                 foregroundColor: p.onAccent,
               ),
-              onPressed: () async {
-                final input = textController.text.trim();
-                if (input.isEmpty) {
-                  setDialogState(() => errorText = 'Please enter cookie text');
-                  return;
-                }
-                final accountService = getIt<YtmAccountService>();
-                String cookieStr = input;
-                if (cookieStr.toLowerCase().contains('cookie:')) {
-                  final idx = cookieStr.toLowerCase().indexOf('cookie:');
-                  cookieStr = cookieStr.substring(idx + 7).trim();
-                }
-                await accountService.saveSession(cookieStr);
-                final valid = await accountService.validateSession();
-                if (valid) {
-                  if (ctx.mounted) Navigator.pop(ctx);
-                  if (context.mounted) {
-                    setState(() {
-                      _isLoggedIn = true;
-                      _detectedCookies = cookieStr;
-                    });
-                    Navigator.of(context).pop(true);
-                  }
-                } else {
-                  setDialogState(() => errorText = 'Invalid or expired cookies (must include SAPISID and PSID)');
-                }
-              },
-              child: const Text('Connect'),
+              onPressed: busy
+                  ? null
+                  : () async {
+                      final input = textController.text.trim();
+                      if (input.isEmpty) {
+                        setDialogState(() => errorText = 'Please enter cookie text');
+                        return;
+                      }
+                      final accountService = getIt<YtmAccountService>();
+                      // Normalise first: a DevTools paste arrives with newlines, a
+                      // `Cookie:` prefix and per-cookie attributes, and the shape
+                      // check has to run on what will actually be sent. The old
+                      // substring trim of `cookie:` left all of that in place.
+                      final cookieStr = YtmAccountService.normalizeCookieHeader(input);
+                      if (!YtmAccountService.looksLikeSignedInCookies(cookieStr)) {
+                        setDialogState(() => errorText = 'Missing session cookies — the paste needs '
+                            'an SAPISID and a __Secure-3PSID (or 1PSID)');
+                        return;
+                      }
+                      // Snapshot the jar we may have to put back: saveSession
+                      // overwrites secure storage, pushes the new cookies into the
+                      // native store and burns the current poToken, so a paste that
+                      // turns out to be expired used to leave the app signed in to a
+                      // dead session with no way back.
+                      final previous = accountService.cookies;
+                      setDialogState(() {
+                        busy = true;
+                        errorText = null;
+                      });
+                      final saved = await accountService.saveSession(cookieStr);
+                      final verdict = saved
+                          ? await accountService.validateSessionDetailed()
+                          : SessionValidationResult.invalid;
+                      if (verdict == SessionValidationResult.valid) {
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        if (context.mounted) {
+                          setState(() {
+                            _isLoggedIn = true;
+                            _detectedCookies = cookieStr;
+                          });
+                          Navigator.of(context).pop(true);
+                        }
+                        return;
+                      }
+                      if (verdict == SessionValidationResult.invalid) {
+                        // Roll back rather than keep a jar YouTube rejected.
+                        if (previous != null && previous.isNotEmpty) {
+                          await accountService.saveSession(previous);
+                        } else {
+                          await accountService.logout();
+                        }
+                      }
+                      if (!ctx.mounted) return;
+                      setDialogState(() {
+                        busy = false;
+                        errorText = verdict == SessionValidationResult.invalid
+                            ? 'YouTube rejected these cookies — they have expired or '
+                                'belong to a signed-out session'
+                            // `unknown` is a network failure or an IP block, not a
+                            // verdict on the cookies: reporting "invalid" here sent
+                            // people off to re-copy a jar that was fine.
+                            : 'Could not reach YouTube to verify — the cookies are '
+                                'saved, try again when back online';
+                      });
+                    },
+              child: Text(busy ? 'Checking…' : 'Connect'),
             ),
           ],
         ),
       ),
     );
+    // Disposed once the dialog is gone rather than never: the sheet outlives it,
+    // so every manual-import attempt used to leak its controller.
+    textController.dispose();
   }
 }

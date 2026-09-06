@@ -5,7 +5,11 @@ import org.json.JSONObject
 /**
  * Layer 2: Precise Block Signals for YouTube Music Innertube API.
  *
- * Categorizes YouTube failure modes into 8 discrete, actionable signals.
+ * Categorizes YouTube failure modes into discrete, actionable signals.
+ *
+ * [NetworkUnavailable] is deliberately distinct from [IpBlocked] and
+ * [RateLimited]: the device simply having no route to YouTube must not trigger
+ * proxy rotation or a global cooldown that outlives the outage.
  */
 enum class YtmBlockSignal(val code: String) {
     RateLimited("RATE_LIMITED"),
@@ -15,7 +19,8 @@ enum class YtmBlockSignal(val code: String) {
     ClientDeprecated("CLIENT_DEPRECATED"),
     GeoBlocked("GEO_BLOCKED"),
     SignInRequired("SIGN_IN_REQUIRED"),
-    VideoGone("VIDEO_GONE");
+    VideoGone("VIDEO_GONE"),
+    NetworkUnavailable("YTM_NETWORK");
 
     companion object {
         private val BOT_SUBSTRINGS = listOf(
@@ -47,16 +52,47 @@ enum class YtmBlockSignal(val code: String) {
             "غير متاح في بلدك"
         )
 
+        // Unambiguous "this specific video is gone" wording. Anything that also
+        // appears on YouTube's consent / block / captcha interstitials belongs in
+        // GONE_WEAK_SUBSTRINGS instead, otherwise a 403 IP block whose body
+        // mentions the Terms of Service is silently classified as VideoGone and
+        // the track is skipped with no backoff or path rotation.
         private val GONE_SUBSTRINGS = listOf(
             "video unavailable",
             "removed by the user",
             "removed by user",
             "private video",
             "video has been removed",
-            "deleted",
-            "terms of service",
             "no longer available",
             "does not exist"
+        )
+
+        // Only meaningful alongside a playabilityStatus that already says the
+        // video itself is unusable.
+        private val GONE_WEAK_SUBSTRINGS = listOf(
+            "deleted",
+            "terms of service",
+            "account associated with this video has been terminated"
+        )
+
+        // 200 + UNPLAYABLE reasons that are genuinely about this one video and
+        // must never be read as an IP-level block. Kept to distinctive phrases:
+        // short fragments like "age" would match "message"/"usage".
+        private val UNPLAYABLE_CONTENT_SUBSTRINGS = listOf(
+            "premium",
+            "members only",
+            "member-only",
+            "requires payment",
+            "purchase",
+            "rental",
+            "playback on other websites",
+            "watch on youtube",
+            "live event has ended",
+            "live stream offline",
+            "premieres in",
+            "confirm your age",
+            "age-restricted",
+            "not available on this app"
         )
 
         private val DEPRECATED_SUBSTRINGS = listOf(
@@ -127,12 +163,18 @@ enum class YtmBlockSignal(val code: String) {
                 return GeoBlocked
             }
 
-            // 6. Video Gone / Removed / Private (parenthesized: a bare ERROR
-            // status without gone wording must NOT mask IpBlocked/RateLimited)
-            if ((status == "ERROR" && GONE_SUBSTRINGS.any { combinedReasons.contains(it) }) ||
-                (status == "UNPLAYABLE" && GONE_SUBSTRINGS.any { combinedReasons.contains(it) }) ||
-                httpCode == 404 ||
-                GONE_SUBSTRINGS.any { combinedReasons.contains(it) }) {
+            // 6. Video Gone / Removed / Private.
+            // The status-qualified clauses can trust the wording. The bare
+            // substring scan cannot — it runs against the whole raw body, which
+            // for a 403/429 interstitial is an HTML page full of boilerplate —
+            // so it is restricted to 404 and 2xx responses. Weak wording
+            // ("deleted", "terms of service") needs a corroborating status.
+            val goneWording = GONE_SUBSTRINGS.any { combinedReasons.contains(it) }
+            val weakGoneWording = GONE_WEAK_SUBSTRINGS.any { combinedReasons.contains(it) }
+            if (httpCode == 404 ||
+                ((status == "ERROR" || status == "UNPLAYABLE") && (goneWording || weakGoneWording)) ||
+                (status == "UNPLAYABLE" && UNPLAYABLE_CONTENT_SUBSTRINGS.any { combinedReasons.contains(it) }) ||
+                (goneWording && httpCode in 200..299)) {
                 return VideoGone
             }
 
@@ -159,9 +201,13 @@ enum class YtmBlockSignal(val code: String) {
                 400 -> ClientDeprecated
                 404 -> VideoGone
                 200 -> {
-                    // A 200 response with UNPLAYABLE and no other matched signal
-                    // (e.g. ANDROID_TESTSUITE on flagged IPs) indicates IP/access block.
-                    if (status == "UNPLAYABLE") IpBlocked else RateLimited
+                    // A 200 + UNPLAYABLE is far more often a per-video condition
+                    // (premium, members-only, ended livestream, embed-disabled)
+                    // than an IP block. Declaring IpBlocked here marks the whole
+                    // network path failed and trips the chain short-circuit for
+                    // what is really one unplayable track, so default to
+                    // VideoGone and let repeated 403/429s prove a real block.
+                    if (status == "UNPLAYABLE" || status == "ERROR") VideoGone else RateLimited
                 }
                 else -> RateLimited
             }

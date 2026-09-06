@@ -160,17 +160,22 @@ internal object ClientCapabilityMatrix {
             for (type in InnertubeClient.ClientType.values()) {
                 val clientObj = clientsJson.optJSONObject(type.name)
                 if (clientObj != null) {
+                    // Each field falls back to the built-in capability, not to a blanket
+                    // false/0: a JSON entry that only overrides `clientVersion` used to
+                    // silently reset requiresPoToken, supportsSearch and priority,
+                    // reordering the whole chain and dropping search-capable clients.
+                    val fallback = defaultCapabilities[type]
                     mutable[type] = ClientCapability(
                         clientType = type,
-                        clientNameId = clientObj.optString("clientNameId", type.clientNameId),
-                        defaultClientVersion = clientObj.optString("clientVersion", type.clientVersion),
-                        requiresPoToken = clientObj.optBoolean("requiresPoToken", false),
-                        requiresLogin = clientObj.optBoolean("requiresLogin", false),
-                        supportsStreamResolve = clientObj.optBoolean("supportsStreamResolve", true),
-                        supportsSearch = clientObj.optBoolean("supportsSearch", false),
-                        supportsBrowse = clientObj.optBoolean("supportsBrowse", false),
-                        requiresJsSignature = clientObj.optBoolean("requiresJsSignature", false),
-                        priority = clientObj.optInt("priority", 0)
+                        clientNameId = clientObj.optString("clientNameId", fallback?.clientNameId ?: type.clientNameId),
+                        defaultClientVersion = clientObj.optString("clientVersion", fallback?.defaultClientVersion ?: type.clientVersion),
+                        requiresPoToken = clientObj.optBoolean("requiresPoToken", fallback?.requiresPoToken ?: false),
+                        requiresLogin = clientObj.optBoolean("requiresLogin", fallback?.requiresLogin ?: false),
+                        supportsStreamResolve = clientObj.optBoolean("supportsStreamResolve", fallback?.supportsStreamResolve ?: true),
+                        supportsSearch = clientObj.optBoolean("supportsSearch", fallback?.supportsSearch ?: false),
+                        supportsBrowse = clientObj.optBoolean("supportsBrowse", fallback?.supportsBrowse ?: false),
+                        requiresJsSignature = clientObj.optBoolean("requiresJsSignature", fallback?.requiresJsSignature ?: false),
+                        priority = clientObj.optInt("priority", fallback?.priority ?: 0)
                     )
                 } else {
                     defaultCapabilities[type]?.let { mutable[type] = it }

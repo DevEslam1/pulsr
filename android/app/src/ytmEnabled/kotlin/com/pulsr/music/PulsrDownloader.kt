@@ -20,8 +20,16 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
 
     @Throws(IOException::class, ReCaptchaException::class)
     override fun execute(request: Request): Response {
-        // 1. Rate limiting permit acquisition
-        RateLimiter.shared.acquirePermit()
+        // 1. Rate limiting permit acquisition, paced per endpoint. Everything
+        //    used to share Bucket.PLAYER's 200ms floor, so NewPipe's search
+        //    calls bypassed the 1500ms gap that keeps /search off YouTube's
+        //    throttle — the endpoint that rate-limits soonest.
+        val bucket = bucketFor(request.url())
+        val permitHeld = RateLimiter.shared.acquirePermit(bucket)
+        if (!permitHeld) {
+            Thread.currentThread().interrupt()
+            throw IOException("Rate limiter wait interrupted for ${request.url()}")
+        }
 
         var connection: HttpURLConnection? = null
         try {
@@ -81,7 +89,8 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
             }
 
             if (code == HTTP_TOO_MANY_REQUESTS) {
-                RateLimiter.shared.onRateLimited()
+                val retryAfter = connection.getHeaderField("Retry-After")?.trim()?.toLongOrNull()
+                RateLimiter.shared.onRateLimited(retryAfter)
                 ProxyManager.onPathFailed(request.url())
                 throw ReCaptchaException("HTTP 429 Too Many Requests: Rate limited by YouTube", request.url())
             }
@@ -96,17 +105,24 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
                 decoded.use { it.readBytes().toString(Charsets.UTF_8) }
             }
 
-            if (body != null && (body.contains("Sign in to confirm that you're not a bot") ||
-                        body.contains("LOGIN_REQUIRED") ||
-                        body.contains("Sign in to confirm you're not a bot") ||
-                        body.contains("recaptcha"))) {
+            // Bot-detection body scan, restricted to failed responses.
+            //
+            // Running it on 2xx bodies made benign traffic trip a global
+            // backoff: `LOGIN_REQUIRED` is the normal 200 playabilityStatus of a
+            // private or members-only track, and a bare "recaptcha" appears in
+            // the markup of ordinary YouTube HTML pages — which is exactly what
+            // YoutubeParsingHelper.getClientVersion() scrapes. One such request
+            // then throttled every path and marked the network failed.
+            if (code >= 400 && body != null && BOT_MARKERS.any { body.contains(it, ignoreCase = true) }) {
                 RateLimiter.shared.onRateLimited()
                 ProxyManager.onPathFailed(request.url())
                 throw ReCaptchaException("YouTube bot verification required: Sign in to confirm you're not a bot", request.url())
             }
 
             // Mark successful request in rate limiter
-            RateLimiter.shared.onSuccess()
+            if (code in 200..299) {
+                RateLimiter.shared.onSuccess()
+            }
 
             return Response(
                 code,
@@ -122,7 +138,11 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
         } catch (e: Exception) {
             throw IOException("Request to ${request.url()} failed: ${e.message}", e)
         } finally {
-            connection?.disconnect()
+            // Deliberately not calling connection.disconnect(): it tears down the
+            // underlying socket and defeats HttpURLConnection keep-alive, so every
+            // extractor request paid a fresh TCP + TLS handshake. The streams are
+            // already fully read and closed above, which returns the connection to
+            // the pool for reuse.
             RateLimiter.shared.releasePermit()
         }
     }
@@ -130,6 +150,20 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
     private fun isPlayerRequest(url: String): Boolean {
         val path = runCatching { URL(url).path }.getOrNull() ?: url
         return path.contains("/youtubei/v1/player")
+    }
+
+    private fun bucketFor(url: String): RateLimiter.Bucket {
+        val path = runCatching { URL(url).path }.getOrNull() ?: url
+        return when {
+            path.contains("/youtubei/v1/search") -> RateLimiter.Bucket.SEARCH
+            path.contains("/youtubei/v1/browse") ||
+                path.contains("/youtubei/v1/next") ||
+                path.contains("/youtubei/v1/music") -> RateLimiter.Bucket.BROWSE
+            path.contains("/youtubei/v1/player") -> RateLimiter.Bucket.PLAYER
+            // base.js / iframe_api / HTML scrapes: cheap, and stalling them
+            // behind the player floor delays every resolution that needs them.
+            else -> RateLimiter.Bucket.STREAM
+        }
     }
 
     private fun resolveCookies(url: String): String? {
@@ -167,6 +201,18 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
         private const val CONNECT_TIMEOUT_MS = 15_000
         private const val READ_TIMEOUT_MS = 30_000
         private const val HTTP_TOO_MANY_REQUESTS = 429
+
+        // Phrases that only appear on a genuine interstitial. Deliberately no
+        // bare "recaptcha" or "LOGIN_REQUIRED": both occur in ordinary
+        // responses, see the scan site above.
+        private val BOT_MARKERS = listOf(
+            "Sign in to confirm that you're not a bot",
+            "Sign in to confirm you're not a bot",
+            "/recaptcha/api2",
+            "g-recaptcha",
+            "unusual traffic from your computer network",
+            "automated queries"
+        )
 
         fun sanitizeCookieHeader(cookies: String): String {
             return cookies.split(';')
