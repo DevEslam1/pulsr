@@ -283,6 +283,23 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                     true
                 }
             }
+            // Explicit disconnect. `setCookies("")` only empties the in-process
+            // store and its prefs; this also expires the tracked names in the
+            // WebView CookieManager and drops the account-bound poToken state, so
+            // a logout cannot be undone by the next cold start re-reading the jar.
+            "clearCookies" -> {
+                val ctx = context
+                if (ctx == null) {
+                    result.success(true)
+                    return
+                }
+                runOffMainThread(result) {
+                    YtmCookieStore.getInstance(ctx).clear()
+                    PoTokenManager.init(ctx.applicationContext)
+                    PoTokenManager.clearSession()
+                    true
+                }
+            }
             "resolveStream" -> {
                 val videoId = call.argument<String>("videoId")
                 if (videoId == null || !VIDEO_ID.matches(videoId)) {

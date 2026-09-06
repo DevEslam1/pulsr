@@ -1026,6 +1026,10 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
       final targetSlot = _queueSlots[slot] ??
           const _QueueSlotData(
               songs: [], currentIndex: 0, position: Duration.zero, speed: 1.0);
+      final targetOriginalSong = (targetSlot.currentIndex >= 0 &&
+              targetSlot.currentIndex < targetSlot.songs.length)
+          ? targetSlot.songs[targetSlot.currentIndex]
+          : null;
       final validSongs = targetSlot.songs.where((s) => !s.isMissing).toList();
 
       _debouncedPersistQueueSlots();
@@ -1041,7 +1045,14 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
 
       safeEmit(state.copyWith(activeQueueSlot: slot, queue: validSongs));
 
-      final safeIdx = targetSlot.currentIndex.clamp(0, validSongs.length - 1);
+      int safeIdx = -1;
+      if (targetOriginalSong != null) {
+        safeIdx =
+            validSongs.indexWhere((s) => _isSameTrack(s, targetOriginalSong));
+      }
+      if (safeIdx == -1) {
+        safeIdx = targetSlot.currentIndex.clamp(0, validSongs.length - 1);
+      }
       final song = validSongs[safeIdx];
       safeEmit(state.copyWith(
         currentIndex: safeIdx,

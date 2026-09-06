@@ -169,29 +169,21 @@ class PulsrDownloader(private val context: Context? = null) : Downloader() {
     private fun resolveCookies(url: String): String? {
         if (context != null) {
             val store = YtmCookieStore.getInstance(context)
-            val storeCookies = store.getMergedCookieHeader()
+            // Host-scoped: the store answers for google.com and youtube.com at
+            // once, but the header must only carry what the target host would
+            // legitimately receive.
+            val storeCookies = store.getMergedCookieHeader(url)
             if (!storeCookies.isNullOrEmpty()) {
                 return storeCookies
             }
         }
 
-        // Fallback to direct CookieManager lookup
+        // Fallback to direct CookieManager lookup. Only the target URL's own jar:
+        // aggregating every Google domain here sent accounts.google.com
+        // credentials to youtube.com, which is the leak the store now filters.
         return runCatching {
             val cm = android.webkit.CookieManager.getInstance()
-            val direct = cm.getCookie(url)
-            if (!direct.isNullOrEmpty()) return@runCatching direct
-
-            val jar = mutableMapOf<String, String>()
-            for (u in YtmCookieStore.DOMAINS) {
-                val c = cm.getCookie(u) ?: continue
-                for (pair in c.split(";")) {
-                    val parts = pair.trim().split("=", limit = 2)
-                    if (parts.size == 2 && parts[0].isNotBlank()) {
-                        jar[parts[0].trim()] = parts[1].trim()
-                    }
-                }
-            }
-            if (jar.isEmpty()) null else jar.entries.joinToString("; ") { "${it.key}=${it.value}" }
+            cm.getCookie(url)?.takeIf { it.isNotEmpty() }
         }.getOrNull()
     }
 

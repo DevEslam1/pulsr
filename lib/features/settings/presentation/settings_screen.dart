@@ -32,6 +32,7 @@ import 'hidden_folders_screen.dart';
 import 'widgets/backup_section.dart';
 import 'widgets/battery_optimization_card.dart';
 import 'widgets/settings_slider_row.dart';
+import 'widgets/ytm_account_disconnect_dialog.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -674,7 +675,7 @@ class SettingsScreen extends StatelessWidget {
                                 context.l10n.ytmConnected,
                                 '${ytmAccount.accountName ?? "Connected"} • Tap to manage',
                                 onTap: () =>
-                                    _showYtmAccountDisconnectDialog(context),
+                                    showYtmAccountDisconnectDialog(context),
                               );
                             }
                           },
@@ -2494,56 +2495,6 @@ class SettingsScreen extends StatelessWidget {
             isBrowseMode: true,
           );
         },
-      ),
-    );
-  }
-
-  void _showYtmAccountDisconnectDialog(BuildContext context) {
-    final account = getIt<YtmAccountService>();
-    final p = context.palette;
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: p.surfaceContainerHigh,
-        title: Text(context.l10n.ytmAccount,
-            style: TextStyle(color: p.textPrimary)),
-        content: Text(
-          'Connected as: ${account.accountName ?? "User"}\n\nManage your YouTube Music account or disconnect from this device.',
-          style: TextStyle(color: p.textSecondary),
-        ),
-        actions: [
-          TextButton.icon(
-            onPressed: () {
-              Navigator.pop(ctx);
-              YtmWebLoginSheet.show(
-                context,
-                isBrowseMode: true,
-              );
-            },
-            icon: Icon(Icons.language_rounded, size: 18, color: p.accent),
-            label: Text(context.l10n.openWebPlayer,
-                style: TextStyle(color: p.accent)),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(context.l10n.cancel,
-                style: TextStyle(color: p.textSecondary)),
-          ),
-          FilledButton(
-            onPressed: () async {
-              await account.logout();
-              if (ctx.mounted) Navigator.pop(ctx);
-              if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Disconnected from YouTube Music')),
-                );
-              }
-            },
-            style: FilledButton.styleFrom(backgroundColor: p.error),
-            child: Text(context.l10n.disconnect),
-          ),
-        ],
       ),
     );
   }

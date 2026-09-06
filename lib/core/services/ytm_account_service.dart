@@ -12,6 +12,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:pulsr/core/di/injection.dart';
 import 'package:pulsr/core/services/ytm_client_version_resolver.dart';
 import 'package:pulsr/core/services/ytm_service.dart';
+import 'package:pulsr/core/services/ytm_url_cache.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../domain/models/lyrics_line.dart';
 import '../../domain/models/ytm_track.dart';
@@ -143,7 +144,7 @@ class YtmAccountService {
       // header carries both while buildAuthorizationHeader hashes only the first
       // — the signature then belongs to an account the request is not making.
       final nativeCookies =
-          rawNative == null ? null : normalizeCookieHeader(rawNative);
+          rawNative == null ? null : scopeCookiesForYouTube(rawNative);
       if (nativeCookies != null &&
           nativeCookies.isNotEmpty &&
           looksLikeSignedInCookies(nativeCookies)) {
@@ -323,9 +324,55 @@ class YtmAccountService {
     return ordered.entries.map((e) => '${e.key}=${e.value}').join('; ');
   }
 
+  /// Cookies that belong to Google's account-management surface and are never
+  /// sent to a YouTube host by a real browser.
+  ///
+  /// The login WebView spans `accounts.google.com` and `music.youtube.com`, and
+  /// both the Dart and native jars are keyed by cookie *name* only — so the
+  /// account-chooser and identity cookies from the Google side end up in the
+  /// same map as the YouTube session and ride along on every InnerTube request.
+  /// That is a needless leak of account-management state to a different host,
+  /// and an oversized `Cookie` header is itself a bot signal.
+  static const Set<String> _googleAccountOnlyCookies = {
+    'LSID',
+    'LSOLH',
+    'ACCOUNT_CHOOSER',
+    'SMSV',
+    'GAPS',
+    'OSID',
+    '__Secure-OSID',
+    'NID',
+    'AEC',
+    '1P_JAR',
+    'OTZ',
+    'SEARCH_SAMESITE',
+    'COMPASS',
+    'S',
+    'SSOSID',
+  };
+
+  /// Drops from [raw] the cookies a browser would never send to a YouTube host.
+  ///
+  /// `__Host-`-prefixed cookies are host-locked by definition — carrying one
+  /// across hosts is always wrong — and the names above belong to Google's
+  /// account surface. Mirrors `YtmCookieStore.isSendableToYouTube` on the
+  /// native side so both jars scope identically.
+  static String scopeCookiesForYouTube(String raw) {
+    final kept = <String>[];
+    for (final pair in normalizeCookieHeader(raw).split('; ')) {
+      final eq = pair.indexOf('=');
+      if (eq <= 0) continue;
+      final name = pair.substring(0, eq);
+      if (name.toLowerCase().startsWith('__host-')) continue;
+      if (_googleAccountOnlyCookies.contains(name)) continue;
+      kept.add(pair);
+    }
+    return kept.join('; ');
+  }
+
   /// Saves extracted web cookies, warms the session, and triggers fresh attestation.
   Future<bool> saveSession(String rawCookies) async {
-    final jar = normalizeCookieHeader(rawCookies);
+    final jar = scopeCookiesForYouTube(rawCookies);
     // A blob with no SAPISID-family cookie and no PSID is not a session. Saving
     // one flipped `loginState` to true, pushed it into the native cookie store
     // and invalidated a working poToken, leaving the UI showing a signed-in
@@ -379,7 +426,8 @@ class YtmAccountService {
         // that it arrived, never its value.
         debugPrint('[YTM_ACCOUNT] dataSyncId ready after login');
       } else {
-        debugPrint('[YTM_ACCOUNT] dataSyncId still null after bootstrap — Tier-1 will be skipped until populated');
+        debugPrint('[YTM_ACCOUNT] dataSyncId still null after bootstrap — '
+            'Tier-1 will resolve as a guest until populated');
       }
     }());
     return true;
@@ -398,28 +446,54 @@ class YtmAccountService {
     await prefs.remove(_dataSyncIdPrefKey);
     loginState.value = false;
 
+    // Resolved stream URLs are cached with the cookie header they were resolved
+    // under, so leaving the cache in place kept serving the disconnected
+    // session's URLs — and its cookies — until every entry aged out.
     try {
-      final ytmService = getIt<YtmService>();
-      await ytmService.syncCookies('');
-      await ytmService.invalidatePoToken();
+      if (getIt.isRegistered<YtmUrlCache>()) {
+        getIt<YtmUrlCache>().clear();
+      }
     } catch (_) {}
+
+    // The WebView jar first: the native store re-reads it whenever its own prefs
+    // are empty, so clearing native before the jar leaves a window (and, if the
+    // jar survives, a cold start) in which the session comes straight back.
     try {
       await _deleteSessionWebViewCookies();
     } catch (_) {}
+    try {
+      final ytmService = getIt<YtmService>();
+      // Marks the native store signed out, expires the tracked cookie names in
+      // CookieManager, and drops the account-bound poToken + dataSyncId. Plain
+      // `syncCookies('')` does none of the last three.
+      await ytmService.clearNativeSession();
+      await ytmService.syncCookies('');
+      await ytmService.invalidatePoToken();
+    } catch (_) {}
   }
 
-  /// Cookie domains owned by the YTM sign-in flow. Logout clears only these
-  /// instead of wiping every WebView/Google cookie on the device.
-  static const List<String> _sessionCookieDomains = [
-    '.youtube.com',
-    '.google.com',
-    'https://music.youtube.com',
-    'https://www.youtube.com',
-    'https://youtube.com',
-    'https://m.youtube.com',
-    'https://accounts.google.com',
-    'https://accounts.youtube.com',
-    'https://myaccount.google.com',
+  /// Cookie scopes owned by the YTM sign-in flow, as `(url, domain)` pairs.
+  /// Logout clears only these instead of wiping every WebView/Google cookie on
+  /// the device.
+  ///
+  /// Both scopes of each host are listed on purpose. The Google session cookies
+  /// are *domain* cookies (`Domain=.youtube.com`, `Domain=.google.com`), and
+  /// expiring a name host-only does not remove the domain-scoped cookie of the
+  /// same name — it just adds a second, host-scoped one, leaving the live
+  /// credential in the jar. The dotted entries used to be turned into the URL
+  /// `https://.youtube.com`, which is not a valid host at all, so the domain
+  /// cookies were never touched.
+  static const List<(String, String?)> _sessionCookieScopes = [
+    ('https://youtube.com', '.youtube.com'),
+    ('https://youtube.com', null),
+    ('https://www.youtube.com', null),
+    ('https://music.youtube.com', null),
+    ('https://m.youtube.com', null),
+    ('https://accounts.youtube.com', null),
+    ('https://google.com', '.google.com'),
+    ('https://google.com', null),
+    ('https://accounts.google.com', null),
+    ('https://myaccount.google.com', null),
   ];
 
   /// Deletes only YTM/Google session cookies from the WebView cookie store.
@@ -427,23 +501,28 @@ class YtmAccountService {
   Future<void> clearSessionWebViewCookies() => _deleteSessionWebViewCookies();
 
   Future<void> _deleteSessionWebViewCookies() async {
+    var deletedAny = false;
     try {
       final cookieManager = CookieManager.instance();
-      for (final domain in _sessionCookieDomains) {
-        final isHostScoped = domain.startsWith('https://');
-        await cookieManager.deleteCookies(
-          url: WebUri(isHostScoped ? domain : 'https://$domain'),
-          domain: isHostScoped ? '' : domain,
-          path: '/',
-        );
+      for (final (url, domain) in _sessionCookieScopes) {
+        try {
+          await cookieManager.deleteCookies(
+            url: WebUri(url),
+            domain: domain ?? '',
+            path: '/',
+          );
+          deletedAny = true;
+        } catch (_) {
+          // One bad scope must not abandon the rest.
+        }
       }
-    } catch (_) {
-      // Scoped deletion unsupported on this platform — fall back to a full
-      // wipe rather than leaving session cookies behind.
-      try {
-        await CookieManager.instance().deleteAllCookies();
-      } catch (_) {}
-    }
+    } catch (_) {}
+    if (deletedAny) return;
+    // Scoped deletion unsupported on this platform — fall back to a full wipe
+    // rather than leaving session cookies behind.
+    try {
+      await CookieManager.instance().deleteAllCookies();
+    } catch (_) {}
   }
 
   Future<void> _warmSession() async {
@@ -1453,64 +1532,77 @@ class YtmAccountService {
           .ensurePoTokenReady()
           .timeout(const Duration(seconds: 2));
     } catch (_) {}
-    String? poToken;
-    String? visitorData;
+    // Two attestation pairs, kept strictly apart. A poToken is only valid for
+    // the identity it was minted against, and the session cookies are only
+    // valid alongside the account-bound one — so the authenticated WEB_REMIX
+    // request uses (account token, session visitorData, cookies) while every
+    // guest client in the chain uses (guest token, guest visitorData, no
+    // cookies). Crossing them is what YouTube answers with LOGIN_REQUIRED /
+    // "confirm you're not a bot".
+    String? accountPoToken;
+    String? accountVisitorData;
     bool hadAccountPoToken = false; // true only when account-bound token minted successfully
+    // Whether this pass may carry the session (cookies + SAPISIDHASH). Only an
+    // account-bound poToken earns that; otherwise the pass runs as a clean guest.
+    var useSessionAuth = isAuthenticated;
     if (isAuthenticated) {
       // dataSyncId guard: if we still don't have a dataSyncId (e.g. first play
-      // immediately after login before _warmSession completed), skip Tier-1
-      // entirely rather than falling back to a guest poToken + auth cookies.
-      // A guest poToken paired with session cookies is a poisoned combination
-      // that YouTube rejects for every client, causing the full LOGIN_REQUIRED
-      // cascade. Tier-2 (native extractor) works cleanly without this mismatch.
-      if (_dataSyncId == null || _dataSyncId!.isEmpty) {
+      // immediately after login before _warmSession completed) we cannot mint an
+      // account-bound token. A guest poToken paired with session cookies is a
+      // poisoned combination that YouTube rejects for every client, causing the
+      // full LOGIN_REQUIRED cascade — but the remedy is to drop the *cookies*,
+      // not to drop Tier-1. Returning null here handed every signed-in
+      // resolution to Tier-2, so Tier-1 was effectively off while logged in.
+      final dsid = _dataSyncId;
+      if (dsid == null || dsid.isEmpty) {
         debugPrint('[YTM_ACCOUNT] dataSyncId not yet available for $videoId — '
-            'skipping Tier-1 to avoid guest-poToken+cookie mismatch. '
-            'Tier-2 native extractor will handle this request.');
-        return null;
-      }
-      final dsid = _dataSyncId!;
-      try {
-        final account = await getIt<YtmService>()
-            .getAccountPoToken(dsid)
-            .timeout(const Duration(seconds: 2));
-        poToken = account?['poToken'] as String?;
-        final vd = account?['visitorData'] as String?;
-        visitorData =
-            _sessionVisitorData ?? (vd != null && vd.isNotEmpty ? vd : null);
-        if (poToken != null && poToken.isNotEmpty) {
-          hadAccountPoToken = true;
+            'running Tier-1 as a guest pass (no session cookies).');
+        useSessionAuth = false;
+      } else {
+        try {
+          final account = await getIt<YtmService>()
+              .getAccountPoToken(dsid)
+              .timeout(const Duration(seconds: 2));
+          accountPoToken = account?['poToken'] as String?;
+          final vd = account?['visitorData'] as String?;
+          accountVisitorData =
+              _sessionVisitorData ?? (vd != null && vd.isNotEmpty ? vd : null);
+          if (accountPoToken != null && accountPoToken.isNotEmpty) {
+            hadAccountPoToken = true;
+          }
+        } catch (e) {
+          debugPrint('[YTM_ACCOUNT] Account poToken minting failed: $e');
         }
-      } catch (e) {
-        debugPrint('[YTM_ACCOUNT] Account poToken minting failed: $e');
-      }
-      // If account-bound poToken minting failed (e.g. BotGuard not ready yet),
-      // skip Tier-1 to avoid the guest-token+cookie mismatch. Tier-2 handles it.
-      if (!hadAccountPoToken) {
-        debugPrint('[YTM_ACCOUNT] Account-bound poToken unavailable for $videoId — '
-            'skipping Tier-1 to avoid mismatch. Tier-2 will handle this.');
-        return null;
+        // Account-bound minting failed (e.g. BotGuard not ready yet): fall back
+        // to a guest pass rather than sending a guest token with session
+        // cookies. Both the token and the visitorData must be the guest ones,
+        // so drop what the account attempt left behind.
+        if (!hadAccountPoToken) {
+          debugPrint('[YTM_ACCOUNT] Account-bound poToken unavailable for $videoId — '
+              'running Tier-1 as a guest pass (no session cookies).');
+          useSessionAuth = false;
+          accountPoToken = null;
+          accountVisitorData = null;
+        }
       }
     }
-    if (poToken == null || poToken.isEmpty) {
-      try {
-        final poState = await getIt<YtmService>()
-            .getPoTokenState()
-            .timeout(const Duration(seconds: 2));
-        poToken = poState?['streamingPoToken'] as String?;
-        visitorData ??= poState?['visitorData'] as String?;
-      } catch (_) {}
-    }
-    // Diagnostics: every bot-gate log below reports whether a token was
-    // actually attached, so "WEB_REMIX bot challenge" is immediately
-    // attributable to missing attestation vs rejected attestation.
-    final hadPoToken = poToken != null && poToken.isNotEmpty;
+    // Guest pair, needed by every non-WEB_REMIX client in the chain even when
+    // signed in — those clients are only reachable as guests.
+    String? guestPoToken;
+    String? guestVisitorData;
+    try {
+      final poState = await getIt<YtmService>()
+          .getPoTokenState()
+          .timeout(const Duration(seconds: 2));
+      guestPoToken = poState?['streamingPoToken'] as String?;
+      guestVisitorData = poState?['visitorData'] as String?;
+    } catch (_) {}
 
-    final clientChain = isAuthenticated
+    final clientChain = useSessionAuth
         ? [
-            'WEB_REMIX', // cookies + poToken → most reliable
-            'ANDROID_VR', // still works for some content unauthenticated
-            'ANDROID_MUSIC', // now needs cookies (sent below)
+            'WEB_REMIX', // the only client that carries the session
+            'ANDROID_VR', // guest fallbacks from here down
+            'ANDROID_MUSIC',
             'IOS_MUSIC',
             'TVHTML5_SIMPLY_EMBEDDED_PLAYER',
             'WEB_EMBEDDED_PLAYER',
@@ -1541,6 +1633,22 @@ class YtmAccountService {
             client == 'WEB_EMBEDDED_PLAYER' ||
             client == 'MWEB' ||
             client == 'TVHTML5_SIMPLY_EMBEDDED_PLAYER';
+        // Only WEB_REMIX may carry the signed-in session. The other web-shaped
+        // clients earn their place in this chain precisely by resolving *logged
+        // out* on a flagged IP; authenticating them is an auth-context mismatch
+        // that YouTube answers with LOGIN_REQUIRED / "confirm you're not a
+        // bot". That is what disabled the working fallbacks the moment the user
+        // signed in, and it fed the bot-block short-circuit below.
+        final acceptsSessionAuth = useSessionAuth && client == 'WEB_REMIX';
+        // The token must be bound to the identity the request is made under:
+        // datasyncId for the authenticated pass, visitorData for a guest one.
+        final poToken = acceptsSessionAuth ? accountPoToken : guestPoToken;
+        final visitorData =
+            acceptsSessionAuth ? accountVisitorData : guestVisitorData;
+        // Diagnostics: the bot-gate log below reports whether a token was
+        // actually attached, so "WEB_REMIX bot challenge" is immediately
+        // attributable to missing attestation vs rejected attestation.
+        final hadPoToken = poToken != null && poToken.isNotEmpty;
         final endpointHost = (client == 'ANDROID_MUSIC' ||
                 client == 'IOS_MUSIC' ||
                 client == 'WEB_REMIX')
@@ -1597,8 +1705,8 @@ class YtmAccountService {
           headers['Referer'] = '$origin/';
           headers['X-Origin'] = origin;
           headers['x-origin'] = origin;
-          headers['x-goog-authuser'] = '0';
-          if (_cookies != null && _cookies!.isNotEmpty) {
+          if (acceptsSessionAuth && _cookies != null && _cookies!.isNotEmpty) {
+            headers['x-goog-authuser'] = '0';
             headers['Cookie'] = _cookies!;
             final authHeader =
                 buildAuthorizationHeader(_cookies!, origin: origin);
@@ -1767,7 +1875,11 @@ class YtmAccountService {
               artist: details?['author'] as String? ?? '',
               artworkUrl: null,
               userAgent: headers['User-Agent'],
-              cookies: isWeb ? _cookies : null,
+              // Only a stream resolved under the session may be fetched with
+              // the session. A guest client's URL must be played back as a
+              // guest, or playback re-creates the very auth mismatch the chain
+              // just worked around.
+              cookies: acceptsSessionAuth ? _cookies : null,
               // The player response never states an expiry of its own, but the
               // URL it hands back always carries one. Left null, `isExpired` and
               // `isExpiringSoon` answer false for the whole ~6-hour life of the

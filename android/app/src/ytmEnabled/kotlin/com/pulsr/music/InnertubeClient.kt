@@ -156,6 +156,24 @@ internal class InnertubeClient(
             get() = ClientCapabilityMatrix.getCapability(this)
                 .clientNameId
                 .ifBlank { clientNameId }
+
+        /**
+         * Whether this client may carry the signed-in Google session: the cookie
+         * jar, the SAPISIDHASH `Authorization`, the session `visitorData`, the
+         * account-bound poToken and `user.lockedSafetyMode`.
+         *
+         * Only WEB_REMIX may. The remaining [isWeb] clients are embed / TV /
+         * mobile-web contexts that earn their place in the chain precisely by
+         * resolving *logged out* on a flagged IP. An authenticated embed request
+         * is an auth-context mismatch: YouTube answers LOGIN_REQUIRED with
+         * "sign in to confirm you're not a bot", which [YtmBlockSignal] reads as
+         * a BotChallenge — so it counts toward the chain short-circuit and
+         * invalidates the poToken mid-sweep. Signing in therefore disabled the
+         * exact fallbacks that work while signed out. This is the same
+         * guest-only rule already applied to ANDROID_MUSIC / IOS_MUSIC.
+         */
+        val acceptsSessionAuth: Boolean
+            get() = this == WEB_REMIX
     }
 
     class InnertubeException(
@@ -177,22 +195,6 @@ internal class InnertubeClient(
             ResolutionStrategy.Operation.STREAM_RESOLVE,
             limitedMode = PoTokenManager.isLimitedMode
         )
-
-        // Authenticated cold-start datasyncId bootstrap if needed.
-        // Throttled: harvestSessionState only yields a datasyncId on some
-        // responses, so without this every single track paid an extra full
-        // player round trip before its own resolution even started.
-        if (cookieStore.isSessionValid() && PoTokenManager.dataSyncId.isEmpty()) {
-            val now = android.os.SystemClock.elapsedRealtime()
-            if (now - lastDataSyncBootstrapMs > DATASYNC_BOOTSTRAP_INTERVAL_MS) {
-                lastDataSyncBootstrapMs = now
-                try {
-                    requestPlayer(videoId, ClientType.WEB_REMIX)
-                } catch (t: Throwable) {
-                    Log.w(TAG, "Datasync bootstrap call failed for $videoId: ${t.message}")
-                }
-            }
-        }
 
         val traceId = UUID.randomUUID().toString()
 
@@ -350,6 +352,29 @@ internal class InnertubeClient(
 
         val trackType = ClientWinnerStore.TRACK_TYPE_MUSIC
         val winnerStore = ClientWinnerStore.getInstance(context)
+
+        // Authenticated cold-start datasyncId bootstrap. harvestSessionState only
+        // yields a datasyncId on some responses, so a signed-in cold start needs
+        // one WEB_REMIX round trip before an account-bound poToken can be minted.
+        //
+        // Its result is now used instead of discarded: the response was thrown
+        // away, so every track resolved in the throttle window paid a full extra
+        // authenticated player request that could not do anything but fail or be
+        // ignored. If it resolves, that *is* the answer; if it does not, the
+        // datasyncId it harvested still benefits the chain below.
+        if (cookieStore.isSessionValid() && PoTokenManager.dataSyncId.isEmpty()) {
+            val now = android.os.SystemClock.elapsedRealtime()
+            if (now - lastDataSyncBootstrapMs > DATASYNC_BOOTSTRAP_INTERVAL_MS) {
+                lastDataSyncBootstrapMs = now
+                val bootstrapped = attemptClient(ClientType.WEB_REMIX)
+                if (bootstrapped != null) {
+                    winnerStore.recordWinningClient(trackType, ClientType.WEB_REMIX)
+                    return bootstrapped
+                }
+                winnerStore.recordFailure(trackType, ClientType.WEB_REMIX)
+                shortCircuit.get()?.let { throw it }
+            }
+        }
 
         val candidate1 = clientChain.firstOrNull()
         val candidate2 = clientChain.getOrNull(1)
@@ -591,7 +616,7 @@ internal class InnertubeClient(
                     .header("x-youtube-client-version", clientType.effectiveClientVersion)
 
                 // Attach visitorData if available
-                val authedWeb = clientType.isWeb && cookieStore.isSessionValid()
+                val authedWeb = clientType.acceptsSessionAuth && cookieStore.isSessionValid()
                 val visitorData = if (authedWeb) {
                     PoTokenManager.sessionVisitorData.ifEmpty { PoTokenManager.visitorData }
                 } else {
@@ -607,14 +632,21 @@ internal class InnertubeClient(
                     reqBuilder.header("Referer", "$origin/")
                     reqBuilder.header("X-Origin", origin)
                     reqBuilder.header("x-origin", origin)
-                    reqBuilder.header("x-goog-authuser", "0")
+                    // Only an authenticated request has an "auth user" to index.
+                    if (authedWeb) {
+                        reqBuilder.header("x-goog-authuser", "0")
+                    }
                 } else {
                     reqBuilder.header("X-Origin", clientType.endpointHost)
                 }
 
-                // Attach cookies and SAPISIDHASH for Web client requests
-                if (clientType.isWeb) {
-                    val cookieHeader = cookieStore.getMergedCookieHeader()
+                // Attach cookies and SAPISIDHASH only for the one client allowed
+                // to carry the session (see ClientType.acceptsSessionAuth). Also
+                // gated on isSessionValid(): CookieManager hands back empty and
+                // "EXPIRED" values, and attaching a jar plus a SAPISIDHASH built
+                // from those is an authenticated request with no credential.
+                if (authedWeb) {
+                    val cookieHeader = cookieStore.getMergedCookieHeader(clientType.endpointHost)
                     if (!cookieHeader.isNullOrEmpty()) {
                         reqBuilder.header("Cookie", cookieHeader)
 
@@ -638,16 +670,21 @@ internal class InnertubeClient(
                     }
                 }
 
-                // Keep mobile clients guest-only: attaching WEB session cookies
-                // to ANDROID_MUSIC/IOS_MUSIC poisons the fallback that works
-                // logged-out (YouTube returns LOGIN_REQUIRED for mismatched
-                // auth on these endpoints). Authenticated playback is covered
-                // by WEB_REMIX with cookies + SAPISIDHASH above.
+                // Every other client stays guest-only: attaching WEB session
+                // cookies to ANDROID_MUSIC/IOS_MUSIC — or to the embed/TV/MWEB
+                // web clients — poisons the fallback that works logged-out
+                // (YouTube returns LOGIN_REQUIRED for mismatched auth on those
+                // endpoints). Authenticated playback is covered by WEB_REMIX
+                // with cookies + SAPISIDHASH above.
 
                 val response = YtmHttpClient.okHttpClient.newCall(reqBuilder.build()).execute()
                 val code = response.code
 
-                if (clientType.isWeb) {
+                // Only the authenticated client's Set-Cookie may touch the jar.
+                // A guest embed/MWEB response hands out its own VISITOR_INFO1_LIVE
+                // / YSC, and merging those into the session jar overwrote the
+                // signed-in values with anonymous ones.
+                if (authedWeb) {
                     val setCookies = response.headers("Set-Cookie")
                     if (setCookies.isNotEmpty()) {
                         cookieStore.ingestSetCookieHeaders(setCookies)
@@ -762,7 +799,7 @@ internal class InnertubeClient(
     }
 
     private fun harvestSessionState(json: JSONObject, clientType: ClientType) {
-        if (!clientType.isWeb || !cookieStore.isSessionValid()) return
+        if (!clientType.acceptsSessionAuth || !cookieStore.isSessionValid()) return
         val responseContext = json.optJSONObject("responseContext") ?: return
         val dataSyncId = responseContext
             .optJSONObject("mainAppWebResponseContext")
@@ -803,7 +840,13 @@ internal class InnertubeClient(
                 (!PoTokenManager.webViewBroken && !PoTokenManager.isLimitedMode && PoTokenManager.ensureReadySync())
             if (hasPo) {
                 val dataSyncId = PoTokenManager.dataSyncId
-                val poToken = if (cookieStore.isSessionValid() && dataSyncId.isNotEmpty()) {
+                // Only the client that actually carries the session may send an
+                // account-bound token. An embed/MWEB request is a guest request,
+                // and a datasyncId-bound token in a guest context is rejected.
+                val poToken = if (clientType.acceptsSessionAuth &&
+                    cookieStore.isSessionValid() &&
+                    dataSyncId.isNotEmpty()
+                ) {
                     PoTokenManager.accountPoTokenForSync(dataSyncId)
                 } else {
                     // A token must be bound to visitorData. Minting one against a
@@ -831,7 +874,7 @@ internal class InnertubeClient(
             put("clientVersion", clientType.effectiveClientVersion)
             put("hl", fp.hl)
             put("gl", fp.gl)
-            val authedWeb = clientType.isWeb && cookieStore.isSessionValid()
+            val authedWeb = clientType.acceptsSessionAuth && cookieStore.isSessionValid()
             // Must mirror the X-Goog-Visitor-Id header built in postWithRetry.
             // Sending the header without the matching context.client.visitorData
             // is an identity mismatch and reliably provokes a bot challenge.
@@ -909,7 +952,7 @@ internal class InnertubeClient(
             contextJson.put("thirdParty", thirdParty)
         }
 
-        if (clientType.isWeb && cookieStore.isSessionValid()) {
+        if (clientType.acceptsSessionAuth && cookieStore.isSessionValid()) {
             val user = JSONObject()
             user.put("lockedSafetyMode", false)
             contextJson.put("user", user)

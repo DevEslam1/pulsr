@@ -909,8 +909,11 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           jar[c.name] = c.value as String? ?? '';
         }
       }
-      final combinedCookies =
-          jar.entries.map((e) => '${e.key}=${e.value}').join('; ');
+      // This jar spans accounts.google.com and music.youtube.com and is keyed by
+      // name only, so the Google account-management cookies land in it too.
+      // Scope them out before anything treats this as the YouTube session.
+      final combinedCookies = YtmAccountService.scopeCookiesForYouTube(
+          jar.entries.map((e) => '${e.key}=${e.value}').join('; '));
       if (combinedCookies.isNotEmpty &&
           YtmAccountService.looksLikeSignedInCookies(combinedCookies)) {
         if (!_isLoggedIn) {
@@ -1013,7 +1016,10 @@ class _YtmWebLoginSheetState extends State<YtmWebLoginSheet> {
           }
         }
         if (jar.isNotEmpty) {
-          cookies = jar.entries.map((e) => '${e.key}=${e.value}').join('; ');
+          // Same cross-host jar as in _detectLoginState: keep only what a
+          // browser would actually send to a YouTube host.
+          cookies = YtmAccountService.scopeCookiesForYouTube(
+              jar.entries.map((e) => '${e.key}=${e.value}').join('; '));
         }
       } catch (e, st) {
         ErrorLogger.log('_forceSaveAndFinish failed', error: e, stackTrace: st, category: 'YtmWebLoginSheet');

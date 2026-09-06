@@ -44,10 +44,12 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 )
             )
             "getCookies" -> {
+                // YouTube hosts only. Folding accounts.google.com into the same
+                // name-keyed jar sent Google account-management cookies to
+                // youtube.com, which a browser never does.
                 val urls = listOf(
                     "https://music.youtube.com",
                     "https://www.youtube.com",
-                    "https://accounts.google.com",
                     "https://youtube.com"
                 )
                 val cookieJar = mutableMapOf<String, String>()
@@ -65,6 +67,7 @@ class YtmExtractorPlugin : MethodChannel.MethodCallHandler {
                 result.success(merged)
             }
             "setCookies" -> result.success(true)
+            "clearCookies" -> result.success(true)
             "isVpnConnected" -> result.success(false)
             "clearNetworkCaches" -> result.success(true)
             else -> result.error("YTM_DISABLED", "YouTube Music is not available in this build", null)

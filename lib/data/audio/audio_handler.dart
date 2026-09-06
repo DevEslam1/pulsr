@@ -1519,7 +1519,7 @@ class PulsrAudioHandler extends BaseAudioHandler
 
     for (int offset = 1; offset <= 2; offset++) {
       if (_prefetching.length >= 2) break;
-      final targetIdx = _getNextIndex(offset: offset);
+      final targetIdx = _getNextIndex(offset: offset, peek: true);
       if (targetIdx != null && targetIdx >= 0 && targetIdx < _songs.length) {
         final song = _songs[targetIdx];
         // Skip local files (instant) and downloaded YouTube tracks
@@ -1769,13 +1769,13 @@ class PulsrAudioHandler extends BaseAudioHandler
     });
   }
 
-  int? _getNextIndex({int offset = 1}) {
+  int? _getNextIndex({int offset = 1, bool peek = false}) {
     if (_songs.isEmpty) return null;
     if (_activePlayer.loopMode == LoopMode.one) {
       return _currentIndex;
     }
     if (_activePlayer.shuffleModeEnabled && _songs.length > 1) {
-      if (offset == 1) {
+      if (offset == 1 && !peek) {
         _shuffleHistory.add(_currentIndex);
         if (_shuffleHistory.length > 50) {
           _shuffleHistory.removeAt(0);
@@ -2552,8 +2552,8 @@ class PulsrAudioHandler extends BaseAudioHandler
     // native reshuffle is needed there.
     playbackState.add(playbackState.value.copyWith(shuffleMode: shuffleMode));
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('shuffle_mode',
-        shuffleMode == AudioServiceShuffleMode.all ? 'all' : 'none');
+    await prefs.setBool(PrefsKeys.playbackShuffle,
+        shuffleMode == AudioServiceShuffleMode.all);
   }
 
   @override
@@ -2571,7 +2571,7 @@ class PulsrAudioHandler extends BaseAudioHandler
 
     playbackState.add(playbackState.value.copyWith(repeatMode: repeatMode));
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('repeat_mode', repeatMode.name);
+    await prefs.setString(PrefsKeys.playbackRepeatMode, repeatMode.name);
   }
 
   static const int maxQueueSize = 500;

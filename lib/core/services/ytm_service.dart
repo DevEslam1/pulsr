@@ -208,6 +208,22 @@ class YtmService {
     } catch (_) {}
   }
 
+  /// Tears down the native session on an explicit disconnect.
+  ///
+  /// Stronger than `syncCookies('')`, which only empties the in-process store
+  /// and its prefs: this also expires the tracked names in the WebView
+  /// CookieManager and drops the account-bound poToken plus the dataSyncId. Both
+  /// matter for a durable logout — the native store re-reads the WebView jar
+  /// whenever its prefs are empty, so a half-cleared disconnect came back on the
+  /// next cold start.
+  Future<void> clearNativeSession() async {
+    try {
+      await _channel
+          .invokeMethod<bool>('clearCookies')
+          .timeout(const Duration(seconds: 4));
+    } catch (_) {}
+  }
+
   /// Calls native PoTokenManager to ensure attestation tokens are ready.
   Future<bool> ensurePoTokenReady() async {
     try {

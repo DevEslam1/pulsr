@@ -242,7 +242,9 @@ object PoTokenManager {
     }
 
     /**
-     * Generates or retrieves cached poToken strictly bound to current [visitorData].
+     * Generates or retrieves a cached poToken bound to [identifier] — the
+     * `visitorData` for a guest request, the `datasyncId` for a signed-in one.
+     *
      * Never blocks critical-path playback if a token is already cached or stored.
      */
     fun poTokenForSync(identifier: String): String {
@@ -264,12 +266,7 @@ object PoTokenManager {
 
         // 3. If WebView is broken, fallback to last streaming token
         if (webViewBroken) {
-            synchronized(tokenLru) {
-                val fallback = tokenLru.get(identifier)?.token
-                if (!fallback.isNullOrEmpty()) return fallback
-            }
-            if (streamingPoToken.isNotEmpty()) return streamingPoToken
-            return ""
+            return fallbackTokenFor(identifier)
         }
 
         // 4. Use existing warm generator if available
@@ -283,14 +280,17 @@ object PoTokenManager {
                 minted
             } catch (t: Throwable) {
                 Log.w(TAG, "Minting poToken failed with warm generator: ${t.message}", t)
-                synchronized(tokenLru) {
-                    tokenLru.get(identifier)?.token ?: streamingPoToken
-                }
+                fallbackTokenFor(identifier)
             }
         }
 
-        // 5. If we have a valid stored streaming token, return it and warm generator in background
-        if (streamingPoToken.isNotEmpty() && !isExpired()) {
+        // 5. If we have a valid stored streaming token, return it and warm generator
+        //    in the background. Only for the guest case: the stored token is bound
+        //    to visitorData, so handing it back for a datasyncId identifier ships a
+        //    wrong-binding token that YouTube answers with an empty format list.
+        //    That made the first signed-in resolve after every cold start fail,
+        //    because a cold start has no generator but does have a stored token.
+        if (identifier == currentVisitor && streamingPoToken.isNotEmpty() && !isExpired()) {
             triggerBackgroundRefresh()
             return streamingPoToken
         }
@@ -300,9 +300,7 @@ object PoTokenManager {
 
         val activeGen = generator
         if (activeGen == null || activeGen.isExpired()) {
-            synchronized(tokenLru) {
-                return tokenLru.get(identifier)?.token ?: streamingPoToken
-            }
+            return fallbackTokenFor(identifier)
         }
 
         return try {
@@ -313,10 +311,25 @@ object PoTokenManager {
             minted
         } catch (t: Throwable) {
             Log.w(TAG, "Minting poToken failed for $identifier: ${t.message}", t)
-            synchronized(tokenLru) {
-                tokenLru.get(identifier)?.token ?: streamingPoToken
-            }
+            fallbackTokenFor(identifier)
         }
+    }
+
+    /**
+     * Best token still available for [identifier] when minting is impossible.
+     *
+     * A poToken is only valid for the identifier it was minted against, so
+     * [streamingPoToken] — always bound to `visitorData` — may only stand in for
+     * a guest request. For an account-bound identifier the honest answer is "no
+     * token": the caller then sends the request without one, which can still
+     * succeed, where a wrong-binding token is rejected every time.
+     */
+    private fun fallbackTokenFor(identifier: String): String {
+        synchronized(tokenLru) {
+            val cached = tokenLru.get(identifier)?.token
+            if (!cached.isNullOrEmpty()) return cached
+        }
+        return if (identifier == visitorData) streamingPoToken else ""
     }
 
     suspend fun poTokenFor(identifier: String): String = withContext(Dispatchers.IO) {
@@ -378,6 +391,25 @@ object PoTokenManager {
         synchronized(tokenLru) {
             tokenLru.evictAll()
         }
+    }
+
+    /**
+     * Full reset for an explicit disconnect or account switch: drops the
+     * attestation *and* the dataSyncId.
+     *
+     * [invalidate] keeps the id on purpose — a bot challenge does not change
+     * which account is signed in. A logout does, and nothing used to clear it,
+     * so the next session kept minting account-bound tokens for an account the
+     * user had disconnected (or, after a switch, for the previous one).
+     */
+    fun clearSession() {
+        invalidate()
+        synchronized(tokenLru) {
+            val old = dataSyncId
+            dataSyncId = ""
+            if (old.isNotEmpty()) tokenLru.remove(old)
+        }
+        appContext?.let { PoTokenStore.clearDataSyncId(it) }
     }
 
     private fun refreshInternal() {

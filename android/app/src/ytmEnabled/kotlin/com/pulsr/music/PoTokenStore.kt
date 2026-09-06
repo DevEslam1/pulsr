@@ -162,6 +162,19 @@ internal object PoTokenStore {
     }
 
     /**
+     * Drops the persisted dataSyncId. Only an explicit disconnect or an account
+     * switch may do this — see [clearAttestation] for the bot-challenge case,
+     * which must keep it.
+     */
+    fun clearDataSyncId(context: Context) {
+        try {
+            getPrefs(context).edit().remove(KEY_DATA_SYNC_ID).apply()
+        } catch (t: Throwable) {
+            Log.e(TAG, "Failed to clear dataSyncId in store: ${t.message}", t)
+        }
+    }
+
+    /**
      * Clears attestation state while keeping the dataSyncId, which identifies the
      * signed-in account rather than the token.
      */
