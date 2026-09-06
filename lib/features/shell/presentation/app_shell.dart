@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../core/utils/adaptive.dart';
-import '../../player/presentation/mini_player.dart';
 import '../../player/presentation/widgets/tablet_player_bar.dart';
-import 'bottom_nav_bar.dart';
 import 'widgets/landscape_sidebar.dart';
+import 'widgets/stacked_bottom_dock.dart';
 import 'widgets/tablet_side_inspector.dart';
 
 class AppShell extends StatefulWidget {
@@ -18,6 +17,7 @@ class AppShell extends StatefulWidget {
 class _AppShellState extends State<AppShell> {
   bool _isSideInspectorOpen = false;
   bool? _isSidebarExtended;
+  DockStackMode _dockMode = DockStackMode.defaultLayout;
 
   void _onTapNav(int index) {
     widget.navigationShell.goBranch(
@@ -40,7 +40,6 @@ class _AppShellState extends State<AppShell> {
 
     // ── Portrait Layout (Phone & Tablet Portrait) ──────────────────────
     if (!isLandscape) {
-      final double maxPlayerWidth = isTablet ? 640.0 : 560.0;
       return Scaffold(
         resizeToAvoidBottomInset: false,
         body: Stack(
@@ -50,20 +49,12 @@ class _AppShellState extends State<AppShell> {
               left: 0,
               right: 0,
               bottom: 0,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Center(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: maxPlayerWidth),
-                      child: MiniPlayer(onTap: () => _openNowPlaying(context)),
-                    ),
-                  ),
-                  PulsrBottomNavBar(
-                    currentIndex: widget.navigationShell.currentIndex,
-                    onTap: _onTapNav,
-                  ),
-                ],
+              child: StackedBottomDock(
+                currentIndex: widget.navigationShell.currentIndex,
+                onTapNav: _onTapNav,
+                onOpenNowPlaying: () => _openNowPlaying(context),
+                mode: _dockMode,
+                onModeChanged: (newMode) => setState(() => _dockMode = newMode),
               ),
             ),
           ],

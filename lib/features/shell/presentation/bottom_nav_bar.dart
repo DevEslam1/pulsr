@@ -8,11 +8,17 @@ import '../../../core/utils/l10n_extensions.dart';
 class PulsrBottomNavBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
+  final VoidCallback? onSwipeDown;
+  final VoidCallback? onSwipeUp;
+  final bool includeSafeArea;
 
   const PulsrBottomNavBar({
     super.key,
     required this.currentIndex,
     required this.onTap,
+    this.onSwipeDown,
+    this.onSwipeUp,
+    this.includeSafeArea = true,
   });
 
   List<({IconData activeIcon, IconData icon, String label})> _getItems(
@@ -59,7 +65,7 @@ class PulsrBottomNavBar extends StatelessWidget {
       top: false,
       left: false,
       right: false,
-      bottom: true,
+      bottom: includeSafeArea,
       child: Padding(
         padding: EdgeInsets.fromLTRB(
           isTablet ? 24 : 14,
@@ -72,10 +78,20 @@ class PulsrBottomNavBar extends StatelessWidget {
           heightFactor: 1.0,
           child: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxBarWidth),
-            child: SizedBox(
-              height: barHeight,
-              child: Container(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onVerticalDragEnd: (d) {
+                final v = d.primaryVelocity ?? 0;
+                if (v > 180) {
+                  onSwipeDown?.call();
+                } else if (v < -180) {
+                  onSwipeUp?.call();
+                }
+              },
+              child: SizedBox(
                 height: barHeight,
+                child: Container(
+                  height: barHeight,
                 decoration: BoxDecoration(
                   borderRadius: navRadius,
                   boxShadow: [
@@ -146,8 +162,9 @@ class PulsrBottomNavBar extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
 
 class _NavTabItem extends StatelessWidget {

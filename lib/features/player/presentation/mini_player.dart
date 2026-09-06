@@ -13,7 +13,15 @@ import '../cubit/player_state.dart';
 
 class MiniPlayer extends StatelessWidget {
   final VoidCallback onTap;
-  const MiniPlayer({super.key, required this.onTap});
+  final VoidCallback? onSwipeDown;
+  final VoidCallback? onSwipeUp;
+
+  const MiniPlayer({
+    super.key,
+    required this.onTap,
+    this.onSwipeDown,
+    this.onSwipeUp,
+  });
 
   void _handleSwipe(PlayerCubit cubit, MiniPlayerSwipeAction action,
       {required bool isLeft}) {
@@ -55,7 +63,16 @@ class MiniPlayer extends StatelessWidget {
           child: GestureDetector(
             onTap: onTap,
             onVerticalDragEnd: (d) {
-              if ((d.primaryVelocity ?? 0) < -200) onTap();
+              final v = d.primaryVelocity ?? 0;
+              if (v > 180) {
+                onSwipeDown?.call();
+              } else if (v < -180) {
+                if (onSwipeUp != null) {
+                  onSwipeUp!();
+                } else {
+                  onTap();
+                }
+              }
             },
             onHorizontalDragEnd: (d) {
               final v = d.primaryVelocity ?? 0;
