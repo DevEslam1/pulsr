@@ -16,7 +16,12 @@ class LrcParser {
   /// Parses raw LRC string content into a sorted list of `LyricsLine`.
   static List<LyricsLine> parse(String lrcContent,
       {LyricsSource source = LyricsSource.none}) {
-    final lines = lrcContent.split(RegExp(r'\r?\n'));
+    // Strip UTF-8 BOM if present
+    var content = lrcContent;
+    if (content.isNotEmpty && content.codeUnitAt(0) == 0xFEFF) {
+      content = content.substring(1);
+    }
+    final lines = content.split(RegExp(r'\r?\n'));
     final List<LyricsLine> result = [];
 
     // Check for [offset:+/-ms] tag
@@ -32,10 +37,19 @@ class LrcParser {
     }
 
     // Match tags like [01:23.45] or [01:23.456] or [01:23.4] or [01:23] or [120:00.00]
-    final RegExp timeExp = RegExp(r'\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]');
-    final RegExp wordTagExp = RegExp(r'<(?:\d{1,3}:)?\d{2}(?:\.\d{1,3})?>');
+    // Also handle comma decimal separator used in some editors: [01:23,45]
+    final RegExp timeExp = RegExp(r'\[(\d{1,3}):(\d{2})(?:[.,](\d{1,3}))?\]');
+    final RegExp wordTagExp = RegExp(r'<(?:\d{1,3}:)?\d{2}(?:[.,]\d{1,3})?>');
+    // Metadata tags to ignore (artist, title, album, etc.)
+    final RegExp metaExp = RegExp(
+        r'^\s*\[(ar|ti|al|by|offset|length):',
+        caseSensitive: false);
 
-    for (final line in lines) {
+    for (final rawLine in lines) {
+      final line = rawLine.trim();
+      if (line.isEmpty) continue;
+      if (metaExp.hasMatch(line)) continue;
+
       final matches = timeExp.allMatches(line).toList();
       if (matches.isEmpty) continue;
 
@@ -95,47 +109,73 @@ class LrcParser {
     return result;
   }
 
+  /// Helper to read a file and parse as LRC, returning null if file missing or
+  /// content doesn't contain synced timestamps.
+  static Future<List<LyricsLine>?> _tryParseLrcFile(
+    String path, LyricsSource source) async {
+    try {
+      final file = File(path);
+      if (!await file.exists()) return null;
+      final content = await file.readAsString();
+      final lines = parse(content, source: source);
+      if (lines.isNotEmpty) return lines;
+    } catch (_) {}
+    return null;
+  }
+
   /// Searches for a local `.lrc` file matching the audio file path across standard locations:
-  /// 1. Exact path with .lrc extension (e.g. /Music/Song.lrc)
-  /// 2. /Music/Lyrics/Song.lrc
-  /// 3. /Music/lyrics.lrc
+  /// 1. Exact path with .lrc extension (e.g. /Music/Song.lrc) – also tries .txt fallback
+  /// 2. /Music/Lyrics/Song.lrc and /Music/lyrics/Song.lrc
+  /// 3. /Music/lyrics.lrc (generic)
   static Future<List<LyricsLine>?> findAndParseLrc(
     String audioFilePath, {
     LyricsSource source = LyricsSource.externalLrc,
   }) async {
+    if (audioFilePath.isEmpty ||
+        audioFilePath.startsWith('content:') ||
+        audioFilePath.startsWith('http') ||
+        audioFilePath.startsWith('ytmusic://')) {
+      return null;
+    }
     try {
       final lastDot = audioFilePath.lastIndexOf('.');
       if (lastDot == -1) return null;
-      final directLrcPath = '${audioFilePath.substring(0, lastDot)}.lrc';
-      final file = File(directLrcPath);
-      if (await file.exists()) {
-        final content = await file.readAsString();
-        final lines = parse(content, source: source);
-        if (lines.isNotEmpty) return lines;
+      final basePath = audioFilePath.substring(0, lastDot);
+
+      // 1. Direct sibling .lrc (and .txt fallback for some providers)
+      for (final ext in ['.lrc', '.txt', '.LRC', '.TXT']) {
+        final candidate = '$basePath$ext';
+        final lines = await _tryParseLrcFile(candidate, source);
+        if (lines != null) return lines;
       }
 
       // Check sibling "Lyrics" / "lyrics" subdirectory (case-insensitive on ext4)
       final parentDir = File(audioFilePath).parent;
       final fileName = audioFilePath.split(Platform.pathSeparator).last;
+      final dotIdx = fileName.lastIndexOf('.');
       final fileNameWithoutExt =
-          fileName.substring(0, fileName.lastIndexOf('.'));
-      for (final subdirName in ['Lyrics', 'lyrics']) {
-        final lyricsSubdirLrc = File(
-            '${parentDir.path}${Platform.pathSeparator}$subdirName${Platform.pathSeparator}$fileNameWithoutExt.lrc');
-        if (await lyricsSubdirLrc.exists()) {
-          final content = await lyricsSubdirLrc.readAsString();
-          final lines = parse(content, source: source);
-          if (lines.isNotEmpty) return lines;
+          dotIdx != -1 ? fileName.substring(0, dotIdx) : fileName;
+      for (final subdirName in ['Lyrics', 'lyrics', 'LRC', 'lrc']) {
+        for (final ext in ['.lrc', '.txt']) {
+          final p =
+              '${parentDir.path}${Platform.pathSeparator}$subdirName${Platform.pathSeparator}$fileNameWithoutExt$ext';
+          final lines = await _tryParseLrcFile(p, source);
+          if (lines != null) return lines;
         }
       }
 
-      for (final genericName in ['lyrics.lrc', 'Lyrics.lrc']) {
+      for (final genericName in ['lyrics.lrc', 'Lyrics.lrc', 'lyrics.txt']) {
         final genericLrc =
             File('${parentDir.path}${Platform.pathSeparator}$genericName');
         if (await genericLrc.exists()) {
-          final content = await genericLrc.readAsString();
-          final lines = parse(content, source: source);
-          if (lines.isNotEmpty) return lines;
+          try {
+            final content = await genericLrc.readAsString();
+            final lines = parse(content, source: source);
+            if (lines.isNotEmpty) return lines;
+            // If not synced, try plain-text fallback from generic file
+            final plain = parsePlainText(content, source: source);
+            if (plain.isNotEmpty) return plain;
+          } catch (_) {}
         }
       }
     } catch (e, st) {
@@ -202,33 +242,43 @@ class LrcParser {
     }
 
     LyricsResult? resolved;
+    List<LyricsLine>? embeddedPlainFallback;
 
-    // 1. Embedded lyrics via platform channel / tag reader
-    final embeddedText = await getEmbeddedLyrics(audioFilePath);
-    if (embeddedText != null && embeddedText.trim().isNotEmpty) {
-      final syncedLines = parse(embeddedText, source: LyricsSource.embedded);
-      if (syncedLines.isNotEmpty) {
+    // 1. External .lrc file – highest priority for synced lyrics
+    final lrcLines = await findAndParseLrc(audioFilePath,
+        source: LyricsSource.externalLrc);
+    if (lrcLines != null && lrcLines.isNotEmpty) {
+      final isSynced = lrcLines.any((l) => l.timestamp > Duration.zero);
+      if (isSynced) {
         resolved =
-            LyricsResult(lines: syncedLines, source: LyricsSource.embedded);
+            LyricsResult(lines: lrcLines, source: LyricsSource.externalLrc);
       } else {
-        final plainLines =
-            parsePlainText(embeddedText, source: LyricsSource.embedded);
-        if (plainLines.isNotEmpty) {
+        // Keep as fallback if no synced source found
+        embeddedPlainFallback = lrcLines;
+      }
+    }
+
+    // 2. Embedded lyrics via platform channel / tag reader
+    if (resolved == null) {
+      final embeddedText = await getEmbeddedLyrics(audioFilePath);
+      if (embeddedText != null && embeddedText.trim().isNotEmpty) {
+        final syncedLines = parse(embeddedText, source: LyricsSource.embedded);
+        if (syncedLines.isNotEmpty) {
           resolved =
-              LyricsResult(lines: plainLines, source: LyricsSource.embedded);
+              LyricsResult(lines: syncedLines, source: LyricsSource.embedded);
+        } else {
+          final plainLines =
+              parsePlainText(embeddedText, source: LyricsSource.embedded);
+          if (plainLines.isNotEmpty) {
+            embeddedPlainFallback ??= plainLines;
+            // Only use plain if no better source exists later (LRCLIB may provide synced)
+          }
         }
       }
     }
 
-    // 2. External .lrc file
-    if (resolved == null) {
-      final lrcLines = await findAndParseLrc(audioFilePath,
-          source: LyricsSource.externalLrc);
-      if (lrcLines != null && lrcLines.isNotEmpty) {
-        resolved =
-            LyricsResult(lines: lrcLines, source: LyricsSource.externalLrc);
-      }
-    }
+    // Prefer external plain fallback if no synced yet and no LRCLIB will be tried
+    // Otherwise keep plain for later if LRCLIB fails
 
     // 3. Online LRCLIB query
     if (resolved == null &&
@@ -249,6 +299,12 @@ class LrcParser {
         ErrorLogger.log('Failed to fetch lyrics from LRCLIB for $trackTitle',
             error: e, stackTrace: st, category: 'LrcParser');
       }
+    }
+
+    // 4. Fallback to plain unsynced lyrics if no synced source succeeded
+    if (resolved == null && embeddedPlainFallback != null) {
+      final src = embeddedPlainFallback.first.source;
+      resolved = LyricsResult(lines: embeddedPlainFallback, source: src);
     }
 
     // Cache the result (including null to avoid repeated failing lookups, with TTL)

@@ -162,14 +162,29 @@ internal object YtmHttpClient {
             .followRedirects(true)
             .followSslRedirects(true)
             .proxySelector(object : ProxySelector() {
+                // Fallback to the system selector so a VPN that works as a
+                // local HTTP/SOCKS proxy (127.0.0.1:port) is respected when the
+                // user has not configured a custom proxy in Pulsr. Returning
+                // NO_PROXY unconditionally bypassed the VPN and made YT Music
+                // work in the official app but fail in Pulsr.
+                private val systemSelector: ProxySelector? = ProxySelector.getDefault()
+
                 override fun select(uri: URI?): List<Proxy> {
                     val urlStr = uri?.toString()
                     val customProxy = ProxyManager.getProxy(urlStr)
-                    return if (customProxy != null) listOf(customProxy) else listOf(Proxy.NO_PROXY)
+                    if (customProxy != null) return listOf(customProxy)
+                    // Delegate to system – covers VPN-as-proxy and enterprise PAC.
+                    val systemProxies = runCatching { systemSelector?.select(uri) }.getOrNull()
+                    if (systemProxies != null && systemProxies.isNotEmpty() && systemProxies.any { it != Proxy.NO_PROXY }) {
+                        return systemProxies
+                    }
+                    return listOf(Proxy.NO_PROXY)
                 }
 
                 override fun connectFailed(uri: URI?, sa: SocketAddress?, ioe: IOException?) {
                     ProxyManager.onPathFailed(uri?.toString())
+                    // Also notify system selector so it can rotate.
+                    runCatching { systemSelector?.connectFailed(uri, sa, ioe) }
                 }
             })
             .build()

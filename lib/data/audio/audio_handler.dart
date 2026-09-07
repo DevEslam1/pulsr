@@ -1456,6 +1456,17 @@ class PulsrAudioHandler extends BaseAudioHandler
     _prefetching.clear();
   }
 
+  /// Clears all IP-bound stream URL caches and DNS-era state.
+  ///
+  /// Call on VPN/network-path change: googlevideo URLs carry an IP-bound
+  /// `expire`/`ip` signature and return 403 when the egress IP changes.
+  void clearNetworkCaches() {
+    _streamCache.clear();
+    _inFlightResolves.clear();
+    _prefetching.clear();
+    cancelPrefetches();
+  }
+
   /// Warms [_streamCache] for an upcoming YouTube track so track switching is instant.
   void _prefetchStream(SongsTableData song) {
     final videoId = song.remoteId;
@@ -1700,12 +1711,16 @@ class PulsrAudioHandler extends BaseAudioHandler
         final fadeDuration = _crossfadeManager.duration;
 
         final targetNextVolume = _calculateReplayGainVolume(nextSong);
-        await Future.wait([
-          _crossfadeManager.fadeVolume(
-              active, initialActiveVolume, 0.0, fadeDuration, currentFadeId),
-          _crossfadeManager.fadeVolume(
-              inactive, 0.0, targetNextVolume, fadeDuration, currentFadeId),
-        ]);
+        final isRepeatOne = _activePlayer.loopMode == LoopMode.one;
+        await _crossfadeManager.crossfadeVolumes(
+          active: active,
+          inactive: inactive,
+          fromActiveVol: initialActiveVolume,
+          toInactiveVol: targetNextVolume,
+          duration: fadeDuration,
+          fadeId: currentFadeId,
+          isRepeatOne: isRepeatOne,
+        );
 
         if (_crossfadeManager.currentFadeId != currentFadeId) {
           try {

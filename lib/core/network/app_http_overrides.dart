@@ -29,9 +29,22 @@ class AppHttpOverrides extends HttpOverrides {
   HttpClient createHttpClient(SecurityContext? context) {
     final client = super.createHttpClient(context);
 
-    // Dynamic findProxy callback
+    // Dynamic findProxy callback — when no custom proxy is active, fall
+    // back to the platform's proxy resolution (covers VPNs that expose
+    // themselves as a local HTTP/SOCKS proxy). Returning a hard-coded
+    // 'DIRECT' bypassed the VPN and made Pulsr fail while the official
+    // YouTube Music app (which uses the system selector) kept working.
     client.findProxy = (uri) {
-      return _config.toFindProxyString(uri);
+      if (_config.enabled && _config.isValid && !_config.isBypassed(uri)) {
+        return _config.toFindProxyString(uri);
+      }
+      // Delegate to Dart's environment proxy (http_proxy/https_proxy) and
+      // ultimately to DIRECT if none is set — DIRECT still traverses a
+      // TUN-based VPN at the IP layer.
+      return HttpClient.findProxyFromEnvironment(
+        uri,
+        environment: Platform.environment,
+      );
     };
 
     // Dynamic proxy authentication credentials
@@ -76,7 +89,17 @@ class AppHttpOverrides extends HttpOverrides {
         ..connectionTimeout = timeout
         ..idleTimeout = timeout;
 
-      testClient.findProxy = (u) => testConfig.toFindProxyString(u);
+      testClient.findProxy = (u) {
+        if (testConfig.enabled &&
+            testConfig.isValid &&
+            !testConfig.isBypassed(u)) {
+          return testConfig.toFindProxyString(u);
+        }
+        return HttpClient.findProxyFromEnvironment(
+          u,
+          environment: Platform.environment,
+        );
+      };
 
       if (testConfig.enabled && testConfig.hasAuth) {
         testClient.addProxyCredentials(

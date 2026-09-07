@@ -17,6 +17,7 @@ import 'core/theme/aura_theme.dart';
 import 'core/theme/dynamic_theme_cubit.dart';
 import 'core/widgets/cached_artwork.dart';
 import 'core/router/app_router.dart';
+import 'core/network/network_change_monitor.dart';
 import 'core/services/auth_service.dart';
 import 'core/services/file_intent_handler.dart';
 import 'core/services/restore_detection_service.dart';
@@ -155,6 +156,8 @@ class PulsrApp extends StatefulWidget {
 class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
   late final GoRouter _router;
   StreamSubscription<void>? _authExpiredSub;
+  StreamSubscription<void>? _networkChangeSub;
+  NetworkChangeMonitor? _networkMonitor;
   DateTime? _lastAuthExpiredPrompt;
 
   @override
@@ -165,6 +168,7 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     _autoScanOnStartup();
     _checkInitialAudioIntent();
     _listenForYtmSessionExpiry();
+    _startNetworkChangeMonitor();
   }
 
   @override
@@ -223,10 +227,36 @@ class _PulsrAppState extends State<PulsrApp> with WidgetsBindingObserver {
     });
   }
 
+  void _startNetworkChangeMonitor() {
+    getIt.allReady().then((_) {
+      if (!mounted) return;
+      try {
+        final monitor = NetworkChangeMonitor();
+        _networkMonitor = monitor;
+        monitor.start();
+        _networkChangeSub = monitor.onNetworkChanged.listen((_) async {
+          debugPrint('[PulsrApp] Network path changed — invalidating YTM caches');
+          try {
+            if (getIt.isRegistered<YtmService>()) {
+              await getIt<YtmService>().handleNetworkChange();
+            }
+          } catch (_) {}
+          try {
+            if (getIt.isRegistered<PulsrAudioHandler>()) {
+              getIt<PulsrAudioHandler>().clearNetworkCaches();
+            }
+          } catch (_) {}
+        });
+      } catch (_) {}
+    });
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _authExpiredSub?.cancel();
+    _networkChangeSub?.cancel();
+    _networkMonitor?.dispose();
     super.dispose();
   }
 

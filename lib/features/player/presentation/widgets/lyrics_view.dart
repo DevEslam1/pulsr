@@ -92,10 +92,27 @@ class _LyricsViewState extends State<LyricsView> {
       final lrc = LrcParser.formatToLrc(widget.lyrics);
       _lyricController.loadLyric(lrc);
 
-      // Initial progress update if available
-      if (widget.currentPosition != null) {
-        _updateProgress(widget.currentPosition!);
+      // Push current position immediately so highlight appears without waiting
+      // for the next 200ms tick. Works for both explicit currentPosition and
+      // BlocListener-driven mode.
+      Duration? pos = widget.currentPosition;
+      if (pos == null) {
+        try {
+          pos = context.read<PlayerCubit>().state.position;
+        } catch (_) {}
       }
+      if (pos != null) {
+        // Defer one frame so LyricController finishes internal parse.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _updateProgress(pos!);
+        });
+        // Also try immediate for fast highlight.
+        _updateProgress(pos);
+      }
+    } else {
+      // Plain-text lyrics: clear synced controller so stale synced data
+      // doesn't leak when switching between synced/plain.
+      _lyricController.loadLyric('');
     }
   }
 
@@ -110,8 +127,13 @@ class _LyricsViewState extends State<LyricsView> {
   void didUpdateWidget(covariant LyricsView oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    if (!identical(widget.lyrics, oldWidget.lyrics) ||
-        widget.lyrics.length != oldWidget.lyrics.length) {
+    // LyricsView is recreated with a ValueKey per song, but during loading
+    // states the parent may emit new list instances; use identity check.
+    // Also handle content changes where length happens to be equal.
+    if (!identical(widget.lyrics, oldWidget.lyrics)) {
+      _syncLyricsToController();
+    } else if (widget.lyrics.length != oldWidget.lyrics.length ||
+        widget.source != oldWidget.source) {
       _syncLyricsToController();
     }
 

@@ -809,6 +809,7 @@ class PlayerCubit extends PulsrCubit<PlayerState> {
   Future<void> refreshLyrics() async {
     final song = state.currentSong;
     if (song != null) {
+      LrcParser.invalidateSong(songId: song.id, path: song.path);
       await _loadLyricsForSong(song);
     }
   }

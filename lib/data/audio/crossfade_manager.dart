@@ -222,7 +222,7 @@ class CrossfadeManager {
     final stopwatch = Stopwatch()..start();
 
     late final Timer timer;
-    timer = Timer.periodic(const Duration(milliseconds: 33), (t) {
+    timer = Timer.periodic(const Duration(milliseconds: 16), (t) {
       if (_fadeId != fadeId) {
         t.cancel();
         _activeTimers.remove(t);
@@ -258,6 +258,77 @@ class CrossfadeManager {
       }
     });
 
+    _activeTimers.add(timer);
+    return completer.future;
+  }
+
+  /// Phase-locked crossfade driving *both* players from a single timer using
+  /// [evaluateGainPair]. Running two independent [fadeVolume] timers causes
+  /// inter-timer jitter (one fires before the other) and — for equal-power —
+  /// uses `1 - sin` for the fade-out instead of `cos`, producing a ~3 dB dip
+  /// and audible stepping/zipper noise at the midpoint. A single timer
+  /// guarantees `cos²+sin²=1` at every tick and 16 ms (~60 fps) granularity.
+  Future<void> crossfadeVolumes({
+    required AudioPlayer active,
+    required AudioPlayer inactive,
+    required double fromActiveVol,
+    required double toInactiveVol,
+    required Duration duration,
+    required int fadeId,
+    bool isRepeatOne = false,
+  }) async {
+    if (duration == Duration.zero) {
+      await active.setVolume(0.0);
+      await inactive.setVolume(toInactiveVol.clamp(0.0, 1.0));
+      return;
+    }
+    final totalMs = duration.inMilliseconds.toDouble();
+    if (totalMs <= 0) {
+      await active.setVolume(0.0);
+      await inactive.setVolume(toInactiveVol.clamp(0.0, 1.0));
+      return;
+    }
+    final completer = Completer<void>();
+    final stopwatch = Stopwatch()..start();
+    late final Timer timer;
+    timer = Timer.periodic(const Duration(milliseconds: 16), (t) {
+      if (_fadeId != fadeId) {
+        t.cancel();
+        _activeTimers.remove(t);
+        if (!completer.isCompleted) completer.complete();
+        return;
+      }
+      final elapsed = stopwatch.elapsedMilliseconds.toDouble();
+      final fraction = (elapsed / totalMs).clamp(0.0, 1.0);
+      final (oldGain, newGain) =
+          evaluateGainPair(fraction, isRepeatOne: isRepeatOne);
+      try {
+        // Gains are 0→1; scale by the ReplayGain-compensated peaks.
+        active.setVolume((oldGain * fromActiveVol).clamp(0.0, 1.0));
+        inactive.setVolume((newGain * toInactiveVol).clamp(0.0, 1.0));
+      } catch (e, st) {
+        ErrorLogger.log(
+          'Error adjusting volume during crossfade',
+          error: e,
+          stackTrace: st,
+          category: 'CrossfadeManager',
+        );
+        t.cancel();
+        _activeTimers.remove(t);
+        if (!completer.isCompleted) completer.complete();
+        return;
+      }
+      if (fraction >= 1.0) {
+        // Guarantee exact endpoints — avoids leaving at 0.99 due to timing.
+        try {
+          active.setVolume(0.0);
+          inactive.setVolume(toInactiveVol.clamp(0.0, 1.0));
+        } catch (_) {}
+        t.cancel();
+        _activeTimers.remove(t);
+        if (!completer.isCompleted) completer.complete();
+      }
+    });
     _activeTimers.add(timer);
     return completer.future;
   }

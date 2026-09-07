@@ -185,10 +185,66 @@ class MainActivity : AudioServiceActivity() {
                         }
 
                         if (file != null && file.exists()) {
+                            // 1) jaudiotagger – try multiple lyric keys
                             try {
                                 val audioFile = AudioFileIO.read(file)
-                                lyrics = audioFile.tag?.getFirst(FieldKey.LYRICS)
+                                val tag = audioFile.tag
+                                if (tag != null) {
+                                    val candidates = listOf(
+                                        FieldKey.LYRICS,
+                                        FieldKey.UNSYNCED_LYRICS
+                                    )
+                                    for (key in candidates) {
+                                        try {
+                                            val v = tag.getFirst(key)
+                                            if (!v.isNullOrBlank()) { lyrics = v; break }
+                                        } catch (_: Exception) {}
+                                    }
+                                    // Fallback: scan any field whose id contains "lyric" (e.g. TXXX:LYRICS)
+                                    if (lyrics.isNullOrBlank()) {
+                                        try {
+                                            for (field in tag.allFields) {
+                                                val id = try { field.id } catch (_: Exception) { "" }
+                                                if (id.contains("LYRIC", ignoreCase = true) ||
+                                                    id.contains("USLT", ignoreCase = true) ||
+                                                    id.contains("SYLT", ignoreCase = true)) {
+                                                    val v = field.toString()
+                                                    // field.toString() for jaudiotagger Text fields returns the text content
+                                                    // Use getFirst logic already covered, but try raw
+                                                    if (!v.isNullOrBlank() && v.length > 4 && !v.startsWith("Field")) {
+                                                        lyrics = v; break
+                                                    }
+                                                }
+                                            }
+                                        } catch (_: Exception) {}
+                                    }
+                                }
                             } catch (_: Exception) {}
+                            // 2) MediaMetadataRetriever fallback – some OEMs write lyrics that jaudiotagger misses
+                            if (lyrics.isNullOrBlank()) {
+                                var retriever: MediaMetadataRetriever? = null
+                                try {
+                                    retriever = MediaMetadataRetriever()
+                                    if (filePath.startsWith("content:")) {
+                                        retriever.setDataSource(applicationContext, Uri.parse(filePath))
+                                    } else {
+                                        retriever.setDataSource(file.absolutePath)
+                                    }
+                                    // No dedicated lyrics key in MediaMetadataRetriever, but try writer/lyricist
+                                    val fallbackKeys = listOf(
+                                        MediaMetadataRetriever.METADATA_KEY_WRITER,
+                                        MediaMetadataRetriever.METADATA_KEY_AUTHOR
+                                    )
+                                    for (k in fallbackKeys) {
+                                        val v = retriever.extractMetadata(k)
+                                        if (!v.isNullOrBlank() && v.contains("\n")) {
+                                            lyrics = v; break
+                                        }
+                                    }
+                                } catch (_: Exception) {} finally {
+                                    try { retriever?.release() } catch (_: Exception) {}
+                                }
+                            }
                         }
                         runOnUiThread { runCatching { result.success(lyrics) } }
                     } catch (e: Exception) {
